@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 'Build Artifacts'
+    uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
+    with:
+      runs-on: 4x150g-runner
+      container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      git-fetch-depth: '0'
+      skip-test: true
+      audit-allow-warnings: true
+      cargo-clippy-extra-args: '-- -D warnings'
+      init-script: |
+        ./scripts/build_solidity_smart_contracts.sh
+      artifact-pre-script: |
+        ./scripts/build.sh
+      enable-target-cache: true
+      disable-cache: ${{ github.ref_name == 'main' }}
+      output-artifact: artifact-evm
+
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
+
+  release:
+    name: 'Release'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from Cargo.toml
+        run: |
+          VERSION=$(grep -E '^version\s*=' Cargo.toml | head -n1 | awk -F'["'\'']' '{print $2}')
+          echo "RUST_CRATE_VERSION=$VERSION" >> $GITHUB_ENV
+
+      # Check if the tag already exists
+      - name: Validate tag
+        run: |
+          # Check is the tag that will be created already exists
+          echo $RUST_CRATE_VERSION
+          if git show-ref --tags | grep -q "$RUST_CRATE_VERSION"; then
+            echo "Tag v$RUST_CRATE_VERSION already exists. Exiting."
+            exit 1
+          fi
+
+      # Download the artifacts from our previous workflow job
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          # Artifact name is defined in the build workflow
+          name: artifact-evm
+          path: ./.artifacts
+
+      #  Compress the artifacts into a tar.gz file
+      - name: Compress artifacts
+        run: |
+          cd ./.artifacts
+          tar -czf ../evm-v${{ env.RUST_CRATE_VERSION }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions .
+
+      # Create a new GitHub release with the tag version
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.RUST_CRATE_VERSION }}
+          name: v${{ env.RUST_CRATE_VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GH_PKG_TOKEN }}
+          files: |
+            ./*.tar.gz

@@ -1,0 +1,22 @@
+name: "Reinstall devnet"
+
+on: workflow_dispatch
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build-test-deploy:
+        uses: ./.github/workflows/build-deploy-canister.yml
+        with:
+            installation-method: reinstall
+            chain_id: 1
+            canister_ids: ./canister_ids.devnet.json
+            force_deploy: true
+            ethereum_genesis_accounts: 1
+        secrets:
+            EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+            GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
+            GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+            SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

@@ -1,0 +1,186 @@
+name: "Build and Deploy"
+
+on:
+  workflow_call:
+    inputs:
+      installation-method:
+        required: true
+        type: string
+        description: "installation method, can be any of create, reinstall, upgrade"
+      network:
+        type: string
+        required: false
+        description: "network where canister will be deployed to"
+        default: "ic"
+      wallet:
+        type: string
+        required: false
+        description: "owner wallet for canister"
+        default: "4cfzs-sqaaa-aaaak-aegca-cai"
+      chain_id:
+        type: number
+        required: false
+        description: "chain id"
+        default: 355113
+      force_deploy:
+        type: boolean
+        required: false
+        description: "if true, force deploy ignoring main branch"
+        default: false
+      canister_ids:
+        type: string
+        required: false
+        default: ""
+        description: "Specify a different canister_ids.json file which will replace the default canister_ids.json"
+      ethereum_genesis_accounts:
+        type: number
+        required: false
+        default: 0
+        description: "If 1, build evm-canister with ethereum-genesis-accounts feature"
+
+    secrets:
+      EVM_DEPLOYER:
+        required: true
+      GH_PKG_LOGIN:
+        required: true
+      GH_PKG_TOKEN:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+
+env:
+  EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+
+jobs:
+  build-test:
+    name: "Build and Test"
+    uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
+    with:
+      runs-on: 4x150g-runner
+      container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      git-fetch-depth: "0"
+      skip-test: ${{ github.ref_type == 'tag' }}
+      audit-allow-warnings: true
+      cargo-clippy-extra-args: "-- -D warnings"
+      output-artifact: artifact-evm
+      init-script: |
+        ./scripts/build_solidity_smart_contracts.sh
+      artifact-pre-script: |
+        export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
+        ./scripts/build.sh
+      test-script: |
+        export WASMS_DIR="`pwd`/.artifact"
+        export RUST_BACKTRACE="full"
+        ./scripts/tests.sh
+        ./scripts/dfx/tests/execute_tests.sh
+      enable-target-cache: true
+      disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
+
+
+  emv-client:
+    name: "EVM client tests"
+    needs: [build-test]
+    runs-on: 4x150g-runner
+    container:
+      image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      credentials:
+        username: ${{ secrets.GH_PKG_LOGIN }}
+        password: ${{ secrets.GH_PKG_TOKEN }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_PKG_TOKEN }}
+
+      - name: Checkout EVM client
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          repository: bitfinity-network/evm-client
+          ref: main
+          path: evm-client
+          token: ${{ secrets.GH_PKG_TOKEN }}
+
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: 'evm-client/.nvmrc'
+
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v3
+        with:
+          name: artifact-evm
+          path: ./.artifact
+
+      - name: Prepare Yarn
+        run: |
+          cd evm-client
+          npm install -g yarn
+          git config --global url."https://github".insteadOf ssh://git@github
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          yarn install
+
+      - name: Execute evm-client tests
+        run: |
+          ./scripts/dfx/deploy_local.sh create
+
+          echo "Launching EVM client tests"   
+          #export IC_HOST="http://127.0.0.1:8080"
+          export IC_HOST="http://127.0.0.1:4943"
+          export RPC_URL="http://127.0.0.1:8545"       
+          cd evm-client
+          yarn test
+
+
+  deploy-dfx:
+    name: "Deploying canisters to IC"
+    needs: [build-test]
+    runs-on: ubuntu-22.04
+    if: github.ref == 'refs/heads/main' || inputs.force_deploy
+    container:
+      image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      credentials:
+        username: ${{ secrets.GH_PKG_LOGIN }}
+        password: ${{ secrets.GH_PKG_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v3
+        with:
+          name: artifact-evm
+          path: ./.artifact
+
+      - name: "List files from artifact"
+        run: ls -laR ./.artifact
+
+      - name: "Deploying canisters"
+        run: |
+          # Run deployment script
+          echo "$EVM_DEPLOYER" > identity.pem
+          dfx identity import EVM_DEPLOYER identity.pem --storage-mode=plaintext
+          rm -rf identity.pem
+          ./scripts/dfx/deploy_remote.sh ${{ inputs.installation-method }} ${{ inputs.chain_id }} ${{ inputs.network }} ${{ inputs.wallet }} ${{ inputs.canister_ids }}
+
+
+  notify:
+    runs-on: ubuntu-22.04
+    if: needs.deploy-dfx.result == 'success' || needs.deploy-dfx.result == 'failure'
+    needs: [deploy-dfx]
+    steps:
+      - name: Slack Notification
+        id: slack
+        uses: slackapi/slack-github-action@v1.17.0
+        with:
+          channel-id: "alerts-github-actions"
+          slack-message: "EVM canister deployment status (method: ${{ inputs.installation-method }}): ${{ needs.deploy-dfx.result }} \n Check the CI action here: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

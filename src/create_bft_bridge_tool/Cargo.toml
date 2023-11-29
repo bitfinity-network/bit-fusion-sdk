@@ -1,0 +1,17 @@
+[package]
+name = "create_bft_bridge_tool"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+candid = { workspace = true }
+clap = { workspace = true }
+did = { workspace = true }
+eth-signer = { workspace = true }
+ethers-core = { workspace = true }
+ethereum-types = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
+hex = { workspace = true }
+rand = { workspace = true }
