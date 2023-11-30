@@ -18,7 +18,6 @@ print_help() {
     echo "Examples:"
     echo "  $0                      # Build all canisters, download binaries and build tools (default)"
     echo "  $0 all                  # Build all canisters and download binaries and build tools"
-    echo "  $0 evm                  # Build only the EVM canister for mainnet"
     echo "  $0 evm_testnet          # Build only the EVM canister for testnet"
     echo "  $0 spender minter       # Build the spender and minter canisters"
 }
