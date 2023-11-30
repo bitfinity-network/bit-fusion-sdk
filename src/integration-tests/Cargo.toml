@@ -54,6 +54,5 @@ tokio = { workspace = true, features = ["fs", "process"] }
 pocket-ic = { workspace = true }
 
 [features]
-default = ["pocket_ic_integration_test"]
 pocket_ic_integration_test = []
 dfx_integration_test = []
