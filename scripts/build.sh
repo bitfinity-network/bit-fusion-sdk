@@ -103,6 +103,9 @@ build_requested_canisters() {
 
         # Build all canisters
         
+        script_dir=$(dirname $0)
+        project_dir=$(realpath "${script_dir}/..")
+
         cp "$project_dir/src/integration-tests/evm_testnet.did" "$WASM_DIR/evm_testnet.did"
         cp "$project_dir/src/integration-tests/evm_testnet.wasm.gz" "$WASM_DIR/evm_testnet.wasm.gz"
 
