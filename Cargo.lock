@@ -272,6 +272,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
+name = "ascii-canvas"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8824ecca2e851cec16968d54a01dd372ef8f95b244fb84b84e70128be347c3c6"
+dependencies = [
+ "term",
+]
+
+[[package]]
 name = "async-compression"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -363,6 +372,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 
 [[package]]
+name = "base32"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23ce669cd6c8588f79e15cf450314f9638f967fc5770ff1c7c1deb0925ea7cfa"
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -379,6 +394,12 @@ name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+
+[[package]]
+name = "beef"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
 name = "bincode"
@@ -429,7 +450,7 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitfinity-benchmark"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "candid",
@@ -550,10 +571,14 @@ dependencies = [
  "byteorder",
  "candid_derive",
  "codespan-reporting",
+ "convert_case 0.6.0",
  "crc32fast",
  "data-encoding",
  "hex",
+ "lalrpop",
+ "lalrpop-util",
  "leb128",
+ "logos",
  "num-bigint",
  "num-traits",
  "num_enum 0.6.1",
@@ -717,6 +742,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -799,6 +833,16 @@ checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
  "itertools 0.10.5",
+]
+
+[[package]]
+name = "crossbeam-channel"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a33c2bf77f2df06183c3aa30d1e96c0695a313d4f9c453cc3762a6db39f99200"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -927,7 +971,7 @@ version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
  "rustc_version 0.4.0",
@@ -937,7 +981,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -961,6 +1005,12 @@ dependencies = [
  "sha3",
  "thiserror",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "difflib"
@@ -999,6 +1049,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs-next"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
+dependencies = [
+ "cfg-if",
+ "dirs-sys-next",
+]
+
+[[package]]
 name = "dirs-sys"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1008,6 +1068,17 @@ dependencies = [
  "option-ext",
  "redox_users",
  "windows-sys",
+]
+
+[[package]]
+name = "dirs-sys-next"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ebda144c4fe02d1f7ea1a7d9641b6fc6b580adcfa024ae48797ecdeb6825b4d"
+dependencies = [
+ "libc",
+ "redox_users",
+ "winapi",
 ]
 
 [[package]]
@@ -1054,6 +1125,15 @@ dependencies = [
  "sec1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "ena"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c533630cf40e9caa44bd91aadc88a75d75a4c3a12b4cfde353cbed41daa1e1f1"
+dependencies = [
+ "log",
 ]
 
 [[package]]
@@ -1109,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "async-trait",
  "candid",
@@ -1160,14 +1240,14 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "anyhow",
  "candid",
  "ethers-core",
  "hex",
  "ic-canister-client",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "jsonrpc-core",
  "log",
  "reqwest",
@@ -1222,7 +1302,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "candid",
  "did",
@@ -1277,6 +1357,12 @@ dependencies = [
  "rustc-hex",
  "static_assertions",
 ]
+
+[[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
@@ -1673,7 +1759,7 @@ dependencies = [
 [[package]]
 name = "ic-canister"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -1682,7 +1768,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-client"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "async-trait",
  "candid",
@@ -1698,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-macros"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -1791,7 +1877,7 @@ dependencies = [
 [[package]]
 name = "ic-crypto-getrandom-for-wasm"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "getrandom",
 ]
@@ -1799,7 +1885,7 @@ dependencies = [
 [[package]]
 name = "ic-exports"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "candid",
  "flate2",
@@ -1821,7 +1907,7 @@ dependencies = [
 [[package]]
 name = "ic-helpers"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "async-trait",
  "auto_ops",
@@ -1842,7 +1928,7 @@ dependencies = [
 [[package]]
 name = "ic-kit"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "candid",
  "futures",
@@ -1870,7 +1956,7 @@ dependencies = [
 [[package]]
 name = "ic-log"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1886,7 +1972,7 @@ dependencies = [
 [[package]]
 name = "ic-metrics"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "candid",
  "ic-canister",
@@ -1904,7 +1990,7 @@ checksum = "be4867a1d9f232e99ca68682161d1fc67dff9501f4f1bf42d69a9358289ad0f8"
 [[package]]
 name = "ic-stable-structures"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "ic-stable-structures 0.6.0",
  "memmap2",
@@ -1916,7 +2002,7 @@ dependencies = [
 [[package]]
 name = "ic-storage"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "candid",
  "ic-exports",
@@ -1928,7 +2014,7 @@ dependencies = [
 [[package]]
 name = "ic-storage-derive"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "quote",
  "syn 2.0.39",
@@ -1937,7 +2023,7 @@ dependencies = [
 [[package]]
 name = "ic-test-utils"
 version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#c406cbf361e7e4456e8ca78a50d1d1e3486b633f"
 dependencies = [
  "candid",
  "dirs",
@@ -1992,11 +2078,15 @@ checksum = "a54b5297861c651551676e8c43df805dad175cc33bc97dbd992edbbb85dcbcdf"
 
 [[package]]
 name = "icrc-ledger-types"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#33e3e6bdd2d33fde7345681c150248eda6d0e61b"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dafdc6d688022822cda32f534ea13bb0b72b5f1a82235fbb4bc24250b1d8418b"
 dependencies = [
+ "base32",
  "candid",
+ "crc32fast",
  "hex",
+ "num-bigint",
  "num-traits",
  "serde",
  "serde_bytes",
@@ -2109,7 +2199,6 @@ dependencies = [
  "minter-did",
  "minter_canister",
  "once_cell",
- "pocket-ic",
  "rand",
  "register_evm_agent",
  "rlp",
@@ -2160,9 +2249,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
 dependencies = [
  "either",
 ]
@@ -2218,6 +2307,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f6d5ed8676d904364de097082f4e7d240b571b67989ced0240f08b7f966f940"
 dependencies = [
  "cpufeatures",
+]
+
+[[package]]
+name = "lalrpop"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da4081d44f4611b66c6dd725e6de3169f9f63905421e8626fcb86b6a898998b8"
+dependencies = [
+ "ascii-canvas",
+ "bit-set",
+ "diff",
+ "ena",
+ "is-terminal",
+ "itertools 0.10.5",
+ "lalrpop-util",
+ "petgraph",
+ "pico-args",
+ "regex",
+ "regex-syntax 0.7.5",
+ "string_cache",
+ "term",
+ "tiny-keccak",
+ "unicode-xid",
+]
+
+[[package]]
+name = "lalrpop-util"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f35c735096c0293d313e8f2a641627472b83d01b937177fe76e5e2708d31e0d"
+dependencies = [
+ "regex",
 ]
 
 [[package]]
@@ -2284,6 +2405,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
+name = "logos"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c000ca4d908ff18ac99b93a062cb8958d331c3220719c52e77cb19cc6ac5d2c1"
+dependencies = [
+ "logos-derive",
+]
+
+[[package]]
+name = "logos-codegen"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc487311295e0002e452025d6b580b77bb17286de87b57138f3b5db711cded68"
+dependencies = [
+ "beef",
+ "fnv",
+ "proc-macro2",
+ "quote",
+ "regex-syntax 0.6.29",
+ "syn 2.0.39",
+]
+
+[[package]]
+name = "logos-derive"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbfc0d229f1f42d790440136d941afd806bc9e949e2bcb8faa813b0f00d1267e"
+dependencies = [
+ "logos-codegen",
+]
+
+[[package]]
 name = "lru-cache"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2297,6 +2450,15 @@ name = "match_cfg"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffbee8634e0d45d258acb448e7eaab3fce7a0a467395d4d9f228e3c1f01fb2e4"
+
+[[package]]
+name = "matchers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
+dependencies = [
+ "regex-automata 0.1.10",
+]
 
 [[package]]
 name = "memchr"
@@ -2329,6 +2491,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
+name = "mime_guess"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4192263c238a5f0d0c6bfd21f336a313a4ce1c450542449ca191bb657b4642ef"
+dependencies = [
+ "mime",
+ "unicase",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2340,7 +2512,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "candid",
  "did",
@@ -2368,7 +2540,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "candid",
  "did",
@@ -2454,10 +2626,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9252111cf132ba0929b6f8e030cac2a24b507f3a4d6db6fb2896f27b354c714b"
 
 [[package]]
+name = "new_debug_unreachable"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
+
+[[package]]
 name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
+dependencies = [
+ "overload",
+ "winapi",
+]
 
 [[package]]
 name = "num"
@@ -2648,6 +2836,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "overload"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
 name = "pairing"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2748,6 +2942,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
+dependencies = [
+ "fixedbitset",
+ "indexmap 2.1.0",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "pico-args"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2799,9 +3018,9 @@ dependencies = [
 
 [[package]]
 name = "pocket-ic"
-version = "1.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3ec0d4fbef9949836203390b819d2ad944f405030f93c724f78d20184d59f85"
+checksum = "ce4c698117a4cc5fce56a909db4fce965003f041c1bf916b7cd8a6757b017586"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
@@ -2812,6 +3031,9 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2825,6 +3047,12 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+
+[[package]]
+name = "precomputed-hash"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "predicates"
@@ -2947,7 +3175,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rand_xorshift",
- "regex-syntax",
+ "regex-syntax 0.8.2",
  "rusty-fork",
  "tempfile",
  "unarray",
@@ -3070,8 +3298,17 @@ checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata",
- "regex-syntax",
+ "regex-automata 0.4.3",
+ "regex-syntax 0.8.2",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
+dependencies = [
+ "regex-syntax 0.6.29",
 ]
 
 [[package]]
@@ -3082,8 +3319,20 @@ checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.8.2",
 ]
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
+
+[[package]]
+name = "regex-syntax"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbb5fb1acd8a1a18b3dd5be62d25485eb770e05afb408a9627d14d451bae12da"
 
 [[package]]
 name = "regex-syntax"
@@ -3094,7 +3343,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "register_evm_agent"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#43426897161919942b8331d2949a8debd25375e7"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=share_evm_types#ba1eae9e27ce124d99d561f0ecd4dfb75529d0a6"
 dependencies = [
  "anyhow",
  "candid",
@@ -3136,6 +3385,7 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
+ "mime_guess",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -3603,6 +3853,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded-slab"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3632,6 +3891,12 @@ dependencies = [
  "thiserror",
  "time",
 ]
+
+[[package]]
+name = "siphasher"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "slab"
@@ -3751,6 +4016,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "string_cache"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f91138e76242f575eb1d3b38b4f1362f10d3a43f47d182a5b359af488a02293b"
+dependencies = [
+ "new_debug_unreachable",
+ "once_cell",
+ "parking_lot",
+ "phf_shared",
+ "precomputed-hash",
+]
+
+[[package]]
 name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3847,6 +4125,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "term"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c59df8ac95d96ff9bede18eb7300b0fda5e5d8d90960e76f8e14ae765eedbf1f"
+dependencies = [
+ "dirs-next",
+ "rustversion",
+ "winapi",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3879,6 +4168,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.39",
+]
+
+[[package]]
+name = "thread_local"
+version = "1.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
+dependencies = [
+ "cfg-if",
+ "once_cell",
 ]
 
 [[package]]
@@ -4043,6 +4342,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-appender"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
+dependencies = [
+ "crossbeam-channel",
+ "thiserror",
+ "time",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-attributes"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4060,6 +4371,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
+ "valuable",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
+dependencies = [
+ "matchers",
+ "nu-ansi-term",
+ "once_cell",
+ "regex",
+ "sharded-slab",
+ "smallvec",
+ "thread_local",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]
@@ -4151,6 +4492,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
+name = "unicase"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7d2d4dafb69621809a81864c9c1b864479e1235c0dd4e199924b9742439ed89"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "unicode-bidi"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4170,6 +4520,12 @@ checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "unicode-width"

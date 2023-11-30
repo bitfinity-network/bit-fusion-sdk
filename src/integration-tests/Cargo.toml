@@ -51,7 +51,6 @@ register-evm-agent = { workspace = true }
 rlp = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
-pocket-ic = { workspace = true }
 
 [features]
 pocket_ic_integration_test = []

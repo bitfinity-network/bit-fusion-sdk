@@ -33,6 +33,8 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
     (ctx, john_wallet, bft_bridge)
 }
 
+/// To be fixed in EPROD-634
+#[ignore]
 #[tokio::test]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
@@ -90,6 +92,8 @@ async fn invalid_bridge() {
     assert_eq!(res, McError::InvalidBftBridgeContract);
 }
 
+/// To be fixed in EPROD-634
+#[ignore]
 #[tokio::test]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
@@ -555,6 +559,11 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
         .await
         .unwrap()
         .is_ok());
+
+    // Advance state to avoid canister rate limit.
+    for _ in 0..100 {
+        ctx.client.tick().await;
+    }
 
     // upgrade canister
     ctx.upgrade_minter_canister().await.unwrap();

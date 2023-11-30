@@ -2,8 +2,8 @@ use did::error::EvmError;
 use ic_canister_client::CanisterClientError;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
+use ic_exports::pocket_ic::CallError;
 use ic_test_utils::Error;
-use pocket_ic::CallError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

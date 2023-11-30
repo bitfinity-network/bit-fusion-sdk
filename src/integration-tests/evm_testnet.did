@@ -315,6 +315,7 @@ service : (EvmCanisterInitData) -> {
   admin_set_blockchain_history_size : (nat64) -> (Result);
   admin_set_coinbase : (text) -> (Result);
   admin_set_evm_state_history_size : (nat64) -> (Result);
+  admin_set_max_tx_pool_size : (nat64) -> (Result);
   admin_set_min_gas_price : (text) -> (Result);
   admin_set_panic_transaction_from : (opt text) -> (Result);
   append_blockchain_blocks : (
@@ -359,6 +360,7 @@ service : (EvmCanisterInitData) -> {
       Result_9,
     ) query;
   get_evm_state_history_size : () -> (nat64) query;
+  get_max_tx_pool_size : () -> (nat64) query;
   get_min_gas_price : () -> (text) query;
   get_state_storage_item_hashes : (opt text, nat32) -> (Result_10) query;
   http_request : (HttpRequest) -> (HttpResponse) query;

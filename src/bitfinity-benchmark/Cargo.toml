@@ -1,17 +1,9 @@
 [package]
 name = "bitfinity-benchmark"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[[bin]]
-name = "random-transactions-benchmark"
-path = "src/bin/random-transactions.rs"
-
-[[bin]]
-name = "replicate-ethereum-mainnet-benchmark"
-path = "src/bin/replicate-ethereum-mainnet.rs"
 
 [dependencies]
 anyhow = { workspace = true }
