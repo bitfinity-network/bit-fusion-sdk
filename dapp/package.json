@@ -1,0 +1,19 @@
+{
+  "name": "uniswap",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^2.0.0",
+    "hardhat": "^2.19.1"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3",
+    "ethers": "^6.9.0"
+  }
+}
