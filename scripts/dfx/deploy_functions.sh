@@ -48,7 +48,8 @@ deploy() {
 
     deploy_evm_canister "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$minter_address" "$deploy_bft_contract_sender" "$signature_verification_id" "$OWNER" "$CHAIN_ID"
 
-    if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "reinstall" ]; then
+    get_bft_bridge_contract_response=$(dfx canister --network=$NETWORK call minter get_bft_bridge_contract)
+    if [[ $get_bft_bridge_contract_response == "(variant { Ok = null })" ]]; then
         deploy_bridge_contract "$deploy_bft_contract_tx" "$NETWORK" "$CHAIN_ID"
     fi
 
