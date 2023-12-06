@@ -4,16 +4,31 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "compile": "npx hardhat compile",
+    "deploy:evmc": "npx hardhat run scripts/deploy.js --network evmc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox-viem": "^2.0.0",
-    "hardhat": "^2.19.1"
+    "@nomicfoundation/hardhat-verify": "^2.0.2",
+    "@nomicfoundation/hardhat-viem": "^1.0.1",
+    "@types/chai": "^4.3.11",
+    "@types/chai-as-promised": "^7.1.8",
+    "@types/mocha": "^10.0.6",
+    "chai": "^4.3.10",
+    "hardhat": "^2.19.1",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2",
+    "viem": "^1.19.11"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
+    "dotenv": "^16.3.1",
     "ethers": "^6.9.0"
   }
 }
