@@ -4,8 +4,8 @@ import hre from "hardhat";
 const ETHCONTRACT = "0xa2f96ef6ed3d67a0352e659b1e980f13e098618f"
 
 async function main() {
-  
-  const wrapper = await hre.viem.deployContract("Werc20", [ETHCONTRACT]);
+
+  const wrapper = await hre.viem.deployContract("WERC20", [ETHCONTRACT]);
 
   console.log(
     `Wrapper fro ETH contract ${ETHCONTRACT} deployed to ${wrapper.address}`

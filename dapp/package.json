@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "compile": "npx hardhat compile",
-    "deploy:evmc": "npx hardhat run scripts/deploy.js --network evmc",
+    "deploy:evmc": "npx hardhat run --network evmc scripts/deploy.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
