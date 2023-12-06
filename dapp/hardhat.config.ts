@@ -20,11 +20,8 @@ const config: HardhatUserConfig = {
   },
   defaultNetwork: "evmc",
   networks: {
-    localhost: {
-      url: LOCAL_EVMC_URL,
-      accounts: [...(process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [])],
-    },
     evmc: {
+      chainId: 355113,
       url: LOCAL_EVMC_URL,
       accounts: [...(process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [])],
     },
