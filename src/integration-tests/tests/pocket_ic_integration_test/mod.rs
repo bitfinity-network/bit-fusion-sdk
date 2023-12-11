@@ -1,6 +1,6 @@
+mod ck_erc20;
 mod minter_canister;
 mod token;
-mod ck_erc20;
 
 use std::fmt;
 use std::time::Duration;
