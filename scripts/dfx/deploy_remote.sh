@@ -1,9 +1,6 @@
 #!/bin/bash
 FILE="dfx.json"
 
-# Create a backup of the original file
-cp "$FILE" "$FILE.bak"
-
 set -e
 
 args=("$@")
@@ -14,9 +11,6 @@ CHAIN_ID=${args[1]:-355113}
 NETWORK=${args[2]:-"ic"}
 # Wallet
 WALLET=${args[3]:-"4cfzs-sqaaa-aaaak-aegca-cai"}
-CANISTER_IDS_FILE=${args[4]}
-# Network Name
-NETWORK_NAME=${args[5]:-"testnet"}
 
 source ./scripts/dfx/deploy_functions.sh
 
@@ -24,22 +18,16 @@ entry_point() {
     dfx identity use EVM_DEPLOYER
     dfx identity --network="$NETWORK" set-wallet "$WALLET"
 
-    # override canister_ids.json
-    if [ -n "$CANISTER_IDS_FILE" ] && [ "$CANISTER_IDS_FILE" != "canister_ids.json" ]; then
-        cp "$CANISTER_IDS_FILE" canister_ids.json
-    fi
-
-
     LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 1024; log_filter=opt \"off\"; }"
     OWNER=$(dfx identity get-principal)
 
     if [ "$INSTALL_MODE" = "create" ]; then
         create "$NETWORK"
         INSTALL_MODE="install"
-        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME"
+        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME" "$EVM_CANISTER_ID"
 
     elif [ "$INSTALL_MODE" = "upgrade" ] || [ "$INSTALL_MODE" = "reinstall" ]; then
-        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME"
+        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME" "$EVM_CANISTER_ID"
     else
         echo "Command Not Found!"
         exit 1

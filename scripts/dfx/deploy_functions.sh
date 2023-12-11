@@ -19,41 +19,43 @@ deploy() {
     OWNER=$4
     CHAIN_ID=$5
 
+    # Set if external EVM canister principal should be used instead of custom deployment.
+    # Unused in case if NETWORK=local.
+    EVM_CANISTER=$6
+
     dfx build --network=$NETWORK
 
     if [ "$NETWORK" = "local" ]; then
         deploy_icrc1_canister "$NETWORK" "$INSTALL_MODE" "$OWNER"
         token_id=$(dfx canister --network=$NETWORK id token)
-    fi
 
-    # Get EVM canister ID
-    evm_id=$(dfx canister --network=$NETWORK id evm_testnet)
+        EVM_CANISTER=$(dfx canister --network=$NETWORK id evm_testnet)
+
+        deploy_signature_verification_canister "$NETWORK" "$INSTALL_MODE" "$EVM_CANISTER"
+        signature_verification_id=$(dfx canister --network=$NETWORK id signature_verification)
+        
+        deploy_evm_canister "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$signature_verification_id" "$OWNER" "$CHAIN_ID"
+    fi
 
     spender_id=$(dfx canister --network=$NETWORK id spender)
 
-    deploy_minter_canister "$NETWORK" "$INSTALL_MODE" "$evm_id" "$CHAIN_ID" "$OWNER" "$LOG_SETTINGS" "$spender_id"
+    deploy_minter_canister "$NETWORK" "$INSTALL_MODE" "$EVM_CANISTER" "$CHAIN_ID" "$OWNER" "$LOG_SETTINGS" "$spender_id"
 
     minter_id=$(dfx canister --network=$NETWORK id minter)
 
     deploy_spender_canister "$NETWORK" "$INSTALL_MODE" "$minter_id"
 
-    deploy_signature_verification_canister "$NETWORK" "$INSTALL_MODE" "$evm_id"
-
-    signature_verification_id=$(dfx canister --network=$NETWORK id signature_verification)
-
-    # Prepare a transaction to create a bridge contract
-    minter_address=$(get_minter_address "$NETWORK")
-    deploy_bft_contract_tx=$(get_bft_contract_tx "$minter_address" "$CHAIN_ID")
-    deploy_bft_contract_sender=$(get_tx_sender "$deploy_bft_contract_tx")
-
-    deploy_evm_canister "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$minter_address" "$deploy_bft_contract_sender" "$signature_verification_id" "$OWNER" "$CHAIN_ID"
-
     get_bft_bridge_contract_response=$(dfx canister --network=$NETWORK call minter get_bft_bridge_contract)
     if [[ $get_bft_bridge_contract_response == "(variant { Ok = null })" ]]; then
+        # Prepare a transaction to create a bridge contract
+        minter_address=$(get_minter_address "$NETWORK")
+        deploy_bft_contract_tx=$(get_bft_contract_tx "$minter_address" "$CHAIN_ID")
+        deploy_bft_contract_sender=$(get_tx_sender "$deploy_bft_contract_tx")
+        testnet_mint_native_tokens "$NETWORK" "$EVM_CANISTER" "$deploy_bft_contract_sender" "0x20000000000000"
         deploy_bridge_contract "$deploy_bft_contract_tx" "$NETWORK" "$CHAIN_ID"
     fi
-
-    echo "Token ($token_id), Minter ($minter_id), EVM ($evm_id), and Signature Verification ($signature_verification_id) canisters initialized."
+    
+    echo "Token ($token_id), Minter ($minter_id), EVM ($EVM_CANISTER), and Signature Verification ($signature_verification_id) canisters initialized."
 
 }
 
@@ -114,7 +116,6 @@ extract_address() {
 get_minter_address() {
     set -e
     NETWORK=$1
-    MINTER_ID=$(dfx canister --network=$NETWORK id minter)
 
     MINTER_ADDRESS=$(dfx canister --network=$NETWORK call minter get_minter_canister_evm_address "()")
     MINTER_ADDRESS=$(extract_address "$MINTER_ADDRESS")
@@ -139,11 +140,9 @@ deploy_evm_canister() {
     NETWORK=$1
     INSTALL_MODE=$2
     LOG_SETTINGS=$3
-    MINTER_ADDRESS=$4
-    CONTRACT_SENDER=$5
-    SIGNATURE_VERIFICATION=$6
-    OWNER=$7
-    CHAIN_ID=$8
+    SIGNATURE_VERIFICATION=$4
+    OWNER=$5
+    CHAIN_ID=$6
 
     # Init EVM canister with token canister ID as argument
     # Note that for the contract sender we set the balance enough to create the contract and that's it
@@ -152,7 +151,7 @@ deploy_evm_canister() {
         signature_verification_principal=principal \"$SIGNATURE_VERIFICATION\";
         log_settings=$LOG_SETTINGS;
         owner=principal \"$OWNER\";
-        genesis_accounts=vec { record { 0= \"$MINTER_ADDRESS\"}; record { 0= \"$CONTRACT_SENDER\"; 1= opt \"0x20000000000000\"} };
+        genesis_accounts=vec {};
         chain_id = $CHAIN_ID:nat64;
         coinbase = \"0x0000000000000000000000000000000000000000\";
     })"
@@ -160,6 +159,16 @@ deploy_evm_canister() {
     echo "Deploying EVM canister with init args: $evm_init_args"
 
     dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK --argument="$evm_init_args" evm_testnet
+}
+
+testnet_mint_native_tokens() {
+    NETWORK=$1
+    EVM_CANISTER=$2
+    ADDRESS=$3
+    AMOUNT=$4
+
+    dfx canister --network=$NETWORK call $EVM_CANISTER mint_native_tokens "(\"$ADDRESS\", \"$AMOUNT\")"
+
 }
 
 # Get sender address from the Candid-encoded transaction

@@ -2,9 +2,6 @@
 
 FILE="dfx.json"
 
-# Create a backup of the original file
-cp "$FILE" "$FILE.bak"
-
 set -e
 set -x
 
