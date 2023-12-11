@@ -42,6 +42,7 @@ start_icx() {
     sleep 2
     # Start ICX Proxy
     dfx_local_port=$(dfx info replica-port)
+    evm_id=$(dfx canister --network=$NETWORK id evm_testnet)
     icx-proxy --fetch-root-key --address 127.0.0.1:8545 --dns-alias 127.0.0.1:$evm_id --replica http://localhost:$dfx_local_port &
     sleep 2
 
