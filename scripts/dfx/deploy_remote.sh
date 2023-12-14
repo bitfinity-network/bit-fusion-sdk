@@ -34,4 +34,21 @@ entry_point() {
     fi
 }
 
+FILE="dfx.json"
+
+# Create a backup of the original file
+cp "$FILE" "$FILE.bak"
+
+# Define a function to restore the backup file
+restore_backup() {
+    cp "$FILE.bak" "$FILE" && rm "$FILE.bak"
+}
+
+trap restore_backup EXIT INT TERM
+
+# Update dfx.json
+if [ "$NETWORK" = "ic" ]; then
+    jq 'del(.canisters.evm_testnet) | del(.canisters.signature_verification) | del(.canisters.token)' $FILE >tmp.$$.json && mv tmp.$$.json $FILE
+fi
+
 entry_point
