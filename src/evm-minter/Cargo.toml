@@ -1,0 +1,19 @@
+[package]
+name = "evm-minter"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+export-api = []
+
+[dependencies]
+did = { workspace = true }
+ic-metrics = { workspace = true }
+candid = { workspace = true }
+serde = { workspace = true }
+ic-canister = { workspace = true }
+ic-exports = { workspace = true, features = ["icrc"] }
+ic-storage = { workspace = true }
+ic-stable-structures = { workspace = true }

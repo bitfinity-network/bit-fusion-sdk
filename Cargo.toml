@@ -5,6 +5,7 @@ members = [
     "src/minter-contract-utils",
     "src/integration-tests",
     "src/minter-canister",
+    "src/evm-minter",
     "src/spender-canister",
     "src/solidity-helper",
 ]
@@ -28,17 +29,17 @@ clap = { version = "4", features = ["derive"] }
 csv = "1.1"
 debug-ignore = "1.0.5"
 derive_more = "0.99"
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", branch = "share_evm_types" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", branch = "task_manager_branch_dependency" }
 elsa = "1.7"
 env_logger = { version = "0.10.0", default-features = false }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", branch = "share_evm_types" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", branch = "share_evm_types" }
-iceth_client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "iceth-client", branch = "share_evm_types" }
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "share_evm_types" }
-minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", branch = "share_evm_types" }
-minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", branch = "share_evm_types" }
-register-evm-agent = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "register_evm_agent", branch = "share_evm_types" }
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", branch = "share_evm_types" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", branch = "task_manager_branch_dependency" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", branch = "task_manager_branch_dependency" }
+iceth_client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "iceth-client", branch = "task_manager_branch_dependency" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "task_manager_branch_dependency" }
+minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", branch = "task_manager_branch_dependency" }
+minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", branch = "task_manager_branch_dependency" }
+register-evm-agent = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "register_evm_agent", branch = "task_manager_branch_dependency" }
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", branch = "task_manager_branch_dependency" }
 ethers-core = "2.0"
 ethereum-types = "0.14"
 flate2 = "1"
@@ -46,17 +47,17 @@ futures = { version = "0.3", default-features = false }
 hash-db = "0.15"
 hashbrown = { version = "0.14" }
 hex = "0.4"
-ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.11.x" }
-ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.11.x" }
-ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", tag = "v0.11.x" }
-ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.11.x" }
-ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.11.x" }
-ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.11.x", features = [
+ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", branch = "EPROD-641_task_processor" }
+ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", branch = "EPROD-641_task_processor" }
+ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", branch = "EPROD-641_task_processor" }
+ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", branch = "EPROD-641_task_processor" }
+ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", branch = "EPROD-641_task_processor" }
+ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", branch = "EPROD-641_task_processor", features = [
     "export-api",
 ] }
-ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.11.x" }
-ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", tag = "v0.11.x" }
-ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.11.x" }
+ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", branch = "EPROD-641_task_processor" }
+ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", branch = "EPROD-641_task_processor" }
+ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", branch = "EPROD-641_task_processor" }
 jsonrpc-core = "18.0"
 k256 = { version = "0.13", default-features = false }
 lightspeed_scheduler = "0.55"
