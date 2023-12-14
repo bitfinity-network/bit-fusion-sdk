@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Mutex, Arc};
 
 use candid::Principal;
 use ic_canister::{generate_idl, init, post_upgrade, Canister, Idl, PreUpdate};
@@ -9,14 +8,14 @@ use ic_metrics::{Metrics, MetricsStorage};
 use crate::state::{ConfigData, State};
 
 #[derive(Canister, Clone, Debug)]
-pub struct SpenderCanister {
+pub struct EvmMinter {
     #[id]
     id: Principal,
 }
 
-impl PreUpdate for SpenderCanister {}
+impl PreUpdate for EvmMinter {}
 
-impl SpenderCanister {
+impl EvmMinter {
     fn set_timers(&mut self) {
         // Set the metrics updating interval
         #[cfg(target_family = "wasm")]
@@ -41,7 +40,7 @@ impl SpenderCanister {
     }
 }
 
-impl Metrics for SpenderCanister {
+impl Metrics for EvmMinter {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()

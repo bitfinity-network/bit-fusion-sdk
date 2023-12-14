@@ -24,10 +24,10 @@ entry_point() {
     if [ "$INSTALL_MODE" = "create" ]; then
         create "$NETWORK"
         INSTALL_MODE="install"
-        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME" "$EVM_CANISTER_ID"
+        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$EVM_CANISTER_ID"
 
     elif [ "$INSTALL_MODE" = "upgrade" ] || [ "$INSTALL_MODE" = "reinstall" ]; then
-        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$NETWORK_NAME" "$EVM_CANISTER_ID"
+        deploy "$NETWORK" "$INSTALL_MODE" "$LOG_SETTINGS" "$OWNER" "$CHAIN_ID" "$EVM_CANISTER_ID"
     else
         echo "Command Not Found!"
         exit 1
