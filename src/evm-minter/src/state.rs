@@ -2,15 +2,9 @@ pub use self::config::{Config, ConfigData};
 
 mod config;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct State {
     pub config: Config,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self { config: Default::default() }
-    }
 }
 
 impl State {

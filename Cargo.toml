@@ -5,7 +5,7 @@ members = [
     "src/minter-contract-utils",
     "src/integration-tests",
     "src/minter-canister",
-    "src/evm-minter",
+    # "src/evm-minter",
     "src/spender-canister",
     "src/solidity-helper",
 ]

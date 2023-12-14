@@ -1310,20 +1310,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-minter"
-version = "0.2.0"
-dependencies = [
- "candid",
- "did",
- "ic-canister",
- "ic-exports",
- "ic-metrics",
- "ic-stable-structures 0.11.1",
- "ic-storage",
- "serde",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
