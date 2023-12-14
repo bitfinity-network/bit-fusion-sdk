@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Mutex, Arc};
 
 use candid::Principal;
 use ic_canister::{generate_idl, init, post_upgrade, Canister, Idl, PreUpdate};
@@ -46,6 +47,11 @@ impl Metrics for SpenderCanister {
         MetricsStorage::get()
     }
 }
+
+thread_local! {
+    static STATE: Rc<RefCell<State>> = Rc::default();
+}
+
 
 #[cfg(test)]
 mod test {}

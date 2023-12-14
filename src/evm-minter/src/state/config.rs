@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::fmt;
 
 use candid::{CandidType, Principal};
 use did::codec;
@@ -9,8 +9,29 @@ use serde::{Deserialize, Serialize};
 
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
-#[derive(Debug, Default)]
-pub struct Config {}
+pub struct Config {
+    data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Config")
+            .field("data", &self.data.get())
+            .finish()
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            data: StableCell::new(
+                MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)),
+                ConfigData::default(),
+            )
+            .expect("stable memory config initialization failed"),
+        }
+    }
+}
 
 impl Config {
     pub fn init(config: ConfigData) {
@@ -20,7 +41,7 @@ impl Config {
     }
 
     pub fn get_evmc_principal(&self) -> Principal {
-        self.with_data(|data| data.evmc_principal)
+        self.data.get().evmc_principal
     }
 
     pub fn set_evmc_principal(&mut self, principal: Principal) {
@@ -28,45 +49,35 @@ impl Config {
     }
 
     pub fn get_external_evm_link(&self) -> EvmLink {
-        self.with_data(|data| data.external_evm.clone())
+        self.data.get().external_evm_link.clone()
     }
 
     pub fn set_external_evm_link(&mut self, external_evm: EvmLink) {
-        self.update_data(|data| data.external_evm = external_evm);
+        self.update_data(|data| data.external_evm_link = external_evm);
     }
 
-    fn with_data<T, F>(&self, f: F) -> T
-    where
-        F: FnOnce(&ConfigData) -> T,
-    {
-        CONFIG_CELL.with(|cell| f(&cell.borrow().get()))
-    }
-
-    fn update_data<F>(&self, f: F)
+    fn update_data<F>(&mut self, f: F)
     where
         F: FnOnce(&mut ConfigData),
     {
-        CONFIG_CELL.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let mut data = cell.get().clone();
+            let mut data = self.data.get().clone();
             f(&mut data);
-            cell.set(data)
+            self.data.set(data)
                 .expect("failed to update config stable memory data");
-        })
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
     pub evmc_principal: Principal,
-    pub external_evm: EvmLink,
+    pub external_evm_link: EvmLink,
 }
 
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
             evmc_principal: Principal::anonymous(),
-            external_evm: EvmLink::default(),
+            external_evm_link: EvmLink::default(),
         }
     }
 }
@@ -93,13 +104,6 @@ impl Storable for ConfigData {
     }
 
     const BOUND: ic_stable_structures::Bound = ic_stable_structures::Bound::Unbounded;
-}
-
-thread_local! {
-    static CONFIG_CELL: RefCell<StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>> = {
-        RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)), ConfigData::default())
-            .expect("stable memory config initialization failed"))
-    };
 }
 
 #[cfg(test)]
