@@ -5,13 +5,12 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::scheduler::Scheduler;
 use ic_task_scheduler::task::ScheduledTask;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
+pub use self::config::{BridgeSide, Config, ConfigData};
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::tasks::PersistentTask;
-
-pub use self::config::{Config, ConfigData, BridgeSide};
 
 mod config;
 

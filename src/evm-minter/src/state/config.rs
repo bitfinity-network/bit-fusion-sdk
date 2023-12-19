@@ -1,15 +1,15 @@
+use std::borrow::Cow;
+use std::fmt;
+
 use candid::{CandidType, Principal};
 use did::codec;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::fmt;
-
-use crate::client::EvmLink;
-use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 use super::Settings;
+use crate::client::EvmLink;
+use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 pub struct Config {
     data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
@@ -65,6 +65,12 @@ impl Config {
             .set(data)
             .expect("failed to update config stable memory data");
     }
+
+    pub fn is_initialized(&self, bridge_side: BridgeSide) -> bool {
+        let side_idx = bridge_side as usize;
+        self.data.get().evms[side_idx].chain_id.is_some()
+            && self.data.get().evms[side_idx].chain_id.is_some()
+    }
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -109,9 +115,10 @@ impl Storable for ConfigData {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use did::codec;
     use ic_stable_structures::Storable;
+
+    use super::*;
 
     #[test]
     fn test_to_bytes() {

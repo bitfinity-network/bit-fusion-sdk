@@ -14,17 +14,21 @@ use crate::state::{BridgeSide, State};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PersistentTask {
     InitEvmState(BridgeSide),
+    CollectEvmInfo(BridgeSide),
 }
 
 impl Task for PersistentTask {
     fn execute(
         &self,
-        _task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
+        _: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let state = get_state();
-        Box::pin(match self {
-            PersistentTask::InitEvmState(side) => Self::init_evm_state(state, *side),
-        })
+        match self {
+            PersistentTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
+            PersistentTask::CollectEvmInfo(side) => {
+                Box::pin(Self::collect_evm_events(state, *side))
+            }
+        }
     }
 }
 
@@ -95,6 +99,18 @@ impl PersistentTask {
             .config
             .set_evm_next_block(next_block, side);
         Ok(())
+    }
+
+    async fn collect_evm_events(
+        state: Rc<RefCell<State>>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        if !state.borrow().config.is_initialized(side) {
+            return Self::init_evm_state(state, side).await;
+        }
+
+        let _client = state.borrow().config.get_evm_info(side).link.get_client();
+        todo!("json-rpc client eth_getLogs impl")
     }
 }
 

@@ -1,12 +1,11 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use candid::{Principal, CandidType};
+use candid::{CandidType, Principal};
 use ethereum_json_rpc_client::{Client, EthJsonRcpClient};
 use ic_canister_client::IcCanisterClient;
 use jsonrpc_core::{Request, Response};
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub enum Clients {
