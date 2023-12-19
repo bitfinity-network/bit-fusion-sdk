@@ -1,6 +1,8 @@
 mod canister;
 mod memory;
 mod state;
+mod tasks;
+mod client;
 
 use ic_metrics::Metrics;
 

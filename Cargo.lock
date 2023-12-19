@@ -981,7 +981,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -992,7 +992,7 @@ dependencies = [
  "ethers-core",
  "hex",
  "ic-log",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "jsonrpc-core",
  "log",
  "murmur3",
@@ -1189,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "async-trait",
  "candid",
@@ -1199,7 +1199,7 @@ dependencies = [
  "hex",
  "ic-canister",
  "ic-exports",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "serde",
  "sha2 0.10.8",
  "thiserror",
@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "anyhow",
  "candid",
@@ -1302,11 +1302,30 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "candid",
  "did",
  "ic-canister-client",
+]
+
+[[package]]
+name = "evm-minter"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "candid",
+ "did",
+ "ethereum-json-rpc-client",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-metrics",
+ "ic-stable-structures 0.11.2",
+ "ic-storage",
+ "ic-task-scheduler",
+ "jsonrpc-core",
+ "serde",
 ]
 
 [[package]]
@@ -1758,8 +1777,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -1767,8 +1786,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister-client"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "async-trait",
  "candid",
@@ -1783,8 +1802,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister-macros"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -1876,16 +1895,16 @@ dependencies = [
 
 [[package]]
 name = "ic-crypto-getrandom-for-wasm"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "getrandom",
 ]
 
 [[package]]
 name = "ic-exports"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "candid",
  "flate2",
@@ -1906,8 +1925,8 @@ dependencies = [
 
 [[package]]
 name = "ic-helpers"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "async-trait",
  "auto_ops",
@@ -1927,8 +1946,8 @@ dependencies = [
 
 [[package]]
 name = "ic-kit"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "candid",
  "futures",
@@ -1955,8 +1974,8 @@ dependencies = [
 
 [[package]]
 name = "ic-log"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1971,8 +1990,8 @@ dependencies = [
 
 [[package]]
 name = "ic-metrics"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "candid",
  "ic-canister",
@@ -1989,8 +2008,8 @@ checksum = "be4867a1d9f232e99ca68682161d1fc67dff9501f4f1bf42d69a9358289ad0f8"
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "ic-stable-structures 0.6.0",
  "memmap2",
@@ -2001,8 +2020,8 @@ dependencies = [
 
 [[package]]
 name = "ic-storage"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "candid",
  "ic-exports",
@@ -2013,17 +2032,31 @@ dependencies = [
 
 [[package]]
 name = "ic-storage-derive"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "quote",
  "syn 2.0.39",
 ]
 
 [[package]]
+name = "ic-task-scheduler"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
+dependencies = [
+ "bincode",
+ "ic-kit",
+ "ic-stable-structures 0.11.2",
+ "log",
+ "parking_lot",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "ic-test-utils"
-version = "0.11.1"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=EPROD-641_task_processor#bb97164af4c4c89a2488c48963a0fab521b2ecdb"
+version = "0.11.2"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.11.x#d9e349d1c0871aaeac3402661d342de1517b94c3"
 dependencies = [
  "candid",
  "dirs",
@@ -2191,7 +2224,7 @@ dependencies = [
  "ic-exports",
  "ic-helpers",
  "ic-log",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "ic-test-utils",
  "jsonrpc-core",
  "minter-client",
@@ -2512,7 +2545,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "candid",
  "did",
@@ -2540,7 +2573,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "candid",
  "did",
@@ -2548,7 +2581,7 @@ dependencies = [
  "ethers-core",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "serde",
  "thiserror",
 ]
@@ -2569,7 +2602,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-metrics",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "ic-storage",
  "log",
  "minter-contract-utils",
@@ -3343,7 +3376,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "register_evm_agent"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=task_manager_branch_dependency#bfbe53d7667779f326e0cdd37f7cd191c5570e6a"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
 dependencies = [
  "anyhow",
  "candid",
@@ -3970,7 +4003,7 @@ dependencies = [
  "ic-canister",
  "ic-exports",
  "ic-metrics",
- "ic-stable-structures 0.11.1",
+ "ic-stable-structures 0.11.2",
  "ic-storage",
 ]
 

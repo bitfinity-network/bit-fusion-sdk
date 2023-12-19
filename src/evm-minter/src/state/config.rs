@@ -1,13 +1,15 @@
-use std::borrow::Cow;
-use std::fmt;
-
 use candid::{CandidType, Principal};
 use did::codec;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::fmt;
 
+use crate::client::EvmLink;
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
+
+use super::Settings;
 
 pub struct Config {
     data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
@@ -34,63 +36,62 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn init(config: ConfigData) {
+    pub fn init(&mut self, settings: Settings) {
         Self::default().update_data(|data| {
-            *data = config;
+            data.evms[BridgeSide::Base as usize].link = settings.base_evm_link;
+            data.evms[BridgeSide::Wrapped as usize].link = settings.wrapped_evm_link;
         })
     }
 
-    pub fn get_evmc_principal(&self) -> Principal {
-        self.data.get().evmc_principal
+    pub fn get_evm_info(&self, bridge_side: BridgeSide) -> EvmInfo {
+        self.data.get().evms[bridge_side as usize].clone()
     }
 
-    pub fn set_evmc_principal(&mut self, principal: Principal) {
-        self.update_data(|data| data.evmc_principal = principal);
+    pub fn set_evm_chain_id(&mut self, chain_id: u64, bridge_side: BridgeSide) {
+        self.update_data(|data| data.evms[bridge_side as usize].chain_id = Some(chain_id));
     }
 
-    pub fn get_external_evm_link(&self) -> EvmLink {
-        self.data.get().external_evm_link.clone()
-    }
-
-    pub fn set_external_evm_link(&mut self, external_evm: EvmLink) {
-        self.update_data(|data| data.external_evm_link = external_evm);
+    pub fn set_evm_next_block(&mut self, next_block: u64, bridge_side: BridgeSide) {
+        self.update_data(|data| data.evms[bridge_side as usize].next_block = Some(next_block));
     }
 
     fn update_data<F>(&mut self, f: F)
     where
         F: FnOnce(&mut ConfigData),
     {
-            let mut data = self.data.get().clone();
-            f(&mut data);
-            self.data.set(data)
-                .expect("failed to update config stable memory data");
+        let mut data = self.data.get().clone();
+        f(&mut data);
+        self.data
+            .set(data)
+            .expect("failed to update config stable memory data");
     }
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub enum BridgeSide {
+    Base = 0,
+    Wrapped = 1,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub struct EvmInfo {
+    pub link: EvmLink,
+    pub chain_id: Option<u64>,
+    pub next_block: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
-    pub evmc_principal: Principal,
-    pub external_evm_link: EvmLink,
+    pub admin: Principal,
+    pub evms: [EvmInfo; 2],
 }
 
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
-            evmc_principal: Principal::anonymous(),
-            external_evm_link: EvmLink::default(),
+            admin: Principal::anonymous(),
+            evms: Default::default(),
         }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
-pub enum EvmLink {
-    Http(String),
-    Ic(Principal),
-}
-
-impl Default for EvmLink {
-    fn default() -> Self {
-        EvmLink::Ic(Principal::anonymous())
     }
 }
 
@@ -109,7 +110,6 @@ impl Storable for ConfigData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use candid::Principal;
     use did::codec;
     use ic_stable_structures::Storable;
 
@@ -133,16 +133,36 @@ mod tests {
     fn test_config_getters_and_setters() {
         let mut config = Config::default();
 
-        assert_eq!(config.get_evmc_principal(), Principal::anonymous());
-        assert_eq!(config.get_external_evm_link(), EvmLink::default());
+        assert_eq!(config.get_evm_info(BridgeSide::Base), EvmInfo::default());
+        assert_eq!(config.get_evm_info(BridgeSide::Wrapped), EvmInfo::default());
 
-        let evmc_principal = Principal::from_slice(b"evmc");
-        let external_evm = EvmLink::Http("https://example.com".to_string());
+        let base_chain_id = 42;
+        let wrapped_chain_id = 84;
+        config.set_evm_chain_id(base_chain_id, BridgeSide::Base);
+        config.set_evm_chain_id(wrapped_chain_id, BridgeSide::Wrapped);
 
-        config.set_evmc_principal(evmc_principal);
-        config.set_external_evm_link(external_evm.clone());
+        assert_eq!(
+            config.get_evm_info(BridgeSide::Base).chain_id,
+            Some(base_chain_id)
+        );
+        assert_eq!(
+            config.get_evm_info(BridgeSide::Wrapped).chain_id,
+            Some(wrapped_chain_id)
+        );
 
-        assert_eq!(config.get_evmc_principal(), evmc_principal);
-        assert_eq!(config.get_external_evm_link(), external_evm);
+        let base_next_block = 1;
+        let wrapped_next_block = 2;
+
+        config.set_evm_next_block(1, BridgeSide::Base);
+        config.set_evm_next_block(2, BridgeSide::Wrapped);
+
+        assert_eq!(
+            config.get_evm_info(BridgeSide::Base).next_block,
+            Some(base_next_block)
+        );
+        assert_eq!(
+            config.get_evm_info(BridgeSide::Wrapped).next_block,
+            Some(wrapped_next_block)
+        );
     }
 }
