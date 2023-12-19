@@ -113,6 +113,7 @@ build_requested_canisters() {
 
         build_canister "spender_canister" "export-api" "spender.wasm" "spender"
         build_canister "minter_canister" "export-api" "minter.wasm" "minter"
+        build_canister "evm-minter" "export-api" "evm-minter.wasm" "evm-minter"
 
         # Build tools
         build_create_bft_bridge_tool

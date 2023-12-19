@@ -24,6 +24,12 @@
       "wasm": ".artifact/minter.wasm.gz",
       "type": "custom"
     },
+    "evm-minter": {
+      "build": "",
+      "candid": ".artifact/evm-minter.did",
+      "wasm": ".artifact/evm-minter.wasm.gz",
+      "type": "custom"
+    },
     "spender": {
       "build": "",
       "candid": ".artifact/spender.did",
