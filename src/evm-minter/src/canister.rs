@@ -28,6 +28,8 @@ impl EvmMinter {
         // Set the metrics updating interval
         #[cfg(target_family = "wasm")]
         {
+            use std::time::Duration;
+            
             self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
