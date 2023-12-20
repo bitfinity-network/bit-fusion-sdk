@@ -20,6 +20,7 @@ mod mint_orders;
 mod signer;
 
 /// State of a minter canister.
+#[derive(Default)]
 pub struct State {
     /// Minter canister configuration.
     pub config: Config,
@@ -33,16 +34,7 @@ pub struct State {
     pub logger_config_service: LoggerConfigService,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            config: Config::default(),
-            signer: SignerInfo::default(),
-            mint_orders: MintOrders::default(),
-            logger_config_service: LoggerConfigService::default(),
-        }
-    }
-}
+
 
 impl State {
     /// Clear the state and set initial data from settings.

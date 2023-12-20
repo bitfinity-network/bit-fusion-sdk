@@ -1,5 +1,5 @@
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H160};
+use did::{H160};
 use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;
 use ic_exports::ic_kit::ic;

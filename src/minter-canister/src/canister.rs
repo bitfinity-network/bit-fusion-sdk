@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H160, U256};
+use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
@@ -16,7 +16,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
-use minter_did::init::{InitData, OperationPricing};
+use minter_did::init::{InitData};
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 
@@ -282,9 +282,9 @@ impl MinterCanister {
 
     /// create_erc_20_mint_order inspect_message check
     pub fn create_erc_20_mint_order_inspect_message_check(
-        principal: Principal,
+        _principal: Principal,
         reason: &Icrc2Burn,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
         inspect_mint_reason(reason)
     }
@@ -323,9 +323,9 @@ impl MinterCanister {
 
     /// start_icrc2_mint inspect_message check
     pub fn start_icrc2_mint_inspect_message_check(
-        principal: Principal,
+        _principal: Principal,
         user: &H160,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
         if user.0.is_zero() {
             return Err(Error::InvalidBurnOperation("zero user address".into()));
@@ -385,10 +385,10 @@ impl MinterCanister {
 
     /// start_icrc2_mint inspect_message check
     pub fn finish_icrc2_mint_inspect_message_check(
-        caller: Principal,
+        _caller: Principal,
         amount: &Nat,
         user: &H160,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
         if amount == &Nat::from(0) {
             return Err(Error::InvalidBurnOperation("zero amount".into()));
