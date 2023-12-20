@@ -20,6 +20,16 @@ fn main() {
         "BFTBridge",
         "BUILD_SMART_CONTRACT_BFT_BRIDGE_DEPLOYED_HEX_CODE",
     );
+    set_contract_code(
+        &contracts,
+        "UniswapV2Factory",
+        "BUILD_SMART_CONTRACT_UNISWAP_FACTORY_HEX_CODE",
+    );
+    set_contract_code(
+        &contracts,
+        "UniswapV2ERC20",
+        "BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE",
+    );
 }
 
 /// Loads the contract with the specified name

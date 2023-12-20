@@ -1,3 +1,4 @@
+mod ck_erc20;
 mod minter_canister;
 mod token;
 

@@ -1,0 +1,8 @@
+{
+  "minter": {
+    "ic": "2op56-cyaaa-aaaak-afdqq-cai"
+  },
+  "spender": {
+    "ic": "2hmwc-uqaaa-aaaak-afdra-cai"
+  }
+}

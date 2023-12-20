@@ -18,7 +18,7 @@ use crate::utils::error::TestError;
 
 /// Initializez test environment with:
 /// - john wallet with native tokens,
-/// - opetaion points for john,``
+/// - opetaion points for john,
 /// - bridge contract
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
