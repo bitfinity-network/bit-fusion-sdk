@@ -30,7 +30,6 @@ pub struct State {
     /// Signed mint orders.
     pub mint_orders: MintOrders,
 
-
     pub logger_config_service: LoggerConfigService,
 }
 

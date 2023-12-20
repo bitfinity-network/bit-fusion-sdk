@@ -312,7 +312,7 @@ impl MinterCanister {
     #[update]
     pub async fn get_minter_canister_evm_address(&mut self) -> Result<H160> {
         // deduct fee for endpoint query
-    
+
         let ctx = get_base_context(&self.context.0);
         let signer = ctx.borrow().get_state().signer.get_transaction_signer();
         signer
@@ -327,7 +327,6 @@ impl MinterCanister {
         user: &H160,
         state: &State,
     ) -> Result<()> {
-
         if user.0.is_zero() {
             return Err(Error::InvalidBurnOperation("zero user address".into()));
         };
@@ -463,7 +462,6 @@ impl MinterCanister {
         Ok(transfer_result?)
     }
 
-
     async fn register_evm_bridge(&self, evm: &dyn Evm, bft_bridge: H160) -> Result<()> {
         let context = get_base_context(&self.context.0);
 
@@ -503,7 +501,6 @@ fn inspect_check_is_owner(principal: Principal, state: &State) -> Result<()> {
 
     Ok(())
 }
-
 
 /// inspect function to check whether the provided principal is anonymous
 fn check_anonymous_principal(principal: Principal) -> Result<()> {
@@ -829,7 +826,6 @@ mod test {
         canister_call!(canister.init(init_data), ()).await.unwrap();
         inject::get_context().update_id(Principal::management_canister());
 
-
         let evm_address = canister_call!(canister.get_minter_canister_evm_address(), Result<H160>)
             .await
             .unwrap();
@@ -860,7 +856,6 @@ mod test {
         canister_call!(canister.init(init_data), ()).await.unwrap();
 
         inject::get_context().update_id(Principal::management_canister());
-
 
         let evm_address = canister_call!(canister.get_bft_bridge_contract(), Result<Option<H160>>)
             .await
