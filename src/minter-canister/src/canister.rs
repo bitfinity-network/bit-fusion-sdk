@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H160, U256};
+use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
@@ -16,7 +16,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
-use minter_did::init::{InitData, OperationPricing};
+use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 
@@ -221,12 +221,6 @@ impl MinterCanister {
     #[update]
     pub fn get_bft_bridge_contract(&mut self) -> Result<Option<H160>> {
         // deduct fee for endpoint query
-        let context = get_base_context(&self.context.0);
-        context
-            .borrow()
-            .mut_state()
-            .operation_points
-            .deduct_endpoint_query_fee(ic::caller())?;
 
         Ok(self
             .context
@@ -288,11 +282,10 @@ impl MinterCanister {
 
     /// create_erc_20_mint_order inspect_message check
     pub fn create_erc_20_mint_order_inspect_message_check(
-        principal: Principal,
+        _principal: Principal,
         reason: &Icrc2Burn,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
-        inspect_enough_operation_points(principal, state, |p| p.erc20_mint)?;
         inspect_mint_reason(reason)
     }
 
@@ -309,12 +302,6 @@ impl MinterCanister {
             &context.borrow().get_state(),
         )?;
 
-        context
-            .borrow()
-            .mut_state()
-            .operation_points
-            .deduct_erc20_mint_fee(ic::caller())?;
-
         let token_service = context.borrow().get_evm_token_service();
         token_service
             .create_mint_order_for(ic::caller(), reason, &context)
@@ -325,12 +312,6 @@ impl MinterCanister {
     #[update]
     pub async fn get_minter_canister_evm_address(&mut self) -> Result<H160> {
         // deduct fee for endpoint query
-        let context = get_base_context(&self.context.0);
-        context
-            .borrow()
-            .mut_state()
-            .operation_points
-            .deduct_endpoint_query_fee(ic::caller())?;
 
         let ctx = get_base_context(&self.context.0);
         let signer = ctx.borrow().get_state().signer.get_transaction_signer();
@@ -342,12 +323,10 @@ impl MinterCanister {
 
     /// start_icrc2_mint inspect_message check
     pub fn start_icrc2_mint_inspect_message_check(
-        principal: Principal,
+        _principal: Principal,
         user: &H160,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
-        inspect_enough_operation_points(principal, state, |p| p.icrc_mint_approval)?;
-
         if user.0.is_zero() {
             return Err(Error::InvalidBurnOperation("zero user address".into()));
         };
@@ -364,11 +343,6 @@ impl MinterCanister {
             &user,
             &ctx.borrow().get_state(),
         )?;
-
-        ctx.borrow()
-            .mut_state()
-            .operation_points
-            .deduct_icrc_mint_fee(ic::caller())?;
 
         let token_service = ctx.borrow().get_evm_token_service();
         let valid_burn = token_service
@@ -411,10 +385,10 @@ impl MinterCanister {
 
     /// start_icrc2_mint inspect_message check
     pub fn finish_icrc2_mint_inspect_message_check(
-        caller: Principal,
+        _caller: Principal,
         amount: &Nat,
         user: &H160,
-        state: &State,
+        _state: &State,
     ) -> Result<()> {
         if amount == &Nat::from(0) {
             return Err(Error::InvalidBurnOperation("zero amount".into()));
@@ -423,8 +397,7 @@ impl MinterCanister {
         if user.0.is_zero() {
             return Err(Error::InvalidBurnOperation("zero user address".into()));
         };
-
-        inspect_enough_operation_points(caller, state, |p| p.icrc_transfer)
+        Ok(())
     }
 
     /// Make `SpenderCanister` to transfer ICRC-2 tokens to the user according to the given `burn_tx`.
@@ -450,11 +423,6 @@ impl MinterCanister {
             &user,
             &ctx.borrow().get_state(),
         )?;
-
-        ctx.borrow_mut()
-            .mut_state()
-            .operation_points
-            .deduct_icrc_transfer_fee(caller)?;
 
         let token_service = ctx.borrow().get_evm_token_service();
         token_service
@@ -494,93 +462,6 @@ impl MinterCanister {
         Ok(transfer_result?)
     }
 
-    /// Checks on_evm_transaction_notification:
-    /// - caller is evm canister
-    /// - user data is valid principal
-    ///
-    /// Returns principal decoded from user data.
-    pub fn on_evm_transaction_notification_inspect_message_check(
-        state: &State,
-        caller: Principal,
-        user_data: &[u8],
-    ) -> Result<Principal> {
-        if caller != state.config.get_evm_principal() {
-            return Err(Error::NotAuthorized);
-        }
-
-        Principal::try_from_slice(user_data)
-            .map_err(|_| Error::Internal("invalid principal data".into()))
-    }
-
-    /// Obtain EVM canister transaction notifications.
-    /// For each notification with successful transaction increases
-    /// operation points of principal encoded in `user_data`.
-    #[update]
-    fn on_evm_transaction_notification(
-        &mut self,
-        _receipt: Option<TransactionReceipt>,
-        user_data: Vec<u8>,
-    ) -> Option<()> {
-        let ctx = get_base_context(&self.context.0);
-        let user_principal = MinterCanister::on_evm_transaction_notification_inspect_message_check(
-            &ctx.borrow().get_state(),
-            ic::caller(),
-            &user_data,
-        )
-        .ok()?;
-
-        let context = self.context.0.borrow();
-        let mut state = context.mut_state();
-
-        state.operation_points.add_evmc_tx_points(user_principal);
-
-        Some(())
-    }
-
-    /// Returns operation pricing.
-    #[query]
-    pub fn get_operation_pricing(&self) -> OperationPricing {
-        self.context
-            .0
-            .borrow()
-            .get_state()
-            .operation_points
-            .get_pricing()
-    }
-
-    /// set_operation_pricing inspect_message check
-    pub fn set_operation_pricing_inspect_message_check(
-        principal: Principal,
-        state: &State,
-    ) -> Result<()> {
-        inspect_check_is_owner(principal, state)
-    }
-
-    /// Returns pricing.
-    #[update]
-    pub fn set_operation_pricing(&mut self, pricing: OperationPricing) -> Result<()> {
-        let state = self.context.0.borrow_mut();
-
-        MinterCanister::set_operation_pricing_inspect_message_check(
-            ic::caller(),
-            &state.get_state(),
-        )?;
-        state.mut_state().operation_points.set_pricing(pricing);
-        Ok(())
-    }
-
-    /// Return user's points.
-    #[query]
-    pub fn get_user_operation_points(&self, user: Option<Principal>) -> u32 {
-        let user = user.unwrap_or(ic::caller());
-        self.context
-            .0
-            .borrow()
-            .get_state()
-            .operation_points
-            .get_user_points(user)
-    }
-
     async fn register_evm_bridge(&self, evm: &dyn Evm, bft_bridge: H160) -> Result<()> {
         let context = get_base_context(&self.context.0);
 
@@ -616,23 +497,6 @@ fn inspect_check_is_owner(principal: Principal, state: &State) -> Result<()> {
 
     if owner != principal {
         return Err(Error::NotAuthorized);
-    }
-
-    Ok(())
-}
-
-/// inspect function to check whether caller have enough operation points
-fn inspect_enough_operation_points<F>(caller: Principal, state: &State, price_fn: F) -> Result<()>
-where
-    F: Fn(&OperationPricing) -> u32,
-{
-    let pricing = state.operation_points.get_pricing();
-    let points = state.operation_points.get_user_points(caller);
-    if points < price_fn(&pricing) {
-        return Err(Error::InsufficientOperationPoints {
-            expected: pricing.evm_registration,
-            got: points,
-        });
     }
 
     Ok(())
@@ -962,18 +826,6 @@ mod test {
         canister_call!(canister.init(init_data), ()).await.unwrap();
         inject::get_context().update_id(Principal::management_canister());
 
-        let res = canister_call!(
-            canister.on_evm_transaction_notification(
-                None,
-                Principal::management_canister().as_slice().to_vec()
-            ),
-            Option<()>
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(res, Some(()));
-
         let evm_address = canister_call!(canister.get_minter_canister_evm_address(), Result<H160>)
             .await
             .unwrap();
@@ -1004,18 +856,6 @@ mod test {
         canister_call!(canister.init(init_data), ()).await.unwrap();
 
         inject::get_context().update_id(Principal::management_canister());
-
-        let res = canister_call!(
-            canister.on_evm_transaction_notification(
-                None,
-                Principal::management_canister().as_slice().to_vec()
-            ),
-            Option<()>
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(res, Some(()));
 
         let evm_address = canister_call!(canister.get_bft_bridge_contract(), Result<Option<H160>>)
             .await
