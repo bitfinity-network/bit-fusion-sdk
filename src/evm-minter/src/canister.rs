@@ -36,9 +36,9 @@ impl EvmMinter {
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 let state = get_state();
-                if !state.borrow().initialized() {
-                    return;
-                }
+                // if !state.borrow().initialized() { # Missing function
+                //     return;
+                // }
 
                 state
                     .borrow_mut()
