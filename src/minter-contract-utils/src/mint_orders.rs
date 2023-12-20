@@ -1,20 +1,23 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{Bound, MultimapStructure, StableMultimap, Storable, VirtualMemory};
-
+use ic_stable_structures::stable_structures::Memory;
+use ic_stable_structures::{
+    Bound, MemoryManager, MultimapStructure as _, StableMultimap, Storable,
+};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
-use crate::constant::MINT_ORDERS_MEMORY_ID;
-use crate::memory::MEMORY_MANAGER;
+pub struct MintOrders<M: Memory> {
+    mint_orders_map: StableMultimap<MintOrderKey, u32, SignedMintOrder, M>,
+}
 
-/// Storage for user's signed mint orders.
-#[derive(Default, Clone)]
-pub struct MintOrders {}
+impl<M: Memory> MintOrders<M> {
+    pub fn new(memory_manager: &dyn MemoryManager<M, u8>, memory_id: u8) -> Self {
+        Self {
+            mint_orders_map: StableMultimap::new(memory_manager.get(memory_id)),
+        }
+    }
 
-impl MintOrders {
     /// Inserts a new signed mint order.
     /// Returns replaced signed mint order if it already exists.
     pub fn insert(
@@ -25,7 +28,7 @@ impl MintOrders {
         order: &SignedMintOrder,
     ) -> Option<SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
-        MINT_ORDERS_MAP.with(|map| map.borrow_mut().insert(&key, &operation_id, order))
+        self.mint_orders_map.insert(&key, &operation_id, order)
     }
 
     /// Returns the signed mint order for the given sender and token, if it exists.
@@ -36,18 +39,28 @@ impl MintOrders {
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
-        MINT_ORDERS_MAP.with(|map| map.borrow().get(&key, &operation_id))
+        self.mint_orders_map.get(&key, &operation_id)
     }
 
     /// Returns all the signed mint orders for the given sender and token.
     pub fn get_all(&self, sender: Id256, src_token: Id256) -> Vec<(u32, SignedMintOrder)> {
         let key = MintOrderKey { sender, src_token };
-        MINT_ORDERS_MAP.with(|map| map.borrow().range(&key).collect())
+        self.mint_orders_map.range(&key).collect()
     }
 
     /// Removes all signed mint orders.
     pub fn clear(&mut self) {
-        MINT_ORDERS_MAP.with(|map| map.borrow_mut().clear());
+        self.mint_orders_map.clear();
+    }
+
+    pub fn remove(
+        &mut self,
+        sender: Id256,
+        src_token: Id256,
+        operation_id: u32,
+    ) -> Option<SignedMintOrder> {
+        let key = MintOrderKey { sender, src_token };
+        self.mint_orders_map.remove(&key, &operation_id)
     }
 }
 
@@ -88,16 +101,12 @@ impl Storable for MintOrderKey {
     };
 }
 
-thread_local! {
-    static MINT_ORDERS_MAP: RefCell<StableMultimap<MintOrderKey, u32, SignedMintOrder, VirtualMemory<DefaultMemoryImpl>>> =
-        RefCell::new(StableMultimap::new(MEMORY_MANAGER.with(|mm| mm.get(MINT_ORDERS_MEMORY_ID))));
-}
-
 #[cfg(test)]
 mod tests {
     use candid::Principal;
     use ic_exports::ic_kit::MockContext;
-    use ic_stable_structures::Storable;
+    use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+    use ic_stable_structures::{default_ic_memory_manager, Storable, VirtualMemory};
     use minter_did::id256::Id256;
     use minter_did::order::{MintOrder, SignedMintOrder};
 
@@ -114,9 +123,10 @@ mod tests {
         assert_eq!(mint_order_key, decoded);
     }
 
-    fn init_context() -> MintOrders {
+    fn init_context() -> MintOrders<VirtualMemory<DefaultMemoryImpl>> {
+        let memory_manager = default_ic_memory_manager();
         MockContext::new().inject();
-        MintOrders::default()
+        MintOrders::new(&memory_manager, 0)
     }
 
     #[test]
@@ -136,6 +146,23 @@ mod tests {
             .insert(sender, src_token, operation_id, &order)
             .is_some());
         assert_eq!(orders.get(sender, src_token, operation_id), Some(order));
+    }
+
+    #[test]
+    fn test_should_remove_mint_order() {
+        let mut orders = init_context();
+
+        let sender = Id256::from(&Principal::management_canister());
+        let src_token = Id256::from(&Principal::anonymous());
+        let operation_id = 0;
+
+        let order = SignedMintOrder([0; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
+
+        assert!(orders
+            .insert(sender, src_token, operation_id, &order)
+            .is_none());
+        assert!(orders.remove(sender, src_token, operation_id).is_some());
+        assert!(orders.get(sender, src_token, operation_id).is_none());
     }
 
     #[test]

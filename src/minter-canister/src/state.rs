@@ -6,18 +6,19 @@ pub use config::Config;
 use did::{H160, U256};
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
+use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
+use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
-use self::mint_orders::MintOrders;
 use self::operation_points::OperationPoints;
 use self::signer::SignerInfo;
-use crate::constant::{DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, NONCES_COUNTER_MEMORY_ID};
+use crate::constant::{
+    DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID,
+};
 use crate::memory::MEMORY_MANAGER;
 
 mod config;
 pub mod log;
-mod mint_orders;
 pub mod operation_points;
 mod signer;
 
@@ -30,7 +31,7 @@ pub struct State {
     pub signer: SignerInfo,
 
     /// Signed mint orders.
-    pub mint_orders: MintOrders,
+    pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
 
     /// Operation points. Used as fee for expensive operations.
     pub operation_points: OperationPoints,
@@ -41,10 +42,11 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         let config = Config::default();
+        let memory_manager = default_ic_memory_manager();
         Self {
             config: Config::default(),
             signer: SignerInfo::default(),
-            mint_orders: MintOrders::default(),
+            mint_orders: MintOrders::new(&memory_manager, MINT_ORDERS_MEMORY_ID),
             logger_config_service: LoggerConfigService::default(),
             operation_points: OperationPoints::new(config.get_owner()),
         }

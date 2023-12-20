@@ -28,7 +28,7 @@ use crate::tokens::{bft_bridge, icrc1, icrc2};
 
 mod inspect;
 
-/// Type alias for the shared mutable context implementation we use in the canister
+/// Type alias for the shared mutable context implementation we use iin the canister
 type SharedContext = Rc<RefCell<ContextImpl<EvmCanisterImpl>>>;
 
 #[derive(Clone, Default)]
