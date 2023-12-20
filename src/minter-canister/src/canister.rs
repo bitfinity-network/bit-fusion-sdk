@@ -16,7 +16,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
-use minter_did::init::{InitData};
+use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 

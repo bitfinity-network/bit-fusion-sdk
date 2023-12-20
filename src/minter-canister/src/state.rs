@@ -34,8 +34,6 @@ pub struct State {
     pub logger_config_service: LoggerConfigService,
 }
 
-
-
 impl State {
     /// Clear the state and set initial data from settings.
     pub fn reset(&mut self, settings: Settings) {
