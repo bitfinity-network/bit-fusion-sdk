@@ -981,7 +981,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1189,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "async-trait",
  "candid",
@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "anyhow",
  "candid",
@@ -1302,7 +1302,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "candid",
  "did",
@@ -2545,7 +2545,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "candid",
  "did",
@@ -2573,7 +2573,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "candid",
  "did",
@@ -3376,7 +3376,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "register_evm_agent"
 version = "0.8.1"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.9.x#bb3ae7e598853b4928aae6e03b0cfb9ea6ec4ad9"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
 dependencies = [
  "anyhow",
  "candid",

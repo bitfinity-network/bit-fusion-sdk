@@ -3,6 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use ethereum_json_rpc_client::EthGetLogsParams;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
@@ -109,8 +110,18 @@ impl PersistentTask {
             return Self::init_evm_state(state, side).await;
         }
 
-        let _client = state.borrow().config.get_evm_info(side).link.get_client();
-        todo!("json-rpc client eth_getLogs impl")
+        let client = state.borrow().config.get_evm_info(side).link.get_client();
+
+        let params = EthGetLogsParams {
+            address: todo!(),
+            from_block: todo!(),
+            to_block: todo!(),
+            topics: todo!(),
+        };
+
+        let logs = client.get_logs(params).await.into_scheduler_result()?;
+
+        todo!("spawn tasks according to logs");
     }
 }
 
