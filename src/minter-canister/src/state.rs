@@ -34,6 +34,18 @@ pub struct State {
     pub logger_config_service: LoggerConfigService,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        let config = Config::default();
+        Self {
+            config: Config::default(),
+            signer: SignerInfo::default(),
+            mint_orders: MintOrders::default(),
+            logger_config_service: LoggerConfigService::default(),
+        }
+    }
+}
+
 impl State {
     /// Clear the state and set initial data from settings.
     pub fn reset(&mut self, settings: Settings) {
