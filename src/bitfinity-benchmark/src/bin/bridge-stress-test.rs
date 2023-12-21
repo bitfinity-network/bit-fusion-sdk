@@ -205,8 +205,6 @@ async fn main() -> anyhow::Result<()> {
         .mint_bft_native_tokens(10u64.pow(18u32).into())
         .await?;
 
-    admin.add_operation_points().await?;
-
     log::trace!("Creating wrapped tokens");
     create_wrapped_tokens(&admin, &icrc2_tokens).await?;
 

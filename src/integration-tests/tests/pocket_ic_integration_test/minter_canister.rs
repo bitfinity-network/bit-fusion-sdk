@@ -23,9 +23,7 @@ use crate::utils::error::TestError;
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-    ctx.add_operation_points(john(), &john_wallet)
-        .await
-        .unwrap();
+    
     let bft_bridge = ctx
         .initialize_bft_bridge(ADMIN, &john_wallet)
         .await
@@ -163,7 +161,6 @@ async fn test_icrc2_tokens_roundtrip() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
     let minter_client = ctx.minter_client(JOHN);
-    let initial_operation_points = minter_client.get_user_operation_points(None).await.unwrap();
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
@@ -269,16 +266,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap();
     assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 4);
     assert_eq!(wrapped_balance, 0);
-
-    let final_operation_points = minter_client.get_user_operation_points(None).await.unwrap();
-    let pricing = minter_client.get_operation_pricing().await.unwrap();
-    assert_eq!(
-        initial_operation_points,
-        final_operation_points
-            + pricing.erc20_mint
-            + pricing.icrc_mint_approval
-            + pricing.icrc_transfer
-    );
+    
 }
 
 #[tokio::test]
@@ -286,9 +274,6 @@ async fn test_icrc2_burn_by_different_users() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
     let alice_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-    ctx.add_operation_points(alice(), &alice_wallet)
-        .await
-        .unwrap();
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let _wrapped_token = ctx
@@ -485,48 +470,6 @@ async fn test_icrc2_forbid_unexisting_token_mint() {
     assert_eq!(receipt.status, Some(U64::zero()));
 }
 
-#[tokio::test]
-async fn owner_should_have_max_operation_points() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
-    let client = ctx.minter_client(ADMIN);
-    let admin_points = client.get_user_operation_points(None).await.unwrap();
-    assert_eq!(admin_points, u32::MAX);
-}
-
-#[tokio::test]
-async fn notification_tx_increases_operation_points() {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
-    let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-
-    ctx.add_operation_points(john(), &john_wallet)
-        .await
-        .unwrap();
-
-    let mut client = ctx.minter_client(ADMIN);
-    let init_points = client
-        .get_user_operation_points(Some(john()))
-        .await
-        .unwrap();
-
-    let mut pricing = client.get_operation_pricing().await.unwrap();
-    assert_eq!(pricing.evmc_notification, init_points);
-
-    pricing.evmc_notification = 42;
-    client
-        .set_operation_pricing(pricing)
-        .await
-        .unwrap()
-        .unwrap();
-    ctx.add_operation_points(john(), &john_wallet)
-        .await
-        .unwrap();
-
-    let increased_points = client
-        .get_user_operation_points(Some(john()))
-        .await
-        .unwrap();
-    assert_eq!(pricing.evmc_notification, increased_points - init_points);
-}
 
 #[tokio::test]
 async fn spender_canister_access_control() {

@@ -10,7 +10,6 @@ use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 
 use self::log::LoggerConfigService;
 use self::mint_orders::MintOrders;
-use self::operation_points::OperationPoints;
 use self::signer::SignerInfo;
 use crate::constant::{DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, NONCES_COUNTER_MEMORY_ID};
 use crate::memory::MEMORY_MANAGER;
@@ -18,10 +17,10 @@ use crate::memory::MEMORY_MANAGER;
 mod config;
 pub mod log;
 mod mint_orders;
-pub mod operation_points;
 mod signer;
 
 /// State of a minter canister.
+#[derive(Default)]
 pub struct State {
     /// Minter canister configuration.
     pub config: Config,
@@ -31,9 +30,6 @@ pub struct State {
 
     /// Signed mint orders.
     pub mint_orders: MintOrders,
-
-    /// Operation points. Used as fee for expensive operations.
-    pub operation_points: OperationPoints,
 
     pub logger_config_service: LoggerConfigService,
 }
@@ -46,7 +42,6 @@ impl Default for State {
             signer: SignerInfo::default(),
             mint_orders: MintOrders::default(),
             logger_config_service: LoggerConfigService::default(),
-            operation_points: OperationPoints::new(config.get_owner()),
         }
     }
 }
@@ -54,13 +49,11 @@ impl Default for State {
 impl State {
     /// Clear the state and set initial data from settings.
     pub fn reset(&mut self, settings: Settings) {
-        self.operation_points = OperationPoints::new(settings.owner);
         self.signer
             .reset(settings.signing_strategy.clone(), settings.chain_id)
             .expect("failed to set signer");
         self.config.reset(settings);
         self.mint_orders.clear();
-        self.operation_points.clear();
         NONCES_COUNTER
             .with(|cell| cell.borrow_mut().set(0))
             .expect("failed to reset nonce counter");

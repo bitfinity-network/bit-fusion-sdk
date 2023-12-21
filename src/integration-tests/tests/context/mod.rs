@@ -328,31 +328,7 @@ pub trait TestContext {
             .into_address()
             .unwrap()
             .into())
-    }
-
-    /// Adds operation points to caller in minter canister.
-    async fn add_operation_points(
-        &self,
-        caller: Principal,
-        wallet: &Wallet<'_, SigningKey>,
-    ) -> Result<()> {
-        let notification = NotificationInput {
-            about_tx: None,
-            receiver_canister: self.canisters().minter(),
-            user_data: caller.as_slice().to_vec(),
-        };
-        let notify_tx_hash = self.send_notification_tx(wallet, notification).await?;
-        let receipt = self.wait_transaction_receipt(&notify_tx_hash).await?;
-
-        if receipt.as_ref().and_then(|r| r.status) != Some(U64::one()) {
-            dbg!(&receipt);
-            return Err(TestError::Evm(EvmError::Internal(
-                "transction to add operation points failed".into(),
-            )));
-        }
-
-        Ok(())
-    }
+    }    
 
     /// Burns ICRC-2 token 1 and creates according mint order.
     async fn burn_icrc2(

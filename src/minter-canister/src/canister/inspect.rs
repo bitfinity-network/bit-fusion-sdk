@@ -1,5 +1,5 @@
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H160};
+use did::H160;
 use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;
 use ic_exports::ic_kit::ic;
@@ -32,9 +32,6 @@ async fn inspect_method(method: &str) -> Result<()> {
             let (evm,) = api::call::arg_data::<(Principal,)>();
             MinterCanister::set_evm_principal_inspect_message_check(ic::caller(), evm, &state)
         }
-        "set_operation_pricing" => {
-            MinterCanister::set_operation_pricing_inspect_message_check(ic::caller(), &state)
-        }
         "set_owner" => {
             let (owner,) = api::call::arg_data::<(Principal,)>();
             MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)
@@ -61,15 +58,6 @@ async fn inspect_method(method: &str) -> Result<()> {
                 &state,
             )?;
             Ok(())
-        }
-        "on_evm_transaction_notification" => {
-            let (_, user_data) = api::call::arg_data::<(Option<TransactionReceipt>, Vec<u8>)>();
-            MinterCanister::on_evm_transaction_notification_inspect_message_check(
-                &state,
-                ic::caller(),
-                &user_data,
-            )
-            .map(|_| ())
         }
         "register_evmc_bft_bridge" => {
             let (bft_bridge_address,) = api::call::arg_data::<(H160,)>();
