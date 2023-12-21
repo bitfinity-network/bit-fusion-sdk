@@ -471,9 +471,11 @@ impl MinterCanister {
     /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
     #[query]
     fn transform(&self, raw: TransformArgs) -> MHttpResponse {
-        // transform(raw)
-
-        panic!("not implemented")
+        MHttpResponse {
+            status: raw.response.status,
+            headers: raw.response.headers,
+            body: raw.response.body,
+        }
     }
 
     async fn register_evm_bridge(&self, evm: &dyn Evm, bft_bridge: H160) -> Result<()> {
