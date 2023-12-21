@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use candid::{CandidType, Principal};
-use did::codec;
+use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
@@ -82,6 +82,7 @@ pub enum BridgeSide {
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmInfo {
     pub link: EvmLink,
+    pub bridge_contract: H160,
     pub chain_id: Option<u64>,
     pub next_block: Option<u64>,
 }

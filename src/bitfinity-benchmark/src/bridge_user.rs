@@ -4,7 +4,7 @@ use std::time::Duration;
 use candid::{Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::state::BasicAccount;
-use did::{NotificationInput, TransactionReceipt, H160, H256, U256, U64};
+use did::{TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
@@ -205,7 +205,6 @@ impl BridgeUser {
     }
 
     const CONTRACT_CALL_GAS: u64 = 10_000_000;
-    const TRANSFER_GAS: u64 = 23_000;
 
     async fn execute_transaction(
         &self,
@@ -317,7 +316,6 @@ impl BridgeUser {
     }
 
     async fn select_next_action(&self, tokens: &Tokens) -> anyhow::Result<Action> {
-        const MIN_OPERAION_POINTS: u32 = 4;
         const MIN_BALANCE_TO_TRANSFER: u64 = 100_000;
 
         let idx = rand::random::<usize>() % tokens.len();
