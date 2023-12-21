@@ -8,6 +8,7 @@ use ic_canister::{
     generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
     MethodType, PreUpdate,
 };
+use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
@@ -25,10 +26,6 @@ use crate::evm::{Evm, EvmCanisterImpl};
 use crate::state::{Settings, State};
 use crate::tokens::icrc1::IcrcTransferDst;
 use crate::tokens::{bft_bridge, icrc1, icrc2};
-
-use ic_exports::ic_cdk::api::management_canister::http_request::{
-    HttpResponse as MHttpResponse, TransformArgs,
-};
 
 mod inspect;
 
@@ -470,8 +467,8 @@ impl MinterCanister {
     /// by different nodes of the IC subnet to reach a consensus, more info:
     /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
     #[query]
-    fn transform(&self, raw: TransformArgs) -> MHttpResponse {
-        MHttpResponse {
+    fn transform(&self, raw: TransformArgs) -> HttpResponse {
+        HttpResponse {
             status: raw.response.status,
             headers: raw.response.headers,
             body: raw.response.body,
