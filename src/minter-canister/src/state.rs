@@ -10,7 +10,6 @@ use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell,
 use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
-use self::mint_orders::MintOrders;
 use self::signer::SignerInfo;
 use crate::constant::{
     DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID,
@@ -19,11 +18,9 @@ use crate::memory::MEMORY_MANAGER;
 
 mod config;
 pub mod log;
-mod mint_orders;
 mod signer;
 
 /// State of a minter canister.
-#[derive(Default)]
 pub struct State {
     /// Minter canister configuration.
     pub config: Config,
@@ -39,7 +36,6 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let config = Config::default();
         let memory_manager = default_ic_memory_manager();
         Self {
             config: Config::default(),
