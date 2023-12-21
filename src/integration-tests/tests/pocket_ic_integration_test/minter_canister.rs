@@ -23,7 +23,7 @@ use crate::utils::error::TestError;
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-    
+
     let bft_bridge = ctx
         .initialize_bft_bridge(ADMIN, &john_wallet)
         .await
@@ -266,7 +266,6 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap();
     assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 4);
     assert_eq!(wrapped_balance, 0);
-    
 }
 
 #[tokio::test]
@@ -469,7 +468,6 @@ async fn test_icrc2_forbid_unexisting_token_mint() {
         .unwrap();
     assert_eq!(receipt.status, Some(U64::zero()));
 }
-
 
 #[tokio::test]
 async fn spender_canister_access_control() {

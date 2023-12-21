@@ -328,7 +328,7 @@ pub trait TestContext {
             .into_address()
             .unwrap()
             .into())
-    }    
+    }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
     async fn burn_icrc2(
