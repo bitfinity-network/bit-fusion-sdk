@@ -23,7 +23,7 @@ env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
 jobs:
   build-test-deploy:
-    uses: ./.github/workflows/build-deploy-canister.yml
+    uses: ./.github/workflows/build-test.yml
     with:
       installation-method: upgrade
     secrets:

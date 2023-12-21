@@ -76,12 +76,6 @@ impl BridgeUser {
 
         let mut stats = UserStats::default();
 
-        if let Err(e) = self.add_operation_points().await {
-            log::warn!("Failed to add operation points: {e}");
-            stats.add_error(&e, "initial add operation points");
-            return stats;
-        };
-
         let erc20_address_futures = icrc2_tokens
             .iter()
             .map(|token| self.get_wrapped_token_address(*token));
@@ -136,29 +130,6 @@ impl BridgeUser {
             .evm_client()
             .mint_native_tokens(self.address.clone(), amount)
             .await??)
-    }
-
-    /// Get user's operation points.
-    pub async fn get_operation_points(&self) -> anyhow::Result<u32> {
-        log::trace!("getting operation points to user {}", self.name);
-        Ok(self.minter_client().get_user_operation_points(None).await?)
-    }
-
-    /// Add operation points to user.
-    pub async fn add_operation_points(&self) -> anyhow::Result<()> {
-        log::trace!("adding operation points to user {}", self.name);
-
-        let input = NotificationInput {
-            about_tx: None,
-            receiver_canister: self.minter_principal,
-            user_data: self.principal.as_slice().to_vec(),
-        }
-        .encode()?;
-
-        self.execute_transaction(self.address.clone(), input, Self::TRANSFER_GAS)
-            .await?;
-
-        Ok(())
     }
 
     /// Get BFTBridge address.
@@ -349,12 +320,6 @@ impl BridgeUser {
         const MIN_OPERAION_POINTS: u32 = 4;
         const MIN_BALANCE_TO_TRANSFER: u64 = 100_000;
 
-        let operation_points = self.get_operation_points().await?;
-
-        if operation_points < MIN_OPERAION_POINTS {
-            return Ok(Action::AddOperationPoints);
-        }
-
         let idx = rand::random::<usize>() % tokens.len();
         let (_, erc20) = tokens.get_token_pair(idx).unwrap(); // idx < tokens.len()
 
@@ -427,10 +392,6 @@ impl BridgeUser {
     async fn perform_aciton(&self, action: Action, tokens: &Tokens) -> anyhow::Result<UserStats> {
         let mut stats = UserStats::default();
         match action {
-            Action::AddOperationPoints => {
-                self.add_operation_points().await?;
-                stats.operation_points_additions += 1;
-            }
             Action::DepositIcrc2(token_idx, amount) => {
                 let icrc2_token = tokens.icrc2[token_idx];
                 self.deposit_icrc2(icrc2_token, &amount).await?;
@@ -644,7 +605,6 @@ impl BridgeUser {
 /// Represents statistics of bridge operations.
 #[derive(Debug, Default)]
 pub struct UserStats {
-    pub operation_points_additions: u32,
     pub icrc2_deposits_number: u32,
     pub icrc2_total_deposit_amount: Nat,
     pub erc20_withdrawals_number: u32,
@@ -655,7 +615,6 @@ pub struct UserStats {
 impl UserStats {
     /// Add anonther statistics to `self`.
     pub fn merge(&mut self, other: &Self) {
-        self.operation_points_additions += other.operation_points_additions;
         self.icrc2_deposits_number += other.icrc2_deposits_number;
         self.icrc2_total_deposit_amount += other.icrc2_total_deposit_amount.clone();
         self.erc20_withdrawals_number += other.erc20_withdrawals_number;
@@ -674,7 +633,6 @@ impl UserStats {
 type TokenIdx = usize;
 
 enum Action {
-    AddOperationPoints,
     DepositIcrc2(TokenIdx, Nat),
     WithdrawErc20(TokenIdx, U256),
 }

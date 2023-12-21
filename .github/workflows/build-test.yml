@@ -1,0 +1,69 @@
+name: "Build and Deploy"
+
+on:
+  workflow_call:
+    inputs:
+      installation-method:
+        required: true
+        type: string
+        description: "installation method, can be any of create, reinstall, upgrade"
+      network:
+        type: string
+        required: false
+        description: "network where canister will be deployed to"
+        default: "ic"
+      wallet:
+        type: string
+        required: false
+        description: "owner wallet for canister"
+        default: "4cfzs-sqaaa-aaaak-aegca-cai"
+      chain_id:
+        type: number
+        required: false
+        description: "chain id"
+        default: 355113
+      force_deploy:
+        type: boolean
+        required: false
+        description: "if true, force deploy ignoring main branch"
+        default: false
+
+    secrets:
+      EVM_DEPLOYER:
+        required: true
+      GH_PKG_LOGIN:
+        required: true
+      GH_PKG_TOKEN:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+
+env:
+  EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+
+jobs:
+  build-test:
+    name: "Build and Test"
+    uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
+    with:
+      runs-on: 4x150g-runner
+      container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      git-fetch-depth: "0"
+      skip-test: ${{ github.ref_type == 'tag' }}
+      audit-allow-warnings: true
+      cargo-clippy-extra-args: "-- -D warnings"
+      output-artifact: artifact-evm
+      init-script: |
+        ./scripts/build_solidity.sh
+      artifact-pre-script: |
+        export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
+        ./scripts/build.sh
+      test-script: |
+        export WASMS_DIR="`pwd`/.artifact"
+        export RUST_BACKTRACE="full"
+        ./scripts/tests.sh
+      enable-target-cache: true
+      disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
+    secrets:
+      gh_token: ${{ secrets.GH_PKG_TOKEN }}
+      gh_login: ${{ secrets.GH_PKG_LOGIN }}
