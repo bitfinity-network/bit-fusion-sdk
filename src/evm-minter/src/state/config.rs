@@ -66,10 +66,18 @@ impl Config {
             .expect("failed to update config stable memory data");
     }
 
-    pub fn is_initialized(&self, bridge_side: BridgeSide) -> bool {
+    pub fn get_initialized_evm_info(&self, bridge_side: BridgeSide) -> Option<InitializedEvmInfo> {
         let side_idx = bridge_side as usize;
-        self.data.get().evms[side_idx].chain_id.is_some()
-            && self.data.get().evms[side_idx].chain_id.is_some()
+
+        let chain_id = self.data.get().evms[side_idx].chain_id?;
+        let next_block = self.data.get().evms[side_idx].next_block?;
+
+        Some(InitializedEvmInfo {
+            link: self.data.get().evms[side_idx].link.clone(),
+            bridge_contract: self.data.get().evms[side_idx].bridge_contract.clone(),
+            chain_id,
+            next_block,
+        })
     }
 }
 
@@ -85,6 +93,13 @@ pub struct EvmInfo {
     pub bridge_contract: H160,
     pub chain_id: Option<u64>,
     pub next_block: Option<u64>,
+}
+
+pub struct InitializedEvmInfo {
+    pub link: EvmLink,
+    pub bridge_contract: H160,
+    pub chain_id: u64,
+    pub next_block: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]

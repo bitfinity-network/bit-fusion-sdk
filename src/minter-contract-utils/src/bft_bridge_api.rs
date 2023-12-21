@@ -220,6 +220,43 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
+    name: "MintTokenEvent".into(),
+    inputs: vec![
+        EventParam {
+            name: "amount".into(),
+            kind: ParamType::Uint(256),
+            indexed: false,
+        },
+        EventParam {
+            name: "fromToken".into(),
+            kind: ParamType::FixedBytes(32),
+            indexed: false,
+        },
+        EventParam {
+            name: "senderID".into(),
+            kind: ParamType::FixedBytes(32),
+            indexed: false,
+        },
+        EventParam {
+            name: "toERC20".into(),
+            kind: ParamType::FixedBytes(32),
+            indexed: false,
+        },
+        EventParam {
+            name: "recipient".into(),
+            kind: ParamType::FixedBytes(32),
+            indexed: false,
+        },
+        EventParam {
+            name: "nonce".into(),
+            kind: ParamType::Uint(32),
+            indexed: false,
+        },
+    ],
+    anonymous: false,
+});
+
 #[allow(deprecated)] // need to initialize `constant` field
 pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     name: "getWrappedToken".into(),

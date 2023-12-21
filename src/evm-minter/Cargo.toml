@@ -9,6 +9,7 @@ default = []
 export-api = []
 
 [dependencies]
+minter-contract-utils = { path = "../minter-contract-utils" }
 did = { workspace = true }
 ic-metrics = { workspace = true }
 candid = { workspace = true }
@@ -22,3 +23,4 @@ ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"]
 ic-canister-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 anyhow = { workspace = true }
+ethers-core = { workspace = true }

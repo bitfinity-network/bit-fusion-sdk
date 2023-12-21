@@ -7,6 +7,7 @@ use ethereum_json_rpc_client::EthGetLogsParams;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
+use minter_contract_utils::bft_bridge_api::{BURNT_EVENT, MINTED_EVENT};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
@@ -106,20 +107,20 @@ impl PersistentTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
-        if !state.borrow().config.is_initialized(side) {
+        let Some(evm_info) = state.borrow().config.get_initialized_evm_info(side) else {
             return Self::init_evm_state(state, side).await;
-        }
-
-        let client = state.borrow().config.get_evm_info(side).link.get_client();
-
-        let params = EthGetLogsParams {
-            address: todo!(),
-            from_block: todo!(),
-            to_block: todo!(),
-            topics: todo!(),
         };
 
-        let logs = client.get_logs(params).await.into_scheduler_result()?;
+        let client = evm_info.link.get_client();
+
+        let params = EthGetLogsParams {
+            address: vec![evm_info.bridge_contract.into()],
+            from_block: evm_info.next_block.into(),
+            to_block: ethers_core::types::BlockNumber::Safe,
+            topics: vec![BURNT_EVENT.signature(), MINTED_EVENT.signature()],
+        };
+
+        let _logs = client.get_logs(params).await.into_scheduler_result()?;
 
         todo!("spawn tasks according to logs");
     }
