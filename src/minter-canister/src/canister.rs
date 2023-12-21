@@ -26,6 +26,10 @@ use crate::state::{Settings, State};
 use crate::tokens::icrc1::IcrcTransferDst;
 use crate::tokens::{bft_bridge, icrc1, icrc2};
 
+use ic_exports::ic_cdk::api::management_canister::http_request::{
+    HttpResponse as MHttpResponse, TransformArgs,
+};
+
 mod inspect;
 
 /// Type alias for the shared mutable context implementation we use in the canister
@@ -460,6 +464,16 @@ impl MinterCanister {
         }
 
         Ok(transfer_result?)
+    }
+
+    /// Requirements for Http outcalls, used to ignore small differences in the data obtained
+    /// by different nodes of the IC subnet to reach a consensus, more info:
+    /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
+    #[query]
+    fn transform(&self, raw: TransformArgs) -> MHttpResponse {
+        // transform(raw)
+
+        panic!("not implemented")
     }
 
     async fn register_evm_bridge(&self, evm: &dyn Evm, bft_bridge: H160) -> Result<()> {
