@@ -6,21 +6,21 @@ pub use config::Config;
 use did::{H160, U256};
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
+use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
+use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
-use self::mint_orders::MintOrders;
 use self::signer::SignerInfo;
-use crate::constant::{DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, NONCES_COUNTER_MEMORY_ID};
+use crate::constant::{
+    DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID,
+};
 use crate::memory::MEMORY_MANAGER;
 
 mod config;
 pub mod log;
-mod mint_orders;
 mod signer;
 
 /// State of a minter canister.
-#[derive(Default)]
 pub struct State {
     /// Minter canister configuration.
     pub config: Config,
@@ -29,18 +29,18 @@ pub struct State {
     pub signer: SignerInfo,
 
     /// Signed mint orders.
-    pub mint_orders: MintOrders,
+    pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
 
     pub logger_config_service: LoggerConfigService,
 }
 
 impl Default for State {
     fn default() -> Self {
-        let config = Config::default();
+        let memory_manager = default_ic_memory_manager();
         Self {
             config: Config::default(),
             signer: SignerInfo::default(),
-            mint_orders: MintOrders::default(),
+            mint_orders: MintOrders::new(&memory_manager, MINT_ORDERS_MEMORY_ID),
             logger_config_service: LoggerConfigService::default(),
         }
     }
