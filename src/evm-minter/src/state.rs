@@ -10,14 +10,14 @@ use serde::{Deserialize, Serialize};
 pub use self::config::{BridgeSide, Config, ConfigData};
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
-use crate::tasks::PersistentTask;
+use crate::tasks::BridgeTask;
 
 mod config;
 
 type Storage =
-    StableUnboundedMap<u32, ScheduledTask<PersistentTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 
-type PersistentScheduler = Scheduler<PersistentTask, Storage>;
+type PersistentScheduler = Scheduler<BridgeTask, Storage>;
 
 pub struct State {
     pub config: Config,

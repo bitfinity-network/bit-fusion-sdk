@@ -1,7 +1,10 @@
+use candid::CandidType;
 use ethers_core::abi::{
-    Constructor, Event, EventParam, Function, Param, ParamType, StateMutability,
+    Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
 };
+use ethers_core::types::{H160, U256};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
     inputs: vec![Param {
@@ -220,6 +223,81 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
+pub struct BurntEventData {
+    pub sender: did::H160,
+    pub amount: did::U256,
+    pub from_erc20: did::H160,
+    pub recipient_id: Vec<u8>,
+    pub to_token: Vec<u8>,
+    pub name: Vec<u8>,
+    pub symbol: Vec<u8>,
+    pub decimals: u8,
+}
+
+#[derive(Debug, Default)]
+struct BurntEventDataBuilder {
+    pub sender: Option<H160>,
+    pub amount: Option<U256>,
+    pub from_erc20: Option<H160>,
+    pub recipient_id: Option<Vec<u8>>,
+    pub to_token: Option<Vec<u8>>,
+    pub name: Option<Vec<u8>>,
+    pub symbol: Option<Vec<u8>>,
+    pub decimals: Option<u8>,
+}
+
+impl BurntEventDataBuilder {
+    fn build(self) -> Result<BurntEventData, ethers_core::abi::Error> {
+        fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
+            let msg = format!("missing event field `{}`", field);
+            move || ethers_core::abi::Error::Other(msg.into())
+        }
+
+        Ok(BurntEventData {
+            sender: self.sender.ok_or_else(not_found("sender"))?.into(),
+            amount: self.amount.ok_or_else(not_found("amount"))?.into(),
+            from_erc20: self.from_erc20.ok_or_else(not_found("from_erc20"))?.into(),
+            recipient_id: self.recipient_id.ok_or_else(not_found("recipient_id"))?,
+            to_token: self.to_token.ok_or_else(not_found("to_token"))?,
+            name: self.name.ok_or_else(not_found("name"))?,
+            symbol: self.symbol.ok_or_else(not_found("symbol"))?,
+            decimals: self.decimals.ok_or_else(not_found("decimals"))?,
+        })
+    }
+
+    fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
+        match name {
+            "sender" => self.sender = value.into_address(),
+            "amount" => self.amount = value.into_uint(),
+            "from_erc20" => self.from_erc20 = value.into_address(),
+            "recipient_id" => self.recipient_id = value.into_fixed_bytes(),
+            "to_token" => self.to_token = value.into_fixed_bytes(),
+            "name" => self.name = value.into_fixed_bytes(),
+            "symbol" => self.symbol = value.into_fixed_bytes(),
+            "decimals" => self.decimals = value.into_uint().map(|v| v.as_u32() as _),
+            _ => {}
+        };
+        self
+    }
+}
+
+impl TryFrom<RawLog> for BurntEventData {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        let parsed = BURNT_EVENT.parse_log(log)?;
+
+        let mut data_builder = BurntEventDataBuilder::default();
+
+        for param in parsed.params {
+            data_builder.with_field_from_token(&param.name, param.value);
+        }
+
+        data_builder.build()
+    }
+}
+
 pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
     name: "MintTokenEvent".into(),
     inputs: vec![
@@ -256,6 +334,73 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
     ],
     anonymous: false,
 });
+
+#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
+pub struct MintedEventData {
+    pub amount: did::U256,
+    pub from_token: Vec<u8>,
+    pub sender_id: Vec<u8>,
+    pub to_erc20: did::H160,
+    pub recipient: did::H160,
+    pub nonce: u32,
+}
+
+#[derive(Debug, Default)]
+struct MintedEventDataBuilder {
+    pub amount: Option<U256>,
+    pub from_token: Option<Vec<u8>>,
+    pub sender_id: Option<Vec<u8>>,
+    pub to_erc20: Option<H160>,
+    pub recipient: Option<H160>,
+    pub nonce: Option<u32>,
+}
+
+impl MintedEventDataBuilder {
+    fn build(self) -> Result<MintedEventData, ethers_core::abi::Error> {
+        fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
+            let msg = format!("missing event field `{}`", field);
+            move || ethers_core::abi::Error::Other(msg.into())
+        }
+
+        Ok(MintedEventData {
+            amount: self.amount.ok_or_else(not_found("amount"))?.into(),
+            from_token: self.from_token.ok_or_else(not_found("from_token"))?,
+            sender_id: self.sender_id.ok_or_else(not_found("sender_id"))?,
+            to_erc20: self.to_erc20.ok_or_else(not_found("to_erc20"))?.into(),
+            recipient: self.recipient.ok_or_else(not_found("recipient"))?.into(),
+            nonce: self.nonce.ok_or_else(not_found("nonce"))?,
+        })
+    }
+
+    fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
+        match name {
+            "amount" => self.amount = value.into_uint().map(Into::into),
+            "from_token" => self.from_token = value.into_fixed_bytes(),
+            "sender_id" => self.sender_id = value.into_fixed_bytes(),
+            "to_erc20" => self.to_erc20 = value.into_address().map(Into::into),
+            "recipient" => self.recipient = value.into_address().map(Into::into),
+            "nonce" => self.nonce = value.into_uint().map(|v| v.as_u32()),
+            _ => {}
+        };
+        self
+    }
+}
+
+impl TryFrom<RawLog> for MintedEventData {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        let parsed = MINTED_EVENT.parse_log(log)?;
+
+        let mut data_builder = MintedEventDataBuilder::default();
+
+        for param in parsed.params {
+            data_builder.with_field_from_token(&param.name, param.value);
+        }
+
+        data_builder.build()
+    }
+}
 
 #[allow(deprecated)] // need to initialize `constant` field
 pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {

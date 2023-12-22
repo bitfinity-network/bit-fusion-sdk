@@ -2568,9 +2568,12 @@ dependencies = [
 name = "minter-contract-utils"
 version = "0.2.0"
 dependencies = [
+ "candid",
+ "did",
  "ethers-core",
  "hex",
  "once_cell",
+ "serde",
  "solidity-helper",
 ]
 

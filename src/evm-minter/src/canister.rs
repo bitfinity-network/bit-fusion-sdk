@@ -9,7 +9,7 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 
 use crate::state::{BridgeSide, Settings, State};
-use crate::tasks::PersistentTask;
+use crate::tasks::BridgeTask;
 
 const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
 const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
@@ -69,24 +69,24 @@ impl EvmMinter {
         self.set_timers();
     }
 
-    fn init_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<PersistentTask> {
+    fn init_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
         let init_options = TaskOptions::default()
             .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
             .with_backoff_policy(BackoffPolicy::Exponential {
                 secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
                 multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
             });
-        PersistentTask::InitEvmState(bridge_side).into_scheduled(init_options)
+        BridgeTask::InitEvmState(bridge_side).into_scheduled(init_options)
     }
 
-    fn collect_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<PersistentTask> {
+    fn collect_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
         let options = TaskOptions::default()
             .with_retry_policy(RetryPolicy::Infinite)
             .with_backoff_policy(BackoffPolicy::Fixed {
                 secs: EVM_EVENTS_COLLECTING_DELAY,
             });
 
-        PersistentTask::CollectEvmInfo(bridge_side).into_scheduled(options)
+        BridgeTask::CollectEvmInfo(bridge_side).into_scheduled(options)
     }
 
     #[post_upgrade]

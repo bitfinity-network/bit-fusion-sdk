@@ -4,37 +4,53 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use ethereum_json_rpc_client::EthGetLogsParams;
+use ethers_core::abi::RawLog;
+use ethers_core::types::Log;
+use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{BURNT_EVENT, MINTED_EVENT};
+use minter_contract_utils::bft_bridge_api::{
+    BurntEventData, MintedEventData, BURNT_EVENT, MINTED_EVENT,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
 use crate::state::{BridgeSide, State};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum PersistentTask {
+pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmInfo(BridgeSide),
+    PrepareMintOrder(BurntEventData),
+    RemoveMintOrder(MintedEventData),
 }
 
-impl Task for PersistentTask {
+impl Task for BridgeTask {
     fn execute(
         &self,
         _: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let state = get_state();
         match self {
-            PersistentTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            PersistentTask::CollectEvmInfo(side) => {
+            BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
+            BridgeTask::CollectEvmInfo(side) => {
                 Box::pin(Self::collect_evm_events(state, *side))
+            }
+            BridgeTask::PrepareMintOrder(data) => {
+                Box::pin(Self::prepare_mint_order(state, data.clone()))
+            }
+            BridgeTask::RemoveMintOrder(_data) => {
+                Box::pin(async move {
+                    // todo: remove mint order
+                    Ok(())
+                })
             }
         }
     }
 }
 
-impl PersistentTask {
+impl BridgeTask {
     pub fn into_scheduled(self, options: TaskOptions) -> ScheduledTask<Self> {
         ScheduledTask::with_options(self, options)
     }
@@ -120,9 +136,59 @@ impl PersistentTask {
             topics: vec![BURNT_EVENT.signature(), MINTED_EVENT.signature()],
         };
 
-        let _logs = client.get_logs(params).await.into_scheduler_result()?;
+        let logs = client.get_logs(params).await.into_scheduler_result()?;
 
-        todo!("spawn tasks according to logs");
+        let mut mut_state = state.borrow_mut();
+
+        // Filter out logs that do not have block number.
+        // Such logs are produced when the block is not finalized yet.
+        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
+        if let Some(last_log) = last_log {
+            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
+            mut_state.config.set_evm_next_block(next_block_number, side);
+        };
+
+        mut_state.scheduler.append_tasks(
+            logs.into_iter()
+                .filter_map(|l| Self::task_by_log(l))
+                .collect(),
+        );
+
+        Ok(())
+    }
+
+    async fn prepare_mint_order(
+        _state: Rc<RefCell<State>>,
+        _burn_event: BurntEventData,
+    ) -> Result<(), SchedulerError> {
+        todo!()
+    }
+
+    fn task_by_log(log: Log) -> Option<ScheduledTask<BridgeTask>> {
+        let raw_log = RawLog {
+            topics: log.topics,
+            data: log.data.to_vec(),
+        };
+
+        const TASK_RETRY_DELAY_SECS: u32 = 5;
+
+        let options = TaskOptions::default()
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: TASK_RETRY_DELAY_SECS,
+            })
+            .with_max_retries_policy(u32::MAX);
+
+        if let Ok(burnt_event_data) = BurntEventData::try_from(raw_log.clone()) {
+            let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data);
+            return Some(mint_order_task.into_scheduled(options));
+        }
+
+        if let Ok(mint_event_data) = MintedEventData::try_from(raw_log) {
+            let remove_mint_order_task = BridgeTask::RemoveMintOrder(mint_event_data);
+            return Some(remove_mint_order_task.into_scheduled(options));
+        }
+
+        None
     }
 }
 

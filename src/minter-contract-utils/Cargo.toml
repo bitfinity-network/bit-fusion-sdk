@@ -9,6 +9,9 @@ edition.workspace = true
 once_cell = { workspace = true }
 hex = { workspace = true }
 ethers-core = { workspace = true }
+did = { workspace = true }
+candid = { workspace = true }
+serde = { workspace = true }
 
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }
