@@ -11,15 +11,15 @@ minter-contract-utils = { path = "../minter-contract-utils" }
 did = { workspace = true }
 minter-did = { workspace = true }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+  "reqwest",
+  "pocket-ic-tests-client",
+] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-exports = { workspace = true, features = [
-  "icrc",
-  "ledger",
-] }
+ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-helpers = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true, features = [
@@ -51,6 +51,8 @@ register-evm-agent = { workspace = true }
 rlp = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
+evm-minter = { path = "../evm-minter" }
+signature-verification-canister-client = { workspace = true }
 
 [features]
 pocket_ic_integration_test = []

@@ -33,6 +33,12 @@ pub async fn get_spender_canister_bytecode() -> Vec<u8> {
     get_or_load_wasm(&CANISTER_BYTECODE, "spender.wasm.gz").await
 }
 
+/// Returns the bytecode of the minter evm
+pub async fn get_evm_minter_canister_bytecode() -> Vec<u8> {
+    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
+    get_or_load_wasm(&CANISTER_BYTECODE, "evm-minter.wasm.gz").await
+}
+
 /// Returns the bytecode of the evmc canister - Testnet
 pub async fn get_evm_testnet_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
