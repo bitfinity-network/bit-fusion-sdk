@@ -6,15 +6,19 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-once_cell = { workspace = true }
-hex = { workspace = true }
 ethers-core = { workspace = true }
 did = { workspace = true }
 candid = { workspace = true }
+hex = { workspace = true }
+ic-stable-structures = { workspace = true }
+minter-did = { workspace = true }
+once_cell = { workspace = true }
 serde = { workspace = true }
 
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }
 
 [dev-dependencies]
+candid = { workspace = true }
+ic-exports = { workspace = true }
 solidity-helper = { path = "../solidity-helper" }
