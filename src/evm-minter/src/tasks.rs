@@ -198,12 +198,12 @@ impl BridgeTask {
         let sender = Id256::from_evm_address(&burn_event.sender, sender_chain_id);
         let src_token = Id256::from_evm_address(&burn_event.from_erc20, sender_chain_id);
 
-        let nonce = state.borrow_mut().next_nonce();
-
         fn to_array<const N: usize>(data: &[u8]) -> Result<[u8; N], SchedulerError> {
             data.try_into().into_scheduler_result()
         }
 
+        let nonce = burn_event.operation_id;
+        
         let mint_order = MintOrder {
             amount: burn_event.amount,
             sender,
@@ -224,7 +224,10 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        todo!("store signed mint order");
+        state
+            .borrow_mut()
+            .mint_orders
+            .insert(sender, src_token, nonce, &signed_mint_order);
 
         Ok(())
     }

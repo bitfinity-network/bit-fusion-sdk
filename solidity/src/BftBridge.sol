@@ -152,6 +152,7 @@ contract BFTBridge {
         address fromERC20,
         bytes32 recipientID,
         bytes32 toToken,
+        uint32 operationID,
         bytes32 name,
         bytes16 symbol,
         uint8 decimals
@@ -285,18 +286,20 @@ contract BFTBridge {
             decimals = _decimals;
         } catch {}
 
+        uint32 operationID = operationIDCounter++;
+
         emit BurnTokenEvent(
             msg.sender,
             amount,
             fromERC20,
             recipientID,
             toTokenID,
+            operationID,
             name,
             symbol,
             decimals
         );
 
-        uint32 operationID = operationIDCounter++;
         _pendingBurns[msg.sender][operationID] = Erc20BurnInfo(
             msg.sender,
             amount,

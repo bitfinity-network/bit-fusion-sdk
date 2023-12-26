@@ -8,11 +8,14 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::scheduler::Scheduler;
 use ic_task_scheduler::task::ScheduledTask;
+use minter_contract_utils::mint_orders::MintOrders;
 use serde::{Deserialize, Serialize};
 
 pub use self::config::{BridgeSide, Config, ConfigData};
 use crate::client::EvmLink;
-use crate::memory::{MEMORY_MANAGER, NONCE_MEMORY_ID, PENDING_TASKS_MEMORY_ID, SIGNER_MEMORY_ID};
+use crate::memory::{
+    MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, PENDING_TASKS_MEMORY_ID, SIGNER_MEMORY_ID,
+};
 use crate::tasks::BridgeTask;
 
 mod config;
@@ -20,7 +23,6 @@ mod config;
 type TasksStorage =
     StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
-type NonceStorage = StableCell<u32, VirtualMemory<DefaultMemoryImpl>>;
 
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
@@ -28,7 +30,7 @@ pub struct State {
     pub config: Config,
     pub scheduler: PersistentScheduler,
     pub signer: SignerStorage,
-    pub nonce: NonceStorage,
+    pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for State {
@@ -44,14 +46,13 @@ impl Default for State {
         )
         .expect("failed to initialize transaction signer");
 
-        let nonce = NonceStorage::new(MEMORY_MANAGER.with(|mm| mm.get(NONCE_MEMORY_ID)), 0)
-            .expect("failed to initialize nonce storage");
+        let mint_orders = MintOrders::new(MEMORY_MANAGER.with(|mm| mm.get(MINT_ORDERS_MEMORY_ID)));
 
         Self {
             config: Default::default(),
             scheduler: PersistentScheduler::new(pending_tasks),
             signer,
-            nonce,
+            mint_orders,
         }
     }
 }
@@ -75,14 +76,6 @@ impl State {
 
         self.config.init(settings);
         self.signer.set(signer).expect("failed to set signer");
-    }
-
-    pub fn next_nonce(&mut self) -> u32 {
-        let next_nonce = *self.nonce.get();
-        self.nonce
-            .set(next_nonce + 1)
-            .expect("failed to store updated nonce");
-        next_nonce
     }
 }
 

@@ -40,7 +40,7 @@ impl Default for State {
         Self {
             config: Config::default(),
             signer: SignerInfo::default(),
-            mint_orders: MintOrders::new(&memory_manager, MINT_ORDERS_MEMORY_ID),
+            mint_orders: MintOrders::new(memory_manager.get(MINT_ORDERS_MEMORY_ID)),
             logger_config_service: LoggerConfigService::default(),
         }
     }

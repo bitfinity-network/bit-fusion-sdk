@@ -2,11 +2,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use ic_canister::{generate_idl, init, post_upgrade, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_task_scheduler::retry::{BackoffPolicy, RetryPolicy};
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use minter_did::id256::Id256;
+use minter_did::order::SignedMintOrder;
 
 use crate::state::{BridgeSide, Settings, State};
 use crate::tasks::BridgeTask;
@@ -92,6 +94,27 @@ impl EvmMinter {
     #[post_upgrade]
     pub fn post_upgrade(&mut self) {
         self.set_timers();
+    }
+
+    /// Returns `(operaion_id, signed_mint_order)` pairs for the given sender id.
+    #[query]
+    pub async fn list_mint_orders(
+        &self,
+        sender: Id256,
+        src_token: Id256,
+    ) -> Vec<(u32, SignedMintOrder)> {
+        get_state().borrow().mint_orders.get_all(sender, src_token)
+    }
+
+    /// Returns the `signed_mint_order` if present.
+    #[query]
+    pub async fn get_mint_orders(
+        &self,
+        sender: Id256,
+        src_token: Id256,
+        operation_id: u32,
+    ) -> Option<SignedMintOrder> {
+        get_state().borrow().mint_orders.get(sender, src_token, operation_id)
     }
 
     pub fn idl() -> Idl {
