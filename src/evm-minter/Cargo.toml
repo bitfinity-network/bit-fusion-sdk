@@ -24,3 +24,5 @@ ic-canister-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 anyhow = { workspace = true }
 ethers-core = { workspace = true }
+eth-signer = { workspace = true }
+minter-did = { workspace = true }

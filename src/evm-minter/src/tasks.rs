@@ -6,6 +6,7 @@ use std::rc::Rc;
 use ethereum_json_rpc_client::EthGetLogsParams;
 use ethers_core::abi::RawLog;
 use ethers_core::types::Log;
+use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
@@ -13,6 +14,8 @@ use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::bft_bridge_api::{
     BurntEventData, MintedEventData, BURNT_EVENT, MINTED_EVENT,
 };
+use minter_did::id256::Id256;
+use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
@@ -22,7 +25,7 @@ use crate::state::{BridgeSide, State};
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmInfo(BridgeSide),
-    PrepareMintOrder(BurntEventData),
+    PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
 }
 
@@ -34,11 +37,9 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            BridgeTask::CollectEvmInfo(side) => {
-                Box::pin(Self::collect_evm_events(state, *side))
-            }
-            BridgeTask::PrepareMintOrder(data) => {
-                Box::pin(Self::prepare_mint_order(state, data.clone()))
+            BridgeTask::CollectEvmInfo(side) => Box::pin(Self::collect_evm_events(state, *side)),
+            BridgeTask::PrepareMintOrder(data, side) => {
+                Box::pin(Self::prepare_mint_order(state, data.clone(), *side))
             }
             BridgeTask::RemoveMintOrder(_data) => {
                 Box::pin(async move {
@@ -150,7 +151,7 @@ impl BridgeTask {
 
         mut_state.scheduler.append_tasks(
             logs.into_iter()
-                .filter_map(|l| Self::task_by_log(l))
+                .filter_map(|l| Self::task_by_log(l, side))
                 .collect(),
         );
 
@@ -158,13 +159,77 @@ impl BridgeTask {
     }
 
     async fn prepare_mint_order(
-        _state: Rc<RefCell<State>>,
-        _burn_event: BurntEventData,
+        state: Rc<RefCell<State>>,
+        burn_event: BurntEventData,
+        sender_side: BridgeSide,
     ) -> Result<(), SchedulerError> {
-        todo!()
+        let recipient = Id256::from_slice(&burn_event.recipient_id)
+            .and_then(|id| id.to_evm_address().ok())
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("failed to decode recipient data".into())
+            })?
+            .1;
+
+        let dst_token = Id256::from_slice(&burn_event.to_token)
+            .and_then(|id| id.to_evm_address().ok())
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("failed to decode dst token data".into())
+            })?
+            .1;
+
+        let sender_chain_id = state
+            .borrow()
+            .config
+            .get_initialized_evm_info(sender_side)
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("sender evm info is not initialized".into())
+            })?
+            .chain_id as u32;
+
+        let recipient_chain_id = state
+            .borrow()
+            .config
+            .get_initialized_evm_info(sender_side.other())
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("recipient evm info is not initialized".into())
+            })?
+            .chain_id as u32;
+
+        let sender = Id256::from_evm_address(&burn_event.sender, sender_chain_id);
+        let src_token = Id256::from_evm_address(&burn_event.from_erc20, sender_chain_id);
+
+        let nonce = state.borrow_mut().next_nonce();
+
+        fn to_array<const N: usize>(data: &[u8]) -> Result<[u8; N], SchedulerError> {
+            data.try_into().into_scheduler_result()
+        }
+
+        let mint_order = MintOrder {
+            amount: burn_event.amount,
+            sender,
+            src_token,
+            recipient,
+            dst_token,
+            nonce,
+            sender_chain_id,
+            recipient_chain_id,
+            name: to_array(&burn_event.name)?,
+            symbol: to_array(&burn_event.symbol)?,
+            decimals: burn_event.decimals,
+        };
+
+        let signer = state.borrow().signer.get().clone();
+        let signed_mint_order = mint_order
+            .encode_and_sign(&signer)
+            .await
+            .into_scheduler_result()?;
+
+        todo!("store signed mint order");
+
+        Ok(())
     }
 
-    fn task_by_log(log: Log) -> Option<ScheduledTask<BridgeTask>> {
+    fn task_by_log(log: Log, sender_side: BridgeSide) -> Option<ScheduledTask<BridgeTask>> {
         let raw_log = RawLog {
             topics: log.topics,
             data: log.data.to_vec(),
@@ -179,7 +244,7 @@ impl BridgeTask {
             .with_max_retries_policy(u32::MAX);
 
         if let Ok(burnt_event_data) = BurntEventData::try_from(raw_log.clone()) {
-            let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data);
+            let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data, sender_side);
             return Some(mint_order_task.into_scheduled(options));
         }
 

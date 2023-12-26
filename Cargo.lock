@@ -1315,6 +1315,7 @@ dependencies = [
  "anyhow",
  "candid",
  "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "ic-canister",
@@ -1326,6 +1327,7 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "minter-contract-utils",
+ "minter-did",
  "serde",
 ]
 

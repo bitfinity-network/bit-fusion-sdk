@@ -87,6 +87,15 @@ pub enum BridgeSide {
     Wrapped = 1,
 }
 
+impl BridgeSide {
+    pub fn other(self) -> Self {
+        match self {
+            Self::Base => Self::Wrapped,
+            Self::Wrapped => Self::Base,
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmInfo {
     pub link: EvmLink,
