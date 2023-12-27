@@ -114,7 +114,10 @@ impl EvmMinter {
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        get_state().borrow().mint_orders.get(sender, src_token, operation_id)
+        get_state()
+            .borrow()
+            .mint_orders
+            .get(sender, src_token, operation_id)
     }
 
     pub fn idl() -> Idl {

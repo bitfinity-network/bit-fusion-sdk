@@ -203,7 +203,7 @@ impl BridgeTask {
         }
 
         let nonce = burn_event.operation_id;
-        
+
         let mint_order = MintOrder {
             amount: burn_event.amount,
             sender,
