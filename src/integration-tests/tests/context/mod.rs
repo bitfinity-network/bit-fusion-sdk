@@ -33,9 +33,9 @@ use super::utils::error::Result;
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
-    get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_minter_canister_bytecode, get_signature_verification_canister_bytecode,
-    get_spender_canister_bytecode,
+    get_evm_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
+    get_icrc1_token_canister_bytecode, get_minter_canister_bytecode,
+    get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
@@ -499,6 +499,7 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
+            _ => todo!(),
         }
     }
 
@@ -717,6 +718,7 @@ pub enum CanisterType {
     Token2,
     Minter,
     Spender,
+    EvmMinter,
 }
 
 impl CanisterType {
@@ -740,6 +742,7 @@ impl CanisterType {
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Minter => get_minter_canister_bytecode().await,
             CanisterType::Spender => get_spender_canister_bytecode().await,
+            CanisterType::EvmMinter => get_evm_minter_canister_bytecode().await,
         }
     }
 }

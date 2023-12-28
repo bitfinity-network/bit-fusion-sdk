@@ -130,7 +130,7 @@ contract BFTBridge {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
-    // Constructor to initialize minterCanisterAddress and bridgeType
+    // Constructor to initialize minterCanisterAddress
     constructor(address minterAddress) {
         minterCanisterAddress = minterAddress;
     }

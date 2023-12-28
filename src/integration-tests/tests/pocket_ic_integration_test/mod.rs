@@ -8,7 +8,8 @@ use std::time::Duration;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
-use ic_canister_client::PocketIcClient;
+use evm_canister_client::EvmCanisterClient;
+use ic_canister_client::{IcCanisterClient, PocketIcClient};
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::pocket_ic::nio::PocketIcAsync;
@@ -65,6 +66,30 @@ impl PocketIcTestContext {
     pub async fn advance_time(&self, time: Duration) {
         self.client.advance_time(time).await;
         self.client.tick().await;
+    }
+
+    pub async fn deploy_canister(
+        &self,
+        canister_type: CanisterType,
+        args: impl ArgumentEncoder + Send,
+    ) -> Principal {
+        let canister = self
+            .create_canister()
+            .await
+            .expect("canister should be created");
+
+        let wasm = canister_type.default_canister_wasm().await;
+
+        self.client
+            .install_canister(
+                canister,
+                wasm,
+                candid::encode_args::<_>(args).unwrap(),
+                Some(self.admin()),
+            )
+            .await;
+
+        canister
     }
 }
 
@@ -169,4 +194,22 @@ impl fmt::Debug for PocketIcTestContext {
             .field("canisters", &self.canisters)
             .finish()
     }
+}
+
+pub async fn wait_transaction_receipt(
+    ctx: &PocketIcTestContext,
+    evm_principal: Principal,
+    hash: &H256,
+) -> Result<Option<TransactionReceipt>> {
+    for _ in 0..50 {
+        let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
+        ctx.advance_time(time).await;
+
+        let evm = EvmCanisterClient::new(IcCanisterClient::new(evm_principal));
+        let receipt = evm.eth_get_transaction_receipt(hash.clone()).await??;
+        if receipt.is_some() {
+            return Ok(receipt);
+        }
+    }
+    Ok(None)
 }

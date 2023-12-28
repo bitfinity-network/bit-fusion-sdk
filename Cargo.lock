@@ -2223,6 +2223,7 @@ dependencies = [
  "ethereum-types",
  "ethers-core",
  "evm-canister-client",
+ "evm-minter",
  "futures",
  "hex",
  "ic-canister",
@@ -2243,6 +2244,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
+ "signature-verification-canister-client",
  "solidity-helper",
  "thiserror",
  "tokio",
@@ -3924,6 +3926,16 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core",
+]
+
+[[package]]
+name = "signature-verification-canister-client"
+version = "0.8.1"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=eth_get_logs_in_jsonrpc_client#813b81f999437f8db57a13b83b736d1a4469e7b1"
+dependencies = [
+ "candid",
+ "did",
+ "ic-canister-client",
 ]
 
 [[package]]
