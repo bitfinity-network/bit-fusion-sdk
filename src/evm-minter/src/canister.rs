@@ -2,8 +2,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
+use did::error::EvmError;
+use did::H160;
+use eth_signer::sign_strategy::TransactionSigner;
+use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
+use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::{BackoffPolicy, RetryPolicy};
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
@@ -118,6 +122,12 @@ impl EvmMinter {
             .borrow()
             .mint_orders
             .get(sender, src_token, operation_id)
+    }
+
+    /// Returns EVM address of the canister.
+    #[update]
+    pub async fn get_evm_address(&self) -> Result<H160, EvmError> {
+        get_state().borrow().signer.get().get_address().await
     }
 
     pub fn idl() -> Idl {

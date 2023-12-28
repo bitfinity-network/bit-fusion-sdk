@@ -541,7 +541,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
 #[tokio::test]
 async fn test_external_bridging() {
-    let (ctx, _john_wallet, bft_bridge) = init_bridge().await;
+    let (ctx, _john_wallet, _bft_bridge) = init_bridge().await;
 
     let minter_client = ctx.minter_client(ADMIN);
 
@@ -639,7 +639,7 @@ async fn test_external_bridging() {
         .unwrap();
 
     // Initialize evm-minter with EvmInfos for both EVM canisters.
-    let evm_minter = ctx
+    let _evm_minter = ctx
         .deploy_canister(
             CanisterType::EvmMinter,
             (Settings {

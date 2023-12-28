@@ -34,7 +34,6 @@ pub struct State {
     pub logger_config_service: LoggerConfigService,
 }
 
-<<<<<<< HEAD
 impl Default for State {
     fn default() -> Self {
         let memory_manager = default_ic_memory_manager();
@@ -47,8 +46,6 @@ impl Default for State {
     }
 }
 
-=======
->>>>>>> chore/integration-tests
 impl State {
     /// Clear the state and set initial data from settings.
     pub fn reset(&mut self, settings: Settings) {
