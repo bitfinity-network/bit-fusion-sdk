@@ -1321,6 +1321,7 @@ dependencies = [
  "ic-canister",
  "ic-canister-client",
  "ic-exports",
+ "ic-log",
  "ic-metrics",
  "ic-stable-structures 0.11.2",
  "ic-storage",

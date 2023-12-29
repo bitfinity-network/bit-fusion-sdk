@@ -10,6 +10,7 @@ use evm_minter::client::EvmLink;
 use evm_minter::state::Settings;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
+use ic_log::LogSettings;
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_canister::SigningStrategy;
 use minter_contract_utils::build_data::{
@@ -648,6 +649,11 @@ async fn test_external_bridging() {
                 signing_strategy: SigningStrategy::Local {
                     private_key: [42; 32],
                 },
+                log_settings: Some(LogSettings {
+                    enable_console: true,
+                    in_memory_records: None,
+                    log_filter: Some("info".to_string()),
+                }),
             },),
         )
         .await;

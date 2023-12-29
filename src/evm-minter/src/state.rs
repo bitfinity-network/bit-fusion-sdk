@@ -4,14 +4,16 @@ use candid::CandidType;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningKeyId, SigningStrategy, TxSigner,
 };
+use ic_log::LogSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::scheduler::Scheduler;
 use ic_task_scheduler::task::ScheduledTask;
 use minter_contract_utils::mint_orders::MintOrders;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 pub use self::config::{BridgeSide, Config, ConfigData};
+use self::log::LoggerConfigService;
 use crate::client::EvmLink;
 use crate::memory::{
     MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, PENDING_TASKS_MEMORY_ID, SIGNER_MEMORY_ID,
@@ -19,6 +21,7 @@ use crate::memory::{
 use crate::tasks::BridgeTask;
 
 mod config;
+mod log;
 
 type TasksStorage =
     StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -31,6 +34,7 @@ pub struct State {
     pub scheduler: PersistentScheduler,
     pub signer: SignerStorage,
     pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
+    pub logger: LoggerConfigService,
 }
 
 impl Default for State {
@@ -48,11 +52,14 @@ impl Default for State {
 
         let mint_orders = MintOrders::new(MEMORY_MANAGER.with(|mm| mm.get(MINT_ORDERS_MEMORY_ID)));
 
+        let logger = LoggerConfigService::default();
+
         Self {
             config: Default::default(),
             scheduler: PersistentScheduler::new(pending_tasks),
             signer,
             mint_orders,
+            logger,
         }
     }
 }
@@ -74,14 +81,22 @@ impl State {
             .make_signer(0)
             .expect("failed to make signer according to settings");
 
+        if let Some(log_settings) = &settings.log_settings {
+            self.logger.init(log_settings.clone());
+        }
+
         self.config.init(settings);
         self.signer.set(signer).expect("failed to set signer");
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+#[derive(Debug, Clone, Deserialize, CandidType)]
 pub struct Settings {
     pub base_evm_link: EvmLink,
     pub wrapped_evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
+
+    /// Log settings
+    #[serde(default)]
+    pub log_settings: Option<LogSettings>,
 }
