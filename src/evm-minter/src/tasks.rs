@@ -69,6 +69,8 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
+        log::trace!("initializing evm chain id for side {:?}", side);
+        
         let link = {
             let state = state.borrow();
             let info = state.config.get_evm_info(side);
@@ -95,6 +97,7 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
+        log::trace!("initializing evm next block for side {:?}", side);
         let link = {
             let state = state.borrow();
             let info = state.config.get_evm_info(side);
@@ -124,6 +127,8 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
+        log::trace!("collecting evm events: {side:?}");
+
         let Some(evm_info) = state.borrow().config.get_initialized_evm_info(side) else {
             return Self::init_evm_state(state, side).await;
         };
@@ -163,6 +168,7 @@ impl BridgeTask {
         burn_event: BurntEventData,
         sender_side: BridgeSide,
     ) -> Result<(), SchedulerError> {
+        log::trace!("preparing mint order: {burn_event:?}");
         let recipient = Id256::from_slice(&burn_event.recipient_id)
             .and_then(|id| id.to_evm_address().ok())
             .ok_or_else(|| {
@@ -233,6 +239,7 @@ impl BridgeTask {
     }
 
     fn task_by_log(log: Log, sender_side: BridgeSide) -> Option<ScheduledTask<BridgeTask>> {
+        log::trace!("creating task from the log: {log:?}");
         let raw_log = RawLog {
             topics: log.topics,
             data: log.data.to_vec(),

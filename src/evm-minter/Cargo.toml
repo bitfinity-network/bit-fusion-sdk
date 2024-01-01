@@ -27,3 +27,4 @@ ethers-core = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 minter-did = { workspace = true }
 ic-log = { workspace = true }
+log = { workspace = true }

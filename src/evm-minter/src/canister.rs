@@ -43,15 +43,11 @@ impl EvmMinter {
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 let state = get_state();
 
-                // if !state.borrow().initialized() { # Missing function
-                //     return;
-                // }
+                let task_execution_result = state.borrow_mut().scheduler.run();
 
-                state
-                    .borrow_mut()
-                    .scheduler
-                    .run()
-                    .expect("scheduler failed to execute tasks");
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
             });
         }
     }

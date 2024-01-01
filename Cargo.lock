@@ -1327,6 +1327,7 @@ dependencies = [
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
+ "log",
  "minter-contract-utils",
  "minter-did",
  "serde",
