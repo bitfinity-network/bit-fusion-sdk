@@ -101,7 +101,7 @@ pub trait TestContext {
     async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
         let client = self.evm_client(self.admin_name());
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval + Duration::from_secs(2);
+        let timeout = tx_processing_interval * 2;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
@@ -644,7 +644,7 @@ pub fn evm_canister_init_data(
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,
-            log_filter: Some("info".to_string()),
+            log_filter: Some("trace".to_string()),
         }),
         transaction_processing_interval,
         owner,

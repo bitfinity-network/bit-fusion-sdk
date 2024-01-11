@@ -24,7 +24,7 @@ pub fn get_workspace_root_dir() -> PathBuf {
         .to_path_buf()
 }
 
-pub const EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS: Duration = Duration::from_millis(100);
+pub const EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS: Duration = Duration::from_millis(500);
 pub const CHAIN_ID: u64 = 355113;
 
 /// Re-usable function to prepare the evm canister

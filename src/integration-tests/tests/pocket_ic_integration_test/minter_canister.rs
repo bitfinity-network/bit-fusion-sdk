@@ -625,6 +625,10 @@ async fn test_external_bridging() {
 
     // Tick to advance time.
     ctx.advance_time(Duration::from_secs(10)).await;
+
+    // refresh gas limit multiplier
+    external_evm_client.admin_disable_evm(false).await.unwrap().unwrap();
+
     let external_bridge_address = ctx
         .wait_transaction_receipt(&hash)
         .await
