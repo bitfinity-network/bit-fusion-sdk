@@ -9,7 +9,7 @@ use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
 use evm_canister_client::EvmCanisterClient;
-use ic_canister_client::{IcCanisterClient, PocketIcClient};
+use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::pocket_ic::nio::PocketIcAsync;
@@ -163,18 +163,26 @@ impl TestContext for PocketIcTestContext {
     }
 
     /// Waits for transaction receipt.
-    async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
+    async fn wait_transaction_receipt_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        hash: &H256,
+    ) -> Result<Option<TransactionReceipt>> {
         for _ in 0..50 {
             let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
             self.advance_time(time).await;
-            let receipt = self
-                .evm_client(ADMIN)
-                .eth_get_transaction_receipt(hash.clone())
-                .await??;
+            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
+
+            if result.is_err() {
+                println!("failed to get tx receipt: {result:?}")
+            }
+
+            let receipt = result?;
             if receipt.is_some() {
                 return Ok(receipt);
             }
         }
+
         Ok(None)
     }
 
@@ -194,22 +202,4 @@ impl fmt::Debug for PocketIcTestContext {
             .field("canisters", &self.canisters)
             .finish()
     }
-}
-
-pub async fn wait_transaction_receipt(
-    ctx: &PocketIcTestContext,
-    evm_principal: Principal,
-    hash: &H256,
-) -> Result<Option<TransactionReceipt>> {
-    for _ in 0..50 {
-        let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
-        ctx.advance_time(time).await;
-
-        let evm = EvmCanisterClient::new(IcCanisterClient::new(evm_principal));
-        let receipt = evm.eth_get_transaction_receipt(hash.clone()).await??;
-        if receipt.is_some() {
-            return Ok(receipt);
-        }
-    }
-    Ok(None)
 }

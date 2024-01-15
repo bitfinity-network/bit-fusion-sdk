@@ -27,7 +27,9 @@ use crate::context::{
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 use crate::utils::error::TestError;
-use crate::utils::{self, get_solidity_smart_contracts};
+use crate::utils::{
+    self, get_solidity_smart_contracts,
+};
 
 /// Initializez test environment with:
 /// - john wallet with native tokens,
@@ -565,10 +567,6 @@ async fn test_external_bridging() {
         )
     };
 
-    {
-        dbg!(external_evm_client.get_block_gas_limit().await.unwrap());
-    }
-
     // whitelist external EVM canister.
     {
         let signature =
@@ -623,25 +621,13 @@ async fn test_external_bridging() {
         .unwrap()
         .unwrap();
 
-    // Tick to advance time.
-    ctx.advance_time(Duration::from_secs(10)).await;
-
-    // refresh gas limit multiplier
-    external_evm_client.admin_disable_evm(false).await.unwrap().unwrap();
-
     let external_bridge_address = ctx
-        .wait_transaction_receipt(&hash)
+        .wait_transaction_receipt_on_evm(&external_evm_client, &hash)
         .await
         .unwrap()
         .unwrap()
         .contract_address
         .expect("contract address");
-
-    minter_client
-        .register_evmc_bft_bridge(external_bridge_address.clone())
-        .await
-        .unwrap()
-        .unwrap();
 
     // Initialize evm-minter with EvmInfos for both EVM canisters.
     let _evm_minter = ctx
@@ -691,11 +677,11 @@ async fn test_external_bridging() {
             .unwrap()
             .unwrap();
 
-        let receipt =
-            crate::pocket_ic_integration_test::wait_transaction_receipt(&ctx, external_evm, &hash)
-                .await
-                .unwrap()
-                .unwrap();
+        let receipt = ctx
+            .wait_transaction_receipt_on_evm(&external_evm_client, &hash)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receipt.status, Some(U64::one()));
 
@@ -758,11 +744,11 @@ async fn test_external_bridging() {
         .unwrap()
         .unwrap();
 
-    let receipt =
-        crate::pocket_ic_integration_test::wait_transaction_receipt(&ctx, external_evm, &hash)
-            .await
-            .unwrap()
-            .unwrap();
+    let receipt = ctx
+        .wait_transaction_receipt_on_evm(&external_evm_client, &hash)
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(receipt.status, Some(U64::one()));
 

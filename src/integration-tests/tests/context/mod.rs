@@ -100,6 +100,15 @@ pub trait TestContext {
     /// Waits for transaction receipt.
     async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
         let client = self.evm_client(self.admin_name());
+        self.wait_transaction_receipt_on_evm(&client, hash).await
+    }
+
+    /// Waits for transaction receipt.
+    async fn wait_transaction_receipt_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        hash: &H256,
+    ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
         let timeout = tx_processing_interval * 2;
         let start = Instant::now();
@@ -108,7 +117,9 @@ pub trait TestContext {
         while time_passed < timeout && receipt.is_none() {
             time::sleep(tx_processing_interval).await;
             time_passed = Instant::now() - start;
-            receipt = client.eth_get_transaction_receipt(hash.clone()).await??;
+            receipt = evm_client
+                .eth_get_transaction_receipt(hash.clone())
+                .await??;
         }
         Ok(receipt)
     }
