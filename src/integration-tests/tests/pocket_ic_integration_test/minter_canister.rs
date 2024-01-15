@@ -14,7 +14,7 @@ use ic_log::LogSettings;
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_canister::SigningStrategy;
 use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
+    BFT_BRIDGE_SMART_CONTRACT_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
 };
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Error as McError;
@@ -546,8 +546,6 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 async fn test_external_bridging() {
     let (ctx, _john_wallet, _bft_bridge) = init_bridge().await;
 
-    let minter_client = ctx.minter_client(ADMIN);
-
     // Deploy external EVM canister.
     let (external_evm, external_evm_client) = {
         let external_evm = ctx
@@ -649,11 +647,6 @@ async fn test_external_bridging() {
         .await;
 
     // Deploy ERC-20 token on external EVM.
-    let erc20_token_bytecode = &get_solidity_smart_contracts()
-        .get("TestWTM")
-        .unwrap()
-        .bytecode;
-
     let data: Constructor = Constructor {
         inputs: vec![Param {
             name: "initialSupply".into(),
@@ -664,7 +657,7 @@ async fn test_external_bridging() {
 
     let data = data
         .encode_input(
-            erc20_token_bytecode.to_vec(),
+            TEST_WTM_HEX_CODE.clone(),
             &[Token::Uint(100_u64.pow(24).into())],
         )
         .unwrap();

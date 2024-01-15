@@ -275,7 +275,7 @@ impl BurntEventDataBuilder {
     }
 
     fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
-        match name {
+        match name { 
             "sender" => self.sender = value.into_address(),
             "amount" => self.amount = value.into_uint(),
             "from_erc20" => self.from_erc20 = value.into_address(),

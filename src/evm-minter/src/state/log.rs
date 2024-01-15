@@ -31,14 +31,13 @@ pub struct LoggerConfigService {
 impl Default for LoggerConfigService {
     fn default() -> Self {
         let settings = LogSettings::default();
-        let config = init_log(&settings).expect("failed to initialize default logger config");
         Self {
             settings: StableCell::new(
                 MEMORY_MANAGER.with(|mm| mm.get(LOGGER_SETTINGS_MEMORY_ID)),
                 StorableLogSettings(settings),
             )
             .expect("failed to init default logger settings"),
-            config: Some(config),
+            config: None,
         }
     }
 }
@@ -67,6 +66,8 @@ impl LoggerConfigService {
     fn update_log_settings(&mut self, filter: &str) {
         let mut log_settings = self.settings.get().clone();
         log_settings.0.log_filter = Some(filter.to_string());
-        self.settings.set(log_settings).expect("failed to update logger settings");
+        self.settings
+            .set(log_settings)
+            .expect("failed to update logger settings");
     }
 }

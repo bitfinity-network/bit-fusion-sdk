@@ -19,6 +19,9 @@ const BUILD_SMART_CONTRACT_UNISWAP_FACTORY_HEX_CODE: &str =
 const BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE: &str =
     env!("BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE");
 
+const BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE: &str =
+    env!("BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE");
+
 /// Get contract code from the environment variable
 fn get_contract_code(env_name: &str) -> Vec<u8> {
     hex::decode(env_name)
@@ -44,6 +47,11 @@ pub static UNISWAP_FACTORY_HEX_CODE: Lazy<Vec<u8>> =
 /// Uniswap token contract bytecode
 pub static UNISWAP_TOKEN_HEX_CODE: Lazy<Vec<u8>> =
     Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE));
+
+/// Uniswap token contract bytecode
+pub static TEST_WTM_HEX_CODE: Lazy<Vec<u8>> =
+    Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE));
+
 
 #[cfg(test)]
 mod tests {
