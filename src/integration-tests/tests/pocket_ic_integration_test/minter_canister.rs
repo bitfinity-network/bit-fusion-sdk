@@ -14,7 +14,7 @@ use ic_log::LogSettings;
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_canister::SigningStrategy;
 use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
+    BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Error as McError;
@@ -27,9 +27,7 @@ use crate::context::{
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 use crate::utils::error::TestError;
-use crate::utils::{
-    self, get_solidity_smart_contracts,
-};
+use crate::utils;
 
 /// Initializez test environment with:
 /// - john wallet with native tokens,
@@ -658,7 +656,7 @@ async fn test_external_bridging() {
     let data = data
         .encode_input(
             TEST_WTM_HEX_CODE.clone(),
-            &[Token::Uint(100_u64.pow(24).into())],
+            &[Token::Uint(u64::MAX.into())],
         )
         .unwrap();
 
