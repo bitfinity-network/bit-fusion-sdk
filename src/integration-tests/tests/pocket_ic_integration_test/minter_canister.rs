@@ -26,8 +26,8 @@ use crate::context::{
     evm_canister_init_data, CanisterType, TestContext, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::error::TestError;
 use crate::utils;
+use crate::utils::error::TestError;
 
 /// Initializez test environment with:
 /// - john wallet with native tokens,
@@ -542,7 +542,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
 #[tokio::test]
 async fn test_external_bridging() {
-    let (ctx, _john_wallet, _bft_bridge) = init_bridge().await;
+    let (ctx, _john_wallet, bft_bridge) = init_bridge().await;
 
     // Deploy external EVM canister.
     let (external_evm, external_evm_client) = {
@@ -654,13 +654,11 @@ async fn test_external_bridging() {
     };
 
     let data = data
-        .encode_input(
-            TEST_WTM_HEX_CODE.clone(),
-            &[Token::Uint(u64::MAX.into())],
-        )
+        .encode_input(TEST_WTM_HEX_CODE.clone(), &[Token::Uint(u64::MAX.into())])
         .unwrap();
 
-    let tx = ctx.signed_transaction(&bob_wallet, None, nonce, 0, data);
+    let nonce = nonce.0.as_u64() + 1;
+    let tx = ctx.signed_transaction(&bob_wallet, None, nonce.into(), 0, data);
     let erc20_token_address = {
         let hash = external_evm_client
             .send_raw_transaction(tx)
@@ -683,8 +681,8 @@ async fn test_external_bridging() {
     let token_id = Id256::from_evm_address(&erc20_token_address, 355113);
     let wrapped_token = ctx
         .create_wrapped_token(
-            &ctx.new_wallet(9_000_000).await.unwrap(),
-            &external_bridge_address,
+            &ctx.new_wallet(u128::MAX).await.unwrap(),
+            &dbg!(bft_bridge),
             token_id,
         )
         .await
@@ -695,7 +693,7 @@ async fn test_external_bridging() {
     let alice_address: H160 = alice_wallet.address().into();
 
     let nonce = external_evm_client
-        .account_basic(alice_address.clone())
+        .account_basic(bob_address.clone())
         .await
         .unwrap()
         .nonce;
@@ -745,7 +743,7 @@ async fn test_external_bridging() {
 
     // Call BFTBridge::burn() on behalf of the user in external EVM.
     let nonce = external_evm_client
-        .account_basic(alice_address.clone())
+        .account_basic(bob_address.clone())
         .await
         .unwrap()
         .nonce;

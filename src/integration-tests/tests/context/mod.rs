@@ -655,7 +655,7 @@ pub fn evm_canister_init_data(
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,
-            log_filter: Some("trace".to_string()),
+            log_filter: Some("debug".to_string()),
         }),
         transaction_processing_interval,
         owner,
