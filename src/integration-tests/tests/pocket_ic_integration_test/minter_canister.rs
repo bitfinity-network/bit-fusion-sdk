@@ -13,6 +13,7 @@ use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
 use ic_log::LogSettings;
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_canister::SigningStrategy;
+use minter_contract_utils::bft_bridge_api::BURN;
 use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
 };
@@ -714,8 +715,8 @@ async fn test_external_bridging() {
         ],
     )
     .encode_input(&[
-        Token::Address(alice_address.clone().into()),
-        Token::Uint(10_u64.pow(18).into()),
+        Token::Address(external_bridge_address.clone().into()),
+        Token::Uint(1000_u64.into()),
     ])
     .unwrap();
 
@@ -727,14 +728,14 @@ async fn test_external_bridging() {
         data,
     );
 
-    let hash = external_evm_client
+    let approve_tx_hash = external_evm_client
         .send_raw_transaction(approve_tx)
         .await
         .unwrap()
         .unwrap();
 
     let receipt = ctx
-        .wait_transaction_receipt_on_evm(&external_evm_client, &hash)
+        .wait_transaction_receipt_on_evm(&external_evm_client, &approve_tx_hash)
         .await
         .unwrap()
         .unwrap();
@@ -752,7 +753,7 @@ async fn test_external_bridging() {
 
     let input = bft_bridge_api::BURN
         .encode_input(&[
-            Token::Uint(10_u64.pow(18).into()),
+            Token::Uint(1000_u64.into()),
             Token::Address(erc20_token_address.into()),
             Token::FixedBytes(alice_id.0.to_vec()),
         ])
@@ -766,19 +767,21 @@ async fn test_external_bridging() {
         input,
     );
 
-    let hash = external_evm_client
+    let burn_tx_hash = external_evm_client
         .send_raw_transaction(burn_tx)
         .await
         .unwrap()
         .unwrap();
 
-    // Tick to advance time.
-    ctx.advance_time(Duration::from_secs(10)).await;
-
     // Wait some time for the evm-minter see and process it.
-    let receipt = ctx.wait_transaction_receipt(&hash).await.unwrap().unwrap();
+    let receipt = ctx
+        .wait_transaction_receipt_on_evm(&external_evm_client, &burn_tx_hash)
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(receipt.status, Some(U64::one()));
+    
 
     // Query SignedMintOrder from the evm-minter.
     // TODO: Endpoint for it is In progress now.

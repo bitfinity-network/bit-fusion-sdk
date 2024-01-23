@@ -6,32 +6,22 @@ use eth_signer::sign_strategy::{
 };
 use ic_log::LogSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableCell, StableUnboundedMap, VirtualMemory};
-use ic_task_scheduler::scheduler::Scheduler;
-use ic_task_scheduler::task::ScheduledTask;
+use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use minter_contract_utils::mint_orders::MintOrders;
 use serde::Deserialize;
 
 pub use self::config::{BridgeSide, Config, ConfigData};
 use self::log::LoggerConfigService;
 use crate::client::EvmLink;
-use crate::memory::{
-    MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, PENDING_TASKS_MEMORY_ID, SIGNER_MEMORY_ID,
-};
-use crate::tasks::BridgeTask;
+use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, SIGNER_MEMORY_ID};
 
 mod config;
 mod log;
 
-type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
-
-type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
 pub struct State {
     pub config: Config,
-    pub scheduler: PersistentScheduler,
     pub signer: SignerStorage,
     pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
     pub logger: LoggerConfigService,
@@ -39,9 +29,6 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        let pending_tasks =
-            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
-
         let default_signer =
             TxSigner::ManagementCanister(ManagementCanisterSigner::new(SigningKeyId::Test, vec![]));
         let signer = SignerStorage::new(
@@ -56,7 +43,6 @@ impl Default for State {
 
         Self {
             config: Default::default(),
-            scheduler: PersistentScheduler::new(pending_tasks),
             signer,
             mint_orders,
             logger,

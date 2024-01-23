@@ -32,12 +32,12 @@ pub enum BridgeTask {
 impl Task for BridgeTask {
     fn execute(
         &self,
-        _: Box<dyn 'static + TaskScheduler<Self>>,
+        scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            BridgeTask::CollectEvmInfo(side) => Box::pin(Self::collect_evm_events(state, *side)),
+            BridgeTask::CollectEvmInfo(side) => Box::pin(Self::collect_evm_events(state, scheduler, *side)),
             BridgeTask::PrepareMintOrder(data, side) => {
                 Box::pin(Self::prepare_mint_order(state, data.clone(), *side))
             }
@@ -125,6 +125,7 @@ impl BridgeTask {
 
     async fn collect_evm_events(
         state: Rc<RefCell<State>>,
+        scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
         log::trace!("collecting evm events: {side:?}");
@@ -154,7 +155,7 @@ impl BridgeTask {
             mut_state.config.set_evm_next_block(next_block_number, side);
         };
 
-        mut_state.scheduler.append_tasks(
+        scheduler.append_tasks(
             logs.into_iter()
                 .filter_map(|l| Self::task_by_log(l, side))
                 .collect(),

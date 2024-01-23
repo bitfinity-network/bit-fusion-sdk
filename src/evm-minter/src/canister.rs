@@ -7,13 +7,15 @@ use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
-use ic_stable_structures::CellStructure;
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::{BackoffPolicy, RetryPolicy};
-use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
+use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::state::{BridgeSide, Settings, State};
 use crate::tasks::BridgeTask;
 
@@ -41,9 +43,7 @@ impl EvmMinter {
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
-                let state = get_state();
-
-                let task_execution_result = state.borrow_mut().scheduler.run();
+                let task_execution_result = get_scheduler().borrow_mut().run();
 
                 if let Err(err) = task_execution_result {
                     log::error!("task execution failed: {err}",);
@@ -66,7 +66,7 @@ impl EvmMinter {
             Self::collect_evm_info_task(BridgeSide::Wrapped),
         ];
 
-        state.borrow_mut().scheduler.append_tasks(tasks);
+        get_scheduler().borrow_mut().append_tasks(tasks);
 
         self.set_timers();
     }
@@ -123,7 +123,8 @@ impl EvmMinter {
     /// Returns EVM address of the canister.
     #[update]
     pub async fn get_evm_address(&self) -> Result<H160, EvmError> {
-        get_state().borrow().signer.get().get_address().await
+        let signer = get_state().borrow().signer.get().clone();
+        signer.get_address().await
     }
 
     pub fn idl() -> Idl {
@@ -138,12 +139,26 @@ impl Metrics for EvmMinter {
     }
 }
 
+type TasksStorage =
+    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
+
+    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
+        let pending_tasks =
+            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
+            PersistentScheduler::new(pending_tasks)
+    }));
 }
 
 pub fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
+}
+
+pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
+    SCHEDULER.with(|scheduler| scheduler.clone())
 }
 
 #[cfg(test)]
