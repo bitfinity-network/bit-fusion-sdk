@@ -12,8 +12,6 @@ mod evm_client;
 mod evm_client_mock;
 
 pub use evm_client::{EvmCanister, EvmCanisterImpl};
-#[cfg(test)]
-pub use evm_client_mock::MockEvmCanister;
 
 /// Interface for calling EVMC methods
 #[cfg_attr(test, mockall::automock)]
