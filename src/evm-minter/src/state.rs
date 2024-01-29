@@ -7,7 +7,7 @@ use ic_task_scheduler::scheduler::Scheduler;
 use ic_task_scheduler::task::ScheduledTask;
 use serde::{Deserialize, Serialize};
 
-pub use self::config::{BridgeSide, Config, ConfigData};
+pub use self::config::{BridgeSide, Config};
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::tasks::PersistentTask;
