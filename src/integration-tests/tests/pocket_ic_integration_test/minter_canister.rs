@@ -27,8 +27,8 @@ use crate::context::{
     evm_canister_init_data, CanisterType, TestContext, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils;
 use crate::utils::error::TestError;
+use crate::utils::{self, CHAIN_ID};
 
 /// Initializez test environment with:
 /// - john wallet with native tokens,
@@ -564,6 +564,9 @@ async fn test_external_bridging() {
         )
     };
 
+    println!("Deployed external EVM canister: {}", external_evm);
+    println!("Deployed EVM canister: {}", ctx.canisters().evm());
+
     // whitelist external EVM canister.
     {
         let signature =
@@ -627,23 +630,27 @@ async fn test_external_bridging() {
         .expect("contract address");
 
     // Initialize evm-minter with EvmInfos for both EVM canisters.
-    let _evm_minter = ctx
+    let evm_minter_canister = ctx
         .deploy_canister(
             CanisterType::EvmMinter,
             (Settings {
-                base_evm_link: EvmLink::Ic(ctx.canisters().evm()),
-                wrapped_evm_link: EvmLink::Ic(external_evm),
+                base_evm_link: EvmLink::Ic(external_evm),
+                wrapped_evm_link: EvmLink::Ic(ctx.canisters().evm()),
+                base_bridge_contract: external_bridge_address.clone(),
+                wrapped_bridge_contract: bft_bridge.clone(),
                 signing_strategy: SigningStrategy::Local {
                     private_key: [42; 32],
                 },
                 log_settings: Some(LogSettings {
                     enable_console: true,
                     in_memory_records: None,
-                    log_filter: Some("info".to_string()),
+                    log_filter: Some("trace".to_string()),
                 }),
             },),
         )
         .await;
+
+    println!("Deployed EVM minter canister: {}", evm_minter_canister);
 
     // Deploy ERC-20 token on external EVM.
     let data: Constructor = Constructor {
@@ -683,7 +690,7 @@ async fn test_external_bridging() {
     let wrapped_token = ctx
         .create_wrapped_token(
             &ctx.new_wallet(u128::MAX).await.unwrap(),
-            &dbg!(bft_bridge),
+            &bft_bridge,
             token_id,
         )
         .await
@@ -781,11 +788,31 @@ async fn test_external_bridging() {
         .unwrap();
 
     assert_eq!(receipt.status, Some(U64::one()));
-    
+
+    let burn_operation_id = BURN
+        .decode_output(receipt.output.unwrap().as_slice())
+        .unwrap()
+        .first()
+        .cloned()
+        .unwrap()
+        .into_uint()
+        .unwrap()
+        .as_u32();
+
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     // Query SignedMintOrder from the evm-minter.
-    // TODO: Endpoint for it is In progress now.
-    let signed_order = SignedMintOrder([5; 262]); // Example
+    let client = ctx.client(evm_minter_canister, ADMIN);
+
+    let bob_address_id = Id256::from_evm_address(&bob_address, CHAIN_ID as _);
+    let signed_order = client
+        .update::<_, Option<SignedMintOrder>>(
+            "get_mint_order",
+            (bob_address_id, token_id, burn_operation_id),
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
     // Send the SignedMintOrder to the BFTBridge::mint() endpoint of the first EVM.
     let nonce = external_evm_client

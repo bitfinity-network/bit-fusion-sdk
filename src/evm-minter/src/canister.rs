@@ -2,14 +2,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use did::error::EvmError;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
-use ic_task_scheduler::retry::{BackoffPolicy, RetryPolicy};
+use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use minter_did::id256::Id256;
@@ -22,7 +21,6 @@ use crate::tasks::BridgeTask;
 const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
 const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
 const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
-const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
 
 #[derive(Canister, Clone, Debug)]
 pub struct EvmMinter {
@@ -43,6 +41,14 @@ impl EvmMinter {
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
+                // Tasks to collect EVMs events
+                let tasks = vec![
+                    Self::collect_evm_events_task(BridgeSide::Base),
+                    Self::collect_evm_events_task(BridgeSide::Wrapped),
+                ];
+
+                get_scheduler().borrow_mut().append_tasks(tasks);
+
                 let task_execution_result = get_scheduler().borrow_mut().run();
 
                 if let Err(err) = task_execution_result {
@@ -57,18 +63,26 @@ impl EvmMinter {
         let state = get_state();
         state.borrow_mut().init(settings);
 
+        log::info!("starting evm-minter canister");
+
         let tasks = vec![
             // Tasks to init EVMs state
             Self::init_evm_info_task(BridgeSide::Base),
             Self::init_evm_info_task(BridgeSide::Wrapped),
-            // Tasks to collect EVMs events
-            Self::collect_evm_info_task(BridgeSide::Base),
-            Self::collect_evm_info_task(BridgeSide::Wrapped),
         ];
 
-        get_scheduler().borrow_mut().append_tasks(tasks);
+        {
+            let scheduler = get_scheduler();
+            let mut borrowed_scheduller = scheduler.borrow_mut();
+            borrowed_scheduller.set_failed_task_callback(|task, error| {
+                log::error!("task failed: {task:?}, error: {error:?}")
+            });
+            borrowed_scheduller.append_tasks(tasks);
+        }
 
         self.set_timers();
+
+        log::info!("evm-minter canister initialized");
     }
 
     fn init_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
@@ -81,14 +95,17 @@ impl EvmMinter {
         BridgeTask::InitEvmState(bridge_side).into_scheduled(init_options)
     }
 
-    fn collect_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
+    #[cfg(target_family = "wasm")]
+    fn collect_evm_events_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
+        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
+
         let options = TaskOptions::default()
-            .with_retry_policy(RetryPolicy::Infinite)
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
             .with_backoff_policy(BackoffPolicy::Fixed {
                 secs: EVM_EVENTS_COLLECTING_DELAY,
             });
 
-        BridgeTask::CollectEvmInfo(bridge_side).into_scheduled(options)
+        BridgeTask::CollectEvmEvents(bridge_side).into_scheduled(options)
     }
 
     #[post_upgrade]
@@ -108,7 +125,7 @@ impl EvmMinter {
 
     /// Returns the `signed_mint_order` if present.
     #[query]
-    pub async fn get_mint_orders(
+    pub async fn get_mint_order(
         &self,
         sender: Id256,
         src_token: Id256,
@@ -122,9 +139,15 @@ impl EvmMinter {
 
     /// Returns EVM address of the canister.
     #[update]
-    pub async fn get_evm_address(&self) -> Result<H160, EvmError> {
+    pub async fn get_evm_address(&self) -> Option<H160> {
         let signer = get_state().borrow().signer.get().clone();
-        signer.get_address().await
+        match signer.get_address().await {
+            Ok(address) => Some(address),
+            Err(e) => {
+                log::error!("failed to get EVM address: {e}");
+                None
+            }
+        }
     }
 
     pub fn idl() -> Idl {

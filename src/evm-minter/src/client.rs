@@ -1,3 +1,4 @@
+use core::fmt;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -42,8 +43,19 @@ impl Default for EvmLink {
     }
 }
 
+impl fmt::Display for EvmLink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EvmLink::Http(url) => write!(f, "Http EVM link: {url}"),
+            EvmLink::Ic(principal) => write!(f, "Ic EVM link: {principal}"),
+        }
+    }
+}
+
 impl EvmLink {
     pub fn get_client(&self) -> EthJsonRcpClient<impl Client> {
+        log::trace!("creating client for {self}");
+
         match self {
             EvmLink::Http(_) => todo!(),
             EvmLink::Ic(principal) => EthJsonRcpClient::new(Clients::canister(*principal)),

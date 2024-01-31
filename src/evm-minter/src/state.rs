@@ -1,6 +1,7 @@
 use std::fmt;
 
 use candid::CandidType;
+use did::H160;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningKeyId, SigningStrategy, TxSigner,
 };
@@ -72,6 +73,7 @@ impl State {
         }
 
         self.config.init(settings);
+
         self.signer.set(signer).expect("failed to set signer");
     }
 }
@@ -80,6 +82,8 @@ impl State {
 pub struct Settings {
     pub base_evm_link: EvmLink,
     pub wrapped_evm_link: EvmLink,
+    pub base_bridge_contract: H160,
+    pub wrapped_bridge_contract: H160,
     pub signing_strategy: SigningStrategy,
 
     /// Log settings

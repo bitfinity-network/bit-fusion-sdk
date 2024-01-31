@@ -12,6 +12,7 @@ use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
 use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
+use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use log::*;
 use minter_did::error::{Error, Result};
@@ -146,11 +147,11 @@ impl MinterCanister {
     /// Gets the logs
     /// - `count` is the number of logs to return
     #[update]
-    pub fn ic_logs(&self, count: usize) -> Result<Vec<String>> {
+    pub fn ic_logs(&self, count: usize, offset: usize) -> Result<Logs> {
         self.with_state(|s| MinterCanister::ic_logs_inspect_message_check(ic::caller(), s))?;
 
         // Request execution
-        Ok(ic_log::take_memory_records(count))
+        Ok(ic_log::take_memory_records(count, offset))
     }
 
     /// Returns principal of canister owner.
@@ -688,68 +689,6 @@ mod test {
         assert_eq!(err, Error::NotAuthorized);
     }
 
-    // This test work fine if executed alone but could fail if executed with all other tests
-    // due to the global nature of the global logger in Rust.
-    // In fact, if the Rust log is already set, a second attempt to set it causes a panic
-    #[ignore]
-    #[tokio::test]
-    async fn test_set_logger_filter() {
-        MockContext::new().inject();
-        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
-        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-        let mut canister = MinterCanister::from_principal(mock_canister_id);
-
-        let init_data = InitData {
-            owner: Principal::anonymous(),
-            evm_principal: Principal::anonymous(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
-            spender_principal: Principal::anonymous(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
-            },
-            process_transactions_results_interval: None,
-            log_settings: None,
-        };
-        canister_call!(canister.init(init_data), ()).await.unwrap();
-
-        {
-            let info_message = format!("message-{}", rand::random::<u64>());
-            let error_message = format!("message-{}", rand::random::<u64>());
-
-            log::info!("{info_message}");
-            log::error!("{error_message}");
-
-            // Only the error message should be present
-            let log_records = ic_log::take_memory_records(128);
-            assert!(!log_records.iter().any(|log| log.contains(&info_message)));
-            assert!(log_records.iter().any(|log| log.contains(&error_message)));
-        }
-        // Set new logger filter
-        let new_filter = "info";
-        let res = canister_call!(
-            canister.set_logger_filter(new_filter.to_string()),
-            Result<()>
-        )
-        .await
-        .unwrap();
-        assert!(res.is_ok());
-
-        {
-            let info_message = format!("message-{}", rand::random::<u64>());
-            let error_message = format!("message-{}", rand::random::<u64>());
-
-            log::info!("{info_message}");
-            log::error!("{error_message}");
-
-            // All log messages should be present
-            let log_records = ic_log::take_memory_records(128);
-            assert!(log_records.iter().any(|log| log.contains(&info_message)));
-            assert!(log_records.iter().any(|log| log.contains(&error_message)));
-        }
-    }
-
     #[tokio::test]
     async fn test_ic_logs_is_access_controlled() {
         MockContext::new().inject();
@@ -774,7 +713,7 @@ mod test {
 
         inject::get_context().update_id(Principal::management_canister());
 
-        let logs = canister_call!(canister.ic_logs(10), Result<Vec<String>>)
+        let logs = canister_call!(canister.ic_logs(10, 0), Result<Logs>)
             .await
             .unwrap();
         assert!(logs.is_ok());
@@ -796,7 +735,7 @@ mod test {
 
         inject::get_context().update_id(Principal::anonymous());
 
-        let logs = canister_call!(canister.ic_logs(10), Result<Vec<String>>)
+        let logs = canister_call!(canister.ic_logs(10, 0), Result<Logs>)
             .await
             .unwrap();
         assert!(logs.is_err());

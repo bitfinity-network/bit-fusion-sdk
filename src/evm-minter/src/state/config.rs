@@ -37,9 +37,14 @@ impl Default for Config {
 
 impl Config {
     pub fn init(&mut self, settings: Settings) {
-        Self::default().update_data(|data| {
-            data.evms[BridgeSide::Base as usize].link = settings.base_evm_link;
-            data.evms[BridgeSide::Wrapped as usize].link = settings.wrapped_evm_link;
+        self.update_data(|data| {
+            let base_evm = &mut data.evms[BridgeSide::Base as usize];
+            base_evm.link = settings.base_evm_link;
+            base_evm.bridge_contract = settings.base_bridge_contract;
+
+            let wrapped_evm = &mut data.evms[BridgeSide::Wrapped as usize];
+            wrapped_evm.link = settings.wrapped_evm_link;
+            wrapped_evm.bridge_contract = settings.wrapped_bridge_contract;
         })
     }
 
