@@ -32,7 +32,7 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
 }
 
 #[tokio::test]
-#[should_panic(expected = "JoinError")]
+#[should_panic(expected = "JoinError")] // this is the error returned by pocket-ic when inspect fails
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
     let mut admin_client = ctx.minter_client(ADMIN);
@@ -90,7 +90,7 @@ async fn invalid_bridge() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "JoinError")]
+#[should_panic(expected = "JoinError")] // this is the error returned by pocket-ic when inspect fails
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
     let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
