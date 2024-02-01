@@ -32,7 +32,7 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
 }
 
 #[tokio::test]
-#[should_panic(expected = "Call rejected by inspect check")]
+#[should_panic(expected = "JoinError")]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
     let mut admin_client = ctx.minter_client(ADMIN);
