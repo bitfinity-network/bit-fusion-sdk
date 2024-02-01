@@ -31,9 +31,8 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
     (ctx, john_wallet, bft_bridge)
 }
 
-/// To be fixed in EPROD-634
-#[ignore]
 #[tokio::test]
+#[should_panic(expected = "Call rejected by inspect check")]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
     let mut admin_client = ctx.minter_client(ADMIN);
@@ -90,9 +89,8 @@ async fn invalid_bridge() {
     assert_eq!(res, McError::InvalidBftBridgeContract);
 }
 
-/// To be fixed in EPROD-634
-#[ignore]
 #[tokio::test]
+#[should_panic(expected = "JoinError")]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
     let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
