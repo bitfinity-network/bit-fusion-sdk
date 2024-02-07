@@ -14,12 +14,13 @@ use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::bft_bridge_api::{
     BurntEventData, MintedEventData, BURNT_EVENT, MINTED_EVENT,
 };
+use minter_contract_utils::BridgeSide;
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
-use crate::state::{BridgeSide, State};
+use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BridgeTask {
@@ -154,7 +155,10 @@ impl BridgeTask {
             address: Some(vec![evm_info.bridge_contract.into()]),
             from_block: evm_info.next_block.into(),
             to_block: ethers_core::types::BlockNumber::Safe,
-            topics: Some(vec![vec![BURNT_EVENT.signature(), MINTED_EVENT.signature()]]),
+            topics: Some(vec![vec![
+                BURNT_EVENT.signature(),
+                MINTED_EVENT.signature(),
+            ]]),
         };
 
         log::debug!("collecting logs from side {side:?} with params: {params:?}");
@@ -206,10 +210,7 @@ impl BridgeTask {
 
         let dst_token = Id256::from_slice(&burn_event.to_token)
             .and_then(|id| id.to_evm_address().ok())
-            .ok_or_else(|| {
-                log::error!("failed to decode dst token data: {burn_event:?}");
-                SchedulerError::TaskExecutionFailed("failed to decode dst token data".into())
-            })?
+            .unwrap_or_default()
             .1;
 
         let sender_chain_id = state
@@ -285,14 +286,22 @@ impl BridgeTask {
             })
             .with_max_retries_policy(u32::MAX);
 
-        if let Ok(burnt_event_data) = BurntEventData::try_from(raw_log.clone()) {
-            let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data, sender_side);
-            return Some(mint_order_task.into_scheduled(options));
+        match BurntEventData::try_from(raw_log.clone()) {
+            Ok(burnt_event_data) => {
+                log::debug!("Adding PrepareMintOrder task");
+                let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data, sender_side);
+                return Some(mint_order_task.into_scheduled(options));
+            }
+            Err(e) => log::debug!("Failed to decode BurntEventData: {e}"),
         }
 
-        if let Ok(mint_event_data) = MintedEventData::try_from(raw_log) {
-            let remove_mint_order_task = BridgeTask::RemoveMintOrder(mint_event_data);
-            return Some(remove_mint_order_task.into_scheduled(options));
+        match MintedEventData::try_from(raw_log) {
+            Ok(mint_event_data) => {
+                log::debug!("Adding RemoveMintOrder task");
+                let remove_mint_order_task = BridgeTask::RemoveMintOrder(mint_event_data);
+                return Some(remove_mint_order_task.into_scheduled(options));
+            }
+            Err(e) => log::debug!("Failed to decode MintedEventData: {e}"),
         }
 
         None

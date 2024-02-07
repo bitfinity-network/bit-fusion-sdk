@@ -27,17 +27,17 @@ clap = { version = "4", features = ["derive"] }
 csv = "1.1"
 debug-ignore = "1.0.5"
 derive_more = "0.99"
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", branch = "http_outcall_fix" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.10.x" }
 elsa = "1.7"
 env_logger = { version = "0.10.0", default-features = false }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", branch = "http_outcall_fix" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", branch = "http_outcall_fix" }
-iceth_client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "iceth-client", branch = "http_outcall_fix" }
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "http_outcall_fix" }
-minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", branch = "http_outcall_fix" }
-minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", branch = "http_outcall_fix" }
-register-evm-agent = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "register_evm_agent", branch = "http_outcall_fix" }
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", branch = "http_outcall_fix" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.10.x" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.10.x" }
+iceth_client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "iceth-client", tag = "v0.10.x" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.10.x" }
+minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.10.x" }
+minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.10.x" }
+register-evm-agent = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "register_evm_agent", tag = "v0.10.x" }
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.10.x" }
 ethers-core = "2.0"
 ethereum-types = "0.14"
 flate2 = "1"
@@ -71,9 +71,7 @@ rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 rayon = "1"
 
 reqwest = { version = "0.11", default-features = false }
-revm = { version = "3.4", default-features = false, features = [
-    "optional_eip3607", "serde"
-] }
+revm = { version = "3.4", default-features = false, features = ["optional_eip3607", "serde"] }
 serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"

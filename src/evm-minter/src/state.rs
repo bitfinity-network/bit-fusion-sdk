@@ -1,6 +1,6 @@
 use std::fmt;
 
-use candid::CandidType;
+use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningKeyId, SigningStrategy, TxSigner,
@@ -11,7 +11,7 @@ use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use minter_contract_utils::mint_orders::MintOrders;
 use serde::Deserialize;
 
-pub use self::config::{BridgeSide, Config, ConfigData};
+pub use self::config::{Config, ConfigData};
 use self::log::LoggerConfigService;
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, SIGNER_MEMORY_ID};
@@ -61,7 +61,7 @@ impl fmt::Debug for State {
 }
 
 impl State {
-    pub fn init(&mut self, settings: Settings) {
+    pub fn init(&mut self, admin: Principal, settings: Settings) {
         let signer = settings
             .signing_strategy
             .clone()
@@ -72,7 +72,7 @@ impl State {
             self.logger.init(log_settings.clone());
         }
 
-        self.config.init(settings);
+        self.config.init(admin, settings);
 
         self.signer.set(signer).expect("failed to set signer");
     }

@@ -53,6 +53,18 @@ type Block_1 = record {
   gasUsed : text;
   mixHash : text;
 };
+type BuildData = record {
+  rustc_semver : text;
+  git_branch : text;
+  pkg_version : text;
+  cargo_target_triple : text;
+  cargo_debug : text;
+  pkg_name : text;
+  cargo_features : text;
+  build_timestamp : text;
+  git_sha : text;
+  git_commit_timestamp : text;
+};
 type Duration = record { secs : nat64; nanos : nat32 };
 type EstimateGasRequest = record {
   to : opt text;
@@ -379,6 +391,7 @@ service : (EvmCanisterInitData) -> {
   get_block_gas_limit : () -> (nat64) query;
   get_block_size_limit : () -> (nat64) query;
   get_blockchain_state_history_size : () -> (nat64) query;
+  get_canister_build_data : () -> (BuildData) query;
   get_clear_info_entries : (opt record { nat64; text }, nat32) -> (
       Result_10,
     ) query;

@@ -1,4 +1,16 @@
 type AccessListItem = record { storageKeys : vec text; address : text };
+type BuildData = record {
+  rustc_semver : text;
+  git_branch : text;
+  pkg_version : text;
+  cargo_target_triple : text;
+  cargo_debug : text;
+  pkg_name : text;
+  cargo_features : text;
+  build_timestamp : text;
+  git_sha : text;
+  git_commit_timestamp : text;
+};
 type Interval = variant {
   PerHour;
   PerWeek;
@@ -50,6 +62,7 @@ service : (vec principal) -> {
   get_metrics : () -> (MetricsStorage) query;
   add_access : (principal) -> (Result);
   get_access_list : () -> (vec principal) query;
+  get_canister_build_data : () -> (BuildData) query;
   get_owner : () -> (principal) query;
   remove_access : (principal) -> (Result);
   set_owner : (principal) -> (Result);

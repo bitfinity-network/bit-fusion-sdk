@@ -5,6 +5,7 @@ use candid::{CandidType, Principal};
 use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
+use minter_contract_utils::BridgeSide;
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
@@ -36,8 +37,10 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn init(&mut self, settings: Settings) {
+    pub fn init(&mut self, admin: Principal, settings: Settings) {
         self.update_data(|data| {
+            data.admin = admin;
+
             let base_evm = &mut data.evms[BridgeSide::Base as usize];
             base_evm.link = settings.base_evm_link;
             base_evm.bridge_contract = settings.base_bridge_contract;
@@ -58,6 +61,14 @@ impl Config {
 
     pub fn set_evm_next_block(&mut self, next_block: u64, bridge_side: BridgeSide) {
         self.update_data(|data| data.evms[bridge_side as usize].next_block = Some(next_block));
+    }
+
+    pub fn set_bft_bridge_address(&mut self, bridge_side: BridgeSide, address: H160) {
+        self.update_data(|data| data.evms[bridge_side as usize].bridge_contract = address);
+    }
+
+    pub fn check_admin(&self, caller: Principal) -> Option<()> {
+        (self.data.get().admin == caller).then_some(())
     }
 
     fn update_data<F>(&mut self, f: F)
@@ -83,21 +94,6 @@ impl Config {
             chain_id,
             next_block,
         })
-    }
-}
-
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
-pub enum BridgeSide {
-    Base = 0,
-    Wrapped = 1,
-}
-
-impl BridgeSide {
-    pub fn other(self) -> Self {
-        match self {
-            Self::Base => Self::Wrapped,
-            Self::Wrapped => Self::Base,
-        }
     }
 }
 

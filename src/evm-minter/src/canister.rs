@@ -5,17 +5,19 @@ use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_exports::ic_kit::ic;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use minter_contract_utils::BridgeSide;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
-use crate::state::{BridgeSide, Settings, State};
+use crate::state::{Settings, State};
 use crate::tasks::BridgeTask;
 
 const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
@@ -60,8 +62,9 @@ impl EvmMinter {
 
     #[init]
     pub fn init(&mut self, settings: Settings) {
+        let admin = ic::caller();
         let state = get_state();
-        state.borrow_mut().init(settings);
+        state.borrow_mut().init(admin, settings);
 
         log::info!("starting evm-minter canister");
 
@@ -148,6 +151,24 @@ impl EvmMinter {
                 None
             }
         }
+    }
+
+    /// Sets the BFT bridge contract address.
+    ///
+    /// The caller must be the owner.
+    #[update]
+    pub async fn admin_set_bft_bridge_address(
+        &mut self,
+        bridge_side: BridgeSide,
+        address: H160,
+    ) -> Option<()> {
+        let state = get_state();
+        state.borrow().config.check_admin(ic::caller())?;
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_address(bridge_side, address);
+        Some(())
     }
 
     pub fn idl() -> Idl {

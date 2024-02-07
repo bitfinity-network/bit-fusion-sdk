@@ -264,10 +264,10 @@ impl BurntEventDataBuilder {
         Ok(BurntEventData {
             sender: self.sender.ok_or_else(not_found("sender"))?.into(),
             amount: self.amount.ok_or_else(not_found("amount"))?.into(),
-            from_erc20: self.from_erc20.ok_or_else(not_found("from_erc20"))?.into(),
-            recipient_id: self.recipient_id.ok_or_else(not_found("recipient_id"))?,
-            to_token: self.to_token.ok_or_else(not_found("to_token"))?,
-            operation_id: self.operation_id.ok_or_else(not_found("to_token"))?,
+            from_erc20: self.from_erc20.ok_or_else(not_found("fromERC20"))?.into(),
+            recipient_id: self.recipient_id.ok_or_else(not_found("recipientID"))?,
+            to_token: self.to_token.ok_or_else(not_found("toToken"))?,
+            operation_id: self.operation_id.ok_or_else(not_found("operationID"))?,
             name: self.name.ok_or_else(not_found("name"))?,
             symbol: self.symbol.ok_or_else(not_found("symbol"))?,
             decimals: self.decimals.ok_or_else(not_found("decimals"))?,
@@ -278,10 +278,10 @@ impl BurntEventDataBuilder {
         match name {
             "sender" => self.sender = value.into_address(),
             "amount" => self.amount = value.into_uint(),
-            "from_erc20" => self.from_erc20 = value.into_address(),
-            "recipient_id" => self.recipient_id = value.into_fixed_bytes(),
-            "to_token" => self.to_token = value.into_fixed_bytes(),
-            "operation_id" => self.operation_id = value.into_uint().map(|v| v.as_u32()),
+            "fromERC20" => self.from_erc20 = value.into_address(),
+            "recipientID" => self.recipient_id = value.into_fixed_bytes(),
+            "toToken" => self.to_token = value.into_fixed_bytes(),
+            "operationID" => self.operation_id = value.into_uint().map(|v| v.as_u32()),
             "name" => self.name = value.into_fixed_bytes(),
             "symbol" => self.symbol = value.into_fixed_bytes(),
             "decimals" => self.decimals = value.into_uint().map(|v| v.as_u32() as _),
@@ -373,9 +373,9 @@ impl MintedEventDataBuilder {
 
         Ok(MintedEventData {
             amount: self.amount.ok_or_else(not_found("amount"))?.into(),
-            from_token: self.from_token.ok_or_else(not_found("from_token"))?,
-            sender_id: self.sender_id.ok_or_else(not_found("sender_id"))?,
-            to_erc20: self.to_erc20.ok_or_else(not_found("to_erc20"))?.into(),
+            from_token: self.from_token.ok_or_else(not_found("fromToken"))?,
+            sender_id: self.sender_id.ok_or_else(not_found("senderID"))?,
+            to_erc20: self.to_erc20.ok_or_else(not_found("toERC20"))?.into(),
             recipient: self.recipient.ok_or_else(not_found("recipient"))?.into(),
             nonce: self.nonce.ok_or_else(not_found("nonce"))?,
         })
@@ -384,9 +384,9 @@ impl MintedEventDataBuilder {
     fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
         match name {
             "amount" => self.amount = value.into_uint().map(Into::into),
-            "from_token" => self.from_token = value.into_fixed_bytes(),
-            "sender_id" => self.sender_id = value.into_fixed_bytes(),
-            "to_erc20" => self.to_erc20 = value.into_address().map(Into::into),
+            "fromToken" => self.from_token = value.into_fixed_bytes(),
+            "senderID" => self.sender_id = value.into_fixed_bytes(),
+            "toERC20" => self.to_erc20 = value.into_address().map(Into::into),
             "recipient" => self.recipient = value.into_address().map(Into::into),
             "nonce" => self.nonce = value.into_uint().map(|v| v.as_u32()),
             _ => {}
