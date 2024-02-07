@@ -11,10 +11,11 @@ use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use minter_contract_utils::mint_orders::MintOrders;
 use serde::Deserialize;
 
-pub use self::config::{Config, ConfigData};
-use self::log::LoggerConfigService;
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, SIGNER_MEMORY_ID};
+pub use config::Config;
+
+use self::log::LoggerConfigService;
 
 mod config;
 mod log;

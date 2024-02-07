@@ -2,6 +2,8 @@
 set -e
 set -x
 
+export RUST_BACKTRACE=full
+
 # Add unit tests for all the packages
 cargo test
 

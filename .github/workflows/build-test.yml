@@ -47,7 +47,7 @@ jobs:
     uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       runs-on: 4x150g-runner
-      container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.72-dfx0.15
+      container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.75-dfx0.15
       git-fetch-depth: "0"
       skip-test: ${{ github.ref_type == 'tag' }}
       audit-allow-warnings: true
@@ -60,7 +60,7 @@ jobs:
         ./scripts/build.sh
       test-script: |
         export WASMS_DIR="`pwd`/.artifact"
-        export RUST_BACKTRACE="full"
+        ./scripts/tests_i686.sh
         ./scripts/tests.sh
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
