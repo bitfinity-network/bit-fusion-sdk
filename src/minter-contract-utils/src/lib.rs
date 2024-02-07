@@ -7,7 +7,6 @@ pub mod mint_orders;
 pub mod uniswap_api;
 pub mod wrapped_token_api;
 
-
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub enum BridgeSide {
     Base = 0,

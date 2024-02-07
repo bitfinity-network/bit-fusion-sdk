@@ -660,7 +660,7 @@ pub fn evm_canister_init_data(
         transaction_processing_interval,
         owner,
         ..Default::default()
-    } 
+    }
 }
 
 #[derive(Debug, Clone, Default)]
