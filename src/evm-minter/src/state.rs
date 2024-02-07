@@ -1,6 +1,7 @@
 use std::fmt;
 
 use candid::{CandidType, Principal};
+pub use config::Config;
 use did::H160;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningKeyId, SigningStrategy, TxSigner,
@@ -11,11 +12,9 @@ use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use minter_contract_utils::mint_orders::MintOrders;
 use serde::Deserialize;
 
+use self::log::LoggerConfigService;
 use crate::client::EvmLink;
 use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, SIGNER_MEMORY_ID};
-pub use config::Config;
-
-use self::log::LoggerConfigService;
 
 mod config;
 mod log;
