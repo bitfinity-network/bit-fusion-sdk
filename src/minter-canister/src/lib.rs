@@ -22,5 +22,5 @@ pub fn idl() -> String {
     let mut metrics_idl = <MinterCanister as Metrics>::get_idl();
     metrics_idl.merge(&minter_canister_idl);
 
-    candid::bindings::candid::compile(&metrics_idl.env.env, &Some(metrics_idl.actor))
+    candid::pretty::candid::compile(&metrics_idl.env.env, &Some(metrics_idl.actor))
 }
