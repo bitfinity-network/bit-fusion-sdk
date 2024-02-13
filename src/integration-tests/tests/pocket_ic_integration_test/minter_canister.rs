@@ -894,6 +894,9 @@ async fn test_external_bridging() {
 
     assert_eq!(amount, U256::from_hex_str(&balance).unwrap().0.as_u64());
 
+    // Wait for mint order removal
+    ctx.advance_time(Duration::from_secs(2)).await;
+
     // Check mint order removed
     let signed_order = client
         .update::<_, Option<SignedMintOrder>>(
@@ -902,6 +905,6 @@ async fn test_external_bridging() {
         )
         .await
         .unwrap();
-    
+
     assert!(signed_order.is_none())
 }
