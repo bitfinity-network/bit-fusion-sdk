@@ -893,4 +893,14 @@ async fn test_external_bridging() {
         .unwrap();
 
     assert_eq!(amount, U256::from_hex_str(&balance).unwrap().0.as_u64());
+
+    // Check mint order removed
+    let signed_order = client
+    .update::<_, Option<SignedMintOrder>>(
+        "get_mint_order",
+        (bob_address_id, token_id, burn_operation_id),
+    )
+    .await
+    .unwrap()
+    .unwrap();
 }
