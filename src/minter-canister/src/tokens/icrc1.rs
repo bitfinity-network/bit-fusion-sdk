@@ -168,7 +168,7 @@ mod test {
 
         let config = TokenConfiguration {
             principal: ic_token,
-            fee: Nat::from(24),
+            fee: Nat::from(24_u64),
             minting_account: Account {
                 owner: Principal::from_slice(&[43; 20]),
                 subaccount: None,

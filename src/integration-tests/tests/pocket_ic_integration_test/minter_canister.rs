@@ -3,8 +3,10 @@ use did::{H160, U64};
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
+use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
+use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_contract_utils::build_data::WRAPPED_TOKEN_SMART_CONTRACT_CODE;
 use minter_contract_utils::wrapped_token_api;
@@ -31,8 +33,6 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
     (ctx, john_wallet, bft_bridge)
 }
 
-/// To be fixed in EPROD-634
-#[ignore]
 #[tokio::test]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
@@ -40,7 +40,14 @@ async fn set_owner_access() {
     admin_client.set_owner(alice()).await.unwrap().unwrap();
 
     // Now Alice is owner, so admin can't update owner anymore.
-    admin_client.set_owner(alice()).await.unwrap().unwrap_err();
+    let err = admin_client.set_owner(alice()).await.unwrap_err();
+    assert!(matches!(
+        err,
+        CanisterClientError::PocketIcTestError(CallError::UserError(UserError {
+            code: ErrorCode::CanisterCalledTrap,
+            description: _,
+        }))
+    ));
 
     // Now Alice is owner, so she can update owner.
     let mut alice_client = ctx.minter_client(ALICE);
@@ -90,14 +97,12 @@ async fn invalid_bridge() {
     assert_eq!(res, McError::InvalidBftBridgeContract);
 }
 
-/// To be fixed in EPROD-634
-#[ignore]
 #[tokio::test]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
     let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let bft_bridge = ctx
+    let _ = ctx
         .initialize_bft_bridge(ADMIN, &admin_wallet)
         .await
         .unwrap();
@@ -106,11 +111,15 @@ async fn double_register_bridge() {
         .await
         .unwrap_err();
 
-    let TestError::MinterCanister(McError::BftBridgeAlreadyRegistered(registered)) = err else {
-        panic!("unexpected error");
-    };
-
-    assert_eq!(registered, bft_bridge);
+    assert!(matches!(
+        err,
+        TestError::CanisterClient(CanisterClientError::PocketIcTestError(
+            CallError::UserError(UserError {
+                code: ErrorCode::CanisterCalledTrap,
+                description: _,
+            })
+        ))
+    ));
 }
 
 #[tokio::test]

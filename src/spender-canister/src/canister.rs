@@ -62,7 +62,7 @@ impl SpenderCanister {
         let minter_canister = minter_canister();
         if ic::caller() != minter_canister {
             return Err(TransferFromError::GenericError {
-                error_code: 0xff.into(),
+                error_code: 0xff_u64.into(),
                 message: "only minter canister can call `SpenderCanister::finish_icrc2_mint`"
                     .into(),
             });
@@ -81,7 +81,7 @@ impl SpenderCanister {
         virtual_canister_call!(token, "icrc2_transfer_from", (args,), std::result::Result<Nat, TransferFromError>)
         .await.unwrap_or_else(|e| {
             Err(TransferFromError::GenericError {
-                error_code: (e.0 as i32).into(),
+                error_code: (e.0 as u64).into(),
                 message: e.1,
             })
         })

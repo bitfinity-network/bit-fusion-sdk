@@ -12,6 +12,7 @@ use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
 use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
+use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use log::*;
 use minter_did::error::{Error, Result};
@@ -146,11 +147,11 @@ impl MinterCanister {
     /// Gets the logs
     /// - `count` is the number of logs to return
     #[update]
-    pub fn ic_logs(&self, count: usize) -> Result<Vec<String>> {
+    pub fn ic_logs(&self, count: usize, offset: usize) -> Result<Logs> {
         self.with_state(|s| MinterCanister::ic_logs_inspect_message_check(ic::caller(), s))?;
 
         // Request execution
-        Ok(ic_log::take_memory_records(count))
+        Ok(ic_log::take_memory_records(count, offset))
     }
 
     /// Returns principal of canister owner.
@@ -390,7 +391,7 @@ impl MinterCanister {
         user: &H160,
         _state: &State,
     ) -> Result<()> {
-        if amount == &Nat::from(0) {
+        if amount == &Nat::from(0u64) {
             return Err(Error::InvalidBurnOperation("zero amount".into()));
         }
 
@@ -722,9 +723,15 @@ mod test {
             log::error!("{error_message}");
 
             // Only the error message should be present
-            let log_records = ic_log::take_memory_records(128);
-            assert!(!log_records.iter().any(|log| log.contains(&info_message)));
-            assert!(log_records.iter().any(|log| log.contains(&error_message)));
+            let log_records = ic_log::take_memory_records(128, 0);
+            assert!(!log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&info_message)));
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&error_message)));
         }
         // Set new logger filter
         let new_filter = "info";
@@ -744,9 +751,15 @@ mod test {
             log::error!("{error_message}");
 
             // All log messages should be present
-            let log_records = ic_log::take_memory_records(128);
-            assert!(log_records.iter().any(|log| log.contains(&info_message)));
-            assert!(log_records.iter().any(|log| log.contains(&error_message)));
+            let log_records = ic_log::take_memory_records(128, 0);
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&info_message)));
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&error_message)));
         }
     }
 
@@ -774,7 +787,7 @@ mod test {
 
         inject::get_context().update_id(Principal::management_canister());
 
-        let logs = canister_call!(canister.ic_logs(10), Result<Vec<String>>)
+        let logs = canister_call!(canister.ic_logs(10, 0), Result<Logs>)
             .await
             .unwrap();
         assert!(logs.is_ok());
@@ -796,7 +809,7 @@ mod test {
 
         inject::get_context().update_id(Principal::anonymous());
 
-        let logs = canister_call!(canister.ic_logs(10), Result<Vec<String>>)
+        let logs = canister_call!(canister.ic_logs(10, 0), Result<Logs>)
             .await
             .unwrap();
         assert!(logs.is_err());
