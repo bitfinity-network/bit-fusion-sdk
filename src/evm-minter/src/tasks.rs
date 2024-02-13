@@ -44,11 +44,8 @@ impl Task for BridgeTask {
             BridgeTask::PrepareMintOrder(data, side) => {
                 Box::pin(Self::prepare_mint_order(state, data.clone(), *side))
             }
-            BridgeTask::RemoveMintOrder(_data) => {
-                Box::pin(async move {
-                    // todo: remove mint order
-                    Ok(())
-                })
+            BridgeTask::RemoveMintOrder(data) => {
+                Box::pin(Self::remove_mint_order(state, data.clone()))
             }
         }
     }
@@ -181,6 +178,7 @@ impl BridgeTask {
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
             mut_state.config.set_evm_next_block(next_block_number, side);
+            log::trace!("updated evm next block for side {side:?}: {next_block_number}");
         };
 
         log::trace!("appending logs to tasks: {side:?}: {logs:?}");
@@ -267,6 +265,8 @@ impl BridgeTask {
             .mint_orders
             .insert(sender, src_token, nonce, &signed_mint_order);
 
+        log::trace!("Mint order added");
+
         Ok(())
     }
 
@@ -305,6 +305,32 @@ impl BridgeTask {
         }
 
         None
+    }
+
+    async fn remove_mint_order(
+        state: Rc<RefCell<State>>,
+        minted_event: MintedEventData,
+    ) -> Result<(), SchedulerError> {
+        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
+            SchedulerError::TaskExecutionFailed(
+                "failed to decode sender id256 from minted event".into(),
+            )
+        })?;
+        
+        let src_token = Id256::from_slice(&minted_event.from_token).ok_or_else(|| {
+            SchedulerError::TaskExecutionFailed(
+                "failed to decode token id256 from minted event".into(),
+            )
+        })?;
+
+        state
+            .borrow_mut()
+            .mint_orders
+            .remove(sender_id, src_token, minted_event.nonce);
+
+        log::trace!("Mint order removed");
+
+        Ok(())
     }
 }
 

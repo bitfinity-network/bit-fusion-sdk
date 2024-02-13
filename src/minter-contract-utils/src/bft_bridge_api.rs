@@ -327,12 +327,12 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
         },
         EventParam {
             name: "toERC20".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Address,
             indexed: false,
         },
         EventParam {
             name: "recipient".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Address,
             indexed: false,
         },
         EventParam {
