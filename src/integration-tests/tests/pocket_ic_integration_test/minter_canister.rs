@@ -896,11 +896,12 @@ async fn test_external_bridging() {
 
     // Check mint order removed
     let signed_order = client
-    .update::<_, Option<SignedMintOrder>>(
-        "get_mint_order",
-        (bob_address_id, token_id, burn_operation_id),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+        .update::<_, Option<SignedMintOrder>>(
+            "get_mint_order",
+            (bob_address_id, token_id, burn_operation_id),
+        )
+        .await
+        .unwrap();
+    
+    assert!(signed_order.is_none())
 }
