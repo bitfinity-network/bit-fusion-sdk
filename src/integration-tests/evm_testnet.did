@@ -53,6 +53,10 @@ type Block_1 = record {
   gasUsed : text;
   mixHash : text;
 };
+type BlockchainStorageLimits = record {
+  receipts_bytes_limit : nat64;
+  blocks_and_transactions_bytes_limit : nat64;
+};
 type BuildData = record {
   rustc_semver : text;
   git_branch : text;
@@ -113,7 +117,7 @@ type EvmStats = record {
   block_number : nat64;
   cycles : nat;
   chain_id : nat64;
-  pending_transactions : vec Transaction;
+  pending_transactions : vec text;
   pending_transactions_count : nat64;
   block_gas_limit : nat64;
   state_root : text;
@@ -344,7 +348,7 @@ service : (EvmCanisterInitData) -> {
   admin_reserve_stable_storage_pages : (nat64) -> (Result);
   admin_set_block_gas_limit : (nat64) -> (Result);
   admin_set_block_size_limit : (nat64) -> (Result);
-  admin_set_blockchain_history_size : (nat64) -> (Result);
+  admin_set_blockchain_size_limit : (BlockchainStorageLimits) -> (Result);
   admin_set_coinbase : (text) -> (Result);
   admin_set_evm_state_history_size : (nat64) -> (Result);
   admin_set_max_batch_requests : (nat32) -> (Result);
@@ -390,7 +394,7 @@ service : (EvmCanisterInitData) -> {
   eth_syncing : () -> (bool) query;
   get_block_gas_limit : () -> (nat64) query;
   get_block_size_limit : () -> (nat64) query;
-  get_blockchain_state_history_size : () -> (nat64) query;
+  get_blockchain_size_limit : () -> (BlockchainStorageLimits) query;
   get_canister_build_data : () -> (BuildData) query;
   get_clear_info_entries : (opt record { nat64; text }, nat32) -> (
       Result_10,
