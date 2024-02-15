@@ -9,11 +9,10 @@ default = []
 export-api = []
 
 [dependencies]
+async-recursion = "1.0.4"
 async-trait = { workspace = true }
 candid = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
 did = { workspace = true }
-minter-did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
@@ -25,9 +24,10 @@ ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
+minter-did = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-async-recursion = "1.0.4"
 
 [dev-dependencies]
 mockall = { workspace = true }
