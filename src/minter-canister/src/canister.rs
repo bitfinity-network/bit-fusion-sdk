@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
+use did::build::BuildData;
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
@@ -21,6 +22,7 @@ use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 
+use crate::build_data::canister_build_data;
 use crate::context::{get_base_context, Context, ContextImpl};
 use crate::evm::{Evm, EvmCanisterImpl};
 use crate::state::{Settings, State};
@@ -476,6 +478,12 @@ impl MinterCanister {
             .set_bft_bridge_contract(bft_bridge);
 
         Ok(())
+    }
+
+    /// Returns the build data of the canister
+    #[query]
+    pub fn get_canister_build_data(&self) -> BuildData {
+        canister_build_data()
     }
 
     /// Returns candid IDL.

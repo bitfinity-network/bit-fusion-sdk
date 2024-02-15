@@ -523,3 +523,11 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
         .unwrap()
         .is_ok());
 }
+
+#[tokio::test]
+async fn test_canister_build_data() {
+    let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
+    let minter_client = ctx.minter_client(ALICE);
+    let build_data = minter_client.get_canister_build_data().await.unwrap();
+    assert!(build_data.pkg_name.contains("evm_canister"));
+}

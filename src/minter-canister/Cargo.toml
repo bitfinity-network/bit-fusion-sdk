@@ -33,3 +33,6 @@ async-recursion = "1.0.4"
 mockall = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
+
+[build-dependencies]
+vergen = { workspace = true }

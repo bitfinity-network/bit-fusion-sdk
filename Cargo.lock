@@ -580,6 +580,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c59e92b5a388f549b863a7bea62612c09f24c8393560709a54558a9abdfb3b9c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "candid"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -612,6 +621,29 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "694c8807f2ae16faecc43dc17d74b3eb042482789fd0eb64b39a2e04e087053f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d886547e41f740c616ae73108f6eb70afe6d940c7bc697cb30f13daec073037"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.21",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -1016,8 +1048,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1042,12 +1074,6 @@ dependencies = [
  "sha3",
  "thiserror",
 ]
-
-[[package]]
-name = "difflib"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
 name = "digest"
@@ -1217,8 +1243,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "async-trait",
  "candid",
@@ -1268,8 +1294,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "anyhow",
  "candid",
@@ -1332,8 +1358,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "candid",
  "did",
@@ -1417,15 +1443,6 @@ checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "float-cmp"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -2301,7 +2318,6 @@ dependencies = [
  "minter_canister",
  "once_cell",
  "rand",
- "register_evm_agent",
  "rlp",
  "serde",
  "serde_json",
@@ -2549,8 +2565,8 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "candid",
  "did",
@@ -2582,8 +2598,8 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
+version = "0.12.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
 dependencies = [
  "candid",
  "did",
@@ -2622,6 +2638,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "vergen",
 ]
 
 [[package]]
@@ -2637,9 +2654,9 @@ dependencies = [
 
 [[package]]
 name = "mockall"
-version = "0.11.4"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
+checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
 dependencies = [
  "cfg-if",
  "downcast",
@@ -2652,14 +2669,14 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.11.4"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22ce75669015c4f47b289fd4d4f56e894e4c96003ffdf3ac51313126f94c6cbb"
+checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
 dependencies = [
  "cfg-if",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -2667,12 +2684,6 @@ name = "murmur3"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9252111cf132ba0929b6f8e030cac2a24b507f3a4d6db6fb2896f27b354c714b"
-
-[[package]]
-name = "normalize-line-endings"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "nu-ansi-term"
@@ -2796,6 +2807,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "num_threads"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -3058,16 +3078,12 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "predicates"
-version = "2.1.5"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
+checksum = "68b87bfd4605926cdfefc1c3b5f8fe560e3feca9d5552cf68c466d3d8236c7e8"
 dependencies = [
- "difflib",
- "float-cmp",
- "itertools 0.10.5",
- "normalize-line-endings",
+ "anstyle",
  "predicates-core",
- "regex",
 ]
 
 [[package]]
@@ -3335,30 +3351,6 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
-name = "register_evm_agent"
-version = "0.11.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.11.x#4d8589b458950821ad8e6b24af78b1b2ca9e31ce"
-dependencies = [
- "anyhow",
- "candid",
- "clap",
- "did",
- "env_logger",
- "eth-signer",
- "ethers-core",
- "evm-canister-client",
- "hex",
- "ic-exports",
- "log",
- "rand",
- "rlp",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
 
 [[package]]
 name = "reqwest"
@@ -3723,6 +3715,9 @@ name = "semver"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97ed7a9823b74f99c7742f5336af7be5ecd3eeafcb1507d1fa93347b1d589b0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "semver-parser"
@@ -4219,7 +4214,9 @@ checksum = "c8248b6521bb14bc45b4067159b9b6ad792e2d6d754d6c41fb50e29fefe38749"
 dependencies = [
  "deranged",
  "itoa",
+ "libc",
  "num-conv",
+ "num_threads",
  "powerfmt",
  "serde",
  "time-core",
@@ -4624,6 +4621,21 @@ name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
+
+[[package]]
+name = "vergen"
+version = "8.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e27d6bdd219887a9eadd19e1c34f32e47fa332301184935c6d9bca26f3cca525"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "cfg-if",
+ "regex",
+ "rustc_version 0.4.0",
+ "rustversion",
+ "time",
+]
 
 [[package]]
 name = "version_check"
