@@ -9,10 +9,10 @@ default = []
 export-api = []
 
 [dependencies]
-did = { workspace = true }
-ic-metrics = { workspace = true }
 candid = { workspace = true }
+did = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
-ic-storage = { workspace = true }
+ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
+ic-storage = { workspace = true }

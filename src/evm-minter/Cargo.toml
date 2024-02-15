@@ -9,16 +9,16 @@ default = []
 export-api = []
 
 [dependencies]
-did = { workspace = true }
-ic-metrics = { workspace = true }
-candid = { workspace = true }
-serde = { workspace = true }
-ic-canister = { workspace = true }
-ic-exports = { workspace = true, features = ["icrc"] }
-ic-storage = { workspace = true }
-ic-stable-structures = { workspace = true }
-ic-task-scheduler = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
-ic-canister-client = { workspace = true }
-jsonrpc-core = { workspace = true }
 anyhow = { workspace = true }
+candid = { workspace = true }
+did = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
+ic-canister = { workspace = true }
+ic-canister-client = { workspace = true }
+ic-exports = { workspace = true, features = ["icrc"] }
+ic-metrics = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-storage = { workspace = true }
+ic-task-scheduler = { workspace = true }
+jsonrpc-core = { workspace = true }
+serde = { workspace = true }

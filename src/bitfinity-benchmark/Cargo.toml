@@ -9,7 +9,7 @@ edition.workspace = true
 anyhow = { workspace = true }
 candid = { workspace = true }
 clap = { workspace = true }
-csv = { workspace = true }
+did = { workspace = true }
 env_logger = { workspace = true }
 eth-signer = { workspace = true }
 ethereum-types = { workspace = true }
@@ -17,20 +17,12 @@ ethers-core = { workspace = true }
 evm-canister-client = { workspace = true, features = ["ic-agent-client"] }
 futures = { workspace = true }
 hex = { workspace = true }
-ic-metrics = { workspace = true }
 ic-exports = { workspace = true }
+ic-test-utils = { workspace = true }
 log = { workspace = true }
-reqwest = { workspace = true, features = [
-    "gzip",
-    "json",
-    "rustls-tls",
-    "trust-dns",
-] }
+minter-client = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
+minter-did = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-ic-test-utils = { workspace = true }
-did = { workspace = true }
-minter-did = { workspace = true }
-minter-client = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }

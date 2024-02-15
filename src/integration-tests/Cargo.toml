@@ -6,52 +6,43 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = { workspace = true }
 candid = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
 did = { workspace = true }
-minter-did = { workspace = true }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+  "reqwest",
+  "pocket-ic-tests-client",
+] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
+evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-exports = { workspace = true, features = [
-  "icrc",
-  "ledger",
-] }
+ic-canister-client = { workspace = true, features = ["pocket-ic-client"] }
+ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-helpers = { workspace = true }
 ic-log = { workspace = true }
-ic-stable-structures = { workspace = true, features = [
-  "memory-mapped-files-memory",
-] }
-jsonrpc-core = { workspace = true }
+ic-stable-structures = { workspace = true }
 minter_canister = { path = "../minter-canister" }
+minter-client = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
+minter-did = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rlp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 solidity-helper = { path = "../solidity-helper" }
-ic-canister-client = { workspace = true, features = [
-  "ic-agent-client",
-  "pocket-ic-client",
-] }
-evm-canister-client = { workspace = true, features = ["ic-agent-client"] }
-register-evm-agent = { workspace = true }
-async-trait = { workspace = true }
-minter-client = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 criterion = { workspace = true }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
-register-evm-agent = { workspace = true }
 rlp = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 
 [features]
 pocket_ic_integration_test = []
-dfx_integration_test = []
