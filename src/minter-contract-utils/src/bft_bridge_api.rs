@@ -228,6 +228,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+/// Emited when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct BurntEventData {
     pub sender: did::H160,
@@ -241,6 +242,7 @@ pub struct BurntEventData {
     pub decimals: u8,
 }
 
+/// Builds `BurntEventData` from tokens.
 #[derive(Debug, Default)]
 struct BurntEventDataBuilder {
     pub sender: Option<H160>,
@@ -255,6 +257,8 @@ struct BurntEventDataBuilder {
 }
 
 impl BurntEventDataBuilder {
+    /// Builds `BurntEventData` from tokens.
+    /// All fields are required.
     fn build(self) -> Result<BurntEventData, ethers_core::abi::Error> {
         fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
             let msg = format!("missing event field `{}`", field);
@@ -344,6 +348,7 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+/// Event emitted when token is minted by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct MintedEventData {
     pub amount: did::U256,
@@ -354,6 +359,7 @@ pub struct MintedEventData {
     pub nonce: u32,
 }
 
+/// Builds `MintedEventData` from tokens.
 #[derive(Debug, Default)]
 struct MintedEventDataBuilder {
     pub amount: Option<U256>,
@@ -365,6 +371,8 @@ struct MintedEventDataBuilder {
 }
 
 impl MintedEventDataBuilder {
+    /// Builds `MintedEventData` from tokens.
+    /// All fields are required.
     fn build(self) -> Result<MintedEventData, ethers_core::abi::Error> {
         fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
             let msg = format!("missing event field `{}`", field);

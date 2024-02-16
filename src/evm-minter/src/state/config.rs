@@ -12,6 +12,7 @@ use super::Settings;
 use crate::client::EvmLink;
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
+/// Configuration storage for the evm-minter canister.
 pub struct Config {
     data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
 }
@@ -37,6 +38,7 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Initializes the config.
     pub fn init(&mut self, admin: Principal, settings: Settings) {
         self.update_data(|data| {
             data.admin = admin;
@@ -51,22 +53,27 @@ impl Config {
         })
     }
 
+    /// Returns evm info for the given bridge side.
     pub fn get_evm_info(&self, bridge_side: BridgeSide) -> EvmInfo {
         self.data.get().evms[bridge_side as usize].clone()
     }
 
+    /// Sets evm chain id for the given bridge side.
     pub fn set_evm_chain_id(&mut self, chain_id: u64, bridge_side: BridgeSide) {
         self.update_data(|data| data.evms[bridge_side as usize].chain_id = Some(chain_id));
     }
 
+    /// Sets evm next block number for the given bridge side.
     pub fn set_evm_next_block(&mut self, next_block: u64, bridge_side: BridgeSide) {
         self.update_data(|data| data.evms[bridge_side as usize].next_block = Some(next_block));
     }
 
+    /// Sets evm bridge contract address for the given bridge side.
     pub fn set_bft_bridge_address(&mut self, bridge_side: BridgeSide, address: H160) {
         self.update_data(|data| data.evms[bridge_side as usize].bridge_contract = address);
     }
 
+    /// Checks if the caller is the admin.
     pub fn check_admin(&self, caller: Principal) -> Option<()> {
         (self.data.get().admin == caller).then_some(())
     }
@@ -82,6 +89,8 @@ impl Config {
             .expect("failed to update config stable memory data");
     }
 
+    /// Returns initialized evm info for the given bridge side.
+    /// Returns `None` if evm info is not fully initialized.
     pub fn get_initialized_evm_info(&self, bridge_side: BridgeSide) -> Option<InitializedEvmInfo> {
         let side_idx = bridge_side as usize;
 
@@ -97,6 +106,7 @@ impl Config {
     }
 }
 
+/// Information about EVM on a bridge side.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmInfo {
     pub link: EvmLink,
@@ -105,6 +115,7 @@ pub struct EvmInfo {
     pub next_block: Option<u64>,
 }
 
+/// Information about EVM on a bridge side after initialization.
 pub struct InitializedEvmInfo {
     pub link: EvmLink,
     pub bridge_contract: H160,
@@ -112,6 +123,8 @@ pub struct InitializedEvmInfo {
     pub next_block: u64,
 }
 
+
+/// Configuration data.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
     pub admin: Principal,
