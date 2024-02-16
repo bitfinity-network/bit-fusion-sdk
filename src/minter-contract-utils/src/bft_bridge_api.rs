@@ -274,7 +274,7 @@ impl BurntEventDataBuilder {
         })
     }
 
-    fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
+    fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
         match name {
             "sender" => self.sender = value.into_address(),
             "amount" => self.amount = value.into_uint(),
@@ -300,7 +300,7 @@ impl TryFrom<RawLog> for BurntEventData {
         let mut data_builder = BurntEventDataBuilder::default();
 
         for param in parsed.params {
-            data_builder.with_field_from_token(&param.name, param.value);
+            data_builder = data_builder.with_field_from_token(&param.name, param.value);
         }
 
         data_builder.build()
@@ -433,7 +433,7 @@ mod tests {
     use did::H160;
     use ethers_core::abi::Token;
 
-    use crate::bft_bridge_api::MintedEventDataBuilder;
+    use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
 
     #[test]
     fn minted_event_data_builder_test() {
@@ -460,5 +460,41 @@ mod tests {
         assert_eq!(event.to_erc20, to_erc20);
         assert_eq!(event.recipient, recipient);
         assert_eq!(event.nonce, nonce.as_u32());
+    }
+
+    #[test]
+    fn burnt_event_data_builder_test() {
+        let sender = H160::from_slice(&[3; 20]);
+        let amount = 42.into();
+        let from_erc20 = H160::from_slice(&[3; 20]);
+        let recipient_id = vec![2; 32];
+        let to_token = vec![3; 32];
+        let operation_id = 24.into();
+        let name = vec![4; 32];
+        let symbol = vec![5; 32];
+        let decimals = 6u8.into();
+
+        let event = BurntEventDataBuilder::default()
+            .with_field_from_token("sender", Token::Address(sender.0))
+            .with_field_from_token("amount", Token::Uint(amount))
+            .with_field_from_token("fromERC20", Token::Address(from_erc20.0))
+            .with_field_from_token("recipientID", Token::FixedBytes(recipient_id.clone()))
+            .with_field_from_token("toToken", Token::FixedBytes(to_token.clone()))
+            .with_field_from_token("operationID", Token::Uint(operation_id))
+            .with_field_from_token("name", Token::FixedBytes(name.clone()))
+            .with_field_from_token("symbol", Token::FixedBytes(symbol.clone()))
+            .with_field_from_token("decimals", Token::Uint(decimals))
+            .build()
+            .unwrap();
+
+        assert_eq!(event.sender, sender);
+        assert_eq!(event.amount.0, amount);
+        assert_eq!(event.from_erc20, from_erc20);
+        assert_eq!(event.recipient_id, recipient_id);
+        assert_eq!(event.to_token, to_token);
+        assert_eq!(event.operation_id, operation_id.as_u32());
+        assert_eq!(event.name, name);
+        assert_eq!(event.symbol, symbol);
+        assert_eq!(event.decimals, decimals.as_u32() as u8);
     }
 }
