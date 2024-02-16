@@ -10,8 +10,8 @@ candid = { workspace = true }
 clap = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
-ethers-core = { workspace = true }
 ethereum-types = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
+ethers-core = { workspace = true }
 hex = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
 rand = { workspace = true }

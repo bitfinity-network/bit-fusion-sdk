@@ -316,7 +316,7 @@ impl BridgeTask {
                 "failed to decode sender id256 from minted event".into(),
             )
         })?;
-        
+
         let src_token = Id256::from_slice(&minted_event.from_token).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
                 "failed to decode token id256 from minted event".into(),

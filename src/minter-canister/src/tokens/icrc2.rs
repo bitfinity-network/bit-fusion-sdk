@@ -20,7 +20,7 @@ pub async fn icrc2_approve(
         .await
         .unwrap_or_else(|e| {
             Err(ApproveError::GenericError {
-                error_code: (e.0 as i32).into(),
+                error_code: (e.0 as u64).into(),
                 message: e.1,
             })
         })
@@ -34,7 +34,7 @@ pub async fn icrc2_transfer_from(
     virtual_canister_call!(token, "icrc2_transfer_from", (args,), std::result::Result<Nat, TransferFromError>)
             .await.unwrap_or_else(|e| {
                 Err(TransferFromError::GenericError {
-                    error_code: (e.0 as i32).into(),
+                    error_code: (e.0 as u64).into(),
                     message: e.1,
                 })
             })
@@ -68,7 +68,7 @@ pub async fn approve_mint(
     repeat_on_bad_fee: bool,
 ) -> Result<Success> {
     let fee = get_token_configuration(token).await?.fee;
-    let full_fee = Nat::from(2) * fee.clone();
+    let full_fee = Nat::from(2_u64) * fee.clone();
 
     // Fee deducted twice because there are two transactions: approve and transferFrom.
     if amount < full_fee {
@@ -85,7 +85,7 @@ pub async fn approve_mint(
         from_subaccount: None,
         spender,
         amount: effective_amount.clone(),
-        expected_allowance: Some(0.into()),
+        expected_allowance: Some(0_u64.into()),
         expires_at: Some(u64::MAX),
         fee: Some(fee),
         memo: None,

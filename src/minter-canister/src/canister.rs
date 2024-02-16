@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
+use did::build::BuildData;
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
@@ -21,6 +22,7 @@ use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 
+use crate::build_data::canister_build_data;
 use crate::context::{get_base_context, Context, ContextImpl};
 use crate::evm::{Evm, EvmCanisterImpl};
 use crate::state::{Settings, State};
@@ -391,7 +393,7 @@ impl MinterCanister {
         user: &H160,
         _state: &State,
     ) -> Result<()> {
-        if amount == &Nat::from(0) {
+        if amount == &Nat::from(0u64) {
             return Err(Error::InvalidBurnOperation("zero amount".into()));
         }
 
@@ -476,6 +478,12 @@ impl MinterCanister {
             .set_bft_bridge_contract(bft_bridge);
 
         Ok(())
+    }
+
+    /// Returns the build data of the canister
+    #[query]
+    pub fn get_canister_build_data(&self) -> BuildData {
+        canister_build_data()
     }
 
     /// Returns candid IDL.
@@ -687,6 +695,80 @@ mod test {
         .unwrap_err();
 
         assert_eq!(err, Error::NotAuthorized);
+    }
+
+    // This test work fine if executed alone but could fail if executed with all other tests
+    // due to the global nature of the global logger in Rust.
+    // In fact, if the Rust log is already set, a second attempt to set it causes a panic
+    #[ignore]
+    #[tokio::test]
+    async fn test_set_logger_filter() {
+        MockContext::new().inject();
+        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
+        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
+        let mut canister = MinterCanister::from_principal(mock_canister_id);
+
+        let init_data = InitData {
+            owner: Principal::anonymous(),
+            evm_principal: Principal::anonymous(),
+            evm_chain_id: DEFAULT_CHAIN_ID,
+            bft_bridge_contract: None,
+            evm_gas_price: DEFAULT_GAS_PRICE.into(),
+            spender_principal: Principal::anonymous(),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1u8; 32],
+            },
+            process_transactions_results_interval: None,
+            log_settings: None,
+        };
+        canister_call!(canister.init(init_data), ()).await.unwrap();
+
+        {
+            let info_message = format!("message-{}", rand::random::<u64>());
+            let error_message = format!("message-{}", rand::random::<u64>());
+
+            log::info!("{info_message}");
+            log::error!("{error_message}");
+
+            // Only the error message should be present
+            let log_records = ic_log::take_memory_records(128, 0);
+            assert!(!log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&info_message)));
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&error_message)));
+        }
+        // Set new logger filter
+        let new_filter = "info";
+        let res = canister_call!(
+            canister.set_logger_filter(new_filter.to_string()),
+            Result<()>
+        )
+        .await
+        .unwrap();
+        assert!(res.is_ok());
+
+        {
+            let info_message = format!("message-{}", rand::random::<u64>());
+            let error_message = format!("message-{}", rand::random::<u64>());
+
+            log::info!("{info_message}");
+            log::error!("{error_message}");
+
+            // All log messages should be present
+            let log_records = ic_log::take_memory_records(128, 0);
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&info_message)));
+            assert!(log_records
+                .logs
+                .iter()
+                .any(|log| log.log.contains(&error_message)));
+        }
     }
 
     #[tokio::test]
