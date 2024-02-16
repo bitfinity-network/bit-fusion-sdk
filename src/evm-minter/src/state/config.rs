@@ -123,7 +123,6 @@ pub struct InitializedEvmInfo {
     pub next_block: u64,
 }
 
-
 /// Configuration data.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
