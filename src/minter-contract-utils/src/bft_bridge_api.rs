@@ -381,7 +381,7 @@ impl MintedEventDataBuilder {
         })
     }
 
-    fn with_field_from_token(&mut self, name: &str, value: Token) -> &mut Self {
+    fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
         match name {
             "amount" => self.amount = value.into_uint().map(Into::into),
             "fromToken" => self.from_token = value.into_fixed_bytes(),
@@ -404,7 +404,7 @@ impl TryFrom<RawLog> for MintedEventData {
         let mut data_builder = MintedEventDataBuilder::default();
 
         for param in parsed.params {
-            data_builder.with_field_from_token(&param.name, param.value);
+            data_builder = data_builder.with_field_from_token(&param.name, param.value);
         }
 
         data_builder.build()
@@ -427,3 +427,38 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     constant: None,
     state_mutability: StateMutability::View,
 });
+
+#[cfg(test)]
+mod tests {
+    use did::H160;
+    use ethers_core::abi::Token;
+
+    use crate::bft_bridge_api::MintedEventDataBuilder;
+
+    #[test]
+    fn minted_event_data_builder_test() {
+        let amount = 42.into();
+        let from_token = vec![1; 32];
+        let sender_id = vec![2; 32];
+        let to_erc20 = H160::from_slice(&[3; 20]);
+        let recipient = H160::from_slice(&[4; 20]);
+        let nonce = 42u64.into();
+
+        let event = MintedEventDataBuilder::default()
+            .with_field_from_token("amount", Token::Uint(amount))
+            .with_field_from_token("fromToken", Token::FixedBytes(from_token.clone()))
+            .with_field_from_token("senderID", Token::FixedBytes(sender_id.clone()))
+            .with_field_from_token("toERC20", Token::Address(to_erc20.0))
+            .with_field_from_token("recipient", Token::Address(recipient.0))
+            .with_field_from_token("nonce", Token::Uint(nonce))
+            .build()
+            .unwrap();
+
+        assert_eq!(event.amount.0, amount);
+        assert_eq!(event.from_token, from_token);
+        assert_eq!(event.sender_id, sender_id);
+        assert_eq!(event.to_erc20, to_erc20);
+        assert_eq!(event.recipient, recipient);
+        assert_eq!(event.nonce, nonce.as_u32());
+    }
+}
