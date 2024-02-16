@@ -37,7 +37,6 @@ solidity-helper = { path = "../solidity-helper" }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-criterion = { workspace = true }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 rlp = { workspace = true }

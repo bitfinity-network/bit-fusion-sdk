@@ -438,10 +438,13 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
 
 #[cfg(test)]
 mod tests {
-    use did::H160;
-    use ethers_core::abi::Token;
+    use did::{H160, H256};
+    use ethers_core::abi::{Bytes, RawLog, Token};
+    use ethers_core::utils::hex::traits::FromHex;
 
     use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
+
+    use super::{BurntEventData, MintedEventData};
 
     #[test]
     fn minted_event_data_builder_test() {
@@ -504,5 +507,25 @@ mod tests {
         assert_eq!(event.name, name);
         assert_eq!(event.symbol, symbol);
         assert_eq!(event.decimals, decimals.as_u32() as u8);
+    }
+
+    #[test]
+    fn convert_raw_log_into_minted_event() {
+        let raw = RawLog {
+            topics: vec![H256::from_hex_str("0x4e37fc8684e0f7ad6a6c1178855450294a16b418314493bd7883699e6b3a0140").unwrap().0],
+            data: Bytes::from_hex("0x00000000000000000000000000000000000000000000000000000000000003e80100056b29e76e9f3b04252ff67c2e623a34dd275f46e5b79f000000000000000100056b29a2d1f5f7d0d6e524a73194b76469eba08460ba4400000000000000000000000000000000000000119544f158a75a60beb83d3a44dd16100ad6d1e50000000000000000000000001e368dfb3f4a2d4e326d2111e6415ce54e7403250000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        };
+
+        let _event = MintedEventData::try_from(raw).unwrap();
+    }
+
+    #[test]
+    fn convert_raw_log_into_burnt_event() {
+        let raw = RawLog {
+            topics: vec![H256::from_hex_str("0x311bd942e9a7359e50783d6a90327804169b0f6c5307e406c944f3d7b63ecdc6").unwrap().0],
+            data: Bytes::from_hex("0x000000000000000000000000a2d1f5f7d0d6e524a73194b76469eba08460ba4400000000000000000000000000000000000000000000000000000000000003e8000000000000000000000000e76e9f3b04252ff67c2e623a34dd275f46e5b79f0100056b291e368dfb3f4a2d4e326d2111e6415ce54e740325000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        };
+
+        let _event = BurntEventData::try_from(raw).unwrap();
     }
 }
