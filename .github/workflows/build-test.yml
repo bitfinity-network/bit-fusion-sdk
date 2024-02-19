@@ -56,6 +56,9 @@ jobs:
       init-script: |
         ./scripts/build_solidity.sh
       artifact-pre-script: |
+        export GH_API_TOKEN=$SECRET1
+        ./scripts/evmc-get-release.sh "v0.2.0-2207-g78d7fc4a" "evm-v0.2.0-2207-g78d7fc4a.tar.gz"
+
         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
         ./scripts/build.sh
       test-script: |
@@ -67,3 +70,5 @@ jobs:
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+      env_secret1: ${{ secrets.GH_PKG_TOKEN }}
+

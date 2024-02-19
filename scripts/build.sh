@@ -20,7 +20,6 @@ print_help() {
     echo "Examples:"
     echo "  $0                      # Build all canisters, download binaries and build tools (default)"
     echo "  $0 all                  # Build all canisters and download binaries and build tools"
-    echo "  $0 evm_testnet          # Build only the EVM canister for testnet"
     echo "  $0 spender minter       # Build the spender and minter canisters"
 }
 
@@ -107,12 +106,6 @@ build_requested_canisters() {
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        cp "$project_dir/src/integration-tests/evm_testnet.did" "$WASM_DIR/evm_testnet.did"
-        cp "$project_dir/src/integration-tests/evm_testnet.wasm.gz" "$WASM_DIR/evm_testnet.wasm.gz"
-
-        cp "$project_dir/src/integration-tests/signature_verification.did" "$WASM_DIR/signature_verification.did"
-        cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
-
         build_canister "spender_canister" "export-api" "spender.wasm" "spender"
         build_canister "minter_canister" "export-api" "minter.wasm" "minter"
         build_canister "evm-minter" "export-api" "evm-minter.wasm" "evm-minter"
@@ -122,13 +115,7 @@ build_requested_canisters() {
     else
         for canister in "$@"; do
             case "$canister" in
-            evm)
-                build_canister "evm_canister" "$EVM_FEATURES" "evm.wasm" "evm"
-                ;;
-            evm_testnet)
-                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet.wasm" "evm_testnet"
-                ;;
-            signature_verification | spender | minter)
+            spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
