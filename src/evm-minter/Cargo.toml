@@ -27,4 +27,4 @@ ethers-core = { workspace = true }
 minter-did = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ic-log = { workspace = true }
-eth-signer = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
