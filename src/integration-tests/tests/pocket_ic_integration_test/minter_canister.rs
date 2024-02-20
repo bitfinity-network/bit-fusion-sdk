@@ -16,7 +16,7 @@ use ic_log::LogSettings;
 use minter_canister::tokens::icrc1::IcrcTransferDst;
 use minter_canister::SigningStrategy;
 use minter_contract_utils::bft_bridge_api::BURN;
-use minter_contract_utils::build_data::{
+use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api, BridgeSide};

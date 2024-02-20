@@ -45,7 +45,8 @@ impl Task for BridgeTask {
                 Box::pin(Self::prepare_mint_order(state, data.clone(), *side))
             }
             BridgeTask::RemoveMintOrder(data) => {
-                Box::pin(Self::remove_mint_order(state, data.clone()))
+                let data = data.clone();
+                Box::pin(async move { Self::remove_mint_order(state, data) })
             }
         }
     }
@@ -307,7 +308,7 @@ impl BridgeTask {
         None
     }
 
-    async fn remove_mint_order(
+    fn remove_mint_order(
         state: Rc<RefCell<State>>,
         minted_event: MintedEventData,
     ) -> Result<(), SchedulerError> {

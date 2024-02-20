@@ -2,7 +2,7 @@ use did::H160;
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
-use minter_contract_utils::build_data::{UNISWAP_FACTORY_HEX_CODE, UNISWAP_TOKEN_HEX_CODE};
+use minter_contract_utils::build_data::test_contracts::{UNISWAP_FACTORY_HEX_CODE, UNISWAP_TOKEN_HEX_CODE};
 use minter_contract_utils::uniswap_api::{
     UNISWAP_FACTORY_CONSTRUCTOR, UNISWAP_FACTORY_CREATE_PAIR, UNISWAP_TOKEN_CONSTRUCTOR,
 };

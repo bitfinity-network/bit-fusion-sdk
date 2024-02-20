@@ -7,7 +7,7 @@ use eth_signer::{Signer, Wallet};
 use ethereum_types::H160;
 use ethers_core::abi::Token;
 use minter_contract_utils::bft_bridge_api;
-use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 
 /// Cli args
 #[derive(Parser, Debug)]
