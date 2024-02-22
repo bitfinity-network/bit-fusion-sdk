@@ -13,5 +13,5 @@ eth-signer = { workspace = true }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 hex = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
+minter-contract-utils = { path = "../minter-contract-utils", features = ["test-contracts"] }
 rand = { workspace = true }

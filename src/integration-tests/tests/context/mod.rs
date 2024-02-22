@@ -20,7 +20,7 @@ use ic_exports::icrc_types::icrc1_ledger::{
 use ic_log::LogSettings;
 use minter_canister::SigningStrategy;
 use minter_client::MinterCanisterClient;
-use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
@@ -33,9 +33,9 @@ use super::utils::error::Result;
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
-    get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_minter_canister_bytecode, get_signature_verification_canister_bytecode,
-    get_spender_canister_bytecode,
+    get_evm_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
+    get_icrc1_token_canister_bytecode, get_minter_canister_bytecode,
+    get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
@@ -100,15 +100,26 @@ pub trait TestContext {
     /// Waits for transaction receipt.
     async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
         let client = self.evm_client(self.admin_name());
+        self.wait_transaction_receipt_on_evm(&client, hash).await
+    }
+
+    /// Waits for transaction receipt.
+    async fn wait_transaction_receipt_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        hash: &H256,
+    ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval + Duration::from_secs(2);
+        let timeout = tx_processing_interval * 2;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
         while time_passed < timeout && receipt.is_none() {
             time::sleep(tx_processing_interval).await;
             time_passed = Instant::now() - start;
-            receipt = client.eth_get_transaction_receipt(hash.clone()).await??;
+            receipt = evm_client
+                .eth_get_transaction_receipt(hash.clone())
+                .await??;
         }
         Ok(receipt)
     }
@@ -499,6 +510,7 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
+            _ => todo!(),
         }
     }
 
@@ -643,7 +655,7 @@ pub fn evm_canister_init_data(
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,
-            log_filter: Some("info".to_string()),
+            log_filter: Some("debug".to_string()),
         }),
         transaction_processing_interval,
         owner,
@@ -717,6 +729,7 @@ pub enum CanisterType {
     Token2,
     Minter,
     Spender,
+    EvmMinter,
 }
 
 impl CanisterType {
@@ -740,6 +753,7 @@ impl CanisterType {
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Minter => get_minter_canister_bytecode().await,
             CanisterType::Spender => get_spender_canister_bytecode().await,
+            CanisterType::EvmMinter => get_evm_minter_canister_bytecode().await,
         }
     }
 }

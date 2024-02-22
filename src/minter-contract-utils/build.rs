@@ -30,6 +30,11 @@ fn main() {
         "UniswapV2ERC20",
         "BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE",
     );
+    set_contract_code(
+        &contracts,
+        "WatermelonToken",
+        "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
+    );
 }
 
 /// Loads the contract with the specified name

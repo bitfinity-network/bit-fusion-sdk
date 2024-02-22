@@ -10,10 +10,7 @@ async-trait = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = [
-  "reqwest",
-  "pocket-ic-tests-client",
-] }
+ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
@@ -26,7 +23,7 @@ ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
 minter_canister = { path = "../minter-canister" }
 minter-client = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
+minter-contract-utils = { path = "../minter-contract-utils", features = ["test-contracts"] }
 minter-did = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
@@ -37,12 +34,13 @@ solidity-helper = { path = "../solidity-helper" }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-criterion = { workspace = true }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 rlp = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
+evm-minter = { path = "../evm-minter" }
+signature-verification-canister-client = { workspace = true }
 
 [features]
 pocket_ic_integration_test = []

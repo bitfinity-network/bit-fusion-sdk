@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 
 use ic_stable_structures::stable_structures::Memory;
-use ic_stable_structures::{
-    Bound, MemoryManager, MultimapStructure as _, StableMultimap, Storable,
-};
+use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storable};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -12,9 +10,9 @@ pub struct MintOrders<M: Memory> {
 }
 
 impl<M: Memory> MintOrders<M> {
-    pub fn new(memory_manager: &dyn MemoryManager<M, u8>, memory_id: u8) -> Self {
+    pub fn new(memory: M) -> Self {
         Self {
-            mint_orders_map: StableMultimap::new(memory_manager.get(memory_id)),
+            mint_orders_map: StableMultimap::new(memory),
         }
     }
 
@@ -106,7 +104,7 @@ mod tests {
     use candid::Principal;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-    use ic_stable_structures::{default_ic_memory_manager, Storable, VirtualMemory};
+    use ic_stable_structures::{default_ic_memory_manager, MemoryId, Storable, VirtualMemory};
     use minter_did::id256::Id256;
     use minter_did::order::{MintOrder, SignedMintOrder};
 
@@ -126,7 +124,7 @@ mod tests {
     fn init_context() -> MintOrders<VirtualMemory<DefaultMemoryImpl>> {
         let memory_manager = default_ic_memory_manager();
         MockContext::new().inject();
-        MintOrders::new(&memory_manager, 0)
+        MintOrders::new(memory_manager.get(MemoryId::new(0)))
     }
 
     #[test]

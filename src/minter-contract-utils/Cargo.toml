@@ -3,10 +3,13 @@ name = "minter-contract-utils"
 version.workspace = true
 edition.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+test-contracts = []
 
 [dependencies]
 ethers-core = { workspace = true }
+did = { workspace = true }
+candid = { workspace = true }
 hex = { workspace = true }
 ic-stable-structures = { workspace = true }
 minter-did = { workspace = true }

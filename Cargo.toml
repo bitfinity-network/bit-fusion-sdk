@@ -20,7 +20,6 @@ anyhow = "1.0"
 async-trait = "0.1"
 candid = { version = "0.10", features = ["value"] }
 clap = { version = "4", features = ["derive"] }
-criterion = "0.5"
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.12.x" }
 env_logger = { version = "0.11", default-features = false }
 eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.12.x" }
@@ -43,7 +42,6 @@ ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.13.x" }
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.13.x" }
 jsonrpc-core = "18.0"
-lightspeed_scheduler = "0.57"
 log = "0.4"
 minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.12.x" }
 minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.12.x" }

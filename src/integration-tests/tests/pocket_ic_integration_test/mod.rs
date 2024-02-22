@@ -8,6 +8,7 @@ use std::time::Duration;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
+use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -65,6 +66,30 @@ impl PocketIcTestContext {
     pub async fn advance_time(&self, time: Duration) {
         self.client.advance_time(time).await;
         self.client.tick().await;
+    }
+
+    pub async fn deploy_canister(
+        &self,
+        canister_type: CanisterType,
+        args: impl ArgumentEncoder + Send,
+    ) -> Principal {
+        let canister = self
+            .create_canister()
+            .await
+            .expect("canister should be created");
+
+        let wasm = canister_type.default_canister_wasm().await;
+
+        self.client
+            .install_canister(
+                canister,
+                wasm,
+                candid::encode_args::<_>(args).unwrap(),
+                Some(self.admin()),
+            )
+            .await;
+
+        canister
     }
 }
 
@@ -138,18 +163,26 @@ impl TestContext for PocketIcTestContext {
     }
 
     /// Waits for transaction receipt.
-    async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
+    async fn wait_transaction_receipt_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        hash: &H256,
+    ) -> Result<Option<TransactionReceipt>> {
         for _ in 0..50 {
             let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
             self.advance_time(time).await;
-            let receipt = self
-                .evm_client(ADMIN)
-                .eth_get_transaction_receipt(hash.clone())
-                .await??;
+            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
+
+            if result.is_err() {
+                println!("failed to get tx receipt: {result:?}")
+            }
+
+            let receipt = result?;
             if receipt.is_some() {
                 return Ok(receipt);
             }
         }
+
         Ok(None)
     }
 

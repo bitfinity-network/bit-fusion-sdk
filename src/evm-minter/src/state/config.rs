@@ -2,15 +2,17 @@ use std::borrow::Cow;
 use std::fmt;
 
 use candid::{CandidType, Principal};
-use did::codec;
+use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
+use minter_contract_utils::BridgeSide;
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
 use crate::client::EvmLink;
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
+/// Configuration storage for the evm-minter canister.
 pub struct Config {
     data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
 }
@@ -36,23 +38,44 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn init(&mut self, settings: Settings) {
-        Self::default().update_data(|data| {
-            data.evms[BridgeSide::Base as usize].link = settings.base_evm_link;
-            data.evms[BridgeSide::Wrapped as usize].link = settings.wrapped_evm_link;
+    /// Initializes the config.
+    pub fn init(&mut self, admin: Principal, settings: Settings) {
+        self.update_data(|data| {
+            data.admin = admin;
+
+            let base_evm = &mut data.evms[BridgeSide::Base as usize];
+            base_evm.link = settings.base_evm_link;
+            base_evm.bridge_contract = settings.base_bridge_contract;
+
+            let wrapped_evm = &mut data.evms[BridgeSide::Wrapped as usize];
+            wrapped_evm.link = settings.wrapped_evm_link;
+            wrapped_evm.bridge_contract = settings.wrapped_bridge_contract;
         })
     }
 
+    /// Returns evm info for the given bridge side.
     pub fn get_evm_info(&self, bridge_side: BridgeSide) -> EvmInfo {
         self.data.get().evms[bridge_side as usize].clone()
     }
 
+    /// Sets evm chain id for the given bridge side.
     pub fn set_evm_chain_id(&mut self, chain_id: u64, bridge_side: BridgeSide) {
         self.update_data(|data| data.evms[bridge_side as usize].chain_id = Some(chain_id));
     }
 
+    /// Sets evm next block number for the given bridge side.
     pub fn set_evm_next_block(&mut self, next_block: u64, bridge_side: BridgeSide) {
         self.update_data(|data| data.evms[bridge_side as usize].next_block = Some(next_block));
+    }
+
+    /// Sets evm bridge contract address for the given bridge side.
+    pub fn set_bft_bridge_address(&mut self, bridge_side: BridgeSide, address: H160) {
+        self.update_data(|data| data.evms[bridge_side as usize].bridge_contract = address);
+    }
+
+    /// Checks if the caller is the admin.
+    pub fn check_admin(&self, caller: Principal) -> Option<()> {
+        (self.data.get().admin == caller).then_some(())
     }
 
     fn update_data<F>(&mut self, f: F)
@@ -66,26 +89,41 @@ impl Config {
             .expect("failed to update config stable memory data");
     }
 
-    pub fn is_initialized(&self, bridge_side: BridgeSide) -> bool {
+    /// Returns initialized evm info for the given bridge side.
+    /// Returns `None` if evm info is not fully initialized.
+    pub fn get_initialized_evm_info(&self, bridge_side: BridgeSide) -> Option<InitializedEvmInfo> {
         let side_idx = bridge_side as usize;
-        self.data.get().evms[side_idx].chain_id.is_some()
-            && self.data.get().evms[side_idx].chain_id.is_some()
+
+        let chain_id = self.data.get().evms[side_idx].chain_id?;
+        let next_block = self.data.get().evms[side_idx].next_block?;
+
+        Some(InitializedEvmInfo {
+            link: self.data.get().evms[side_idx].link.clone(),
+            bridge_contract: self.data.get().evms[side_idx].bridge_contract.clone(),
+            chain_id,
+            next_block,
+        })
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
-pub enum BridgeSide {
-    Base = 0,
-    Wrapped = 1,
-}
-
+/// Information about EVM on a bridge side.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmInfo {
     pub link: EvmLink,
+    pub bridge_contract: H160,
     pub chain_id: Option<u64>,
     pub next_block: Option<u64>,
 }
 
+/// Information about EVM on a bridge side after initialization.
+pub struct InitializedEvmInfo {
+    pub link: EvmLink,
+    pub bridge_contract: H160,
+    pub chain_id: u64,
+    pub next_block: u64,
+}
+
+/// Configuration data.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
     pub admin: Principal,
