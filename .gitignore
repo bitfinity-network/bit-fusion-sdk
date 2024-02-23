@@ -23,3 +23,9 @@ dist/
 
 # environment variables
 .env
+
+# Artifacts folder
+.artifact
+
+# Wasm files
+*.wasm

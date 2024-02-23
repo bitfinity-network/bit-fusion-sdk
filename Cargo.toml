@@ -1,5 +1,28 @@
 [workspace]
-members = [
-    "src/ckOrd_backend"
-]
+members = ["src/inscription-canister"]
+
 resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+
+[profile.dev]
+debug = false
+
+# Set the settings for all dependencies (but not this crate itself or any workspace member).
+# This includes build dependencies.
+# Level range is from 0 (default for dev) to 3 (default for release)
+[profile.dev.package."*"]
+opt-level = 2
+
+# Set the settings for build scripts and proc-macros.
+[profile.dev.build-override]
+opt-level = 2
+
+[profile.release]
+#opt-level = "z"
+lto = true
+codegen-units = 1
