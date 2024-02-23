@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "ckOrd_backend": {
+      "candid": "src/ckOrd_backend/ckOrd_backend.did",
+      "package": "ckOrd_backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
