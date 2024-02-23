@@ -10,7 +10,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
@@ -19,12 +19,15 @@ use serde::{Deserialize, Serialize};
 use crate::canister::get_state;
 use crate::state::State;
 
+type SignedMintOrderData = Vec<u8>;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmEvents(BridgeSide),
     PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
+    SendMintTransaction(SignedMintOrderData, BridgeSide),
 }
 
 impl Task for BridgeTask {
@@ -38,13 +41,19 @@ impl Task for BridgeTask {
             BridgeTask::CollectEvmEvents(side) => {
                 Box::pin(Self::collect_evm_events(state, scheduler, *side))
             }
-            BridgeTask::PrepareMintOrder(data, side) => {
-                Box::pin(Self::prepare_mint_order(state, data.clone(), *side))
-            }
+            BridgeTask::PrepareMintOrder(data, side) => Box::pin(Self::prepare_mint_order(
+                state,
+                scheduler,
+                data.clone(),
+                *side,
+            )),
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(state, data) })
             }
+            BridgeTask::SendMintTransaction(order_data, side) => Box::pin(
+                Self::send_mint_transaction(state, order_data.clone(), *side),
+            ),
         }
     }
 }
@@ -129,6 +138,7 @@ impl BridgeTask {
 
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
+        scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         burn_event: BurntEventData,
         burn_side: BridgeSide,
     ) -> Result<(), SchedulerError> {
@@ -196,6 +206,12 @@ impl BridgeTask {
             .mint_orders
             .insert(sender, src_token, nonce, &signed_mint_order);
 
+        let options = TaskOptions::default();
+        scheduler.append_task(
+            BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec(), burn_side.other())
+                .into_scheduled(options),
+        );
+
         log::trace!("Mint order added");
 
         Ok(())
@@ -251,6 +267,53 @@ impl BridgeTask {
             .remove(sender_id, src_token, minted_event.nonce);
 
         log::trace!("Mint order removed");
+
+        Ok(())
+    }
+
+    async fn send_mint_transaction(
+        state: Rc<RefCell<State>>,
+        order_data: Vec<u8>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        log::trace!("Sending mint transaction");
+
+        let signer = state.borrow().signer.get().clone();
+        let sender = signer.get_address().await.into_scheduler_result()?;
+
+        let evm_info = state.borrow().config.get_evm_info(side);
+
+        let evm_params = state
+            .borrow()
+            .config
+            .get_evm_params(side)
+            .into_scheduler_result()?;
+
+        let mut tx = bft_bridge_api::mint_transaction(
+            sender.0,
+            evm_info.bridge_contract.0,
+            evm_params.nonce.into(),
+            evm_params.gas_price.into(),
+            order_data,
+            evm_params.chain_id as _,
+        );
+
+        let signature = signer
+            .sign_transaction(&(&tx).into())
+            .await
+            .into_scheduler_result()?;
+        tx.r = signature.r.0;
+        tx.s = signature.s.0;
+        tx.v = signature.v.0;
+        tx.hash = tx.hash();
+
+        let client = evm_info.link.get_client();
+        client
+            .send_raw_transaction(tx)
+            .await
+            .into_scheduler_result()?;
+
+        log::trace!("Mint transaction sent");
 
         Ok(())
     }

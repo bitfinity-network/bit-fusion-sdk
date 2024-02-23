@@ -83,14 +83,19 @@ impl EvmParams {
             .fold((0u64, EthU256::zero()), |(count, sum), price| {
                 (count + 1, sum + price)
             });
-
         let mean_price = sum_price / EthU256::from(tx_with_price_count.max(1));
+        const DEFAULT_GAS_PRICE: u64 = 46 * 10u64.pow(9);
+        let gas_price = if mean_price == EthU256::zero() {
+            DEFAULT_GAS_PRICE.into()
+        } else {
+            mean_price.into()
+        };
 
         Ok(Self {
             chain_id,
             next_block,
             nonce,
-            gas_price: mean_price.into(),
+            gas_price,
         })
     }
 }

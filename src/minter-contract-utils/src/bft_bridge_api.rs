@@ -3,7 +3,7 @@ use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::abi::{
     Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
 };
-use ethers_core::types::{BlockNumber as EthBlockNumber, Log, H160, U256};
+use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -483,6 +483,32 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     constant: None,
     state_mutability: StateMutability::View,
 });
+
+pub fn mint_transaction(
+    sender: H160,
+    bridge: H160,
+    nonce: U256,
+    gas_price: U256,
+    mint_order_data: Vec<u8>,
+    chain_id: u32,
+) -> Transaction {
+    let data = MINT
+        .encode_input(&[Token::Bytes(mint_order_data)])
+        .expect("mint order encoding should pass");
+
+    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
+    ethers_core::types::Transaction {
+        from: sender,
+        to: bridge.into(),
+        nonce,
+        value: U256::zero(),
+        gas: DEFAULT_TX_GAS_LIMIT.into(),
+        gas_price: Some(gas_price),
+        input: data.into(),
+        chain_id: Some(chain_id.into()),
+        ..Default::default()
+    }
+}
 
 #[cfg(test)]
 mod tests {
