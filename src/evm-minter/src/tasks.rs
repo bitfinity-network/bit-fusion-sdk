@@ -3,18 +3,15 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use ethereum_json_rpc_client::EthGetLogsParams;
-use ethers_core::abi::RawLog;
-use ethers_core::types::Log;
+use eth_signer::sign_strategy::TransactionSigner;
+use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{
-    BurntEventData, MintedEventData, BURNT_EVENT, MINTED_EVENT,
-};
-use minter_contract_utils::BridgeSide;
+use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
@@ -61,77 +58,23 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
-        Self::init_evm_chain_id(state.clone(), side).await?;
-        Self::init_evm_next_block(state, side).await?;
-
-        log::trace!("evm state initialized for side {:?}", side);
-
-        Ok(())
-    }
-
-    pub async fn init_evm_chain_id(
-        state: Rc<RefCell<State>>,
-        side: BridgeSide,
-    ) -> Result<(), SchedulerError> {
-        log::trace!("initializing evm chain id for side {:?}", side);
-
-        let link = {
-            let state = state.borrow();
-            let info = state.config.get_evm_info(side);
-
-            // If chain id is already set, there is nothing to do.
-            // WARN: Changing chain id in runtime may lead to funds loss.
-            if info.chain_id.is_some() {
-                return Ok(());
-            }
-
-            info.link
+        let client = state.borrow().config.get_evm_info(side).link.get_client();
+        let address = {
+            let signer = state.borrow().signer.get().clone();
+            signer.get_address().await.into_scheduler_result()?
         };
 
-        let chain_id = match link
-            .get_client()
-            .get_chain_id()
-            .await
-            .into_scheduler_result()
-        {
-            Ok(id) => id,
-            Err(e) => {
-                log::error!("failed to get chain id: {e}");
-                return Err(e);
-            }
-        };
-
-        state.borrow_mut().config.set_evm_chain_id(chain_id, side);
-        Ok(())
-    }
-
-    pub async fn init_evm_next_block(
-        state: Rc<RefCell<State>>,
-        side: BridgeSide,
-    ) -> Result<(), SchedulerError> {
-        log::trace!("initializing evm next block for side {:?}", side);
-        let link = {
-            let state = state.borrow();
-            let info = state.config.get_evm_info(side);
-
-            // If next block is already set, there is nothing to do.
-            // WARN: Re-initializing next block in runtime may lead to funds loss.
-            if info.next_block.is_some() {
-                return Ok(());
-            }
-
-            info.link
-        };
-
-        let next_block = link
-            .get_client()
-            .get_block_number()
+        let evm_params = EvmParams::query(client, address)
             .await
             .into_scheduler_result()?;
+
         state
             .borrow_mut()
             .config
-            .set_evm_next_block(next_block, side);
+            .update_evm_params(|old| *old = evm_params, side);
+
+        log::trace!("evm state initialized for side {:?}", side);
+
         Ok(())
     }
 
@@ -142,34 +85,24 @@ impl BridgeTask {
     ) -> Result<(), SchedulerError> {
         log::trace!("collecting evm events: side: {side:?}");
 
-        let Some(evm_info) = state.borrow().config.get_initialized_evm_info(side) else {
-            log::warn!("failed to collect events for side {side:?}: evm info is not initialized",);
+        let evm_info = state.borrow().config.get_evm_info(side);
+        let Some(params) = evm_info.params else {
+            log::warn!("no evm params for side {side} found");
             return Self::init_evm_state(state, side).await;
         };
 
         let client = evm_info.link.get_client();
 
-        let params = EthGetLogsParams {
-            address: Some(vec![evm_info.bridge_contract.into()]),
-            from_block: evm_info.next_block.into(),
-            to_block: ethers_core::types::BlockNumber::Safe,
-            topics: Some(vec![vec![
-                BURNT_EVENT.signature(),
-                MINTED_EVENT.signature(),
-            ]]),
-        };
+        let logs = BridgeEvent::collect_logs(
+            &client,
+            params.next_block.into(),
+            BlockNumber::Safe,
+            evm_info.bridge_contract.0,
+        )
+        .await
+        .into_scheduler_result()?;
 
-        log::debug!("collecting logs from side {side:?} with params: {params:?}");
-
-        let logs = match client.get_logs(params).await.into_scheduler_result() {
-            Ok(logs) => logs,
-            Err(e) => {
-                log::error!("failed to get logs: {e}");
-                return Err(e);
-            }
-        };
-
-        log::debug!("got logs from side {side:?}: {logs:?}");
+        log::debug!("got logs from side {side}: {logs:?}");
 
         let mut mut_state = state.borrow_mut();
 
@@ -178,8 +111,9 @@ impl BridgeTask {
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state.config.set_evm_next_block(next_block_number, side);
-            log::trace!("updated evm next block for side {side:?}: {next_block_number}");
+            mut_state
+                .config
+                .update_evm_params(|params| params.next_block = next_block_number, side);
         };
 
         log::trace!("appending logs to tasks: {side:?}: {logs:?}");
@@ -196,9 +130,22 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         burn_event: BurntEventData,
-        sender_side: BridgeSide,
+        burn_side: BridgeSide,
     ) -> Result<(), SchedulerError> {
         log::trace!("preparing mint order: {burn_event:?}");
+
+        let burn_evm_params = state
+            .borrow()
+            .config
+            .get_evm_params(burn_side)
+            .into_scheduler_result()?;
+
+        let mint_evm_params = state
+            .borrow()
+            .config
+            .get_evm_params(burn_side.other())
+            .into_scheduler_result()?;
+
         let recipient = Id256::from_slice(&burn_event.recipient_id)
             .and_then(|id| id.to_evm_address().ok())
             .ok_or_else(|| {
@@ -212,25 +159,8 @@ impl BridgeTask {
             .unwrap_or_default()
             .1;
 
-        let sender_chain_id = state
-            .borrow()
-            .config
-            .get_initialized_evm_info(sender_side)
-            .ok_or_else(|| {
-                log::error!("sender evm info is not initialized: {sender_side:?}");
-                SchedulerError::TaskExecutionFailed("sender evm info is not initialized".into())
-            })?
-            .chain_id as u32;
-
-        let recipient_chain_id = state
-            .borrow()
-            .config
-            .get_initialized_evm_info(sender_side.other())
-            .ok_or_else(|| {
-                log::error!("recipient evm info is not initialized: {sender_side:?}");
-                SchedulerError::TaskExecutionFailed("recipient evm info is not initialized".into())
-            })?
-            .chain_id as u32;
+        let sender_chain_id = burn_evm_params.chain_id as u32;
+        let recipient_chain_id = mint_evm_params.chain_id as u32;
 
         let sender = Id256::from_evm_address(&burn_event.sender, sender_chain_id);
         let src_token = Id256::from_evm_address(&burn_event.from_erc20, sender_chain_id);
@@ -274,11 +204,6 @@ impl BridgeTask {
     fn task_by_log(log: Log, sender_side: BridgeSide) -> Option<ScheduledTask<BridgeTask>> {
         log::trace!("creating task from the log: {log:?}");
 
-        let raw_log = RawLog {
-            topics: log.topics,
-            data: log.data.to_vec(),
-        };
-
         const TASK_RETRY_DELAY_SECS: u32 = 5;
 
         let options = TaskOptions::default()
@@ -287,22 +212,18 @@ impl BridgeTask {
             })
             .with_max_retries_policy(u32::MAX);
 
-        match BurntEventData::try_from(raw_log.clone()) {
-            Ok(burnt_event_data) => {
+        match BridgeEvent::from_log(log).into_scheduler_result() {
+            Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = BridgeTask::PrepareMintOrder(burnt_event_data, sender_side);
+                let mint_order_task = BridgeTask::PrepareMintOrder(burnt, sender_side);
                 return Some(mint_order_task.into_scheduled(options));
             }
-            Err(e) => log::debug!("Failed to decode BurntEventData: {e}"),
-        }
-
-        match MintedEventData::try_from(raw_log) {
-            Ok(mint_event_data) => {
+            Ok(BridgeEvent::Minted(minted)) => {
                 log::debug!("Adding RemoveMintOrder task");
-                let remove_mint_order_task = BridgeTask::RemoveMintOrder(mint_event_data);
+                let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
-            Err(e) => log::debug!("Failed to decode MintedEventData: {e}"),
+            Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
         None

@@ -5,11 +5,10 @@ use candid::{CandidType, Principal};
 use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::BridgeSide;
+use minter_contract_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
-use crate::client::EvmLink;
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 /// Configuration storage for the evm-minter canister.
@@ -54,23 +53,35 @@ impl Config {
     }
 
     /// Returns evm info for the given bridge side.
-    pub fn get_evm_info(&self, bridge_side: BridgeSide) -> EvmInfo {
-        self.data.get().evms[bridge_side as usize].clone()
+    pub fn get_evm_info(&self, side: BridgeSide) -> EvmInfo {
+        self.data.get().evms[side as usize].clone()
     }
 
-    /// Sets evm chain id for the given bridge side.
-    pub fn set_evm_chain_id(&mut self, chain_id: u64, bridge_side: BridgeSide) {
-        self.update_data(|data| data.evms[bridge_side as usize].chain_id = Some(chain_id));
-    }
-
-    /// Sets evm next block number for the given bridge side.
-    pub fn set_evm_next_block(&mut self, next_block: u64, bridge_side: BridgeSide) {
-        self.update_data(|data| data.evms[bridge_side as usize].next_block = Some(next_block));
+    /// Sets owner principal.
+    pub fn set_admin(&mut self, admin: Principal) {
+        self.update_data(|data| data.admin = admin);
     }
 
     /// Sets evm bridge contract address for the given bridge side.
     pub fn set_bft_bridge_address(&mut self, bridge_side: BridgeSide, address: H160) {
         self.update_data(|data| data.evms[bridge_side as usize].bridge_contract = address);
+    }
+
+    pub fn get_evm_params(&self, side: BridgeSide) -> anyhow::Result<EvmParams> {
+        self.data.get().evms[side as usize]
+            .params
+            .clone()
+            .ok_or_else(|| {
+                anyhow::Error::msg(format!("EVM params not set for bridge side: {side}",))
+            })
+    }
+
+    pub fn update_evm_params<F: FnOnce(&mut EvmParams)>(&mut self, f: F, side: BridgeSide) {
+        self.update_data(|data| {
+            let mut params = data.evms[side as usize].params.clone().unwrap_or_default();
+            f(&mut params);
+            data.evms[side as usize].params = Some(params);
+        })
     }
 
     /// Checks if the caller is the admin.
@@ -88,39 +99,6 @@ impl Config {
             .set(data)
             .expect("failed to update config stable memory data");
     }
-
-    /// Returns initialized evm info for the given bridge side.
-    /// Returns `None` if evm info is not fully initialized.
-    pub fn get_initialized_evm_info(&self, bridge_side: BridgeSide) -> Option<InitializedEvmInfo> {
-        let side_idx = bridge_side as usize;
-
-        let chain_id = self.data.get().evms[side_idx].chain_id?;
-        let next_block = self.data.get().evms[side_idx].next_block?;
-
-        Some(InitializedEvmInfo {
-            link: self.data.get().evms[side_idx].link.clone(),
-            bridge_contract: self.data.get().evms[side_idx].bridge_contract.clone(),
-            chain_id,
-            next_block,
-        })
-    }
-}
-
-/// Information about EVM on a bridge side.
-#[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
-pub struct EvmInfo {
-    pub link: EvmLink,
-    pub bridge_contract: H160,
-    pub chain_id: Option<u64>,
-    pub next_block: Option<u64>,
-}
-
-/// Information about EVM on a bridge side after initialization.
-pub struct InitializedEvmInfo {
-    pub link: EvmLink,
-    pub bridge_contract: H160,
-    pub chain_id: u64,
-    pub next_block: u64,
 }
 
 /// Configuration data.
@@ -175,39 +153,17 @@ mod tests {
     }
 
     #[test]
-    fn test_config_getters_and_setters() {
+    fn test_update_params() {
         let mut config = Config::default();
 
-        assert_eq!(config.get_evm_info(BridgeSide::Base), EvmInfo::default());
-        assert_eq!(config.get_evm_info(BridgeSide::Wrapped), EvmInfo::default());
+        config.get_evm_params(BridgeSide::Base).unwrap_err();
+        config.update_evm_params(|params| params.next_block = 100, BridgeSide::Base);
+        let params = config.get_evm_params(BridgeSide::Base).unwrap();
+        assert_eq!(params.next_block, 100);
 
-        let base_chain_id = 42;
-        let wrapped_chain_id = 84;
-        config.set_evm_chain_id(base_chain_id, BridgeSide::Base);
-        config.set_evm_chain_id(wrapped_chain_id, BridgeSide::Wrapped);
-
-        assert_eq!(
-            config.get_evm_info(BridgeSide::Base).chain_id,
-            Some(base_chain_id)
-        );
-        assert_eq!(
-            config.get_evm_info(BridgeSide::Wrapped).chain_id,
-            Some(wrapped_chain_id)
-        );
-
-        let base_next_block = 1;
-        let wrapped_next_block = 2;
-
-        config.set_evm_next_block(1, BridgeSide::Base);
-        config.set_evm_next_block(2, BridgeSide::Wrapped);
-
-        assert_eq!(
-            config.get_evm_info(BridgeSide::Base).next_block,
-            Some(base_next_block)
-        );
-        assert_eq!(
-            config.get_evm_info(BridgeSide::Wrapped).next_block,
-            Some(wrapped_next_block)
-        );
+        config.get_evm_params(BridgeSide::Wrapped).unwrap_err();
+        config.update_evm_params(|params| params.next_block = 200, BridgeSide::Wrapped);
+        let params = config.get_evm_params(BridgeSide::Wrapped).unwrap();
+        assert_eq!(params.next_block, 200);
     }
 }

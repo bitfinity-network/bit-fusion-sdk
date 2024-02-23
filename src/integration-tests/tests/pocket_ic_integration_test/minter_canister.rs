@@ -6,7 +6,6 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use evm_minter::client::EvmLink;
 use evm_minter::state::Settings;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
@@ -19,7 +18,9 @@ use minter_contract_utils::bft_bridge_api::BURN;
 use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
 };
-use minter_contract_utils::{bft_bridge_api, wrapped_token_api, BridgeSide};
+use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_contract_utils::evm_link::EvmLink;
+use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Error as McError;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;

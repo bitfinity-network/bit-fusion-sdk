@@ -1,8 +1,9 @@
 use candid::CandidType;
+use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::abi::{
     Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
 };
-use ethers_core::types::{H160, U256};
+use ethers_core::types::{BlockNumber as EthBlockNumber, Log, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -227,6 +228,53 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     ],
     anonymous: false,
 });
+
+/// Emited when token is burnt or minted by BFTBridge.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+pub enum BridgeEvent {
+    Burnt(BurntEventData),
+    Minted(MintedEventData),
+}
+
+impl BridgeEvent {
+    pub async fn collect_logs(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        from_block: EthBlockNumber,
+        to_block: EthBlockNumber,
+        bridge_contract: H160,
+    ) -> Result<Vec<Log>, anyhow::Error> {
+        let params = EthGetLogsParams {
+            address: Some(vec![bridge_contract]),
+            from_block,
+            to_block,
+            topics: Some(vec![vec![
+                BURNT_EVENT.signature(),
+                MINTED_EVENT.signature(),
+            ]]),
+        };
+
+        evm_client.get_logs(params).await
+    }
+
+    pub fn from_log(log: Log) -> Result<Self, ethers_core::abi::Error> {
+        let raw_log = RawLog {
+            topics: log.topics,
+            data: log.data.to_vec(),
+        };
+
+        Self::try_from(raw_log)
+    }
+}
+
+impl TryFrom<RawLog> for BridgeEvent {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        BurntEventData::try_from(log.clone())
+            .map(Self::Burnt)
+            .or_else(|_| MintedEventData::try_from(log).map(Self::Minted))
+    }
+}
 
 /// Emited when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
