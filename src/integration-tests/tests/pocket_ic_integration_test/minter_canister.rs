@@ -650,7 +650,7 @@ async fn test_external_bridging() {
                 base_bridge_contract: external_bridge_address.clone(),
                 wrapped_bridge_contract: H160::default(),
                 signing_strategy: SigningStrategy::Local {
-                    private_key: [42; 32],
+                    private_key: [1; 32],
                 },
                 log_settings: Some(LogSettings {
                     enable_console: true,
@@ -845,7 +845,10 @@ async fn test_external_bridging() {
         .unwrap()
         .as_u32();
 
-    // Tick to advance time.
+    // Tick to advance time twice, because we need two timers to be executed:
+    // 1) Timer in minter canister to send a mint tx
+    // 2) Timer in evm canister to process the mint tx
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
 
     // Chech the balance of the wrapped token.
