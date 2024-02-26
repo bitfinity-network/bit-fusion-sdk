@@ -1,2 +1,2 @@
 [alias]
-inscription-wasm = "build --release --target wasm32-unknown-unknown --package inscription-canister"
+inscription-wasm = "build --release --target wasm32-unknown-unknown --package inscription_canister"

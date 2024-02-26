@@ -8,9 +8,13 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+bitcoin = { version = "0.31", features = ["serde"] }
 candid = "0.10"
 ic-cdk = "0.12"
-serde = "1.0"
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [profile.dev]
 debug = false
