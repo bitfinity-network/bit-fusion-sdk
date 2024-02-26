@@ -1,14 +1,16 @@
 use candid::Principal;
-use ic_cdk::api::call::{call_with_payment, RejectionCode};
+use ic_cdk::api::call::call_with_payment;
 use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetBalanceRequest, GetUtxosRequest, GetUtxosResponse, Satoshi,
     SendTransactionRequest,
 };
 
+type BitcoinApiResult<T> = std::result::Result<T, BitcoinApiError>;
+
+const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
+const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
 const GET_BALANCE_COST_CYCLES: u64 = 100_000_000;
 const GET_UTXOS_COST_CYCLES: u64 = 10_000_000_000;
-const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
-const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 
 #[derive(Debug, Clone)]
 pub enum BitcoinApiError {
@@ -17,16 +19,7 @@ pub enum BitcoinApiError {
     SendTransactionRequest(String),
 }
 
-impl From<RejectionCode> for BitcoinApiError {
-    fn from(_err: ic_cdk::api::call::RejectionCode) -> Self {
-        todo!()
-    }
-}
-
-pub async fn get_balance(
-    network: BitcoinNetwork,
-    address: String,
-) -> Result<Satoshi, BitcoinApiError> {
+pub async fn get_balance(network: BitcoinNetwork, address: String) -> BitcoinApiResult<Satoshi> {
     call_with_payment::<(GetBalanceRequest,), (Satoshi,)>(
         Principal::management_canister(),
         "bitcoin_get_balance",
@@ -45,7 +38,7 @@ pub async fn get_balance(
 pub async fn get_utxos(
     network: BitcoinNetwork,
     address: String,
-) -> Result<GetUtxosResponse, BitcoinApiError> {
+) -> BitcoinApiResult<GetUtxosResponse> {
     call_with_payment::<(GetUtxosRequest,), (GetUtxosResponse,)>(
         Principal::management_canister(),
         "bitcoin_get_utxos",
@@ -64,7 +57,7 @@ pub async fn get_utxos(
 pub async fn send_transaction(
     network: BitcoinNetwork,
     transaction: Vec<u8>,
-) -> Result<(), BitcoinApiError> {
+) -> BitcoinApiResult<()> {
     let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
         + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
 

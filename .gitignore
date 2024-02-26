@@ -29,3 +29,6 @@ dist/
 
 # Wasm files
 *.wasm
+
+# misc
+.build.sh.swp
