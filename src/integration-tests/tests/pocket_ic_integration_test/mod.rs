@@ -2,6 +2,7 @@ mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
 mod token;
+mod btc;
 
 use std::fmt;
 use std::time::Duration;

@@ -33,9 +33,11 @@ use super::utils::error::Result;
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
+    get_btc_canister_bytecode, get_ck_btc_minter_canister_bytecode,
     get_erc20_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
-    get_icrc1_token_canister_bytecode, get_minter_canister_bytecode,
-    get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
+    get_icrc1_ledger_canister_bytecode, get_icrc1_token_canister_bytecode,
+    get_minter_canister_bytecode, get_signature_verification_canister_bytecode,
+    get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
@@ -757,6 +759,13 @@ impl CanisterType {
         CanisterType::Spender,
     ];
 
+    pub const BTC_CANISTER_SET: [CanisterType; 4] = [
+        CanisterType::Btc,
+        CanisterType::CkBtcMinter,
+        CanisterType::Kyt,
+        CanisterType::Icrc1Ledger,
+    ];
+
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
@@ -766,6 +775,10 @@ impl CanisterType {
             CanisterType::Minter => get_minter_canister_bytecode().await,
             CanisterType::Spender => get_spender_canister_bytecode().await,
             CanisterType::EvmMinter => get_erc20_minter_canister_bytecode().await,
+            CanisterType::Btc => get_btc_canister_bytecode().await,
+            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
+            CanisterType::Kyt => get_kyt_canister_bytecode().await,
+            CanisterType::Icrc1Ledger => get_icrc1_ledger_canister_bytecode().await,
         }
     }
 }
