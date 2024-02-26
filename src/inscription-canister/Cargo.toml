@@ -6,10 +6,6 @@ edition.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
-[[bin]]
-name = "inscription-canister-did"
-path = "src/lib.rs"
-
 [dependencies]
 bitcoin = { workspace = true }
 candid = { workspace = true }
