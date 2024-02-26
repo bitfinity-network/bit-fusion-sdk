@@ -1,3 +1,4 @@
+pub mod bitcoin_api;
 pub mod inscription;
 mod utils;
 
