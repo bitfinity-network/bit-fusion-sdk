@@ -7,10 +7,11 @@ use ic_cdk::api::management_canister::bitcoin::{
 
 type BitcoinApiResult<T> = std::result::Result<T, BitcoinApiError>;
 
-const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
-const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
+// The fees for the various Bitcoin endpoints.
 const GET_BALANCE_COST_CYCLES: u64 = 100_000_000;
 const GET_UTXOS_COST_CYCLES: u64 = 10_000_000_000;
+const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
+const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 
 #[derive(Debug, Clone)]
 pub enum BitcoinApiError {
