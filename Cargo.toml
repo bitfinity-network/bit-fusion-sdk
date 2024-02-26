@@ -8,6 +8,9 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+candid = "0.10"
+ic-cdk = "0.12"
+serde = "1.0"
 
 [profile.dev]
 debug = false

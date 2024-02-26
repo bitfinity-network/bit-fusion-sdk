@@ -3,12 +3,10 @@ name = "inscription_canister"
 version.workspace = true
 edition.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-candid = "0.10"
-ic-cdk = "0.12"
-ic-cdk-timers = "0.6" # Feel free to remove this dependency if you don't need timers
+candid = { workspace = true }
+ic-cdk = { workspace = true }
+serde = { workspace = true }

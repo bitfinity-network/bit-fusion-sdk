@@ -1,10 +1,17 @@
 {
   "canisters": {
     "inscription_canister": {
-      "build": "",
-      "candid": ".artifact/inscription_canister.did",
-      "wasm": ".artifact/inscription_canister.wasm.gz",
-      "type": "custom"
+      "candid": "src/inscription-canister/inscription_canister.did",
+      "package": "inscription_canister",
+      "type": "rust"
     }
-  }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
 }
