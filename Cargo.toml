@@ -12,7 +12,6 @@ bitcoin = { version = "0.31", features = ["serde"] }
 candid = "0.10"
 ic-cdk = "0.12"
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
-
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
