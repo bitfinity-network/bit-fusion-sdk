@@ -7,6 +7,10 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+ic-cdk-timers = "0.6"                                  # Feel free to remove this dependency if you don't need timers
+rand = { version = "0.8.5", features = ["getrandom"] }
+
 bitcoin = { workspace = true }
 candid = { workspace = true }
 ic-cdk = { workspace = true }

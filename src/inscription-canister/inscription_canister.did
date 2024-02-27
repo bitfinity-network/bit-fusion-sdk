@@ -1,1 +1,40 @@
-service : {}
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
+
+type Error = variant {
+  NoUtxosReturned : text;
+  TransactionNotSent : text;
+  NoBalanceReturned : text;
+  CurrentFeePercentilesUnavailable : text;
+};
+
+type GetUtxosResponse = record {
+  next_page : opt vec nat8;
+  tip_height : nat32;
+  tip_block_hash : vec nat8;
+  utxos : vec Utxo;
+};
+
+type Outpoint = record { txid : vec nat8; vout : nat32 };
+
+type Result = variant { Ok : nat64; Err : Error };
+
+type Result_1 = variant { Ok : vec nat64; Err : Error };
+
+type Result_2 = variant { Ok : GetUtxosResponse; Err : Error };
+
+type Result_3 = variant { Ok : text; Err : Error };
+
+type SendRequest = record {
+  destination_address : text;
+  amount_in_satoshi : nat64;
+};
+
+type Utxo = record { height : nat32; value : nat64; outpoint : Outpoint };
+
+service : (BitcoinNetwork) -> {
+  get_balance : (text) -> (Result);
+  get_current_fee_percentiles : () -> (Result_1);
+  get_p2pkh_address : () -> (text);
+  get_utxos : (text) -> (Result_2);
+  send : (SendRequest) -> (Result_3);
+};
