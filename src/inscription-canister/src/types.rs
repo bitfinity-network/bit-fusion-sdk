@@ -85,3 +85,9 @@ pub enum LockTime {
     Blocks(u32),
     Seconds(u32),
 }
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct SendRequest {
+    pub destination_address: String,
+    pub amount_in_satoshi: u64,
+}
