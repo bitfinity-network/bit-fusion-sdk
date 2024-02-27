@@ -20,13 +20,13 @@ anyhow = "1.0"
 async-trait = "0.1"
 candid = { version = "0.10", features = ["value"] }
 clap = { version = "4", features = ["derive"] }
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", branch = "more_eth_methods" }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", branch = "more_eth_methods" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", branch = "more_eth_methods" }
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "more_eth_methods" }
-minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", branch = "more_eth_methods" }
-minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", branch = "more_eth_methods" }
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", branch = "more_eth_methods" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.12.x" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.12.x" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.12.x" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.12.x" }
+minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.12.x" }
+minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.12.x" }
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.12.x" }
 env_logger = { version = "0.11", default-features = false }
 ethereum-types = "0.14"
 ethers-core = "2.0"

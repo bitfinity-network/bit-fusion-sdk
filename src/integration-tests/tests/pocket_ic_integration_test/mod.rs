@@ -63,11 +63,6 @@ impl PocketIcTestContext {
         }
     }
 
-    pub async fn advance_time(&self, time: Duration) {
-        self.client.advance_time(time).await;
-        self.client.tick().await;
-    }
-
     pub async fn deploy_canister(
         &self,
         canister_type: CanisterType,
@@ -99,6 +94,11 @@ impl TestContext for PocketIcTestContext {
 
     fn canisters(&self) -> TestCanisters {
         self.canisters.clone()
+    }
+
+    async fn advance_time(&self, time: Duration) {
+        self.client.advance_time(time).await;
+        self.client.tick().await;
     }
 
     fn client(&self, canister: Principal, caller: &str) -> Self::Client {

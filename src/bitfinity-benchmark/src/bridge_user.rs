@@ -129,7 +129,8 @@ impl BridgeUser {
         Ok(self
             .evm_client()
             .mint_native_tokens(self.address.clone(), amount)
-            .await??)
+            .await??
+            .1)
     }
 
     /// Get BFTBridge address.
