@@ -11,7 +11,8 @@ edition = "2021"
 bitcoin = { version = "0.31", features = ["serde"] }
 candid = "0.10"
 ic-cdk = "0.12"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "attempt-rng-fix" }
+ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk.git", branch = "main" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "main" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

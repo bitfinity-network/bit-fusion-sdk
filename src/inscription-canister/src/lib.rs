@@ -1,6 +1,5 @@
 pub mod bitcoin_api;
 pub mod inscription;
-mod rand_init;
 mod types;
 mod utils;
 
@@ -31,8 +30,6 @@ thread_local! {
 
 #[ic_cdk::init]
 pub fn init(network: BitcoinNetwork) {
-    rand_init::init_ic_rand();
-
     BITCOIN_NETWORK.with(|n| n.set(network));
 
     ECDSA_KEY_NAME.with(|key_name| {
