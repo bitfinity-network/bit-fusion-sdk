@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::{BitcoinApiError, BitcoinApiResult};
 use candid::Principal;
 use ic_cdk::api::{
     call::call_with_payment,
@@ -19,7 +19,7 @@ const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 ///
 /// Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
-pub async fn get_balance(network: BitcoinNetwork, address: String) -> Result<Satoshi> {
+pub async fn get_balance(network: BitcoinNetwork, address: String) -> BitcoinApiResult<Satoshi> {
     call_with_payment::<(GetBalanceRequest,), (Satoshi,)>(
         Principal::management_canister(),
         "bitcoin_get_balance",
@@ -31,7 +31,7 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> Result<Sat
         GET_BALANCE_COST_CYCLES,
     )
     .await
-    .map_err(|e| Error::NoBalanceReturned(format!("{:?}", e)))
+    .map_err(|e| BitcoinApiError::NoBalanceReturned(format!("{:?}", e)))
     .map(|res| res.0)
 }
 
@@ -39,7 +39,10 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> Result<Sat
 ///
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
-pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<GetUtxosResponse> {
+pub async fn get_utxos(
+    network: BitcoinNetwork,
+    address: String,
+) -> BitcoinApiResult<GetUtxosResponse> {
     call_with_payment::<(GetUtxosRequest,), (GetUtxosResponse,)>(
         Principal::management_canister(),
         "bitcoin_get_utxos",
@@ -51,7 +54,7 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<GetUt
         GET_UTXOS_COST_CYCLES,
     )
     .await
-    .map_err(|e| Error::NoUtxosReturned(format!("{:?}", e)))
+    .map_err(|e| BitcoinApiError::NoUtxosReturned(format!("{:?}", e)))
     .map(|res| res.0)
 }
 
@@ -62,7 +65,7 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<GetUt
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_current_fee_percentiles
 pub async fn get_current_fee_percentiles(
     network: BitcoinNetwork,
-) -> Result<Vec<MillisatoshiPerByte>> {
+) -> BitcoinApiResult<Vec<MillisatoshiPerByte>> {
     call_with_payment::<(GetCurrentFeePercentilesRequest,), (Vec<MillisatoshiPerByte>,)>(
         Principal::management_canister(),
         "bitcoin_get_current_fee_percentiles",
@@ -70,7 +73,7 @@ pub async fn get_current_fee_percentiles(
         GET_CURRENT_FEE_PERCENTILES_CYCLES,
     )
     .await
-    .map_err(|e| Error::CurrentFeePercentilesUnavailable(format!("{:?}", e)))
+    .map_err(|e| BitcoinApiError::CurrentFeePercentilesUnavailable(format!("{:?}", e)))
     .map(|res| res.0)
 }
 
@@ -78,7 +81,10 @@ pub async fn get_current_fee_percentiles(
 ///
 /// Relies on the `bitcoin_send_transaction` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_send_transaction
-pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) -> Result<()> {
+pub async fn send_transaction(
+    network: BitcoinNetwork,
+    transaction: Vec<u8>,
+) -> BitcoinApiResult<()> {
     let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
         + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
 
@@ -92,5 +98,5 @@ pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) -> 
         transaction_fee,
     )
     .await
-    .map_err(|e| Error::TransactionNotSent(format!("{:?}", e)))
+    .map_err(|e| BitcoinApiError::TransactionNotSent(format!("{:?}", e)))
 }

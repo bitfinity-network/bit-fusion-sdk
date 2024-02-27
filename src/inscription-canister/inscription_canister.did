@@ -1,10 +1,10 @@
-type BitcoinNetwork = variant { mainnet; regtest; testnet };
-type Error = variant {
+type BitcoinApiError = variant {
   NoUtxosReturned : text;
   TransactionNotSent : text;
   NoBalanceReturned : text;
   CurrentFeePercentilesUnavailable : text;
 };
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
 type GetUtxosResponse = record {
   next_page : opt vec nat8;
   tip_height : nat32;
@@ -12,10 +12,10 @@ type GetUtxosResponse = record {
   utxos : vec Utxo;
 };
 type Outpoint = record { txid : vec nat8; vout : nat32 };
-type Result = variant { Ok : nat64; Err : Error };
-type Result_1 = variant { Ok : vec nat64; Err : Error };
-type Result_2 = variant { Ok : GetUtxosResponse; Err : Error };
-type Result_3 = variant { Ok : text; Err : Error };
+type Result = variant { Ok : nat64; Err : BitcoinApiError };
+type Result_1 = variant { Ok : vec nat64; Err : BitcoinApiError };
+type Result_2 = variant { Ok : GetUtxosResponse; Err : BitcoinApiError };
+type Result_3 = variant { Ok : text; Err : BitcoinApiError };
 type SendRequest = record {
   destination_address : text;
   amount_in_satoshi : nat64;

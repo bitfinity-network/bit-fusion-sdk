@@ -1,23 +1,56 @@
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
-pub struct CommitTransactionArgs {
-    pub inputs: Vec<TxInput>,
-    pub inscription: Inscription,
-    pub leftovers_recipient: String,
-    pub commit_fee: u64,
-    pub reveal_fee: u64,
-    pub txin_script_pubkey: Vec<u8>,
+#[derive(CandidType, Deserialize, Debug)]
+pub enum Protocol {
+    Brc20(Brc20),
+    Nft(Nft),
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
-pub struct Inscription {
+#[derive(CandidType, Deserialize, Debug)]
+pub enum Brc20 {
+    Deploy(Brc20Deploy),
+    Mint(Brc20Mint),
+    Transfer(Brc20Transfer),
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct Nft {
     pub body: Option<Vec<u8>>,
     pub content_encoding: Option<Vec<u8>>,
     pub content_type: Option<Vec<u8>>,
     pub metadata: Option<Vec<u8>>,
     pub unrecognized_even_field: bool,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct Brc20Deploy {
+    pub tick: String,
+    pub max: u64,
+    pub lim: Option<u64>,
+    pub dec: Option<u64>,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct Brc20Mint {
+    pub tick: String,
+    pub amt: u64,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct Brc20Transfer {
+    pub tick: String,
+    pub amt: u64,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct CommitTransactionArgs {
+    pub inputs: Vec<TxInput>,
+    pub inscription: Protocol,
+    pub leftovers_recipient: String,
+    pub commit_fee: u64,
+    pub reveal_fee: u64,
+    pub txin_script_pubkey: Vec<u8>,
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
