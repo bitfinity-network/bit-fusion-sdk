@@ -5,7 +5,7 @@ use ic_cdk::api::management_canister::bitcoin::{
     SendTransactionRequest,
 };
 
-type BitcoinApiResult<T> = std::result::Result<T, BitcoinApiError>;
+use crate::{Error, Result};
 
 // The fees for the various Bitcoin endpoints.
 const GET_BALANCE_COST_CYCLES: u64 = 100_000_000;
@@ -20,7 +20,7 @@ pub enum BitcoinApiError {
     SendTransactionRequest(String),
 }
 
-pub async fn get_balance(network: BitcoinNetwork, address: String) -> BitcoinApiResult<Satoshi> {
+pub async fn get_balance(network: BitcoinNetwork, address: String) -> Result<Satoshi> {
     call_with_payment::<(GetBalanceRequest,), (Satoshi,)>(
         Principal::management_canister(),
         "bitcoin_get_balance",
@@ -32,14 +32,11 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> BitcoinApi
         GET_BALANCE_COST_CYCLES,
     )
     .await
-    .map_err(|e| BitcoinApiError::GetBalanceRequest(format!("Failed to get balance: {:?}", e)))
+    .map_err(|e| Error::NoBalanceReturned(format!("{:?}", e)))
     .map(|res| res.0)
 }
 
-pub async fn get_utxos(
-    network: BitcoinNetwork,
-    address: String,
-) -> BitcoinApiResult<GetUtxosResponse> {
+pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<GetUtxosResponse> {
     call_with_payment::<(GetUtxosRequest,), (GetUtxosResponse,)>(
         Principal::management_canister(),
         "bitcoin_get_utxos",
@@ -51,14 +48,11 @@ pub async fn get_utxos(
         GET_UTXOS_COST_CYCLES,
     )
     .await
-    .map_err(|e| BitcoinApiError::GetUtxosRequest(format!("Failed to get UTXOs: {:?}", e)))
+    .map_err(|e| Error::NoUtxosReturned(format!("{:?}", e)))
     .map(|res| res.0)
 }
 
-pub async fn send_transaction(
-    network: BitcoinNetwork,
-    transaction: Vec<u8>,
-) -> BitcoinApiResult<()> {
+pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) -> Result<()> {
     let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
         + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
 
@@ -72,7 +66,5 @@ pub async fn send_transaction(
         transaction_fee,
     )
     .await
-    .map_err(|e| {
-        BitcoinApiError::SendTransactionRequest(format!("Failed to send transaction: {:?}", e))
-    })
+    .map_err(|e| Error::TransactionNotSent(format!("{:?}", e)))
 }

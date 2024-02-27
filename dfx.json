@@ -1,9 +1,16 @@
 {
   "canisters": {
     "inscription_canister": {
-      "candid": "src/inscription-canister/inscription_canister.did",
+      "type": "rust",
       "package": "inscription_canister",
-      "type": "rust"
+      "candid": "src/inscription-canister/inscription_canister.did",
+      "wasm": "target/wasm32-unknown-unknown/release/inscription_canister.wasm",
+      "build": "build.sh",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
     }
   },
   "defaults": {
