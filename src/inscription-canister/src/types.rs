@@ -1,60 +1,22 @@
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
 
-// #[derive(CandidType, Deserialize, Debug)]
-// pub enum Protocol {
-//     Brc20 {
-//         deploy: String,
-//         mint: String,
-//         transfer: String,
-//     },
-//     Nft {
-//         content_type: Option<String>,
-//         body: Option<String>,
-//         metadata: Option<String>,
-//     },
-// }
-
 #[derive(CandidType, Deserialize, Debug)]
-pub enum Brc20 {
-    Deploy(Brc20Deploy),
-    Mint(Brc20Mint),
-    Transfer(Brc20Transfer),
+pub enum Protocol {
+    Brc20 { func: Brc20Func },
+    Nft,
 }
 
 #[derive(CandidType, Deserialize, Debug)]
-pub struct Nft {
-    pub body: Option<Vec<u8>>,
-    pub content_encoding: Option<Vec<u8>>,
-    pub content_type: Option<Vec<u8>>,
-    pub metadata: Option<Vec<u8>>,
-    pub unrecognized_even_field: bool,
+pub enum Brc20Func {
+    Deploy,
+    Mint,
+    Transfer,
 }
 
 #[derive(CandidType, Deserialize, Debug)]
-pub struct Brc20Deploy {
-    pub tick: String,
-    pub max: u64,
-    pub lim: Option<u64>,
-    pub dec: Option<u64>,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
-pub struct Brc20Mint {
-    pub tick: String,
-    pub amt: u64,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
-pub struct Brc20Transfer {
-    pub tick: String,
-    pub amt: u64,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
-pub struct CommitTransactionArgs {
+pub struct CreateCommitTransactionArgs {
     pub inputs: Vec<TxInput>,
-    // pub inscription: Protocol,
     pub leftovers_recipient: String,
     pub commit_fee: u64,
     pub reveal_fee: u64,
@@ -62,7 +24,7 @@ pub struct CommitTransactionArgs {
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
-pub struct CommitTransactionReply {
+pub struct CreateCommitTransaction {
     pub tx: Transaction,
     pub redeem_script: Vec<u8>,
     pub reveal_balance: u64,
@@ -76,21 +38,21 @@ pub struct Transaction {
     pub output: Vec<TxOut>,
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Debug)]
 pub struct RevealTransactionArgs {
     pub input: TxInput,
     pub recipient_address: String,
     pub redeem_script: Vec<u8>,
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Debug)]
 pub struct TxInput {
-    pub id: Txid,
+    pub id: String,
     pub index: u32,
     pub amount: u64,
 }
 
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Debug)]
 pub struct Txid {
     tx_id: String,
 }
@@ -105,7 +67,7 @@ pub struct TxIn {
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct OutPoint {
-    pub txid: Txid,
+    pub txid: String,
     pub vout: u32,
 }
 

@@ -1,9 +1,3 @@
-type BitcoinApiError = variant {
-  NoUtxosReturned : text;
-  TransactionNotSent : text;
-  NoBalanceReturned : text;
-  CurrentFeePercentilesUnavailable : text;
-};
 type BitcoinNetwork = variant { mainnet; regtest; testnet };
 type GetUtxosResponse = record {
   next_page : opt vec nat8;
@@ -12,19 +6,15 @@ type GetUtxosResponse = record {
   utxos : vec Utxo;
 };
 type Outpoint = record { txid : vec nat8; vout : nat32 };
-type Result = variant { Ok : nat64; Err : BitcoinApiError };
-type Result_1 = variant { Ok : vec nat64; Err : BitcoinApiError };
-type Result_2 = variant { Ok : GetUtxosResponse; Err : BitcoinApiError };
-type Result_3 = variant { Ok : text; Err : BitcoinApiError };
 type SendRequest = record {
   destination_address : text;
   amount_in_satoshi : nat64;
 };
 type Utxo = record { height : nat32; value : nat64; outpoint : Outpoint };
 service : (BitcoinNetwork) -> {
-  get_balance : (text) -> (Result);
-  get_current_fee_percentiles : () -> (Result_1);
+  get_balance : (text) -> (nat64);
+  get_current_fee_percentiles : () -> (vec nat64);
   get_p2pkh_address : () -> (text);
-  get_utxos : (text) -> (Result_2);
-  send : (SendRequest) -> (Result_3);
+  get_utxos : (text) -> (GetUtxosResponse);
+  send : (SendRequest) -> (text);
 }

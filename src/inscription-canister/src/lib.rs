@@ -5,24 +5,13 @@ pub mod inscription;
 pub mod types;
 mod utils;
 
-use candid::{CandidType, Deserialize};
 use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
 };
 use std::cell::{Cell, RefCell};
 
-pub type BitcoinApiResult<T> = std::result::Result<T, BitcoinApiError>;
-
-#[derive(CandidType, Deserialize, Clone, Debug)]
-pub enum BitcoinApiError {
-    TransactionNotSent(String),
-    NoUtxosReturned(String),
-    NoBalanceReturned(String),
-    CurrentFeePercentilesUnavailable(String),
-}
-
 thread_local! {
-    static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Testnet);
+    static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
 
     static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
 
@@ -43,14 +32,14 @@ pub fn init(network: BitcoinNetwork) {
 
 /// Returns the balance of the given bitcoin address.
 #[ic_cdk::update]
-pub async fn get_balance(address: String) -> BitcoinApiResult<u64> {
+pub async fn get_balance(address: String) -> u64 {
     let network = BITCOIN_NETWORK.with(|n| n.get());
     bitcoin_api::get_balance(network, address).await
 }
 
 /// Returns the UTXOs of the given bitcoin address.
 #[ic_cdk::update]
-pub async fn get_utxos(address: String) -> BitcoinApiResult<GetUtxosResponse> {
+pub async fn get_utxos(address: String) -> GetUtxosResponse {
     let network = BITCOIN_NETWORK.with(|n| n.get());
     bitcoin_api::get_utxos(network, address).await
 }
@@ -58,7 +47,7 @@ pub async fn get_utxos(address: String) -> BitcoinApiResult<GetUtxosResponse> {
 /// Returns the 100 fee percentiles measured in millisatoshi/byte.
 /// Percentiles are computed from the last 10,000 transactions (if available).
 #[ic_cdk::update]
-pub async fn get_current_fee_percentiles() -> BitcoinApiResult<Vec<MillisatoshiPerByte>> {
+pub async fn get_current_fee_percentiles() -> Vec<MillisatoshiPerByte> {
     let network = BITCOIN_NETWORK.with(|n| n.get());
     bitcoin_api::get_current_fee_percentiles(network).await
 }
@@ -75,7 +64,7 @@ pub async fn get_p2pkh_address() -> String {
 /// Sends the given amount of bitcoin from this canister to the given address.
 /// Returns the transaction ID.
 #[ic_cdk::update]
-pub async fn send(_request: types::SendRequest) -> BitcoinApiResult<String> {
+pub async fn send(_request: types::SendRequest) -> String {
     let _derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
     let _network = BITCOIN_NETWORK.with(|n| n.get());
     let _key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
@@ -90,7 +79,7 @@ pub async fn send(_request: types::SendRequest) -> BitcoinApiResult<String> {
     // .await;
 
     // tx_id.to_string()
-    Ok(String::new())
+    String::new()
 }
 
 // Enable Candid export

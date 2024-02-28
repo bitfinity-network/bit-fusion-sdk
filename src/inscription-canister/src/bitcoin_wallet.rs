@@ -1,6 +1,124 @@
-use crate::ecdsa_api;
+use core::str::FromStr;
+
+use crate::{
+    bitcoin_api, ecdsa_api,
+    inscription::{handle_inscriptions, InscriptionType, Protocol},
+    types, ECDSA_KEY_NAME,
+};
+use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
+use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ord_rs::{
+    transaction::{CreateCommitTransactionArgs, RevealTransactionArgs, TxInput},
+    Inscription, OrdResult, OrdTransactionBuilder,
+};
 use sha2::Digest;
+
+// WIP
+pub async fn send_transaction_with_inscription(
+    commit_tx_args: types::CreateCommitTransactionArgs,
+    network: BitcoinNetwork,
+    inscription_protocol: Protocol,
+    inscription_data: &str,
+    dst_address: Option<String>,
+) -> OrdResult<(String, String)> {
+    // TODO: Refactor
+    let mut builder = OrdTransactionBuilder::p2wsh(PrivateKey::from_wif("").unwrap()); // TEMPORARY
+
+    let inscription = handle_inscriptions(inscription_protocol, inscription_data)?;
+
+    let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
+
+    let derivation_path = vec![];
+
+    // Fetch our public key, P2PKH address, and UTXOs.
+    let own_public_key =
+        ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
+    let own_address = public_key_to_p2pkh_address(network, &own_public_key);
+
+    let own_address = Address::from_str(&own_address)
+        .unwrap()
+        .require_network(Network::Regtest)
+        .unwrap();
+
+    let dst_address = if let Some(dst_address) = dst_address {
+        Address::from_str(&dst_address)
+            .unwrap()
+            .require_network(Network::Regtest)
+            .unwrap()
+    } else {
+        // Send inscription to canister's own address if none is provided
+        own_address.clone()
+    };
+
+    let commit_tx_args = match inscription {
+        InscriptionType::Brc20 { inner } => parse_commit_tx_args(inner, commit_tx_args),
+        // TODO: Handle NFTs
+        // FIXME
+        InscriptionType::Nft { inner: _ } => {
+            todo!()
+        }
+    };
+
+    let (commit_tx, reveal_tx) =
+        build_transaction_with_inscription(&mut builder, commit_tx_args, dst_address.clone())
+            .await
+            .expect("Failed to build transaction with inscription");
+
+    let commit_tx_bytes = serialize(&commit_tx);
+    ic_cdk::print(format!(
+        "Signed commit transaction: {}",
+        hex::encode(&commit_tx_bytes)
+    ));
+
+    ic_cdk::print("Sending commit transaction...");
+    bitcoin_api::send_transaction(network, commit_tx_bytes).await;
+    ic_cdk::print("Done");
+
+    let reveal_tx_bytes = serialize(&reveal_tx);
+    ic_cdk::print(format!(
+        "Signed reveal transaction: {}",
+        hex::encode(&reveal_tx_bytes)
+    ));
+
+    ic_cdk::print("Sending reveal transaction...");
+    bitcoin_api::send_transaction(network, reveal_tx_bytes).await;
+    ic_cdk::print("Done");
+
+    Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
+}
+
+async fn build_transaction_with_inscription<T>(
+    builder: &mut OrdTransactionBuilder,
+    args: CreateCommitTransactionArgs<T>,
+    recipient_address: Address,
+) -> OrdResult<(Transaction, Transaction)>
+where
+    T: Inscription,
+{
+    let commit_tx = builder.build_commit_transaction(args)?;
+    let reveal_tx_args = RevealTransactionArgs {
+        input: TxInput {
+            id: commit_tx.tx.txid(),
+            index: 0,
+            amount: commit_tx.reveal_balance,
+        },
+        recipient_address,
+        redeem_script: commit_tx.clone().redeem_script,
+    };
+    let reveal_tx = builder.build_reveal_transaction(reveal_tx_args)?;
+    Ok((commit_tx.tx, reveal_tx))
+}
+
+fn parse_commit_tx_args<T>(
+    _inscription: T,
+    _args: types::CreateCommitTransactionArgs,
+) -> CreateCommitTransactionArgs<T>
+where
+    T: Inscription,
+{
+    todo!()
+}
 
 /// Returns the P2PKH address of this canister at the given derivation path.
 /// We use this to generate payment addresses

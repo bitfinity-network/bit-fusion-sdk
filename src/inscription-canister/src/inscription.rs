@@ -1,7 +1,7 @@
-use crate::{types::Brc20Transfer, utils};
+use crate::utils;
 use bitcoin::script::PushBytesBuf;
 use ord_rs::{
-    brc20::{Brc20, Brc20Deploy, Brc20Mint},
+    brc20::{Brc20, Brc20Deploy, Brc20Mint, Brc20Transfer},
     Inscription, OrdError, OrdResult,
 };
 use serde::{Deserialize, Serialize};
@@ -91,29 +91,34 @@ impl Inscription for Nft {
     }
 }
 
-pub fn handle_inscriptions(protocol: Protocol, data: &str) -> OrdResult<Box<dyn Inscription>> {
+pub enum InscriptionType {
+    Brc20 { inner: Brc20 },
+    Nft { inner: Nft },
+}
+
+pub fn handle_inscriptions(protocol: Protocol, data: &str) -> OrdResult<InscriptionType> {
     match protocol {
         Protocol::Brc20 { func } => match func {
             Brc20Func::Deploy => {
                 let deploy = serde_json::from_str::<Brc20Deploy>(data)?;
                 let deploy_op = Brc20::deploy(deploy.tick, deploy.max, deploy.lim, deploy.dec);
-                Ok(Box::new(deploy_op))
+                Ok(InscriptionType::Brc20 { inner: deploy_op })
             }
             Brc20Func::Mint => {
                 let mint = serde_json::from_str::<Brc20Mint>(data)?;
                 let mint_op = Brc20::mint(mint.tick, mint.amt);
-                Ok(Box::new(mint_op))
+                Ok(InscriptionType::Brc20 { inner: mint_op })
             }
             Brc20Func::Transfer => {
                 let transfer = serde_json::from_str::<Brc20Transfer>(data)?;
                 let transfer_op = Brc20::transfer(transfer.tick, transfer.amt);
-                Ok(Box::new(transfer_op))
+                Ok(InscriptionType::Brc20 { inner: transfer_op })
             }
         },
         Protocol::Nft => {
             let nft_data = serde_json::from_str::<Nft>(data)?;
             let nft = Nft::new(nft_data.content_type, nft_data.body, nft_data.metadata);
-            Ok(Box::new(nft))
+            Ok(InscriptionType::Nft { inner: nft })
         }
     }
 }
