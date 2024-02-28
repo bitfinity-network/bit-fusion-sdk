@@ -1,5 +1,5 @@
 [package]
-name = "evm-minter"
+name = "erc20-minter"
 version.workspace = true
 edition.workspace = true
 

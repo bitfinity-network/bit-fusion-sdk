@@ -18,7 +18,7 @@ use ic_exports::icrc_types::icrc1_ledger::{
     ArchiveOptions, FeatureFlags, InitArgs, LedgerArgument,
 };
 use ic_log::LogSettings;
-use minter_canister::SigningStrategy;
+use icrc2_minter::SigningStrategy;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
@@ -33,7 +33,7 @@ use super::utils::error::Result;
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
-    get_evm_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
+    get_erc20_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
     get_icrc1_token_canister_bytecode, get_minter_canister_bytecode,
     get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
@@ -753,7 +753,7 @@ impl CanisterType {
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Minter => get_minter_canister_bytecode().await,
             CanisterType::Spender => get_spender_canister_bytecode().await,
-            CanisterType::EvmMinter => get_evm_minter_canister_bytecode().await,
+            CanisterType::EvmMinter => get_erc20_minter_canister_bytecode().await,
         }
     }
 }

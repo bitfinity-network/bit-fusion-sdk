@@ -20,8 +20,8 @@
     },
     "minter": {
       "build": "",
-      "candid": ".artifact/minter.did",
-      "wasm": ".artifact/minter.wasm.gz",
+      "candid": ".artifact/icrc2-minter.did",
+      "wasm": ".artifact/icrc2-minter.wasm.gz",
       "type": "custom"
     },
     "erc20-minter": {
