@@ -2,7 +2,7 @@ use core::str::FromStr;
 
 use crate::{
     bitcoin_api, ecdsa_api,
-    inscription::{handle_inscriptions, InscriptionType, Protocol},
+    inscription::{handle_inscriptions, InscriptionWrapper, Protocol},
     types, ECDSA_KEY_NAME,
 };
 use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
@@ -52,10 +52,10 @@ pub async fn send_transaction_with_inscription(
     };
 
     let commit_tx_args = match inscription {
-        InscriptionType::Brc20 { inner } => parse_commit_tx_args(inner, commit_tx_args),
+        InscriptionWrapper::Brc20 { inner } => parse_commit_tx_args(inner, commit_tx_args),
         // TODO: Handle NFTs
         // FIXME
-        InscriptionType::Nft { inner: _ } => {
+        InscriptionWrapper::Nft { inner: _ } => {
             todo!()
         }
     };

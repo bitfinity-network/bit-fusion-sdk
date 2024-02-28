@@ -7,6 +7,13 @@ use ord_rs::{
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+/// A wrapper around the concrete types that implement `ord_rs::Inscription`.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum InscriptionWrapper {
+    Brc20 { inner: Brc20 },
+    Nft { inner: Nft },
+}
+
 /// Represents the type of digital artifact being inscribed.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Protocol {
@@ -91,34 +98,29 @@ impl Inscription for Nft {
     }
 }
 
-pub enum InscriptionType {
-    Brc20 { inner: Brc20 },
-    Nft { inner: Nft },
-}
-
-pub fn handle_inscriptions(protocol: Protocol, data: &str) -> OrdResult<InscriptionType> {
+pub fn handle_inscriptions(protocol: Protocol, data: &str) -> OrdResult<InscriptionWrapper> {
     match protocol {
         Protocol::Brc20 { func } => match func {
             Brc20Func::Deploy => {
                 let deploy = serde_json::from_str::<Brc20Deploy>(data)?;
                 let deploy_op = Brc20::deploy(deploy.tick, deploy.max, deploy.lim, deploy.dec);
-                Ok(InscriptionType::Brc20 { inner: deploy_op })
+                Ok(InscriptionWrapper::Brc20 { inner: deploy_op })
             }
             Brc20Func::Mint => {
                 let mint = serde_json::from_str::<Brc20Mint>(data)?;
                 let mint_op = Brc20::mint(mint.tick, mint.amt);
-                Ok(InscriptionType::Brc20 { inner: mint_op })
+                Ok(InscriptionWrapper::Brc20 { inner: mint_op })
             }
             Brc20Func::Transfer => {
                 let transfer = serde_json::from_str::<Brc20Transfer>(data)?;
                 let transfer_op = Brc20::transfer(transfer.tick, transfer.amt);
-                Ok(InscriptionType::Brc20 { inner: transfer_op })
+                Ok(InscriptionWrapper::Brc20 { inner: transfer_op })
             }
         },
         Protocol::Nft => {
             let nft_data = serde_json::from_str::<Nft>(data)?;
             let nft = Nft::new(nft_data.content_type, nft_data.body, nft_data.metadata);
-            Ok(InscriptionType::Nft { inner: nft })
+            Ok(InscriptionWrapper::Nft { inner: nft })
         }
     }
 }
