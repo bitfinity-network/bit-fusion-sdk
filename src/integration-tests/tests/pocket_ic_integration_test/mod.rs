@@ -1,7 +1,6 @@
 mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
-mod minter;
 mod token;
 
 use std::fmt;
@@ -9,9 +8,8 @@ use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H256};
-use did::{H160, U256, U64};
-use eth_signer::{Signer, Wallet};
+use did::{TransactionReceipt, H160, H256};
+use eth_signer::Wallet;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;

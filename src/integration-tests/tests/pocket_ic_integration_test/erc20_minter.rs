@@ -1,35 +1,25 @@
 use std::time::Duration;
 
-use candid::{Nat, Principal};
 use did::{H160, U256, U64};
-use erc20_minter::client::EvmLink;
 use erc20_minter::state::Settings;
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
-use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use ic_canister_client::CanisterClientError;
-use ic_exports::ic_kit::mock_principals::{alice, john};
-use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
-use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 use ic_log::LogSettings;
-use icrc2_minter::tokens::icrc1::IcrcTransferDst;
 use icrc2_minter::SigningStrategy;
+use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::bft_bridge_api::BURN;
 use minter_contract_utils::build_data::test_contracts::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
+    BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
 };
-use minter_contract_utils::{bft_bridge_api, wrapped_token_api, BridgeSide};
-use minter_did::error::Error as McError;
+use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
-use crate::context::{
-    evm_canister_init_data, CanisterType, TestContext, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
-};
-use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::error::TestError;
+use crate::context::{evm_canister_init_data, CanisterType, TestContext};
+use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::{self, CHAIN_ID};
 
 // Create a second EVM canister (external_evm) instance and create BFTBridge contract on it, // It will play role of external evm
@@ -43,7 +33,6 @@ use crate::utils::{self, CHAIN_ID};
 // Send the SignedMintOrder to the BFTBridge::mint() endpoint of the first EVM.
 // Make sure the tokens minted.
 // Make sure SignedMintOrder removed from erc20-minter after some time.
-
 #[tokio::test]
 async fn test_external_bridging() {
     let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
