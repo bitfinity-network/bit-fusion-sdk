@@ -1,11 +1,19 @@
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
 
-#[derive(CandidType, Deserialize, Debug)]
-pub enum Protocol {
-    Brc20(Brc20),
-    Nft(Nft),
-}
+// #[derive(CandidType, Deserialize, Debug)]
+// pub enum Protocol {
+//     Brc20 {
+//         deploy: String,
+//         mint: String,
+//         transfer: String,
+//     },
+//     Nft {
+//         content_type: Option<String>,
+//         body: Option<String>,
+//         metadata: Option<String>,
+//     },
+// }
 
 #[derive(CandidType, Deserialize, Debug)]
 pub enum Brc20 {
@@ -46,7 +54,7 @@ pub struct Brc20Transfer {
 #[derive(CandidType, Deserialize, Debug)]
 pub struct CommitTransactionArgs {
     pub inputs: Vec<TxInput>,
-    pub inscription: Protocol,
+    // pub inscription: Protocol,
     pub leftovers_recipient: String,
     pub commit_fee: u64,
     pub reveal_fee: u64,

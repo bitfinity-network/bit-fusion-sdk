@@ -1,40 +1,29 @@
-use crate::utils;
+use crate::{types::Brc20Transfer, utils};
 use bitcoin::script::PushBytesBuf;
-use ord_rs::{brc20::Brc20, Inscription, OrdResult};
+use ord_rs::{
+    brc20::{Brc20, Brc20Deploy, Brc20Mint},
+    Inscription, OrdError, OrdResult,
+};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Represents the type of digital artifact being inscribed.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Protocol {
     /// Satoshis imbued with `deploy`, `mint`, and `transfer` functionalities,
     /// as well as token supply, simulating fungibility (e.g., like ERC20 tokens).
-    Brc20(Brc20),
+    Brc20 { func: Brc20Func },
     /// For now, we refer to all other inscriptions (i.e. non-BRC20 ords) as
     /// non-fungible (e.g., like ERC721 tokens).
-    Nft(Nft),
+    Nft,
 }
 
-impl Inscription for Protocol {
-    fn content_type(&self) -> String {
-        match self {
-            Self::Brc20(brc20) => brc20.content_type(),
-            Self::Nft(nft) => nft.content_type(),
-        }
-    }
-
-    fn data(&self) -> OrdResult<PushBytesBuf> {
-        match self {
-            Self::Brc20(brc20) => brc20.data(),
-            Self::Nft(nft) => nft.data(),
-        }
-    }
-
-    fn parse(data: &[u8]) -> OrdResult<Self>
-    where
-        Self: Sized,
-    {
-        Ok(serde_json::from_str(&String::from_utf8_lossy(data))?)
-    }
+/// Represents a BRC20 operation/function
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum Brc20Func {
+    Deploy,
+    Mint,
+    Transfer,
 }
 
 /// Represents an arbitrary Ordinal inscription with optional metadata and content.
@@ -44,35 +33,26 @@ impl Inscription for Protocol {
 pub struct Nft {
     /// The main body of the inscription. This could be the actual data or content
     /// inscribed onto a Bitcoin satoshi.
-    pub body: Option<Vec<u8>>,
+    pub body: Option<String>,
     /// Specifies the MIME type of the `body` content, such as `text/plain` for text,
     /// `image/png` for images, etc., to inform how the data should be interpreted.
-    pub content_type: Option<Vec<u8>>,
+    pub content_type: Option<String>,
     /// Optional metadata associated with the inscription. This could be used to store
     /// additional information about the inscription, such as creator identifiers, timestamps,
     /// or related resources.
-    pub metadata: Option<Vec<u8>>,
+    pub metadata: Option<String>,
 }
 
 impl Nft {
-    /// Creates a new `Nft` with no metadata.
-    pub fn new(body: Option<Vec<u8>>, content_type: Option<Vec<u8>>) -> Self {
-        Self {
-            body,
-            content_type,
-            ..Default::default()
-        }
-    }
-
-    /// Creates a new `Nft` with some metadata.
-    pub fn new_with_metadata(
-        body: Option<Vec<u8>>,
-        content_type: Option<Vec<u8>>,
-        metadata: Option<Vec<u8>>,
+    /// Creates a new `Nft` with optional data.
+    pub fn new(
+        content_type: Option<String>,
+        body: Option<String>,
+        metadata: Option<String>,
     ) -> Self {
         Self {
-            body,
             content_type,
+            body,
             metadata,
         }
     }
@@ -83,11 +63,19 @@ impl Nft {
     }
 }
 
+impl FromStr for Nft {
+    type Err = OrdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(OrdError::from)
+    }
+}
+
 impl Inscription for Nft {
     fn content_type(&self) -> String {
         self.content_type
             .as_ref()
-            .map(|bytes| String::from_utf8_lossy(bytes).to_string())
+            .map(|c| c.to_string())
             .unwrap_or_default()
     }
 
@@ -100,5 +88,32 @@ impl Inscription for Nft {
         Self: Sized,
     {
         Ok(serde_json::from_str(&String::from_utf8_lossy(data))?)
+    }
+}
+
+pub fn handle_inscriptions(protocol: Protocol, data: &str) -> OrdResult<Box<dyn Inscription>> {
+    match protocol {
+        Protocol::Brc20 { func } => match func {
+            Brc20Func::Deploy => {
+                let deploy = serde_json::from_str::<Brc20Deploy>(data)?;
+                let deploy_op = Brc20::deploy(deploy.tick, deploy.max, deploy.lim, deploy.dec);
+                Ok(Box::new(deploy_op))
+            }
+            Brc20Func::Mint => {
+                let mint = serde_json::from_str::<Brc20Mint>(data)?;
+                let mint_op = Brc20::mint(mint.tick, mint.amt);
+                Ok(Box::new(mint_op))
+            }
+            Brc20Func::Transfer => {
+                let transfer = serde_json::from_str::<Brc20Transfer>(data)?;
+                let transfer_op = Brc20::transfer(transfer.tick, transfer.amt);
+                Ok(Box::new(transfer_op))
+            }
+        },
+        Protocol::Nft => {
+            let nft_data = serde_json::from_str::<Nft>(data)?;
+            let nft = Nft::new(nft_data.content_type, nft_data.body, nft_data.metadata);
+            Ok(Box::new(nft))
+        }
     }
 }
