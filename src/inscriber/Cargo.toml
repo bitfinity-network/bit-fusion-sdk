@@ -1,19 +1,23 @@
 [package]
-name = "inscription_canister"
+name = "inscriber"
 version.workspace = true
 edition.workspace = true
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-ic-crypto-getrandom-for-wasm = { workspace = true }
 bitcoin = { workspace = true }
 candid = { workspace = true }
+
+ic-canister = { workspace = true }
 ic-cdk = { workspace = true }
+ic-crypto-getrandom-for-wasm = { workspace = true }
+ic-exports = { workspace = true }
+ic-metrics = { workspace = true }
+ic-storage = { workspace = true }
+
 ord-rs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
 bs58 = "0.5.0"
 ripemd = "0.1.3"
 sha2 = "0.10.8"

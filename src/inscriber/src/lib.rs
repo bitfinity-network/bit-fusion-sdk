@@ -1,5 +1,6 @@
 pub mod bitcoin_api;
 pub mod bitcoin_wallet;
+pub mod canister;
 pub mod ecdsa_api;
 pub mod inscription;
 pub mod types;
@@ -10,6 +11,18 @@ use ic_cdk::api::management_canister::bitcoin::{
 };
 use std::cell::{Cell, RefCell};
 
+use ic_metrics::Metrics;
+
+pub use crate::canister::Inscriber;
+
+pub fn idl() -> String {
+    let inscriber_idl = Inscriber::idl();
+    let mut metrics_idl = <Inscriber as Metrics>::get_idl();
+    metrics_idl.merge(&inscriber_idl);
+
+    candid::pretty::candid::compile(&metrics_idl.env.env, &Some(metrics_idl.actor))
+}
+
 thread_local! {
     static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
 
@@ -18,17 +31,17 @@ thread_local! {
     static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
 }
 
-#[ic_cdk::init]
-pub fn init(network: BitcoinNetwork) {
-    BITCOIN_NETWORK.with(|n| n.set(network));
+// #[ic_cdk::init]
+// pub fn init(network: BitcoinNetwork) {
+//     BITCOIN_NETWORK.with(|n| n.set(network));
 
-    ECDSA_KEY_NAME.with(|key_name| {
-        key_name.replace(String::from(match network {
-            BitcoinNetwork::Regtest => "dfx_test_key",
-            BitcoinNetwork::Mainnet | BitcoinNetwork::Testnet => "test_key_1",
-        }))
-    });
-}
+//     ECDSA_KEY_NAME.with(|key_name| {
+//         key_name.replace(String::from(match network {
+//             BitcoinNetwork::Regtest => "dfx_test_key",
+//             BitcoinNetwork::Mainnet | BitcoinNetwork::Testnet => "test_key_1",
+//         }))
+//     });
+// }
 
 /// Returns the balance of the given bitcoin address.
 #[ic_cdk::update]

@@ -1,24 +1,10 @@
 {
   "canisters": {
-    "inscription_canister": {
-      "type": "rust",
-      "package": "inscription_canister",
-      "candid": "src/inscription-canister/inscription_canister.did",
-      "wasm": "target/wasm32-unknown-unknown/release/inscription_canister.wasm",
-      "build": "build.sh",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ]
+    "inscriber": {
+      "build": "",
+      "candid": ".artifact/inscriber.did",
+      "wasm": ".artifact/inscriber.wasm.gz",
+      "type": "custom"
     }
-  },
-  "defaults": {
-    "build": {
-      "args": "",
-      "packtool": ""
-    }
-  },
-  "output_env_file": ".env",
-  "version": 1
+  }
 }

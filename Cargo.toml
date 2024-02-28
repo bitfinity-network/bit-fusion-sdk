@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/inscription-canister"]
+members = ["src/inscriber"]
 
 resolver = "2"
 
@@ -11,8 +11,20 @@ edition = "2021"
 bitcoin = { version = "0.31", features = ["serde"] }
 candid = "0.10"
 ic-cdk = "0.12"
-ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk.git", branch = "main" }
+
+ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
+# ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.13.x" }
+ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk.git", package = "ic-crypto-getrandom-for-wasm", tag = "v0.13.x" }
+ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
+# ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", tag = "v0.13.x" }
+# ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.13.x" }
+ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.13.x", features = [
+    "export-api",
+] }
+# ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", tag = "v0.13.x" }
+ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.13.x" }
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "main" }
+
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
