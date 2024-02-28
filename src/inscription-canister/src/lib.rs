@@ -1,7 +1,8 @@
 pub mod bitcoin_api;
 pub mod bitcoin_wallet;
+pub mod ecdsa_api;
 pub mod inscription;
-mod types;
+pub mod types;
 mod utils;
 
 use candid::{CandidType, Deserialize};
@@ -21,7 +22,6 @@ pub enum BitcoinApiError {
 }
 
 thread_local! {
-    // TODO: change to `Mainnet` when in production
     static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Testnet);
 
     static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
