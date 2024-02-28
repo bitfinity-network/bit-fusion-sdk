@@ -1,5 +1,7 @@
 mod ck_erc20;
-mod minter_canister;
+pub mod erc20_minter;
+pub mod icrc2_minter;
+mod minter;
 mod token;
 
 use std::fmt;
@@ -8,6 +10,9 @@ use std::time::Duration;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
+use did::{H160, U256, U64};
+use eth_signer::{Signer, Wallet};
+use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
@@ -202,4 +207,19 @@ impl fmt::Debug for PocketIcTestContext {
             .field("canisters", &self.canisters)
             .finish()
     }
+}
+
+/// Initializez test environment with:
+/// - john wallet with native tokens,
+/// - opetaion points for john,
+/// - bridge contract
+async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
+    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
+
+    let bft_bridge = ctx
+        .initialize_bft_bridge(ADMIN, &john_wallet)
+        .await
+        .unwrap();
+    (ctx, john_wallet, bft_bridge)
 }

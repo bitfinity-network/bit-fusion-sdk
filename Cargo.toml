@@ -4,8 +4,8 @@ members = [
     "src/create_bft_bridge_tool",
     "src/minter-contract-utils",
     "src/integration-tests",
-    "src/minter-canister",
-    "src/evm-minter",
+    "src/icrc2-minter",
+    "src/erc20-minter",
     "src/spender-canister",
     "src/solidity-helper",
 ]

@@ -1,5 +1,5 @@
 [package]
-name = "minter_canister"
+name = "icrc2-minter"
 version.workspace = true
 edition.workspace = true
 
