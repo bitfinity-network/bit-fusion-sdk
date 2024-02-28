@@ -114,8 +114,8 @@ build_requested_canisters() {
         cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
 
         build_canister "spender_canister" "export-api" "spender.wasm" "spender"
-        build_canister "minter_canister" "export-api" "minter.wasm" "minter"
-        build_canister "evm-minter" "export-api" "evm-minter.wasm" "evm-minter"
+        build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
+        build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
 
         # Build tools
         build_create_bft_bridge_tool
