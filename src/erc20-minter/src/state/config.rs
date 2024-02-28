@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::Settings;
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
-/// Configuration storage for the evm-minter canister.
+/// Configuration storage for the erc20-minter canister.
 pub struct Config {
     data: StableCell<ConfigData, VirtualMemory<DefaultMemoryImpl>>,
 }

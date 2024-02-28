@@ -66,7 +66,7 @@ impl EvmMinter {
         let state = get_state();
         state.borrow_mut().init(admin, settings);
 
-        log::info!("starting evm-minter canister");
+        log::info!("starting erc20-minter canister");
 
         let tasks = vec![
             // Tasks to init EVMs state
@@ -85,7 +85,7 @@ impl EvmMinter {
 
         self.set_timers();
 
-        log::info!("evm-minter canister initialized");
+        log::info!("erc20-minter canister initialized");
     }
 
     fn init_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
