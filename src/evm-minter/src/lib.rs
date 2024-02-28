@@ -1,5 +1,4 @@
 pub mod canister;
-pub mod client;
 pub mod memory;
 pub mod state;
 pub mod tasks;

@@ -124,6 +124,8 @@ pub trait TestContext {
         Ok(receipt)
     }
 
+    async fn advance_time(&self, time: Duration);
+
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
@@ -134,6 +136,9 @@ pub trait TestContext {
         client
             .mint_native_tokens(wallet.address().into(), balance.into())
             .await??;
+
+        self.advance_time(Duration::from_secs(2)).await;
+
         Ok(wallet)
     }
 

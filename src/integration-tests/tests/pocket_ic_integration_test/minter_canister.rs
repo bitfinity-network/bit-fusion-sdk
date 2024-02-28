@@ -6,7 +6,6 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use evm_minter::client::EvmLink;
 use evm_minter::state::Settings;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
@@ -19,7 +18,9 @@ use minter_contract_utils::bft_bridge_api::BURN;
 use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE, WRAPPED_TOKEN_SMART_CONTRACT_CODE,
 };
-use minter_contract_utils::{bft_bridge_api, wrapped_token_api, BridgeSide};
+use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_contract_utils::evm_link::EvmLink;
+use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Error as McError;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
@@ -616,6 +617,8 @@ async fn test_external_bridging() {
         wallet
     };
 
+    ctx.advance_time(Duration::from_secs(4)).await;
+
     let bob_address: H160 = bob_wallet.address().into();
     let nonce = external_evm_client
         .account_basic(bob_address.clone())
@@ -649,7 +652,7 @@ async fn test_external_bridging() {
                 base_bridge_contract: external_bridge_address.clone(),
                 wrapped_bridge_contract: H160::default(),
                 signing_strategy: SigningStrategy::Local {
-                    private_key: [42; 32],
+                    private_key: [1; 32],
                 },
                 log_settings: Some(LogSettings {
                     enable_console: true,
@@ -666,6 +669,12 @@ async fn test_external_bridging() {
     let evm_minter_client = ctx.client(evm_minter_canister, ADMIN);
     let evm_minter_address = evm_minter_client
         .update::<_, Option<H160>>("get_evm_address", ())
+        .await
+        .unwrap()
+        .unwrap();
+
+    ctx.evm_client(ADMIN)
+        .mint_native_tokens(evm_minter_address.clone(), u64::MAX.into())
         .await
         .unwrap()
         .unwrap();
@@ -838,42 +847,11 @@ async fn test_external_bridging() {
         .unwrap()
         .as_u32();
 
+    // Tick to advance time twice, because we need two timers to be executed:
+    // 1) Timer in minter canister to send a mint tx
+    // 2) Timer in evm canister to process the mint tx
     ctx.advance_time(Duration::from_secs(2)).await;
-
-    // Query SignedMintOrder from the evm-minter.
-    let client = ctx.client(evm_minter_canister, ADMIN);
-
-    let bob_address_id = Id256::from_evm_address(&bob_address, CHAIN_ID as _);
-    let signed_order = client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (bob_address_id, token_id, burn_operation_id),
-        )
-        .await
-        .unwrap()
-        .unwrap();
-
-    // Send the SignedMintOrder to the BFTBridge::mint() endpoint of the first EVM.
-    let input = bft_bridge_api::MINT
-        .encode_input(&[Token::Bytes(signed_order.0.to_vec())])
-        .unwrap();
-
-    ctx.evm_client(ADMIN)
-        .mint_native_tokens(bob_address.clone(), u64::MAX.into())
-        .await
-        .unwrap()
-        .unwrap();
-
-    let (_, receipt) = ctx
-        .call_contract(&bob_wallet, &evmc_bridge_address, input, 0)
-        .await
-        .unwrap();
-    assert_eq!(receipt.status, Some(U64::one()));
-
-    // Tick to advance time.
     ctx.advance_time(Duration::from_secs(2)).await;
-
-    assert_eq!(receipt.status, Some(U64::one()));
 
     // Chech the balance of the wrapped token.
     let data = utils::function_selector(
@@ -890,7 +868,7 @@ async fn test_external_bridging() {
     let balance = ctx
         .evm_client(ADMIN)
         .eth_call(
-            Some(bob_address),
+            Some(bob_address.clone()),
             Some(wrapped_token.clone()),
             None,
             3_000_000,
@@ -907,6 +885,9 @@ async fn test_external_bridging() {
     ctx.advance_time(Duration::from_secs(2)).await;
 
     // Check mint order removed
+    let client = ctx.client(evm_minter_canister, ADMIN);
+    let bob_address_id = Id256::from_evm_address(&bob_address, CHAIN_ID as _);
+
     let signed_order = client
         .update::<_, Option<SignedMintOrder>>(
             "get_mint_order",
