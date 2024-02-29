@@ -219,5 +219,6 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
         .initialize_bft_bridge(ADMIN, &john_wallet)
         .await
         .unwrap();
+
     (ctx, john_wallet, bft_bridge)
 }
