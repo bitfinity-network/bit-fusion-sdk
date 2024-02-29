@@ -53,22 +53,17 @@ pub async fn get_minter_canister_bytecode() -> Vec<u8> {
 
 pub async fn get_btc_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "ic-btc-canister.wasm.gz")
+    get_or_load_wasm(&CANISTER_BYTECODE, "ic-bitcoin-canister-mock.wasm.gz").await
 }
 
 pub async fn get_ck_btc_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "ic-ckbtc-minter.wasm.gz")
+    get_or_load_wasm(&CANISTER_BYTECODE, "ic-ckbtc-minter.wasm.gz").await
 }
 
 pub async fn get_kyt_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "ic-ckbtc-kyt.wasm.gz")
-}
-
-pub async fn get_icrc1_ledger_canister_bytecode() -> Vec<u8> {
-    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "ic-icrc1-ledger.wasm.gz")
+    get_or_load_wasm(&CANISTER_BYTECODE, "ic-ckbtc-kyt.wasm.gz").await
 }
 
 async fn load_wasm_bytecode_or_panic(wasm_name: &str) -> Vec<u8> {

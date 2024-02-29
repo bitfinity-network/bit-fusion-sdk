@@ -29,9 +29,10 @@ ethers-core = "2.0"
 evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.12.x" }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
+ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.13.x" }
-ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
+ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x", features = ["icrc", "ledger"] }
 ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", tag = "v0.13.x" }
 ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.13.x" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.13.x", features = [

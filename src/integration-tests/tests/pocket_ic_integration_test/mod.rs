@@ -1,8 +1,8 @@
+mod btc;
 mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
 mod token;
-mod btc;
 
 use std::fmt;
 use std::time::Duration;
@@ -13,6 +13,7 @@ use did::{TransactionReceipt, H160, H256};
 use eth_signer::Wallet;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
+use ic_btc_interface::Network;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -25,6 +26,8 @@ use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 const ADMIN: &str = "admin";
 const JOHN: &str = "john";
 const ALICE: &str = "alice";
+
+pub const BITCOIN_MAINNET_CANISTER_ID: &str = "ghsi2-tqaaa-aaaan-aaaca-cai";
 
 pub struct PocketIcTestContext {
     pub client: PocketIcAsync,
@@ -40,10 +43,20 @@ impl PocketIcTestContext {
         };
 
         for canister_type in canisters_set {
-            let principal = ctx
-                .create_canister()
-                .await
-                .expect("canister should be created");
+            let principal = if matches!(canister_type, CanisterType::Btc) {
+                let id =
+                    Principal::from_text(BITCOIN_MAINNET_CANISTER_ID).expect("invalid principal");
+                ctx.create_canister_with_id(id)
+                    .await
+                    .expect("failed to create canister");
+                // ctx.reinstall_canister(id, get_btc_canister_bytecode().await, (network,)).await.expect("failed to create canister");
+                id
+            } else {
+                ctx.create_canister()
+                    .await
+                    .expect("canister should be created")
+            };
+
             ctx.canisters.set(*canister_type, principal);
         }
 
@@ -122,6 +135,15 @@ impl TestContext for PocketIcTestContext {
         let principal = self.client.create_canister(Some(self.admin())).await;
         self.client.add_cycles(principal, u128::MAX).await;
         Ok(principal)
+    }
+
+    async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
+        let sync_client = ic_exports::pocket_ic::PocketIc::new();
+        sync_client
+            .create_canister_with_id(Some(self.admin()), None, id)
+            .expect("failed to create canister");
+        self.client.add_cycles(id, u128::MAX).await;
+        Ok(id)
     }
 
     async fn install_canister(

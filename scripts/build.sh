@@ -11,7 +11,7 @@ WASM_DIR=".artifact"
 # This is the hash of a recent commit on the https://github.com/dfinity/ic repository.
 # It is used to identify the IC canisters to download.
 # To be updated periodically to use the latest version.
-IC_COMMIT_HASH="c337458aafa8e8864eadfcfe38d7e5fa385b0006" # 1-11-2023
+IC_COMMIT_HASH="85bd56a70e55b2cea75cae6405ae11243e5fdad8" # 2024-02-21
 EVM_FEATURES="export-api"
 
 # Function to print help instructions
@@ -54,12 +54,20 @@ download_file() {
     local url="$1"
     local output_path="$2"
     echo "Downloading $url to $output_path"
-    curl -o "$output_path" "$url"
+    curl --fail -o "$output_path" "$url"
 }
 
 get_icrc1_binaries() {
     download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-icrc1-ledger.wasm.gz" "$WASM_DIR/icrc1-ledger.wasm.gz"
     download_file "https://raw.githubusercontent.com/dfinity/ic/${IC_COMMIT_HASH}/rs/rosetta-api/icrc1/ledger/ledger.did" "$WASM_DIR/icrc1.did"
+}
+
+get_ckbtc_binaries() {
+  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-minter.wasm.gz" "$WASM_DIR/ic-ckbtc-minter.wasm.gz"
+  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-btc-canister.wasm.gz" "$WASM_DIR/ic-btc-canister.wasm.gz"
+  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-kyt.wasm.gz" "$WASM_DIR/ic-ckbtc-kyt.wasm.gz"
+
+  cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz $WASM_DIR/ic-bitcoin-canister-mock.wasm.gz
 }
 
 build_create_bft_bridge_tool() {
@@ -101,6 +109,9 @@ build_requested_canisters() {
         # Download binaries only if "all" is specified
         echo "Getting ICRC-1 Binaries"
         get_icrc1_binaries
+
+        echo "Getting ckBTC Binaries"
+        get_ckbtc_binaries
 
         # Build all canisters
         
