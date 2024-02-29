@@ -1,0 +1,20 @@
+[package]
+name = "http_outcall_mock"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+async-trait = { workspace = true }
+candid = { workspace = true }
+ic-cdk = "0.12"
+serde = { workspace = true }
+
+[dev-dependencies]
+pocket-ic = "2.2.0"
+http_outcall_mock = { path = ".", features = ["pocket_ic_test"] }
+
+[features]
+pocket_ic_test = []

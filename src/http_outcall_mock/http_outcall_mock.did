@@ -1,0 +1,4 @@
+service : {
+    "greet": (text) -> (text) query;
+    "get_icp_usd_rate": () -> (text);
+}

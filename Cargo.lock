@@ -1619,6 +1619,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "http_outcall_mock"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "candid",
+ "http_outcall_mock",
+ "ic-cdk",
+ "pocket-ic",
+ "serde",
+]
+
+[[package]]
 name = "httparse"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
