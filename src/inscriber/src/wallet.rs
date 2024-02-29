@@ -1,9 +1,12 @@
+pub mod bitcoin_api;
+pub mod ecdsa_api;
+
 use core::str::FromStr;
 
 use crate::{
-    bitcoin_api, ecdsa_api,
+    constants::ECDSA_KEY_NAME,
     inscription::{handle_inscriptions, InscriptionWrapper, Protocol},
-    types, ECDSA_KEY_NAME,
+    types,
 };
 use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
 use hex::ToHex;
@@ -15,7 +18,7 @@ use ord_rs::{
 use sha2::Digest;
 
 // WIP
-pub async fn send_transaction_with_inscription(
+pub async fn inscribe(
     commit_tx_args: types::CreateCommitTransactionArgs,
     network: BitcoinNetwork,
     inscription_protocol: Protocol,
@@ -61,7 +64,7 @@ pub async fn send_transaction_with_inscription(
     };
 
     let (commit_tx, reveal_tx) =
-        build_transaction_with_inscription(&mut builder, commit_tx_args, dst_address.clone())
+        commit_and_reveal(&mut builder, commit_tx_args, dst_address.clone())
             .await
             .expect("Failed to build transaction with inscription");
 
@@ -88,7 +91,7 @@ pub async fn send_transaction_with_inscription(
     Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
 }
 
-async fn build_transaction_with_inscription<T>(
+async fn commit_and_reveal<T>(
     builder: &mut OrdTransactionBuilder,
     args: CreateCommitTransactionArgs<T>,
     recipient_address: Address,

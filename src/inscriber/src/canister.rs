@@ -1,7 +1,17 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ic_canister::{generate_idl, init, Canister, Idl, PreUpdate};
+use crate::{
+    build_data::canister_build_data,
+    constants::{BITCOIN_NETWORK, ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME},
+    wallet::{self, bitcoin_api},
+};
+
+use did::build::BuildData;
+use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
+use ic_cdk::api::management_canister::bitcoin::{
+    BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
+};
 use ic_exports::candid::Principal;
 use ic_metrics::{Metrics, MetricsStorage};
 
@@ -15,8 +25,73 @@ impl PreUpdate for Inscriber {}
 
 impl Inscriber {
     #[init]
-    pub fn init(&self) {
-        todo!()
+    pub fn init(&mut self, network: BitcoinNetwork) {
+        BITCOIN_NETWORK.with(|n| n.set(network));
+
+        ECDSA_KEY_NAME.with(|key_name| {
+            key_name.replace(String::from(match network {
+                BitcoinNetwork::Regtest => "dfx_test_key",
+                BitcoinNetwork::Mainnet | BitcoinNetwork::Testnet => "test_key_1",
+            }))
+        });
+    }
+
+    /// Returns the balance of the given bitcoin address.
+    #[update]
+    pub async fn get_balance(&mut self, address: String) -> u64 {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        bitcoin_api::get_balance(network, address).await
+    }
+
+    /// Returns the UTXOs of the given bitcoin address.
+    #[update]
+    pub async fn get_utxos(&mut self, address: String) -> GetUtxosResponse {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        bitcoin_api::get_utxos(network, address).await
+    }
+
+    /// Returns the 100 fee percentiles measured in millisatoshi/byte.
+    /// Percentiles are computed from the last 10,000 transactions (if available).
+    #[update]
+    pub async fn get_current_fee_percentiles(&mut self) -> Vec<MillisatoshiPerByte> {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        bitcoin_api::get_current_fee_percentiles(network).await
+    }
+
+    /// Returns the P2PKH address of this canister at a specific derivation path.
+    #[update]
+    pub async fn get_p2pkh_address(&mut self) -> String {
+        let derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
+        let key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        wallet::get_p2pkh_address(network, key_name, derivation_path).await
+    }
+
+    /// Inscribes and sends the given amount of bitcoin from this canister to the given address.
+    /// Returns the transaction ID.
+    #[update]
+    pub async fn inscribe(&mut self) -> String {
+        let _derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
+        let _network = BITCOIN_NETWORK.with(|n| n.get());
+        let _key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
+        // TODO:
+        // let tx_id = bitcoin_wallet::inscribe(
+        // commit_tx_args,
+        // network,
+        // inscription_protocol,
+        // inscription_data,
+        // dst_address
+        // )
+        // .await;
+
+        // tx_id.to_string()
+        String::new()
+    }
+
+    /// Returns the build data of the canister
+    #[query]
+    pub fn get_canister_build_data(&self) -> BuildData {
+        canister_build_data()
     }
 
     pub fn idl() -> Idl {
