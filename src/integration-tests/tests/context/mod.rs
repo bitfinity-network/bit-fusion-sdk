@@ -196,6 +196,13 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let minter_canister_address = self.get_minter_canister_evm_address(caller).await?;
+
+        let client = self.evm_client(self.admin_name());
+        client
+            .mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
+            .await??;
+        self.advance_time(Duration::from_secs(2)).await;
+
         let minter_client = self.minter_client(caller);
 
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
