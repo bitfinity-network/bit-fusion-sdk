@@ -15,6 +15,10 @@ use ic_exports::icrc_types::icrc2::approve::ApproveError;
 use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
 use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_task_scheduler::scheduler::Scheduler;
+use ic_task_scheduler::task::ScheduledTask;
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
@@ -23,9 +27,12 @@ use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
 
 use crate::build_data::canister_build_data;
+use crate::constant::PENDING_TASKS_MEMORY_ID;
 use crate::context::{get_base_context, Context, ContextImpl};
 use crate::evm::{Evm, EvmCanisterImpl};
+use crate::memory::MEMORY_MANAGER;
 use crate::state::{Settings, State};
+use crate::tasks::BridgeTask;
 use crate::tokens::icrc1::IcrcTransferDst;
 use crate::tokens::{bft_bridge, icrc1, icrc2};
 
@@ -533,6 +540,22 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
     }
 
     Ok(())
+}
+
+type TasksStorage =
+    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
+thread_local! {
+    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
+        let pending_tasks =
+            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
+            PersistentScheduler::new(pending_tasks)
+    }));
+}
+
+pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
+    SCHEDULER.with(|scheduler| scheduler.clone())
 }
 
 #[cfg(test)]

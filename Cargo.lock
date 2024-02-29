@@ -2084,6 +2084,7 @@ dependencies = [
  "ic-metrics",
  "ic-stable-structures 0.13.0",
  "ic-storage",
+ "ic-task-scheduler",
  "log",
  "minter-contract-utils",
  "minter-did",

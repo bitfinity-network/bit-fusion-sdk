@@ -22,6 +22,7 @@ ic-exports = { workspace = true, features = ["icrc"] }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
+ic-task-scheduler = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }

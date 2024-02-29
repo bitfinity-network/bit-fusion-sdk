@@ -4,6 +4,7 @@ mod constant;
 mod context;
 mod evm;
 mod memory;
+mod tasks;
 pub mod state;
 pub mod tokens;
 
