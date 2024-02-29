@@ -1,5 +1,7 @@
 pub mod bitcoin_api;
 pub mod bitcoin_wallet;
+#[allow(unused)]
+mod build_data;
 pub mod canister;
 pub mod ecdsa_api;
 pub mod inscription;

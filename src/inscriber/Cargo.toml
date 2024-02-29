@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 bitcoin = { workspace = true }
 candid = { workspace = true }
+did = { workspace = true }
 
 ic-canister = { workspace = true }
 ic-cdk = { workspace = true }
@@ -22,3 +23,6 @@ bs58 = "0.5.0"
 ripemd = "0.1.3"
 sha2 = "0.10.8"
 hex = "0.4.3"
+
+[build-dependencies]
+vergen = { workspace = true }
