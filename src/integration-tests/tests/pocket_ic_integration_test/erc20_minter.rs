@@ -99,6 +99,8 @@ async fn test_external_bridging() {
         wallet
     };
 
+    ctx.advance_time(Duration::from_secs(4)).await;
+
     let bob_address: H160 = bob_wallet.address().into();
     let nonce = external_evm_client
         .account_basic(bob_address.clone())
@@ -346,6 +348,8 @@ async fn test_external_bridging() {
         .await
         .unwrap()
         .unwrap();
+
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     let (_, receipt) = ctx
         .call_contract(&bob_wallet, &evmc_bridge_address, input, 0)
