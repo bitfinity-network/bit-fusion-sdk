@@ -6,7 +6,7 @@ use core::str::FromStr;
 use crate::{
     constants::ECDSA_KEY_NAME,
     inscription::{handle_inscriptions, InscriptionWrapper, Protocol},
-    types,
+    utils,
 };
 use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
 use hex::ToHex;
@@ -19,7 +19,7 @@ use sha2::Digest;
 
 // WIP
 pub async fn inscribe(
-    commit_tx_args: types::CreateCommitTransactionArgs,
+    commit_tx_args: utils::CreateCommitTransactionArgs,
     network: BitcoinNetwork,
     inscription_protocol: Protocol,
     inscription_data: &str,
@@ -115,7 +115,7 @@ where
 
 fn parse_commit_tx_args<T>(
     _inscription: T,
-    _args: types::CreateCommitTransactionArgs,
+    _args: utils::CreateCommitTransactionArgs,
 ) -> CreateCommitTransactionArgs<T>
 where
     T: Inscription,

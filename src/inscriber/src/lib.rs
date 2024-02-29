@@ -1,10 +1,10 @@
 #[allow(unused)]
 mod build_data;
-pub mod canister;
 mod constants;
-pub mod inscription;
-pub mod types;
 mod utils;
+
+pub mod canister;
+pub mod inscription;
 pub mod wallet;
 
 use ic_metrics::Metrics;

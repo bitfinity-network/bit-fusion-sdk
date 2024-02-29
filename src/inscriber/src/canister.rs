@@ -7,12 +7,13 @@ use crate::{
     wallet::{self, bitcoin_api},
 };
 
+use candid::Principal;
 use did::build::BuildData;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
+use ic_cdk::api::call::CallResult;
 use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
 };
-use ic_exports::candid::Principal;
 use ic_metrics::{Metrics, MetricsStorage};
 
 #[derive(Canister, Clone, Debug)]
@@ -38,14 +39,14 @@ impl Inscriber {
 
     /// Returns the balance of the given bitcoin address.
     #[update]
-    pub async fn get_balance(&mut self, address: String) -> u64 {
+    pub async fn get_balance(&mut self, address: String) -> CallResult<(u64,)> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_balance(network, address).await
     }
 
     /// Returns the UTXOs of the given bitcoin address.
     #[update]
-    pub async fn get_utxos(&mut self, address: String) -> GetUtxosResponse {
+    pub async fn get_utxos(&mut self, address: String) -> CallResult<(GetUtxosResponse,)> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_utxos(network, address).await
     }
@@ -53,7 +54,7 @@ impl Inscriber {
     /// Returns the 100 fee percentiles measured in millisatoshi/byte.
     /// Percentiles are computed from the last 10,000 transactions (if available).
     #[update]
-    pub async fn get_current_fee_percentiles(&mut self) -> Vec<MillisatoshiPerByte> {
+    pub async fn get_current_fee_percentiles(&mut self) -> CallResult<(Vec<MillisatoshiPerByte>,)> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_current_fee_percentiles(network).await
     }

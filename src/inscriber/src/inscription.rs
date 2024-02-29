@@ -1,10 +1,13 @@
 use crate::utils;
+
 use bitcoin::script::PushBytesBuf;
+use candid::{CandidType, Deserialize};
 use ord_rs::{
     brc20::{Brc20, Brc20Deploy, Brc20Mint, Brc20Transfer},
     Inscription, OrdError, OrdResult,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+
 use std::str::FromStr;
 
 /// A wrapper around the concrete types that implement `ord_rs::Inscription`.
@@ -15,7 +18,7 @@ pub enum InscriptionWrapper {
 }
 
 /// Represents the type of digital artifact being inscribed.
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(CandidType, Deserialize, Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum Protocol {
     /// Satoshis imbued with `deploy`, `mint`, and `transfer` functionalities,
     /// as well as token supply, simulating fungibility (e.g., like ERC20 tokens).
@@ -26,7 +29,7 @@ pub enum Protocol {
 }
 
 /// Represents a BRC20 operation/function
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(CandidType, Deserialize, Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum Brc20Func {
     Deploy,
     Mint,
