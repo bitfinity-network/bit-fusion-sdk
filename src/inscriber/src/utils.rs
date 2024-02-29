@@ -4,13 +4,23 @@ use bitcoin::script::PushBytesBuf;
 use candid::{CandidType, Deserialize};
 use ord_rs::OrdResult;
 
+use crate::inscription::Protocol;
+
+pub fn to_push_bytes(bytes: &[u8]) -> OrdResult<PushBytesBuf> {
+    let mut push_bytes = PushBytesBuf::with_capacity(bytes.len());
+    push_bytes.extend_from_slice(bytes)?;
+    Ok(push_bytes)
+}
+
 #[derive(CandidType, Deserialize, Debug)]
 pub struct CreateCommitTransactionArgs {
     pub inputs: Vec<TxInput>,
+    pub inscripton_protocol: Protocol,
+    pub inscription: String,
     pub leftovers_recipient: String,
     pub commit_fee: u64,
     pub reveal_fee: u64,
-    pub txin_script_pubkey: Vec<u8>,
+    pub txin_script_pubkey: String,
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
@@ -78,10 +88,4 @@ pub struct TxOut {
 pub enum LockTime {
     Blocks(u32),
     Seconds(u32),
-}
-
-pub fn to_push_bytes(bytes: &[u8]) -> OrdResult<PushBytesBuf> {
-    let mut push_bytes = PushBytesBuf::with_capacity(bytes.len());
-    push_bytes.extend_from_slice(bytes)?;
-    Ok(push_bytes)
 }

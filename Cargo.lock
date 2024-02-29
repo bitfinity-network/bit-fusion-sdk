@@ -1665,7 +1665,7 @@ dependencies = [
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=main#7661b73a680898a7781091d917b06e19c99c46fa"
+source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=main#7ade8b0f257c903315709acd19344e8417dd97ee"
 dependencies = [
  "bitcoin",
  "log",

@@ -6,7 +6,6 @@ use core::str::FromStr;
 use crate::{
     constants::ECDSA_KEY_NAME,
     inscription::{handle_inscriptions, InscriptionWrapper, Protocol},
-    utils,
 };
 use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
 use hex::ToHex;
@@ -18,20 +17,19 @@ use ord_rs::{
 use sha2::Digest;
 
 // WIP
-pub async fn inscribe(
-    commit_tx_args: utils::CreateCommitTransactionArgs,
+pub async fn inscribe<T>(
+    commit_tx_args: CreateCommitTransactionArgs<T>,
     network: BitcoinNetwork,
     inscription_protocol: Protocol,
-    inscription_data: &str,
+    inscription_data: InscriptionWrapper,
     dst_address: Option<String>,
-) -> OrdResult<(String, String)> {
+) -> OrdResult<(String, String)>
+where
+    T: Inscription,
+{
     // TODO: Refactor
     let mut builder = OrdTransactionBuilder::p2wsh(PrivateKey::from_wif("").unwrap()); // TEMPORARY
-
-    let inscription = handle_inscriptions(inscription_protocol, inscription_data)?;
-
     let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
-
     let derivation_path = vec![];
 
     // Fetch our public key, P2PKH address, and UTXOs.
@@ -54,19 +52,13 @@ pub async fn inscribe(
         own_address.clone()
     };
 
-    let commit_tx_args = match inscription {
-        InscriptionWrapper::Brc20 { inner } => parse_commit_tx_args(inner, commit_tx_args),
-        // TODO: Handle NFTs
-        // FIXME
-        InscriptionWrapper::Nft { inner: _ } => {
-            todo!()
-        }
-    };
+    // ADD MORE INSCRIPTION PROCESSING LOGIC IN `/src/inscription.rs`
+    let _inscription_data = handle_inscriptions(inscription_protocol, inscription_data)?;
 
     let (commit_tx, reveal_tx) =
         commit_and_reveal(&mut builder, commit_tx_args, dst_address.clone())
             .await
-            .expect("Failed to build transaction with inscription");
+            .expect("Failed to build commit and reveal transactions");
 
     let commit_tx_bytes = serialize(&commit_tx);
     ic_cdk::print(format!(
@@ -111,16 +103,6 @@ where
     };
     let reveal_tx = builder.build_reveal_transaction(reveal_tx_args)?;
     Ok((commit_tx.tx, reveal_tx))
-}
-
-fn parse_commit_tx_args<T>(
-    _inscription: T,
-    _args: utils::CreateCommitTransactionArgs,
-) -> CreateCommitTransactionArgs<T>
-where
-    T: Inscription,
-{
-    todo!()
 }
 
 /// Returns the P2PKH address of this canister at the given derivation path.
