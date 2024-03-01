@@ -1,4 +1,3 @@
-mod btc;
 mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
@@ -13,7 +12,6 @@ use did::{TransactionReceipt, H160, H256};
 use eth_signer::Wallet;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use ic_btc_interface::Network;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;

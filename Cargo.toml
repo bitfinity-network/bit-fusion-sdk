@@ -8,6 +8,7 @@ members = [
     "src/erc20-minter",
     "src/spender-canister",
     "src/solidity-helper",
+    "src/btc-bridge",
 ]
 resolver = "2"
 
