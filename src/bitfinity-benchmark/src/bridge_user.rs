@@ -430,10 +430,7 @@ impl BridgeUser {
         };
 
         log::trace!("Burning ICRC-2 tokens by {} user", self.name);
-        let mint_order = self
-            .minter_client()
-            .burn_icrc2(reason)
-            .await??;
+        let mint_order = self.minter_client().burn_icrc2(reason).await??;
 
         log::debug!(
             "Mint order nonce for {}: {}",

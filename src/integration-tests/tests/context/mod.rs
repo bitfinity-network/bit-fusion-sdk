@@ -372,10 +372,7 @@ pub trait TestContext {
             operation_id,
         };
 
-        Ok(self
-            .minter_client(caller)
-            .burn_icrc2(reason)
-            .await??)
+        Ok(self.minter_client(caller).burn_icrc2(reason).await??)
     }
 
     /// Approves burning of ICRC-2 token.
