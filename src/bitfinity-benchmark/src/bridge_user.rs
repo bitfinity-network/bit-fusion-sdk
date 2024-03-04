@@ -432,7 +432,7 @@ impl BridgeUser {
         log::trace!("Burning ICRC-2 tokens by {} user", self.name);
         let mint_order = self
             .minter_client()
-            .create_erc_20_mint_order(reason)
+            .burn_icrc2(reason)
             .await??;
 
         log::debug!(
@@ -470,26 +470,12 @@ impl BridgeUser {
         let operation_id = self
             .burn_erc20(&erc20_token, amount, bft_bridge_address.clone())
             .await?;
-        self.minter_client()
-            .start_icrc2_mint(&self.address, operation_id)
-            .await??;
-        self.finish_erc20_burn(operation_id, bft_bridge_address)
-            .await?;
 
         let amount_without_fee = Nat::from(amount) - Nat::from(ICRC1_TRANSFER_FEE * 2);
         log::trace!(
             "Transferring {amount_without_fee} ICRC-2 {icrc2_token} tokens by {} user",
             self.name
         );
-        self.minter_client()
-            .finish_icrc2_mint(
-                operation_id,
-                &self.address,
-                icrc2_token,
-                self.principal,
-                amount_without_fee,
-            )
-            .await??;
 
         Ok(())
     }

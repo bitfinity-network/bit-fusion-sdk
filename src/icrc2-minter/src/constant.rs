@@ -13,3 +13,5 @@ pub const DEFAULT_CHAIN_ID: u32 = 355113;
 pub const DEFAULT_GAS_PRICE: u64 = 10_000;
 
 pub const IC_CHAIN_ID: u32 = 0;
+
+pub const TASK_RETRY_DELAY_SECS: u32 = 5;

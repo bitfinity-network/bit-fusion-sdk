@@ -1,8 +1,6 @@
 mod build_data;
-mod canister;
+pub mod canister;
 mod constant;
-mod context;
-mod evm;
 mod memory;
 mod tasks;
 pub mod state;

@@ -2,12 +2,15 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use candid::{CandidType, Deserialize, Principal};
-use did::{codec, H160, U256};
+use did::{codec, H160};
+use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
+use evm_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
+use minter_contract_utils::evm_bridge::EvmParams;
 
 use super::Settings;
-use crate::constant::{CONFIG_MEMORY_ID, DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE};
+use crate::constant::CONFIG_MEMORY_ID;
 use crate::memory::MEMORY_MANAGER;
 
 /// Minter canister configuration.
@@ -20,9 +23,8 @@ impl Config {
         let new_data = ConfigData {
             owner: settings.owner,
             evm_principal: settings.evm_principal,
-            evm_chain_id: settings.chain_id,
-            bft_bridge_contract: settings.bft_bridge_contract,
-            evm_gas_price: settings.evm_gas_price,
+            evm_params: None,
+            bft_bridge_contract: None,
             spender_principal: settings.spender_principal,
         };
 
@@ -49,18 +51,23 @@ impl Config {
         self.update_data(|data| data.evm_principal = evm);
     }
 
-    /// Returns the chain ID
-    pub fn get_evmc_chain_id(&self) -> u32 {
-        self.with_data(|data| data.get().evm_chain_id)
+    /// Returns parameters of EVM canister with which the minter canister works.
+    pub fn get_evm_params(&self) -> Option<EvmParams> {
+        self.with_data(|data| data.get().evm_params.clone())
     }
 
-    /// Returns evm gas price
-    pub fn get_evm_gas_price(&self) -> U256 {
-        self.with_data(|data| data.get().evm_gas_price.clone())
+    /// Updates parameters of EVM canister with which the minter canister works.
+    pub fn update_evm_params<F: FnOnce(&mut EvmParams)>(&mut self, f: F) {
+        self.update_data(|data| {
+            let mut params = data.evm_params.clone().unwrap_or_default().clone();
+            f(&mut params);
+            data.evm_params = Some(params);
+        })
     }
 
-    pub fn set_evm_gas_price(&mut self, evm_gas_price: U256) {
-        self.update_data(|data| data.evm_gas_price = evm_gas_price);
+    /// Returns EVM client
+    pub fn get_evm_client(&self) -> EthJsonRpcClient<impl Client> {
+        EthJsonRpcClient::new(IcCanisterClient::new(self.get_evm_principal()))
     }
 
     pub fn get_bft_bridge_contract(&self) -> Option<H160> {
@@ -108,10 +115,8 @@ impl Config {
 pub struct ConfigData {
     pub owner: Principal,
     pub evm_principal: Principal,
-    pub evm_chain_id: u32,
+    pub evm_params: Option<EvmParams>,
     pub bft_bridge_contract: Option<H160>,
-
-    pub evm_gas_price: U256,
     pub spender_principal: Principal,
 }
 
@@ -120,10 +125,8 @@ impl Default for ConfigData {
         Self {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
+            evm_params: None,
             bft_bridge_contract: None,
-
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::anonymous(),
         }
     }
@@ -156,7 +159,6 @@ mod tests {
     use ic_stable_structures::Storable;
 
     use super::*;
-    use crate::constant::DEFAULT_GAS_PRICE;
     use crate::state::config::ConfigData;
     use crate::state::Settings;
 
@@ -182,14 +184,10 @@ mod tests {
         let settings = Settings {
             owner: Principal::management_canister(),
             evm_principal: Principal::anonymous(),
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: Some(H160::from_slice(&[22; 20])),
             spender_principal: Principal::anonymous(),
-            process_transactions_results_interval: None,
         };
 
         config.reset(settings.clone());

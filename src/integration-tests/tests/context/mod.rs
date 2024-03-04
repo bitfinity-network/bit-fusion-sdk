@@ -374,7 +374,7 @@ pub trait TestContext {
 
         Ok(self
             .minter_client(caller)
-            .create_erc_20_mint_order(reason)
+            .burn_icrc2(reason)
             .await??)
     }
 
@@ -639,14 +639,10 @@ pub fn minter_canister_init_data(
     InitData {
         owner,
         evm_principal,
-        evm_chain_id: CHAIN_ID as _,
-        bft_bridge_contract: None,
-        evm_gas_price: DEFAULT_GAS_PRICE.into(),
         spender_principal,
         signing_strategy: SigningStrategy::Local {
             private_key: wallet.signer().to_bytes().into(),
         },
-        process_transactions_results_interval: Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,

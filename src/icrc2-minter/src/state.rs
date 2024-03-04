@@ -1,9 +1,8 @@
 use std::cell::RefCell;
-use std::time::Duration;
 
 use candid::Principal;
 pub use config::Config;
-use did::{H160, U256};
+use did::H160;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
@@ -11,9 +10,7 @@ use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
 use self::signer::SignerInfo;
-use crate::constant::{
-    DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID,
-};
+use crate::constant::{MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
 use crate::memory::MEMORY_MANAGER;
 
 mod config;
@@ -50,7 +47,7 @@ impl State {
     /// Clear the state and set initial data from settings.
     pub fn reset(&mut self, settings: Settings) {
         self.signer
-            .reset(settings.signing_strategy.clone(), settings.chain_id)
+            .reset(settings.signing_strategy.clone(), 0)
             .expect("failed to set signer");
         self.config.reset(settings);
         self.mint_orders.clear();
@@ -81,12 +78,8 @@ thread_local! {
 pub struct Settings {
     pub owner: Principal,
     pub evm_principal: Principal,
-    pub evm_gas_price: U256,
     pub signing_strategy: SigningStrategy,
-    pub chain_id: u32,
-    pub bft_bridge_contract: Option<H160>,
     pub spender_principal: Principal,
-    pub process_transactions_results_interval: Option<Duration>,
 }
 
 impl Default for Settings {
@@ -94,14 +87,10 @@ impl Default for Settings {
         Self {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
             spender_principal: Principal::anonymous(),
-            process_transactions_results_interval: Default::default(),
         }
     }
 }
