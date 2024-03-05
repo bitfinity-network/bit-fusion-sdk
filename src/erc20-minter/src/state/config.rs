@@ -42,11 +42,11 @@ impl Config {
         self.update_data(|data| {
             data.admin = admin;
 
-            let base_evm = &mut data.evms[BridgeSide::Base as usize];
+            let base_evm = &mut data.evm_info_by_side_mut(BridgeSide::Base);
             base_evm.link = settings.base_evm_link;
             base_evm.bridge_contract = settings.base_bridge_contract;
 
-            let wrapped_evm = &mut data.evms[BridgeSide::Wrapped as usize];
+            let wrapped_evm = &mut data.evm_info_by_side_mut(BridgeSide::Wrapped);
             wrapped_evm.link = settings.wrapped_evm_link;
             wrapped_evm.bridge_contract = settings.wrapped_bridge_contract;
         })
@@ -54,7 +54,7 @@ impl Config {
 
     /// Returns evm info for the given bridge side.
     pub fn get_evm_info(&self, side: BridgeSide) -> EvmInfo {
-        self.data.get().evms[side as usize].clone()
+        self.data.get().evm_info_by_side(side).clone()
     }
 
     /// Sets owner principal.
@@ -63,12 +63,14 @@ impl Config {
     }
 
     /// Sets evm bridge contract address for the given bridge side.
-    pub fn set_bft_bridge_address(&mut self, bridge_side: BridgeSide, address: H160) {
-        self.update_data(|data| data.evms[bridge_side as usize].bridge_contract = address);
+    pub fn set_bft_bridge_address(&mut self, side: BridgeSide, address: H160) {
+        self.update_data(|data| data.evm_info_by_side_mut(side).bridge_contract = address);
     }
 
     pub fn get_evm_params(&self, side: BridgeSide) -> anyhow::Result<EvmParams> {
-        self.data.get().evms[side as usize]
+        self.data
+            .get()
+            .evm_info_by_side(side)
             .params
             .clone()
             .ok_or_else(|| {
@@ -78,9 +80,13 @@ impl Config {
 
     pub fn update_evm_params<F: FnOnce(&mut EvmParams)>(&mut self, f: F, side: BridgeSide) {
         self.update_data(|data| {
-            let mut params = data.evms[side as usize].params.clone().unwrap_or_default();
+            let mut params = data
+                .evm_info_by_side(side)
+                .params
+                .clone()
+                .unwrap_or_default();
             f(&mut params);
-            data.evms[side as usize].params = Some(params);
+            data.evm_info_by_side_mut(side).params = Some(params);
         })
     }
 
@@ -105,14 +111,32 @@ impl Config {
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct ConfigData {
     pub admin: Principal,
-    pub evms: [EvmInfo; 2],
+    pub base_evm: EvmInfo,
+    pub wrapped_evm: EvmInfo,
+}
+
+impl ConfigData {
+    pub fn evm_info_by_side(&self, side: BridgeSide) -> &EvmInfo {
+        match side {
+            BridgeSide::Base => &self.base_evm,
+            BridgeSide::Wrapped => &self.wrapped_evm,
+        }
+    }
+
+    pub fn evm_info_by_side_mut(&mut self, side: BridgeSide) -> &mut EvmInfo {
+        match side {
+            BridgeSide::Base => &mut self.base_evm,
+            BridgeSide::Wrapped => &mut self.wrapped_evm,
+        }
+    }
 }
 
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
             admin: Principal::anonymous(),
-            evms: Default::default(),
+            base_evm: EvmInfo::default(),
+            wrapped_evm: EvmInfo::default(),
         }
     }
 }
