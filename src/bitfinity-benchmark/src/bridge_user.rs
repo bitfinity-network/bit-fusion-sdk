@@ -14,9 +14,7 @@ use evm_canister_client::{EvmCanisterClient, IcAgentClient};
 use ic_exports::icrc_types::icrc1::account::Subaccount;
 use ic_test_utils::Agent;
 use minter_client::MinterCanisterClient;
-use minter_contract_utils::bft_bridge_api::{
-    BURN, DEPLOY_WRAPPED_TOKEN, FINISH_BURN, GET_WRAPPED_TOKEN, MINT,
-};
+use minter_contract_utils::bft_bridge_api::{BURN, DEPLOY_WRAPPED_TOKEN, GET_WRAPPED_TOKEN};
 use minter_contract_utils::wrapped_token_api::{ERC_20_APPROVE, ERC_20_BALANCE};
 use minter_did::id256::Id256;
 use minter_did::reason::Icrc2Burn;
@@ -415,8 +413,6 @@ impl BridgeUser {
             self.name
         );
 
-        let bft_bridge_address = self.get_bft_bridge_address().await?;
-
         let amount_with_fee = amount.clone() + Nat::from(ICRC1_TRANSFER_FEE);
         self.approve_icrc2_burn(icrc2_token, amount_with_fee)
             .await?;
@@ -430,21 +426,7 @@ impl BridgeUser {
         };
 
         log::trace!("Burning ICRC-2 tokens by {} user", self.name);
-        let mint_order = self.minter_client().burn_icrc2(reason).await??;
-
-        log::debug!(
-            "Mint order nonce for {}: {}",
-            self.name,
-            u32::from_be_bytes(mint_order.0[136..140].try_into().unwrap()),
-        );
-
-        log::trace!("Minting ERC-20 tokens by {} user", self.name);
-        let input = MINT
-            .encode_input(&[Token::Bytes(mint_order.0.to_vec())])
-            .unwrap();
-
-        self.execute_transaction(bft_bridge_address, input, Self::CONTRACT_CALL_GAS)
-            .await?;
+        let _operation_id = self.minter_client().burn_icrc2(reason).await??;
 
         Ok(())
     }
@@ -464,7 +446,7 @@ impl BridgeUser {
 
         self.approve_erc20_burn(erc20_token.clone(), amount, &bft_bridge_address)
             .await?;
-        let operation_id = self
+        let _operation_id = self
             .burn_erc20(&erc20_token, amount, bft_bridge_address.clone())
             .await?;
 
@@ -553,34 +535,6 @@ impl BridgeUser {
         };
 
         Ok(operation_id.as_u32())
-    }
-
-    async fn finish_erc20_burn(
-        &self,
-        operation_id: u32,
-        bft_bridge_address: H160,
-    ) -> anyhow::Result<()> {
-        log::trace!("Finishing ERC-20 burn by {} user", self.name);
-
-        let input = FINISH_BURN.encode_input(&[Token::Uint(operation_id.into())])?;
-
-        let receipt = self
-            .execute_transaction(bft_bridge_address, input, Self::CONTRACT_CALL_GAS)
-            .await?;
-        let Some(output) = receipt.output else {
-            anyhow::bail!("finish_erc20_burn transaction output is empty");
-        };
-
-        let decoded = &FINISH_BURN.decode_output(&output)?;
-        let &[Token::Bool(success)] = decoded.as_slice() else {
-            anyhow::bail!("failed to decode finish_burn call output by {}", self.name);
-        };
-
-        if !success {
-            anyhow::bail!("failed to finish burn by {}", self.name);
-        }
-
-        Ok(())
     }
 }
 

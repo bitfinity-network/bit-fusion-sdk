@@ -2,7 +2,6 @@ use std::cell::RefCell;
 
 use candid::Principal;
 pub use config::Config;
-use did::H160;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};

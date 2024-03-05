@@ -5,7 +5,6 @@ use candid::Principal;
 use did::build::BuildData;
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
@@ -51,8 +50,54 @@ impl MinterCanister {
         // This block of code only need to be run in the wasm environment
         #[cfg(target_family = "wasm")]
         {
-            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
+            use std::time::Duration;
+
+            self.update_metrics_timer(Duration::from_secs(60 * 60));
+
+            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
+                // Tasks to collect EVMs events
+                let tasks = vec![
+                    Self::collect_evm_events_task(),
+                    Self::collect_evm_events_task(),
+                ];
+
+                get_scheduler().borrow_mut().append_tasks(tasks);
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
+            });
         }
+    }
+
+    fn init_evm_info_task() -> ScheduledTask<BridgeTask> {
+        const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
+        const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
+        const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
+
+        let init_options = TaskOptions::default()
+            .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
+            .with_backoff_policy(BackoffPolicy::Exponential {
+                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
+                multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+            });
+        BridgeTask::InitEvmInfo.into_scheduled(init_options)
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
+        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: EVM_EVENTS_COLLECTING_DELAY,
+            });
+
+        BridgeTask::CollectEvmEvents.into_scheduled(options)
     }
 
     /// Initialize the canister with given data.
@@ -80,7 +125,16 @@ impl MinterCanister {
             spender_principal: init_data.spender_principal,
         };
 
-        state.config.reset(settings);
+        state.reset(settings);
+
+        {
+            let scheduler = get_scheduler();
+            let mut borrowed_scheduller = scheduler.borrow_mut();
+            borrowed_scheduller.set_failed_task_callback(|task, error| {
+                log::error!("task failed: {task:?}, error: {error:?}")
+            });
+            borrowed_scheduller.append_task(Self::init_evm_info_task());
+        }
 
         self.set_timers();
     }
@@ -117,7 +171,7 @@ impl MinterCanister {
         let mut state = state.borrow_mut();
 
         MinterCanister::set_logger_filter_inspect_message_check(ic::caller(), &state)?;
-        state.logger_config_service.set_logger_filter(&filter);
+        state.logger_config_service.set_logger_filter(&filter)?;
 
         debug!("updated logger filter to {filter}");
 
@@ -133,7 +187,7 @@ impl MinterCanister {
     /// - `count` is the number of logs to return
     #[update]
     pub fn ic_logs(&self, count: usize, offset: usize) -> Result<Logs> {
-        MinterCanister::ic_logs_inspect_message_check(ic::caller(), &get_state().borrow());
+        MinterCanister::ic_logs_inspect_message_check(ic::caller(), &get_state().borrow())?;
 
         // Request execution
         Ok(ic_log::take_memory_records(count, offset))
@@ -235,17 +289,14 @@ impl MinterCanister {
     #[update]
     pub async fn register_evmc_bft_bridge(&self, bft_bridge_address: H160) -> Result<()> {
         let state = get_state();
-        let state = state.borrow();
 
         Self::register_evmc_bft_bridge_inspect_message_check(
             ic::caller(),
             bft_bridge_address.clone(),
-            &state,
-        );
+            &state.borrow(),
+        )?;
 
-        let client = state.config.get_evm_client();
-        self.register_evm_bridge(&client, bft_bridge_address)
-            .await?;
+        self.register_evm_bridge(bft_bridge_address).await?;
 
         Ok(())
     }
@@ -346,12 +397,10 @@ impl MinterCanister {
             .map_err(|e| Error::Internal(format!("failed to get minter canister address: {e}")))
     }
 
-    async fn register_evm_bridge(
-        &self,
-        evm: &EthJsonRpcClient<impl Client>,
-        bft_bridge: H160,
-    ) -> Result<()> {
-        bft_bridge::check_bft_bridge_contract(evm, bft_bridge.clone(), get_state()).await?;
+    async fn register_evm_bridge(&self, bft_bridge: H160) -> Result<()> {
+        let state = get_state();
+        let client = state.borrow().config.get_evm_client();
+        bft_bridge::check_bft_bridge_contract(&client, bft_bridge.clone(), get_state()).await?;
 
         get_state()
             .borrow_mut()

@@ -1,4 +1,4 @@
-use candid::{Nat, Principal};
+use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;

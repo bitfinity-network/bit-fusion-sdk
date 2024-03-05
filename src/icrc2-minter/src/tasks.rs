@@ -46,7 +46,7 @@ impl Task for BridgeTask {
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let state = crate::canister::get_state();
         match self {
-            BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_state(state)),
+            BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
             BridgeTask::PrepareMintOrder(data) => {
                 Box::pin(Self::prepare_mint_order(state, scheduler, data.clone()))
@@ -70,7 +70,9 @@ impl BridgeTask {
         ScheduledTask::with_options(self, options)
     }
 
-    pub async fn init_evm_state(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+    pub async fn init_evm_info(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+        log::trace!("evm info initialization started");
+
         let client = state.borrow().config.get_evm_client();
         let address = {
             let signer = state.borrow().signer.get_transaction_signer();
@@ -136,11 +138,7 @@ impl BridgeTask {
 
         log::trace!("appending logs to tasks: {logs:?}");
 
-        scheduler.append_tasks(
-            logs.into_iter()
-                .filter_map(|l| Self::task_by_log(l))
-                .collect(),
-        );
+        scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
         Ok(())
     }
@@ -159,7 +157,7 @@ impl BridgeTask {
             ));
         };
 
-        let sender_chain_id = IC_CHAIN_ID as u32;
+        let sender_chain_id = IC_CHAIN_ID;
         let recipient_chain_id = evm_params.chain_id as u32;
 
         let sender = Id256::from(&burnt_data.sender);
@@ -342,7 +340,7 @@ impl BridgeTask {
             ));
         };
 
-        let spender = state.borrow().config.get_spender_principal().into();
+        let spender = state.borrow().config.get_spender_principal();
         let spender_subaccount = icrc2::approve_subaccount(
             minted_event.sender,
             minted_event.operation_id,
@@ -361,15 +359,18 @@ impl BridgeTask {
         let amount = Nat::from(&minted_event.amount);
         let approve_result =
             icrc2::approve_mint(to_token, spender_account, amount.clone(), true).await;
-        match approve_result {
-            Ok(_) | Err(Error::Icrc2ApproveError(ApproveError::AllowanceChanged { .. })) => {}
+        let allowance = match approve_result {
+            Ok(suceess) => suceess.amount,
+            Err(Error::Icrc2ApproveError(ApproveError::AllowanceChanged { current_allowance })) => {
+                current_allowance
+            }
             Err(e) => {
                 log::warn!("Failed to approve mint: {:?}", e);
                 return Err(SchedulerError::TaskExecutionFailed(
                     "Failed to approve mint".into(),
                 ));
             }
-        }
+        };
 
         log::trace!("Approved icrc2 mint");
 
@@ -383,29 +384,34 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?
             .fee;
-        let transfer_result = virtual_canister_call!(
+        let allowance_without_fee = allowance.clone() - fee.clone();
+        let mut transfer_result = virtual_canister_call!(
             spender,
             "finish_icrc2_mint",
-            (dst_info.token, dst_info.recipient, spender_subaccount, amount.clone(), fee),
+            (dst_info.token, dst_info.recipient, spender_subaccount, allowance_without_fee, fee),
             std::result::Result<Nat, TransferFromError>
         )
         .await
         .map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?;
 
+        log::debug!("transfer result: {:?}", transfer_result);
+
         if let Err(TransferFromError::BadFee { expected_fee }) = transfer_result {
             // refresh cached token configuration if fee changed
             let _ = icrc1::refresh_token_configuration(dst_info.token).await;
 
-            virtual_canister_call!(
+            let allowance_without_fee = allowance - expected_fee.clone();
+            transfer_result = virtual_canister_call!(
                 spender,
                 "finish_icrc2_mint",
-                (dst_info, spender_subaccount, amount, expected_fee),
+                (dst_info, spender_subaccount, allowance_without_fee, expected_fee),
                 std::result::Result<Nat, TransferFromError>
             )
             .await
-            .map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?
             .map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?;
         }
+
+        transfer_result.map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?;
 
         log::trace!("Finished icrc2 mint");
 
