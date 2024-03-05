@@ -8,8 +8,6 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
 const MAINNET_CHAIN_ID: u32 = 0;
@@ -102,8 +100,12 @@ impl State {
         &self.signer
     }
 
-    pub fn push_mint_order(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
-        self.orders_store.push_mint_order(sender, nonce, mint_order);
+    pub fn mint_orders(&self) -> &OrdersStore {
+        &self.orders_store
+    }
+
+    pub fn mint_orders_mut(&mut self) -> &mut OrdersStore {
+        &mut self.orders_store
     }
 
     pub fn get_evm_info(&self) -> EvmInfo {
@@ -128,5 +130,9 @@ impl State {
 
     pub fn decimals(&self) -> u8 {
         self.config.decimals
+    }
+
+    pub fn update_evm_params(&mut self, f: impl FnOnce(&mut Option<EvmParams>)) {
+        f(&mut self.evm_params)
     }
 }

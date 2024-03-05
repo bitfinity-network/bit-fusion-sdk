@@ -4,6 +4,8 @@ use std::rc::Rc;
 use crate::ck_btc_interface::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
 use crate::interface::Erc20MintStatus::Scheduled;
 use crate::interface::{Erc20MintError, Erc20MintStatus};
+use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use candid::{CandidType, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -12,11 +14,18 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
+use ic_task_scheduler::retry::BackoffPolicy;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use serde::Deserialize;
 
 use crate::state::{BtcBridgeConfig, State};
+
+const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
+const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
+const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -33,9 +42,42 @@ pub struct InitArgs {
 }
 
 impl BtcBridge {
+    fn set_timers(&mut self) {
+        #[cfg(target_family = "wasm")]
+        {
+            use std::time::Duration;
+
+            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
+
+            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
+                get_scheduler()
+                    .borrow_mut()
+                    .append_task(Self::collect_evm_events_task());
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
+            });
+        }
+    }
+
     // #[init]
     pub fn init(&mut self, config: BtcBridgeConfig) {
         get_state().borrow_mut().configure(config);
+
+        {
+            let scheduler = get_scheduler();
+            let mut borrowed_scheduller = scheduler.borrow_mut();
+            borrowed_scheduller.set_failed_task_callback(|task, error| {
+                log::error!("task failed: {task:?}, error: {error:?}")
+            });
+            borrowed_scheduller.append_task(Self::init_evm_info_task());
+        }
+
+        self.set_timers();
     }
 
     // #[update]
@@ -143,7 +185,8 @@ impl BtcBridge {
 
         get_state()
             .borrow_mut()
-            .push_mint_order(sender, nonce, signed_mint_order.clone());
+            .mint_orders_mut()
+            .push(sender, nonce, signed_mint_order.clone());
 
         log::trace!("Mint order added");
 
@@ -201,6 +244,29 @@ impl BtcBridge {
         todo!()
     }
 
+    fn init_evm_info_task() -> ScheduledTask<BtcTask> {
+        let init_options = TaskOptions::default()
+            .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
+            .with_backoff_policy(BackoffPolicy::Exponential {
+                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
+                multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+            });
+        BtcTask::InitEvmState.into_scheduled(init_options)
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
+        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: EVM_EVENTS_COLLECTING_DELAY,
+            });
+
+        BtcTask::CollectEvmEvents.into_scheduled(options)
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -222,8 +288,18 @@ impl Metrics for BtcBridge {
 
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
+
+    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
+        let pending_tasks =
+            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
+            PersistentScheduler::new(pending_tasks)
+    }));
 }
 
 pub fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
+}
+
+pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
+    SCHEDULER.with(|scheduler| scheduler.clone())
 }

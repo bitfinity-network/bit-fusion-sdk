@@ -12,12 +12,18 @@ pub struct Entry {
 }
 
 impl OrdersStore {
-    pub fn push_mint_order(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
+    pub fn push(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
         // todo: check for length, duplicates?
         self.0.push(Entry {
             sender,
             nonce,
             mint_order,
         })
+    }
+
+    pub fn remove(&mut self, sender: Id256, nonce: u32) {
+        // todo: chick if it is possible to have multiple orders with same values?
+        self.0
+            .retain(|entry| entry.sender != sender && entry.nonce != nonce)
     }
 }
