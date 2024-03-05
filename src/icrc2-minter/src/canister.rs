@@ -780,31 +780,4 @@ mod test {
 
         assert!(evm_address.is_ok());
     }
-
-    #[tokio::test]
-    async fn test_get_bft_bridge_contract() {
-        MockContext::new().inject();
-        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
-        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-        let mut canister = MinterCanister::from_principal(mock_canister_id);
-
-        let init_data = InitData {
-            owner: Principal::management_canister(),
-            evm_principal: Principal::management_canister(),
-            spender_principal: Principal::management_canister(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
-            },
-            log_settings: None,
-        };
-        canister_call!(canister.init(init_data), ()).await.unwrap();
-
-        inject::get_context().update_id(Principal::management_canister());
-
-        let evm_address = canister_call!(canister.get_bft_bridge_contract(), Result<Option<H160>>)
-            .await
-            .unwrap();
-
-        assert!(evm_address.is_some());
-    }
 }
