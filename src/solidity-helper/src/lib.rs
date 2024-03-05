@@ -81,12 +81,22 @@ fn compile(
         ))
     })?;
 
-    Command::new("forge")
+    eprintln!("Output: {output_path_str:?}, curr: {solidity_root_path:?}");
+
+    let output = Command::new("/home/maxim/.foundry/bin/forge")
         .args(["build", "--out", output_path_str, "--skip", "test"])
         .current_dir(solidity_root_path)
         .output()?;
 
-    Ok(output_path)
+    eprintln!("Build output: {output:?}");
+
+    if output.status.success() {
+        Ok(output_path)
+    } else {
+        Err(SolidityHelperError::GenericError(format!(
+            "Failed to compile solidity: {output:?}"
+        )))
+    }
 }
 
 /// Returns a map with:

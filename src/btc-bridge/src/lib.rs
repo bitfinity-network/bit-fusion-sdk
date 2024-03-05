@@ -1,4 +1,8 @@
 pub mod canister;
+pub mod ck_btc_interface;
+pub mod interface;
+pub mod memory;
+pub mod orders_store;
 pub mod state;
 
 use ic_metrics::Metrics;
