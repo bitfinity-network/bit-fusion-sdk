@@ -69,24 +69,19 @@ impl Inscriber {
     }
 
     /// Inscribes and sends the given amount of bitcoin from this canister to the given address.
-    /// Returns the transaction ID.
+    /// Returns the commit and reveal transaction IDs.
     #[update]
-    pub async fn inscribe(&mut self) -> String {
-        let _derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
-        let _network = BITCOIN_NETWORK.with(|n| n.get());
-        let _key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
-        // TODO:
-        // let tx_id = bitcoin_wallet::inscribe(
-        // commit_tx_args,
-        // network,
-        // inscription_protocol,
-        // inscription_data,
-        // dst_address
-        // )
-        // .await;
-
-        // tx_id.to_string()
-        String::new()
+    pub async fn inscribe(
+        &mut self,
+        tx_args: String,
+        recipient: Option<String>,
+        fee_rate: Option<u64>,
+    ) -> (String, String) {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let tx_args = tx_args.as_bytes().to_vec();
+        wallet::inscribe(network, tx_args, recipient, fee_rate.unwrap_or(10))
+            .await
+            .unwrap()
     }
 
     /// Returns the build data of the canister
