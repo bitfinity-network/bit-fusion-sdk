@@ -4,9 +4,9 @@ use std::cell::Cell;
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 
 thread_local! {
-    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
+    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
 
-    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
+    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = const { vec![] };
 
     pub(crate) static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
 }

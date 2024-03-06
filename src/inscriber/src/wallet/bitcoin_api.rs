@@ -1,13 +1,13 @@
-use crate::constants::{
-    GET_BALANCE_COST_CYCLES, GET_CURRENT_FEE_PERCENTILES_CYCLES, GET_UTXOS_COST_CYCLES,
-    SEND_TRANSACTION_BASE_CYCLES, SEND_TRANSACTION_PER_BYTE_CYCLES,
-};
-
 use candid::Principal;
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest, GetUtxosRequest,
     GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest,
+};
+
+use crate::constants::{
+    GET_BALANCE_COST_CYCLES, GET_CURRENT_FEE_PERCENTILES_CYCLES, GET_UTXOS_COST_CYCLES,
+    SEND_TRANSACTION_BASE_CYCLES, SEND_TRANSACTION_PER_BYTE_CYCLES,
 };
 
 /// Returns the balance of the given bitcoin address.

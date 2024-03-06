@@ -1,12 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::{
-    build_data::canister_build_data,
-    constants::{BITCOIN_NETWORK, ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME},
-    wallet::{self, bitcoin_api},
-};
-
 use candid::Principal;
 use did::build::BuildData;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
@@ -15,6 +9,11 @@ use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
 };
 use ic_metrics::{Metrics, MetricsStorage};
+
+use crate::build_data::canister_build_data;
+use crate::constants::{BITCOIN_NETWORK, ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME};
+use crate::wallet::inscription::{CommitTransactionArgs, Protocol};
+use crate::wallet::{self, bitcoin_api};
 
 #[derive(Canister, Clone, Debug)]
 pub struct Inscriber {
@@ -73,15 +72,22 @@ impl Inscriber {
     #[update]
     pub async fn inscribe(
         &mut self,
-        tx_args: String,
+        inscription_type: Protocol,
+        tx_args: CommitTransactionArgs,
         recipient: Option<String>,
         fee_rate: Option<u64>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
-        let tx_args = tx_args.as_bytes().to_vec();
-        wallet::inscribe(network, tx_args, recipient, fee_rate.unwrap_or(10))
-            .await
-            .unwrap()
+
+        wallet::inscribe(
+            network,
+            inscription_type,
+            tx_args,
+            recipient,
+            fee_rate.unwrap_or(10),
+        )
+        .await
+        .unwrap()
     }
 
     /// Returns the build data of the canister

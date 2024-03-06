@@ -1,8 +1,9 @@
-use crate::constants::SIGN_WITH_ECDSA_COST_CYCLES;
-
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::{api::call::call_with_payment, call};
+use ic_cdk::api::call::call_with_payment;
+use ic_cdk::call;
 use serde::Serialize;
+
+use crate::constants::SIGN_WITH_ECDSA_COST_CYCLES;
 
 /// Returns the ECDSA public key of this canister at the given derivation path.
 pub async fn ecdsa_public_key(key_name: String, derivation_path: Vec<Vec<u8>>) -> Vec<u8> {

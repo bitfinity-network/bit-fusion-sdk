@@ -1,7 +1,6 @@
 #[allow(unused)]
 mod build_data;
 mod constants;
-mod utils;
 
 pub mod canister;
 pub mod wallet;
