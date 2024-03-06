@@ -3,15 +3,12 @@ pub mod ecdsa_api;
 
 use core::str::FromStr;
 
-use crate::{
-    constants::ECDSA_KEY_NAME,
-    inscription::{handle_inscriptions, InscriptionWrapper, Protocol},
-};
+use crate::constants::ECDSA_KEY_NAME;
 use bitcoin::{consensus::serialize, Address, Network, PrivateKey, Transaction};
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::{
-    transaction::{CreateCommitTransactionArgs, RevealTransactionArgs, TxInput},
+    wallet::{CreateCommitTransactionArgs, RevealTransactionArgs, TxInput},
     Inscription, OrdResult, OrdTransactionBuilder,
 };
 use sha2::Digest;
@@ -20,8 +17,7 @@ use sha2::Digest;
 pub async fn inscribe<T>(
     commit_tx_args: CreateCommitTransactionArgs<T>,
     network: BitcoinNetwork,
-    inscription_protocol: Protocol,
-    inscription_data: InscriptionWrapper,
+    _inscription: T,
     dst_address: Option<String>,
 ) -> OrdResult<(String, String)>
 where
@@ -51,9 +47,6 @@ where
         // Send inscription to canister's own address if none is provided
         own_address.clone()
     };
-
-    // ADD MORE INSCRIPTION PROCESSING LOGIC IN `/src/inscription.rs`
-    let _inscription_data = handle_inscriptions(inscription_protocol, inscription_data)?;
 
     let (commit_tx, reveal_tx) =
         commit_and_reveal(&mut builder, commit_tx_args, dst_address.clone())

@@ -1,21 +1,10 @@
 //! Utility functions and types
 
-use bitcoin::script::PushBytesBuf;
 use candid::{CandidType, Deserialize};
-use ord_rs::OrdResult;
-
-use crate::inscription::Protocol;
-
-pub fn to_push_bytes(bytes: &[u8]) -> OrdResult<PushBytesBuf> {
-    let mut push_bytes = PushBytesBuf::with_capacity(bytes.len());
-    push_bytes.extend_from_slice(bytes)?;
-    Ok(push_bytes)
-}
 
 #[derive(CandidType, Deserialize, Debug)]
 pub struct CreateCommitTransactionArgs {
     pub inputs: Vec<TxInput>,
-    pub inscripton_protocol: Protocol,
     pub inscription: String,
     pub leftovers_recipient: String,
     pub commit_fee: u64,

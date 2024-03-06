@@ -4,7 +4,6 @@ mod constants;
 mod utils;
 
 pub mod canister;
-pub mod inscription;
 pub mod wallet;
 
 use ic_metrics::Metrics;
