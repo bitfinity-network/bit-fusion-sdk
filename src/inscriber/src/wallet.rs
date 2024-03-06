@@ -1,5 +1,6 @@
 pub mod bitcoin_api;
 pub mod ecdsa_api;
+pub mod inscription;
 
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::OrdResult;
