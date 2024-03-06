@@ -14,7 +14,7 @@ use minter_did::reason::Icrc2Burn;
 
 use super::bft_bridge::ValidBurn;
 use super::{icrc1, TxHash};
-use crate::constant::{DEFAULT_TX_GAS_LIMIT, IC_CHAIN_ID};
+use crate::constant::{DEFAULT_GAS_PRICE, DEFAULT_TX_GAS_LIMIT, IC_CHAIN_ID};
 use crate::context::Context;
 use crate::tokens::icrc2;
 
@@ -268,7 +268,7 @@ impl EvmTokensService {
                 Some(bft_bridge),
                 None,
                 DEFAULT_TX_GAS_LIMIT,
-                None,
+                Some(DEFAULT_GAS_PRICE.into()),
                 Some(get_burn_info_input.into()),
                 context,
             )

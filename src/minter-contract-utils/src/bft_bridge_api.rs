@@ -1,8 +1,9 @@
 use candid::CandidType;
+use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::abi::{
     Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
 };
-use ethers_core::types::{H160, U256};
+use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -228,6 +229,53 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+/// Emited when token is burnt or minted by BFTBridge.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+pub enum BridgeEvent {
+    Burnt(BurntEventData),
+    Minted(MintedEventData),
+}
+
+impl BridgeEvent {
+    pub async fn collect_logs(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        from_block: EthBlockNumber,
+        to_block: EthBlockNumber,
+        bridge_contract: H160,
+    ) -> Result<Vec<Log>, anyhow::Error> {
+        let params = EthGetLogsParams {
+            address: Some(vec![bridge_contract]),
+            from_block,
+            to_block,
+            topics: Some(vec![vec![
+                BURNT_EVENT.signature(),
+                MINTED_EVENT.signature(),
+            ]]),
+        };
+
+        evm_client.get_logs(params).await
+    }
+
+    pub fn from_log(log: Log) -> Result<Self, ethers_core::abi::Error> {
+        let raw_log = RawLog {
+            topics: log.topics,
+            data: log.data.to_vec(),
+        };
+
+        Self::try_from(raw_log)
+    }
+}
+
+impl TryFrom<RawLog> for BridgeEvent {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        BurntEventData::try_from(log.clone())
+            .map(Self::Burnt)
+            .or_else(|_| MintedEventData::try_from(log).map(Self::Minted))
+    }
+}
+
 /// Emited when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct BurntEventData {
@@ -435,6 +483,32 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     constant: None,
     state_mutability: StateMutability::View,
 });
+
+pub fn mint_transaction(
+    sender: H160,
+    bridge: H160,
+    nonce: U256,
+    gas_price: U256,
+    mint_order_data: Vec<u8>,
+    chain_id: u32,
+) -> Transaction {
+    let data = MINT
+        .encode_input(&[Token::Bytes(mint_order_data)])
+        .expect("mint order encoding should pass");
+
+    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
+    ethers_core::types::Transaction {
+        from: sender,
+        to: bridge.into(),
+        nonce,
+        value: U256::zero(),
+        gas: DEFAULT_TX_GAS_LIMIT.into(),
+        gas_price: Some(gas_price),
+        input: data.into(),
+        chain_id: Some(chain_id.into()),
+        ..Default::default()
+    }
+}
 
 #[cfg(test)]
 mod tests {

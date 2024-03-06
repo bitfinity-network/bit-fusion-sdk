@@ -124,6 +124,8 @@ pub trait TestContext {
         Ok(receipt)
     }
 
+    async fn advance_time(&self, time: Duration);
+
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
@@ -134,6 +136,9 @@ pub trait TestContext {
         client
             .mint_native_tokens(wallet.address().into(), balance.into())
             .await??;
+
+        self.advance_time(Duration::from_secs(2)).await;
+
         Ok(wallet)
     }
 
@@ -191,6 +196,13 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let minter_canister_address = self.get_minter_canister_evm_address(caller).await?;
+
+        let client = self.evm_client(self.admin_name());
+        client
+            .mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
+            .await??;
+        self.advance_time(Duration::from_secs(2)).await;
+
         let minter_client = self.minter_client(caller);
 
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();

@@ -15,6 +15,10 @@ ic-stable-structures = { workspace = true }
 minter-did = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
+jsonrpc-core = { workspace = true }
+ic-canister-client = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
+anyhow = { workspace = true }
 
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }

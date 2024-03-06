@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use candid::{CandidType, Principal};
-use ethereum_json_rpc_client::{Client, EthJsonRcpClient};
+use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
 use jsonrpc_core::{Request, Response};
 use serde::{Deserialize, Serialize};
@@ -53,12 +53,10 @@ impl fmt::Display for EvmLink {
 }
 
 impl EvmLink {
-    pub fn get_client(&self) -> EthJsonRcpClient<impl Client> {
-        log::trace!("creating client for {self}");
-
+    pub fn get_client(&self) -> EthJsonRpcClient<impl Client> {
         match self {
             EvmLink::Http(_) => todo!(),
-            EvmLink::Ic(principal) => EthJsonRcpClient::new(Clients::canister(*principal)),
+            EvmLink::Ic(principal) => EthJsonRpcClient::new(Clients::canister(*principal)),
         }
     }
 }
