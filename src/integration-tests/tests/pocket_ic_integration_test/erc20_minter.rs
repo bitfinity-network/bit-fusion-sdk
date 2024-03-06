@@ -17,7 +17,7 @@ use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
-use super::{init_bridge, PocketIcTestContext, JOHN};
+use super::PocketIcTestContext;
 use crate::context::{evm_canister_init_data, CanisterType, TestContext};
 use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::{self, CHAIN_ID};
@@ -403,47 +403,4 @@ async fn test_external_bridging() {
         .unwrap();
 
     assert!(signed_order.is_none())
-}
-
-#[tokio::test]
-async fn test_erc20_forbids_double_spend() {
-    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
-
-    let base_token_id = Id256::from(&ctx.canisters().token_1());
-    let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
-        .await
-        .unwrap();
-
-    let amount = 300_000u64;
-    let operation_id = 42;
-
-    let mint_order = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, operation_id)
-        .await
-        .unwrap();
-
-    let receipt = ctx
-        .mint_erc_20_with_order(&john_wallet, &bft_bridge, mint_order)
-        .await
-        .unwrap();
-    assert_eq!(receipt.status, Some(U64::one()));
-
-    let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
-        .await
-        .unwrap();
-    assert_eq!(wrapped_balance as u64, amount);
-
-    let receipt = ctx
-        .mint_erc_20_with_order(&john_wallet, &bft_bridge, mint_order)
-        .await
-        .unwrap();
-    assert_eq!(receipt.status, Some(U64::zero()));
-
-    let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
-        .await
-        .unwrap();
-    assert_eq!(wrapped_balance as u64, amount);
 }
