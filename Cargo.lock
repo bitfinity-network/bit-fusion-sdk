@@ -5550,6 +5550,7 @@ dependencies = [
  "ic-helpers",
  "ic-icrc1-ledger",
  "ic-log",
+ "ic-management-canister-types",
  "ic-stable-structures 0.13.0",
  "ic-state-machine-tests",
  "ic-test-utils",

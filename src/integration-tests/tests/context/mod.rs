@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use btc_bridge::state::BtcBridgeConfig;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -475,7 +476,7 @@ pub trait TestContext {
             }
             CanisterType::Signature => {
                 println!("Installing default Signature canister...");
-                let evm_canister = self.canisters().get_or_anonymous(CanisterType::Evm);
+                let evm_canister = self.canisters().evm();
                 let init_data = vec![evm_canister];
                 self.install_canister(
                     self.canisters().signature_verification(),
@@ -558,7 +559,12 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
-            _ => todo!(),
+            CanisterType::EvmMinter => {
+                todo!()
+            }
+            CanisterType::BtcBridge => {
+                todo!()
+            }
         }
     }
 
@@ -843,7 +849,7 @@ impl TestCanisters {
         *self
             .0
             .get(&CanisterType::BtcBridge)
-            .expect("kyt canister should be initialized (see `TestContext::new()`)")
+            .expect("bridge canister should be initialized (see `TestContext::new()`)")
     }
 
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {

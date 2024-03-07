@@ -157,7 +157,7 @@ impl BtcBridge {
         let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
         let src_token = (&get_state().borrow().ck_btc_ledger()).into();
 
-        let recipient_chain_id = get_state().borrow().erc20_token_id();
+        let recipient_chain_id = get_state().borrow().erc20_chain_id();
 
         // todo: check if this is correct. Maybe we need to sue txid here?
         let nonce = base_utxo.height;

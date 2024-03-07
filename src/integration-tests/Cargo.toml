@@ -43,6 +43,7 @@ ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "re
 ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 icrc-ledger-types = { version = "0.1", optional = true }
 
@@ -70,6 +71,7 @@ state_machine_tests = [
     "ic-ckbtc-minter",
     "ic-ckbtc-kyt",
     "ic-icrc1-ledger",
+    "ic-management-canister-types",
     "ic-state-machine-tests",
     "icrc-ledger-types",
 ]

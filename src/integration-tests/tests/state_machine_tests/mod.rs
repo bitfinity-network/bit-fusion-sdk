@@ -5,22 +5,24 @@ use candid::{encode_args, CandidType, Decode, Nat, Principal};
 use ic_base_types::{CanisterId, PrincipalId};
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use ic_exports::ic_kit::mock_principals::{alice, bob};
+use ic_management_canister_types::CanisterSettingsArgsBuilder;
 use ic_state_machine_tests::StateMachine;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::de::DeserializeOwned;
+use std::sync::Arc;
 use std::time::Duration;
 
 mod btc;
 
 pub struct StateMachineContext {
-    env: StateMachine,
+    env: Arc<StateMachine>,
     canisters: TestCanisters,
 }
 
 impl StateMachineContext {
     pub fn new(env: StateMachine) -> Self {
         Self {
-            env,
+            env: Arc::new(env),
             canisters: TestCanisters::default(),
         }
     }
@@ -28,7 +30,7 @@ impl StateMachineContext {
 
 #[async_trait::async_trait]
 impl<'a> TestContext for &'a StateMachineContext {
-    type Client = StateMachineClient<'a>;
+    type Client = StateMachineClient;
 
     fn canisters(&self) -> TestCanisters {
         self.canisters.clone()
@@ -45,7 +47,7 @@ impl<'a> TestContext for &'a StateMachineContext {
         StateMachineClient {
             canister,
             caller,
-            env: &self.env,
+            env: self.env.clone(),
         }
     }
 
@@ -58,11 +60,22 @@ impl<'a> TestContext for &'a StateMachineContext {
     }
 
     async fn advance_time(&self, time: Duration) {
-        self.env.advance_time(time)
+        let env = self.env.clone();
+        tokio::task::spawn_blocking(move || env.advance_time(time))
+            .await
+            .unwrap()
     }
 
     async fn create_canister(&self) -> crate::utils::error::Result<Principal> {
-        Ok(self.env.create_canister(None).into())
+        let env = self.env.clone();
+        let args = CanisterSettingsArgsBuilder::new()
+            .with_controller(self.admin().into())
+            .build();
+        Ok(
+            tokio::task::spawn_blocking(move || env.create_canister(Some(args)).into())
+                .await
+                .unwrap(),
+        )
     }
 
     async fn create_canister_with_id(
@@ -78,14 +91,19 @@ impl<'a> TestContext for &'a StateMachineContext {
         wasm: Vec<u8>,
         args: impl ArgumentEncoder + Send,
     ) -> crate::utils::error::Result<()> {
+        let env = self.env.clone();
         let data = encode_args(args).unwrap();
-        self.env
-            .install_existing_canister(
+
+        tokio::task::spawn_blocking(move || {
+            env.install_existing_canister(
                 CanisterId::try_from(PrincipalId(canister)).unwrap(),
                 wasm,
                 data,
             )
             .map_err(|err| TestError::Generic(format!("{err:?}")))
+        })
+        .await
+        .unwrap()
     }
 
     async fn reinstall_canister(
@@ -112,29 +130,37 @@ impl<'a> TestContext for &'a StateMachineContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct StateMachineClient<'a> {
+pub struct StateMachineClient {
     canister: Principal,
     caller: Principal,
-    env: &'a StateMachine,
+    env: Arc<StateMachine>,
 }
 
 #[async_trait::async_trait]
-impl<'a> CanisterClient for StateMachineClient<'a> {
+impl CanisterClient for StateMachineClient {
     async fn update<T, R>(&self, method: &str, args: T) -> CanisterClientResult<R>
     where
         T: ArgumentEncoder + Send + Sync,
         R: DeserializeOwned + CandidType,
     {
+        let env = self.env.clone();
         let data = encode_args(args).expect("Failed to encode data");
-        let result = self
-            .env
-            .execute_ingress_as(
-                self.caller.into(),
-                CanisterId::try_from(PrincipalId(self.canister)).unwrap(),
+        let sender = self.caller.into();
+        let canister = self.canister;
+        let method = method.to_string();
+
+        let result = tokio::task::spawn_blocking(move || {
+            env.execute_ingress_as(
+                sender,
+                CanisterId::try_from(PrincipalId(canister)).unwrap(),
                 method,
                 data,
             )
-            .expect("request failed");
+            .expect("request failed")
+        })
+        .await
+        .unwrap();
+
         Ok(Decode!(&result.bytes(), R).expect("failed to decode result"))
     }
 
@@ -143,15 +169,24 @@ impl<'a> CanisterClient for StateMachineClient<'a> {
         T: ArgumentEncoder + Send + Sync,
         R: DeserializeOwned + CandidType,
     {
+        let env = self.env.clone();
         let data = encode_args(args).expect("Failed to encode data");
-        let result = self
-            .env
-            .execute_ingress(
-                CanisterId::try_from(PrincipalId(self.canister)).unwrap(),
+        let sender = self.caller.into();
+        let canister = self.canister;
+        let method = method.to_string();
+
+        let result = tokio::task::spawn_blocking(move || {
+            env.execute_ingress_as(
+                sender,
+                CanisterId::try_from(PrincipalId(canister)).unwrap(),
                 method,
                 data,
             )
-            .expect("request failed");
+            .expect("request failed")
+        })
+        .await
+        .unwrap();
+
         Ok(Decode!(&result.bytes(), R).expect("failed to decode result"))
     }
 }

@@ -3,14 +3,16 @@
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;
 use crate::utils::wasm::{
-    get_btc_canister_bytecode, get_ck_btc_minter_canister_bytecode,
-    get_icrc1_token_canister_bytecode, get_kyt_canister_bytecode,
+    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
+    get_ck_btc_minter_canister_bytecode, get_icrc1_token_canister_bytecode,
+    get_kyt_canister_bytecode,
 };
 use bitcoin::util::psbt::serialize::Deserialize;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork};
 use btc_bridge::canister::eth_address_to_subaccount;
 use btc_bridge::ck_btc_interface::PendingUtxo;
 use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
+use btc_bridge::state::BtcBridgeConfig;
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
 use eth_signer::Signer;
@@ -30,15 +32,19 @@ use ic_ckbtc_minter::updates::retrieve_btc::{
 };
 use ic_ckbtc_minter::updates::update_balance::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
 use ic_ckbtc_minter::{Log, MinterInfo, CKBTC_LEDGER_MEMO_SIZE, MIN_RELAY_FEE_PER_VBYTE};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
 use icrc_ledger_types::icrc2::approve::{ApproveArgs, ApproveError};
 use icrc_ledger_types::icrc3::transactions::{GetTransactionsRequest, GetTransactionsResponse};
+use minter_contract_utils::evm_link::EvmLink;
+use minter_did::id256::Id256;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 const KYT_FEE: u64 = 2_000;
@@ -174,82 +180,90 @@ struct CkBtcSetup {
 impl CkBtcSetup {
     pub async fn new() -> Self {
         let bitcoin_id = mainnet_bitcoin_canister_id();
-        let env = StateMachineBuilder::new()
-            .with_default_canister_range()
-            .with_extra_canister_range(bitcoin_id..=bitcoin_id)
-            .build();
-
-        install_bitcoin_mock_canister(&env);
-        let ledger_id = env.create_canister(None);
-        let minter_id =
-            env.create_canister_with_cycles(None, Cycles::new(100_000_000_000_000), None);
-        let kyt_id = env.create_canister(None);
-
-        env.install_existing_canister(
-            ledger_id,
-            ledger_wasm(),
-            Encode!(&LedgerArgument::Init(
-                LedgerInitArgsBuilder::with_symbol_and_name("ckBTC", "ckBTC")
-                    .with_minting_account(minter_id.get().0)
-                    .with_transfer_fee(TRANSFER_FEE)
-                    .with_max_memo_length(CKBTC_LEDGER_MEMO_SIZE)
-                    .with_feature_flags(ic_icrc1_ledger::FeatureFlags { icrc2: true })
-                    .build()
-            ))
-            .unwrap(),
-        )
-        .expect("failed to install the ledger");
-
-        env.install_existing_canister(
-            minter_id,
-            minter_wasm(),
-            Encode!(&MinterArg::Init(CkbtcMinterInitArgs {
-                btc_network: ic_ckbtc_minter::lifecycle::init::BtcNetwork::Mainnet,
-                ecdsa_key_name: "master_ecdsa_public_key".to_string(),
-                retrieve_btc_min_amount: 100_000,
-                ledger_id,
-                max_time_in_queue_nanos: 100,
-                min_confirmations: Some(MIN_CONFIRMATIONS),
-                mode: Mode::GeneralAvailability,
-                kyt_fee: Some(KYT_FEE),
-                kyt_principal: kyt_id.into(),
-            }))
-            .unwrap(),
-        )
-        .expect("failed to install the minter");
-
         let caller = PrincipalId::new_user_test_id(1);
-        let kyt_provider = PrincipalId::new_user_test_id(2);
 
-        env.install_existing_canister(
-            kyt_id,
-            kyt_wasm(),
-            Encode!(&LifecycleArg::InitArg(KytInitArg {
-                minter_id: minter_id.into(),
-                maintainers: vec![kyt_provider.into()],
-                mode: KytMode::AcceptAll,
-            }))
-            .unwrap(),
-        )
-        .expect("failed to install the KYT canister");
+        let (env, ledger_id, minter_id, kyt_id, kyt_provider) =
+            tokio::task::spawn_blocking(move || {
+                let env = StateMachineBuilder::new()
+                    .with_default_canister_range()
+                    .with_extra_canister_range(bitcoin_id..=bitcoin_id)
+                    .build();
 
-        env.execute_ingress(
-            bitcoin_id,
-            "set_fee_percentiles",
-            Encode!(&(1..=100).map(|i| i * 100).collect::<Vec<u64>>()).unwrap(),
-        )
-        .expect("failed to set fee percentiles");
+                install_bitcoin_mock_canister(&env);
+                let ledger_id = env.create_canister(None);
+                let minter_id =
+                    env.create_canister_with_cycles(None, Cycles::new(100_000_000_000_000), None);
+                let kyt_id = env.create_canister(None);
 
-        env.execute_ingress_as(
-            kyt_provider,
-            kyt_id,
-            "set_api_key",
-            Encode!(&SetApiKeyArg {
-                api_key: "api key".to_string(),
+                env.install_existing_canister(
+                    ledger_id,
+                    ledger_wasm(),
+                    Encode!(&LedgerArgument::Init(
+                        LedgerInitArgsBuilder::with_symbol_and_name("ckBTC", "ckBTC")
+                            .with_minting_account(minter_id.get().0)
+                            .with_transfer_fee(TRANSFER_FEE)
+                            .with_max_memo_length(CKBTC_LEDGER_MEMO_SIZE)
+                            .with_feature_flags(ic_icrc1_ledger::FeatureFlags { icrc2: true })
+                            .build()
+                    ))
+                    .unwrap(),
+                )
+                .expect("failed to install the ledger");
+
+                env.install_existing_canister(
+                    minter_id,
+                    minter_wasm(),
+                    Encode!(&MinterArg::Init(CkbtcMinterInitArgs {
+                        btc_network: ic_ckbtc_minter::lifecycle::init::BtcNetwork::Mainnet,
+                        ecdsa_key_name: "master_ecdsa_public_key".to_string(),
+                        retrieve_btc_min_amount: 100_000,
+                        ledger_id,
+                        max_time_in_queue_nanos: 100,
+                        min_confirmations: Some(MIN_CONFIRMATIONS),
+                        mode: Mode::GeneralAvailability,
+                        kyt_fee: Some(KYT_FEE),
+                        kyt_principal: kyt_id.into(),
+                    }))
+                    .unwrap(),
+                )
+                .expect("failed to install the minter");
+
+                let kyt_provider = PrincipalId::new_user_test_id(2);
+
+                env.install_existing_canister(
+                    kyt_id,
+                    kyt_wasm(),
+                    Encode!(&LifecycleArg::InitArg(KytInitArg {
+                        minter_id: minter_id.into(),
+                        maintainers: vec![kyt_provider.into()],
+                        mode: KytMode::AcceptAll,
+                    }))
+                    .unwrap(),
+                )
+                .expect("failed to install the KYT canister");
+
+                env.execute_ingress(
+                    bitcoin_id,
+                    "set_fee_percentiles",
+                    Encode!(&(1..=100).map(|i| i * 100).collect::<Vec<u64>>()).unwrap(),
+                )
+                .expect("failed to set fee percentiles");
+
+                env.execute_ingress_as(
+                    kyt_provider,
+                    kyt_id,
+                    "set_api_key",
+                    Encode!(&SetApiKeyArg {
+                        api_key: "api key".to_string(),
+                    })
+                    .unwrap(),
+                )
+                .expect("failed to set api key");
+
+                (env, ledger_id, minter_id, kyt_id, kyt_provider)
             })
-            .unwrap(),
-        )
-        .expect("failed to set api key");
+            .await
+            .unwrap();
 
         let mut context = StateMachineContext::new(env);
         context.canisters.set(CanisterType::Kyt, kyt_id.into());
@@ -257,7 +271,12 @@ impl CkBtcSetup {
             .canisters
             .set(CanisterType::CkBtcMinter, minter_id.into());
 
-        for canister_type in [CanisterType::Signature, CanisterType::Evm] {
+        let canisters = [
+            CanisterType::Signature,
+            CanisterType::Evm,
+            CanisterType::Minter,
+        ];
+        for canister_type in canisters {
             context.canisters.set(
                 canister_type,
                 (&context)
@@ -265,8 +284,49 @@ impl CkBtcSetup {
                     .await
                     .expect("failed to create a canister"),
             );
+        }
+
+        for canister_type in canisters {
             (&context).install_default_canister(canister_type).await
         }
+
+        let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
+        let bft_bridge = (&context)
+            .initialize_bft_bridge("admin", &wallet)
+            .await
+            .unwrap();
+        let token_id = Id256::from(&Principal::from(minter_id));
+        let _token = (&context)
+            .create_wrapped_token(&wallet, &bft_bridge, token_id)
+            .await
+            .unwrap();
+
+        let btc_bridge = (&context).create_canister().await.unwrap();
+        let mut token_name = [0; 32];
+        token_name.copy_from_slice(b"wrapper");
+        let mut token_symbol = [0; 16];
+        token_symbol.copy_from_slice(b"WPT");
+
+        let config = BtcBridgeConfig {
+            ck_btc_minter: minter_id.into(),
+            ck_btc_ledger: ledger_id.into(),
+            erc20_chain_id: 0,
+            network: BitcoinNetwork::Mainnet,
+            evm_link: EvmLink::Ic((&context).canisters().evm()),
+            bridge_address: bft_bridge,
+            token_name,
+            token_symbol,
+            decimals: 8,
+        };
+        (&context)
+            .install_canister(
+                btc_bridge,
+                get_btc_bridge_canister_bytecode().await,
+                (config,),
+            )
+            .await
+            .unwrap();
+        context.canisters.set(CanisterType::BtcBridge, btc_bridge);
 
         Self {
             context,
@@ -280,8 +340,8 @@ impl CkBtcSetup {
         }
     }
 
-    pub fn env(&self) -> &StateMachine {
-        &self.context.env
+    pub fn env(&self) -> Arc<StateMachine> {
+        self.context.env.clone()
     }
 
     pub fn set_fee_percentiles(&self, fees: &Vec<u64>) {
@@ -855,6 +915,15 @@ impl CkBtcSetup {
     pub fn kyt_fee(&self) -> u64 {
         KYT_FEE
     }
+
+    pub async fn async_drop(self) {
+        let mut env = self.context.env;
+        tokio::task::spawn_blocking(move || {
+            drop(env);
+        })
+        .await
+        .unwrap();
+    }
 }
 
 #[tokio::test]
@@ -869,14 +938,14 @@ async fn update_balance_should_return_correct_confirmations() {
         kyt_fee: None,
     };
     let minter_arg = MinterArg::Upgrade(Some(upgrade_args));
-    ckbtc
-        .env()
-        .upgrade_canister(
-            ckbtc.minter_id,
-            minter_wasm(),
-            Encode!(&minter_arg).unwrap(),
-        )
-        .expect("Failed to upgrade the minter canister");
+    let env = ckbtc.env();
+    let minter_id = ckbtc.minter_id;
+    tokio::task::spawn_blocking(move || {
+        env.upgrade_canister(minter_id, minter_wasm(), Encode!(&minter_arg).unwrap())
+            .expect("Failed to upgrade the minter canister");
+    })
+    .await
+    .unwrap();
 
     ckbtc.set_tip_height(12);
 
@@ -899,15 +968,19 @@ async fn update_balance_should_return_correct_confirmations() {
         subaccount: None,
     };
 
-    let res = ckbtc
-        .env()
-        .execute_ingress_as(
+    let env = ckbtc.env();
+    let res = tokio::task::spawn_blocking(move || {
+        env.execute_ingress_as(
             PrincipalId::new_user_test_id(1),
             ckbtc.minter_id,
             "update_balance",
             Encode!(&update_balance_args).unwrap(),
         )
-        .expect("Failed to call update_balance");
+        .expect("Failed to call update_balance")
+    })
+    .await
+    .unwrap();
+
     let res = Decode!(&res.bytes(), Result<Vec<UtxoStatus>, UpdateBalanceError>).unwrap();
     assert_eq!(
         res,
@@ -917,6 +990,8 @@ async fn update_balance_should_return_correct_confirmations() {
             pending_utxos: Some(vec![])
         })
     );
+
+    ckbtc.async_drop().await;
 }
 
 #[tokio::test]

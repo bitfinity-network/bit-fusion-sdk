@@ -25,15 +25,15 @@ pub struct State {
 
 #[derive(Debug, CandidType, Deserialize)]
 pub struct BtcBridgeConfig {
-    ck_btc_minter: Principal,
-    ck_btc_ledger: Principal,
-    erc20_token_id: u32,
-    network: BitcoinNetwork,
-    evm_link: EvmLink,
-    bridge_address: H160,
-    token_name: [u8; 32],
-    token_symbol: [u8; 16],
-    decimals: u8,
+    pub ck_btc_minter: Principal,
+    pub ck_btc_ledger: Principal,
+    pub erc20_chain_id: u32,
+    pub network: BitcoinNetwork,
+    pub evm_link: EvmLink,
+    pub bridge_address: H160,
+    pub token_name: [u8; 32],
+    pub token_symbol: [u8; 16],
+    pub decimals: u8,
 }
 
 impl Default for BtcBridgeConfig {
@@ -41,7 +41,7 @@ impl Default for BtcBridgeConfig {
         Self {
             ck_btc_minter: Principal::anonymous(),
             ck_btc_ledger: Principal::anonymous(),
-            erc20_token_id: 0,
+            erc20_chain_id: 0,
             network: BitcoinNetwork::Regtest,
             evm_link: EvmLink::default(),
             bridge_address: H160::default(),
@@ -84,8 +84,8 @@ impl State {
         self.config.ck_btc_ledger
     }
 
-    pub fn erc20_token_id(&self) -> u32 {
-        self.config.erc20_token_id
+    pub fn erc20_chain_id(&self) -> u32 {
+        self.config.erc20_chain_id
     }
 
     pub fn btc_chain_id(&self) -> u32 {
