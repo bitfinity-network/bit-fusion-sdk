@@ -5,7 +5,7 @@ pub mod inscription;
 use std::str::FromStr;
 
 use bitcoin::consensus::serialize;
-use bitcoin::{Address, FeeRate, Network, PublicKey, Transaction};
+use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, ScriptBuf, Transaction, Txid};
 use hex::ToHex;
 use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use inscription::CommitTransactionArgs;
@@ -101,7 +101,7 @@ pub async fn inscribe(
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => build_commit_and_reveal_transactions(
             &mut builder,
-            process_brc20_commit_transaction_args(commit_tx_args),
+            parse_brc20_commit_transaction_args(commit_tx_args, bitcoin_network)?,
             dst_address.clone(),
             bitcoin_network,
         )
@@ -109,7 +109,7 @@ pub async fn inscribe(
         .expect("Failed to build BRC20 commit and reveal transactions"),
         Protocol::Nft => build_commit_and_reveal_transactions(
             &mut builder,
-            process_nft_commit_transaction_args(commit_tx_args),
+            parse_nft_commit_transaction_args(commit_tx_args, bitcoin_network)?,
             dst_address.clone(),
             bitcoin_network,
         )
@@ -163,16 +163,68 @@ where
     Ok((commit_tx.tx, reveal_tx))
 }
 
-fn process_brc20_commit_transaction_args(
-    _brc20_args: CommitTransactionArgs,
-) -> CreateCommitTransactionArgs<ord_rs::Brc20> {
-    todo!()
+fn parse_brc20_commit_transaction_args(
+    args: CommitTransactionArgs,
+    network: Network,
+) -> OrdResult<CreateCommitTransactionArgs<ord_rs::Brc20>> {
+    let inscription: ord_rs::Brc20 = serde_json::from_str(&args.inscription)?;
+    let inputs: Vec<TxInput> = args
+        .inputs
+        .into_iter()
+        .map(|input| TxInput {
+            id: Txid::from_str(&input.id).expect("failed to parse tx id"),
+            index: input.index,
+            amount: Amount::from_sat(input.amount),
+        })
+        .collect();
+    let leftovers_recipient = Address::from_str(&args.leftovers_recipient)
+        .expect("Failed to parse address")
+        .require_network(network)
+        .unwrap();
+    let commit_fee = Amount::from_sat(args.commit_fee);
+    let reveal_fee = Amount::from_sat(args.reveal_fee);
+    let txin_script_pubkey = ScriptBuf::from_bytes(args.txin_script_pubkey.into_bytes());
+
+    Ok(CreateCommitTransactionArgs {
+        inputs,
+        inscription,
+        leftovers_recipient,
+        commit_fee,
+        reveal_fee,
+        txin_script_pubkey,
+    })
 }
 
-fn process_nft_commit_transaction_args(
-    _nft_args: CommitTransactionArgs,
-) -> CreateCommitTransactionArgs<ord_rs::Nft> {
-    todo!()
+fn parse_nft_commit_transaction_args(
+    args: CommitTransactionArgs,
+    network: Network,
+) -> OrdResult<CreateCommitTransactionArgs<ord_rs::Nft>> {
+    let inscription: ord_rs::Nft = serde_json::from_str(&args.inscription)?;
+    let inputs: Vec<TxInput> = args
+        .inputs
+        .into_iter()
+        .map(|input| TxInput {
+            id: Txid::from_str(&input.id).expect("failed to parse tx id"),
+            index: input.index,
+            amount: Amount::from_sat(input.amount),
+        })
+        .collect();
+    let leftovers_recipient = Address::from_str(&args.leftovers_recipient)
+        .expect("Failed to parse address")
+        .require_network(network)
+        .unwrap();
+    let commit_fee = Amount::from_sat(args.commit_fee);
+    let reveal_fee = Amount::from_sat(args.reveal_fee);
+    let txin_script_pubkey = ScriptBuf::from_bytes(args.txin_script_pubkey.into_bytes());
+
+    Ok(CreateCommitTransactionArgs {
+        inputs,
+        inscription,
+        leftovers_recipient,
+        commit_fee,
+        reveal_fee,
+        txin_script_pubkey,
+    })
 }
 
 /// Returns the P2PKH address of this canister at the given derivation path.
