@@ -75,4 +75,14 @@ pub struct OutPoint {
 #[derive(
     CandidType, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize,
 )]
-pub struct Txid([u8; 32]);
+pub struct Txid(pub [u8; 32]);
+
+impl<'a> TryFrom<&'a [u8]> for Txid {
+    type Error = ();
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        let mut inner = [0; 32];
+        inner.copy_from_slice(value);
+        Ok(Self(inner))
+    }
+}

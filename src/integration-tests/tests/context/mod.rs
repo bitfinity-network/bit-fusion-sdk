@@ -35,9 +35,10 @@ use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, M
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
-    get_btc_canister_bytecode, get_ck_btc_minter_canister_bytecode,
-    get_erc20_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
-    get_icrc1_token_canister_bytecode, get_kyt_canister_bytecode, get_minter_canister_bytecode,
+    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
+    get_ck_btc_minter_canister_bytecode, get_erc20_minter_canister_bytecode,
+    get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
+    get_kyt_canister_bytecode, get_minter_canister_bytecode,
     get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
@@ -838,6 +839,13 @@ impl TestCanisters {
             .expect("kyt canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn btc_bridge(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::BtcBridge)
+            .expect("kyt canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -863,6 +871,7 @@ pub enum CanisterType {
     CkBtcMinter,
     Kyt,
     Icrc1Ledger,
+    BtcBridge,
 }
 
 impl CanisterType {
@@ -898,6 +907,7 @@ impl CanisterType {
             CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
             CanisterType::Kyt => get_kyt_canister_bytecode().await,
             CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
+            CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
         }
     }
 }

@@ -22,7 +22,7 @@ pub type PersistentScheduler = Scheduler<BtcTask, TasksStorage>;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BtcTask {
     InitEvmState,
-    CollectEvmState,
+    CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
 }
@@ -158,7 +158,7 @@ impl Task for BtcTask {
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         match self {
             BtcTask::InitEvmState => Box::pin(Self::init_evm_state()),
-            BtcTask::CollectEvmState => Box::pin(Self::collect_evm_events(task_scheduler)),
+            BtcTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
             BtcTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })

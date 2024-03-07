@@ -5,7 +5,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
-#[derive(Debug, CandidType, Deserialize)]
+#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintStatus {
     Scheduled {
         current_confirmations: u32,
@@ -19,7 +19,7 @@ pub enum Erc20MintStatus {
     },
 }
 
-#[derive(Debug, CandidType, Deserialize)]
+#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintError {
     ValueTooSmall(Utxo),
     Tainted(Utxo),
@@ -27,4 +27,5 @@ pub enum Erc20MintError {
     Sign(String),
     Evm(String),
     NotInitialized,
+    NothingToMint,
 }

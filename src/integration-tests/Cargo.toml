@@ -48,6 +48,7 @@ icrc-ledger-types = { version = "0.1", optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+btc-bridge = { path = "../btc-bridge" }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 rlp = { workspace = true }

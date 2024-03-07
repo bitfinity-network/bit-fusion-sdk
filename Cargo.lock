@@ -5526,6 +5526,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin",
+ "btc-bridge",
  "candid",
  "did",
  "erc20-minter",

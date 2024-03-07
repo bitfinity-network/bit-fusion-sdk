@@ -66,6 +66,11 @@ pub async fn get_kyt_canister_bytecode() -> Vec<u8> {
     get_or_load_wasm(&CANISTER_BYTECODE, "ic-ckbtc-kyt.wasm.gz").await
 }
 
+pub async fn get_btc_bridge_canister_bytecode() -> Vec<u8> {
+    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
+    get_or_load_wasm(&CANISTER_BYTECODE, "btc-bridge.wasm.gz").await
+}
+
 async fn load_wasm_bytecode_or_panic(wasm_name: &str) -> Vec<u8> {
     let path = get_path_to_file(wasm_name).await;
 

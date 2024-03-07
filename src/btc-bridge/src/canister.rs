@@ -2,14 +2,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ck_btc_interface::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
-use crate::interface::Erc20MintStatus::Scheduled;
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use candid::{CandidType, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, virtual_canister_call, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, update, virtual_canister_call, Canister, Idl, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
@@ -64,7 +63,7 @@ impl BtcBridge {
         }
     }
 
-    // #[init]
+    #[init]
     pub fn init(&mut self, config: BtcBridgeConfig) {
         get_state().borrow_mut().configure(config);
 
@@ -80,7 +79,7 @@ impl BtcBridge {
         self.set_timers();
     }
 
-    // #[update]
+    #[update]
     pub async fn btc_to_erc20(&self, eth_address: H160) -> Result<Erc20MintStatus, Erc20MintError> {
         match self.request_update_balance(&eth_address).await {
             Ok(UtxoStatus::Minted {
@@ -94,7 +93,7 @@ impl BtcBridge {
                 pending_utxos,
             }) => {
                 self.schedule_mint(eth_address);
-                Ok(Scheduled {
+                Ok(Erc20MintStatus::Scheduled {
                     current_confirmations: curr_confirmations,
                     required_confirmations,
                     pending_utxos,
@@ -255,7 +254,7 @@ impl BtcBridge {
     }
 
     #[cfg(target_family = "wasm")]
-    fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
+    fn collect_evm_events_task() -> ScheduledTask<BtcTask> {
         const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
 
         let options = TaskOptions::default()
@@ -272,7 +271,7 @@ impl BtcBridge {
     }
 }
 
-fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
+pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     let mut subaccount = [0; 32];
     subaccount.copy_from_slice(eth_address.0.as_bytes());
 

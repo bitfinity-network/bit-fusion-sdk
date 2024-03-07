@@ -1,12 +1,19 @@
 #![allow(dead_code)]
 
+use crate::context::{CanisterType, TestContext};
+use crate::state_machine_tests::StateMachineContext;
 use crate::utils::wasm::{
     get_btc_canister_bytecode, get_ck_btc_minter_canister_bytecode,
     get_icrc1_token_canister_bytecode, get_kyt_canister_bytecode,
 };
 use bitcoin::util::psbt::serialize::Deserialize;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork};
+use btc_bridge::canister::eth_address_to_subaccount;
+use btc_bridge::ck_btc_interface::PendingUtxo;
+use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
 use candid::{Decode, Encode, Nat, Principal};
+use did::H160;
+use eth_signer::Signer;
 use ic_base_types::{CanisterId, PrincipalId};
 use ic_bitcoin_canister_mock::{OutPoint, PushUtxoToAddress, Utxo};
 use ic_btc_interface::{Network, Txid};
@@ -31,6 +38,7 @@ use icrc_ledger_types::icrc2::approve::{ApproveArgs, ApproveError};
 use icrc_ledger_types::icrc3::transactions::{GetTransactionsRequest, GetTransactionsResponse};
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 const KYT_FEE: u64 = 2_000;
@@ -153,17 +161,18 @@ fn install_bitcoin_mock_canister(env: &StateMachine) {
 }
 
 struct CkBtcSetup {
-    pub env: StateMachine,
+    pub context: StateMachineContext,
     pub caller: PrincipalId,
     pub kyt_provider: PrincipalId,
     pub bitcoin_id: CanisterId,
     pub ledger_id: CanisterId,
     pub minter_id: CanisterId,
     pub kyt_id: CanisterId,
+    pub tip_height: AtomicU32,
 }
 
 impl CkBtcSetup {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let bitcoin_id = mainnet_bitcoin_canister_id();
         let env = StateMachineBuilder::new()
             .with_default_canister_range()
@@ -242,19 +251,41 @@ impl CkBtcSetup {
         )
         .expect("failed to set api key");
 
+        let mut context = StateMachineContext::new(env);
+        context.canisters.set(CanisterType::Kyt, kyt_id.into());
+        context
+            .canisters
+            .set(CanisterType::CkBtcMinter, minter_id.into());
+
+        for canister_type in [CanisterType::Signature, CanisterType::Evm] {
+            context.canisters.set(
+                canister_type,
+                (&context)
+                    .create_canister()
+                    .await
+                    .expect("failed to create a canister"),
+            );
+            (&context).install_default_canister(canister_type).await
+        }
+
         Self {
-            env,
+            context,
             kyt_provider,
             caller,
             bitcoin_id,
             ledger_id,
             minter_id,
             kyt_id,
+            tip_height: AtomicU32::default(),
         }
     }
 
+    pub fn env(&self) -> &StateMachine {
+        &self.context.env
+    }
+
     pub fn set_fee_percentiles(&self, fees: &Vec<u64>) {
-        self.env
+        self.env()
             .execute_ingress(
                 self.bitcoin_id,
                 "set_fee_percentiles",
@@ -264,7 +295,8 @@ impl CkBtcSetup {
     }
 
     pub fn set_tip_height(&self, tip_height: u32) {
-        self.env
+        self.tip_height.store(tip_height, Ordering::Relaxed);
+        self.env()
             .execute_ingress(
                 self.bitcoin_id,
                 "set_tip_height",
@@ -273,9 +305,20 @@ impl CkBtcSetup {
             .expect("failed to set fee tip height");
     }
 
+    pub fn advance_tip_height(&self, delta: u32) {
+        let prev_value = self.tip_height.fetch_add(delta, Ordering::Relaxed);
+        self.env()
+            .execute_ingress(
+                self.bitcoin_id,
+                "set_tip_height",
+                Encode!(&(prev_value + delta)).unwrap(),
+            )
+            .expect("failed to set fee tip height");
+    }
+
     pub fn push_utxo(&self, address: String, utxo: Utxo) {
         assert_reply(
-            self.env
+            self.env()
                 .execute_ingress(
                     self.bitcoin_id,
                     "push_utxo_to_address",
@@ -289,7 +332,7 @@ impl CkBtcSetup {
         let account = account.into();
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress_as(
                         self.caller,
                         self.minter_id,
@@ -310,7 +353,7 @@ impl CkBtcSetup {
     pub fn get_minter_info(&self) -> MinterInfo {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress(self.minter_id, "get_minter_info", Encode!().unwrap(),)
                     .expect("failed to get minter info")
             ),
@@ -328,7 +371,7 @@ impl CkBtcSetup {
         };
         let response = Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(self.minter_id, "http_request", Encode!(&request).unwrap(),)
                     .expect("failed to get minter info")
             ),
@@ -341,7 +384,7 @@ impl CkBtcSetup {
     pub fn refresh_fee_percentiles(&self) {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress_as(
                         self.caller,
                         self.minter_id,
@@ -359,7 +402,7 @@ impl CkBtcSetup {
         self.refresh_fee_percentiles();
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.minter_id,
                         "estimate_withdrawal_fee",
@@ -380,7 +423,7 @@ impl CkBtcSetup {
 
         let utxo_status = Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress_as(
                         self.caller,
                         self.minter_id,
@@ -410,7 +453,7 @@ impl CkBtcSetup {
     pub fn get_transactions(&self, arg: GetTransactionsRequest) -> GetTransactionsResponse {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(self.ledger_id, "get_transactions", Encode!(&arg).unwrap())
                     .expect("failed to query get_transactions on the ledger")
             ),
@@ -423,7 +466,7 @@ impl CkBtcSetup {
         let account = account.into();
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.minter_id,
                         "get_known_utxos",
@@ -443,7 +486,7 @@ impl CkBtcSetup {
     pub fn balance_of(&self, account: impl Into<Account>) -> Nat {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.ledger_id,
                         "icrc1_balance_of",
@@ -459,7 +502,7 @@ impl CkBtcSetup {
     pub fn withdrawal_account(&self, owner: PrincipalId) -> Account {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress_as(
                         owner,
                         self.minter_id,
@@ -476,7 +519,7 @@ impl CkBtcSetup {
     pub fn transfer(&self, from: impl Into<Account>, to: impl Into<Account>, amount: u64) -> Nat {
         let from = from.into();
         let to = to.into();
-        Decode!(&assert_reply(self.env.execute_ingress_as(
+        Decode!(&assert_reply(self.env().execute_ingress_as(
             PrincipalId::from(from.owner),
             self.ledger_id,
             "icrc1_transfer",
@@ -501,7 +544,7 @@ impl CkBtcSetup {
         amount: u64,
         from_subaccount: Option<[u8; 32]>,
     ) -> Nat {
-        Decode!(&assert_reply(self.env.execute_ingress_as(
+        Decode!(&assert_reply(self.env().execute_ingress_as(
             PrincipalId::from(from),
             self.ledger_id,
             "icrc2_approve",
@@ -532,7 +575,7 @@ impl CkBtcSetup {
     ) -> Result<RetrieveBtcOk, RetrieveBtcError> {
         Decode!(
             &assert_reply(
-                self.env.execute_ingress_as(self.caller, self.minter_id, "retrieve_btc", Encode!(&RetrieveBtcArgs {
+                self.env().execute_ingress_as(self.caller, self.minter_id, "retrieve_btc", Encode!(&RetrieveBtcArgs {
                     address,
                     amount,
                 }).unwrap())
@@ -550,7 +593,7 @@ impl CkBtcSetup {
     ) -> Result<RetrieveBtcOk, RetrieveBtcWithApprovalError> {
         Decode!(
             &assert_reply(
-                self.env.execute_ingress_as(self.caller, self.minter_id, "retrieve_btc_with_approval", Encode!(&RetrieveBtcWithApprovalArgs {
+                self.env().execute_ingress_as(self.caller, self.minter_id, "retrieve_btc_with_approval", Encode!(&RetrieveBtcWithApprovalArgs {
                     address,
                     amount,
                     from_subaccount
@@ -564,7 +607,7 @@ impl CkBtcSetup {
     pub fn retrieve_btc_status(&self, block_index: u64) -> RetrieveBtcStatus {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.minter_id,
                         "retrieve_btc_status",
@@ -580,7 +623,7 @@ impl CkBtcSetup {
     pub fn retrieve_btc_status_v2(&self, block_index: u64) -> RetrieveBtcStatusV2 {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.minter_id,
                         "retrieve_btc_status_v2",
@@ -599,7 +642,7 @@ impl CkBtcSetup {
     ) -> Vec<BtcRetrievalStatusV2> {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress(
                         self.minter_id,
                         "retrieve_btc_status_v2_by_account",
@@ -622,7 +665,7 @@ impl CkBtcSetup {
             return result;
         }
         for _ in 0..max_ticks {
-            self.env.tick();
+            self.env().tick();
             if let Some(result) = condition(self) {
                 return result;
             }
@@ -643,7 +686,7 @@ impl CkBtcSetup {
         mut condition: impl FnMut(&CkBtcSetup) -> bool,
     ) {
         for n in 0..num_ticks {
-            self.env.tick();
+            self.env().tick();
             if !condition(self) {
                 panic!(
                     "Condition '{}' does not hold after {} ticks",
@@ -666,7 +709,7 @@ impl CkBtcSetup {
                 }
                 status => {
                     last_status = Some(status);
-                    self.env.tick();
+                    self.env().tick();
                 }
             }
         }
@@ -680,7 +723,7 @@ impl CkBtcSetup {
         use ic_ckbtc_minter::state::eventlog::{Event, GetEventsArg};
         let events = Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(
                         self.minter_id,
                         "get_events",
@@ -720,7 +763,7 @@ impl CkBtcSetup {
                 }
                 status => {
                     last_status = Some(status);
-                    self.env.tick();
+                    self.env().tick();
                 }
             }
         }
@@ -738,7 +781,7 @@ impl CkBtcSetup {
         let main_address = self.get_btc_address(Principal::from(self.minter_id));
         assert_eq!(change_address.to_string(), main_address);
 
-        self.env
+        self.env()
             .advance_time(MIN_CONFIRMATIONS * Duration::from_secs(600) + Duration::from_secs(1));
         let txid_bytes: [u8; 32] = tx.txid().to_vec().try_into().unwrap();
         self.push_utxo(
@@ -757,7 +800,7 @@ impl CkBtcSetup {
     pub fn mempool(&self) -> BTreeMap<Txid, bitcoin::Transaction> {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .execute_ingress(self.bitcoin_id, "get_mempool", Encode!().unwrap())
                     .expect("failed to call get_mempool on the bitcoin mock")
             ),
@@ -777,7 +820,7 @@ impl CkBtcSetup {
     pub fn minter_self_check(&self) {
         Decode!(
             &assert_reply(
-                self.env
+                self.env()
                     .query(self.minter_id, "self_check", Encode!().unwrap())
                     .expect("failed to query self_check")
             ),
@@ -786,11 +829,37 @@ impl CkBtcSetup {
         .unwrap()
         .expect("minter self-check failed")
     }
+
+    pub fn btc_to_eth20(&self, eth_address: &H160) -> Result<Erc20MintStatus, Erc20MintError> {
+        let payload = Encode!(eth_address).unwrap();
+        let result = self
+            .env()
+            .execute_ingress(
+                CanisterId::try_from(PrincipalId(self.context.canisters.btc_bridge())).unwrap(),
+                "btc_to_erc20",
+                payload,
+            )
+            .expect("btc_to_erc20 call failed");
+
+        Decode!(&result.bytes(), Result<Erc20MintStatus, Erc20MintError>)
+            .expect("failed to decode btc_to_erc20 result")
+    }
+
+    pub fn advance_blocks(&self, blocks_count: usize) {
+        for _ in 0..blocks_count {
+            self.advance_tip_height(1);
+            self.env().advance_time(Duration::from_secs(1));
+        }
+    }
+
+    pub fn kyt_fee(&self) -> u64 {
+        KYT_FEE
+    }
 }
 
-#[test]
-fn update_balance_should_return_correct_confirmations() {
-    let ckbtc = CkBtcSetup::new();
+#[tokio::test]
+async fn update_balance_should_return_correct_confirmations() {
+    let ckbtc = CkBtcSetup::new().await;
     let upgrade_args = UpgradeArgs {
         retrieve_btc_min_amount: None,
         min_confirmations: Some(3),
@@ -801,7 +870,7 @@ fn update_balance_should_return_correct_confirmations() {
     };
     let minter_arg = MinterArg::Upgrade(Some(upgrade_args));
     ckbtc
-        .env
+        .env()
         .upgrade_canister(
             ckbtc.minter_id,
             minter_wasm(),
@@ -831,7 +900,7 @@ fn update_balance_should_return_correct_confirmations() {
     };
 
     let res = ckbtc
-        .env
+        .env()
         .execute_ingress_as(
             PrincipalId::new_user_test_id(1),
             ckbtc.minter_id,
@@ -848,4 +917,79 @@ fn update_balance_should_return_correct_confirmations() {
             pending_utxos: Some(vec![])
         })
     );
+}
+
+#[tokio::test]
+async fn btc_mint_flow() {
+    let ckbtc = CkBtcSetup::new().await;
+
+    ckbtc.set_tip_height(12);
+
+    let deposit_value = 100_000_000;
+    let utxo = Utxo {
+        height: 12,
+        outpoint: OutPoint {
+            txid: range_to_txid(1..=32).into(),
+            vout: 1,
+        },
+        value: deposit_value,
+    };
+
+    let wallet = (&ckbtc.context)
+        .new_wallet(10_000_000_000)
+        .await
+        .expect("Failed to create a wallet");
+    let caller_eth_address = wallet.address().0.into();
+
+    let deposit_account = Account {
+        owner: ckbtc.context.canisters.btc_bridge(),
+        subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+    };
+    ckbtc.deposit_utxo(deposit_account, utxo.clone());
+
+    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    assert_eq!(
+        result,
+        Ok(Erc20MintStatus::Scheduled {
+            current_confirmations: 0,
+            required_confirmations: MIN_CONFIRMATIONS,
+            pending_utxos: Some(vec![PendingUtxo {
+                outpoint: btc_bridge::ck_btc_interface::OutPoint {
+                    txid: btc_bridge::ck_btc_interface::Txid::try_from(utxo.outpoint.txid.as_ref())
+                        .unwrap(),
+                    vout: utxo.outpoint.vout,
+                },
+                value: deposit_value,
+                confirmations: 0,
+            }])
+        })
+    );
+
+    ckbtc.advance_blocks(6);
+
+    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    assert_eq!(
+        result,
+        Ok(Erc20MintStatus::Scheduled {
+            current_confirmations: 6,
+            required_confirmations: MIN_CONFIRMATIONS,
+            pending_utxos: Some(vec![PendingUtxo {
+                outpoint: btc_bridge::ck_btc_interface::OutPoint {
+                    txid: btc_bridge::ck_btc_interface::Txid::try_from(utxo.outpoint.txid.as_ref())
+                        .unwrap(),
+                    vout: utxo.outpoint.vout,
+                },
+                value: deposit_value,
+                confirmations: 6,
+            }])
+        })
+    );
+
+    ckbtc.advance_blocks(6);
+    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    assert_eq!(result, Err(Erc20MintError::NothingToMint));
+
+    // todo
+    // let balance = ckbtc.context.erc20_balance();
+    // assert_eq!(balance, deposit_value - ckbtc.kyt_fee());
 }
