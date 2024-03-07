@@ -1725,7 +1725,7 @@ dependencies = [
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=ordinalsV2#cc6608cc24cf74b0d83c74d730177d2cae663270"
+source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=ordinalsV2#d9a881698b9a56bfcfa6abadb75b264000787bfd"
 dependencies = [
  "async-trait",
  "bitcoin",
