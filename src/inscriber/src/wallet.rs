@@ -68,13 +68,14 @@ pub async fn inscribe(
 
     // Fetch our P2PKH address, and UTXOs.
     let own_address = public_key_to_p2pkh_address(network, &own_public_key);
-    ic_cdk::print("Fetching UTXOs...");
+    log::info!("Fetching UTXOs...");
     // TODO: refactor to use pagination to retrieve all UTXOs for the given address.
-    let _own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
+    let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
         .await
         .expect("Failed to retrieve UTXOs")
         .0
         .utxos;
+    log::trace!("Our own UTXOS: {:#?}", own_utxos);
 
     let own_address = Address::from_str(&own_address)
         .expect("Failed to parse address")
@@ -90,12 +91,6 @@ pub async fn inscribe(
         // Send inscription to canister's own address if `None` is provided
         own_address.clone()
     };
-
-    // TODO: Schnorr signature support
-    // ic_cdk::print("Fetching Schnorr public key...");
-    // let raw_schnorr_public_key = schnorr_api::schnorr_public_key(key_name.clone()).await;
-    // // Convert the raw public key (sec1 encoded) to a XOnlyPublicKey (BIP 340 encoded)
-    // let schnorr_public_key = PublicKey::from_slice(&raw_schnorr_public_key).map_err(OrdError::PubkeyConversion)?;
 
     let _fee_rate = FeeRate::from_sat_per_vb(fee_rate).unwrap();
 

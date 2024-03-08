@@ -49,8 +49,43 @@ build_canister() {
     cargo run > "$WASM_DIR/$canister_name.did"
 }
 
+# Function to determine which canisters to build based on input
+build_requested_canisters() {
+    if [ $# -eq 0 ]; then
+        set -- "all"
+
+    elif [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        print_help
+        exit 0
+    fi
+
+    if [ "$1" = "all" ]; then
+        initialize_env
+
+        # Build all canisters
+        
+        script_dir=$(dirname $0)
+        project_dir=$(realpath "${script_dir}/..")
+
+        build_canister "inscriber"
+    else
+        for canister in "$@"; do
+            case "$canister" in
+            inscriber)
+                build_canister "inscriber"
+                ;;
+            *)
+                echo "Error: Unknown canister '$canister'."
+                print_help
+                exit 1
+                ;;
+            esac
+        done
+    fi
+}
+
 main() {
-    build_canister "$@"
+    build_requested_canisters "$@"
 }
 
 main "$@"
