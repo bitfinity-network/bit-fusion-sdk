@@ -77,15 +77,15 @@ pub async fn inscribe(
         .utxos;
 
     let own_address = Address::from_str(&own_address)
-        .unwrap()
+        .expect("Failed to parse address")
         .require_network(bitcoin_network)
-        .unwrap();
+        .expect("Address belongs to a different network than specified");
 
     let dst_address = if let Some(dst_address) = dst_address {
         Address::from_str(&dst_address)
-            .unwrap()
+            .expect("Failed to parse address")
             .require_network(bitcoin_network)
-            .unwrap()
+            .expect("Address belongs to a different network than specified")
     } else {
         // Send inscription to canister's own address if `None` is provided
         own_address.clone()
@@ -119,24 +119,24 @@ pub async fn inscribe(
     };
 
     let commit_tx_bytes = serialize(&commit_tx);
-    ic_cdk::print(format!(
+    log::trace!(
         "Signed commit transaction: {}",
         hex::encode(&commit_tx_bytes)
-    ));
+    );
 
-    ic_cdk::print("Sending commit transaction...");
+    log::info!("Sending commit transaction...");
     bitcoin_api::send_transaction(network, commit_tx_bytes).await;
-    ic_cdk::print("Done");
+    log::info!("Done");
 
     let reveal_tx_bytes = serialize(&reveal_tx);
-    ic_cdk::print(format!(
+    log::trace!(
         "Signed reveal transaction: {}",
         hex::encode(&reveal_tx_bytes)
-    ));
+    );
 
-    ic_cdk::print("Sending reveal transaction...");
+    log::info!("Sending reveal transaction...");
     bitcoin_api::send_transaction(network, reveal_tx_bytes).await;
-    ic_cdk::print("Done");
+    log::info!("Done");
 
     Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
 }
@@ -148,7 +148,7 @@ async fn build_commit_and_reveal_transactions<T>(
     network: Network,
 ) -> OrdResult<(Transaction, Transaction)>
 where
-    T: Inscription,
+    T: Inscription + DeserializeOwned,
 {
     let commit_tx = builder.build_commit_transaction(network, args).await?;
     let reveal_tx_args = RevealTransactionArgs {
@@ -184,7 +184,7 @@ where
     let leftovers_recipient = Address::from_str(&args.leftovers_recipient)
         .expect("Failed to parse address")
         .require_network(network)
-        .unwrap();
+        .expect("Address belongs to a different network than specified");
     let commit_fee = Amount::from_sat(args.commit_fee);
     let reveal_fee = Amount::from_sat(args.reveal_fee);
     let txin_script_pubkey = ScriptBuf::from_bytes(args.txin_script_pubkey.into_bytes());
@@ -208,7 +208,6 @@ pub async fn get_p2pkh_address(
 ) -> String {
     // Fetch the public key of the given derivation path.
     let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
-
     // Compute the address.
     public_key_to_p2pkh_address(network, &public_key)
 }

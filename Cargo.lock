@@ -396,9 +396,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.15.3"
+version = "3.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea184aa71bb362a1157c896979544cc23974e08fd265f29ea96b59f0b4a555b"
+checksum = "7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa"
 
 [[package]]
 name = "byte-slice-cast"
@@ -704,8 +704,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#d6af444ce9422bbff837f04df994161d200aa6a6"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1440,6 +1440,7 @@ dependencies = [
  "ic-exports",
  "ic-metrics",
  "ic-storage",
+ "log",
  "ord-rs",
  "ripemd",
  "serde",
@@ -1725,7 +1726,7 @@ dependencies = [
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=ordinalsV2#d9a881698b9a56bfcfa6abadb75b264000787bfd"
+source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=main#0139d4ea55b4693a5e43382f01f7ae4d1cd63d58"
 dependencies = [
  "async-trait",
  "bitcoin",
