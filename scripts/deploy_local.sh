@@ -2,9 +2,6 @@
 
 FILE="dfx.json"
 
-# Create a backup of the original file
-cp "$FILE" "$FILE.bak"
-
 set -e
 set -x
 
@@ -18,13 +15,6 @@ NETWORK="local"
 NETWORK_NAME="testnet"
 
 FILE="dfx.json"
-
-# Define a function to restore the backup file
-restore_backup() {
-    cp "$FILE.bak" "$FILE" && rm "$FILE.bak"
-}
-
-trap restore_backup EXIT INT TERM
 
 source ./scripts/deploy_functions.sh
 

@@ -10,6 +10,17 @@ create() {
     dfx canister --network=$NETWORK create --with-cycles=600000000000 --all
 }
 
+deploy_inscriber_canister() {
+    NETWORK=$1
+    INSTALL_MODE=$2
+
+    inscriber_init_args="(variant { testnet })"
+
+    echo "Deploying Inscriber canister with init args: $inscriber_init_args"
+
+    dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK --argument="$inscriber_init_args" inscriber
+}
+
 deploy() {
     set -e
 
@@ -24,11 +35,4 @@ deploy() {
 
     echo "Inscriber ($inscriber_id) canister initialized."
 
-}
-
-deploy_inscriber_canister() {
-    NETWORK=$1
-    INSTALL_MODE=$2
-
-    dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK inscriber
 }
