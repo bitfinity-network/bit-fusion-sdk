@@ -1,7 +1,7 @@
 {
   "p": "brc-20",
   "op": "deploy",
-  "tick": "tdoc",
+  "tick": "demo",
   "max": "28000000",
-  "lim": "1337"
+  "lim": "1500"
 }
