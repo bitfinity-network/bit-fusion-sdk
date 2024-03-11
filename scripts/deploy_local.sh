@@ -18,6 +18,25 @@ FILE="dfx.json"
 
 source ./scripts/deploy_functions.sh
 
+start_dfx() {
+    echo "Attempting to create Alice's Identity"
+    set +e
+
+    if [ "$INSTALL_MODE" = "create" ]; then
+        echo "Stopping DFX"
+        dfx stop
+        echo "Starting DFX"
+        dfx start --clean --background --artificial-delay 0
+    else
+        return
+    fi
+
+    # Create identity
+    dfx identity new --storage-mode=plaintext alice
+    dfx identity use alice
+    echo "Alice's Identity Created"
+}
+
 entry_point() {
     CHAIN_ID=$1
     OWNER=$(dfx identity get-principal)
@@ -34,5 +53,7 @@ entry_point() {
         exit 1
     fi
 }
+
+start_dfx
 
 entry_point "$CHAIN_ID"

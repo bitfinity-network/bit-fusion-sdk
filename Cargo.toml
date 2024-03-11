@@ -7,6 +7,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 
+
 [workspace.dependencies]
 async-trait = "0.1"
 bitcoin = { version = "0.31", features = ["serde"] }
@@ -14,7 +15,6 @@ bs58 = "0.5"
 candid = "0.10"
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
 hex = "0.4"
-ic-cdk = "0.12"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
 ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk.git", package = "ic-crypto-getrandom-for-wasm", tag = "v0.13.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }

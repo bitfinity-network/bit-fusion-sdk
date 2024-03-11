@@ -8,6 +8,8 @@ export RUST_BACKTRACE=full
 # Configuration variables
 WASM_DIR=".artifact"
 
+ORD_FEATURES="export-api"
+
 # Initial setup
 initialize_env() {
     if [ ! -f "./Cargo.toml" ]; then
@@ -46,7 +48,7 @@ build_canister() {
 
     ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$canister_name.wasm" shrink
     gzip -k "$WASM_DIR/$canister_name.wasm" --force
-    cargo run > "$WASM_DIR/$canister_name.did"
+    cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
 }
 
 # Function to determine which canisters to build based on input
@@ -63,16 +65,16 @@ build_requested_canisters() {
         initialize_env
 
         # Build all canisters
-        
+
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        build_canister "inscriber"
+        build_canister "inscriber" "$ORD_FEATURES"
     else
         for canister in "$@"; do
             case "$canister" in
             inscriber)
-                build_canister "inscriber"
+                build_canister "inscriber" "$ORD_FEATURES"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."

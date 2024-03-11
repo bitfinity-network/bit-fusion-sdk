@@ -1435,7 +1435,6 @@ dependencies = [
  "did",
  "hex",
  "ic-canister",
- "ic-cdk",
  "ic-crypto-getrandom-for-wasm",
  "ic-exports",
  "ic-metrics",
