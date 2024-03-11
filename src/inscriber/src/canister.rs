@@ -5,9 +5,7 @@ use candid::Principal;
 use did::build::BuildData;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
 use ic_cdk::api::call::CallResult;
-use ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
-};
+use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, MillisatoshiPerByte, Utxo};
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
@@ -45,7 +43,7 @@ impl Inscriber {
 
     /// Returns the UTXOs of the given bitcoin address.
     #[update]
-    pub async fn get_utxos(&mut self, address: String) -> CallResult<(GetUtxosResponse,)> {
+    pub async fn get_utxos(&mut self, address: String) -> Result<Vec<Utxo>, String> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_utxos(network, address).await
     }

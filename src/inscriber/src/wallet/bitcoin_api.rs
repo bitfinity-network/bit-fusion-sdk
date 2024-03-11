@@ -2,7 +2,7 @@ use candid::Principal;
 use ic_cdk::api::call::{call_with_payment, CallResult};
 use ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest, GetUtxosRequest,
-    GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest,
+    GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest, Utxo, UtxoFilter,
 };
 
 use crate::constants::{
@@ -21,32 +21,52 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult
         (GetBalanceRequest {
             address,
             network,
-            min_confirmations: None,
+            min_confirmations: Some(6),
         },),
         GET_BALANCE_COST_CYCLES,
     )
     .await
 }
 
-/// Returns the UTXOs of the given bitcoin address.
+/// Fetches all UTXOs for the given address using pagination.
 ///
+/// Returns a vector of all UTXOs for the given Bitcoin address.
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
-pub async fn get_utxos(
-    network: BitcoinNetwork,
-    address: String,
-) -> CallResult<(GetUtxosResponse,)> {
-    call_with_payment::<(GetUtxosRequest,), (GetUtxosResponse,)>(
-        Principal::management_canister(),
-        "bitcoin_get_utxos",
-        (GetUtxosRequest {
-            address,
+pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<Utxo>, String> {
+    let mut all_utxos = Vec::new();
+    let mut page_filter: Option<UtxoFilter> = None;
+
+    loop {
+        let get_utxos_request = GetUtxosRequest {
+            address: address.clone(),
             network,
-            filter: None,
-        },),
-        GET_UTXOS_COST_CYCLES,
-    )
-    .await
+            filter: page_filter,
+        };
+
+        let utxos_res: Result<(GetUtxosResponse,), _> = call_with_payment(
+            Principal::management_canister(),
+            "bitcoin_get_utxos",
+            (get_utxos_request,),
+            GET_UTXOS_COST_CYCLES,
+        )
+        .await;
+
+        match utxos_res {
+            Ok(response) => {
+                let (get_utxos_response,) = response;
+                all_utxos.extend(get_utxos_response.utxos);
+                page_filter = get_utxos_response.next_page.map(UtxoFilter::Page);
+            }
+            Err(e) => return Err(format!("Failed to fetch UTXOs: {:?}", e)),
+        }
+
+        if page_filter.is_none() {
+            break;
+        }
+    }
+
+    Ok(all_utxos)
 }
 
 /// Returns the 100 fee percentiles measured in millisatoshi/byte.

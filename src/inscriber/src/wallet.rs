@@ -69,12 +69,9 @@ pub async fn inscribe(
     // Fetch our P2PKH address, and UTXOs.
     let own_address = public_key_to_p2pkh_address(network, &own_public_key);
     log::info!("Fetching UTXOs...");
-    // TODO: refactor to use pagination to retrieve all UTXOs for the given address.
     let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
         .await
-        .expect("Failed to retrieve UTXOs")
-        .0
-        .utxos;
+        .expect("Failed to retrieve UTXOs for given address");
     log::trace!("Our own UTXOS: {:#?}", own_utxos);
 
     let own_address = Address::from_str(&own_address)
