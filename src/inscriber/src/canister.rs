@@ -10,7 +10,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
 use crate::constants::{BITCOIN_NETWORK, ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME};
-use crate::wallet::inscription::{CommitTransactionArgs, Protocol};
+use crate::wallet::inscription::Protocol;
 use crate::wallet::{self, bitcoin_api};
 
 #[derive(Canister, Clone, Debug)]
@@ -71,18 +71,18 @@ impl Inscriber {
     pub async fn inscribe(
         &mut self,
         inscription_type: Protocol,
-        tx_args: CommitTransactionArgs,
-        recipient: Option<String>,
-        fee_rate: Option<u64>,
+        inscription: String,
+        dst_address: Option<String>,
+        leftovers_recipient: Option<String>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
         wallet::inscribe(
             network,
             inscription_type,
-            tx_args,
-            recipient,
-            fee_rate.unwrap_or(10),
+            inscription,
+            dst_address,
+            leftovers_recipient,
         )
         .await
         .unwrap()

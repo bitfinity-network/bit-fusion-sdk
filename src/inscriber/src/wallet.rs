@@ -5,10 +5,10 @@ pub mod inscription;
 use std::str::FromStr;
 
 use bitcoin::consensus::serialize;
-use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, ScriptBuf, Transaction, Txid};
+use bitcoin::hashes::Hash;
+use bitcoin::{Address, Amount, Network, PublicKey, ScriptBuf, Transaction, Txid};
 use hex::ToHex;
-use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use inscription::CommitTransactionArgs;
+use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
     CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,
@@ -38,9 +38,9 @@ impl ExternalSigner for EcdsaSigner {
 pub async fn inscribe(
     network: BitcoinNetwork,
     inscription_type: Protocol,
-    commit_tx_args: CommitTransactionArgs,
+    inscription: String,
     dst_address: Option<String>,
-    fee_rate: u64,
+    leftovers_recipient: Option<String>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
     let bitcoin_network = match network {
@@ -66,7 +66,6 @@ pub async fn inscribe(
         wallet,
     );
 
-    // Fetch our P2PKH address, and UTXOs.
     let own_address = public_key_to_p2pkh_address(network, &own_public_key);
     log::info!("Fetching UTXOs...");
     let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
@@ -79,8 +78,8 @@ pub async fn inscribe(
         .require_network(bitcoin_network)
         .expect("Address belongs to a different network than specified");
 
-    let dst_address = if let Some(dst_address) = dst_address {
-        Address::from_str(&dst_address)
+    let dst_address = if let Some(addr) = dst_address {
+        Address::from_str(&addr)
             .expect("Failed to parse address")
             .require_network(bitcoin_network)
             .expect("Address belongs to a different network than specified")
@@ -89,25 +88,41 @@ pub async fn inscribe(
         own_address.clone()
     };
 
-    let _fee_rate = FeeRate::from_sat_per_vb(fee_rate).unwrap();
+    let leftovers_recipient = if let Some(addr) = leftovers_recipient {
+        Address::from_str(&addr)
+            .expect("Failed to parse address")
+            .require_network(bitcoin_network)
+            .expect("Address belongs to a different network than specified")
+    } else {
+        // Send leftover amounts to canister's address if `None` is provided
+        own_address.clone()
+    };
 
     let (commit_tx, reveal_tx) = match inscription_type {
-        Protocol::Brc20 => build_commit_and_reveal_transactions(
-            &mut builder,
-            parse_commit_transaction_args::<ord_rs::Brc20>(commit_tx_args, bitcoin_network)?,
-            dst_address.clone(),
-            bitcoin_network,
-        )
-        .await
-        .expect("Failed to build BRC20 commit and reveal transactions"),
-        Protocol::Nft => build_commit_and_reveal_transactions(
-            &mut builder,
-            parse_commit_transaction_args::<ord_rs::Nft>(commit_tx_args, bitcoin_network)?,
-            dst_address.clone(),
-            bitcoin_network,
-        )
-        .await
-        .expect("Failed to build NFT commit and reveal transactions"),
+        Protocol::Brc20 => {
+            let inscription: ord_rs::Brc20 = serde_json::from_str(&inscription)?;
+            build_commit_and_reveal_transactions::<ord_rs::Brc20>(
+                &mut builder,
+                inscription,
+                dst_address.clone(),
+                Some(leftovers_recipient),
+                &own_utxos,
+                bitcoin_network,
+            )
+            .await?
+        }
+        Protocol::Nft => {
+            let inscription: ord_rs::Nft = serde_json::from_str(&inscription)?;
+            build_commit_and_reveal_transactions::<ord_rs::Nft>(
+                &mut builder,
+                inscription,
+                dst_address.clone(),
+                Some(leftovers_recipient),
+                &own_utxos,
+                bitcoin_network,
+            )
+            .await?
+        }
     };
 
     let commit_tx_bytes = serialize(&commit_tx);
@@ -135,14 +150,60 @@ pub async fn inscribe(
 
 async fn build_commit_and_reveal_transactions<T>(
     builder: &mut OrdTransactionBuilder,
-    args: CreateCommitTransactionArgs<T>,
+    inscription: T,
     recipient_address: Address,
+    leftovers_recipient: Option<Address>,
+    own_utxos: &[Utxo],
     network: Network,
 ) -> OrdResult<(Transaction, Transaction)>
 where
     T: Inscription + DeserializeOwned,
 {
-    let commit_tx = builder.build_commit_transaction(network, args).await?;
+    let mut utxos_to_spend = vec![];
+    let mut amount = 0;
+    for utxo in own_utxos.iter().rev() {
+        amount += utxo.value;
+        utxos_to_spend.push(utxo);
+    }
+
+    let inputs: Vec<TxInput> = utxos_to_spend
+        .into_iter()
+        .map(|utxo| TxInput {
+            id: Txid::from_raw_hash(
+                Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse tx id"),
+            ),
+            index: utxo.outpoint.vout,
+            amount: Amount::from_sat(amount),
+        })
+        .collect();
+
+    let leftovers_recipient = if let Some(addr) = leftovers_recipient {
+        addr
+    } else {
+        recipient_address.clone()
+    };
+
+    let txin_script_pubkey = ScriptBuf::from_bytes(recipient_address.script_pubkey().into_bytes());
+
+    let Fees {
+        commit_fee,
+        reveal_fee,
+        ..
+    } = calculate_transaction_fees(network);
+
+    let commit_tx_args = CreateCommitTransactionArgs {
+        inputs,
+        inscription,
+        leftovers_recipient,
+        commit_fee,
+        reveal_fee,
+        txin_script_pubkey,
+    };
+
+    let commit_tx = builder
+        .build_commit_transaction(network, commit_tx_args)
+        .await?;
+
     let reveal_tx_args = RevealTransactionArgs {
         input: TxInput {
             id: commit_tx.tx.txid(),
@@ -153,42 +214,28 @@ where
         redeem_script: commit_tx.clone().redeem_script,
     };
     let reveal_tx = builder.build_reveal_transaction(reveal_tx_args).await?;
+
     Ok((commit_tx.tx, reveal_tx))
 }
 
-fn parse_commit_transaction_args<T>(
-    args: CommitTransactionArgs,
-    network: Network,
-) -> OrdResult<CreateCommitTransactionArgs<T>>
-where
-    T: Inscription + DeserializeOwned,
-{
-    let inscription: T = serde_json::from_str(&args.inscription)?;
-    let inputs: Vec<TxInput> = args
-        .inputs
-        .into_iter()
-        .map(|input| TxInput {
-            id: Txid::from_str(&input.id).expect("Failed to parse tx id"),
-            index: input.index,
-            amount: Amount::from_sat(input.amount),
-        })
-        .collect();
-    let leftovers_recipient = Address::from_str(&args.leftovers_recipient)
-        .expect("Failed to parse address")
-        .require_network(network)
-        .expect("Address belongs to a different network than specified");
-    let commit_fee = Amount::from_sat(args.commit_fee);
-    let reveal_fee = Amount::from_sat(args.reveal_fee);
-    let txin_script_pubkey = ScriptBuf::from_bytes(args.txin_script_pubkey.into_bytes());
+struct Fees {
+    pub commit_fee: Amount,
+    pub reveal_fee: Amount,
+}
 
-    Ok(CreateCommitTransactionArgs {
-        inputs,
-        inscription,
-        leftovers_recipient,
-        commit_fee,
-        reveal_fee,
-        txin_script_pubkey,
-    })
+// TODO: Verify the source of this
+fn calculate_transaction_fees(network: Network) -> Fees {
+    match network {
+        Network::Bitcoin => Fees {
+            commit_fee: Amount::from_sat(15_000),
+            reveal_fee: Amount::from_sat(7_000),
+        },
+        Network::Testnet | Network::Regtest | Network::Signet => Fees {
+            commit_fee: Amount::from_sat(2_500),
+            reveal_fee: Amount::from_sat(4_700),
+        },
+        _ => panic!("unknown network"),
+    }
 }
 
 /// Returns the P2PKH address of this canister at the given derivation path.
