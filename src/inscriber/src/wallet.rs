@@ -8,7 +8,7 @@ use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, Network, PublicKey, ScriptBuf, Transaction, Txid};
 use hex::ToHex;
-use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
     CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,

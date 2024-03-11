@@ -4,8 +4,10 @@ use std::rc::Rc;
 use candid::Principal;
 use did::build::BuildData;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
-use ic_cdk::api::call::CallResult;
-use ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, MillisatoshiPerByte, Utxo};
+use ic_exports::ic_cdk::api::call::CallResult;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{
+    BitcoinNetwork, MillisatoshiPerByte, Utxo,
+};
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;

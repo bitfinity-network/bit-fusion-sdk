@@ -3,6 +3,10 @@ name = "inscriber"
 version.workspace = true
 edition.workspace = true
 
+
+[features]
+export-api = []
+
 [dependencies]
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
@@ -11,7 +15,6 @@ candid = { workspace = true }
 did = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-cdk = { workspace = true }
 ic-crypto-getrandom-for-wasm = { workspace = true }
 ic-exports = { workspace = true }
 ic-metrics = { workspace = true }

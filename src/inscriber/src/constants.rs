@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 use std::cell::Cell;
 
-use ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };

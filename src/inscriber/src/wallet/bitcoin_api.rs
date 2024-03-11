@@ -1,6 +1,6 @@
 use candid::Principal;
-use ic_cdk::api::call::{call_with_payment, CallResult};
-use ic_cdk::api::management_canister::bitcoin::{
+use ic_exports::ic_cdk::api::call::{call_with_payment, CallResult};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest, GetUtxosRequest,
     GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest, Utxo, UtxoFilter,
 };

@@ -1,6 +1,6 @@
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::call::call_with_payment;
-use ic_cdk::call;
+use ic_exports::ic_cdk::api::call::call_with_payment;
+use ic_exports::ic_cdk::call;
 use serde::Serialize;
 
 use crate::constants::SIGN_WITH_ECDSA_COST_CYCLES;
