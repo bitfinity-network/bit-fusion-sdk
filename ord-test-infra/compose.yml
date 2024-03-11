@@ -24,9 +24,11 @@ services:
       - bitcoin-data:/data/.bitcoin
       - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf
   ordinals-api:
-    image: ordinals-api
+    build:
+      context: .
+      dockerfile: ordinals-api.dockerfile
     volumes:
-      - ./ordinals-api.env:/app/.env
+      - ./ordinals-api.env:/app/ordinals-api/.env
     ports:
       - "3000:3000"
     depends_on:
@@ -47,18 +49,14 @@ services:
     build:
       context: .
       dockerfile: ordinals-explorer.dockerfile
+    env_file:
+      - ./ordinals-explorer.env
     ports:
-      - "1337:3000"
+      - "1337:3001"
     volumes:
       - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
     depends_on:
       - ordinals-api
-  # ordinals-test:
-  #   build:
-  #     context: .
-  #     dockerfile: ordinals-test.dockerfile
-  #   depends_on:
-  #     - ordhook
 
 volumes:
   bitcoin-data:
