@@ -1109,8 +1109,8 @@ async fn btc_mint_flow() {
     (&ckbtc.context).advance_time(Duration::from_secs(2)).await;
 
     if let Ok(Erc20MintStatus::Minted { tx_id, .. }) = &result[0] {
-        let receipt = (&ckbtc.context)
-            .wait_transaction_receipt(&tx_id)
+        let _receipt = (&ckbtc.context)
+            .wait_transaction_receipt(tx_id)
             .await
             .unwrap();
     }
