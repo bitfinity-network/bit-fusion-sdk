@@ -3,7 +3,9 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::build::BuildData;
-use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
+use ic_canister::{
+    generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
+};
 use ic_exports::ic_cdk::api::call::CallResult;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, MillisatoshiPerByte, Utxo,
@@ -95,6 +97,21 @@ impl Inscriber {
         )
         .await
         .unwrap()
+    }
+
+    #[pre_upgrade]
+    fn pre_upgrade(&self) {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        ic_exports::ic_cdk::storage::stable_save((network,))
+            .expect("Failed to save network to stable memory");
+    }
+
+    #[post_upgrade]
+    fn post_upgrade(&mut self) {
+        let network = ic_exports::ic_cdk::storage::stable_restore::<(BitcoinNetwork,)>()
+            .expect("Failed to read network from stable memory.")
+            .0;
+        self.init(network);
     }
 
     /// Returns the build data of the canister

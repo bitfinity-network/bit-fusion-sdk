@@ -12,6 +12,13 @@ const GET_CURRENT_FEE_PERCENTILES_CYCLES: u64 = 100_000_000;
 const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
 const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 
+// There is an upper bound of 144 on the minimum number of confirmations.
+// If a larger minimum number of confirmations is specified, the call is rejected.
+// In practice, this value is set around 6.
+//
+// Reference: https://internetcomputer.org/docs/current/references/ic-interface-spec#ic-bitcoin_get_utxos
+const MIN_CONFIRMATIONS: u32 = 6;
+
 /// Returns the balance of the given bitcoin address.
 ///
 /// Relies on the `bitcoin_get_balance` endpoint.
@@ -23,7 +30,7 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult
         (GetBalanceRequest {
             address,
             network,
-            min_confirmations: Some(6),
+            min_confirmations: Some(MIN_CONFIRMATIONS),
         },),
         GET_BALANCE_COST_CYCLES,
     )
@@ -60,7 +67,7 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<U
                 all_utxos.extend(get_utxos_response.utxos);
                 page_filter = get_utxos_response.next_page.map(UtxoFilter::Page);
             }
-            Err(e) => return Err(format!("Failed to fetch UTXOs: {:?}", e)),
+            Err(e) => return Err(format!("{:?}", e)),
         }
 
         if page_filter.is_none() {
