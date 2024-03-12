@@ -12,7 +12,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
     CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,
-    OrdTransactionBuilder, RevealTransactionArgs, TxInput, Wallet, WalletType,
+    OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
 };
 use serde::de::DeserializeOwned;
 use sha2::Digest;
@@ -165,9 +165,9 @@ where
         utxos_to_spend.push(utxo);
     }
 
-    let inputs: Vec<TxInput> = utxos_to_spend
+    let inputs: Vec<OrdUtxo> = utxos_to_spend
         .into_iter()
-        .map(|utxo| TxInput {
+        .map(|utxo| OrdUtxo {
             id: Txid::from_raw_hash(
                 Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse tx id"),
             ),
@@ -204,7 +204,7 @@ where
         .await?;
 
     let reveal_tx_args = RevealTransactionArgs {
-        input: TxInput {
+        input: OrdUtxo {
             id: commit_tx.tx.txid(),
             index: 0,
             amount: commit_tx.reveal_balance,
