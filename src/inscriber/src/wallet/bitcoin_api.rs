@@ -5,10 +5,12 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest, Utxo, UtxoFilter,
 };
 
-use crate::constants::{
-    GET_BALANCE_COST_CYCLES, GET_CURRENT_FEE_PERCENTILES_CYCLES, GET_UTXOS_COST_CYCLES,
-    SEND_TRANSACTION_BASE_CYCLES, SEND_TRANSACTION_PER_BYTE_CYCLES,
-};
+// The fees for the various bitcoin endpoints.
+const GET_BALANCE_COST_CYCLES: u64 = 100_000_000;
+const GET_UTXOS_COST_CYCLES: u64 = 10_000_000_000;
+const GET_CURRENT_FEE_PERCENTILES_CYCLES: u64 = 100_000_000;
+const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
+const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 
 /// Returns the balance of the given bitcoin address.
 ///
@@ -94,7 +96,7 @@ pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
     let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
         + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
 
-    let _ = call_with_payment::<(SendTransactionRequest,), ()>(
+    let res: Result<(), _> = call_with_payment(
         Principal::management_canister(),
         "bitcoin_send_transaction",
         (SendTransactionRequest {
@@ -104,4 +106,6 @@ pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
         transaction_fee,
     )
     .await;
+
+    res.unwrap();
 }

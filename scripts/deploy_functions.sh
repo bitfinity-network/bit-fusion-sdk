@@ -14,7 +14,7 @@ deploy_inscriber_canister() {
     NETWORK=$1
     INSTALL_MODE=$2
 
-    inscriber_init_args="(variant { regtest })"
+    inscriber_init_args="(variant { testnet })"
 
     echo "Deploying Inscriber canister with init args: $inscriber_init_args"
 

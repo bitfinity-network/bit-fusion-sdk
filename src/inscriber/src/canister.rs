@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use candid::Principal;
@@ -11,9 +11,16 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
-use crate::constants::{BITCOIN_NETWORK, ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME};
 use crate::wallet::inscription::Protocol;
 use crate::wallet::{self, bitcoin_api};
+
+thread_local! {
+    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
+
+    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
+
+    pub(crate) static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
+}
 
 #[derive(Canister, Clone, Debug)]
 pub struct Inscriber {

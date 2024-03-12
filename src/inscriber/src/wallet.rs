@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 use sha2::Digest;
 
 use self::inscription::Protocol;
-use crate::constants::{ECDSA_DERIVATION_PATH, ECDSA_KEY_NAME};
+use crate::canister::ECDSA_KEY_NAME;
 
 struct EcdsaSigner;
 
@@ -34,7 +34,6 @@ impl ExternalSigner for EcdsaSigner {
     }
 }
 
-// WIP
 pub async fn inscribe(
     network: BitcoinNetwork,
     inscription_type: Protocol,
@@ -51,7 +50,7 @@ pub async fn inscribe(
 
     // fetch the arguments for initializing a wallet
     let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
-    let derivation_path = ECDSA_DERIVATION_PATH.with(|path| path.clone());
+    let derivation_path = vec![];
     let own_public_key =
         ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
 
