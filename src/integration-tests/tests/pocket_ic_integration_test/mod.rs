@@ -25,8 +25,6 @@ const ADMIN: &str = "admin";
 const JOHN: &str = "john";
 const ALICE: &str = "alice";
 
-pub const BITCOIN_MAINNET_CANISTER_ID: &str = "ghsi2-tqaaa-aaaan-aaaca-cai";
-
 pub struct PocketIcTestContext {
     pub client: PocketIcAsync,
     pub canisters: TestCanisters,
@@ -41,19 +39,10 @@ impl PocketIcTestContext {
         };
 
         for canister_type in canisters_set {
-            let principal = if matches!(canister_type, CanisterType::Btc) {
-                let id =
-                    Principal::from_text(BITCOIN_MAINNET_CANISTER_ID).expect("invalid principal");
-                ctx.create_canister_with_id(id)
-                    .await
-                    .expect("failed to create canister");
-                // ctx.reinstall_canister(id, get_btc_canister_bytecode().await, (network,)).await.expect("failed to create canister");
-                id
-            } else {
-                ctx.create_canister()
-                    .await
-                    .expect("canister should be created")
-            };
+            let principal = ctx
+                .create_canister()
+                .await
+                .expect("canister should be created");
 
             ctx.canisters.set(*canister_type, principal);
         }

@@ -173,13 +173,13 @@ pub trait TestContext {
 
         let hash = evm_client
             .send_raw_transaction(create_contract_tx)
-            .await
-            .unwrap()
-            .unwrap();
-        let receipt = self.wait_transaction_receipt(&hash).await.unwrap().unwrap();
-        // .ok_or(TestError::Evm(EvmError::Internal(
-        //     "transction not processed".into(),
-        // )))?;
+            .await??;
+        let receipt = self
+            .wait_transaction_receipt(&hash)
+            .await?
+            .ok_or(TestError::Evm(EvmError::Internal(
+                "transction not processed".into(),
+            )))?;
 
         if receipt.status != Some(U64::one()) {
             println!("tx status: {:?}", receipt.status);
@@ -219,9 +219,7 @@ pub trait TestContext {
         let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
         minter_client
             .register_evmc_bft_bridge(bridge_address.clone())
-            .await
-            .unwrap()
-            .unwrap();
+            .await??;
 
         Ok(bridge_address)
     }
@@ -552,8 +550,7 @@ pub trait TestContext {
             }
             CanisterType::Btc => {
                 println!("Installing default mock ckBTC canister...");
-                // let network = Network::Regtest;
-                // self.install_canister(self.canisters().btc_mock(), wasm, (network,)).await.unwrap();
+                todo!()
             }
             CanisterType::Kyt => {
                 println!("Installing default KYT canister...");
