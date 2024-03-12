@@ -279,19 +279,6 @@ pub trait TestContext {
         Ok((operation_id, tx_hash))
     }
 
-    async fn finish_burn(
-        &self,
-        wallet: &Wallet<'_, SigningKey>,
-        operation_id: u32,
-        bridge: &H160,
-    ) -> Result<H256> {
-        let input = bft_bridge_api::FINISH_BURN
-            .encode_input(&[Token::Uint(operation_id.into())])
-            .unwrap();
-        let results = self.call_contract(wallet, bridge, input, 0).await?;
-        Ok(results.0)
-    }
-
     /// Returns a signed transaction from the given `wallet`.
     fn signed_transaction(
         &self,
@@ -382,7 +369,7 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
         operation_id: u32,
-    ) -> Result<SignedMintOrder> {
+    ) -> Result<u32> {
         self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
             .await?;
 
@@ -394,10 +381,7 @@ pub trait TestContext {
             operation_id,
         };
 
-        Ok(self
-            .minter_client(caller)
-            .create_erc_20_mint_order(reason)
-            .await??)
+        Ok(self.minter_client(caller).burn_icrc2(reason).await??)
     }
 
     /// Approves burning of ICRC-2 token.
@@ -537,6 +521,9 @@ pub trait TestContext {
                 self.install_canister(self.canisters().minter(), wasm, (init_data,))
                     .await
                     .unwrap();
+
+                // Wait for initialization of the Minter canister parameters.
+                self.advance_time(Duration::from_secs(2)).await;
             }
             CanisterType::Spender => {
                 println!("Installing default Spender canister...");
@@ -697,18 +684,14 @@ pub fn minter_canister_init_data(
     InitData {
         owner,
         evm_principal,
-        evm_chain_id: CHAIN_ID as _,
-        bft_bridge_contract: None,
-        evm_gas_price: DEFAULT_GAS_PRICE.into(),
         spender_principal,
         signing_strategy: SigningStrategy::Local {
             private_key: wallet.signer().to_bytes().into(),
         },
-        process_transactions_results_interval: Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,
-            log_filter: Some("info".to_string()),
+            log_filter: Some("trace".to_string()),
         }),
     }
 }

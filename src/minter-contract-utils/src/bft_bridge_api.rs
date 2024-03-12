@@ -119,23 +119,6 @@ pub static GET_PENDING_BURN_INFO: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
-pub static FINISH_BURN: Lazy<Function> = Lazy::new(|| Function {
-    name: "finishBurn".into(),
-    inputs: vec![Param {
-        name: "operationID".into(),
-        kind: ParamType::Uint(32),
-        internal_type: None,
-    }],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Bool,
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
 pub static MINT: Lazy<Function> = Lazy::new(|| Function {
     name: "mint".into(),
     inputs: vec![Param {

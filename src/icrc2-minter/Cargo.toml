@@ -15,6 +15,7 @@ candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
@@ -22,6 +23,7 @@ ic-exports = { workspace = true, features = ["icrc"] }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
+ic-task-scheduler = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
