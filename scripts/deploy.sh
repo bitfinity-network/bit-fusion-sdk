@@ -10,7 +10,7 @@ args=("$@")
 INSTALL_MODE=${args[0]:-"unset"}
 CHAIN_ID=${args[1]:-355113}
 # Network
-NETWORK="ic"
+NETWORK="local"
 
 FILE="dfx.json"
 
