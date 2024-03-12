@@ -1433,6 +1433,7 @@ dependencies = [
  "bs58",
  "candid",
  "did",
+ "getrandom",
  "hex",
  "ic-canister",
  "ic-crypto-getrandom-for-wasm",

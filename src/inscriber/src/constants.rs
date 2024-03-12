@@ -1,5 +1,4 @@
-use core::cell::RefCell;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 

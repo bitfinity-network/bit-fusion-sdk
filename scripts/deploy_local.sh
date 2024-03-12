@@ -12,8 +12,6 @@ CHAIN_ID=${args[1]:-355113}
 # Network
 NETWORK="local"
 
-NETWORK_NAME="testnet"
-
 FILE="dfx.json"
 
 source ./scripts/deploy_functions.sh

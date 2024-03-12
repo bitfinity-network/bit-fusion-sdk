@@ -21,6 +21,7 @@ ic-metrics = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
+getrandom = { version = "0.2", features = ["custom"] }
 ripemd = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
