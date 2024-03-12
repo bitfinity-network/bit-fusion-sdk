@@ -63,7 +63,8 @@ impl<'a> TestContext for &'a StateMachineContext {
         let env = self.env.clone();
         tokio::task::spawn_blocking(move || env.advance_time(time))
             .await
-            .unwrap()
+            .unwrap();
+        self.env.tick();
     }
 
     async fn create_canister(&self) -> crate::utils::error::Result<Principal> {
@@ -71,11 +72,12 @@ impl<'a> TestContext for &'a StateMachineContext {
         let args = CanisterSettingsArgsBuilder::new()
             .with_controller(self.admin().into())
             .build();
-        Ok(
-            tokio::task::spawn_blocking(move || env.create_canister(Some(args)).into())
-                .await
-                .unwrap(),
-        )
+        Ok(tokio::task::spawn_blocking(move || {
+            env.create_canister_with_cycles(None, 1_000_000_000_000_000u128.into(), Some(args))
+                .into()
+        })
+        .await
+        .unwrap())
     }
 
     async fn create_canister_with_id(

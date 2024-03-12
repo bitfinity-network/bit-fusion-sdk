@@ -22,7 +22,7 @@ impl OrdersStore {
     }
 
     pub fn remove(&mut self, sender: Id256, nonce: u32) {
-        // todo: chick if it is possible to have multiple orders with same values?
+        // todo: check if it is possible to have multiple orders with same values?
         self.0
             .retain(|entry| entry.sender != sender && entry.nonce != nonce)
     }

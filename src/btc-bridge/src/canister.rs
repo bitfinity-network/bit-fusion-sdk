@@ -1,26 +1,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ck_btc_interface::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use candid::{CandidType, Principal};
-use did::{H160, H256};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, init, update, virtual_canister_call, Canister, Idl, PreUpdate};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_canister::{generate_idl, init, update, Canister, Idl, PreUpdate};
+use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
-use minter_did::id256::Id256;
-use minter_did::order::{MintOrder, SignedMintOrder};
 use serde::Deserialize;
 
-use crate::state::{BtcBridgeConfig, State};
+use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
 
 const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
 const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
@@ -69,178 +66,56 @@ impl BtcBridge {
 
         {
             let scheduler = get_scheduler();
-            let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.set_failed_task_callback(|task, error| {
+            let mut borrowed_scheduler = scheduler.borrow_mut();
+            borrowed_scheduler.set_failed_task_callback(|task, error| {
                 log::error!("task failed: {task:?}, error: {error:?}")
             });
-            borrowed_scheduller.append_task(Self::init_evm_info_task());
+            borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
         self.set_timers();
     }
 
+    /// Converts Bitcoins into ERC20 wrapper token in EVM.
+    ///
+    /// # Arguments
+    ///
+    /// * `eth_address` - EVM Etherium address of the receiver of the wrapper tokens
+    ///
+    /// # Details
+    ///
+    /// Before this method is called, the Bitcoins to be bridged are to be transferred to a
+    /// certain address. This address is received from `ckBTC` canister by calling `get_btc_address`
+    /// query method. Account given as an argument to this method can be calculated as:
+    /// * `owner` is BtcBridge canister principal
+    /// * `subaccount` is right-zero-padded Etherium address of the caller
+    ///
+    /// Here is a sample Rust code:
+    ///
+    /// ```ignore
+    /// let mut caller_subaccount = [0; 32];
+    /// caller_subaccount[0..caller_eth_address.0.0.len()].copy_from_slice(caller_eth_address.0.as_bytes());
+    ///
+    /// let argument = Account {
+    ///   owner: btc_bridge_canister_principal,
+    ///   subaccount: Some(caller_subaccount),
+    /// }
+    /// ```
+    ///
+    /// After Bitcoins are transferred to the correct address, `btc_to_erc20` method can be called
+    /// right away. (there is no need to wait for the Bitcoin confirmation process to complete) The
+    /// method will return status of all pending transactions.
+    ///
+    /// After the number of Bitcoin confirmations surpass the number required by the ckBTC minter
+    /// canister, the BtcBridge canister will automatically create a mint order for wrapped tokens
+    /// and send it to the EVM. After the EVM transaction is confirmed, the minted wrapped tokens
+    /// will appear at the given `eth_address`.
     #[update]
-    pub async fn btc_to_erc20(&self, eth_address: H160) -> Result<Erc20MintStatus, Erc20MintError> {
-        match self.request_update_balance(&eth_address).await {
-            Ok(UtxoStatus::Minted {
-                minted_amount,
-                utxo,
-                ..
-            }) => self.mint_erc20(eth_address, minted_amount, utxo).await,
-            Err(UpdateBalanceError::NoNewUtxos {
-                current_confirmations: Some(curr_confirmations),
-                required_confirmations,
-                pending_utxos,
-            }) => {
-                self.schedule_mint(eth_address);
-                Ok(Erc20MintStatus::Scheduled {
-                    current_confirmations: curr_confirmations,
-                    required_confirmations,
-                    pending_utxos,
-                })
-            }
-            Ok(UtxoStatus::ValueTooSmall(utxo)) => Err(Erc20MintError::ValueTooSmall(utxo)),
-            Ok(UtxoStatus::Tainted(utxo)) => Err(Erc20MintError::Tainted(utxo)),
-            Ok(UtxoStatus::Checked(_)) => Err(Erc20MintError::CkBtcError(
-                UpdateBalanceError::TemporarilyUnavailable(
-                    "KYT check passed, but mint failed. Try again later.".to_string(),
-                ),
-            )),
-            Err(err) => Err(Erc20MintError::CkBtcError(err)),
-        }
-    }
-
-    async fn request_update_balance(
-        &self,
-        eth_address: &H160,
-    ) -> Result<UtxoStatus, UpdateBalanceError> {
-        let self_id = self.id;
-        let ck_btc_minter = get_state().borrow().ck_btc_minter();
-        let subaccount = eth_address_to_subaccount(eth_address);
-
-        let args = UpdateBalanceArgs {
-            owner: Some(self_id),
-            subaccount: Some(subaccount),
-        };
-        virtual_canister_call!(ck_btc_minter, "update_balance", (args,), Result<UtxoStatus, UpdateBalanceError>)
-            .await
-            .unwrap_or_else(|err| Err(UpdateBalanceError::TemporarilyUnavailable(format!("Failed to connect to ckBTC minter: {err:?}"))))
-    }
-
-    async fn mint_erc20(
+    pub async fn btc_to_erc20(
         &self,
         eth_address: H160,
-        amount: u64,
-        base_utxo: Utxo,
-    ) -> Result<Erc20MintStatus, Erc20MintError> {
-        let mint_order = self
-            .prepare_mint_order(eth_address, amount, base_utxo)
-            .await?;
-        Ok(match self.send_mint_order(mint_order).await {
-            Ok(tx_id) => Erc20MintStatus::Minted { amount, tx_id },
-            Err(err) => {
-                log::warn!("Failed to send mint order: {err:?}");
-                Erc20MintStatus::Signed(mint_order)
-            }
-        })
-    }
-
-    async fn prepare_mint_order(
-        &self,
-        eth_address: H160,
-        amount: u64,
-        base_utxo: Utxo,
-    ) -> Result<SignedMintOrder, Erc20MintError> {
-        log::trace!("preparing mint order");
-
-        let sender_chain_id = get_state().borrow().btc_chain_id();
-        let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
-        let src_token = (&get_state().borrow().ck_btc_ledger()).into();
-
-        let recipient_chain_id = get_state().borrow().erc20_chain_id();
-
-        // todo: check if this is correct. Maybe we need to sue txid here?
-        let nonce = base_utxo.height;
-
-        let mint_order = MintOrder {
-            amount: amount.into(),
-            sender,
-            src_token,
-            recipient: eth_address,
-            dst_token: H160::zero(),
-            nonce,
-            sender_chain_id,
-            recipient_chain_id,
-            name: get_state().borrow().token_name(),
-            symbol: get_state().borrow().token_symbol(),
-            decimals: get_state().borrow().decimals(),
-        };
-
-        let signer = get_state().borrow().signer().get().clone();
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
-
-        get_state()
-            .borrow_mut()
-            .mint_orders_mut()
-            .push(sender, nonce, signed_mint_order.clone());
-
-        log::trace!("Mint order added");
-
-        Ok(signed_mint_order)
-    }
-
-    async fn send_mint_order(&self, mint_order: SignedMintOrder) -> Result<H256, Erc20MintError> {
-        log::trace!("Sending mint transaction");
-
-        let signer = get_state().borrow().signer().get().clone();
-        let sender = signer
-            .get_address()
-            .await
-            .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
-
-        let evm_info = get_state().borrow().get_evm_info();
-
-        let evm_params = get_state()
-            .borrow()
-            .get_evm_params()
-            .clone()
-            .ok_or(Erc20MintError::NotInitialized)?;
-
-        let mut tx = minter_contract_utils::bft_bridge_api::mint_transaction(
-            sender.0,
-            evm_info.bridge_contract.0,
-            evm_params.nonce.into(),
-            evm_params.gas_price.into(),
-            mint_order.to_vec(),
-            evm_params.chain_id as _,
-        );
-
-        let signature = signer
-            .sign_transaction(&(&tx).into())
-            .await
-            .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
-
-        tx.r = signature.r.0;
-        tx.s = signature.s.0;
-        tx.v = signature.v.0;
-        tx.hash = tx.hash();
-
-        let client = evm_info.link.get_client();
-        let id = client
-            .send_raw_transaction(tx)
-            .await
-            .map_err(|err| Erc20MintError::Evm(format!("{err:?}")))?;
-
-        log::trace!("Mint transaction sent");
-
-        Ok(id.into())
-    }
-
-    fn schedule_mint(&self, _eth_address: H160) {
-        todo!()
+    ) -> Vec<Result<Erc20MintStatus, Erc20MintError>> {
+        crate::ops::btc_to_erc20(get_state(), eth_address).await
     }
 
     fn init_evm_info_task() -> ScheduledTask<BtcTask> {
@@ -251,6 +126,28 @@ impl BtcBridge {
                 multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
             });
         BtcTask::InitEvmState.into_scheduled(init_options)
+    }
+
+    /// Returns EVM address of the canister.
+    #[update]
+    pub async fn get_evm_address(&self) -> Option<H160> {
+        let signer = get_state().borrow().signer().get().clone();
+        match signer.get_address().await {
+            Ok(address) => Some(address),
+            Err(e) => {
+                log::error!("failed to get EVM address: {e}");
+                None
+            }
+        }
+    }
+
+    #[update]
+    pub fn admin_configure_bft_bridge(&self, config: BftBridgeConfig) {
+        if ic::caller() != get_state().borrow().admin() {
+            panic!("access denied");
+        }
+
+        get_state().borrow_mut().configure_bft(config);
     }
 
     #[cfg(target_family = "wasm")]
@@ -273,7 +170,7 @@ impl BtcBridge {
 
 pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     let mut subaccount = [0; 32];
-    subaccount.copy_from_slice(eth_address.0.as_bytes());
+    subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_bytes());
 
     Subaccount(subaccount)
 }

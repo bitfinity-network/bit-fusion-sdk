@@ -1,3 +1,7 @@
+//! The types in this module are copied from IC ckBTC interface crate to reduce dependencies of our
+//! crate. Since all these types are a part of ckBTC public API, it is unlikely there will be
+//! a breaking change in these types.
+
 use candid::{CandidType, Deserialize, Principal};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ledger::Subaccount;

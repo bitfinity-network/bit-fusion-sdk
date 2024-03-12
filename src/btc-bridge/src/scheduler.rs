@@ -1,4 +1,5 @@
 use crate::canister::get_state;
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -25,6 +26,7 @@ pub enum BtcTask {
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
+    MintErc20(H160),
 }
 
 impl BtcTask {
@@ -95,11 +97,7 @@ impl BtcTask {
 
         log::trace!("appending logs to tasks");
 
-        scheduler.append_tasks(
-            logs.into_iter()
-                .filter_map(|l| Self::task_by_log(l))
-                .collect(),
-        );
+        scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
         Ok(())
     }
@@ -163,12 +161,17 @@ impl Task for BtcTask {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            BtcTask::MintBtc(_) => {
+            BtcTask::MintErc20(address) => {
+                let address = address.clone();
                 Box::pin(async move {
-                    // todo
+                    let result = crate::ops::btc_to_erc20(get_state(), address).await;
+
+                    log::info!("ERC20 mint result from scheduler: {result:?}");
+
                     Ok(())
                 })
             }
+            BtcTask::MintBtc(_) => Box::pin(async move { todo!() }),
         }
     }
 }

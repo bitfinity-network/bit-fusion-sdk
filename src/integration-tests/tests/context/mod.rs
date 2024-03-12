@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use btc_bridge::state::BtcBridgeConfig;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -29,7 +28,7 @@ use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
-use tokio::time::{self, Instant};
+use tokio::time::Instant;
 
 use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
@@ -121,7 +120,7 @@ pub trait TestContext {
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
         while time_passed < timeout && receipt.is_none() {
-            time::sleep(tx_processing_interval).await;
+            self.advance_time(tx_processing_interval).await;
             time_passed = Instant::now() - start;
             receipt = evm_client
                 .eth_get_transaction_receipt(hash.clone())
@@ -166,20 +165,21 @@ pub trait TestContext {
         let creator_address: H160 = creator_wallet.address().into();
         let nonce = evm_client
             .account_basic(creator_address.clone())
-            .await?
+            .await
+            .unwrap()
             .nonce;
 
         let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
 
         let hash = evm_client
             .send_raw_transaction(create_contract_tx)
-            .await??;
-        let receipt = self
-            .wait_transaction_receipt(&hash)
-            .await?
-            .ok_or(TestError::Evm(EvmError::Internal(
-                "transction not processed".into(),
-            )))?;
+            .await
+            .unwrap()
+            .unwrap();
+        let receipt = self.wait_transaction_receipt(&hash).await.unwrap().unwrap();
+        // .ok_or(TestError::Evm(EvmError::Internal(
+        //     "transction not processed".into(),
+        // )))?;
 
         if receipt.status != Some(U64::one()) {
             println!("tx status: {:?}", receipt.status);
@@ -216,14 +216,30 @@ pub trait TestContext {
             .encode_input(contract, &[Token::Address(minter_canister_address.into())])
             .unwrap();
 
-        let bridge_address = self.create_contract(wallet, input.clone()).await?;
+        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
         minter_client
             .register_evmc_bft_bridge(bridge_address.clone())
-            .await??;
+            .await
+            .unwrap()
+            .unwrap();
 
         Ok(bridge_address)
     }
 
+    async fn initialize_bft_bridge_with_minter(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        minter_canister_address: H160,
+    ) -> Result<H160> {
+        let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
+        let input = bft_bridge_api::CONSTRUCTOR
+            .encode_input(contract, &[Token::Address(minter_canister_address.into())])
+            .unwrap();
+
+        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
+
+        Ok(bridge_address)
+    }
     async fn burn_erc_20_tokens(
         &self,
         wallet: &Wallet<'_, SigningKey>,

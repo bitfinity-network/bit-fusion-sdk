@@ -2,6 +2,7 @@ pub mod canister;
 pub mod ck_btc_interface;
 pub mod interface;
 pub mod memory;
+pub mod ops;
 pub mod orders_store;
 pub mod scheduler;
 pub mod state;
