@@ -7,7 +7,7 @@ create() {
     # Create canisters
     NETWORK=$1
 
-    dfx canister --network=$NETWORK create
+    dfx canister --network=$NETWORK create --all
 }
 
 deploy_inscriber_canister() {
