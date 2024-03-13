@@ -15,17 +15,19 @@ candid = { workspace = true }
 did = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-crypto-getrandom-for-wasm = { workspace = true }
 ic-exports = { workspace = true }
 ic-metrics = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
-getrandom = { version = "0.2", features = ["custom"] }
 ripemd = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+
+# getrandom workaround
+getrandom = { workspace = true }
+rand = { workspace = true }
 
 [build-dependencies]
 vergen = { workspace = true }

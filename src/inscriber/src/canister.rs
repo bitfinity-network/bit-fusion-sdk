@@ -35,6 +35,7 @@ impl PreUpdate for Inscriber {}
 impl Inscriber {
     #[init]
     pub fn init(&mut self, network: BitcoinNetwork) {
+        crate::register_custom_getrandom();
         BITCOIN_NETWORK.with(|n| n.set(network));
 
         ECDSA_KEY_NAME.with(|key_name| {
@@ -85,10 +86,10 @@ impl Inscriber {
         inscription: String,
         dst_address: Option<String>,
         leftovers_recipient: Option<String>,
-    ) -> (String, String) {
+    ) -> Result<(String, String), String> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
-        wallet::inscribe(
+        match wallet::inscribe(
             network,
             inscription_type,
             inscription,
@@ -96,7 +97,10 @@ impl Inscriber {
             leftovers_recipient,
         )
         .await
-        .unwrap()
+        {
+            Ok(val) => Ok(val),
+            Err(err) => Err(format!("{err}")),
+        }
     }
 
     #[pre_upgrade]

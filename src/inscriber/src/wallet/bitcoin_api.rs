@@ -17,6 +17,7 @@ const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
 // In practice, this value is set around 6.
 //
 // Reference: https://internetcomputer.org/docs/current/references/ic-interface-spec#ic-bitcoin_get_utxos
+#[allow(unused)]
 const MIN_CONFIRMATIONS: u32 = 6;
 
 /// Returns the balance of the given bitcoin address.
@@ -30,7 +31,7 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult
         (GetBalanceRequest {
             address,
             network,
-            min_confirmations: Some(MIN_CONFIRMATIONS),
+            min_confirmations: None,
         },),
         GET_BALANCE_COST_CYCLES,
     )

@@ -16,7 +16,6 @@ candid = "0.10"
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
 hex = "0.4"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
-ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk.git", package = "ic-crypto-getrandom-for-wasm", tag = "v0.13.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.13.x", features = [
     "export-api",
@@ -35,6 +34,10 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
+
+# getrandom workaround
+getrandom = { version = "0.2", features = ["custom"] }
+rand = { version = "0.8", features = ["getrandom"] }
 
 [profile.dev]
 debug = false
