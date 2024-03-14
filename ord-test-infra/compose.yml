@@ -12,6 +12,7 @@ services:
       - "5432:5432"
   bitcoind:
     image: lncm/bitcoind:v25.0
+    container_name: bitcoind
     ports:
       - "18443:18443"
       - "18444:18444"
@@ -19,7 +20,6 @@ services:
       # - "8332:8332"
       - "28332:28332"
       - "28333:28333"
-    command: [ "-regtest", "-txindex" ]
     volumes:
       - bitcoin-data:/data/.bitcoin
       - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf
@@ -57,6 +57,17 @@ services:
       - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
     depends_on:
       - ordinals-api
+  ord-cli:
+    build: https://github.com/ordinals/ord.git
+    container_name: ord-cli
+    command: ["sleep", "infinity"]
+    environment:
+      - ORD_BITCOIN_RPC_USERNAME=user
+      - ORD_BITCOIN_RPC_PASSWORD=pass
+    volumes:
+      - ./brc20_json_inscriptions:/brc20_json_inscriptions
+    depends_on:
+      - bitcoind
 
 volumes:
   bitcoin-data:
