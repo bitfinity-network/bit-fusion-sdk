@@ -39,10 +39,11 @@ pub struct InitArgs {
 
 impl BtcBridge {
     fn set_timers(&mut self) {
-        if cfg!(target_family = "wasm") {
+        #[cfg(target_family = "wasm")]
+        {
             use std::time::Duration;
 
-            self.update_metrics_timer(Duration::from_secs(60 * 60));
+            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
