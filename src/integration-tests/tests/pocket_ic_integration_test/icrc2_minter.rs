@@ -1,5 +1,3 @@
-
-
 use candid::{Nat, Principal};
 use did::H160;
 use ethers_core::abi::Token;
