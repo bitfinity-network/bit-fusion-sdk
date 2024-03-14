@@ -35,12 +35,14 @@ use ic_ckbtc_minter::updates::retrieve_btc::{
 use ic_ckbtc_minter::updates::update_balance::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
 use ic_ckbtc_minter::{Log, MinterInfo, CKBTC_LEDGER_MEMO_SIZE, MIN_RELAY_FEE_PER_VBYTE};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::icrc_types::icrc1::account::Account;
+use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
+use ic_exports::icrc_types::icrc2::approve::{ApproveArgs, ApproveError};
+use ic_exports::icrc_types::icrc3::transactions::{
+    GetTransactionsRequest, GetTransactionsResponse,
+};
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use icrc_ledger_types::icrc1::account::Account;
-use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
-use icrc_ledger_types::icrc2::approve::{ApproveArgs, ApproveError};
-use icrc_ledger_types::icrc3::transactions::{GetTransactionsRequest, GetTransactionsResponse};
 use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 use std::collections::BTreeMap;

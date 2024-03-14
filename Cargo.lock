@@ -5556,7 +5556,6 @@ dependencies = [
  "ic-stable-structures 0.13.0",
  "ic-state-machine-tests",
  "ic-test-utils",
- "icrc-ledger-types 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "icrc2-minter",
  "minter-client",
  "minter-contract-utils",

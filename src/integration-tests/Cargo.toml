@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
+bitcoin = { workspace = true, optional = true }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
@@ -35,7 +36,6 @@ solidity-helper = { path = "../solidity-helper" }
 serde_bytes = "0.11.14"
 
 # state machine tests deps
-bitcoin = { version = "0.28.1", optional = true }
 ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
@@ -45,7 +45,6 @@ ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-20
 ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-icrc-ledger-types = { version = "0.1", optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -73,5 +72,4 @@ state_machine_tests = [
     "ic-icrc1-ledger",
     "ic-management-canister-types",
     "ic-state-machine-tests",
-    "icrc-ledger-types",
 ]
