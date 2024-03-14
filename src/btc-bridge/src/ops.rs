@@ -5,7 +5,6 @@ use crate::scheduler::BtcTask;
 use crate::state::State;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::utils::keccak256;
 use ic_canister::virtual_canister_call;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
