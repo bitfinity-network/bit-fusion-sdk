@@ -157,11 +157,6 @@ async fn prepare_mint_order(
         .await
         .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
 
-    let res = MintOrder::decode_signed(&signed_mint_order).unwrap().1;
-    let hash = keccak256(&signed_mint_order.0[0..MintOrder::ENCODED_DATA_SIZE]);
-    let res_ = ethers_core::types::Signature::from(res).recover(hash);
-    ic::print(format!("{res_:?}"));
-
     state
         .borrow_mut()
         .mint_orders_mut()
