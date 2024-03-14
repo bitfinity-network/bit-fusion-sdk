@@ -52,6 +52,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const KYT_FEE: u64 = 2_000;
+const CKBTC_LEDGER_FEE: u64 = 10;
 const TRANSFER_FEE: u64 = 10;
 const MIN_CONFIRMATIONS: u32 = 12;
 const MAX_TIME_IN_QUEUE: Duration = Duration::from_secs(10);
@@ -306,6 +307,7 @@ impl CkBtcSetup {
                 private_key: [2; 32],
             },
             admin: (&context).admin(),
+            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();
@@ -1117,11 +1119,18 @@ async fn btc_mint_flow() {
             .unwrap();
     }
 
+    let expected_balance = (deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE) as u128;
     let balance = (&ckbtc.context)
         .check_erc20_balance(&ckbtc.wrapped_token, &wallet)
         .await
         .unwrap();
-    assert_eq!(balance, (deposit_value - ckbtc.kyt_fee()) as u128);
+    assert_eq!(balance, expected_balance);
+
+    let canister_balance = ckbtc.balance_of(Account {
+        owner: ckbtc.context.canisters.btc_bridge(),
+        subaccount: None,
+    });
+    assert_eq!(canister_balance, expected_balance);
 
     ckbtc.async_drop().await;
 }

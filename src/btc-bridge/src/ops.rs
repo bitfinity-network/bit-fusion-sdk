@@ -3,10 +3,12 @@ use crate::ck_btc_interface::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus}
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::scheduler::BtcTask;
 use crate::state::State;
+use candid::Nat;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::virtual_canister_call;
 use ic_exports::ic_kit::ic;
+use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
@@ -30,9 +32,9 @@ pub async fn btc_to_erc20(
                         utxo,
                         ..
                     } => mint_erc20(&state, eth_address, minted_amount, utxo.height).await,
-                    UtxoStatus::ValueTooSmall(utxo) => Err(Erc20MintError::ValueTooSmall(utxo)),
+                    UtxoStatus::ValueTooSmall(_) => Err(Erc20MintError::ValueTooSmall),
                     UtxoStatus::Tainted(utxo) => Err(Erc20MintError::Tainted(utxo)),
-                    UtxoStatus::Checked(_) => Err(Erc20MintError::CkBtcError(
+                    UtxoStatus::Checked(_) => Err(Erc20MintError::CkBtcMinter(
                         UpdateBalanceError::TemporarilyUnavailable(
                             "KYT check passed, but mint failed. Try again later.".to_string(),
                         ),
@@ -60,7 +62,7 @@ pub async fn btc_to_erc20(
                 pending_utxos,
             })]
         }
-        Err(err) => vec![Err(Erc20MintError::CkBtcError(err))],
+        Err(err) => vec![Err(Erc20MintError::CkBtcMinter(err))],
     }
 }
 
@@ -105,14 +107,55 @@ pub async fn mint_erc20(
     amount: u64,
     nonce: u32,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    let mint_order = prepare_mint_order(state, eth_address, amount, nonce).await?;
+    let fee = state.borrow().ck_btc_ledger_fee();
+    let amount_minus_fee = amount
+        .checked_sub(fee)
+        .ok_or(Erc20MintError::ValueTooSmall)?;
+
+    let mint_order =
+        prepare_mint_order(state, eth_address.clone(), amount_minus_fee, nonce).await?;
+    transfer_ckbtc_from_subaccount(state, &eth_address, amount_minus_fee).await?;
+    store_mint_order(state, mint_order, &eth_address, nonce);
+
     Ok(match send_mint_order(state, mint_order).await {
-        Ok(tx_id) => Erc20MintStatus::Minted { amount, tx_id },
+        Ok(tx_id) => Erc20MintStatus::Minted {
+            amount: amount_minus_fee,
+            tx_id,
+        },
         Err(err) => {
             log::warn!("Failed to send mint order: {err:?}");
             Erc20MintStatus::Signed(Box::new(mint_order))
         }
     })
+}
+
+async fn transfer_ckbtc_from_subaccount(
+    state: &RefCell<State>,
+    eth_address: &H160,
+    amount: u64,
+) -> Result<Nat, TransferError> {
+    let (ledger, fee) = {
+        let state_ref = state.borrow();
+        let ledger = state_ref.ck_btc_ledger();
+        let fee = state_ref.ck_btc_ledger_fee();
+        (ledger, fee)
+    };
+
+    let args = TransferArg {
+        from_subaccount: Some(eth_address_to_subaccount(eth_address).0),
+        to: ic_exports::icrc_types::icrc1::account::Account {
+            owner: ic::id(),
+            subaccount: None,
+        },
+        fee: Some(fee.into()),
+        created_at_time: None,
+        memo: None,
+        amount: amount.into(),
+    };
+
+    virtual_canister_call!(ledger, "icrc1_transfer", (args,), Result<Nat, TransferError>)
+        .await
+        .unwrap_or(Err(TransferError::TemporarilyUnavailable))
 }
 
 async fn prepare_mint_order(
@@ -123,7 +166,7 @@ async fn prepare_mint_order(
 ) -> Result<SignedMintOrder, Erc20MintError> {
     log::trace!("preparing mint order");
 
-    let (sender, signer, mint_order) = {
+    let (signer, mint_order) = {
         let state_ref = state.borrow();
 
         let sender_chain_id = state_ref.btc_chain_id();
@@ -136,7 +179,7 @@ async fn prepare_mint_order(
             amount: amount.into(),
             sender,
             src_token,
-            recipient: eth_address.clone(),
+            recipient: eth_address,
             dst_token: H160::default(),
             nonce,
             sender_chain_id,
@@ -148,7 +191,7 @@ async fn prepare_mint_order(
 
         let signer = state_ref.signer().get().clone();
 
-        (sender, signer, mint_order)
+        (signer, mint_order)
     };
 
     let signed_mint_order = mint_order
@@ -156,14 +199,23 @@ async fn prepare_mint_order(
         .await
         .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
 
+    Ok(signed_mint_order)
+}
+
+fn store_mint_order(
+    state: &RefCell<State>,
+    signed_mint_order: SignedMintOrder,
+    eth_address: &H160,
+    nonce: u32,
+) {
+    let mut state = state.borrow_mut();
+    let sender_chain_id = state.btc_chain_id();
+    let sender = Id256::from_evm_address(eth_address, sender_chain_id);
     state
-        .borrow_mut()
         .mint_orders_mut()
         .push(sender, nonce, signed_mint_order);
 
     log::trace!("Mint order added");
-
-    Ok(signed_mint_order)
 }
 
 async fn send_mint_order(
