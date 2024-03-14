@@ -69,7 +69,8 @@ pub async fn inscribe(
     log::info!("Fetching UTXOs...");
     let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
         .await
-        .expect("Failed to retrieve UTXOs for given address");
+        .expect("Failed to retrieve UTXOs for given address")
+        .utxos;
     log::trace!("Our own UTXOS: {:#?}", own_utxos);
 
     let own_address = Address::from_str(&own_address)

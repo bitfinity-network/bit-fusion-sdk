@@ -6,9 +6,8 @@ use did::build::BuildData;
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
-use ic_exports::ic_cdk::api::call::CallResult;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, MillisatoshiPerByte, Utxo,
+    BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
 };
 use ic_metrics::{Metrics, MetricsStorage};
 
@@ -48,22 +47,22 @@ impl Inscriber {
 
     /// Returns the balance of the given bitcoin address.
     #[update]
-    pub async fn get_balance(&mut self, address: String) -> CallResult<(u64,)> {
+    pub async fn get_balance(&mut self, address: String) -> u64 {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_balance(network, address).await
     }
 
     /// Returns the UTXOs of the given bitcoin address.
     #[update]
-    pub async fn get_utxos(&mut self, address: String) -> Result<Vec<Utxo>, String> {
+    pub async fn get_utxos(&mut self, address: String) -> GetUtxosResponse {
         let network = BITCOIN_NETWORK.with(|n| n.get());
-        bitcoin_api::get_utxos(network, address).await
+        bitcoin_api::get_utxos(network, address).await.unwrap()
     }
 
     /// Returns the 100 fee percentiles measured in millisatoshi/byte.
     /// Percentiles are computed from the last 10,000 transactions (if available).
     #[update]
-    pub async fn get_current_fee_percentiles(&mut self) -> CallResult<(Vec<MillisatoshiPerByte>,)> {
+    pub async fn get_current_fee_percentiles(&mut self) -> Vec<MillisatoshiPerByte> {
         let network = BITCOIN_NETWORK.with(|n| n.get());
         bitcoin_api::get_current_fee_percentiles(network).await
     }
@@ -86,10 +85,10 @@ impl Inscriber {
         inscription: String,
         dst_address: Option<String>,
         leftovers_recipient: Option<String>,
-    ) -> Result<(String, String), String> {
+    ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
-        match wallet::inscribe(
+        wallet::inscribe(
             network,
             inscription_type,
             inscription,
@@ -97,10 +96,7 @@ impl Inscriber {
             leftovers_recipient,
         )
         .await
-        {
-            Ok(val) => Ok(val),
-            Err(err) => Err(format!("{err}")),
-        }
+        .unwrap()
     }
 
     #[pre_upgrade]

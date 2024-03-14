@@ -1,5 +1,5 @@
 use candid::Principal;
-use ic_exports::ic_cdk::api::call::{call_with_payment, CallResult};
+use ic_exports::ic_cdk::api::call::call_with_payment;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest, GetUtxosRequest,
     GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest, Utxo, UtxoFilter,
@@ -24,8 +24,8 @@ const MIN_CONFIRMATIONS: u32 = 6;
 ///
 /// Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
-pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult<(u64,)> {
-    call_with_payment::<(GetBalanceRequest,), (Satoshi,)>(
+pub async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
+    let balance_res: Result<(Satoshi,), _> = call_with_payment(
         Principal::management_canister(),
         "bitcoin_get_balance",
         (GetBalanceRequest {
@@ -35,7 +35,11 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult
         },),
         GET_BALANCE_COST_CYCLES,
     )
-    .await
+    .await;
+
+    balance_res
+        .expect("Failed to retrieve balance for specified address")
+        .0
 }
 
 /// Fetches all UTXOs for the given address using pagination.
@@ -43,9 +47,16 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> CallResult
 /// Returns a vector of all UTXOs for the given Bitcoin address.
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
-pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<Utxo>, String> {
-    let mut all_utxos = Vec::new();
+pub async fn get_utxos(
+    network: BitcoinNetwork,
+    address: String,
+) -> Result<GetUtxosResponse, String> {
+    let mut all_utxos = Vec::<Utxo>::new();
     let mut page_filter: Option<UtxoFilter> = None;
+    let mut tip_block_hash = Vec::<u8>::new();
+    let mut tip_height = 0u32;
+
+    let mut last_page: Option<Vec<u8>>;
 
     loop {
         let get_utxos_request = GetUtxosRequest {
@@ -66,7 +77,15 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<U
             Ok(response) => {
                 let (get_utxos_response,) = response;
                 all_utxos.extend(get_utxos_response.utxos);
-                page_filter = get_utxos_response.next_page.map(UtxoFilter::Page);
+                // Update tip_block_hash and tip_height only if they are not already set
+                if tip_block_hash.is_empty() {
+                    tip_block_hash = get_utxos_response.tip_block_hash;
+                }
+                if tip_height == 0 {
+                    tip_height = get_utxos_response.tip_height;
+                }
+                last_page = get_utxos_response.next_page.clone();
+                page_filter = last_page.clone().map(UtxoFilter::Page);
             }
             Err(e) => return Err(format!("{:?}", e)),
         }
@@ -76,7 +95,12 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<U
         }
     }
 
-    Ok(all_utxos)
+    Ok(GetUtxosResponse {
+        utxos: all_utxos,
+        tip_block_hash,
+        tip_height,
+        next_page: last_page,
+    })
 }
 
 /// Returns the 100 fee percentiles measured in millisatoshi/byte.
@@ -84,16 +108,16 @@ pub async fn get_utxos(network: BitcoinNetwork, address: String) -> Result<Vec<U
 ///
 /// Relies on the `bitcoin_get_current_fee_percentiles` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_current_fee_percentiles
-pub async fn get_current_fee_percentiles(
-    network: BitcoinNetwork,
-) -> CallResult<(Vec<MillisatoshiPerByte>,)> {
-    call_with_payment::<(GetCurrentFeePercentilesRequest,), (Vec<MillisatoshiPerByte>,)>(
+pub async fn get_current_fee_percentiles(network: BitcoinNetwork) -> Vec<MillisatoshiPerByte> {
+    let res: Result<(Vec<MillisatoshiPerByte>,), _> = call_with_payment(
         Principal::management_canister(),
         "bitcoin_get_current_fee_percentiles",
         (GetCurrentFeePercentilesRequest { network },),
         GET_CURRENT_FEE_PERCENTILES_CYCLES,
     )
-    .await
+    .await;
+
+    res.unwrap().0
 }
 
 /// Sends a (signed) transaction to the bitcoin network.
