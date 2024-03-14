@@ -12,7 +12,7 @@ use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
-use minter_contract_utils::BridgeSide;
+use minter_contract_utils::evm_bridge::BridgeSide;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 

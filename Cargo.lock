@@ -930,8 +930,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1150,8 +1150,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "async-trait",
  "candid",
@@ -1201,8 +1201,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "anyhow",
  "candid",
@@ -1266,8 +1266,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "candid",
  "did",
@@ -2076,6 +2076,7 @@ dependencies = [
  "candid",
  "did",
  "eth-signer",
+ "ethereum-json-rpc-client",
  "ethers-core",
  "evm-canister-client",
  "hex",
@@ -2085,6 +2086,7 @@ dependencies = [
  "ic-metrics",
  "ic-stable-structures 0.13.0",
  "ic-storage",
+ "ic-task-scheduler",
  "log",
  "minter-contract-utils",
  "minter-did",
@@ -2448,8 +2450,8 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "candid",
  "did",
@@ -2468,12 +2470,16 @@ dependencies = [
 name = "minter-contract-utils"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "candid",
  "did",
+ "ethereum-json-rpc-client",
  "ethers-core",
  "hex",
+ "ic-canister-client",
  "ic-exports",
  "ic-stable-structures 0.13.0",
+ "jsonrpc-core",
  "minter-did",
  "once_cell",
  "serde",
@@ -2482,8 +2488,8 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "candid",
  "did",
@@ -2498,9 +2504,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
+checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "wasi",
@@ -3742,8 +3748,8 @@ dependencies = [
 
 [[package]]
 name = "signature-verification-canister-client"
-version = "0.12.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.12.x#030dfd8190637e3a8a892f040118c39bc85ba43a"
+version = "0.14.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.14.x#881d3ddf194dfbae94bf7c73dd08b3876f20b5c4"
 dependencies = [
  "candid",
  "did",

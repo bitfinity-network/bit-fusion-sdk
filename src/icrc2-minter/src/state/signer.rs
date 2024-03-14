@@ -28,6 +28,8 @@ impl SignerInfo {
                 .expect("failed to update transaction signer")
         });
 
+        log::trace!("Signer reset finished");
+
         Ok(())
     }
 
@@ -38,5 +40,10 @@ impl SignerInfo {
 }
 
 thread_local! {
-    static TX_SIGNER: RefCell<StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(TX_SIGNER_MEMORY_ID)), TxSigner::ManagementCanister(ManagementCanisterSigner::new(SigningKeyId::Test, vec![]))).expect("failed to initialize transaction signer"))
+    static TX_SIGNER: RefCell<StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>> =
+        RefCell::new(
+            StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(TX_SIGNER_MEMORY_ID)),
+            TxSigner::ManagementCanister(ManagementCanisterSigner::new(SigningKeyId::Test,
+            vec![],
+        ))).expect("failed to initialize transaction signer"))
 }
