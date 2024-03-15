@@ -1,5 +1,6 @@
 pub mod bitcoin_api;
 pub mod ecdsa_api;
+pub mod fees;
 pub mod inscription;
 
 use std::str::FromStr;
