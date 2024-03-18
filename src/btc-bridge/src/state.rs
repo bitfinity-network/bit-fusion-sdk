@@ -168,4 +168,10 @@ impl State {
     pub fn admin(&self) -> Principal {
         self.config.admin
     }
+
+    pub fn check_admin(&self, caller: Principal) {
+        if caller != self.admin() {
+            panic!("access denied");
+        }
+    }
 }
