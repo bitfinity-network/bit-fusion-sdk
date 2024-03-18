@@ -6,9 +6,7 @@ use did::build::BuildData;
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
-};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
@@ -59,14 +57,6 @@ impl Inscriber {
         bitcoin_api::get_utxos(network, address).await.unwrap()
     }
 
-    /// Returns the 100 fee percentiles measured in millisatoshi/byte.
-    /// Percentiles are computed from the last 10,000 transactions (if available).
-    #[update]
-    pub async fn get_current_fee_percentiles(&mut self) -> Vec<MillisatoshiPerByte> {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-        bitcoin_api::get_current_fee_percentiles(network).await
-    }
-
     /// Returns the P2PKH address of this canister at a specific derivation path.
     #[update]
     pub async fn get_p2pkh_address(&mut self) -> String {
@@ -84,7 +74,7 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<String>,
-        leftovers_recipient: Option<String>,
+        multisig: Option<(usize, usize)>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
@@ -93,7 +83,7 @@ impl Inscriber {
             inscription_type,
             inscription,
             dst_address,
-            leftovers_recipient,
+            multisig,
         )
         .await
         .unwrap()

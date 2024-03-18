@@ -97,7 +97,7 @@ Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](ht
 To inscribe a BRC20 `deploy` function onto a Satoshi, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null, null)'
+dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -124,8 +124,8 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    leftovers_recipient: Option<String>,
+    multisig: Option<(usize, usize)>
 ) -> (String, String)
 ```
 
-which is why the above call has `null` and `null` arguments for the `dst_address` and `leftovers_recipient` optional parameters.
+which is why the above call has a `null` argument for the `dst_address` optional parameter.

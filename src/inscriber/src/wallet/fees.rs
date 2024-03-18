@@ -9,7 +9,7 @@ const SCHNORR_SIGHASH_SIZE: usize = 64 + 1;
 /// Represents multisig configuration for a transaction, if applicable.
 /// Encapsulates the number of required signatures and the total number of signatories.
 /// `None` signifies no multisig configuration.
-type MultisigConfig = Option<(usize, usize)>; // (required_signatures, total_signatories)
+pub type MultisigConfig = Option<(usize, usize)>; // (required_signatures, total_signatories)
 
 /// Calculates the estimated transaction fees based on the script type, unsigned transaction size,
 /// current network fee rate, and optional multisig configuration.
