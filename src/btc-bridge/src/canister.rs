@@ -42,7 +42,7 @@ impl BtcBridge {
         #[cfg(target_family = "wasm")]
         {
             use std::time::Duration;
-            const METRICS_UPDATE_INTERVAL_SEC: u32 = 60 * 60;
+            const METRICS_UPDATE_INTERVAL_SEC: u64 = 60 * 60;
 
             self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
