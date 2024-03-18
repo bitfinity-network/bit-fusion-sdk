@@ -22,7 +22,6 @@ use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
 const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
 const EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC: u32 = 2;
 const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
-const METRICS_UPDATE_INTERVAL_SEC: u32 = 60 * 60;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -43,6 +42,7 @@ impl BtcBridge {
         #[cfg(target_family = "wasm")]
         {
             use std::time::Duration;
+            const METRICS_UPDATE_INTERVAL_SEC: u32 = 60 * 60;
 
             self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
