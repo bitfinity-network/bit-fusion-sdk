@@ -6,7 +6,11 @@ use std::str::FromStr;
 
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, Network, PublicKey, ScriptBuf, Transaction, Txid};
+use bitcoin::{
+    address::Error as AddressError, Address, Amount, Network, PublicKey, ScriptBuf, Transaction,
+    Txid,
+};
+use candid::CandidType;
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ord_rs::wallet::ScriptType;
@@ -14,7 +18,7 @@ use ord_rs::{
     CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,
     OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::Digest;
 
 use self::inscription::Protocol;
@@ -251,6 +255,23 @@ pub async fn get_p2pkh_address(
     public_key_to_p2pkh_address(network, &public_key)
 }
 
+/// Returns abstract bitcoin `Address` of this canister at the given derivation path.
+///
+/// Address should be specified by [BitcoinPkAddressType].
+pub async fn get_bitcoin_address(
+    network: BitcoinNetwork,
+    key_name: String,
+    derivation_path: Vec<Vec<u8>>,
+    pk_address_type: BitcoinPkAddressType,
+) -> String {
+    // Fetch the public key of the given derivation path.
+    let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
+    // Compute the bitcoin address.
+    public_key_to_bitcoin_address(network, pk_address_type, &public_key)
+        .expect("Can't convert public key to bitcoin address")
+        .to_string()
+}
+
 // Converts a public key to a P2PKH address.
 fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
     // SHA-256 & RIPEMD-160
@@ -269,6 +290,36 @@ fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> St
     full_address.extend(checksum);
 
     bs58::encode(full_address).into_string()
+}
+
+/// Indicates bitcoin `Address` types which can be created from `PublicKey`.
+#[derive(
+    CandidType, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy,
+)]
+pub enum BitcoinPkAddressType {
+    P2PKH,
+    P2WPKH,
+    P2SHWPKH,
+}
+
+// Creates bitcoin `Address` from `PublicKey` in abstract way.
+fn public_key_to_bitcoin_address(
+    bitcoin_network: BitcoinNetwork,
+    pk_address_type: BitcoinPkAddressType,
+    public_key: &[u8],
+) -> Result<Address, AddressError> {
+    let network = match bitcoin_network {
+        BitcoinNetwork::Mainnet => Network::Bitcoin,
+        BitcoinNetwork::Regtest => Network::Regtest,
+        BitcoinNetwork::Testnet => Network::Testnet,
+    };
+
+    let pk = PublicKey::from_slice(public_key).expect("Can't deserialize public key");
+    match pk_address_type {
+        BitcoinPkAddressType::P2PKH => Ok(Address::p2pkh(&pk, network)),
+        BitcoinPkAddressType::P2WPKH => Ok(Address::p2wpkh(&pk, network)?),
+        BitcoinPkAddressType::P2SHWPKH => Ok(Address::p2shwpkh(&pk, network)?),
+    }
 }
 
 fn sha256(data: &[u8]) -> Vec<u8> {
