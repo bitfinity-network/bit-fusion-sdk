@@ -12,7 +12,7 @@ use ic_metrics::Metrics;
 pub use crate::canister::BtcBridge;
 
 pub fn idl() -> String {
-    let signature_verification_idl = BtcBridge::idl();
+    let btc_bridge_idl = BtcBridge::idl();
     let mut metrics_idl = <BtcBridge as Metrics>::get_idl();
     metrics_idl.merge(&signature_verification_idl);
 
