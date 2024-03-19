@@ -29,6 +29,7 @@ pub struct BtcBridgeConfig {
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
+    pub ck_btc_ledger_fee: u64,
 }
 
 impl Default for BtcBridgeConfig {
@@ -42,6 +43,7 @@ impl Default for BtcBridgeConfig {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
+            ck_btc_ledger_fee: 10,
         }
     }
 }
@@ -170,5 +172,9 @@ impl State {
         if caller != self.admin() {
             panic!("access denied");
         }
+    }
+
+    pub fn ck_btc_ledger_fee(&self) -> u64 {
+        self.config.ck_btc_ledger_fee
     }
 }

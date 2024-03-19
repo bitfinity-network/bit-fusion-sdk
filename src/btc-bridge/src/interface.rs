@@ -2,6 +2,7 @@ use crate::ck_btc_interface::{PendingUtxo, UpdateBalanceError};
 use candid::CandidType;
 use did::H256;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
@@ -37,12 +38,14 @@ pub enum Erc20MintStatus {
 pub enum Erc20MintError {
     /// The amount of BTC transferred to ckBTC is smaller than the fee. The transaction will not
     /// be precessed.
-    ValueTooSmall(Utxo),
+    ValueTooSmall,
     /// The BTC transferred to ckBTC did not pass the KYT check. The transaction will not be
     /// processed.
     Tainted(Utxo),
     /// Error while connecting to ckBTC.
-    CkBtcError(UpdateBalanceError),
+    CkBtcMinter(UpdateBalanceError),
+    /// Error transferring ckBTC tokens with ledger.
+    CkBtcLedger(TransferError),
     /// Error while signing the mint order.
     Sign(String),
     /// Error connecting to the EVM.
@@ -51,4 +54,10 @@ pub enum Erc20MintError {
     NotInitialized,
     /// No pending transactions.
     NothingToMint,
+}
+
+impl From<TransferError> for Erc20MintError {
+    fn from(value: TransferError) -> Self {
+        Self::CkBtcLedger(value)
+    }
 }
