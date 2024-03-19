@@ -4,10 +4,14 @@ use std::rc::Rc;
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
+use crate::{
+    EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
+    EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, init, update, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, post_upgrade, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
@@ -18,10 +22,6 @@ use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::Deserialize;
 
 use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
-
-const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
-const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
-const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -42,8 +42,9 @@ impl BtcBridge {
         #[cfg(target_family = "wasm")]
         {
             use std::time::Duration;
+            const METRICS_UPDATE_INTERVAL_SEC: u64 = 60 * 60;
 
-            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
+            self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
@@ -73,6 +74,11 @@ impl BtcBridge {
             borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
+        self.set_timers();
+    }
+
+    #[post_upgrade]
+    pub fn post_upgrade(&mut self) {
         self.set_timers();
     }
 
@@ -122,7 +128,7 @@ impl BtcBridge {
         let init_options = TaskOptions::default()
             .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
             .with_backoff_policy(BackoffPolicy::Exponential {
-                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
+                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
                 multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
             });
         BtcTask::InitEvmState.into_scheduled(init_options)
@@ -143,10 +149,7 @@ impl BtcBridge {
 
     #[update]
     pub fn admin_configure_bft_bridge(&self, config: BftBridgeConfig) {
-        if ic::caller() != get_state().borrow().admin() {
-            panic!("access denied");
-        }
-
+        get_state().borrow().check_admin(ic::caller());
         get_state().borrow_mut().configure_bft(config);
     }
 
