@@ -124,7 +124,7 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    multisig: Option<(usize, usize)>
+    multisig: Option<MultisigConfig>
 ) -> (String, String)
 ```
 
