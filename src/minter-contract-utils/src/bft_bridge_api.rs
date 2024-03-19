@@ -44,7 +44,7 @@ pub static BURN: Lazy<Function> = Lazy::new(|| Function {
         },
         Param {
             name: "recipientID".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Bytes,
             internal_type: None,
         },
     ],
@@ -180,7 +180,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
         },
         EventParam {
             name: "recipientID".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Bytes,
             indexed: false,
         },
         EventParam {
@@ -314,7 +314,7 @@ impl BurntEventDataBuilder {
             "sender" => self.sender = value.into_address(),
             "amount" => self.amount = value.into_uint(),
             "fromERC20" => self.from_erc20 = value.into_address(),
-            "recipientID" => self.recipient_id = value.into_fixed_bytes(),
+            "recipientID" => self.recipient_id = value.into_bytes(),
             "toToken" => self.to_token = value.into_fixed_bytes(),
             "operationID" => self.operation_id = value.into_uint().map(|v| v.as_u32()),
             "name" => self.name = value.into_fixed_bytes(),
@@ -545,7 +545,7 @@ mod tests {
             .with_field_from_token("sender", Token::Address(sender.0))
             .with_field_from_token("amount", Token::Uint(amount))
             .with_field_from_token("fromERC20", Token::Address(from_erc20.0))
-            .with_field_from_token("recipientID", Token::FixedBytes(recipient_id.clone()))
+            .with_field_from_token("recipientID", Token::Bytes(recipient_id.clone()))
             .with_field_from_token("toToken", Token::FixedBytes(to_token.clone()))
             .with_field_from_token("operationID", Token::Uint(operation_id))
             .with_field_from_token("name", Token::FixedBytes(name.clone()))
@@ -578,8 +578,8 @@ mod tests {
     #[test]
     fn convert_raw_log_into_burnt_event() {
         let raw = RawLog {
-            topics: vec![H256::from_hex_str("0x311bd942e9a7359e50783d6a90327804169b0f6c5307e406c944f3d7b63ecdc6").unwrap().0],
-            data: Bytes::from_hex("0x000000000000000000000000a2d1f5f7d0d6e524a73194b76469eba08460ba4400000000000000000000000000000000000000000000000000000000000003e8000000000000000000000000e76e9f3b04252ff67c2e623a34dd275f46e5b79f0100056b291e368dfb3f4a2d4e326d2111e6415ce54e740325000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+            topics: vec![H256::from_hex_str("0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79").unwrap().0],
+            data: Bytes::from_hex("0x000000000000000000000000e41b09c6e9eaa79356b10f4181564b4bdb169d3500000000000000000000000000000000000000000000000000000000000003e80000000000000000000000002ea5d83d5a08d8556f726d3004a50aa8aa81c5c200000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100056b29dc8b8e5954eebac85b3145745362adfa50d8ad9e00000000000000").unwrap(),
         };
 
         let _event = BurntEventData::try_from(raw).unwrap();
