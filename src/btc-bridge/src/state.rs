@@ -44,7 +44,7 @@ impl Default for BtcBridgeConfig {
             signing_strategy: SigningStrategy::Local {
                 private_key: [0; 32],
             },
-            admin: Principal::anonymous(),
+            admin: Principal::management_canister(),
         }
     }
 }
