@@ -10,6 +10,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetU
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
+use crate::wallet::fees::MultisigConfig;
 use crate::wallet::inscription::Protocol;
 use crate::wallet::{self, bitcoin_api};
 
@@ -74,7 +75,7 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<String>,
-        multisig: Option<(usize, usize)>,
+        multisig: Option<MultisigConfig>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 

@@ -48,7 +48,7 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    multisig: MultisigConfig,
+    multisig: Option<MultisigConfig>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
     let bitcoin_network = match network {
@@ -201,7 +201,7 @@ async fn build_commit_and_reveal_transactions<T>(
     own_utxos: &[Utxo],
     network: Network,
     fee_rate: FeeRate,
-    multisig: MultisigConfig,
+    multisig: Option<MultisigConfig>,
     script_type: ScriptType,
 ) -> OrdResult<(Transaction, Transaction)>
 where
@@ -238,8 +238,12 @@ where
         txin_script_pubkey.clone(),
     );
 
-    let commit_fee =
-        fees::calculate_transaction_fees(script_type, unsigned_commit_tx_size, fee_rate, multisig);
+    let commit_fee = fees::calculate_transaction_fees(
+        script_type,
+        unsigned_commit_tx_size,
+        fee_rate,
+        multisig.clone(),
+    );
 
     let unsigned_reveal_tx_size = estimate_unsigned_reveal_tx_size(
         vec![OutPoint::null()],
