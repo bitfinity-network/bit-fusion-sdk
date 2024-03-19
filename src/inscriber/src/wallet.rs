@@ -261,7 +261,7 @@ pub async fn get_bitcoin_address(
     // Fetch the public key of the given derivation path.
     let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
     // Compute the bitcoin address.
-    public_key_to_bitcoin_address(network, &public_key)
+    public_key_to_bitcoin_address(network, bitcoin::AddressType::P2wpkh, &public_key)
         .expect("Can't convert public key to bitcoin address")
         .to_string()
 }
@@ -289,6 +289,7 @@ fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> St
 // Compute segwit bitcoin `Address` from `PublicKey`.
 fn public_key_to_bitcoin_address(
     bitcoin_network: BitcoinNetwork,
+    address_type: bitcoin::AddressType,
     public_key: &[u8],
 ) -> Result<Address, AddressError> {
     let network = match bitcoin_network {
@@ -298,7 +299,11 @@ fn public_key_to_bitcoin_address(
     };
 
     let pk = PublicKey::from_slice(public_key).expect("Can't deserialize public key");
-    Address::p2wpkh(&pk, network)
+    match address_type {
+        bitcoin::AddressType::P2pkh => Ok(Address::p2pkh(&pk, network)),
+        bitcoin::AddressType::P2wpkh => Address::p2wpkh(&pk, network),
+        _ => unimplemented!(),
+    }
 }
 
 fn sha256(data: &[u8]) -> Vec<u8> {
