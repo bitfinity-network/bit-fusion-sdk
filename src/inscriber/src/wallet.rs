@@ -16,9 +16,10 @@ use bitcoin::{
 };
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use inscription::Nft as CandidNft;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,
+    Brc20, CreateCommitTransactionArgs, ExternalSigner, Inscription, Nft, OrdError, OrdResult,
     OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
 };
 use serde::de::DeserializeOwned;
@@ -125,8 +126,15 @@ pub async fn inscribe(
 
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => {
-            let inscription: ord_rs::Brc20 = serde_json::from_str(&inscription)?;
-            build_commit_and_reveal_transactions::<ord_rs::Brc20>(
+            let op: Brc20 = serde_json::from_str(&inscription)?;
+
+            let inscription = match op {
+                Brc20::Deploy(data) => Brc20::deploy(data.tick, data.max, data.lim, data.dec),
+                Brc20::Mint(data) => Brc20::mint(data.tick, data.amt),
+                Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
+            };
+
+            build_commit_and_reveal_transactions::<Brc20>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
@@ -140,8 +148,13 @@ pub async fn inscribe(
             .await?
         }
         Protocol::Nft => {
-            let inscription: ord_rs::Nft = serde_json::from_str(&inscription)?;
-            build_commit_and_reveal_transactions::<ord_rs::Nft>(
+            let data: CandidNft = serde_json::from_str(&inscription)?;
+            let inscription = Nft::new(
+                Some(data.content_type.as_bytes().to_vec()),
+                Some(data.body.as_bytes().to_vec()),
+            );
+
+            build_commit_and_reveal_transactions::<Nft>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
