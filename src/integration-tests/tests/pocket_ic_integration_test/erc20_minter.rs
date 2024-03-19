@@ -310,7 +310,7 @@ async fn test_external_bridging() {
         .encode_input(&[
             Token::Uint(amount.into()),
             Token::Address(erc20_token_address.into()),
-            Token::FixedBytes(alice_id.0.to_vec()),
+            Token::Bytes(alice_id.0.to_vec()),
         ])
         .unwrap();
 

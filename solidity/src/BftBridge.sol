@@ -146,7 +146,7 @@ contract BFTBridge {
         address sender,
         uint256 amount,
         address fromERC20,
-        bytes32 recipientID,
+        bytes recipientID,
         bytes32 toToken,
         uint32 operationID,
         bytes32 name,
@@ -249,7 +249,7 @@ contract BFTBridge {
     function burn(
         uint256 amount,
         address fromERC20,
-        bytes32 recipientID
+        bytes memory recipientID
     ) public returns (uint32) {
         require(fromERC20 != address(this));
 
@@ -259,7 +259,6 @@ contract BFTBridge {
 
         require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
-        require(recipientID != bytes32(0), "Invalid destination address");
 
         RingBuffer memory buffer = _lastUserDeposit[msg.sender];
         _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);

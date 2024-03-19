@@ -516,7 +516,7 @@ impl BridgeUser {
         let input = BURN.encode_input(&[
             Token::Uint(amount.0),
             Token::Address(erc20_token.0),
-            Token::FixedBytes(recipient.0.to_vec()),
+            Token::Bytes(recipient.0.to_vec()),
         ])?;
 
         let receipt = self

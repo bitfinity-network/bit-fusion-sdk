@@ -245,7 +245,7 @@ pub trait TestContext {
             .encode_input(&[
                 Token::Uint(amount),
                 Token::Address(from_token.0),
-                Token::FixedBytes(recipient.0.to_vec()),
+                Token::Bytes(recipient.0.to_vec()),
             ])
             .unwrap();
 
