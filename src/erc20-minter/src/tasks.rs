@@ -35,6 +35,8 @@ impl Task for BridgeTask {
         &self,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
+        log::trace!("Running ERC-20 task: {:?}", self);
+
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
