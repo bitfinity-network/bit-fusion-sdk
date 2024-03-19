@@ -4,10 +4,14 @@ use std::rc::Rc;
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
+use crate::{
+    EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
+    EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, init, update, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, post_upgrade, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
@@ -18,10 +22,6 @@ use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::Deserialize;
 
 use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
-
-const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
-const EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC: u32 = 2;
-const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -74,6 +74,11 @@ impl BtcBridge {
             borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
+        self.set_timers();
+    }
+
+    #[post_upgrade]
+    pub fn post_upgrade(&mut self) {
         self.set_timers();
     }
 
