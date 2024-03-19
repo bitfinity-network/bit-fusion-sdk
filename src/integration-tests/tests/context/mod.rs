@@ -12,6 +12,7 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
+use ic_exports::ic_kit::mock_principals::alice;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc1_ledger::{
@@ -27,17 +28,21 @@ use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
-use tokio::time::{self, Instant};
+use tokio::time::Instant;
 
 use super::utils::error::Result;
+use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::icrc_client::IcrcClient;
 use crate::utils::wasm::{
-    get_erc20_minter_canister_bytecode, get_evm_testnet_canister_bytecode,
-    get_icrc1_token_canister_bytecode, get_minter_canister_bytecode,
+    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
+    get_ck_btc_minter_canister_bytecode, get_erc20_minter_canister_bytecode,
+    get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
+    get_kyt_canister_bytecode, get_minter_canister_bytecode,
     get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
+
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 #[async_trait::async_trait]
@@ -115,7 +120,7 @@ pub trait TestContext {
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
         while time_passed < timeout && receipt.is_none() {
-            time::sleep(tx_processing_interval).await;
+            self.advance_time(tx_processing_interval).await;
             time_passed = Instant::now() - start;
             receipt = evm_client
                 .eth_get_transaction_receipt(hash.clone())
@@ -160,7 +165,8 @@ pub trait TestContext {
         let creator_address: H160 = creator_wallet.address().into();
         let nonce = evm_client
             .account_basic(creator_address.clone())
-            .await?
+            .await
+            .unwrap()
             .nonce;
 
         let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
@@ -210,7 +216,7 @@ pub trait TestContext {
             .encode_input(contract, &[Token::Address(minter_canister_address.into())])
             .unwrap();
 
-        let bridge_address = self.create_contract(wallet, input.clone()).await?;
+        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
         minter_client
             .register_evmc_bft_bridge(bridge_address.clone())
             .await??;
@@ -218,6 +224,20 @@ pub trait TestContext {
         Ok(bridge_address)
     }
 
+    async fn initialize_bft_bridge_with_minter(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        minter_canister_address: H160,
+    ) -> Result<H160> {
+        let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
+        let input = bft_bridge_api::CONSTRUCTOR
+            .encode_input(contract, &[Token::Address(minter_canister_address.into())])
+            .unwrap();
+
+        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
+
+        Ok(bridge_address)
+    }
     async fn burn_erc_20_tokens(
         &self,
         wallet: &Wallet<'_, SigningKey>,
@@ -409,6 +429,8 @@ pub trait TestContext {
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal>;
 
+    async fn create_canister_with_id(&self, id: Principal) -> Result<Principal>;
+
     /// Installs the `wasm` code to the `canister` with the given init `args`.
     async fn install_canister(
         &self,
@@ -452,7 +474,7 @@ pub trait TestContext {
             }
             CanisterType::Signature => {
                 println!("Installing default Signature canister...");
-                let evm_canister = self.canisters().get_or_anonymous(CanisterType::Evm);
+                let evm_canister = self.canisters().evm();
                 let init_data = vec![evm_canister];
                 self.install_canister(
                     self.canisters().signature_verification(),
@@ -509,7 +531,40 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
-            _ => todo!(),
+            CanisterType::Icrc1Ledger => {
+                println!("Installing default ICRC1 ledger canister...");
+                let init_data = icrc1_ledger_init_data(self.canisters().ck_btc_minter());
+                self.install_canister(self.canisters().icrc1_ledger(), wasm, (init_data,))
+                    .await
+                    .unwrap();
+            }
+            CanisterType::CkBtcMinter => {
+                println!("Installing default ckBTC minter canister...");
+                let init_data = ck_btc_minter_init_data(
+                    self.canisters().icrc1_ledger(),
+                    self.canisters().kyt(),
+                );
+                self.install_canister(self.canisters().ck_btc_minter(), wasm, (init_data,))
+                    .await
+                    .unwrap();
+            }
+            CanisterType::Btc => {
+                println!("Installing default mock ckBTC canister...");
+                todo!()
+            }
+            CanisterType::Kyt => {
+                println!("Installing default KYT canister...");
+                let init_data = kyc_init_data(self.canisters().ck_btc_minter());
+                self.install_canister(self.canisters().kyt(), wasm, (init_data,))
+                    .await
+                    .unwrap();
+            }
+            CanisterType::EvmMinter => {
+                todo!()
+            }
+            CanisterType::BtcBridge => {
+                todo!()
+            }
         }
     }
 
@@ -658,6 +713,60 @@ pub fn evm_canister_init_data(
     }
 }
 
+fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
+    let minting_account = Account {
+        owner: minter_principal,
+        subaccount: None,
+    };
+    let archive_options = ArchiveOptions {
+        trigger_threshold: 10_000_000,
+        num_blocks_to_archive: 1_000_000,
+        node_max_memory_size_bytes: None,
+        max_message_size_bytes: None,
+        controller_id: Principal::anonymous(),
+        cycles_for_archive_creation: None,
+        max_transactions_per_response: None,
+    };
+
+    LedgerArgument::Init(InitArgs {
+        minting_account,
+        fee_collector_account: None,
+        initial_balances: vec![],
+        transfer_fee: Nat::from(10u32),
+        decimals: None,
+        token_name: "ckBtc".into(),
+        token_symbol: "ckBtc".into(),
+        metadata: vec![],
+        archive_options,
+        max_memo_length: Some(80),
+        feature_flags: Some(FeatureFlags { icrc2: true }),
+        maximum_number_of_accounts: None,
+        accounts_overflow_trim_quantity: None,
+    })
+}
+
+fn ck_btc_minter_init_data(ledger: Principal, kyt: Principal) -> MinterArg {
+    MinterArg::Init(crate::utils::btc::InitArgs {
+        btc_network: BtcNetwork::Mainnet,
+        ecdsa_key_name: "master_ecdsa_public_key_fscpm-uiaaa-aaaaa-aaaap-yai".to_string(),
+        retrieve_btc_min_amount: 100_000,
+        ledger_id: ledger,
+        max_time_in_queue_nanos: 100,
+        min_confirmations: Some(12),
+        mode: Mode::GeneralAvailability,
+        kyt_fee: Some(2000),
+        kyt_principal: Some(kyt),
+    })
+}
+
+fn kyc_init_data(ck_btc_minter: Principal) -> LifecycleArg {
+    LifecycleArg::InitArg(InitArg {
+        minter_id: ck_btc_minter,
+        maintainers: vec![alice()],
+        mode: KytMode::AcceptAll,
+    })
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TestCanisters(HashMap<CanisterType, Principal>);
 
@@ -704,6 +813,41 @@ impl TestCanisters {
             .expect("minter canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn ck_btc_minter(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::CkBtcMinter)
+            .expect("ckBTC minter canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn btc_mock(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::Btc)
+            .expect("bitcoin mock canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn icrc1_ledger(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::Icrc1Ledger)
+            .expect("icrc1 ledger canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn kyt(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::Kyt)
+            .expect("kyt canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn btc_bridge(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::BtcBridge)
+            .expect("bridge canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -725,6 +869,11 @@ pub enum CanisterType {
     Minter,
     Spender,
     EvmMinter,
+    Btc,
+    CkBtcMinter,
+    Kyt,
+    Icrc1Ledger,
+    BtcBridge,
 }
 
 impl CanisterType {
@@ -740,6 +889,13 @@ impl CanisterType {
         CanisterType::Spender,
     ];
 
+    pub const BTC_CANISTER_SET: [CanisterType; 4] = [
+        CanisterType::Btc,
+        CanisterType::CkBtcMinter,
+        CanisterType::Kyt,
+        CanisterType::Icrc1Ledger,
+    ];
+
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
@@ -749,6 +905,11 @@ impl CanisterType {
             CanisterType::Minter => get_minter_canister_bytecode().await,
             CanisterType::Spender => get_spender_canister_bytecode().await,
             CanisterType::EvmMinter => get_erc20_minter_canister_bytecode().await,
+            CanisterType::Btc => get_btc_canister_bytecode().await,
+            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
+            CanisterType::Kyt => get_kyt_canister_bytecode().await,
+            CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
+            CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
         }
     }
 }

@@ -43,6 +43,7 @@ impl PocketIcTestContext {
                 .create_canister()
                 .await
                 .expect("canister should be created");
+
             ctx.canisters.set(*canister_type, principal);
         }
 
@@ -121,6 +122,15 @@ impl TestContext for PocketIcTestContext {
         let principal = self.client.create_canister(Some(self.admin())).await;
         self.client.add_cycles(principal, u128::MAX).await;
         Ok(principal)
+    }
+
+    async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
+        let sync_client = ic_exports::pocket_ic::PocketIc::new();
+        sync_client
+            .create_canister_with_id(Some(self.admin()), None, id)
+            .expect("failed to create canister");
+        self.client.add_cycles(id, u128::MAX).await;
+        Ok(id)
     }
 
     async fn install_canister(

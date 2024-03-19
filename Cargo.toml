@@ -8,6 +8,7 @@ members = [
     "src/erc20-minter",
     "src/spender-canister",
     "src/solidity-helper",
+    "src/btc-bridge",
 ]
 resolver = "2"
 
@@ -18,6 +19,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
+bitcoin = "0.28.1"
 candid = { version = "0.10", features = ["value"] }
 clap = { version = "4", features = ["derive"] }
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
@@ -29,6 +31,7 @@ ethers-core = "2.0"
 evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.14.x" }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
+ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.13.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
