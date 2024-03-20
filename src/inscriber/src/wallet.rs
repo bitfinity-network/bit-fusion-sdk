@@ -298,10 +298,22 @@ fn public_key_to_bitcoin_address(
         BitcoinNetwork::Testnet => Network::Testnet,
     };
 
-    let pk = PublicKey::from_slice(public_key).expect("Can't deserialize public key");
     match address_type {
-        bitcoin::AddressType::P2pkh => Ok(Address::p2pkh(&pk, network)),
-        bitcoin::AddressType::P2wpkh => Address::p2wpkh(&pk, network),
+        bitcoin::AddressType::P2pkh => {
+            let pk = PublicKey::from_slice(public_key).expect("Can't deserialize public key");
+            Ok(Address::p2pkh(&pk, network))
+        }
+        bitcoin::AddressType::P2sh => {
+            Address::p2sh(bitcoin::Script::from_bytes(public_key), network)
+        }
+        bitcoin::AddressType::P2wpkh => {
+            let pk = PublicKey::from_slice(public_key).expect("Can't deserialize public key");
+            Address::p2wpkh(&pk, network)
+        }
+        bitcoin::AddressType::P2wsh => Ok(Address::p2wsh(
+            bitcoin::Script::from_bytes(public_key),
+            network,
+        )),
         _ => unimplemented!(),
     }
 }
