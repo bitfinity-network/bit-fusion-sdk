@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
+bitcoin = { workspace = true, optional = true }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
@@ -15,6 +16,7 @@ ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
+ic-btc-interface = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true, features = ["pocket-ic-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
@@ -31,9 +33,22 @@ rlp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 solidity-helper = { path = "../solidity-helper" }
+serde_bytes = "0.11.14"
+
+# state machine tests deps
+ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+btc-bridge = { path = "../btc-bridge" }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 rlp = { workspace = true }
@@ -42,5 +57,19 @@ tokio = { workspace = true, features = ["fs", "process"] }
 erc20-minter = { path = "../erc20-minter" }
 signature-verification-canister-client = { workspace = true }
 
+# IC deps
+
 [features]
 pocket_ic_integration_test = []
+state_machine_tests = [
+    "bitcoin",
+    "ic-config",
+    "ic-base-types",
+    "ic-bitcoin-canister-mock",
+    "ic-canisters-http-types",
+    "ic-ckbtc-minter",
+    "ic-ckbtc-kyt",
+    "ic-icrc1-ledger",
+    "ic-management-canister-types",
+    "ic-state-machine-tests",
+]

@@ -25,6 +25,9 @@ pub enum TestError {
 
     #[error(transparent)]
     Icrc(IcrcError),
+
+    #[error("{0}")]
+    Generic(String),
 }
 
 #[derive(Debug, Error)]

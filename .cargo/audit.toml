@@ -1,0 +1,3 @@
+[advisories]
+# Integration tests dependency error, no actual code
+ignore = ["RUSTSEC-2023-0071"]
