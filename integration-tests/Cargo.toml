@@ -1,0 +1,12 @@
+[package]
+name = "integration-tests"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+candid = { workspace = true }
+ic-canister = { workspace = true }
+ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.13.x" }
+ic-exports = { workspace = true }
+serde = { workspace = true }

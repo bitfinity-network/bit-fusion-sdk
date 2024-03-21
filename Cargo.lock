@@ -1182,6 +1182,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-canister-client"
+version = "0.13.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.13.x#c229d21cc6236e18322fde191888e25574bbc0d6"
+dependencies = [
+ "async-trait",
+ "candid",
+ "ic-canister",
+ "ic-exports",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "ic-canister-macros"
 version = "0.13.0"
 source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.13.x#c229d21cc6236e18322fde191888e25574bbc0d6"
@@ -1447,6 +1460,18 @@ dependencies = [
  "serde_json",
  "sha2",
  "vergen",
+]
+
+[[package]]
+name = "integration-tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "candid",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "serde",
 ]
 
 [[package]]
