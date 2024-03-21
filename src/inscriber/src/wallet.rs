@@ -50,11 +50,7 @@ pub async fn inscribe(
     multisig: Option<MultisigConfig>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
-    let bitcoin_network = match network {
-        BitcoinNetwork::Mainnet => Network::Bitcoin,
-        BitcoinNetwork::Testnet => Network::Testnet,
-        BitcoinNetwork::Regtest => Network::Regtest,
-    };
+    let bitcoin_network = map_network(network);
 
     // fetch the arguments for initializing a wallet
     let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
@@ -62,7 +58,7 @@ pub async fn inscribe(
     let own_public_key =
         ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
     let own_pk = PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?;
-    let own_address = get_bitcoin_address_with_public_key(network, &own_pk);
+    let own_address = btc_address_from_public_key(network, &own_pk);
 
     log::info!("Fetching UTXOs...");
     let own_utxos = bitcoin_api::get_utxos(network, own_address.to_string())
@@ -336,17 +332,21 @@ pub async fn get_bitcoin_address(
     let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
     let pk = PublicKey::from_slice(&public_key).expect("Can't deserialize public key");
 
-    get_bitcoin_address_with_public_key(network, &pk)
+    btc_address_from_public_key(network, &pk)
 }
 
 // Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.
-fn get_bitcoin_address_with_public_key(network: BitcoinNetwork, pk: &PublicKey) -> Address {
-    let network = match network {
-        BitcoinNetwork::Mainnet => Network::Bitcoin,
-        BitcoinNetwork::Regtest => Network::Regtest,
-        BitcoinNetwork::Testnet => Network::Testnet,
-    };
+fn btc_address_from_public_key(network: BitcoinNetwork, pk: &PublicKey) -> Address {
+    let network = map_network(network);
 
     // Compute the bitcoin segwit(bech32) address.
     Address::p2wpkh(pk, network).expect("Can't convert public key to segwit bitcoin address")
+}
+
+fn map_network(network: BitcoinNetwork) -> Network {
+    match network {
+        BitcoinNetwork::Mainnet => Network::Bitcoin,
+        BitcoinNetwork::Testnet => Network::Testnet,
+        BitcoinNetwork::Regtest => Network::Regtest,
+    }
 }
