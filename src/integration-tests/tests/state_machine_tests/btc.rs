@@ -41,6 +41,7 @@ use ic_exports::icrc_types::icrc3::transactions::{
     GetTransactionsRequest, GetTransactionsResponse,
 };
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
+use ic_log::LogSettings;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 use minter_did::id256::Id256;
 
@@ -327,6 +328,11 @@ impl CkBtcSetup {
             },
             admin: (&context).admin(),
             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
+            log_settings: LogSettings {
+                enable_console: true,
+                in_memory_records: None,
+                log_filter: Some("trace".to_string()),
+            },
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();

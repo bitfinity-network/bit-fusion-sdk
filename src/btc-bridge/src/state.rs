@@ -33,6 +33,7 @@ pub struct BtcBridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub ck_btc_ledger_fee: u64,
+    pub log_settings: LogSettings,
 }
 
 impl Default for BtcBridgeConfig {
@@ -47,6 +48,7 @@ impl Default for BtcBridgeConfig {
             },
             admin: Principal::management_canister(),
             ck_btc_ledger_fee: 10,
+            log_settings: LogSettings::default(),
         }
     }
 }
@@ -97,12 +99,7 @@ impl State {
             .expect("failed to init signer in stable memory");
         self.signer = stable;
 
-        init_log(&LogSettings {
-            enable_console: true,
-            in_memory_records: None,
-            log_filter: Some("trace".to_string()),
-        })
-        .expect("failed to init logger");
+        init_log(&config.log_settings).expect("failed to init logger");
 
         self.config = config;
     }
