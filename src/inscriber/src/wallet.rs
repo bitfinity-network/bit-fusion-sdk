@@ -1,22 +1,31 @@
 pub mod bitcoin_api;
 pub mod ecdsa_api;
+pub mod fees;
 pub mod inscription;
 
 use std::str::FromStr;
 
+use bitcoin::absolute::LockTime;
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, Network, PublicKey, ScriptBuf, Transaction, Txid};
+use bitcoin::script::Builder;
+use bitcoin::transaction::Version;
+use bitcoin::{
+    Address, AddressType, Amount, FeeRate, Network, OutPoint, PublicKey, Script, ScriptBuf,
+    Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+};
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use inscription::Nft as CandidNft;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    CreateCommitTransactionArgs, ExternalSigner, Inscription, OrdError, OrdResult,
+    Brc20, CreateCommitTransactionArgs, ExternalSigner, Inscription, Nft, OrdError, OrdResult,
     OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
 };
 use serde::de::DeserializeOwned;
 use sha2::Digest;
 
+use self::fees::MultisigConfig;
 use self::inscription::Protocol;
 use crate::canister::ECDSA_KEY_NAME;
 
@@ -39,7 +48,7 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    leftovers_recipient: Option<String>,
+    multisig: Option<MultisigConfig>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
     let bitcoin_network = match network {
@@ -54,18 +63,9 @@ pub async fn inscribe(
     let own_public_key =
         ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
 
-    // initialize a wallet (transaction signer) and a transaction builder
-    let wallet_type = WalletType::External {
-        signer: Box::new(EcdsaSigner {}),
-    };
-    let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
-    let mut builder = OrdTransactionBuilder::new(
-        PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?,
-        ScriptType::P2TR,
-        wallet,
-    );
-
+    // TODO: Create a generic `public_key_address` function to replace this
     let own_address = public_key_to_p2pkh_address(network, &own_public_key);
+
     log::info!("Fetching UTXOs...");
     let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
         .await
@@ -78,6 +78,27 @@ pub async fn inscribe(
         .require_network(bitcoin_network)
         .expect("Address belongs to a different network than specified");
 
+    // initialize a wallet (transaction signer) and a transaction builder
+    let wallet_type = WalletType::External {
+        signer: Box::new(EcdsaSigner {}),
+    };
+
+    let script_type = match own_address.address_type() {
+        Some(addr_type) => match addr_type {
+            AddressType::P2pkh | AddressType::P2sh | AddressType::P2wpkh => ScriptType::P2WSH,
+            AddressType::P2tr => ScriptType::P2TR,
+            _ => ScriptType::P2WSH,
+        },
+        None => panic!("Unsupported address type!"),
+    };
+
+    let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
+    let mut builder = OrdTransactionBuilder::new(
+        PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?,
+        script_type,
+        wallet,
+    );
+
     let dst_address = if let Some(addr) = dst_address {
         Address::from_str(&addr)
             .expect("Failed to parse address")
@@ -88,38 +109,61 @@ pub async fn inscribe(
         own_address.clone()
     };
 
-    let leftovers_recipient = if let Some(addr) = leftovers_recipient {
-        Address::from_str(&addr)
-            .expect("Failed to parse address")
-            .require_network(bitcoin_network)
-            .expect("Address belongs to a different network than specified")
+    // Get fee percentiles from previous transactions to estimate our own fee.
+    let fee_percentiles = bitcoin_api::get_current_fee_percentiles(network).await;
+
+    let fee_per_byte = if fee_percentiles.is_empty() {
+        // There are no fee percentiles. This case can only happen on a regtest
+        // network where there are no non-coinbase transactions. In this case,
+        // we use a default of 2000 millisatoshis/byte (i.e. 2 satoshis/byte)
+        2000
     } else {
-        // Send leftover amounts to canister's address if `None` is provided
-        own_address.clone()
+        // Choose the 90th percentile for sending fees.
+        fee_percentiles[90]
     };
+
+    let fee_rate = FeeRate::from_sat_per_vb(fee_per_byte).expect("Overflow!");
 
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => {
-            let inscription: ord_rs::Brc20 = serde_json::from_str(&inscription)?;
-            build_commit_and_reveal_transactions::<ord_rs::Brc20>(
+            let op: Brc20 = serde_json::from_str(&inscription)?;
+
+            let inscription = match op {
+                Brc20::Deploy(data) => Brc20::deploy(data.tick, data.max, data.lim, data.dec),
+                Brc20::Mint(data) => Brc20::mint(data.tick, data.amt),
+                Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
+            };
+
+            build_commit_and_reveal_transactions::<Brc20>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
-                Some(leftovers_recipient),
+                own_address,
                 &own_utxos,
                 bitcoin_network,
+                fee_rate,
+                multisig,
+                script_type,
             )
             .await?
         }
         Protocol::Nft => {
-            let inscription: ord_rs::Nft = serde_json::from_str(&inscription)?;
-            build_commit_and_reveal_transactions::<ord_rs::Nft>(
+            let data: CandidNft = serde_json::from_str(&inscription)?;
+            let inscription = Nft::new(
+                Some(data.content_type.as_bytes().to_vec()),
+                Some(data.body.as_bytes().to_vec()),
+            );
+
+            build_commit_and_reveal_transactions::<Nft>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
-                Some(leftovers_recipient),
+                own_address,
                 &own_utxos,
                 bitcoin_network,
+                fee_rate,
+                multisig,
+                script_type,
             )
             .await?
         }
@@ -148,13 +192,17 @@ pub async fn inscribe(
     Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_commit_and_reveal_transactions<T>(
     builder: &mut OrdTransactionBuilder,
     inscription: T,
     recipient_address: Address,
-    leftovers_recipient: Option<Address>,
+    own_address: Address,
     own_utxos: &[Utxo],
     network: Network,
+    fee_rate: FeeRate,
+    multisig: Option<MultisigConfig>,
+    script_type: ScriptType,
 ) -> OrdResult<(Transaction, Transaction)>
 where
     T: Inscription + DeserializeOwned,
@@ -166,30 +214,47 @@ where
         utxos_to_spend.push(utxo);
     }
 
+    let total_spent = Amount::from_sat(amount);
+
     let inputs: Vec<OrdUtxo> = utxos_to_spend
+        .clone()
         .into_iter()
         .map(|utxo| OrdUtxo {
             id: Txid::from_raw_hash(
                 Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse tx id"),
             ),
             index: utxo.outpoint.vout,
-            amount: Amount::from_sat(amount),
+            amount: total_spent,
         })
         .collect();
 
-    let leftovers_recipient = if let Some(addr) = leftovers_recipient {
-        addr
-    } else {
-        recipient_address.clone()
-    };
+    let leftovers_recipient = own_address.clone();
 
-    let txin_script_pubkey = ScriptBuf::from_bytes(recipient_address.script_pubkey().into_bytes());
+    let txin_script_pubkey = ScriptBuf::from_bytes(own_address.script_pubkey().into_bytes());
 
-    let Fees {
-        commit_fee,
-        reveal_fee,
-        ..
-    } = calculate_transaction_fees(network);
+    let unsigned_commit_tx_size = estimate_unsigned_commit_tx_size(
+        utxos_to_spend.clone(),
+        total_spent,
+        txin_script_pubkey.clone(),
+    );
+
+    let commit_fee = fees::calculate_transaction_fees(
+        script_type,
+        unsigned_commit_tx_size,
+        fee_rate,
+        multisig.clone(),
+    );
+
+    let unsigned_reveal_tx_size = estimate_unsigned_reveal_tx_size(
+        vec![OutPoint::null()],
+        vec![TxOut {
+            script_pubkey: recipient_address.script_pubkey(),
+            value: Amount::from_sat(0),
+        }],
+    );
+
+    let reveal_fee =
+        fees::calculate_transaction_fees(script_type, unsigned_reveal_tx_size, fee_rate, multisig);
 
     let commit_tx_args = CreateCommitTransactionArgs {
         inputs,
@@ -218,24 +283,58 @@ where
     Ok((commit_tx.tx, reveal_tx))
 }
 
-struct Fees {
-    pub commit_fee: Amount,
-    pub reveal_fee: Amount,
+pub fn estimate_unsigned_commit_tx_size(
+    utxos_to_spend: Vec<&Utxo>,
+    amount: Amount,
+    txin_script_pubkey: ScriptBuf,
+) -> usize {
+    let tx_in: Vec<TxIn> = utxos_to_spend
+        .into_iter()
+        .map(|utxo| TxIn {
+            previous_output: OutPoint {
+                txid: Txid::from_raw_hash(
+                    Hash::from_slice(&utxo.outpoint.txid)
+                        .expect("Failed to copy txid byte slice into hash object"),
+                ),
+                vout: utxo.outpoint.vout,
+            },
+            sequence: Sequence::ZERO,
+            witness: Witness::new(),
+            script_sig: Script::new().into(),
+        })
+        .collect();
+
+    let unsigned_commit_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: tx_in,
+        output: vec![TxOut {
+            script_pubkey: txin_script_pubkey.clone(),
+            value: amount,
+        }],
+    };
+
+    unsigned_commit_tx.vsize()
 }
 
-// TODO: Verify the source of this
-fn calculate_transaction_fees(network: Network) -> Fees {
-    match network {
-        Network::Bitcoin => Fees {
-            commit_fee: Amount::from_sat(15_000),
-            reveal_fee: Amount::from_sat(7_000),
-        },
-        Network::Testnet | Network::Regtest | Network::Signet => Fees {
-            commit_fee: Amount::from_sat(2_500),
-            reveal_fee: Amount::from_sat(4_700),
-        },
-        _ => panic!("unknown network"),
-    }
+/// Create the reveal transaction
+fn estimate_unsigned_reveal_tx_size(inputs: Vec<OutPoint>, outputs: Vec<TxOut>) -> usize {
+    let unsigned_reveal_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: inputs
+            .iter()
+            .map(|outpoint| TxIn {
+                previous_output: *outpoint,
+                script_sig: Builder::new().into_script(),
+                witness: Witness::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            })
+            .collect(),
+        output: outputs,
+    };
+
+    unsigned_reveal_tx.vsize()
 }
 
 /// Returns the P2PKH address of this canister at the given derivation path.

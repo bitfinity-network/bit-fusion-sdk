@@ -42,13 +42,12 @@ pub struct Brc20Transfer {
     pub amt: u64,
 }
 
-/// Non-BRC20 (arbitrary) inscriptions
-#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+#[derive(CandidType, Clone, Debug, Serialize, Default, Deserialize)]
 pub struct Nft {
-    /// The main body of the NFT.
-    pub body: Option<String>,
-    /// Has a tag of 1, representing the MIME type of the body.
-    pub content_type: Option<String>,
-    /// Has a tag of 5, representing CBOR metadata, stored as data pushes.
-    pub metadata: Option<String>,
+    /// The MIME type of the body. This describes
+    /// the format of the body content, such as "image/png" or "text/plain".
+    pub content_type: String,
+    /// The main body of the NFT. This is the core data or content of the NFT,
+    /// which might represent an image, text, or other types of digital assets.
+    pub body: String,
 }
