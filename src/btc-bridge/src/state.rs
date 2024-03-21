@@ -1,10 +1,12 @@
+use crate::burn_request_store::BurnRequestStore;
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
-use crate::orders_store::OrdersStore;
+use crate::orders_store::MintOrdersStore;
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
@@ -17,7 +19,8 @@ pub struct State {
     config: BtcBridgeConfig,
     bft_config: BftBridgeConfig,
     signer: SignerStorage,
-    orders_store: OrdersStore,
+    orders_store: MintOrdersStore,
+    burn_request_store: BurnRequestStore,
     evm_params: Option<EvmParams>,
 }
 
@@ -77,6 +80,7 @@ impl Default for State {
             bft_config: Default::default(),
             signer,
             orders_store: Default::default(),
+            burn_request_store: Default::default(),
             evm_params: None,
         }
     }
@@ -92,6 +96,13 @@ impl State {
         let stable = SignerStorage::new(MEMORY_MANAGER.with(|mm| mm.get(SIGNER_MEMORY_ID)), signer)
             .expect("failed to init signer in stable memory");
         self.signer = stable;
+
+        init_log(&LogSettings {
+            enable_console: true,
+            in_memory_records: None,
+            log_filter: Some("trace".to_string()),
+        })
+        .expect("failed to init logger");
 
         self.config = config;
     }
@@ -124,12 +135,20 @@ impl State {
         &self.signer
     }
 
-    pub fn mint_orders(&self) -> &OrdersStore {
+    pub fn mint_orders(&self) -> &MintOrdersStore {
         &self.orders_store
     }
 
-    pub fn mint_orders_mut(&mut self) -> &mut OrdersStore {
+    pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
         &mut self.orders_store
+    }
+
+    pub fn burn_request_store(&self) -> &BurnRequestStore {
+        &self.burn_request_store
+    }
+
+    pub fn burn_request_store_mut(&mut self) -> &mut BurnRequestStore {
+        &mut self.burn_request_store
     }
 
     pub fn get_evm_info(&self) -> EvmInfo {

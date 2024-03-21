@@ -90,3 +90,44 @@ impl<'a> TryFrom<&'a [u8]> for Txid {
         Ok(Self(inner))
     }
 }
+/// The arguments of the [retrieve_btc] endpoint.
+///
+#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct RetrieveBtcArgs {
+    // amount to retrieve in satoshi
+    pub amount: u64,
+
+    // address where to send bitcoins
+    pub address: String,
+}
+
+#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct RetrieveBtcOk {
+    // the index of the burn block on the ckbtc ledger
+    pub block_index: u64,
+}
+
+#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub enum RetrieveBtcError {
+    /// There is another request for this principal.
+    AlreadyProcessing,
+
+    /// The withdrawal amount is too low.
+    AmountTooLow(u64),
+
+    /// The bitcoin address is not valid.
+    MalformedAddress(String),
+
+    /// The withdrawal account does not hold the requested ckBTC amount.
+    InsufficientFunds { balance: u64 },
+
+    /// There are too many concurrent requests, retry later.
+    TemporarilyUnavailable(String),
+
+    /// A generic error reserved for future extensions.
+    GenericError {
+        error_message: String,
+        /// See the [ErrorCode] enum above for the list of possible values.
+        error_code: u64,
+    },
+}
