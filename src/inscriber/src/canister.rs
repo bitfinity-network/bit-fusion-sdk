@@ -90,22 +90,10 @@ impl Inscriber {
         .unwrap()
     }
 
-    /// Sets a new ID for the canister
-    #[update]
-    pub fn set_owner(&mut self, new_owner: Principal) {
-        self.id = new_owner
-    }
-
     /// Returns the build data of the canister
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
-    }
-
-    /// Returns the ID of the canister
-    #[query]
-    pub fn get_owner(&self) -> Principal {
-        self.id
     }
 
     #[pre_upgrade]
