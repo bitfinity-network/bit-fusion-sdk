@@ -11,7 +11,7 @@ services:
     ports:
       - "5432:5432"
   bitcoind:
-    image: lncm/bitcoind:v25.0
+    image: lncm/bitcoind:v26.0
     container_name: bitcoind
     ports:
       - "18443:18443"
@@ -66,6 +66,16 @@ services:
       - ORD_BITCOIN_RPC_PASSWORD=pass
     volumes:
       - ./brc20_json_inscriptions:/brc20_json_inscriptions
+    depends_on:
+      - bitcoind
+  ord:
+    build: https://github.com/ordinals/ord.git
+    command: ["ord", "-r", "--bitcoin-rpc-url", "http://bitcoind:18443", "--index-runes", "server", "--http-port", "1338"]
+    ports:
+      - "1338:1338"
+    environment:
+      - ORD_BITCOIN_RPC_USERNAME=user
+      - ORD_BITCOIN_RPC_PASSWORD=pass
     depends_on:
       - bitcoind
 
