@@ -124,8 +124,8 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    leftovers_recipient: Option<String>,
+    multisig: Option<MultisigConfig>
 ) -> (String, String)
 ```
 
-which is why the above call has `null` and `null` arguments for the `dst_address` and `leftovers_recipient` optional parameters.
+which is why the above call has `null` arguments for the `dst_address` and `multisig` optional parameters.

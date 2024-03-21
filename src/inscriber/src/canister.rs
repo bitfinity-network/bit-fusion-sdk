@@ -6,12 +6,11 @@ use did::build::BuildData;
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetUtxosResponse, MillisatoshiPerByte,
-};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
 
 use crate::build_data::canister_build_data;
+use crate::wallet::fees::MultisigConfig;
 use crate::wallet::inscription::Protocol;
 use crate::wallet::{self, bitcoin_api};
 
@@ -59,14 +58,6 @@ impl Inscriber {
         bitcoin_api::get_utxos(network, address).await.unwrap()
     }
 
-    /// Returns the 100 fee percentiles measured in millisatoshi/byte.
-    /// Percentiles are computed from the last 10,000 transactions (if available).
-    #[update]
-    pub async fn get_current_fee_percentiles(&mut self) -> Vec<MillisatoshiPerByte> {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-        bitcoin_api::get_current_fee_percentiles(network).await
-    }
-
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
@@ -86,7 +77,7 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<String>,
-        leftovers_recipient: Option<String>,
+        multisig: Option<MultisigConfig>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
@@ -95,10 +86,16 @@ impl Inscriber {
             inscription_type,
             inscription,
             dst_address,
-            leftovers_recipient,
+            multisig,
         )
         .await
         .unwrap()
+    }
+
+    /// Returns the build data of the canister
+    #[query]
+    pub fn get_canister_build_data(&self) -> BuildData {
+        canister_build_data()
     }
 
     #[pre_upgrade]
@@ -114,12 +111,6 @@ impl Inscriber {
             .expect("Failed to read network from stable memory.")
             .0;
         self.init(network);
-    }
-
-    /// Returns the build data of the canister
-    #[query]
-    pub fn get_canister_build_data(&self) -> BuildData {
-        canister_build_data()
     }
 
     pub fn idl() -> Idl {
