@@ -122,7 +122,7 @@ pub async fn inscribe(
         fee_percentiles[90]
     };
 
-    let fee_rate = FeeRate::from_sat_per_vb(fee_per_byte).unwrap();
+    let fee_rate = FeeRate::from_sat_per_vb(fee_per_byte).expect("Overflow!");
 
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => {
@@ -292,7 +292,10 @@ pub fn estimate_unsigned_commit_tx_size(
         .into_iter()
         .map(|utxo| TxIn {
             previous_output: OutPoint {
-                txid: Txid::from_raw_hash(Hash::from_slice(&utxo.outpoint.txid).unwrap()),
+                txid: Txid::from_raw_hash(
+                    Hash::from_slice(&utxo.outpoint.txid)
+                        .expect("Failed to copy txid byte slice into hash object"),
+                ),
                 vout: utxo.outpoint.vout,
             },
             sequence: Sequence::ZERO,
