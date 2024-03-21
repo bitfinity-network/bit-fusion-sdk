@@ -1,5 +1,5 @@
 [workspace]
-members = [ "integration-tests","src/inscriber"]
+members = ["integration-tests", "src/inscriber"]
 
 resolver = "2"
 

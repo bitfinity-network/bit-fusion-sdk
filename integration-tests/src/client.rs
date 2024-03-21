@@ -1,47 +1,43 @@
-use candid::utils::ArgumentEncoder;
-use candid::{CandidType, Principal};
-use ic_canister::virtual_canister_call;
-use ic_canister_client::{CanisterClient, CanisterClientError, CanisterClientResult};
-use serde::de::DeserializeOwned;
+use candid::Principal;
+use did::build::BuildData;
+use ic_canister_client::{CanisterClient, CanisterClientResult};
+
+use crate::error::InscriberCallResult;
 
 /// An Inscriber canister client.
 #[derive(Debug, Clone)]
-pub struct InscriberCanisterClient {
-    /// The canister id of the Inscriber canister
-    pub canister_id: Principal,
+pub struct InscriberCanisterClient<C>
+where
+    C: CanisterClient,
+{
+    /// The canister client.
+    client: C,
 }
 
-impl InscriberCanisterClient {
-    pub fn new(canister_id: Principal) -> Self {
-        Self { canister_id }
+impl<C: CanisterClient> InscriberCanisterClient<C> {
+    /// Create a new canister client.
+    ///
+    /// # Arguments
+    /// * `client` - The canister client.
+    pub fn new(client: C) -> Self {
+        Self { client }
     }
 
-    async fn call<T, R>(&self, method: &str, args: T) -> CanisterClientResult<R>
-    where
-        T: ArgumentEncoder + Send,
-        R: DeserializeOwned + CandidType,
-    {
-        virtual_canister_call!(self.canister_id, method, args, R)
-            .await
-            .map_err(CanisterClientError::CanisterError)
-    }
-}
-
-#[async_trait::async_trait]
-impl CanisterClient for InscriberCanisterClient {
-    async fn update<T, R>(&self, method: &str, args: T) -> CanisterClientResult<R>
-    where
-        T: ArgumentEncoder + Send + Sync,
-        R: DeserializeOwned + CandidType,
-    {
-        self.call(method, args).await
+    /// Get the owner of the canister
+    pub async fn get_owner(&self) -> CanisterClientResult<Principal> {
+        self.client.query("get_owner", ()).await
     }
 
-    async fn query<T, R>(&self, method: &str, args: T) -> CanisterClientResult<R>
-    where
-        T: ArgumentEncoder + Send + Sync,
-        R: DeserializeOwned + CandidType,
-    {
-        self.call(method, args).await
+    /// Set the owner of the canister
+    pub async fn set_owner(
+        &self,
+        principal: Principal,
+    ) -> CanisterClientResult<InscriberCallResult<()>> {
+        self.client.update("set_owner", (principal,)).await
+    }
+
+    /// Returns the build data of the canister.
+    pub async fn get_canister_build_data(&self) -> CanisterClientResult<BuildData> {
+        self.client.query("get_canister_build_data", ()).await
     }
 }
