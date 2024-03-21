@@ -1,8 +1,13 @@
+use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::VirtualMemory;
+use minter_contract_utils::mint_orders::MintOrders;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
-#[derive(Default, Debug)]
-pub struct MintOrdersStore(pub Vec<Entry>);
+pub struct MintOrdersStore(MintOrders<VirtualMemory<DefaultMemoryImpl>>);
+
+const SRC_TOKEN: Id256 = Id256([0; 32]);
 
 #[derive(Debug)]
 pub struct Entry {
@@ -11,19 +16,20 @@ pub struct Entry {
     pub mint_order: SignedMintOrder,
 }
 
+impl Default for MintOrdersStore {
+    fn default() -> Self {
+        Self(MintOrders::new(
+            MEMORY_MANAGER.with(|mm| mm.get(MINT_ORDERS_MEMORY_ID)),
+        ))
+    }
+}
+
 impl MintOrdersStore {
     pub fn push(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
-        // todo: check for length, duplicates?
-        self.0.push(Entry {
-            sender,
-            nonce,
-            mint_order,
-        })
+        self.0.insert(sender, SRC_TOKEN, nonce, &mint_order);
     }
 
     pub fn remove(&mut self, sender: Id256, nonce: u32) {
-        // todo: check if it is possible to have multiple orders with same values?
-        self.0
-            .retain(|entry| entry.sender != sender && entry.nonce != nonce)
+        self.0.remove(sender, SRC_TOKEN, nonce);
     }
 }
