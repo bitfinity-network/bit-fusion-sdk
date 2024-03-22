@@ -238,11 +238,12 @@ pub trait TestContext {
 
         Ok(bridge_address)
     }
-    async fn burn_erc_20_tokens(
+
+    async fn burn_erc_20_tokens_raw(
         &self,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
-        recipient: Id256,
+        recipient: Vec<u8>,
         bridge: &H160,
         amount: u128,
     ) -> Result<(u32, H256)> {
@@ -265,16 +266,35 @@ pub trait TestContext {
             .encode_input(&[
                 Token::Uint(amount),
                 Token::Address(from_token.0),
-                Token::Bytes(recipient.0.to_vec()),
+                Token::Bytes(recipient),
             ])
             .unwrap();
 
         let (tx_hash, receipt) = self.call_contract(wallet, bridge, input, 0).await?;
         let decoded_output = bft_bridge_api::BURN
-            .decode_output(&receipt.output.unwrap())
+            .decode_output(receipt.output.as_ref().unwrap())
             .unwrap();
+        if receipt.status != Some(U64::one()) {
+            return Err(TestError::Generic(format!(
+                "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
+                String::from_utf8_lossy(receipt.output.as_ref().unwrap())
+            )));
+        }
+
         let operation_id = decoded_output[0].clone().into_uint().unwrap().as_u32();
         Ok((operation_id, tx_hash))
+    }
+
+    async fn burn_erc_20_tokens(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        from_token: &H160,
+        recipient: Id256,
+        bridge: &H160,
+        amount: u128,
+    ) -> Result<(u32, H256)> {
+        self.burn_erc_20_tokens_raw(wallet, from_token, recipient.0.to_vec(), bridge, amount)
+            .await
     }
 
     /// Returns a signed transaction from the given `wallet`.

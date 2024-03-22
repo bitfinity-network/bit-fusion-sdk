@@ -6,8 +6,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bitcoin::util::psbt::serialize::Deserialize;
-use bitcoin::{Address as BtcAddress, Network as BtcNetwork};
+use bitcoin::hashes::Hash;
+use bitcoin::secp256k1::Secp256k1;
+use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use btc_bridge::canister::eth_address_to_subaccount;
 use btc_bridge::ck_btc_interface::PendingUtxo;
 use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
@@ -15,10 +16,13 @@ use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
 use eth_signer::sign_strategy::SigningStrategy;
-use eth_signer::Signer;
+use eth_signer::{Signer, Wallet};
+use ethers_core::k256::ecdsa::SigningKey;
 use ic_base_types::{CanisterId, PrincipalId};
-use ic_bitcoin_canister_mock::{OutPoint, PushUtxoToAddress, Utxo};
-use ic_btc_interface::{Network, Txid};
+use ic_bitcoin_canister_mock::PushUtxoToAddress;
+use ic_btc_interface::{
+    GetUtxosRequest, GetUtxosResponse, Network, NetworkInRequest, OutPoint, Txid, Utxo,
+};
 use ic_canister_client::CanisterClient;
 use ic_canisters_http_types::{HttpRequest, HttpResponse};
 use ic_ckbtc_kyt::{InitArg as KytInitArg, KytMode, LifecycleArg, SetApiKeyArg};
@@ -41,6 +45,7 @@ use ic_exports::icrc_types::icrc3::transactions::{
     GetTransactionsRequest, GetTransactionsResponse,
 };
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
+use ic_log::LogSettings;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
@@ -94,6 +99,19 @@ fn install_ledger(env: &StateMachine) -> CanisterId {
         .unwrap()
 }
 
+fn conv_utxo(utxo: Utxo) -> ic_bitcoin_canister_mock::Utxo {
+    let mut txid = [0; 32];
+    txid.copy_from_slice(utxo.outpoint.txid.as_ref());
+    ic_bitcoin_canister_mock::Utxo {
+        outpoint: ic_bitcoin_canister_mock::OutPoint {
+            txid: txid.into(),
+            vout: utxo.outpoint.vout,
+        },
+        value: utxo.value,
+        height: utxo.height,
+    }
+}
+
 fn install_minter(env: &StateMachine, ledger_id: CanisterId) -> CanisterId {
     let args = CkbtcMinterInitArgs {
         btc_network: ic_ckbtc_minter::lifecycle::init::BtcNetwork::Regtest,
@@ -130,8 +148,8 @@ fn assert_replacement_transaction(old: &bitcoin::Transaction, new: &bitcoin::Tra
     assert_ne!(old.txid(), new.txid());
     assert_eq!(input_utxos(old), input_utxos(new));
 
-    let new_out_value = new.output.iter().map(|out| out.value).sum::<u64>();
-    let prev_out_value = old.output.iter().map(|out| out.value).sum::<u64>();
+    let new_out_value = new.output.iter().map(|out| out.value.to_sat()).sum::<u64>();
+    let prev_out_value = old.output.iter().map(|out| out.value.to_sat()).sum::<u64>();
     let relay_cost = new.vsize() as u64 * MIN_RELAY_FEE_PER_VBYTE / 1000;
 
     assert!(
@@ -183,7 +201,10 @@ struct CkBtcSetup {
     pub kyt_id: CanisterId,
     pub tip_height: AtomicU32,
     pub wrapped_token: H160,
+    pub bft_bridge: H160,
 }
+
+impl CkBtcSetup {}
 
 impl CkBtcSetup {
     pub async fn new() -> Self {
@@ -279,11 +300,7 @@ impl CkBtcSetup {
             .canisters
             .set(CanisterType::CkBtcMinter, minter_id.into());
 
-        let canisters = [
-            CanisterType::Signature,
-            CanisterType::Evm,
-            CanisterType::Minter,
-        ];
+        let canisters = [CanisterType::Signature, CanisterType::Evm];
         for canister_type in canisters {
             context.canisters.set(
                 canister_type,
@@ -310,6 +327,11 @@ impl CkBtcSetup {
             },
             admin: (&context).admin(),
             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
+            log_settings: LogSettings {
+                enable_console: true,
+                in_memory_records: None,
+                log_filter: Some("trace".to_string()),
+            },
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();
@@ -355,7 +377,7 @@ impl CkBtcSetup {
 
         let bft_config = BftBridgeConfig {
             erc20_chain_id: chain_id as u32,
-            bridge_address: bft_bridge,
+            bridge_address: bft_bridge.clone(),
             token_address: token.clone(),
             token_name,
             token_symbol,
@@ -379,6 +401,7 @@ impl CkBtcSetup {
             minter_id,
             kyt_id,
             wrapped_token: token,
+            bft_bridge,
             tip_height: AtomicU32::default(),
         }
     }
@@ -425,7 +448,11 @@ impl CkBtcSetup {
                 .execute_ingress(
                     self.bitcoin_id,
                     "push_utxo_to_address",
-                    Encode!(&PushUtxoToAddress { address, utxo }).unwrap(),
+                    Encode!(&PushUtxoToAddress {
+                        address,
+                        utxo: conv_utxo(utxo)
+                    })
+                    .unwrap(),
                 )
                 .expect("failed to push a UTXO"),
         );
@@ -548,7 +575,7 @@ impl CkBtcSetup {
             vec![UtxoStatus::Minted {
                 block_index: 0,
                 minted_amount: utxo.value - KYT_FEE,
-                utxo,
+                utxo: conv_utxo(utxo),
             }]
         );
     }
@@ -886,11 +913,11 @@ impl CkBtcSetup {
 
         self.env()
             .advance_time(MIN_CONFIRMATIONS * Duration::from_secs(600) + Duration::from_secs(1));
-        let txid_bytes: [u8; 32] = tx.txid().to_vec().try_into().unwrap();
+        let txid_bytes: [u8; 32] = tx.txid().as_byte_array().to_vec().try_into().unwrap();
         self.push_utxo(
             change_address.to_string(),
             Utxo {
-                value: change_utxo.value,
+                value: change_utxo.value.to_sat(),
                 height: 0,
                 outpoint: OutPoint {
                     txid: txid_bytes.into(),
@@ -912,10 +939,13 @@ impl CkBtcSetup {
         .unwrap()
         .iter()
         .map(|tx_bytes| {
-            let tx = bitcoin::Transaction::deserialize(tx_bytes)
+            let tx: bitcoin::Transaction = bitcoin::consensus::encode::deserialize(tx_bytes)
                 .expect("failed to parse a bitcoin transaction");
 
-            (Txid::from(vec_to_txid(tx.txid().to_vec())), tx)
+            (
+                Txid::from(vec_to_txid(tx.txid().as_byte_array().to_vec())),
+                tx,
+            )
         })
         .collect()
     }
@@ -969,6 +999,78 @@ impl CkBtcSetup {
         })
         .await
         .unwrap();
+    }
+
+    pub async fn mint_wrapped_btc(&self, amount: u64, wallet: &Wallet<'_, SigningKey>) -> u64 {
+        let utxo = Utxo {
+            height: self.tip_height.load(Ordering::Relaxed),
+            outpoint: OutPoint {
+                txid: range_to_txid(1..=32).into(),
+                vout: 1,
+            },
+            value: amount,
+        };
+
+        let caller_eth_address = wallet.address().0.into();
+
+        let deposit_account = Account {
+            owner: self.context.canisters.btc_bridge(),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+        };
+        let deposit_address = self.get_btc_address(deposit_account);
+        self.push_utxo(deposit_address, utxo.clone());
+
+        self.advance_blocks(MIN_CONFIRMATIONS as usize);
+        let result = &self.btc_to_eth20(&caller_eth_address)[0];
+        if let Ok(Erc20MintStatus::Minted { amount, .. }) = result {
+            *amount
+        } else {
+            panic!("failed to mint ERC20: {result:?}");
+        }
+    }
+
+    pub async fn get_btc_transactions(&self, address: &str) -> Vec<Utxo> {
+        let args = GetUtxosRequest {
+            address: address.to_string(),
+            network: NetworkInRequest::Mainnet,
+            filter: None,
+        };
+
+        let response = self
+            .env()
+            .execute_ingress(
+                self.bitcoin_id,
+                "bitcoin_get_utxos",
+                Encode!(&(args)).unwrap(),
+            )
+            .expect("failed to get utxos");
+
+        Decode!(&response.bytes(), GetUtxosResponse)
+            .expect("failed to decode get utxos response")
+            .utxos
+    }
+
+    pub async fn burn_btc_to(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        btc_address: &str,
+        amount: u64,
+    ) {
+        let from_token = &self.wrapped_token;
+        let recipient = btc_address.as_bytes().into();
+
+        (&self.context)
+            .burn_erc_20_tokens_raw(
+                wallet,
+                from_token,
+                recipient,
+                &self.bft_bridge,
+                amount as u128,
+            )
+            .await
+            .expect("failed to burn");
+
+        (&self.context).advance_time(Duration::from_secs(2)).await;
     }
 }
 
@@ -1041,7 +1143,7 @@ async fn update_balance_should_return_correct_confirmations() {
 }
 
 #[tokio::test]
-async fn btc_mint_flow() {
+async fn btc_to_erc20_test() {
     let ckbtc = CkBtcSetup::new().await;
 
     ckbtc.set_tip_height(12);
@@ -1135,4 +1237,52 @@ async fn btc_mint_flow() {
     assert_eq!(canister_balance, expected_balance);
 
     ckbtc.async_drop().await;
+}
+
+#[tokio::test]
+async fn erc20_to_btc_test() {
+    let context = CkBtcSetup::new().await;
+    const DEPOSIT_AMOUNT: u64 = 10_000_000;
+    let wallet = (&context.context)
+        .new_wallet(u128::MAX)
+        .await
+        .expect("Failed to create a wallet");
+
+    let minted = context.mint_wrapped_btc(DEPOSIT_AMOUNT, &wallet).await;
+
+    let address = generate_btc_address();
+    context.burn_btc_to(&wallet, &address, minted).await;
+
+    (&context.context)
+        .advance_time(Duration::from_secs(10))
+        .await;
+
+    let txid = context.await_btc_transaction(3, 10);
+    let mempool = context.mempool();
+    assert_eq!(
+        mempool.len(),
+        1,
+        "ckbtc transaction did not appear in the mempool"
+    );
+    let tx = mempool
+        .get(&txid)
+        .expect("the mempool does not contain the withdrawal transaction");
+
+    context.finalize_transaction(tx);
+
+    eprintln!("Transaction: {tx:?}");
+    assert_eq!(tx.output.len(), 2);
+
+    // Total fee lost on transfers depends on BTC transfer fee
+    assert!(minted - tx.output[0].value.to_sat() < 5000);
+
+    context.async_drop().await;
+}
+
+fn generate_btc_address() -> String {
+    let s = Secp256k1::new();
+    let public_key = PublicKey::new(s.generate_keypair(&mut rand::thread_rng()).1);
+
+    let address = BtcAddress::p2pkh(&public_key, BtcNetwork::Bitcoin);
+    address.to_string()
 }

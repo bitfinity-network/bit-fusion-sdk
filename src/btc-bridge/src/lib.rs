@@ -1,3 +1,4 @@
+pub mod burn_request_store;
 pub mod canister;
 pub mod ck_btc_interface;
 pub mod interface;
