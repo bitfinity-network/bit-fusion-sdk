@@ -8,6 +8,7 @@ use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
+use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_log::writer::Logs;
@@ -414,6 +415,18 @@ impl MinterCanister {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
+    }
+
+    /// Requirements for Http outcalls, used to ignore small differences in the data obtained
+    /// by different nodes of the IC subnet to reach a consensus, more info:
+    /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
+    #[query]
+    fn transform(&self, raw: TransformArgs) -> HttpResponse {
+        HttpResponse {
+            status: raw.response.status,
+            headers: raw.response.headers,
+            body: raw.response.body,
+        }
     }
 
     /// Returns candid IDL.

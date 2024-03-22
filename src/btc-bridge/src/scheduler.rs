@@ -1,4 +1,6 @@
-use crate::canister::get_state;
+use std::future::Future;
+use std::pin::Pin;
+
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -12,8 +14,8 @@ use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedE
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
-use std::pin::Pin;
+
+use crate::canister::get_state;
 
 pub type TasksStorage =
     StableUnboundedMap<u32, ScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;

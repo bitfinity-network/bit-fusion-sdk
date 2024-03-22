@@ -1,7 +1,3 @@
-use crate::burn_request_store::BurnRequestStore;
-use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
-use crate::orders_store::MintOrdersStore;
-use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
@@ -12,6 +8,11 @@ use ic_stable_structures::{StableCell, VirtualMemory};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
+
+use crate::burn_request_store::BurnRequestStore;
+use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
+use crate::orders_store::MintOrdersStore;
+use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 

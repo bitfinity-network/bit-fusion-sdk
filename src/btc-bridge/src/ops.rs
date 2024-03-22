@@ -1,11 +1,6 @@
-use crate::canister::{eth_address_to_subaccount, get_scheduler};
-use crate::ck_btc_interface::{
-    RetrieveBtcArgs, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceArgs, UpdateBalanceError,
-    UtxoStatus,
-};
-use crate::interface::{Erc20MintError, Erc20MintStatus};
-use crate::scheduler::BtcTask;
-use crate::state::State;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use candid::{Nat, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -18,8 +13,15 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use crate::canister::{eth_address_to_subaccount, get_scheduler};
+use crate::ck_btc_interface::{
+    RetrieveBtcArgs, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceArgs, UpdateBalanceError,
+    UtxoStatus,
+};
+use crate::interface::{Erc20MintError, Erc20MintStatus};
+use crate::scheduler::BtcTask;
+use crate::state::State;
 
 pub async fn btc_to_erc20(
     state: Rc<RefCell<State>>,

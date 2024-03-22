@@ -9,6 +9,10 @@ use std::time::Duration;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
+use btc_bridge::canister::eth_address_to_subaccount;
+use btc_bridge::ck_btc_interface::PendingUtxo;
+use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
+use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
 use eth_signer::sign_strategy::SigningStrategy;
@@ -43,13 +47,8 @@ use ic_exports::icrc_types::icrc3::transactions::{
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use minter_did::id256::Id256;
-
-use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::ck_btc_interface::PendingUtxo;
-use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
-use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
 use minter_contract_utils::evm_link::EvmLink;
+use minter_did::id256::Id256;
 
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;

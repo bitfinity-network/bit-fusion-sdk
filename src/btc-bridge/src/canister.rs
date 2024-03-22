@@ -1,13 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::interface::{Erc20MintError, Erc20MintStatus};
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
-use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
-use crate::{
-    EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
-    EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
-};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -21,7 +14,14 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::Deserialize;
 
+use crate::interface::{Erc20MintError, Erc20MintStatus};
+use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
+use crate::{
+    EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
+    EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+};
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
