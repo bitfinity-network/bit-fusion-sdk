@@ -78,7 +78,11 @@ impl BtcTask {
         .await
         .into_scheduler_result()?;
 
-        log::debug!("got logs from evm");
+        log::debug!("got {} logs from evm", logs.len());
+
+        if logs.is_empty() {
+            return Ok(());
+        }
 
         let mut mut_state = state.borrow_mut();
 
@@ -171,7 +175,39 @@ impl Task for BtcTask {
                     Ok(())
                 })
             }
-            BtcTask::MintBtc(_) => Box::pin(async move { todo!() }),
+            BtcTask::MintBtc(BurntEventData {
+                operation_id,
+                recipient_id,
+                amount,
+                ..
+            }) => {
+                log::info!("ERC20 burn event received");
+
+                let amount = amount.0.as_u64();
+                let operation_id = *operation_id;
+
+                let Ok(address) = String::from_utf8(recipient_id.clone()) else {
+                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
+                        "Failed to decode recipient address".to_string(),
+                    )));
+                };
+
+                Box::pin(async move {
+                    let result =
+                        crate::ops::burn_ckbtc(&get_state(), operation_id, &address, amount)
+                            .await
+                            .map_err(|err| {
+                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
+                            })?;
+
+                    log::info!(
+                        "Created withdrawal transaction at block {}",
+                        result.block_index
+                    );
+
+                    Ok(())
+                })
+            }
         }
     }
 }

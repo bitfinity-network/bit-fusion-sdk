@@ -1,13 +1,17 @@
 use crate::canister::{eth_address_to_subaccount, get_scheduler};
-use crate::ck_btc_interface::{UpdateBalanceArgs, UpdateBalanceError, UtxoStatus};
+use crate::ck_btc_interface::{
+    RetrieveBtcArgs, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceArgs, UpdateBalanceError,
+    UtxoStatus,
+};
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::scheduler::BtcTask;
 use crate::state::State;
-use candid::Nat;
+use candid::{Nat, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::virtual_canister_call;
 use ic_exports::ic_kit::ic;
+use ic_exports::icrc_types::icrc1::account::Account as IcrcAccount;
 use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
@@ -270,4 +274,119 @@ async fn send_mint_order(
     log::trace!("Mint transaction sent");
 
     Ok(id.into())
+}
+
+pub(crate) async fn burn_ckbtc(
+    state: &RefCell<State>,
+    request_id: u32,
+    address: &str,
+    amount: u64,
+) -> Result<RetrieveBtcOk, RetrieveBtcError> {
+    log::trace!("Transferring {amount} ckBTC to {address} with request id {request_id}");
+
+    state
+        .borrow_mut()
+        .burn_request_store_mut()
+        .insert(request_id, address.to_string(), amount);
+
+    let ck_btc_ledger = state.borrow().ck_btc_ledger();
+    let ck_btc_minter = state.borrow().ck_btc_minter();
+    let fee = state.borrow().ck_btc_ledger_fee();
+    let account = get_ckbtc_withdrawal_account(ck_btc_minter).await?;
+
+    // ICRC1 takes fee on top of the amount
+    let to_transfer = amount - fee;
+    transfer_ckbtc(ck_btc_ledger, account, to_transfer, fee).await?;
+
+    state
+        .borrow_mut()
+        .burn_request_store_mut()
+        .set_transferred(request_id);
+
+    let result = request_btc_withdrawal(ck_btc_minter, address.to_string(), to_transfer).await;
+
+    if result.is_ok() {
+        state
+            .borrow_mut()
+            .burn_request_store_mut()
+            .remove(request_id);
+    }
+
+    result
+}
+
+async fn get_ckbtc_withdrawal_account(
+    ckbtc_minter: Principal,
+) -> Result<IcrcAccount, RetrieveBtcError> {
+    log::trace!("Requesting ckbtc withdrawal account");
+
+    let account = virtual_canister_call!(ckbtc_minter, "get_withdrawal_account", (), IcrcAccount)
+        .await
+        .map_err(|err| {
+            log::error!("Failed to get withdrawal account: {err:?}");
+            RetrieveBtcError::TemporarilyUnavailable("get withdrawal account".to_string())
+        })?;
+
+    log::trace!("Got ckbtc withdrawal account: {account:?}");
+
+    Ok(account)
+}
+
+async fn transfer_ckbtc(
+    ckbtc_ledger: Principal,
+    account: IcrcAccount,
+    amount: u64,
+    fee: u64,
+) -> Result<(), RetrieveBtcError> {
+    log::trace!("Transferring {amount} ckbtc to {account:?} with fee {fee}");
+
+    let arg = ic_exports::icrc_types::icrc1::transfer::TransferArg {
+        from_subaccount: None,
+        to: account,
+        fee: Some(fee.into()),
+        created_at_time: None,
+        memo: None,
+        amount: amount.into(),
+    };
+    virtual_canister_call!(
+        ckbtc_ledger,
+        "icrc1_transfer",
+        (arg,),
+        Result<Nat, ic_exports::icrc_types::icrc1::transfer::TransferError>
+    )
+    .await
+    .map_err(|err| {
+        log::error!("Failed to transfer ckBTC: {err:?}");
+        RetrieveBtcError::TemporarilyUnavailable("ckBTC transfer failed".to_string())
+    })?
+    .map_err(|err| {
+        log::error!("Failed to transfer ckBTC: {err:?}");
+        RetrieveBtcError::TemporarilyUnavailable("ckBTC transfer failed".to_string())
+    })?;
+
+    log::trace!("Transferred {amount} ckbtc to {account:?} with fee {fee}");
+
+    Ok(())
+}
+
+async fn request_btc_withdrawal(
+    ckbtc_minter: Principal,
+    address: String,
+    amount: u64,
+) -> Result<RetrieveBtcOk, RetrieveBtcError> {
+    log::trace!("Requesting withdrawal of {amount} btc to {address}");
+
+    let arg = RetrieveBtcArgs {
+        amount,
+        address: address.clone(),
+    };
+    let result = virtual_canister_call!(ckbtc_minter, "retrieve_btc", (arg,), Result<RetrieveBtcOk, RetrieveBtcError>).await
+        .map_err(|err| {
+            log::error!("Failed to call retrieve_btc: {err:?}");
+            RetrieveBtcError::TemporarilyUnavailable("retrieve_btc call failed".to_string())
+        })?;
+
+    log::trace!("Withdrawal of {amount} btc to {address} requested");
+
+    result
 }

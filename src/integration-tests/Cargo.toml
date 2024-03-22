@@ -7,7 +7,7 @@ edition.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
-bitcoin = { workspace = true, optional = true }
+bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
