@@ -23,7 +23,6 @@ use ord_rs::{
     OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
 };
 use serde::de::DeserializeOwned;
-use sha2::Digest;
 
 use self::fees::MultisigConfig;
 use self::inscription::Protocol;
@@ -51,32 +50,22 @@ pub async fn inscribe(
     multisig: Option<MultisigConfig>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
-    let bitcoin_network = match network {
-        BitcoinNetwork::Mainnet => Network::Bitcoin,
-        BitcoinNetwork::Testnet => Network::Testnet,
-        BitcoinNetwork::Regtest => Network::Regtest,
-    };
+    let bitcoin_network = map_network(network);
 
     // fetch the arguments for initializing a wallet
     let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
     let derivation_path = vec![];
     let own_public_key =
         ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
-
-    // TODO: Create a generic `public_key_address` function to replace this
-    let own_address = public_key_to_p2pkh_address(network, &own_public_key);
+    let own_pk = PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?;
+    let own_address = btc_address_from_public_key(network, &own_pk);
 
     log::info!("Fetching UTXOs...");
-    let own_utxos = bitcoin_api::get_utxos(network, own_address.clone())
+    let own_utxos = bitcoin_api::get_utxos(network, own_address.to_string())
         .await
         .expect("Failed to retrieve UTXOs for given address")
         .utxos;
     log::trace!("Our own UTXOS: {:#?}", own_utxos);
-
-    let own_address = Address::from_str(&own_address)
-        .expect("Failed to parse address")
-        .require_network(bitcoin_network)
-        .expect("Address belongs to a different network than specified");
 
     // initialize a wallet (transaction signer) and a transaction builder
     let wallet_type = WalletType::External {
@@ -93,11 +82,7 @@ pub async fn inscribe(
     };
 
     let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
-    let mut builder = OrdTransactionBuilder::new(
-        PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?,
-        script_type,
-        wallet,
-    );
+    let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
     let dst_address = if let Some(addr) = dst_address {
         Address::from_str(&addr)
@@ -337,46 +322,31 @@ fn estimate_unsigned_reveal_tx_size(inputs: Vec<OutPoint>, outputs: Vec<TxOut>) 
     unsigned_reveal_tx.vsize()
 }
 
-/// Returns the P2PKH address of this canister at the given derivation path.
-/// We use this to generate payment addresses
-pub async fn get_p2pkh_address(
+/// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
+pub async fn get_bitcoin_address(
     network: BitcoinNetwork,
     key_name: String,
     derivation_path: Vec<Vec<u8>>,
-) -> String {
+) -> Address {
     // Fetch the public key of the given derivation path.
     let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
-    // Compute the address.
-    public_key_to_p2pkh_address(network, &public_key)
+    let pk = PublicKey::from_slice(&public_key).expect("Can't deserialize public key");
+
+    btc_address_from_public_key(network, &pk)
 }
 
-// Converts a public key to a P2PKH address.
-fn public_key_to_p2pkh_address(network: BitcoinNetwork, public_key: &[u8]) -> String {
-    // SHA-256 & RIPEMD-160
-    let result = ripemd160(&sha256(public_key));
+// Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.
+fn btc_address_from_public_key(network: BitcoinNetwork, pk: &PublicKey) -> Address {
+    let network = map_network(network);
 
-    let prefix = match network {
-        BitcoinNetwork::Testnet | BitcoinNetwork::Regtest => 0x6f,
-        BitcoinNetwork::Mainnet => 0x00,
-    };
-    let mut data_with_prefix = vec![prefix];
-    data_with_prefix.extend(result);
-
-    let checksum = &sha256(&sha256(&data_with_prefix.clone()))[..4];
-
-    let mut full_address = data_with_prefix;
-    full_address.extend(checksum);
-
-    bs58::encode(full_address).into_string()
+    // Compute the bitcoin segwit(bech32) address.
+    Address::p2wpkh(pk, network).expect("Can't convert public key to segwit bitcoin address")
 }
 
-fn sha256(data: &[u8]) -> Vec<u8> {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(data);
-    hasher.finalize().to_vec()
-}
-fn ripemd160(data: &[u8]) -> Vec<u8> {
-    let mut hasher = ripemd::Ripemd160::new();
-    hasher.update(data);
-    hasher.finalize().to_vec()
+fn map_network(network: BitcoinNetwork) -> Network {
+    match network {
+        BitcoinNetwork::Mainnet => Network::Bitcoin,
+        BitcoinNetwork::Testnet => Network::Testnet,
+        BitcoinNetwork::Regtest => Network::Regtest,
+    }
 }
