@@ -80,7 +80,7 @@ impl BtcTask {
 
         log::debug!("got {} logs from evm", logs.len());
 
-        if logs.len() == 0 {
+        if logs.is_empty() {
             return Ok(());
         }
 
