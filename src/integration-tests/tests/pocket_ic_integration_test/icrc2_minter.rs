@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use candid::{Nat, Principal};
 use did::H160;
 use ethers_core::abi::Token;
@@ -10,7 +12,6 @@ use minter_contract_utils::build_data::test_contracts::WRAPPED_TOKEN_SMART_CONTR
 use minter_contract_utils::wrapped_token_api;
 use minter_did::error::Error as McError;
 use minter_did::id256::Id256;
-use std::time::Duration;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
 use crate::context::{CanisterType, TestContext, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE};

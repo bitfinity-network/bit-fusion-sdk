@@ -1,12 +1,11 @@
 #![allow(dead_code)]
 
-use crate::context::{CanisterType, TestContext};
-use crate::state_machine_tests::StateMachineContext;
-use crate::utils::wasm::{
-    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
-    get_ck_btc_minter_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_kyt_canister_bytecode,
-};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
 use bitcoin::util::psbt::serialize::Deserialize;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork};
 use btc_bridge::canister::eth_address_to_subaccount;
@@ -45,11 +44,14 @@ use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
-use std::collections::BTreeMap;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+
+use crate::context::{CanisterType, TestContext};
+use crate::state_machine_tests::StateMachineContext;
+use crate::utils::wasm::{
+    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
+    get_ck_btc_minter_canister_bytecode, get_icrc1_token_canister_bytecode,
+    get_kyt_canister_bytecode,
+};
 
 const KYT_FEE: u64 = 2_000;
 const CKBTC_LEDGER_FEE: u64 = 10;

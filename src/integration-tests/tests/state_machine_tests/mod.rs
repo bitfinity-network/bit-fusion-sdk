@@ -1,5 +1,6 @@
-use crate::context::{TestCanisters, TestContext};
-use crate::utils::error::TestError;
+use std::sync::Arc;
+use std::time::Duration;
+
 use candid::utils::ArgumentEncoder;
 use candid::{encode_args, CandidType, Decode, Nat, Principal};
 use ic_base_types::{CanisterId, PrincipalId};
@@ -9,8 +10,9 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_management_canister_types::CanisterSettingsArgsBuilder;
 use ic_state_machine_tests::StateMachine;
 use serde::de::DeserializeOwned;
-use std::sync::Arc;
-use std::time::Duration;
+
+use crate::context::{TestCanisters, TestContext};
+use crate::utils::error::TestError;
 
 mod btc;
 
