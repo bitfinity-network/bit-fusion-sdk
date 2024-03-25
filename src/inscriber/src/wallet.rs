@@ -1,30 +1,24 @@
 pub mod bitcoin_api;
 pub mod ecdsa_api;
-pub mod fees;
 pub mod inscription;
 
 use std::str::FromStr;
 
-use bitcoin::absolute::LockTime;
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
-use bitcoin::script::Builder;
-use bitcoin::transaction::Version;
-use bitcoin::{
-    Address, AddressType, Amount, FeeRate, Network, OutPoint, PublicKey, Script, ScriptBuf,
-    Sequence, Transaction, TxIn, TxOut, Txid, Witness,
-};
+use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, Transaction, Txid};
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use ic_exports::ic_cdk::print;
 use inscription::Nft as CandidNft;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    Brc20, CreateCommitTransactionArgs, ExternalSigner, Inscription, Nft, OrdError, OrdResult,
-    OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
+    Brc20, CreateCommitTransactionArgsV2, ExternalSigner, Inscription, MultisigConfig, Nft,
+    OrdError, OrdResult, OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet,
+    WalletType,
 };
 use serde::de::DeserializeOwned;
 
-use self::fees::MultisigConfig;
 use self::inscription::Protocol;
 use crate::canister::ECDSA_KEY_NAME;
 
@@ -47,7 +41,7 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    multisig: Option<MultisigConfig>,
+    multisig_config: Option<MultisigConfig>,
 ) -> OrdResult<(String, String)> {
     // map the network variants
     let bitcoin_network = map_network(network);
@@ -60,26 +54,19 @@ pub async fn inscribe(
     let own_pk = PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?;
     let own_address = btc_address_from_public_key(network, &own_pk);
 
-    log::info!("Fetching UTXOs...");
+    print("Fetching UTXOs...");
     let own_utxos = bitcoin_api::get_utxos(network, own_address.to_string())
         .await
         .expect("Failed to retrieve UTXOs for given address")
         .utxos;
-    log::trace!("Our own UTXOS: {:#?}", own_utxos);
+    print(format!("Our own UTXOS: {:#?}", own_utxos));
 
     // initialize a wallet (transaction signer) and a transaction builder
     let wallet_type = WalletType::External {
         signer: Box::new(EcdsaSigner {}),
     };
 
-    let script_type = match own_address.address_type() {
-        Some(addr_type) => match addr_type {
-            AddressType::P2pkh | AddressType::P2sh | AddressType::P2wpkh => ScriptType::P2WSH,
-            AddressType::P2tr => ScriptType::P2TR,
-            _ => ScriptType::P2WSH,
-        },
-        None => panic!("Unsupported address type!"),
-    };
+    let script_type = ScriptType::P2WSH;
 
     let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
     let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
@@ -111,6 +98,8 @@ pub async fn inscribe(
 
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => {
+            print("109: Begin parsing BRC20");
+
             let op: Brc20 = serde_json::from_str(&inscription)?;
 
             let inscription = match op {
@@ -118,6 +107,8 @@ pub async fn inscribe(
                 Brc20::Mint(data) => Brc20::mint(data.tick, data.amt),
                 Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
             };
+
+            print("119: Finish parsing BRC20");
 
             build_commit_and_reveal_transactions::<Brc20>(
                 &mut builder,
@@ -127,17 +118,20 @@ pub async fn inscribe(
                 &own_utxos,
                 bitcoin_network,
                 fee_rate,
-                multisig,
-                script_type,
+                multisig_config,
             )
             .await?
         }
         Protocol::Nft => {
+            print("135: Begin parsing NFT");
+
             let data: CandidNft = serde_json::from_str(&inscription)?;
             let inscription = Nft::new(
                 Some(data.content_type.as_bytes().to_vec()),
                 Some(data.body.as_bytes().to_vec()),
             );
+
+            print("143: Finish parsing NFT");
 
             build_commit_and_reveal_transactions::<Nft>(
                 &mut builder,
@@ -147,32 +141,31 @@ pub async fn inscribe(
                 &own_utxos,
                 bitcoin_network,
                 fee_rate,
-                multisig,
-                script_type,
+                multisig_config,
             )
             .await?
         }
     };
 
     let commit_tx_bytes = serialize(&commit_tx);
-    log::trace!(
+    print(format!(
         "Signed commit transaction: {}",
         hex::encode(&commit_tx_bytes)
-    );
+    ));
 
-    log::info!("Sending commit transaction...");
+    print("Sending commit transaction...");
     bitcoin_api::send_transaction(network, commit_tx_bytes).await;
-    log::info!("Done");
+    print("Done");
 
     let reveal_tx_bytes = serialize(&reveal_tx);
-    log::trace!(
+    print(format!(
         "Signed reveal transaction: {}",
         hex::encode(&reveal_tx_bytes)
-    );
+    ));
 
-    log::info!("Sending reveal transaction...");
+    print("Sending reveal transaction...");
     bitcoin_api::send_transaction(network, reveal_tx_bytes).await;
-    log::info!("Done");
+    print("Done");
 
     Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
 }
@@ -186,12 +179,13 @@ async fn build_commit_and_reveal_transactions<T>(
     own_utxos: &[Utxo],
     network: Network,
     fee_rate: FeeRate,
-    multisig: Option<MultisigConfig>,
-    script_type: ScriptType,
+    multisig_config: Option<MultisigConfig>,
 ) -> OrdResult<(Transaction, Transaction)>
 where
     T: Inscription + DeserializeOwned,
 {
+    print("190: UTXOs to spend");
+
     let mut utxos_to_spend = vec![];
     let mut amount = 0;
     for utxo in own_utxos.iter().rev() {
@@ -199,7 +193,11 @@ where
         utxos_to_spend.push(utxo);
     }
 
+    print("199: total spend");
+
     let total_spent = Amount::from_sat(amount);
+
+    print("203: Gathering tx inputs");
 
     let inputs: Vec<OrdUtxo> = utxos_to_spend
         .clone()
@@ -215,43 +213,21 @@ where
 
     let leftovers_recipient = own_address.clone();
 
-    let txin_script_pubkey = ScriptBuf::from_bytes(own_address.script_pubkey().into_bytes());
+    let txin_script_pubkey = own_address.script_pubkey();
 
-    let unsigned_commit_tx_size = estimate_unsigned_commit_tx_size(
-        utxos_to_spend.clone(),
-        total_spent,
-        txin_script_pubkey.clone(),
-    );
-
-    let commit_fee = fees::calculate_transaction_fees(
-        script_type,
-        unsigned_commit_tx_size,
-        fee_rate,
-        multisig.clone(),
-    );
-
-    let unsigned_reveal_tx_size = estimate_unsigned_reveal_tx_size(
-        vec![OutPoint::null()],
-        vec![TxOut {
-            script_pubkey: recipient_address.script_pubkey(),
-            value: Amount::from_sat(0),
-        }],
-    );
-
-    let reveal_fee =
-        fees::calculate_transaction_fees(script_type, unsigned_reveal_tx_size, fee_rate, multisig);
-
-    let commit_tx_args = CreateCommitTransactionArgs {
+    let commit_tx_args = CreateCommitTransactionArgsV2 {
         inputs,
         inscription,
         leftovers_recipient,
-        commit_fee,
-        reveal_fee,
         txin_script_pubkey,
+        fee_rate,
+        multisig_config,
     };
 
+    print("262: build commit transaction");
+
     let commit_tx = builder
-        .build_commit_transaction(network, commit_tx_args)
+        .build_commit_transaction_v2(network, recipient_address.clone(), commit_tx_args)
         .await?;
 
     let reveal_tx_args = RevealTransactionArgs {
@@ -263,63 +239,12 @@ where
         recipient_address,
         redeem_script: commit_tx.clone().redeem_script,
     };
+
+    print("278: build reveal transaction");
+
     let reveal_tx = builder.build_reveal_transaction(reveal_tx_args).await?;
 
     Ok((commit_tx.tx, reveal_tx))
-}
-
-pub fn estimate_unsigned_commit_tx_size(
-    utxos_to_spend: Vec<&Utxo>,
-    amount: Amount,
-    txin_script_pubkey: ScriptBuf,
-) -> usize {
-    let tx_in: Vec<TxIn> = utxos_to_spend
-        .into_iter()
-        .map(|utxo| TxIn {
-            previous_output: OutPoint {
-                txid: Txid::from_raw_hash(
-                    Hash::from_slice(&utxo.outpoint.txid)
-                        .expect("Failed to copy txid byte slice into hash object"),
-                ),
-                vout: utxo.outpoint.vout,
-            },
-            sequence: Sequence::ZERO,
-            witness: Witness::new(),
-            script_sig: Script::new().into(),
-        })
-        .collect();
-
-    let unsigned_commit_tx = Transaction {
-        version: Version::TWO,
-        lock_time: LockTime::ZERO,
-        input: tx_in,
-        output: vec![TxOut {
-            script_pubkey: txin_script_pubkey.clone(),
-            value: amount,
-        }],
-    };
-
-    unsigned_commit_tx.vsize()
-}
-
-/// Create the reveal transaction
-fn estimate_unsigned_reveal_tx_size(inputs: Vec<OutPoint>, outputs: Vec<TxOut>) -> usize {
-    let unsigned_reveal_tx = Transaction {
-        version: Version::TWO,
-        lock_time: LockTime::ZERO,
-        input: inputs
-            .iter()
-            .map(|outpoint| TxIn {
-                previous_output: *outpoint,
-                script_sig: Builder::new().into_script(),
-                witness: Witness::new(),
-                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
-            })
-            .collect(),
-        output: outputs,
-    };
-
-    unsigned_reveal_tx.vsize()
 }
 
 /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.

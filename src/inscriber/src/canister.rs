@@ -8,16 +8,16 @@ use ic_canister::{
 };
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
+use ord_rs::MultisigConfig;
 
 use crate::build_data::canister_build_data;
-use crate::wallet::fees::MultisigConfig;
-use crate::wallet::inscription::Protocol;
+use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{self, bitcoin_api};
 
 thread_local! {
-    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
+    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
 
-    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
+    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = const { vec![] };
 
     pub(crate) static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
 }
@@ -77,16 +77,21 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<String>,
-        multisig: Option<MultisigConfig>,
+        multisig_config: Option<Multisig>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
+
+        let multisig_config = multisig_config.map(|m| MultisigConfig {
+            required: m.required,
+            total: m.total,
+        });
 
         wallet::inscribe(
             network,
             inscription_type,
             inscription,
             dst_address,
-            multisig,
+            multisig_config,
         )
         .await
         .unwrap()

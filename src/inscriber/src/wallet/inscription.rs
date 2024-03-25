@@ -51,3 +51,13 @@ pub struct Nft {
     /// which might represent an image, text, or other types of digital assets.
     pub body: String,
 }
+
+/// Represents multisig configuration (m of n) for a transaction, if applicable.
+/// Encapsulates the number of required signatures and the total number of signatories.
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+pub struct Multisig {
+    /// Number of required signatures (m)
+    pub required: usize,
+    /// Total number of signatories (n)
+    pub total: usize,
+}
