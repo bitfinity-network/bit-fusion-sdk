@@ -54,15 +54,15 @@ The above commands will start the local IC replica in the background, connecting
 
 ## Step 2: Generate a Bitcoin Address for the Canister
 
-Bitcoin has different types of addresses (e.g. P2PKH, P2SH). Most of these addresses can be generated from an ECDSA public key. Currently, you can generate a P2PKH address via the following command:
+Bitcoin has different types of addresses (e.g. P2PKH, P2SH). Most of these addresses can be generated from an ECDSA public key. Currently, you can generate the native segwit address type (`P2WPKH`) via the following command:
 
 ```bash
-dfx canister call inscriber get_p2pkh_address
+dfx canister call inscriber get_bitcoin_address
 ```
 
 The above command will generate a unique Bitcoin address from the ECDSA public key of the canister.
 
-## Step 3: Send bitcoins to Canister's P2PKH Address
+## Step 3: Send bitcoins to Canister's Bitcoin Address
 
 Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions.
 
@@ -70,7 +70,7 @@ Now that the canister is deployed and you have a Bitcoin address, you need to to
 docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 101 <CANISTER-BITCOIN-ADDRESS>
 ```
 
-Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_p2pkh_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
+Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_bitcoin_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
 
 ## Step 4: Check the Canister's bitcoin Balance
 
@@ -124,8 +124,8 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    multisig: Option<MultisigConfig>
+    multisig_config: Option<Multisig>
 ) -> (String, String)
 ```
 
-which is why the above call has `null` arguments for the `dst_address` and `multisig` optional parameters.
+which is why the above call has `null` arguments for the `dst_address` and `multisig_config` optional parameters.

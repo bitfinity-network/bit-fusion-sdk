@@ -66,6 +66,7 @@ pub async fn inscribe(
         signer: Box::new(EcdsaSigner {}),
     };
 
+    // Hardcoded for debugging
     let script_type = ScriptType::P2WSH;
 
     let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
@@ -98,8 +99,6 @@ pub async fn inscribe(
 
     let (commit_tx, reveal_tx) = match inscription_type {
         Protocol::Brc20 => {
-            print("109: Begin parsing BRC20");
-
             let op: Brc20 = serde_json::from_str(&inscription)?;
 
             let inscription = match op {
@@ -107,8 +106,6 @@ pub async fn inscribe(
                 Brc20::Mint(data) => Brc20::mint(data.tick, data.amt),
                 Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
             };
-
-            print("119: Finish parsing BRC20");
 
             build_commit_and_reveal_transactions::<Brc20>(
                 &mut builder,
@@ -123,15 +120,11 @@ pub async fn inscribe(
             .await?
         }
         Protocol::Nft => {
-            print("135: Begin parsing NFT");
-
             let data: CandidNft = serde_json::from_str(&inscription)?;
             let inscription = Nft::new(
                 Some(data.content_type.as_bytes().to_vec()),
                 Some(data.body.as_bytes().to_vec()),
             );
-
-            print("143: Finish parsing NFT");
 
             build_commit_and_reveal_transactions::<Nft>(
                 &mut builder,
@@ -184,8 +177,6 @@ async fn build_commit_and_reveal_transactions<T>(
 where
     T: Inscription + DeserializeOwned,
 {
-    print("190: UTXOs to spend");
-
     let mut utxos_to_spend = vec![];
     let mut amount = 0;
     for utxo in own_utxos.iter().rev() {
@@ -193,11 +184,7 @@ where
         utxos_to_spend.push(utxo);
     }
 
-    print("199: total spend");
-
     let total_spent = Amount::from_sat(amount);
-
-    print("203: Gathering tx inputs");
 
     let inputs: Vec<OrdUtxo> = utxos_to_spend
         .clone()
@@ -224,8 +211,6 @@ where
         multisig_config,
     };
 
-    print("262: build commit transaction");
-
     let commit_tx = builder
         .build_commit_transaction_v2(network, recipient_address.clone(), commit_tx_args)
         .await?;
@@ -239,8 +224,6 @@ where
         recipient_address,
         redeem_script: commit_tx.clone().redeem_script,
     };
-
-    print("278: build reveal transaction");
 
     let reveal_tx = builder.build_reveal_transaction(reveal_tx_args).await?;
 
