@@ -1,0 +1,23 @@
+[package]
+name = "ordinals-api-tester"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+export-api = []
+
+[dependencies]
+anyhow = { workspace = true }
+candid = { workspace = true }
+did = { workspace = true }
+ic-canister = { workspace = true }
+ic-canister-client = { workspace = true }
+ic-exports = { workspace = true, features = ["icrc"] }
+ic-metrics = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-storage = { workspace = true }
+ic-task-scheduler = { workspace = true }
+serde = { workspace = true }
+ic-log = { workspace = true }
+ordinals-api = { workspace = true, features = ["http-mock"] }

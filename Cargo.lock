@@ -5588,6 +5588,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "once_cell",
+ "ordinals-api",
  "rand",
  "rlp",
  "serde",
@@ -6490,6 +6491,35 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "ordinals-api"
+version = "0.2.0"
+dependencies = [
+ "candid",
+ "ic-exports",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ordinals-api-tester"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "candid",
+ "did",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-metrics 0.13.0",
+ "ic-stable-structures 0.13.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "ordinals-api",
+ "serde",
+]
 
 [[package]]
 name = "os_str_bytes"

@@ -38,7 +38,7 @@ use crate::utils::wasm::{
     get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
     get_ck_btc_minter_canister_bytecode, get_erc20_minter_canister_bytecode,
     get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_kyt_canister_bytecode, get_minter_canister_bytecode,
+    get_kyt_canister_bytecode, get_minter_canister_bytecode, get_ordinals_api_tester_bytecode,
     get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
@@ -585,6 +585,18 @@ pub trait TestContext {
             CanisterType::BtcBridge => {
                 todo!()
             }
+            CanisterType::OrdinalsApiTester => {
+                println!("Installing ordinals api tester canister...");
+                self.install_canister(
+                    self.canisters().ordinals_api_tester(),
+                    wasm,
+                    ("http://localhost:3000",),
+                )
+                .await
+                .unwrap();
+
+                self.advance_time(Duration::from_secs(2)).await;
+            }
         }
     }
 
@@ -868,6 +880,13 @@ impl TestCanisters {
             .expect("bridge canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn ordinals_api_tester(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::OrdinalsApiTester)
+            .expect("ordinals api tester canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -894,6 +913,7 @@ pub enum CanisterType {
     Kyt,
     Icrc1Ledger,
     BtcBridge,
+    OrdinalsApiTester,
 }
 
 impl CanisterType {
@@ -930,6 +950,7 @@ impl CanisterType {
             CanisterType::Kyt => get_kyt_canister_bytecode().await,
             CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
+            CanisterType::OrdinalsApiTester => get_ordinals_api_tester_bytecode().await,
         }
     }
 }

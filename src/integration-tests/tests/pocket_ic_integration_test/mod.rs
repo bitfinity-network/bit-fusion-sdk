@@ -1,6 +1,7 @@
 mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
+mod ordinals_api_tester;
 mod token;
 
 use std::fmt;

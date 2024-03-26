@@ -1,0 +1,13 @@
+[package]
+name = "ordinals-api"
+version.workspace = true
+edition.workspace = true
+
+[features]
+http-mock = []
+
+[dependencies]
+candid = { workspace = true }
+ic-exports = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

@@ -9,6 +9,8 @@ members = [
     "src/spender-canister",
     "src/solidity-helper",
     "src/btc-bridge",
+    "src/ordinals-api",
+    "src/ordinals-api-tester"
 ]
 resolver = "2"
 
@@ -65,6 +67,7 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
+ordinals-api = { path = "src/ordinals-api" }
 
 [profile.dev]
 debug = false

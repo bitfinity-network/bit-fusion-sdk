@@ -128,6 +128,7 @@ build_requested_canisters() {
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
+        build_canister "ordinals-api-tester" "export-api" "ordinals-api-tester.wasm" "ordinals-api-tester"
 
         # Build tools
         build_create_bft_bridge_tool
