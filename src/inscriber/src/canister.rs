@@ -61,12 +61,8 @@ impl Inscriber {
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
-        let derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
-        let key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
         let network = BITCOIN_NETWORK.with(|n| n.get());
-        wallet::get_bitcoin_address(network, key_name, derivation_path)
-            .await
-            .to_string()
+        wallet::get_bitcoin_address(network).await.to_string()
     }
 
     /// Inscribes and sends the given amount of bitcoin from this canister to the given address.

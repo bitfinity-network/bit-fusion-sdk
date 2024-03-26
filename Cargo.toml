@@ -39,6 +39,8 @@ vergen = { version = "8.3", default-features = false, features = [
 getrandom = { version = "0.2", features = ["custom"] }
 rand = { version = "0.8", features = ["getrandom"] }
 
+k256 = { version = "0.13", features = ["ecdsa"] }
+
 [profile.dev]
 debug = false
 

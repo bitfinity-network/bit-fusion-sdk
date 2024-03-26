@@ -20,19 +20,35 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::Protocol;
-use crate::canister::ECDSA_KEY_NAME;
 
 struct EcdsaSigner;
 
 #[async_trait::async_trait]
 impl ExternalSigner for EcdsaSigner {
-    async fn sign(
+    async fn ecdsa_public_key(&self) -> String {
+        match ecdsa_api::ecdsa_public_key().await {
+            Ok(res) => res.public_key_hex,
+            Err(e) => panic!("{e}"),
+        }
+    }
+
+    async fn sign_with_ecdsa(&self, message: String) -> Vec<u8> {
+        match ecdsa_api::sign_with_ecdsa(message).await {
+            Ok(res) => res.signature_hex.as_bytes().to_vec(),
+            Err(e) => panic!("{e}"),
+        }
+    }
+
+    async fn verify_ecdsa(
         &self,
-        key_name: String,
-        derivation_path: Vec<Vec<u8>>,
-        message_hash: Vec<u8>,
-    ) -> Vec<u8> {
-        ecdsa_api::sign_with_ecdsa(key_name, derivation_path, message_hash).await
+        signature_hex: String,
+        message: String,
+        public_key_hex: String,
+    ) -> bool {
+        match ecdsa_api::verify_ecdsa(signature_hex, message, public_key_hex).await {
+            Ok(res) => res.is_signature_valid,
+            Err(e) => panic!("{e}"),
+        }
     }
 }
 
@@ -46,12 +62,10 @@ pub async fn inscribe(
     // map the network variants
     let bitcoin_network = map_network(network);
 
-    // fetch the arguments for initializing a wallet
-    let key_name = ECDSA_KEY_NAME.with(|name| name.borrow().to_string());
-    let derivation_path = vec![];
-    let own_public_key =
-        ecdsa_api::ecdsa_public_key(key_name.clone(), derivation_path.clone()).await;
-    let own_pk = PublicKey::from_slice(&own_public_key).map_err(OrdError::PubkeyConversion)?;
+    let ecdsa_signer = EcdsaSigner;
+    let own_pk = PublicKey::from_slice(ecdsa_signer.ecdsa_public_key().await.as_bytes())
+        .map_err(OrdError::PubkeyConversion)?;
+
     let own_address = btc_address_from_public_key(network, &own_pk);
 
     print("Fetching UTXOs...");
@@ -62,14 +76,11 @@ pub async fn inscribe(
     print(format!("Our own UTXOS: {:#?}", own_utxos));
 
     // initialize a wallet (transaction signer) and a transaction builder
-    let wallet_type = WalletType::External {
-        signer: Box::new(EcdsaSigner {}),
-    };
-
+    let wallet = Wallet::new_with_signer(WalletType::External {
+        signer: Box::new(ecdsa_signer),
+    });
     // Hardcoded for debugging
     let script_type = ScriptType::P2WSH;
-
-    let wallet = Wallet::new_with_signer(Some(key_name), Some(derivation_path), wallet_type);
     let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
     let dst_address = if let Some(addr) = dst_address {
@@ -230,16 +241,14 @@ where
     Ok((commit_tx.tx, reveal_tx))
 }
 
-/// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
-pub async fn get_bitcoin_address(
-    network: BitcoinNetwork,
-    key_name: String,
-    derivation_path: Vec<Vec<u8>>,
-) -> Address {
-    // Fetch the public key of the given derivation path.
-    let public_key = ecdsa_api::ecdsa_public_key(key_name, derivation_path).await;
-    let pk = PublicKey::from_slice(&public_key).expect("Can't deserialize public key");
+/// Returns bech32 bitcoin `Address` of this canister.
+pub async fn get_bitcoin_address(network: BitcoinNetwork) -> Address {
+    let public_key = match ecdsa_api::ecdsa_public_key().await {
+        Ok(res) => res.public_key_hex,
+        Err(e) => panic!("{e}"),
+    };
 
+    let pk = PublicKey::from_slice(public_key.as_bytes()).expect("Can't deserialize public key");
     btc_address_from_public_key(network, &pk)
 }
 
