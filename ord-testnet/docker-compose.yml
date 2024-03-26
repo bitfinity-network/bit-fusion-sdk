@@ -12,7 +12,7 @@ services:
       - "5432:5432"
   bitcoind:
     image: lncm/bitcoind:v26.0
-    container_name: bitcoind
+    command: ["-txindex", "-regtest"]
     ports:
       - "18443:18443"
       - "18444:18444"
