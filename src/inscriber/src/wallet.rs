@@ -21,7 +21,8 @@ use serde::de::DeserializeOwned;
 
 use self::inscription::Protocol;
 
-struct EcdsaSigner;
+#[derive(Clone)]
+pub struct EcdsaSigner;
 
 #[async_trait::async_trait]
 impl ExternalSigner for EcdsaSigner {
