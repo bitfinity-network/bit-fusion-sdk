@@ -1,48 +1,44 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use candid::{Nat, Principal};
+use candid::Principal;
 use did::build::BuildData;
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
-    generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
-    MethodType, PreUpdate,
+    generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
+use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::Account;
-use ic_exports::icrc_types::icrc2::approve::ApproveError;
-use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
 use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_task_scheduler::retry::BackoffPolicy;
+use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
+use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
-use minter_did::order::SignedMintOrder;
+use minter_did::order::{self, SignedMintOrder};
 use minter_did::reason::Icrc2Burn;
 
 use crate::build_data::canister_build_data;
-use crate::context::{get_base_context, Context, ContextImpl};
-use crate::evm::{Evm, EvmCanisterImpl};
+use crate::constant::{PENDING_TASKS_MEMORY_ID, TASK_RETRY_DELAY_SECS};
+use crate::memory::MEMORY_MANAGER;
 use crate::state::{Settings, State};
-use crate::tokens::icrc1::IcrcTransferDst;
+use crate::tasks::{BridgeTask, BurntIcrc2Data};
 use crate::tokens::{bft_bridge, icrc1, icrc2};
 
 mod inspect;
-
-/// Type alias for the shared mutable context implementation we use in the canister
-type SharedContext = Rc<RefCell<ContextImpl<EvmCanisterImpl>>>;
-
-#[derive(Clone, Default)]
-pub struct ContextWrapper(pub SharedContext);
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
 pub struct MinterCanister {
     #[id]
     id: Principal,
-    pub context: ContextWrapper,
 }
 
 impl PreUpdate for MinterCanister {
@@ -50,38 +46,73 @@ impl PreUpdate for MinterCanister {
 }
 
 impl MinterCanister {
-    fn with_state<R>(&self, f: impl FnOnce(&State) -> R) -> R {
-        let ctx = self.context.0.borrow();
-        let res = f(&ctx.get_state());
-        res
-    }
-
-    fn with_state_mut<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
-        let ctx = self.context.0.borrow();
-        let res = f(&mut ctx.mut_state());
-        res
-    }
-
     /// Initializes the timers
     pub fn set_timers(&mut self) {
         // This block of code only need to be run in the wasm environment
         #[cfg(target_family = "wasm")]
         {
-            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
+            use std::time::Duration;
+
+            self.update_metrics_timer(Duration::from_secs(60 * 60));
+
+            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
+                // Tasks to collect EVMs events
+                let tasks = vec![
+                    Self::collect_evm_events_task(),
+                    Self::collect_evm_events_task(),
+                ];
+
+                get_scheduler().borrow_mut().append_tasks(tasks);
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
+            });
         }
+    }
+
+    fn init_evm_info_task() -> ScheduledTask<BridgeTask> {
+        const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
+        const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
+        const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
+
+        let init_options = TaskOptions::default()
+            .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
+            .with_backoff_policy(BackoffPolicy::Exponential {
+                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
+                multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
+            });
+        BridgeTask::InitEvmInfo.into_scheduled(init_options)
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
+        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: EVM_EVENTS_COLLECTING_DELAY,
+            });
+
+        BridgeTask::CollectEvmEvents.into_scheduled(options)
     }
 
     /// Initialize the canister with given data.
     #[init]
     pub fn init(&mut self, init_data: InitData) {
-        self.with_state_mut(|s| {
-            if let Err(err) = s
-                .logger_config_service
-                .init(init_data.log_settings.clone().unwrap_or_default())
-            {
-                ic_exports::ic_cdk::println!("error configuring the logger. Err: {err:?}")
-            }
-        });
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        if let Err(err) = state
+            .logger_config_service
+            .init(init_data.log_settings.clone().unwrap_or_default())
+        {
+            ic_exports::ic_cdk::println!("error configuring the logger. Err: {err:?}")
+        }
 
         info!("starting minter canister");
         debug!("minter canister init data: [{init_data:?}]");
@@ -91,27 +122,33 @@ impl MinterCanister {
         let settings = Settings {
             owner: init_data.owner,
             evm_principal: init_data.evm_principal,
-            evm_gas_price: init_data.evm_gas_price,
             signing_strategy: init_data.signing_strategy,
-            chain_id: init_data.evm_chain_id,
-            bft_bridge_contract: init_data.bft_bridge_contract,
             spender_principal: init_data.spender_principal,
-            process_transactions_results_interval: init_data.process_transactions_results_interval,
         };
 
-        self.context.0.borrow_mut().get_state();
-        self.with_state_mut(|s| s.reset(settings));
+        state.reset(settings);
+
+        {
+            let scheduler = get_scheduler();
+            let mut borrowed_scheduller = scheduler.borrow_mut();
+            borrowed_scheduller.set_failed_task_callback(|task, error| {
+                log::error!("task failed: {task:?}, error: {error:?}")
+            });
+            borrowed_scheduller.append_task(Self::init_evm_info_task());
+        }
 
         self.set_timers();
     }
 
     #[post_upgrade]
     pub fn post_upgrade(&mut self) {
-        self.with_state_mut(|s| {
-            if let Err(err) = s.logger_config_service.reload() {
-                ic_exports::ic_cdk::println!("error configuring the logger. Err: {err:?}")
-            }
-        });
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        if let Err(err) = state.logger_config_service.reload() {
+            ic_exports::ic_cdk::println!("error configuring the logger. Err: {err:?}")
+        }
+
         self.set_timers();
         debug!("upgrade completed");
     }
@@ -131,10 +168,11 @@ impl MinterCanister {
     /// - debug,crate1::mod1=error,crate1::mod2,crate2=debug
     #[update]
     pub fn set_logger_filter(&mut self, filter: String) -> Result<()> {
-        self.with_state_mut(|s| {
-            MinterCanister::set_logger_filter_inspect_message_check(ic::caller(), s)?;
-            s.logger_config_service.set_logger_filter(&filter)
-        })?;
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        MinterCanister::set_logger_filter_inspect_message_check(ic::caller(), &state)?;
+        state.logger_config_service.set_logger_filter(&filter)?;
 
         debug!("updated logger filter to {filter}");
 
@@ -150,7 +188,7 @@ impl MinterCanister {
     /// - `count` is the number of logs to return
     #[update]
     pub fn ic_logs(&self, count: usize, offset: usize) -> Result<Logs> {
-        self.with_state(|s| MinterCanister::ic_logs_inspect_message_check(ic::caller(), s))?;
+        MinterCanister::ic_logs_inspect_message_check(ic::caller(), &get_state().borrow())?;
 
         // Request execution
         Ok(ic_log::take_memory_records(count, offset))
@@ -159,7 +197,7 @@ impl MinterCanister {
     /// Returns principal of canister owner.
     #[query]
     pub fn get_owner(&self) -> Principal {
-        self.with_state(|s| s.config.get_owner())
+        get_state().borrow().config.get_owner()
     }
 
     /// set_owner inspect_message check
@@ -178,11 +216,12 @@ impl MinterCanister {
     /// else `Error::NotAuthorised` will be returned.
     #[update]
     pub fn set_owner(&mut self, owner: Principal) -> Result<()> {
-        self.with_state_mut::<Result<()>>(|s| {
-            MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, s)?;
-            s.config.set_owner(owner);
-            Ok(())
-        })?;
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)?;
+        state.config.set_owner(owner);
+
         info!("minter canister owner changed to {owner}");
         Ok(())
     }
@@ -190,7 +229,7 @@ impl MinterCanister {
     /// Returns principal of EVM canister with which the minter canister works.
     #[query]
     pub fn get_evm_principal(&self) -> Principal {
-        self.with_state(|s| s.config.get_evm_principal())
+        get_state().borrow().config.get_evm_principal()
     }
 
     /// set_evm_principal inspect_message check
@@ -209,29 +248,21 @@ impl MinterCanister {
     /// else `Error::NotAuthorised` will be returned.
     #[update]
     pub fn set_evm_principal(&mut self, evm: Principal) -> Result<()> {
-        self.with_state_mut::<Result<()>>(|s| {
-            MinterCanister::set_evm_principal_inspect_message_check(ic::caller(), evm, s)?;
-            s.config.set_evm_principal(evm);
-            Ok(())
-        })?;
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        MinterCanister::set_evm_principal_inspect_message_check(ic::caller(), evm, &state)?;
+        state.config.set_evm_principal(evm);
+
         info!("EVM principal changed to {evm}");
         Ok(())
     }
 
-    /// Returns bridge contract address for EVM with the given chain id.
-    /// If `chain_id` is None - returns bridge contract address for EVM canister.
+    /// Returns bridge contract address for EVM.
     /// If contract isn't initialized yet - returns None.
-    #[update]
-    pub fn get_bft_bridge_contract(&mut self) -> Result<Option<H160>> {
-        // deduct fee for endpoint query
-
-        Ok(self
-            .context
-            .0
-            .borrow()
-            .get_state()
-            .config
-            .get_bft_bridge_contract())
+    #[query]
+    pub fn get_bft_bridge_contract(&mut self) -> Option<H160> {
+        get_state().borrow().config.get_bft_bridge_contract()
     }
 
     /// register_evmc_bft_bridge inspect_message check
@@ -258,17 +289,15 @@ impl MinterCanister {
     /// This method is available for canister owner only.
     #[update]
     pub async fn register_evmc_bft_bridge(&self, bft_bridge_address: H160) -> Result<()> {
-        self.with_state::<Result<()>>(|state| {
-            Self::register_evmc_bft_bridge_inspect_message_check(
-                ic::caller(),
-                bft_bridge_address.clone(),
-                state,
-            )
-        })?;
+        let state = get_state();
 
-        let evmc = self.context.0.borrow().get_evm_canister();
-        self.register_evm_bridge(evmc.as_evm(), bft_bridge_address)
-            .await?;
+        Self::register_evmc_bft_bridge_inspect_message_check(
+            ic::caller(),
+            bft_bridge_address.clone(),
+            &state.borrow(),
+        )?;
+
+        self.register_evm_bridge(bft_bridge_address).await?;
 
         Ok(())
     }
@@ -280,200 +309,102 @@ impl MinterCanister {
         sender: Id256,
         src_token: Id256,
     ) -> Vec<(u32, SignedMintOrder)> {
-        self.with_state(|s| s.mint_orders.get_all(sender, src_token))
+        get_state().borrow().mint_orders.get_all(sender, src_token)
     }
 
-    /// create_erc_20_mint_order inspect_message check
-    pub fn create_erc_20_mint_order_inspect_message_check(
-        _principal: Principal,
-        reason: &Icrc2Burn,
-        _state: &State,
-    ) -> Result<()> {
+    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
+    #[query]
+    pub async fn get_mint_order(
+        &self,
+        sender: Id256,
+        src_token: Id256,
+        operation_id: u32,
+    ) -> Option<SignedMintOrder> {
+        get_state()
+            .borrow()
+            .mint_orders
+            .get(sender, src_token, operation_id)
+    }
+
+    /// burn_icrc2 inspect_message check
+    pub fn burn_icrc2_inspect_message_check(reason: &Icrc2Burn) -> Result<()> {
         inspect_mint_reason(reason)
     }
 
     /// Create signed withdraw order data according to the given withdraw `reason`.
     /// A token to mint will be selected automatically by the `reason`.
+    /// Returns operation id.
     #[update]
-    pub async fn create_erc_20_mint_order(&mut self, reason: Icrc2Burn) -> Result<SignedMintOrder> {
+    pub async fn burn_icrc2(&mut self, reason: Icrc2Burn) -> Result<u32> {
         debug!("creating ERC20 mint order with reason {reason:?}");
 
-        let context = get_base_context(&self.context.0);
-        MinterCanister::create_erc_20_mint_order_inspect_message_check(
-            ic::caller(),
-            &reason,
-            &context.borrow().get_state(),
-        )?;
+        let caller = ic::caller();
+        let state = get_state();
+        MinterCanister::burn_icrc2_inspect_message_check(&reason)?;
 
-        let token_service = context.borrow().get_evm_token_service();
-        token_service
-            .create_mint_order_for(ic::caller(), reason, &context)
+        let caller_account = Account {
+            owner: caller,
+            subaccount: reason.from_subaccount,
+        };
+
+        let token_info = icrc1::query_token_info_or_read_from_cache(reason.icrc2_token_principal)
             .await
+            .ok_or(Error::InvalidBurnOperation(
+                "failed to get token info".into(),
+            ))?;
+
+        let name = order::fit_str_to_array(&token_info.name);
+        let symbol = order::fit_str_to_array(&token_info.symbol);
+
+        icrc2::burn(
+            reason.icrc2_token_principal,
+            caller_account,
+            (&reason.amount).into(),
+            true,
+        )
+        .await?;
+
+        let operation_id = state.borrow_mut().next_nonce();
+
+        let options = TaskOptions::default()
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: TASK_RETRY_DELAY_SECS,
+            })
+            .with_max_retries_policy(u32::MAX);
+        get_scheduler().borrow_mut().append_task(
+            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
+                sender: caller,
+                amount: reason.amount,
+                operation_id,
+                name,
+                symbol,
+                decimals: token_info.decimals,
+                src_token: reason.icrc2_token_principal,
+                recipient_address: reason.recipient_address,
+            })
+            .into_scheduled(options),
+        );
+
+        Ok(operation_id)
     }
 
     /// Returns evm_address of the minter canister.
     #[update]
     pub async fn get_minter_canister_evm_address(&mut self) -> Result<H160> {
-        // deduct fee for endpoint query
-
-        let ctx = get_base_context(&self.context.0);
-        let signer = ctx.borrow().get_state().signer.get_transaction_signer();
+        let signer = get_state().borrow().signer.get_transaction_signer();
         signer
             .get_address()
             .await
             .map_err(|e| Error::Internal(format!("failed to get minter canister address: {e}")))
     }
 
-    /// start_icrc2_mint inspect_message check
-    pub fn start_icrc2_mint_inspect_message_check(
-        _principal: Principal,
-        user: &H160,
-        _state: &State,
-    ) -> Result<()> {
-        if user.0.is_zero() {
-            return Err(Error::InvalidBurnOperation("zero user address".into()));
-        };
-        Ok(())
-    }
+    async fn register_evm_bridge(&self, bft_bridge: H160) -> Result<()> {
+        let state = get_state();
+        let client = state.borrow().config.get_evm_client();
+        bft_bridge::check_bft_bridge_contract(&client, bft_bridge.clone(), get_state()).await?;
 
-    /// Returns approved ICRC-2 amount.
-    #[update]
-    pub async fn start_icrc2_mint(&mut self, user: H160, operation_id: u32) -> Result<Nat> {
-        let ctx = get_base_context(&self.context.0);
-
-        MinterCanister::start_icrc2_mint_inspect_message_check(
-            ic::caller(),
-            &user,
-            &ctx.borrow().get_state(),
-        )?;
-
-        let token_service = ctx.borrow().get_evm_token_service();
-        let valid_burn = token_service
-            .check_erc_20_burn(&user, operation_id, &ctx)
-            .await?
-            .try_map_dst(Principal::try_from)?;
-
-        let chain_id = ctx.borrow().get_state().config.get_evmc_chain_id();
-        let tx_subaccount = icrc2::approve_subaccount(
-            user,
-            operation_id,
-            chain_id,
-            valid_burn.to_token,
-            valid_burn.recipient,
-        );
-        let spender = ctx.borrow().get_state().config.get_spender_principal();
-        let spender_account = Account {
-            owner: spender,
-            subaccount: Some(tx_subaccount),
-        };
-
-        let approval_result = icrc2::approve_mint(
-            valid_burn.to_token,
-            spender_account,
-            (&valid_burn.amount).into(),
-            true,
-        )
-        .await;
-
-        let allowance = match approval_result {
-            Ok(success) => success.amount,
-            Err(Error::Icrc2ApproveError(ApproveError::AllowanceChanged { current_allowance })) => {
-                current_allowance
-            }
-            Err(e) => return Err(e),
-        };
-
-        Ok(allowance)
-    }
-
-    /// start_icrc2_mint inspect_message check
-    pub fn finish_icrc2_mint_inspect_message_check(
-        _caller: Principal,
-        amount: &Nat,
-        user: &H160,
-        _state: &State,
-    ) -> Result<()> {
-        if amount == &Nat::from(0u64) {
-            return Err(Error::InvalidBurnOperation("zero amount".into()));
-        }
-
-        if user.0.is_zero() {
-            return Err(Error::InvalidBurnOperation("zero user address".into()));
-        };
-        Ok(())
-    }
-
-    /// Make `SpenderCanister` to transfer ICRC-2 tokens to the user according to the given `burn_tx`.
-    /// Returns transfer ID in case of success.
-    ///
-    /// Before client can use this method, he should call `start_icrc2_mint` for the given `burn_tx`.
-    /// After the approval, user should finalize Wrapped token burning, using `BFTBridge::finish_burn()`.
-    #[update]
-    async fn finish_icrc2_mint(
-        &self,
-        operation_id: u32,
-        user: H160,
-        token: Principal,
-        recipient: Principal,
-        amount: Nat,
-    ) -> Result<Nat> {
-        let ctx = get_base_context(&self.context.0);
-        let caller = ic::caller();
-
-        Self::finish_icrc2_mint_inspect_message_check(
-            caller,
-            &amount,
-            &user,
-            &ctx.borrow().get_state(),
-        )?;
-
-        let token_service = ctx.borrow().get_evm_token_service();
-        token_service
-            .check_erc_20_burn_finalized(&user, operation_id, &ctx)
-            .await?;
-
-        let spender_canister = ctx.borrow().get_state().config.get_spender_principal();
-
-        let fee = icrc1::get_token_configuration(token).await?.fee;
-
-        let chain_id = ctx.borrow().get_state().config.get_evmc_chain_id();
-        let spender_subaccount =
-            icrc2::approve_subaccount(user, operation_id, chain_id, token, recipient);
-
-        let dst_info = IcrcTransferDst { token, recipient };
-        let mut transfer_result = virtual_canister_call!(
-            spender_canister,
-            "finish_icrc2_mint",
-            (dst_info.token, dst_info.recipient, spender_subaccount, amount.clone(), fee),
-            std::result::Result<Nat, TransferFromError>
-        )
-        .await?;
-
-        if let Err(TransferFromError::BadFee { expected_fee }) = transfer_result {
-            // refresh cached token configuration if fee changed
-            let _ = icrc1::refresh_token_configuration(dst_info.token).await;
-
-            transfer_result = virtual_canister_call!(
-                spender_canister,
-                "finish_icrc2_mint",
-                (dst_info, spender_subaccount, amount, expected_fee),
-                std::result::Result<Nat, TransferFromError>
-            )
-            .await?;
-        }
-
-        Ok(transfer_result?)
-    }
-
-    async fn register_evm_bridge(&self, evm: &dyn Evm, bft_bridge: H160) -> Result<()> {
-        let context = get_base_context(&self.context.0);
-
-        bft_bridge::check_bft_bridge_contract(evm, bft_bridge.clone(), &context).await?;
-
-        self.context
-            .0
+        get_state()
             .borrow_mut()
-            .mut_state()
             .config
             .set_bft_bridge_contract(bft_bridge);
 
@@ -484,6 +415,18 @@ impl MinterCanister {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
+    }
+
+    /// Requirements for Http outcalls, used to ignore small differences in the data obtained
+    /// by different nodes of the IC subnet to reach a consensus, more info:
+    /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
+    #[query]
+    fn transform(&self, raw: TransformArgs) -> HttpResponse {
+        HttpResponse {
+            status: raw.response.status,
+            headers: raw.response.headers,
+            body: raw.response.body,
+        }
     }
 
     /// Returns candid IDL.
@@ -535,6 +478,28 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
     Ok(())
 }
 
+type TasksStorage =
+    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
+thread_local! {
+    pub static STATE: Rc<RefCell<State>> = Rc::default();
+
+    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
+        let pending_tasks =
+            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
+            PersistentScheduler::new(pending_tasks)
+    }));
+}
+
+pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
+    SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+pub fn get_state() -> Rc<RefCell<State>> {
+    STATE.with(|state| state.clone())
+}
+
 #[cfg(test)]
 mod test {
     use candid::Principal;
@@ -544,7 +509,6 @@ mod test {
     use minter_did::error::Error;
 
     use super::*;
-    use crate::constant::{DEFAULT_CHAIN_ID, DEFAULT_GAS_PRICE};
     use crate::MinterCanister;
 
     fn owner() -> Principal {
@@ -565,14 +529,10 @@ mod test {
         let init_data = InitData {
             owner: owner(),
             evm_principal: Principal::anonymous(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -590,14 +550,10 @@ mod test {
         let init_data = InitData {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
             spender_principal: Principal::anonymous(),
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -711,14 +667,10 @@ mod test {
         let init_data = InitData {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -781,14 +733,10 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            bft_bridge_contract: None,
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -803,14 +751,10 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::management_canister(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -834,51 +778,16 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
             spender_principal: Principal::management_canister(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            process_transactions_results_interval: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
         inject::get_context().update_id(Principal::management_canister());
 
         let evm_address = canister_call!(canister.get_minter_canister_evm_address(), Result<H160>)
-            .await
-            .unwrap();
-
-        assert!(evm_address.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_get_bft_bridge_contract() {
-        MockContext::new().inject();
-        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
-        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-        let mut canister = MinterCanister::from_principal(mock_canister_id);
-
-        let init_data = InitData {
-            owner: Principal::management_canister(),
-            evm_principal: Principal::management_canister(),
-            evm_chain_id: DEFAULT_CHAIN_ID,
-            bft_bridge_contract: None,
-            evm_gas_price: DEFAULT_GAS_PRICE.into(),
-            spender_principal: Principal::management_canister(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
-            },
-            process_transactions_results_interval: None,
-            log_settings: None,
-        };
-        canister_call!(canister.init(init_data), ()).await.unwrap();
-
-        inject::get_context().update_id(Principal::management_canister());
-
-        let evm_address = canister_call!(canister.get_bft_bridge_contract(), Result<Option<H160>>)
             .await
             .unwrap();
 

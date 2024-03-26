@@ -10,6 +10,7 @@ use ic_log::LogSettings;
 use once_cell::sync::OnceCell;
 use solidity_helper::{compile_solidity_contracts, SolidityContract};
 
+pub mod btc;
 pub mod error;
 pub mod icrc_client;
 pub mod wasm;

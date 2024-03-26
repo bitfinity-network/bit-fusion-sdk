@@ -1,7 +1,6 @@
 mod ck_erc20;
 pub mod erc20_minter;
 pub mod icrc2_minter;
-mod minter;
 mod token;
 
 use std::fmt;
@@ -9,9 +8,8 @@ use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H256};
-use did::{H160, U256, U64};
-use eth_signer::{Signer, Wallet};
+use did::{TransactionReceipt, H160, H256};
+use eth_signer::Wallet;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
@@ -45,6 +43,7 @@ impl PocketIcTestContext {
                 .create_canister()
                 .await
                 .expect("canister should be created");
+
             ctx.canisters.set(*canister_type, principal);
         }
 
@@ -66,11 +65,6 @@ impl PocketIcTestContext {
             ALICE => alice(),
             _ => panic!("unexpected caller"),
         }
-    }
-
-    pub async fn advance_time(&self, time: Duration) {
-        self.client.advance_time(time).await;
-        self.client.tick().await;
     }
 
     pub async fn deploy_canister(
@@ -106,6 +100,11 @@ impl TestContext for PocketIcTestContext {
         self.canisters.clone()
     }
 
+    async fn advance_time(&self, time: Duration) {
+        self.client.advance_time(time).await;
+        self.client.tick().await;
+    }
+
     fn client(&self, canister: Principal, caller: &str) -> Self::Client {
         let caller_principal = Self::principal_of(caller);
         PocketIcClient::from_client(self.client.clone(), canister, caller_principal)
@@ -123,6 +122,15 @@ impl TestContext for PocketIcTestContext {
         let principal = self.client.create_canister(Some(self.admin())).await;
         self.client.add_cycles(principal, u128::MAX).await;
         Ok(principal)
+    }
+
+    async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
+        let sync_client = ic_exports::pocket_ic::PocketIc::new();
+        sync_client
+            .create_canister_with_id(Some(self.admin()), None, id)
+            .expect("failed to create canister");
+        self.client.add_cycles(id, u128::MAX).await;
+        Ok(id)
     }
 
     async fn install_canister(
@@ -221,5 +229,6 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
         .initialize_bft_bridge(ADMIN, &john_wallet)
         .await
         .unwrap();
+
     (ctx, john_wallet, bft_bridge)
 }

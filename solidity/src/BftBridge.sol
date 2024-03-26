@@ -120,10 +120,6 @@ contract BFTBridge {
     // Mapping from Base tokens to Wrapped tokens
     mapping(address => bytes32) private _baseTokenRegistry;
 
-    // Pending burn operations.
-    // A burn operation should be finished with the `finishBurn` function.
-    mapping(address => mapping(uint32 => Erc20BurnInfo)) private _pendingBurns;
-
     // Address of minter canister
     address public minterCanisterAddress;
 
@@ -150,7 +146,7 @@ contract BFTBridge {
         address sender,
         uint256 amount,
         address fromERC20,
-        bytes32 recipientID,
+        bytes recipientID,
         bytes32 toToken,
         uint32 operationID,
         bytes32 name,
@@ -253,7 +249,7 @@ contract BFTBridge {
     function burn(
         uint256 amount,
         address fromERC20,
-        bytes32 recipientID
+        bytes memory recipientID
     ) public returns (uint32) {
         require(fromERC20 != address(this));
 
@@ -263,7 +259,6 @@ contract BFTBridge {
 
         require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
-        require(recipientID != bytes32(0), "Invalid destination address");
 
         RingBuffer memory buffer = _lastUserDeposit[msg.sender];
         _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
@@ -300,59 +295,7 @@ contract BFTBridge {
             decimals
         );
 
-        _pendingBurns[msg.sender][operationID] = Erc20BurnInfo(
-            msg.sender,
-            amount,
-            fromERC20,
-            recipientID,
-            toTokenID,
-            name,
-            symbol,
-            decimals
-        );
         return operationID;
-    }
-
-    // Removes information about the burn operation from the contract.
-    function finishBurn(uint32 operationID) public returns (bool) {
-        // Burn operation with zero amount can't be done and never stored.
-        if (_pendingBurns[msg.sender][operationID].amount != 0) {
-            delete _pendingBurns[msg.sender][operationID];
-            return true;
-        }
-        return false;
-    }
-
-    // Returns information about pending burn with the given operationID for the msg.sender.
-    // If returned amount is zero, there is no pending burn.
-    function getPendingBurnInfo(
-        address user,
-        uint32 operationID
-    )
-        public
-        view
-        returns (
-            address sender,
-            uint256 amount,
-            address fromERC20,
-            bytes32 recipientID,
-            bytes32 toToken,
-            bytes32 name,
-            bytes16 symbol,
-            uint8 decimals
-        )
-    {
-        Erc20BurnInfo memory info = _pendingBurns[user][operationID];
-        return (
-            info.sender,
-            info.amount,
-            info.fromERC20,
-            info.recipientID,
-            info.toToken,
-            info.name,
-            info.symbol,
-            info.decimals
-        );
     }
 
     // Getter function for minter address

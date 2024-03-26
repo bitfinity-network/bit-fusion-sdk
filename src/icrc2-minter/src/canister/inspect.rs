@@ -1,4 +1,4 @@
-use candid::{Nat, Principal};
+use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;
@@ -36,28 +36,9 @@ async fn inspect_method(method: &str) -> Result<()> {
             let (owner,) = api::call::arg_data::<(Principal,)>();
             MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)
         }
-        "create_erc_20_mint_order" => {
+        "burn_icrc2" => {
             let (reason,) = api::call::arg_data::<(Icrc2Burn,)>();
-            MinterCanister::create_erc_20_mint_order_inspect_message_check(
-                ic::caller(),
-                &reason,
-                &state,
-            )
-        }
-        "start_icrc2_mint" => {
-            let (user, _) = api::call::arg_data::<(H160, u32)>();
-            MinterCanister::start_icrc2_mint_inspect_message_check(ic::caller(), &user, &state)
-        }
-        "finish_icrc2_mint" => {
-            let (_, user, _, _, amount) =
-                api::call::arg_data::<(u32, H160, Principal, Principal, Nat)>();
-            MinterCanister::finish_icrc2_mint_inspect_message_check(
-                ic::caller(),
-                &amount,
-                &user,
-                &state,
-            )?;
-            Ok(())
+            MinterCanister::burn_icrc2_inspect_message_check(&reason)
         }
         "register_evmc_bft_bridge" => {
             let (bft_bridge_address,) = api::call::arg_data::<(H160,)>();

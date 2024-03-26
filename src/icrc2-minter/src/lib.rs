@@ -1,10 +1,9 @@
 mod build_data;
-mod canister;
+pub mod canister;
 mod constant;
-mod context;
-mod evm;
 mod memory;
 pub mod state;
+mod tasks;
 pub mod tokens;
 
 use std::marker::PhantomData;

@@ -1,8 +1,9 @@
 use candid::CandidType;
+use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::abi::{
     Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
 };
-use ethers_core::types::{H160, U256};
+use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -43,7 +44,7 @@ pub static BURN: Lazy<Function> = Lazy::new(|| Function {
         },
         Param {
             name: "recipientID".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Bytes,
             internal_type: None,
         },
     ],
@@ -118,23 +119,6 @@ pub static GET_PENDING_BURN_INFO: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
-pub static FINISH_BURN: Lazy<Function> = Lazy::new(|| Function {
-    name: "finishBurn".into(),
-    inputs: vec![Param {
-        name: "operationID".into(),
-        kind: ParamType::Uint(32),
-        internal_type: None,
-    }],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Bool,
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
 pub static MINT: Lazy<Function> = Lazy::new(|| Function {
     name: "mint".into(),
     inputs: vec![Param {
@@ -196,7 +180,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
         },
         EventParam {
             name: "recipientID".into(),
-            kind: ParamType::FixedBytes(32),
+            kind: ParamType::Bytes,
             indexed: false,
         },
         EventParam {
@@ -227,6 +211,53 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     ],
     anonymous: false,
 });
+
+/// Emited when token is burnt or minted by BFTBridge.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+pub enum BridgeEvent {
+    Burnt(BurntEventData),
+    Minted(MintedEventData),
+}
+
+impl BridgeEvent {
+    pub async fn collect_logs(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        from_block: EthBlockNumber,
+        to_block: EthBlockNumber,
+        bridge_contract: H160,
+    ) -> Result<Vec<Log>, anyhow::Error> {
+        let params = EthGetLogsParams {
+            address: Some(vec![bridge_contract]),
+            from_block,
+            to_block,
+            topics: Some(vec![vec![
+                BURNT_EVENT.signature(),
+                MINTED_EVENT.signature(),
+            ]]),
+        };
+
+        evm_client.get_logs(params).await
+    }
+
+    pub fn from_log(log: Log) -> Result<Self, ethers_core::abi::Error> {
+        let raw_log = RawLog {
+            topics: log.topics,
+            data: log.data.to_vec(),
+        };
+
+        Self::try_from(raw_log)
+    }
+}
+
+impl TryFrom<RawLog> for BridgeEvent {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        BurntEventData::try_from(log.clone())
+            .map(Self::Burnt)
+            .or_else(|_| MintedEventData::try_from(log).map(Self::Minted))
+    }
+}
 
 /// Emited when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
@@ -283,7 +314,7 @@ impl BurntEventDataBuilder {
             "sender" => self.sender = value.into_address(),
             "amount" => self.amount = value.into_uint(),
             "fromERC20" => self.from_erc20 = value.into_address(),
-            "recipientID" => self.recipient_id = value.into_fixed_bytes(),
+            "recipientID" => self.recipient_id = value.into_bytes(),
             "toToken" => self.to_token = value.into_fixed_bytes(),
             "operationID" => self.operation_id = value.into_uint().map(|v| v.as_u32()),
             "name" => self.name = value.into_fixed_bytes(),
@@ -436,6 +467,32 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::View,
 });
 
+pub fn mint_transaction(
+    sender: H160,
+    bridge: H160,
+    nonce: U256,
+    gas_price: U256,
+    mint_order_data: Vec<u8>,
+    chain_id: u32,
+) -> Transaction {
+    let data = MINT
+        .encode_input(&[Token::Bytes(mint_order_data)])
+        .expect("mint order encoding should pass");
+
+    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
+    ethers_core::types::Transaction {
+        from: sender,
+        to: bridge.into(),
+        nonce,
+        value: U256::zero(),
+        gas: DEFAULT_TX_GAS_LIMIT.into(),
+        gas_price: Some(gas_price),
+        input: data.into(),
+        chain_id: Some(chain_id.into()),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use did::{H160, H256};
@@ -488,7 +545,7 @@ mod tests {
             .with_field_from_token("sender", Token::Address(sender.0))
             .with_field_from_token("amount", Token::Uint(amount))
             .with_field_from_token("fromERC20", Token::Address(from_erc20.0))
-            .with_field_from_token("recipientID", Token::FixedBytes(recipient_id.clone()))
+            .with_field_from_token("recipientID", Token::Bytes(recipient_id.clone()))
             .with_field_from_token("toToken", Token::FixedBytes(to_token.clone()))
             .with_field_from_token("operationID", Token::Uint(operation_id))
             .with_field_from_token("name", Token::FixedBytes(name.clone()))
@@ -521,8 +578,8 @@ mod tests {
     #[test]
     fn convert_raw_log_into_burnt_event() {
         let raw = RawLog {
-            topics: vec![H256::from_hex_str("0x311bd942e9a7359e50783d6a90327804169b0f6c5307e406c944f3d7b63ecdc6").unwrap().0],
-            data: Bytes::from_hex("0x000000000000000000000000a2d1f5f7d0d6e524a73194b76469eba08460ba4400000000000000000000000000000000000000000000000000000000000003e8000000000000000000000000e76e9f3b04252ff67c2e623a34dd275f46e5b79f0100056b291e368dfb3f4a2d4e326d2111e6415ce54e740325000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+            topics: vec![H256::from_hex_str("0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79").unwrap().0],
+            data: Bytes::from_hex("0x000000000000000000000000e41b09c6e9eaa79356b10f4181564b4bdb169d3500000000000000000000000000000000000000000000000000000000000003e80000000000000000000000002ea5d83d5a08d8556f726d3004a50aa8aa81c5c200000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100056b29dc8b8e5954eebac85b3145745362adfa50d8ad9e00000000000000").unwrap(),
         };
 
         let _event = BurntEventData::try_from(raw).unwrap();
