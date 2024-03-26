@@ -32,9 +32,9 @@ impl ExternalSigner for EcdsaSigner {
         }
     }
 
-    async fn sign_with_ecdsa(&self, message: String) -> Vec<u8> {
+    async fn sign_with_ecdsa(&self, message: String) -> String {
         match ecdsa_api::sign_with_ecdsa(message).await {
-            Ok(res) => res.signature_hex.as_bytes().to_vec(),
+            Ok(res) => res.signature_hex,
             Err(e) => panic!("{e}"),
         }
     }
@@ -63,7 +63,7 @@ pub async fn inscribe(
     let bitcoin_network = map_network(network);
 
     let ecdsa_signer = EcdsaSigner;
-    let own_pk = PublicKey::from_slice(ecdsa_signer.ecdsa_public_key().await.as_bytes())
+    let own_pk = PublicKey::from_str(&ecdsa_signer.ecdsa_public_key().await)
         .map_err(OrdError::PubkeyConversion)?;
 
     let own_address = btc_address_from_public_key(network, &own_pk);
@@ -248,7 +248,7 @@ pub async fn get_bitcoin_address(network: BitcoinNetwork) -> Address {
         Err(e) => panic!("{e}"),
     };
 
-    let pk = PublicKey::from_slice(public_key.as_bytes()).expect("Can't deserialize public key");
+    let pk = PublicKey::from_str(&public_key).expect("Can't deserialize public key");
     btc_address_from_public_key(network, &pk)
 }
 

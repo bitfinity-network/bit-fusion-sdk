@@ -16,10 +16,6 @@ use crate::wallet::{self, bitcoin_api};
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
-
-    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = const { vec![] };
-
-    pub(crate) static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
 }
 
 #[derive(Canister, Clone, Debug)]
@@ -35,13 +31,6 @@ impl Inscriber {
     pub fn init(&mut self, network: BitcoinNetwork) {
         crate::register_custom_getrandom();
         BITCOIN_NETWORK.with(|n| n.set(network));
-
-        ECDSA_KEY_NAME.with(|key_name| {
-            key_name.replace(String::from(match network {
-                BitcoinNetwork::Regtest => "dfx_test_key",
-                BitcoinNetwork::Mainnet | BitcoinNetwork::Testnet => "test_key_1",
-            }))
-        });
     }
 
     /// Returns the balance of the given bitcoin address.
