@@ -61,11 +61,9 @@ impl OrdinalsApiTester {
         offset: u64,
         limit: u64,
     ) -> Option<http::PaginatedResp<brc20::state::Brc20Token>> {
-        let tokens = brc20::api::get_brc20_tokens(&self.get_base_api_url(), offset, limit)
+        brc20::api::get_brc20_tokens(&self.get_base_api_url(), offset, limit)
             .await
-            .expect("Can't perform HTTP outcall");
-
-        tokens
+            .expect("Can't perform HTTP outcall")
     }
 
     #[update]
@@ -73,12 +71,9 @@ impl OrdinalsApiTester {
         &self,
         ticker: String,
     ) -> Option<brc20::state::Brc20TokenDetails> {
-        let token_details =
-            brc20::api::get_brc20_token_by_ticker(&self.get_base_api_url(), &ticker)
-                .await
-                .expect("Can't perform HTTP outcall");
-
-        token_details
+        brc20::api::get_brc20_token_by_ticker(&self.get_base_api_url(), &ticker)
+            .await
+            .expect("Can't perform HTTP outcall")
     }
 
     #[update]
@@ -88,16 +83,14 @@ impl OrdinalsApiTester {
         offset: u64,
         limit: u64,
     ) -> Option<http::PaginatedResp<brc20::state::Brc20Holder>> {
-        let holders = brc20::api::get_brc20_token_holders_by_ticker(
+        brc20::api::get_brc20_token_holders_by_ticker(
             &self.get_base_api_url(),
             &ticker,
             offset,
             limit,
         )
         .await
-        .expect("Can't perform HTTP outcall");
-
-        holders
+        .expect("Can't perform HTTP outcall")
     }
 
     #[update]
@@ -106,15 +99,9 @@ impl OrdinalsApiTester {
         address: String,
         ticker: String,
     ) -> Option<http::PaginatedResp<brc20::state::Brc20Balance>> {
-        let balances = brc20::api::get_brc20_token_balance_by_address(
-            &self.get_base_api_url(),
-            &address,
-            &ticker,
-        )
-        .await
-        .expect("Can't perform HTTP outcall");
-
-        balances
+        brc20::api::get_brc20_token_balance_by_address(&self.get_base_api_url(), &address, &ticker)
+            .await
+            .expect("Can't perform HTTP outcall")
     }
 
     #[update]
@@ -122,11 +109,9 @@ impl OrdinalsApiTester {
         &self,
         id: String,
     ) -> Option<inscription::state::Inscription> {
-        let inscr = inscription::api::get_inscription_by_id(&self.get_base_api_url(), &id)
+        inscription::api::get_inscription_by_id(&self.get_base_api_url(), &id)
             .await
-            .expect("Can't perform HTTP outcall");
-
-        inscr
+            .expect("Can't perform HTTP outcall")
     }
 
     #[update]
@@ -136,16 +121,14 @@ impl OrdinalsApiTester {
         offset: u64,
         limit: u64,
     ) -> Option<http::PaginatedResp<inscription::state::InscriptionLocation>> {
-        let inscrs = inscription::api::get_inscription_transfers_by_id(
+        inscription::api::get_inscription_transfers_by_id(
             &self.get_base_api_url(),
             &id,
             offset,
             limit,
         )
         .await
-        .expect("Can't perform HTTP outcall");
-
-        inscrs
+        .expect("Can't perform HTTP outcall")
     }
 
     #[query]
