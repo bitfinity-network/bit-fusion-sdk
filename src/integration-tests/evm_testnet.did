@@ -162,7 +162,7 @@ type HaltError = variant {
   CallerGasLimitMoreThanBlock;
   InvalidOpcode;
   StateChangeDuringStaticCall;
-  LackOfFundForMaxFee : record { fee : nat64; balance : text };
+  LackOfFundForMaxFee : record { fee : text; balance : text };
   CreateEmpty;
   InvalidCode : nat8;
   GasPriceLessThanBasefee;
@@ -343,6 +343,7 @@ service : (EvmCanisterInitData) -> {
   get_curr_metrics : () -> (MetricsData) query;
   get_metrics : () -> (MetricsStorage) query;
   account_basic : (text) -> (BasicAccount) query;
+  admin_allow_empty_blocks : (bool) -> (Result);
   admin_disable_evm : (bool) -> (Result);
   admin_ic_permissions_add : (principal, vec Permission) -> (Result_1);
   admin_ic_permissions_get : (principal) -> (Result_1) query;
@@ -362,6 +363,7 @@ service : (EvmCanisterInitData) -> {
     ) -> (Result);
   apply_clear_info_changes : (vec StateUpdateAction) -> (Result);
   apply_state_storage_changes : (vec StateUpdateAction_1) -> (Result);
+  blocks_and_transactions_history_total_bytes : () -> (nat64) query;
   eth_accounts : () -> (vec text) query;
   eth_block_number : () -> (nat64) query;
   eth_call : (opt text, opt text, opt text, nat64, opt text, opt text) -> (
@@ -415,11 +417,14 @@ service : (EvmCanisterInitData) -> {
   ic_logs : (nat64, nat64) -> (Result_12) query;
   ic_stats : () -> (Result_13) query;
   is_address_reserved : (principal, text) -> (bool) query;
+  is_empty_block_enabled : () -> (bool) query;
   is_evm_disabled : () -> (bool) query;
+  memory_pages_allocated_for_id : (nat8) -> (nat64) query;
   mint_native_tokens : (text, text) -> (Result_14);
   net_listening : () -> (bool) query;
   net_peer_count : () -> (nat64) query;
   net_version : () -> (nat64) query;
+  receipts_history_total_bytes : () -> (nat64) query;
   reserve_address : (principal, text) -> (Result);
   revert_blockchain_to_block : (nat64) -> (Result_15);
   send_raw_transaction : (Transaction) -> (Result_3);

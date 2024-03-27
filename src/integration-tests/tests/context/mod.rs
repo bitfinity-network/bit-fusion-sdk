@@ -341,7 +341,7 @@ pub trait TestContext {
             .wait_transaction_receipt(&hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
-                "transction not processed".into(),
+                "transaction not processed".into(),
             )))?;
 
         if receipt.status != Some(U64::one()) {

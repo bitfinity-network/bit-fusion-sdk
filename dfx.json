@@ -4,7 +4,12 @@
       "build": "",
       "candid": ".artifact/evm_testnet.did",
       "wasm": ".artifact/evm_testnet.wasm.gz",
-      "type": "custom"
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
     },
     "signature_verification": {
       "build": "",
@@ -34,6 +39,35 @@
       "build": "",
       "candid": ".artifact/spender.did",
       "wasm": ".artifact/spender.wasm.gz",
+      "type": "custom"
+    },
+    "icrc2-minter": {
+      "build": "",
+      "candid": ".artifact/icrc2-minter.did",
+      "wasm": ".artifact/icrc2-minter.wasm.gz",
+      "type": "custom"
+    },
+    "btc-bridge": {
+      "build": "",
+      "candid": ".artifact/btc-bridge.did",
+      "wasm": ".artifact/btc-bridge.wasm.gz",
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    },
+    "ic-ckbtc-kyt": {
+      "build": "",
+      "candid": ".artifact/ic-ckbtc-kyt.did",
+      "wasm": ".artifact/ic-ckbtc-kyt.wasm.gz",
+      "type": "custom"
+    },
+    "ic-ckbtc-minter": {
+      "build": "",
+      "candid": ".artifact/ic-ckbtc-minter.did",
+      "wasm": ".artifact/ic-ckbtc-minter.wasm.gz",
       "type": "custom"
     }
   }

@@ -63,11 +63,12 @@ get_icrc1_binaries() {
 }
 
 get_ckbtc_binaries() {
-  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-minter.wasm.gz" "$WASM_DIR/ic-ckbtc-minter.wasm.gz"
-  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-btc-canister.wasm.gz" "$WASM_DIR/ic-btc-canister.wasm.gz"
-  download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-kyt.wasm.gz" "$WASM_DIR/ic-ckbtc-kyt.wasm.gz"
+    download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-minter.wasm.gz" "$WASM_DIR/ic-ckbtc-minter.wasm.gz"
+    download_file "https://raw.githubusercontent.com/dfinity/ic/${IC_COMMIT_HASH}/rs/bitcoin/ckbtc/minter/ckbtc_minter.did" "$WASM_DIR/ic-ckbtc-minter.did"
+    download_file "https://download.dfinity.systems/ic/${IC_COMMIT_HASH}/canisters/ic-ckbtc-kyt.wasm.gz" "$WASM_DIR/ic-ckbtc-kyt.wasm.gz"
+    download_file "https://raw.githubusercontent.com/dfinity/ic/${IC_COMMIT_HASH}/rs/bitcoin/ckbtc/kyt/kyt.did" "$WASM_DIR/ic-ckbtc-kyt.did"
 
-  cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz $WASM_DIR/ic-bitcoin-canister-mock.wasm.gz
+    cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz $WASM_DIR/ic-bitcoin-canister-mock.wasm.gz
 }
 
 build_create_bft_bridge_tool() {
