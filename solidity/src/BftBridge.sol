@@ -94,15 +94,15 @@ contract BFTBridge {
     ) public pure returns (bytes32 toID) {
         return
             bytes32(
-                abi.encodePacked(
-                    uint8(1),
-                    chainID,
-                    toAddress,
-                    uint32(0),
-                    uint16(0),
-                    uint(8)
-                )
-            );
+            abi.encodePacked(
+                uint8(1),
+                chainID,
+                toAddress,
+                uint32(0),
+                uint16(0),
+                uint(8)
+            )
+        );
     }
 
     // Has a user's transaction nonce been used?
@@ -177,7 +177,7 @@ contract BFTBridge {
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
         MintOrderData memory order = _decodeAndValidateClaim(
-            encodedOrder[:197]
+            encodedOrder[: 197]
         );
 
         _checkMintOrderSignature(encodedOrder);
@@ -233,7 +233,7 @@ contract BFTBridge {
 
         // Fill return buffer with values
         uint32[] memory res = new uint32[](bufferSize);
-        for (uint8 i = buffer.begin; i != buffer.end; ) {
+        for (uint8 i = buffer.begin; i != buffer.end;) {
             res[i] = _userDepositBlocks[msg.sender][i]; // Assign values to the temporary array
             unchecked {
                 i++;
@@ -251,7 +251,7 @@ contract BFTBridge {
         address fromERC20,
         bytes memory recipientID
     ) public returns (uint32) {
-        require(fromERC20 != address(this));
+        require(fromERC20 != address(this), "From address must not be BFT bridge address");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -309,7 +309,7 @@ contract BFTBridge {
     ) external view returns (address) {
         return _erc20TokenRegistry[baseTokenID];
     }
-    
+
     // Returns base token for the given wrapped token
     function getBaseToken(
         address wrappedTokenAddress
@@ -353,16 +353,16 @@ contract BFTBridge {
         bytes calldata encodedOrder
     ) private view returns (MintOrderData memory) {
         // Decode order data
-        uint256 amount = uint256(bytes32(encodedOrder[:32]));
-        bytes32 senderID = bytes32(encodedOrder[32:64]);
-        bytes32 fromTokenID = bytes32(encodedOrder[64:96]);
-        address recipient = address(bytes20(encodedOrder[96:116]));
-        address toERC20 = address(bytes20(encodedOrder[116:136]));
-        uint32 nonce = uint32(bytes4(encodedOrder[136:140]));
-        uint32 senderChainId = uint32(bytes4(encodedOrder[140:144]));
-        uint32 recipientChainId = uint32(bytes4(encodedOrder[144:148]));
-        bytes32 name = bytes32(encodedOrder[148:180]);
-        bytes16 symbol = bytes16(encodedOrder[180:196]);
+        uint256 amount = uint256(bytes32(encodedOrder[: 32]));
+        bytes32 senderID = bytes32(encodedOrder[32 : 64]);
+        bytes32 fromTokenID = bytes32(encodedOrder[64 : 96]);
+        address recipient = address(bytes20(encodedOrder[96 : 116]));
+        address toERC20 = address(bytes20(encodedOrder[116 : 136]));
+        uint32 nonce = uint32(bytes4(encodedOrder[136 : 140]));
+        uint32 senderChainId = uint32(bytes4(encodedOrder[140 : 144]));
+        uint32 recipientChainId = uint32(bytes4(encodedOrder[144 : 148]));
+        bytes32 name = bytes32(encodedOrder[148 : 180]);
+        bytes16 symbol = bytes16(encodedOrder[180 : 196]);
         uint8 decimals = uint8(encodedOrder[196]);
 
         // Assert recipient address is not zero
@@ -376,7 +376,7 @@ contract BFTBridge {
 
         // Check if withdrawal is happening on the correct chain
         require(block.chainid == recipientChainId, "Invalid chain ID");
-        
+
         if (_baseTokenRegistry[toERC20] != bytes32(0)) {
             require(
                 _erc20TokenRegistry[fromTokenID] == toERC20,
@@ -387,17 +387,17 @@ contract BFTBridge {
         // Return the decoded order data
         return
             MintOrderData(
-                amount,
-                senderID,
-                fromTokenID,
-                recipient,
-                toERC20,
-                nonce,
-                name,
-                symbol,
-                decimals,
-                senderChainId
-            );
+            amount,
+            senderID,
+            fromTokenID,
+            recipient,
+            toERC20,
+            nonce,
+            name,
+            symbol,
+            decimals,
+            senderChainId
+        );
     }
 
     // Function to check encodedOrder signature
@@ -405,10 +405,10 @@ contract BFTBridge {
         bytes calldata encodedOrder
     ) private view {
         // Create a hash of the order data
-        bytes32 hash = keccak256(encodedOrder[:197]);
+        bytes32 hash = keccak256(encodedOrder[: 197]);
 
         // Recover signer from the signature
-        address signer = ECDSA.recover(hash, encodedOrder[197:]);
+        address signer = ECDSA.recover(hash, encodedOrder[197 :]);
 
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");

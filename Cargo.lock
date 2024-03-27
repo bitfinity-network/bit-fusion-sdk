@@ -1364,9 +1364,14 @@ dependencies = [
  "eth-signer",
  "ethereum-types",
  "ethers-core",
+ "evm-canister-client",
  "hex",
+ "ic-agent",
+ "ic-canister-client",
  "minter-contract-utils",
+ "minter-did",
  "rand",
+ "tokio",
 ]
 
 [[package]]
