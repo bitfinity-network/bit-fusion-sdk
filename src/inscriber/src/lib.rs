@@ -1,6 +1,5 @@
 #[allow(unused)]
 mod build_data;
-
 pub mod canister;
 pub mod wallet;
 
@@ -15,7 +14,7 @@ use rand::{RngCore, SeedableRng};
 pub use crate::canister::Inscriber;
 
 thread_local! {
-    pub static RNG: RefCell<Option<StdRng>> = RefCell::new(None);
+    pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
 }
 
 pub fn idl() -> String {

@@ -8,18 +8,14 @@ use ic_canister::{
 };
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
+use ord_rs::MultisigConfig;
 
 use crate::build_data::canister_build_data;
-use crate::wallet::fees::MultisigConfig;
-use crate::wallet::inscription::Protocol;
+use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{self, bitcoin_api};
 
 thread_local! {
-    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = Cell::new(BitcoinNetwork::Regtest);
-
-    pub(crate) static ECDSA_DERIVATION_PATH: Vec<Vec<u8>> = vec![];
-
-    pub(crate) static ECDSA_KEY_NAME: RefCell<String> = RefCell::new(String::from(""));
+    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
 }
 
 #[derive(Canister, Clone, Debug)]
@@ -35,13 +31,6 @@ impl Inscriber {
     pub fn init(&mut self, network: BitcoinNetwork) {
         crate::register_custom_getrandom();
         BITCOIN_NETWORK.with(|n| n.set(network));
-
-        ECDSA_KEY_NAME.with(|key_name| {
-            key_name.replace(String::from(match network {
-                BitcoinNetwork::Regtest => "dfx_test_key",
-                BitcoinNetwork::Mainnet | BitcoinNetwork::Testnet => "test_key_1",
-            }))
-        });
     }
 
     /// Returns the balance of the given bitcoin address.
@@ -61,15 +50,11 @@ impl Inscriber {
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
-        let derivation_path = ECDSA_DERIVATION_PATH.with(|d| d.clone());
-        let key_name = ECDSA_KEY_NAME.with(|kn| kn.borrow().to_string());
         let network = BITCOIN_NETWORK.with(|n| n.get());
-        wallet::get_bitcoin_address(network, key_name, derivation_path)
-            .await
-            .to_string()
+        wallet::get_bitcoin_address(network).await.to_string()
     }
 
-    /// Inscribes and sends the given amount of bitcoin from this canister to the given address.
+    /// Inscribes and sends the inscribed sat from this canister to the given address.
     /// Returns the commit and reveal transaction IDs.
     #[update]
     pub async fn inscribe(
@@ -77,16 +62,21 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<String>,
-        multisig: Option<MultisigConfig>,
+        multisig_config: Option<Multisig>,
     ) -> (String, String) {
         let network = BITCOIN_NETWORK.with(|n| n.get());
+
+        let multisig_config = multisig_config.map(|m| MultisigConfig {
+            required: m.required,
+            total: m.total,
+        });
 
         wallet::inscribe(
             network,
             inscription_type,
             inscription,
             dst_address,
-            multisig,
+            multisig_config,
         )
         .await
         .unwrap()

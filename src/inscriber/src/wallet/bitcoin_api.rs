@@ -24,7 +24,7 @@ const MIN_CONFIRMATIONS: u32 = 6;
 ///
 /// Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
-pub async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
+pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
     let balance_res: Result<(Satoshi,), _> = call_with_payment(
         Principal::management_canister(),
         "bitcoin_get_balance",
@@ -47,7 +47,7 @@ pub async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
 /// Returns a vector of all UTXOs for the given Bitcoin address.
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
-pub async fn get_utxos(
+pub(crate) async fn get_utxos(
     network: BitcoinNetwork,
     address: String,
 ) -> Result<GetUtxosResponse, String> {
@@ -108,7 +108,9 @@ pub async fn get_utxos(
 ///
 /// Relies on the `bitcoin_get_current_fee_percentiles` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_current_fee_percentiles
-pub async fn get_current_fee_percentiles(network: BitcoinNetwork) -> Vec<MillisatoshiPerByte> {
+pub(crate) async fn get_current_fee_percentiles(
+    network: BitcoinNetwork,
+) -> Vec<MillisatoshiPerByte> {
     let res: Result<(Vec<MillisatoshiPerByte>,), _> = call_with_payment(
         Principal::management_canister(),
         "bitcoin_get_current_fee_percentiles",
@@ -124,7 +126,7 @@ pub async fn get_current_fee_percentiles(network: BitcoinNetwork) -> Vec<Millisa
 ///
 /// Relies on the `bitcoin_send_transaction` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_send_transaction
-pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
+pub(crate) async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
     let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
         + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
 

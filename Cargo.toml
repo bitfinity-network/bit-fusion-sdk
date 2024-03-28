@@ -22,7 +22,7 @@ ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ] }
 ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.13.x" }
 log = "0.4"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "main" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "fix/external-signing-flow" }
 ripemd = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -38,6 +38,8 @@ vergen = { version = "8.3", default-features = false, features = [
 # getrandom workaround
 getrandom = { version = "0.2", features = ["custom"] }
 rand = { version = "0.8", features = ["getrandom"] }
+
+k256 = { version = "0.13", features = ["ecdsa"] }
 
 [profile.dev]
 debug = false

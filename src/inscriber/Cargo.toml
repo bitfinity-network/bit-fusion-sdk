@@ -29,5 +29,7 @@ sha2 = { workspace = true }
 getrandom = { workspace = true }
 rand = { workspace = true }
 
+k256 = { workspace = true }
+
 [build-dependencies]
 vergen = { workspace = true }
