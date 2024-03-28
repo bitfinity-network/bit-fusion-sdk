@@ -7,10 +7,10 @@ use serde::Serialize;
 
 /// Retrieves the public key of this canister at the given derivation path
 /// from IC's ECDSA API.
-pub async fn ecdsa_public_key() -> Result<PublicKeyReply, String> {
+pub async fn ecdsa_public_key(derivation_path: Vec<Vec<u8>>) -> Result<PublicKeyReply, String> {
     let request = EcdsaPublicKeyArgument {
         canister_id: None,
-        derivation_path: vec![],
+        derivation_path,
         key_id: EcdsaKeyIds::TestKeyLocalDevelopment.to_key_id(),
     };
 
@@ -24,10 +24,13 @@ pub async fn ecdsa_public_key() -> Result<PublicKeyReply, String> {
 }
 
 /// Signs a message with an ECDSA key and returns the signature.
-pub async fn sign_with_ecdsa(message: &str) -> Result<SignatureReply, String> {
+pub async fn sign_with_ecdsa(
+    derivation_path: Vec<Vec<u8>>,
+    message: &str,
+) -> Result<SignatureReply, String> {
     let request = SignWithEcdsaArgument {
         message_hash: sha256(message).to_vec(),
-        derivation_path: vec![],
+        derivation_path,
         key_id: EcdsaKeyIds::TestKeyLocalDevelopment.to_key_id(),
     };
 

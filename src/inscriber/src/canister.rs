@@ -12,7 +12,7 @@ use ord_rs::MultisigConfig;
 
 use crate::build_data::canister_build_data;
 use crate::wallet::inscription::{Multisig, Protocol};
-use crate::wallet::{self, bitcoin_api};
+use crate::wallet::{bitcoin_api, CanisterWallet};
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
@@ -50,8 +50,13 @@ impl Inscriber {
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
+        let derivation_path = Self::derivation_path();
         let network = BITCOIN_NETWORK.with(|n| n.get());
-        wallet::get_bitcoin_address(network).await.to_string()
+
+        CanisterWallet::new(derivation_path, network)
+            .get_bitcoin_address()
+            .await
+            .to_string()
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.
@@ -64,6 +69,7 @@ impl Inscriber {
         dst_address: Option<String>,
         multisig_config: Option<Multisig>,
     ) -> (String, String) {
+        let derivation_path = Self::derivation_path();
         let network = BITCOIN_NETWORK.with(|n| n.get());
 
         let multisig_config = multisig_config.map(|m| MultisigConfig {
@@ -71,15 +77,10 @@ impl Inscriber {
             total: m.total,
         });
 
-        wallet::inscribe(
-            network,
-            inscription_type,
-            inscription,
-            dst_address,
-            multisig_config,
-        )
-        .await
-        .unwrap()
+        CanisterWallet::new(derivation_path, network)
+            .inscribe(inscription_type, inscription, dst_address, multisig_config)
+            .await
+            .expect("Inscription failed")
     }
 
     /// Returns the build data of the canister
@@ -105,6 +106,13 @@ impl Inscriber {
 
     pub fn idl() -> Idl {
         generate_idl!()
+    }
+
+    #[inline]
+    fn derivation_path() -> Vec<Vec<u8>> {
+        let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
+
+        vec![caller_principal] // Derivation path
     }
 }
 
