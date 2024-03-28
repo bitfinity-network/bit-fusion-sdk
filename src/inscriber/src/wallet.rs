@@ -13,7 +13,7 @@ use ic_exports::ic_cdk::print;
 use inscription::Nft as CandidNft;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    Brc20, CreateCommitTransaction, CreateCommitTransactionArgsV2, ExternalSigner, Inscription,
+    Brc20, CreateCommitTransaction, CreateCommitTransactionArgs, ExternalSigner, Inscription,
     MultisigConfig, Nft, OrdError, OrdResult, OrdTransactionBuilder, RevealTransactionArgs,
     Utxo as OrdUtxo, Wallet, WalletType,
 };
@@ -210,7 +210,7 @@ where
         })
         .collect();
 
-    let commit_tx_args = CreateCommitTransactionArgsV2 {
+    let commit_tx_args = CreateCommitTransactionArgs {
         inputs,
         inscription,
         leftovers_recipient: own_address.clone(),
@@ -220,7 +220,7 @@ where
     };
 
     let commit_tx_result = builder
-        .build_commit_transaction_v2(network, recipient_address.clone(), commit_tx_args)
+        .build_commit_transaction(network, recipient_address.clone(), commit_tx_args)
         .await?;
 
     Ok(commit_tx_result)

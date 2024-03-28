@@ -1727,7 +1727,7 @@ dependencies = [
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=fix/external-signing-flow#f7d1bdf708ba145d914018462bed0fe0a3f2cc36"
+source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=fix/external-signing-flow#a544a0928a590004cd1a436fb8b44de47d05606a"
 dependencies = [
  "async-trait",
  "bitcoin",

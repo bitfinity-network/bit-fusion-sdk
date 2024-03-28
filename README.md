@@ -59,10 +59,10 @@ The above command will generate a unique Bitcoin address from the ECDSA public k
 
 ## Step 3: Send bitcoins to Canister's Bitcoin Address
 
-Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions.
+Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions. To avoid UTXO clogging, and since the Bitcoin daemon already generates enough blocks when it starts, generate only 1 additional block and effectively reward the canister wallet with about `5 BTC`. Run the following command:
 
 ```bash
-docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 101 <CANISTER-BITCOIN-ADDRESS>
+docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 1 <CANISTER-BITCOIN-ADDRESS>
 ```
 
 Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_bitcoin_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
