@@ -1,45 +1,22 @@
-use candid::Principal;
-use ic_exports::ic_cdk::api::call::call_with_payment;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest, GetUtxosRequest,
-    GetUtxosResponse, MillisatoshiPerByte, Satoshi, SendTransactionRequest, Utxo, UtxoFilter,
+    self as IcBtc, BitcoinNetwork, GetBalanceRequest, GetCurrentFeePercentilesRequest,
+    GetUtxosRequest, GetUtxosResponse, MillisatoshiPerByte, SendTransactionRequest, Utxo,
+    UtxoFilter,
 };
-
-// The fees for the various bitcoin endpoints.
-const GET_BALANCE_COST_CYCLES: u64 = 100_000_000;
-const GET_UTXOS_COST_CYCLES: u64 = 10_000_000_000;
-const GET_CURRENT_FEE_PERCENTILES_CYCLES: u64 = 100_000_000;
-const SEND_TRANSACTION_BASE_CYCLES: u64 = 5_000_000_000;
-const SEND_TRANSACTION_PER_BYTE_CYCLES: u64 = 20_000_000;
-
-// There is an upper bound of 144 on the minimum number of confirmations.
-// If a larger minimum number of confirmations is specified, the call is rejected.
-// In practice, this value is set around 6.
-//
-// Reference: https://internetcomputer.org/docs/current/references/ic-interface-spec#ic-bitcoin_get_utxos
-#[allow(unused)]
-const MIN_CONFIRMATIONS: u32 = 6;
 
 /// Returns the balance of the given bitcoin address.
 ///
 /// Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
 pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
-    let balance_res: Result<(Satoshi,), _> = call_with_payment(
-        Principal::management_canister(),
-        "bitcoin_get_balance",
-        (GetBalanceRequest {
-            address,
-            network,
-            min_confirmations: None,
-        },),
-        GET_BALANCE_COST_CYCLES,
-    )
-    .await;
-
-    balance_res
-        .expect("Failed to retrieve balance for specified address")
-        .0
+    IcBtc::bitcoin_get_balance(GetBalanceRequest {
+        address,
+        network,
+        min_confirmations: None,
+    })
+    .await
+    .expect("Failed to retrieve balance for specified address")
+    .0
 }
 
 /// Fetches all UTXOs for the given address using pagination.
@@ -65,13 +42,7 @@ pub(crate) async fn get_utxos(
             filter: page_filter,
         };
 
-        let utxos_res: Result<(GetUtxosResponse,), _> = call_with_payment(
-            Principal::management_canister(),
-            "bitcoin_get_utxos",
-            (get_utxos_request,),
-            GET_UTXOS_COST_CYCLES,
-        )
-        .await;
+        let utxos_res = IcBtc::bitcoin_get_utxos(get_utxos_request).await;
 
         match utxos_res {
             Ok(response) => {
@@ -111,15 +82,10 @@ pub(crate) async fn get_utxos(
 pub(crate) async fn get_current_fee_percentiles(
     network: BitcoinNetwork,
 ) -> Vec<MillisatoshiPerByte> {
-    let res: Result<(Vec<MillisatoshiPerByte>,), _> = call_with_payment(
-        Principal::management_canister(),
-        "bitcoin_get_current_fee_percentiles",
-        (GetCurrentFeePercentilesRequest { network },),
-        GET_CURRENT_FEE_PERCENTILES_CYCLES,
-    )
-    .await;
-
-    res.unwrap().0
+    IcBtc::bitcoin_get_current_fee_percentiles(GetCurrentFeePercentilesRequest { network })
+        .await
+        .expect("Failed to retrieve current fee percentiles")
+        .0
 }
 
 /// Sends a (signed) transaction to the bitcoin network.
@@ -127,19 +93,10 @@ pub(crate) async fn get_current_fee_percentiles(
 /// Relies on the `bitcoin_send_transaction` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_send_transaction
 pub(crate) async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
-    let transaction_fee = SEND_TRANSACTION_BASE_CYCLES
-        + (transaction.len() as u64) * SEND_TRANSACTION_PER_BYTE_CYCLES;
-
-    let res: Result<(), _> = call_with_payment(
-        Principal::management_canister(),
-        "bitcoin_send_transaction",
-        (SendTransactionRequest {
-            network,
-            transaction,
-        },),
-        transaction_fee,
-    )
-    .await;
-
-    res.unwrap();
+    IcBtc::bitcoin_send_transaction(SendTransactionRequest {
+        network,
+        transaction,
+    })
+    .await
+    .expect("Failed to send transaction");
 }
