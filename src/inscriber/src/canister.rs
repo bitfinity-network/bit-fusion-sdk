@@ -106,52 +106,6 @@ impl Inscriber {
     pub fn idl() -> Idl {
         generate_idl!()
     }
-
-    #[update]
-    pub async fn test_ecdsa_api_signing(&mut self) {
-        use ord_rs::ExternalSigner;
-        use wallet::EcdsaSigner;
-
-        let signer = EcdsaSigner;
-
-        let ecdsa_pubkey = signer.ecdsa_public_key().await;
-        let message = String::from("Hello world!");
-        let signature = signer.sign_with_ecdsa(message.clone()).await;
-
-        ic_exports::ic_cdk::print("Verifying ECDSA signature signed with ECDSA API");
-        assert!(signer.verify_ecdsa(signature, message, ecdsa_pubkey).await);
-        ic_exports::ic_cdk::print("ECDSA signature verified");
-    }
-
-    #[update]
-    pub async fn test_private_key_ecdsa_signing(&mut self) {
-        // WIF: cQ2WiaKM1RnsytieLDqN6sqBw3wDSkgCHQdgfGUEC5qiYaP8sDaN
-        // Mnemonic: salon embody gorilla simple half olympic portion miss blossom mammal involve lunch
-        // Address: bcrt1q4td8andehe8wft7p9xkl8x3a9t4ax2y59lfy8l
-        use bitcoin::key::Secp256k1;
-        use bitcoin::secp256k1::hashes::{sha256, Hash};
-        use bitcoin::secp256k1::Message;
-        use bitcoin::PrivateKey;
-
-        let secp = Secp256k1::new();
-
-        let private_key =
-            PrivateKey::from_wif("cQ2WiaKM1RnsytieLDqN6sqBw3wDSkgCHQdgfGUEC5qiYaP8sDaN").unwrap();
-        let public_key = private_key.public_key(&secp);
-
-        let msg_hash = sha256::Hash::hash("Hello world!".as_bytes())
-            .as_byte_array()
-            .to_vec();
-
-        let message = Message::from_digest_slice(&msg_hash).unwrap();
-        let signature = secp.sign_ecdsa(&message, &private_key.inner);
-
-        ic_exports::ic_cdk::print("Verifying ECDSA signature signed with private key");
-        assert!(secp
-            .verify_ecdsa(&message, &signature, &public_key.inner)
-            .is_ok());
-        ic_exports::ic_cdk::print("ECDSA signature verified");
-    }
 }
 
 impl Metrics for Inscriber {

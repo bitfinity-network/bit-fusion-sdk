@@ -13,16 +13,16 @@ use ic_exports::ic_cdk::print;
 use inscription::Nft as CandidNft;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    Brc20, CreateCommitTransactionArgsV2, ExternalSigner, Inscription, MultisigConfig, Nft,
-    OrdError, OrdResult, OrdTransactionBuilder, RevealTransactionArgs, Utxo as OrdUtxo, Wallet,
-    WalletType,
+    Brc20, CreateCommitTransaction, CreateCommitTransactionArgsV2, ExternalSigner, Inscription,
+    MultisigConfig, Nft, OrdError, OrdResult, OrdTransactionBuilder, RevealTransactionArgs,
+    Utxo as OrdUtxo, Wallet, WalletType,
 };
 use serde::de::DeserializeOwned;
 
 use self::inscription::Protocol;
 
 #[derive(Clone)]
-pub struct EcdsaSigner;
+pub(crate) struct EcdsaSigner;
 
 #[async_trait::async_trait]
 impl ExternalSigner for EcdsaSigner {
@@ -53,7 +53,18 @@ impl ExternalSigner for EcdsaSigner {
     }
 }
 
-pub async fn inscribe(
+/// Returns bech32 bitcoin `Address` of this canister.
+pub(crate) async fn get_bitcoin_address(network: BitcoinNetwork) -> Address {
+    let public_key = match ecdsa_api::ecdsa_public_key().await {
+        Ok(res) => res.public_key_hex,
+        Err(e) => panic!("{e}"),
+    };
+
+    let pk = PublicKey::from_str(&public_key).expect("Can't deserialize public key");
+    btc_address_from_public_key(network, &pk)
+}
+
+pub(crate) async fn inscribe(
     network: BitcoinNetwork,
     inscription_type: Protocol,
     inscription: String,
@@ -74,7 +85,6 @@ pub async fn inscribe(
         .await
         .expect("Failed to retrieve UTXOs for given address")
         .utxos;
-    print(format!("Our own UTXOS: {:#?}", own_utxos));
 
     // initialize a wallet (transaction signer) and a transaction builder
     let wallet = Wallet::new_with_signer(WalletType::External {
@@ -109,7 +119,7 @@ pub async fn inscribe(
 
     let fee_rate = FeeRate::from_sat_per_vb(fee_per_byte).expect("Overflow!");
 
-    let (commit_tx, reveal_tx) = match inscription_type {
+    let commit_tx_result = match inscription_type {
         Protocol::Brc20 => {
             let op: Brc20 = serde_json::from_str(&inscription)?;
 
@@ -119,7 +129,7 @@ pub async fn inscribe(
                 Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
             };
 
-            build_commit_and_reveal_transactions::<Brc20>(
+            build_commit_transaction::<Brc20>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
@@ -138,7 +148,7 @@ pub async fn inscribe(
                 Some(data.body.as_bytes().to_vec()),
             );
 
-            build_commit_and_reveal_transactions::<Nft>(
+            build_commit_transaction::<Nft>(
                 &mut builder,
                 inscription,
                 dst_address.clone(),
@@ -152,31 +162,25 @@ pub async fn inscribe(
         }
     };
 
-    let commit_tx_bytes = serialize(&commit_tx);
-    print(format!(
-        "Signed commit transaction: {}",
-        hex::encode(&commit_tx_bytes)
-    ));
+    let reveal_tx =
+        build_reveal_transaction(&mut builder, commit_tx_result.clone(), dst_address).await?;
 
     print("Sending commit transaction...");
-    bitcoin_api::send_transaction(network, commit_tx_bytes).await;
+    bitcoin_api::send_transaction(network, serialize(&commit_tx_result.tx)).await;
     print("Done");
-
-    let reveal_tx_bytes = serialize(&reveal_tx);
-    print(format!(
-        "Signed reveal transaction: {}",
-        hex::encode(&reveal_tx_bytes)
-    ));
 
     print("Sending reveal transaction...");
-    bitcoin_api::send_transaction(network, reveal_tx_bytes).await;
+    bitcoin_api::send_transaction(network, serialize(&reveal_tx)).await;
     print("Done");
 
-    Ok((commit_tx.txid().encode_hex(), reveal_tx.txid().encode_hex()))
+    Ok((
+        commit_tx_result.tx.txid().encode_hex(),
+        reveal_tx.txid().encode_hex(),
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn build_commit_and_reveal_transactions<T>(
+async fn build_commit_transaction<T>(
     builder: &mut OrdTransactionBuilder,
     inscription: T,
     recipient_address: Address,
@@ -185,7 +189,7 @@ async fn build_commit_and_reveal_transactions<T>(
     network: Network,
     fee_rate: FeeRate,
     multisig_config: Option<MultisigConfig>,
-) -> OrdResult<(Transaction, Transaction)>
+) -> OrdResult<CreateCommitTransaction>
 where
     T: Inscription + DeserializeOwned,
 {
@@ -203,7 +207,7 @@ where
         .into_iter()
         .map(|utxo| OrdUtxo {
             id: Txid::from_raw_hash(
-                Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse tx id"),
+                Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse txid"),
             ),
             index: utxo.outpoint.vout,
             amount: total_spent,
@@ -223,10 +227,18 @@ where
         multisig_config,
     };
 
-    let commit_tx = builder
+    let commit_tx_result = builder
         .build_commit_transaction_v2(network, recipient_address.clone(), commit_tx_args)
         .await?;
 
+    Ok(commit_tx_result)
+}
+
+async fn build_reveal_transaction(
+    builder: &mut OrdTransactionBuilder,
+    commit_tx: CreateCommitTransaction,
+    recipient_address: Address,
+) -> OrdResult<Transaction> {
     let reveal_tx_args = RevealTransactionArgs {
         input: OrdUtxo {
             id: commit_tx.tx.txid(),
@@ -234,23 +246,10 @@ where
             amount: commit_tx.reveal_balance,
         },
         recipient_address,
-        redeem_script: commit_tx.clone().redeem_script,
+        redeem_script: commit_tx.redeem_script,
     };
 
-    let reveal_tx = builder.build_reveal_transaction(reveal_tx_args).await?;
-
-    Ok((commit_tx.tx, reveal_tx))
-}
-
-/// Returns bech32 bitcoin `Address` of this canister.
-pub async fn get_bitcoin_address(network: BitcoinNetwork) -> Address {
-    let public_key = match ecdsa_api::ecdsa_public_key().await {
-        Ok(res) => res.public_key_hex,
-        Err(e) => panic!("{e}"),
-    };
-
-    let pk = PublicKey::from_str(&public_key).expect("Can't deserialize public key");
-    btc_address_from_public_key(network, &pk)
+    builder.build_reveal_transaction(reveal_tx_args).await
 }
 
 // Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.
