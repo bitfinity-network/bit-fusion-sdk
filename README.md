@@ -22,35 +22,30 @@ rustup target add wasm32-unknown-unknown # Required for building IC canisters
 
 ## Step 1: Init, Build, and Deploy
 
-### Clone this Repo
+### Clone the Repo
 
 ```bash
 git clone https://github.com/bitfinity-network/ckOrd
 cd ckOrd
 ```
 
-### Init `bitcoind`
+### Init `bitcoind` and Start Local IC Replica in Regtest Mode
 
 ```bash
 ./scripts/init.sh
+dfx start --clean --background --enable-bitcoin
 ```
 
-The above command will start `bitcoind` in a Docker container, create a wallet called "testwallet", and generate 101 blocks to make sure the wallet has enough bitcoins to spend. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
+The above commands will start Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, and then start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
 
-### Build the Canister
+### Build and Deploy the Canister
 
 ```bash
 ./scripts/build.sh
-```
-
-#### Start the Local IC Replica and Deploy
-
-```bash
-dfx start --clean --background --enable-bitcoin
 ./scripts/deploy.sh init
 ```
 
-The above commands will start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode, and then deploy the canister.
+The above commands will build and then deploy the canister.
 
 ## Step 2: Generate a Bitcoin Address for the Canister
 
@@ -92,7 +87,20 @@ Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](ht
 
 ## Step 6: Inscribe and Send a Sat
 
-<**NOTE: 95% complete; needs finetuning. WIP**>
+To make an Ordinal (NFT) inscription, for example, you can call the canister's `inscribe` endpoint via:
+
+```bash
+dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", null, null)'
+```
+
+This effectively inscribes the following JSON-encoded data structure:
+
+```json
+{ 
+    "content_type": "text/plain",
+    "body": "demo",
+}
+```
 
 To inscribe a BRC20 `deploy` function onto a Satoshi, for example, you can call the canister's `inscribe` endpoint via:
 
@@ -124,8 +132,8 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     dst_address: Option<String>,
-    multisig_config: Option<Multisig>
+    multisig_config: Option<Multisig>,
 ) -> (String, String)
 ```
 
-which is why the above call has `null` arguments for the `dst_address` and `multisig_config` optional parameters.
+which is why the above calls has `null` arguments for the `dst_address` and `multisig_config` optional parameters.

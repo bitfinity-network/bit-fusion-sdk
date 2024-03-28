@@ -54,7 +54,7 @@ impl Inscriber {
         wallet::get_bitcoin_address(network).await.to_string()
     }
 
-    /// Inscribes and sends the given amount of bitcoin from this canister to the given address.
+    /// Inscribes and sends the inscribed sat from this canister to the given address.
     /// Returns the commit and reveal transaction IDs.
     #[update]
     pub async fn inscribe(
