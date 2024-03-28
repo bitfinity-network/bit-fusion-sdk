@@ -33,19 +33,14 @@ impl ExternalSigner for EcdsaSigner {
         }
     }
 
-    async fn sign_with_ecdsa(&self, message: String) -> String {
+    async fn sign_with_ecdsa(&self, message: &str) -> String {
         match ecdsa_api::sign_with_ecdsa(message).await {
             Ok(res) => res.signature_hex,
             Err(e) => panic!("{e}"),
         }
     }
 
-    async fn verify_ecdsa(
-        &self,
-        signature_hex: String,
-        message: String,
-        public_key_hex: String,
-    ) -> bool {
+    async fn verify_ecdsa(&self, signature_hex: &str, message: &str, public_key_hex: &str) -> bool {
         match ecdsa_api::verify_ecdsa(signature_hex, message, public_key_hex).await {
             Ok(res) => res.is_signature_valid,
             Err(e) => panic!("{e}"),

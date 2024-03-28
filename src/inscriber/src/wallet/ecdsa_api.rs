@@ -25,9 +25,9 @@ pub async fn ecdsa_public_key() -> Result<PublicKeyReply, String> {
 }
 
 /// Signs a message with an ECDSA key and returns the signature.
-pub async fn sign_with_ecdsa(message: String) -> Result<SignatureReply, String> {
+pub async fn sign_with_ecdsa(message: &str) -> Result<SignatureReply, String> {
     let request = SignWithECDSA {
-        message_hash: sha256(&message).to_vec(),
+        message_hash: sha256(message).to_vec(),
         derivation_path: vec![],
         key_id: EcdsaKeyIds::TestKeyLocalDevelopment.to_key_id(),
     };
@@ -48,9 +48,9 @@ pub async fn sign_with_ecdsa(message: String) -> Result<SignatureReply, String> 
 
 /// Verifies an ECDSA signature against a message and a public key.
 pub async fn verify_ecdsa(
-    signature_hex: String,
-    message: String,
-    public_key_hex: String,
+    signature_hex: &str,
+    message: &str,
+    public_key_hex: &str,
 ) -> Result<SignatureVerificationReply, String> {
     let signature_bytes = hex::decode(signature_hex).expect("failed to hex-decode signature");
     let pubkey_bytes = hex::decode(public_key_hex).expect("failed to hex-decode public key");
@@ -71,7 +71,7 @@ fn mgmt_canister_id() -> CanisterId {
     Principal::management_canister()
 }
 
-fn sha256(input: &String) -> [u8; 32] {
+fn sha256(input: &str) -> [u8; 32] {
     use sha2::{Digest, Sha256};
     Sha256::digest(input.as_bytes()).into()
 }
