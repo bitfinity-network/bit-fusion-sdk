@@ -64,6 +64,9 @@ pub(crate) async fn get_bitcoin_address(network: BitcoinNetwork) -> Address {
     btc_address_from_public_key(network, &pk)
 }
 
+/// Handles the inscription flow.
+///
+/// Returns the transaction IDs for both the commit and reveal transactions.
 pub(crate) async fn inscribe(
     network: BitcoinNetwork,
     inscription_type: Protocol,
@@ -200,8 +203,6 @@ where
         utxos_to_spend.push(utxo);
     }
 
-    let total_spent = Amount::from_sat(amount);
-
     let inputs: Vec<OrdUtxo> = utxos_to_spend
         .clone()
         .into_iter()
@@ -210,19 +211,15 @@ where
                 Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse txid"),
             ),
             index: utxo.outpoint.vout,
-            amount: total_spent,
+            amount: Amount::from_sat(amount),
         })
         .collect();
-
-    let leftovers_recipient = own_address.clone();
-
-    let txin_script_pubkey = own_address.script_pubkey();
 
     let commit_tx_args = CreateCommitTransactionArgsV2 {
         inputs,
         inscription,
-        leftovers_recipient,
-        txin_script_pubkey,
+        leftovers_recipient: own_address.clone(),
+        txin_script_pubkey: own_address.script_pubkey(),
         fee_rate,
         multisig_config,
     };
