@@ -7,6 +7,7 @@ use std::str::FromStr;
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, Transaction, Txid};
+use did::{InscribeError, InscribeResult, InscribeTransactions};
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_exports::ic_cdk::print;
@@ -83,9 +84,10 @@ impl CanisterWallet {
         &self,
         inscription_type: Protocol,
         inscription: String,
-        dst_address: Option<String>,
+        dst_address: Option<Address>,
+        leftovers_address: Address,
         multisig_config: Option<MultisigConfig>,
-    ) -> OrdResult<(String, String)> {
+    ) -> InscribeResult<InscribeTransactions> {
         let ecdsa_signer = EcdsaSigner {
             derivation_path: self.derivation_path.clone(),
         };
@@ -98,7 +100,7 @@ impl CanisterWallet {
         print("Fetching UTXOs...");
         let own_utxos = bitcoin_api::get_utxos(self.bitcoin_network, own_address.to_string())
             .await
-            .expect("Failed to retrieve UTXOs for given address")
+            .map_err(InscribeError::FailedToCollectUtxos)?
             .utxos;
 
         // initialize a wallet (transaction signer) and a transaction builder
@@ -109,16 +111,7 @@ impl CanisterWallet {
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
-        let dst_address = if let Some(addr) = dst_address {
-            Address::from_str(&addr)
-                .expect("Failed to parse address")
-                .require_network(self.network)
-                .expect("Address belongs to a different network than specified")
-        } else {
-            // Send inscription to canister's own address if `None` is provided
-            own_address.clone()
-        };
-
+        let dst_address = dst_address.unwrap_or_else(|| own_address.clone());
         // Get fee percentiles from previous transactions to estimate our own fee.
         let fee_percentiles = bitcoin_api::get_current_fee_percentiles(self.bitcoin_network).await;
 
@@ -136,7 +129,8 @@ impl CanisterWallet {
 
         let commit_tx_result = match inscription_type {
             Protocol::Brc20 => {
-                let op: Brc20 = serde_json::from_str(&inscription)?;
+                let op: Brc20 = serde_json::from_str(&inscription)
+                    .map_err(|e| InscribeError::BadAddress(e.to_string()))?;
 
                 let inscription = match op {
                     Brc20::Deploy(data) => Brc20::deploy(data.tick, data.max, data.lim, data.dec),
@@ -148,6 +142,7 @@ impl CanisterWallet {
                     &mut builder,
                     inscription,
                     dst_address.clone(),
+                    leftovers_address,
                     own_address,
                     &own_utxos,
                     fee_rate,
@@ -156,7 +151,8 @@ impl CanisterWallet {
                 .await?
             }
             Protocol::Nft => {
-                let data: CandidNft = serde_json::from_str(&inscription)?;
+                let data: CandidNft = serde_json::from_str(&inscription)
+                    .map_err(|e| InscribeError::BadAddress(e.to_string()))?;
                 let inscription = Nft::new(
                     Some(data.content_type.as_bytes().to_vec()),
                     Some(data.body.as_bytes().to_vec()),
@@ -166,6 +162,7 @@ impl CanisterWallet {
                     &mut builder,
                     inscription,
                     dst_address.clone(),
+                    leftovers_address,
                     own_address,
                     &own_utxos,
                     fee_rate,
@@ -187,10 +184,10 @@ impl CanisterWallet {
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
         print("Done");
 
-        Ok((
-            commit_tx_result.tx.txid().encode_hex(),
-            reveal_tx.txid().encode_hex(),
-        ))
+        Ok(InscribeTransactions {
+            commit_tx: commit_tx_result.tx.txid().encode_hex(),
+            reveal_tx: reveal_tx.txid().encode_hex(),
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -199,6 +196,7 @@ impl CanisterWallet {
         builder: &mut OrdTransactionBuilder,
         inscription: T,
         recipient_address: Address,
+        leftovers_address: Address,
         own_address: Address,
         own_utxos: &[Utxo],
         fee_rate: FeeRate,
@@ -229,7 +227,7 @@ impl CanisterWallet {
         let commit_tx_args = CreateCommitTransactionArgs {
             inputs,
             inscription,
-            leftovers_recipient: own_address.clone(),
+            leftovers_recipient: leftovers_address,
             txin_script_pubkey: own_address.script_pubkey(),
             fee_rate,
             multisig_config,
@@ -269,7 +267,7 @@ impl CanisterWallet {
     }
 
     #[inline]
-    fn map_network(network: BitcoinNetwork) -> Network {
+    pub fn map_network(network: BitcoinNetwork) -> Network {
         match network {
             BitcoinNetwork::Mainnet => Network::Bitcoin,
             BitcoinNetwork::Testnet => Network::Testnet,

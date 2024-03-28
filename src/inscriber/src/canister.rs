@@ -1,8 +1,10 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::str::FromStr;
 
+use bitcoin::Address;
 use candid::Principal;
-use did::build::BuildData;
+use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions};
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
@@ -66,11 +68,18 @@ impl Inscriber {
         &mut self,
         inscription_type: Protocol,
         inscription: String,
+        leftovers_address: String,
         dst_address: Option<String>,
         multisig_config: Option<Multisig>,
-    ) -> (String, String) {
+    ) -> InscribeResult<InscribeTransactions> {
         let derivation_path = Self::derivation_path();
         let network = BITCOIN_NETWORK.with(|n| n.get());
+        let leftovers_address = Self::get_address(leftovers_address, network)?;
+
+        let dst_address = match dst_address {
+            None => None,
+            Some(dst_address) => Some(Self::get_address(dst_address, network)?),
+        };
 
         let multisig_config = multisig_config.map(|m| MultisigConfig {
             required: m.required,
@@ -78,9 +87,14 @@ impl Inscriber {
         });
 
         CanisterWallet::new(derivation_path, network)
-            .inscribe(inscription_type, inscription, dst_address, multisig_config)
+            .inscribe(
+                inscription_type,
+                inscription,
+                dst_address,
+                leftovers_address,
+                multisig_config,
+            )
             .await
-            .expect("Inscription failed")
     }
 
     /// Returns the build data of the canister
@@ -113,6 +127,15 @@ impl Inscriber {
         let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
 
         vec![caller_principal] // Derivation path
+    }
+
+    #[inline]
+    /// Returns the parsed address given the string representation and the expected network.
+    fn get_address(address: String, network: BitcoinNetwork) -> InscribeResult<Address> {
+        Address::from_str(&address)
+            .map_err(|_| InscribeError::BadAddress(address.clone()))?
+            .require_network(CanisterWallet::map_network(network))
+            .map_err(|_| InscribeError::BadAddress(address))
     }
 }
 

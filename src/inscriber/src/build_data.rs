@@ -1,4 +1,4 @@
-use did::build::BuildData;
+use did::BuildData;
 
 // E.g.: x86_64-unknown-linux-gnu
 const CARGO_TARGET_TRIPLE: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");

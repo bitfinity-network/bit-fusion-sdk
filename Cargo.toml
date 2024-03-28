@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/inscriber"]
+members = ["src/did", "src/inscriber"]
 
 resolver = "2"
 
@@ -13,7 +13,6 @@ async-trait = "0.1"
 bitcoin = { version = "0.31", features = ["serde"] }
 bs58 = "0.5"
 candid = "0.10"
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
 hex = "0.4"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
@@ -27,6 +26,7 @@ ripemd = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+thiserror = "1.0"
 vergen = { version = "8.3", default-features = false, features = [
     "build",
     "cargo",

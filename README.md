@@ -90,7 +90,7 @@ Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](ht
 To make an Ordinal (NFT) inscription, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", null, null)'
+dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", "bc1qla0cg5lgzha4wf4njq3z64v53vchpnvmfx235m", null, null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -105,7 +105,7 @@ This effectively inscribes the following JSON-encoded data structure:
 To inscribe a BRC20 `deploy` function onto a Satoshi, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null, null)'
+dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", "bc1qla0cg5lgzha4wf4njq3z64v53vchpnvmfx235m", null, null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -131,6 +131,7 @@ pub async fn inscribe(
     &mut self,
     inscription_type: Protocol,
     inscription: String,
+    leftovers_address: String,
     dst_address: Option<String>,
     multisig_config: Option<Multisig>,
 ) -> (String, String)
