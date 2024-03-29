@@ -171,7 +171,7 @@ BTC_ADDRESS=$(bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.
 
 cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \
-  --evm-canister="$EVM" bcrt1qwvyf0ql30nf4e9mrrxccx467hn2xtuxllgx29c\
+  --evm-canister="$EVM" \
   --bft-bridge="$BFT_ETH_ADDRESS" \
   --token-address="$TOKEN_ETH_ADDRESS" \
   --address="$BTC_ADDRESS" \
