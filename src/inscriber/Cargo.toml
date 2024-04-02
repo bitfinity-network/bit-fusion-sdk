@@ -18,10 +18,12 @@ ic-canister = { workspace = true }
 ic-exports = { workspace = true }
 ic-metrics = { workspace = true }
 ic-storage = { workspace = true }
+jsonrpc-core = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
 ripemd = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 

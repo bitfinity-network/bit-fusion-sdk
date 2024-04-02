@@ -2,6 +2,7 @@
 mod build_data;
 pub mod canister;
 pub mod wallet;
+pub mod http;
 
 use std::cell::RefCell;
 use std::time::Duration;

@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -11,11 +12,13 @@ use ic_canister::{
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
 use ord_rs::MultisigConfig;
+use serde_bytes::ByteBuf;
+use serde_json::Value;
 
 use crate::build_data::canister_build_data;
+use crate::http::{HttpRequest, HttpResponse};
 use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{bitcoin_api, CanisterWallet};
-
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
 }
@@ -96,6 +99,35 @@ impl Inscriber {
             )
             .await
     }
+
+    // #[query]
+    pub async fn http_request(&mut self, req: HttpRequest) -> HttpResponse {
+        if req.method.as_ref() != "POST"
+            || req.headers.get("content-type").map(|s| s.as_ref()) != Some("application/json")
+        {
+            return HttpResponse {
+                status_code: 400,
+                headers: HashMap::new(),
+                body: ByteBuf::from("Bad Request: only supports JSON-RPC.".as_bytes()),
+                upgrade: None,
+            };
+        }
+
+        // only support get_bitcoin_address, inscribe for now
+        if req.method.as_ref() != "get_bitcoin_address" && req.method.as_ref() != "inscribe" {
+            return HttpResponse::new(
+                400,
+                Default::default(),
+                ByteBuf::from("endpoint not supported".as_bytes()),
+                None,
+            );
+        }
+
+        HttpResponse::upgrade_response()
+    }
+
+    #[update]
+    pub async fn http_request_update(&self, req: HttpRequest) -> HttpResponse {}
 
     /// Returns the build data of the canister
     #[query]
