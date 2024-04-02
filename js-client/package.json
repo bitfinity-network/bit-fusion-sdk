@@ -1,7 +1,7 @@
 {
   "name": "js-client",
   "version": "1.0.0",
-  "description": "Javascript Bridge SDK",
+  "description": "Javascript EVM Bridge SDK",
   "author": "infinityswap@one",
   "publishConfig": {
     "access": "public"
