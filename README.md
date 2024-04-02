@@ -20,34 +20,15 @@ After installing Rust, add the `wasm32` target via:
 rustup target add wasm32-unknown-unknown # Required for building IC canisters
 ```
 
-## Step 1: Init, Build, and Deploy
-
-### Clone the Repo
+### Step 1: Init, Build, and Deploy
 
 ```bash
-git clone https://github.com/bitfinity-network/ckOrd
-cd ckOrd
+./run.sh
 ```
 
-### Init `bitcoind` and Start Local IC Replica in Regtest Mode
+The above command will start the Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode, and then build and deploy the canister. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
 
-```bash
-./scripts/init.sh
-dfx start --clean --background --enable-bitcoin
-```
-
-The above commands will start Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, and then start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
-
-### Build and Deploy the Canister
-
-```bash
-./scripts/build.sh
-./scripts/deploy.sh init
-```
-
-The above commands will build and then deploy the canister.
-
-## Step 2: Generate a Bitcoin Address for the Canister
+### Step 2: Generate a Bitcoin Address for the Canister
 
 Bitcoin has different types of addresses (e.g. P2PKH, P2SH). Most of these addresses can be generated from an ECDSA public key. Currently, you can generate the native segwit address type (`P2WPKH`) via the following command:
 
@@ -57,7 +38,7 @@ dfx canister call inscriber get_bitcoin_address
 
 The above command will generate a unique Bitcoin address from the ECDSA public key of the canister.
 
-## Step 3: Send bitcoins to Canister's Bitcoin Address
+### Step 3: Send bitcoins to Canister's Bitcoin Address
 
 Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions. To avoid UTXO clogging, and since the Bitcoin daemon already generates enough blocks when it starts, generate only 1 additional block and effectively reward the canister wallet with about `5 BTC`. Run the following command:
 
@@ -67,7 +48,7 @@ docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 1
 
 Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_bitcoin_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
 
-## Step 4: Check the Canister's bitcoin Balance
+### Step 4: Check the Canister's bitcoin Balance
 
 You can check a Bitcoin address's balance by using the `get_balance` endpoint on the canister via:
 
@@ -75,7 +56,7 @@ You can check a Bitcoin address's balance by using the `get_balance` endpoint on
 dfx canister call inscriber get_balance '("BITCOIN-ADDRESS")'
 ```
 
-## Step 5: Retrieve UTXOs for Canister's (or any Bitcoin) Address
+### Step 5: Retrieve UTXOs for Canister's (or any Bitcoin) Address
 
 You can get a Bitcoin address's UTXOs by using the `get_utxos` endpoint on the canister via:
 
@@ -85,12 +66,12 @@ dfx canister call inscriber get_utxos '("BITCOIN-ADDRESS")'
 
 Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance) API.
 
-## Step 6: Inscribe and Send a Sat
+### Step 6: Inscribe and Send a Sat
 
 To make an Ordinal (NFT) inscription, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", "bc1qla0cg5lgzha4wf4njq3z64v53vchpnvmfx235m", null, null)'
+dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", "LEFTOVERS-ADDRESS", null, null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -105,7 +86,7 @@ This effectively inscribes the following JSON-encoded data structure:
 To inscribe a BRC20 `deploy` function onto a Satoshi, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", "bc1qla0cg5lgzha4wf4njq3z64v53vchpnvmfx235m", null, null)'
+dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", "LEFTOVERS-ADDRESS", null, null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:

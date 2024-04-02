@@ -8,15 +8,15 @@ pub use self::build_data::BuildData;
 
 pub type InscribeResult<T> = Result<T, InscribeError>;
 
-#[derive(Debug, Clone, CandidType)]
 /// The InscribeTransactions struct is used to return the commit and reveal transactions.
+#[derive(Debug, Clone, CandidType)]
 pub struct InscribeTransactions {
     pub commit_tx: String,
     pub reveal_tx: String,
 }
 
-#[derive(Debug, Clone, CandidType, Error)]
 /// Error type for inscribe endpoint.
+#[derive(Debug, Clone, CandidType, Error)]
 pub enum InscribeError {
     #[error("bad address: {0}")]
     BadAddress(String),

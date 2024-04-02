@@ -130,7 +130,7 @@ impl CanisterWallet {
         let commit_tx_result = match inscription_type {
             Protocol::Brc20 => {
                 let op: Brc20 = serde_json::from_str(&inscription)
-                    .map_err(|e| InscribeError::BadAddress(e.to_string()))?;
+                    .map_err(|e| InscribeError::BadInscription(e.to_string()))?;
 
                 let inscription = match op {
                     Brc20::Deploy(data) => Brc20::deploy(data.tick, data.max, data.lim, data.dec),
@@ -152,7 +152,7 @@ impl CanisterWallet {
             }
             Protocol::Nft => {
                 let data: CandidNft = serde_json::from_str(&inscription)
-                    .map_err(|e| InscribeError::BadAddress(e.to_string()))?;
+                    .map_err(|e| InscribeError::BadInscription(e.to_string()))?;
                 let inscription = Nft::new(
                     Some(data.content_type.as_bytes().to_vec()),
                     Some(data.body.as_bytes().to_vec()),
