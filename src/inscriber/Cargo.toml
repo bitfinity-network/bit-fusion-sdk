@@ -19,6 +19,7 @@ ic-exports = { workspace = true }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-storage = { workspace = true }
+ic-stable-structures = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
 ripemd = { workspace = true }

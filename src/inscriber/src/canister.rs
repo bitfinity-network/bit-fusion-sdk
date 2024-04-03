@@ -13,11 +13,13 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ord_rs::MultisigConfig;
 
 use crate::build_data::canister_build_data;
+use crate::state::State;
 use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{bitcoin_api, CanisterWallet};
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
+    pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
 }
 
 #[derive(Canister, Clone, Debug)]
@@ -120,6 +122,10 @@ impl Inscriber {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
+    }
+
+    pub fn get_inscriber_state() -> Rc<RefCell<State>> {
+        INSCRIBER_STATE.with(|state| state.clone())
     }
 
     #[pre_upgrade]

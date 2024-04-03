@@ -1,25 +1,19 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use bitcoin::{Address, Amount};
 use candid::CandidType;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::{StableCell, VirtualMemory};
 use serde::Deserialize;
 
-thread_local! {
-    pub static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
-}
+use crate::wallet::inscription::InscriptionWrapper;
 
-pub fn get_inscriber_state() -> Rc<RefCell<State>> {
-    INSCRIBER_STATE.with(|state| state.clone())
-}
+pub type Inscriptions = StableCell<InscriptionWrapper, VirtualMemory<DefaultMemoryImpl>>;
 
 /// State of the Inscriber
 #[derive(Default)]
 pub struct State {
     config: InscriberConfig,
-    // inscriptions: InscriptionWrapper
     own_addresses: Vec<Address>,
     own_utxos: Vec<UtxoManager>,
     utxo_type: UtxoType,
