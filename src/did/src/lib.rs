@@ -55,5 +55,3 @@ pub struct InscriptionFees {
     pub reveal_fee: u64,
     pub postage: u64,
 }
-
-

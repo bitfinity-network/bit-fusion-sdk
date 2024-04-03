@@ -6,11 +6,11 @@ use std::str::FromStr;
 use bitcoin::Address;
 use candid::Principal;
 use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
+use ethers_core::abi::ethereum_types::H520;
+use ethers_core::types::{Signature, H160};
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
-use ethers_core::abi::ethereum_types::H520;
-use ethers_core::types::{Signature, H160};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
 use serde_bytes::ByteBuf;
@@ -62,7 +62,7 @@ impl Inscriber {
         ops::get_bitcoin_address(derivation_path).await
     }
 
-        /// Returns the estimated inscription fees for the given inscription.
+    /// Returns the estimated inscription fees for the given inscription.
     #[update]
     pub async fn get_inscription_fees(
         &self,
@@ -80,7 +80,6 @@ impl Inscriber {
             .get_inscription_fees(inscription_type, inscription, multisig_config)
             .await
     }
-
 
     /// Returns the estimated inscription fees for the given inscription.
     #[update]
