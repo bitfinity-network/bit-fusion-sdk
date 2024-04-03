@@ -13,6 +13,7 @@ use ic_canister::{
 };
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
+use ord_rs::MultisigConfig;
 use serde_bytes::ByteBuf;
 
 use crate::build_data::canister_build_data;
@@ -60,25 +61,6 @@ impl Inscriber {
     pub async fn get_bitcoin_address(&mut self) -> String {
         let derivation_path = Self::derivation_path(None);
         ops::get_bitcoin_address(derivation_path).await
-    }
-
-    /// Returns the estimated inscription fees for the given inscription.
-    #[update]
-    pub async fn get_inscription_fees(
-        &self,
-        inscription_type: Protocol,
-        inscription: String,
-        multisig_config: Option<Multisig>,
-    ) -> InscribeResult<InscriptionFees> {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-        let multisig_config = multisig_config.map(|m| MultisigConfig {
-            required: m.required,
-            total: m.total,
-        });
-
-        CanisterWallet::new(vec![], network)
-            .get_inscription_fees(inscription_type, inscription, multisig_config)
-            .await
     }
 
     /// Returns the estimated inscription fees for the given inscription.
