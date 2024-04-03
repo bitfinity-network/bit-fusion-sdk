@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use bitcoin::Address;
 use candid::Principal;
-use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions};
+use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
@@ -59,6 +59,25 @@ impl Inscriber {
             .get_bitcoin_address()
             .await
             .to_string()
+    }
+
+    /// Returns the estimated inscription fees for the given inscription.
+    #[update]
+    pub async fn get_inscription_fees(
+        &self,
+        inscription_type: Protocol,
+        inscription: String,
+        multisig_config: Option<Multisig>,
+    ) -> InscribeResult<InscriptionFees> {
+        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let multisig_config = multisig_config.map(|m| MultisigConfig {
+            required: m.required,
+            total: m.total,
+        });
+
+        CanisterWallet::new(vec![], network)
+            .get_inscription_fees(inscription_type, inscription, multisig_config)
+            .await
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.

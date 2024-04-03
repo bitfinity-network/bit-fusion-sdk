@@ -1,5 +1,68 @@
 use candid::{CandidType, Deserialize};
+use ord_rs::Inscription;
 use serde::Serialize;
+
+#[derive(Serialize, Deserialize)]
+pub enum InscriptionWrapper {
+    Brc20(ord_rs::Brc20),
+    Nft(ord_rs::Nft),
+}
+
+impl From<ord_rs::Brc20> for InscriptionWrapper {
+    fn from(inscription: ord_rs::Brc20) -> Self {
+        Self::Brc20(inscription)
+    }
+}
+
+impl From<ord_rs::Nft> for InscriptionWrapper {
+    fn from(inscription: ord_rs::Nft) -> Self {
+        Self::Nft(inscription)
+    }
+}
+
+impl Inscription for InscriptionWrapper {
+    fn content_type(&self) -> String {
+        match self {
+            Self::Brc20(inscription) => inscription.content_type(),
+            Self::Nft(inscription) => Inscription::content_type(inscription),
+        }
+    }
+
+    fn data(&self) -> ord_rs::OrdResult<bitcoin::script::PushBytesBuf> {
+        match self {
+            Self::Brc20(inscription) => inscription.data(),
+            Self::Nft(inscription) => inscription.data(),
+        }
+    }
+
+    fn encode(&self) -> ord_rs::OrdResult<String>
+    where
+        Self: Serialize,
+    {
+        match self {
+            Self::Brc20(inscription) => inscription.encode(),
+            Self::Nft(inscription) => inscription.encode(),
+        }
+    }
+
+    fn generate_redeem_script(
+        &self,
+        builder: bitcoin::script::Builder,
+        pubkey: ord_rs::wallet::RedeemScriptPubkey,
+    ) -> ord_rs::OrdResult<bitcoin::script::Builder> {
+        match self {
+            Self::Brc20(inscription) => inscription.generate_redeem_script(builder, pubkey),
+            Self::Nft(inscription) => inscription.generate_redeem_script(builder, pubkey),
+        }
+    }
+
+    fn parse(_data: &[u8]) -> ord_rs::OrdResult<Self>
+    where
+        Self: Sized,
+    {
+        unimplemented!()
+    }
+}
 
 /// Type of digital artifact being inscribed.
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
