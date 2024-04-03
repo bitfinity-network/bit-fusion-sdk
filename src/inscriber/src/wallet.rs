@@ -10,7 +10,6 @@ use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, ScriptBuf, Transacti
 use did::{InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
-use ic_exports::ic_cdk::print;
 use inscription::Nft as CandidNft;
 use ord_rs::constants::POSTAGE;
 use ord_rs::wallet::ScriptType;
@@ -71,6 +70,20 @@ impl CanisterWallet {
         }
     }
 
+    #[inline]
+    fn with_ecdsa_signer(signer: EcdsaSigner) -> Wallet {
+        Wallet::new_with_signer(WalletType::External {
+            signer: Box::new(signer),
+        })
+    }
+
+    #[inline]
+    fn ecdsa_signer(&self) -> EcdsaSigner {
+        EcdsaSigner {
+            derivation_path: self.derivation_path.clone(),
+        }
+    }
+
     /// Returns bech32 bitcoin `Address` of this canister.
     pub async fn get_bitcoin_address(&self) -> Address {
         let public_key = match ecdsa_api::ecdsa_public_key(self.derivation_path.clone()).await {
@@ -89,9 +102,7 @@ impl CanisterWallet {
         inscription: String,
         multisig_config: Option<MultisigConfig>,
     ) -> InscribeResult<InscriptionFees> {
-        let ecdsa_signer = EcdsaSigner {
-            derivation_path: self.derivation_path.clone(),
-        };
+        let ecdsa_signer = self.ecdsa_signer();
         let own_utxos = vec![OrdUtxo {
             id: Txid::all_zeros(),
             index: 0,
@@ -103,9 +114,7 @@ impl CanisterWallet {
             .assume_checked();
 
         // initialize a wallet (transaction signer) and a transaction builder
-        let wallet = Wallet::new_with_signer(WalletType::External {
-            signer: Box::new(ecdsa_signer),
-        });
+        let wallet = Self::with_ecdsa_signer(ecdsa_signer);
         // Hardcoded for debugging
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(dummy_pubkey, script_type, wallet);
@@ -144,35 +153,36 @@ impl CanisterWallet {
         leftovers_address: Address,
         multisig_config: Option<MultisigConfig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let ecdsa_signer = EcdsaSigner {
-            derivation_path: self.derivation_path.clone(),
-        };
+        let ecdsa_signer = self.ecdsa_signer();
 
         let own_pk = PublicKey::from_str(&ecdsa_signer.ecdsa_public_key().await)
             .map_err(OrdError::PubkeyConversion)?;
 
         let own_address = Self::btc_address_from_public_key(self.bitcoin_network, &own_pk);
 
-        print("Fetching UTXOs...");
+        log::info!("Fetching UTXOs...");
         let own_utxos = bitcoin_api::get_utxos(self.bitcoin_network, own_address.to_string())
             .await
             .map_err(InscribeError::FailedToCollectUtxos)?
             .utxos;
 
         // initialize a wallet (transaction signer) and a transaction builder
-        let wallet = Wallet::new_with_signer(WalletType::External {
-            signer: Box::new(ecdsa_signer),
-        });
+        let wallet = Self::with_ecdsa_signer(ecdsa_signer);
         // Hardcoded for debugging
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
         let dst_address = dst_address.unwrap_or_else(|| own_address.clone());
+        log::info!("Getting fee rate...");
         let fee_rate = self.get_fee_rate().await;
 
+        log::info!("Building commit transaction inputs...");
         let commit_tx_inputs = self.build_commit_transaction_inputs(&own_utxos);
 
+        log::info!("Parsing the inscription...");
         let inscription = self.build_inscription(inscription_type, inscription)?;
+
+        log::info!("Building the commit transaction...");
         let commit_tx_result = self.build_commit_transaction(
             &mut builder,
             inscription,
@@ -184,6 +194,7 @@ impl CanisterWallet {
             multisig_config,
         )?;
 
+        log::info!("Signing commit transaction...");
         let commit_tx = Self::sign_commit_transaction(
             &mut builder,
             commit_tx_result.unsigned_tx,
@@ -194,6 +205,7 @@ impl CanisterWallet {
         )
         .await?;
 
+        log::info!("Building the reveal transaction...");
         let reveal_tx = Self::build_reveal_transaction(
             &mut builder,
             &commit_tx,
@@ -203,13 +215,13 @@ impl CanisterWallet {
         )
         .await?;
 
-        print("Sending commit transaction...");
+        log::info!("Sending the commit transaction...");
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&commit_tx)).await;
-        print("Done");
+        log::info!("Done");
 
-        print("Sending reveal transaction...");
+        log::info!("Sending the reveal transaction...");
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
-        print("Done");
+        log::info!("Done");
 
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
