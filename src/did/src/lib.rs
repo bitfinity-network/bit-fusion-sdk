@@ -33,3 +33,10 @@ impl From<OrdError> for InscribeError {
         InscribeError::OrdError(e.to_string())
     }
 }
+
+#[derive(Debug, Clone, CandidType)]
+pub struct InscriptionFees {
+    pub commit_fee: u64,
+    pub reveal_fee: u64,
+    pub postage: u64,
+}
