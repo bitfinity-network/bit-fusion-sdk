@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -13,14 +13,9 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ord_rs::MultisigConfig;
 
 use crate::build_data::canister_build_data;
-use crate::state::State;
+use crate::state::{InscriberConfig, State, BITCOIN_NETWORK, INSCRIBER_STATE};
 use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{bitcoin_api, CanisterWallet};
-
-thread_local! {
-    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
-    pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
-}
 
 #[derive(Canister, Clone, Debug)]
 pub struct Inscriber {
@@ -32,22 +27,21 @@ impl PreUpdate for Inscriber {}
 
 impl Inscriber {
     #[init]
-    pub fn init(&mut self, network: BitcoinNetwork) {
-        crate::register_custom_getrandom();
-        BITCOIN_NETWORK.with(|n| n.set(network));
+    pub fn init(&mut self, config: InscriberConfig) {
+        Self::get_inscriber_state().borrow_mut().configure(config);
     }
 
     /// Returns the balance of the given bitcoin address.
     #[update]
     pub async fn get_balance(&mut self, address: String) -> u64 {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
         bitcoin_api::get_balance(network, address).await
     }
 
     /// Returns the UTXOs of the given bitcoin address.
     #[update]
     pub async fn get_utxos(&mut self, address: String) -> GetUtxosResponse {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
         bitcoin_api::get_utxos(network, address).await.unwrap()
     }
 
@@ -55,7 +49,7 @@ impl Inscriber {
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
         let derivation_path = Self::derivation_path();
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
 
         CanisterWallet::new(derivation_path, network)
             .get_bitcoin_address()
@@ -71,7 +65,7 @@ impl Inscriber {
         inscription: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscriptionFees> {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
         let multisig_config = multisig_config.map(|m| MultisigConfig {
             required: m.required,
             total: m.total,
@@ -94,7 +88,7 @@ impl Inscriber {
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
         let derivation_path = Self::derivation_path();
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
         let leftovers_address = Self::get_address(leftovers_address, network)?;
 
         let dst_address = match dst_address {
@@ -124,23 +118,19 @@ impl Inscriber {
         canister_build_data()
     }
 
-    pub fn get_inscriber_state() -> Rc<RefCell<State>> {
-        INSCRIBER_STATE.with(|state| state.clone())
-    }
-
     #[pre_upgrade]
     fn pre_upgrade(&self) {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
+        let network = Self::get_network_config();
         ic_exports::ic_cdk::storage::stable_save((network,))
             .expect("Failed to save network to stable memory");
     }
 
     #[post_upgrade]
     fn post_upgrade(&mut self) {
-        let network = ic_exports::ic_cdk::storage::stable_restore::<(BitcoinNetwork,)>()
-            .expect("Failed to read network from stable memory.")
+        let config = ic_exports::ic_cdk::storage::stable_restore::<(InscriberConfig,)>()
+            .expect("Failed to read config from stable memory.")
             .0;
-        self.init(network);
+        self.init(config);
     }
 
     pub fn idl() -> Idl {
@@ -161,6 +151,15 @@ impl Inscriber {
             .map_err(|_| InscribeError::BadAddress(address.clone()))?
             .require_network(CanisterWallet::map_network(network))
             .map_err(|_| InscribeError::BadAddress(address))
+    }
+
+    #[inline]
+    fn get_network_config() -> BitcoinNetwork {
+        BITCOIN_NETWORK.with(|n| n.get())
+    }
+
+    pub fn get_inscriber_state() -> Rc<RefCell<State>> {
+        INSCRIBER_STATE.with(|state| state.clone())
     }
 }
 

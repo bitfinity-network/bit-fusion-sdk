@@ -14,7 +14,14 @@ deploy_inscriber_canister() {
     NETWORK=$1
     INSTALL_MODE=$2
 
-    inscriber_init_args="(variant { regtest })"
+    inscriber_init_args="(record {
+        network = variant { regtest };
+        logger = record {
+            enable_console = true;
+            in_memory_records = opt 10000;
+            log_filter = opt \"info\";
+        };
+    })"
 
     echo "Deploying Inscriber canister with init args: $inscriber_init_args"
 

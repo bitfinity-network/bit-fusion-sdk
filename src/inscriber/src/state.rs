@@ -1,12 +1,24 @@
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use std::time::Duration;
+
 use bitcoin::{Address, Amount};
-use candid::CandidType;
+use candid::{CandidType, Principal};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 use serde::Deserialize;
 
 use crate::wallet::inscription::InscriptionWrapper;
+
+thread_local! {
+    pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
+    pub static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
+    pub static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
+}
 
 pub type Inscriptions = StableCell<InscriptionWrapper, VirtualMemory<DefaultMemoryImpl>>;
 
@@ -21,8 +33,11 @@ pub struct State {
 
 impl State {
     /// Initializes the Inscriber's state with configuration.
-    pub fn with_config(&mut self, config: InscriberConfig) {
+    pub fn configure(&mut self, config: InscriberConfig) {
+        register_custom_getrandom();
+        BITCOIN_NETWORK.with(|n| n.set(config.network));
         init_log(&config.logger).expect("Failed to initialize the logger");
+
         self.config = config;
     }
 
@@ -88,10 +103,8 @@ pub enum UtxoType {
     /// UTXO earmarked for inscription.
     #[default]
     Inscription,
-    /// UTXO used to pay for commit transaction
-    CommitFee,
-    /// UTXO used to pay for reveal transaction
-    RevealFee,
+    /// UTXO used to pay for transaction fees
+    Fees,
     /// UTXOs left after fees have been deducted
     Leftover,
     /// UTXOs for a BRC-20 `transfer` inscription
@@ -103,4 +116,30 @@ pub struct UtxoManager {
     pub utxo: Utxo,
     pub purpose: UtxoType,
     pub amount: Amount,
+}
+
+// In the following, we register a custom `getrandom` implementation because
+// otherwise `getrandom` (which is an indirect dependency of `bitcoin`) fails to compile.
+// This is necessary because `getrandom` by default fails to compile for the
+// `wasm32-unknown-unknown` target (which is required for deploying a canister).
+pub fn register_custom_getrandom() {
+    ic_exports::ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+        ic_exports::ic_cdk::spawn(set_rand())
+    });
+    getrandom::register_custom_getrandom!(custom_rand);
+}
+
+fn custom_rand(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    RNG.with(|rng| rng.borrow_mut().as_mut().unwrap().fill_bytes(buf));
+    Ok(())
+}
+
+async fn set_rand() {
+    let (seed,) = ic_exports::ic_cdk::call(Principal::management_canister(), "raw_rand", ())
+        .await
+        .unwrap();
+    RNG.with(|rng| {
+        *rng.borrow_mut() = Some(StdRng::from_seed(seed));
+        log::debug!("rng: {:?}", *rng.borrow());
+    });
 }
