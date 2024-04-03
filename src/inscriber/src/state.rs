@@ -22,7 +22,7 @@ pub struct State {
     // inscriptions: InscriptionWrapper
     own_addresses: Vec<Address>,
     own_utxos: Vec<UtxoManager>,
-    utxo_types: UtxoType,
+    utxo_type: UtxoType,
 }
 
 impl State {
@@ -32,14 +32,13 @@ impl State {
         self.config = config;
     }
 
-    /// Classifies a new UTXO and add it to the state.
+    /// Classifies a new UTXO and adds it to the state.
     pub fn classify_utxo(&mut self, utxo: Utxo, purpose: UtxoType, amount: Amount) {
-        let classified_utxo = UtxoManager {
+        self.own_utxos.push(UtxoManager {
             utxo,
             purpose,
             amount,
-        };
-        self.own_utxos.push(classified_utxo);
+        });
     }
 
     /// Selects UTXOs based on their purpose.
@@ -64,10 +63,12 @@ impl State {
         }
     }
 
+    /// Returns the user's addresses.
     pub fn own_addresses(&self) -> &[Address] {
         &self.own_addresses
     }
 
+    /// Returns the user's UTXOs being managed by the canister.
     pub fn own_utxos(&self) -> Vec<&Utxo> {
         self.own_utxos
             .iter()
@@ -76,7 +77,7 @@ impl State {
     }
 
     pub fn utxo_type(&self) -> UtxoType {
-        self.utxo_types
+        self.utxo_type
     }
 }
 
