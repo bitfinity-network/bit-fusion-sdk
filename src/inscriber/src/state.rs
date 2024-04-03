@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use bitcoin::{Address, Amount};
 use candid::{CandidType, Principal};
+use did::InscribeError;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -12,7 +13,7 @@ use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use serde::Deserialize;
 
-use crate::wallet::inscription::InscriptionWrapper;
+use crate::wallet::{bitcoin_api, inscription::InscriptionWrapper};
 
 thread_local! {
     pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
@@ -26,7 +27,6 @@ pub type Inscriptions = StableCell<InscriptionWrapper, VirtualMemory<DefaultMemo
 #[derive(Default)]
 pub struct State {
     config: InscriberConfig,
-    own_addresses: Vec<Address>,
     own_utxos: Vec<UtxoManager>,
     utxo_type: UtxoType,
 }
@@ -39,6 +39,49 @@ impl State {
         init_log(&config.logger).expect("Failed to initialize the logger");
 
         self.config = config;
+    }
+
+    // WIP
+    #[allow(unused)]
+    pub(crate) async fn fetch_and_manage_utxos(
+        &mut self,
+        own_address: Address,
+    ) -> Result<Vec<Utxo>, InscribeError> {
+        let network = self.config.network;
+
+        // Fetch the UTXOs for the canister's address.
+        log::info!("Fetching UTXOs for address: {}", own_address);
+        let fetched_utxos = bitcoin_api::get_utxos(network, own_address.to_string())
+            .await
+            .map_err(InscribeError::FailedToCollectUtxos)?
+            .utxos;
+
+        let total_amount: u64 = fetched_utxos.iter().map(|utxo| utxo.value).sum();
+        // TODO: Get inscription fees
+        let fee_reserve_ratio = 0.1; // Reserve 10% of total for fees.
+        let fees_amount = (total_amount as f64 * fee_reserve_ratio).round() as u64;
+        let mut allocated_for_fees = 0u64;
+
+        let mut utxos_for_inscription = Vec::new();
+
+        for utxo in fetched_utxos {
+            let purpose = if allocated_for_fees < fees_amount {
+                allocated_for_fees += utxo.value;
+                UtxoType::Fees
+            } else {
+                UtxoType::Inscription
+            };
+
+            let amount = Amount::from_sat(utxo.value);
+            self.classify_utxo(utxo.clone(), purpose, amount);
+
+            // If this UTXO is earmarked for inscription, add it to the return list.
+            if purpose == UtxoType::Inscription {
+                utxos_for_inscription.push(utxo);
+            }
+        }
+
+        Ok(utxos_for_inscription)
     }
 
     /// Classifies a new UTXO and adds it to the state.
@@ -70,19 +113,6 @@ impl State {
         } else {
             log::warn!("UTXO not found for updating: {}", utxo_id);
         }
-    }
-
-    /// Returns the user's addresses.
-    pub fn own_addresses(&self) -> &[Address] {
-        &self.own_addresses
-    }
-
-    /// Returns the user's UTXOs being managed by the canister.
-    pub fn own_utxos(&self) -> Vec<&Utxo> {
-        self.own_utxos
-            .iter()
-            .map(|manager| &manager.utxo)
-            .collect::<Vec<&Utxo>>()
     }
 
     pub fn utxo_type(&self) -> UtxoType {
@@ -122,7 +152,7 @@ pub struct UtxoManager {
 // otherwise `getrandom` (which is an indirect dependency of `bitcoin`) fails to compile.
 // This is necessary because `getrandom` by default fails to compile for the
 // `wasm32-unknown-unknown` target (which is required for deploying a canister).
-pub fn register_custom_getrandom() {
+fn register_custom_getrandom() {
     ic_exports::ic_cdk_timers::set_timer(Duration::from_secs(0), || {
         ic_exports::ic_cdk::spawn(set_rand())
     });
