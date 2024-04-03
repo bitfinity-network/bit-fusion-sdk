@@ -2,13 +2,14 @@ mod build_data;
 
 use candid::CandidType;
 use ord_rs::OrdError;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use self::build_data::BuildData;
 
 pub type InscribeResult<T> = Result<T, InscribeError>;
 
-#[derive(Debug, Clone, CandidType)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 /// The InscribeTransactions struct is used to return the commit and reveal transactions.
 pub struct InscribeTransactions {
     pub commit_tx: String,
@@ -26,10 +27,24 @@ pub enum InscribeError {
     OrdError(String),
     #[error("failed to collect utxos: {0}")]
     FailedToCollectUtxos(String),
+    #[error("signature error {0}")]
+    SignatureError(String),
 }
 
 impl From<OrdError> for InscribeError {
     fn from(e: OrdError) -> Self {
+        InscribeError::OrdError(e.to_string())
+    }
+}
+
+impl From<ethers_core::types::SignatureError> for InscribeError {
+    fn from(e: ethers_core::types::SignatureError) -> Self {
+        InscribeError::SignatureError(e.to_string())
+    }
+}
+
+impl From<jsonrpc_core::Error> for InscribeError {
+    fn from(e: jsonrpc_core::Error) -> Self {
         InscribeError::OrdError(e.to_string())
     }
 }

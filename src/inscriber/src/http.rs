@@ -7,6 +7,10 @@ use serde::Deserialize;
 use serde_bytes::ByteBuf;
 use serde_json::Value;
 
+mod rpc;
+
+pub use rpc::*;
+
 #[repr(u16)]
 /// An enumeration of HTTP status codes.
 ///
@@ -141,4 +145,16 @@ impl HttpRequest {
             ))
         })
     }
+}
+
+/// Macro that handles returning an HTTP response from a result.
+/// If the result is Ok, it returns the value. If it's Err, it returns a 500 error response.
+#[macro_export]
+macro_rules! http_response {
+    ($result:expr) => {{
+        match $result {
+            Ok(res) => res,
+            Err(err) => return HttpResponse::error(500, err.to_string()),
+        }
+    }};
 }

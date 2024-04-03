@@ -1,8 +1,11 @@
+mod accessor;
 #[allow(unused)]
 mod build_data;
 pub mod canister;
-pub mod wallet;
+mod constant;
 pub mod http;
+pub mod ops;
+pub mod wallet;
 
 use std::cell::RefCell;
 use std::time::Duration;

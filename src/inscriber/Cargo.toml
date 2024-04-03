@@ -13,6 +13,7 @@ bitcoin = { workspace = true }
 bs58 = { workspace = true }
 candid = { workspace = true }
 did = { path = "../did" }
+ethers-core = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }

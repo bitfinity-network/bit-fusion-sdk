@@ -6,19 +6,22 @@ use std::str::FromStr;
 use bitcoin::Address;
 use candid::Principal;
 use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions};
+use ethers_core::abi::ethereum_types::H520;
+use ethers_core::types::{Signature, H160};
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
-use ord_rs::MultisigConfig;
 use serde_bytes::ByteBuf;
-use serde_json::Value;
 
 use crate::build_data::canister_build_data;
-use crate::http::{HttpRequest, HttpResponse};
+use crate::constant::SUPPORTED_ENDPOINTS;
+use crate::http::{HttpRequest, HttpResponse, Rpc};
 use crate::wallet::inscription::{Multisig, Protocol};
 use crate::wallet::{bitcoin_api, CanisterWallet};
+use crate::{http_response, ops};
+
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
 }
@@ -55,13 +58,8 @@ impl Inscriber {
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
     #[update]
     pub async fn get_bitcoin_address(&mut self) -> String {
-        let derivation_path = Self::derivation_path();
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-
-        CanisterWallet::new(derivation_path, network)
-            .get_bitcoin_address()
-            .await
-            .to_string()
+        let derivation_path = Self::derivation_path(None);
+        ops::get_bitcoin_address(derivation_path).await
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.
@@ -75,32 +73,19 @@ impl Inscriber {
         dst_address: Option<String>,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let derivation_path = Self::derivation_path();
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-        let leftovers_address = Self::get_address(leftovers_address, network)?;
-
-        let dst_address = match dst_address {
-            None => None,
-            Some(dst_address) => Some(Self::get_address(dst_address, network)?),
-        };
-
-        let multisig_config = multisig_config.map(|m| MultisigConfig {
-            required: m.required,
-            total: m.total,
-        });
-
-        CanisterWallet::new(derivation_path, network)
-            .inscribe(
-                inscription_type,
-                inscription,
-                dst_address,
-                leftovers_address,
-                multisig_config,
-            )
-            .await
+        let derivation_path = Self::derivation_path(None);
+        ops::inscribe(
+            inscription_type,
+            inscription,
+            leftovers_address,
+            dst_address,
+            multisig_config,
+            derivation_path,
+        )
+        .await
     }
 
-    // #[query]
+    #[query]
     pub async fn http_request(&mut self, req: HttpRequest) -> HttpResponse {
         if req.method.as_ref() != "POST"
             || req.headers.get("content-type").map(|s| s.as_ref()) != Some("application/json")
@@ -113,21 +98,31 @@ impl Inscriber {
             };
         }
 
-        // only support get_bitcoin_address, inscribe for now
-        if req.method.as_ref() != "get_bitcoin_address" && req.method.as_ref() != "inscribe" {
-            return HttpResponse::new(
-                400,
-                Default::default(),
-                ByteBuf::from("endpoint not supported".as_bytes()),
-                None,
-            );
+        if !SUPPORTED_ENDPOINTS.contains(&req.url.as_str()) {
+            return HttpResponse::error(400, "endpoint not supported".to_owned());
         }
 
         HttpResponse::upgrade_response()
     }
 
     #[update]
-    pub async fn http_request_update(&self, req: HttpRequest) -> HttpResponse {}
+    pub async fn http_request_update(&self, req: HttpRequest) -> HttpResponse {
+        let response = match req.decode_body() {
+            Ok(res) => res,
+            Err(err) => return *err,
+        };
+
+        let response = Rpc::process_request(response, &Rpc::handle_calls).await;
+
+        let response = http_response!(serde_json::to_vec(&response));
+
+        HttpResponse {
+            status_code: 200,
+            headers: HashMap::from([("content-type".into(), "application/json".into())]),
+            body: ByteBuf::from(&*response),
+            upgrade: None,
+        }
+    }
 
     /// Returns the build data of the canister
     #[query]
@@ -155,19 +150,31 @@ impl Inscriber {
     }
 
     #[inline]
-    fn derivation_path() -> Vec<Vec<u8>> {
+    /// Returns the derivation path to use for signing/verifying based on the caller principal or provided address.
+    pub(crate) fn derivation_path(address: Option<H160>) -> Vec<Vec<u8>> {
         let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
 
-        vec![caller_principal] // Derivation path
+        match address {
+            Some(address) => vec![address.as_bytes().to_vec()],
+            None => vec![caller_principal],
+        }
     }
 
     #[inline]
     /// Returns the parsed address given the string representation and the expected network.
-    fn get_address(address: String, network: BitcoinNetwork) -> InscribeResult<Address> {
+    pub(crate) fn get_address(address: String, network: BitcoinNetwork) -> InscribeResult<Address> {
         Address::from_str(&address)
             .map_err(|_| InscribeError::BadAddress(address.clone()))?
             .require_network(CanisterWallet::map_network(network))
             .map_err(|_| InscribeError::BadAddress(address))
+    }
+
+    /// Recovers the public key from the given message and signature
+    pub fn recover_pubkey(message: String, signature: H520) -> did::InscribeResult<H160> {
+        let signature = Signature::try_from(signature.as_bytes())?;
+        let address = signature.recover(message)?;
+
+        Ok(address)
     }
 }
 
