@@ -32,3 +32,4 @@ dist/
 
 # misc
 .build.sh.swp
+dfx_log.txt

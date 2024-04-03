@@ -23,7 +23,7 @@ ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.13.x" }
 jsonrpc-core = "18"
 log = "0.4"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "fix/external-signing-flow" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
 ripemd = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"

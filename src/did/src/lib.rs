@@ -16,8 +16,8 @@ pub struct InscribeTransactions {
     pub reveal_tx: String,
 }
 
-#[derive(Debug, Clone, CandidType, Error)]
 /// Error type for inscribe endpoint.
+#[derive(Debug, Clone, CandidType, Error)]
 pub enum InscribeError {
     #[error("bad address: {0}")]
     BadAddress(String),
@@ -48,3 +48,12 @@ impl From<jsonrpc_core::Error> for InscribeError {
         InscribeError::OrdError(e.to_string())
     }
 }
+
+#[derive(Debug, Clone, CandidType)]
+pub struct InscriptionFees {
+    pub commit_fee: u64,
+    pub reveal_fee: u64,
+    pub postage: u64,
+}
+
+
