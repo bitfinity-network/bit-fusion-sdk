@@ -18,6 +18,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
 
 [[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -428,6 +434,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "ff"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -614,6 +630,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
 name = "ic-canister"
 version = "0.13.0"
 source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.13.x#c229d21cc6236e18322fde191888e25574bbc0d6"
@@ -712,6 +734,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-log"
+version = "0.13.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.13.x#c229d21cc6236e18322fde191888e25574bbc0d6"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "candid",
+ "env_filter",
+ "humantime",
+ "ic-exports",
+ "log",
+ "ringbuffer",
+ "serde",
+]
+
+[[package]]
 name = "ic-metrics"
 version = "0.13.0"
 source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.13.x#c229d21cc6236e18322fde191888e25574bbc0d6"
@@ -782,6 +820,7 @@ dependencies = [
  "hex",
  "ic-canister",
  "ic-exports",
+ "ic-log",
  "ic-metrics",
  "ic-storage",
  "k256",
@@ -1060,6 +1099,12 @@ dependencies = [
  "hmac",
  "subtle",
 ]
+
+[[package]]
+name = "ringbuffer"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3df6368f71f205ff9c33c076d170dd56ebf68e8161c733c0caa07a7a5509ed53"
 
 [[package]]
 name = "ripemd"

@@ -16,6 +16,7 @@ candid = "0.10"
 hex = "0.4"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.13.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.13.x" }
+ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.13.x" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.13.x", features = [
     "export-api",
 ] }

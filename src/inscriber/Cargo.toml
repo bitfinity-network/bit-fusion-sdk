@@ -16,6 +16,7 @@ did = { path = "../did" }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }
+ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-storage = { workspace = true }
 log = { workspace = true }

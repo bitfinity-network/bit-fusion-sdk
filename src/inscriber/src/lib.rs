@@ -1,6 +1,7 @@
 #[allow(unused)]
 mod build_data;
 pub mod canister;
+pub mod state;
 pub mod wallet;
 
 use std::cell::RefCell;
