@@ -40,5 +40,10 @@
     "tsup": "^8.0.2",
     "typescript": "^5.4.3",
     "vitest": "^1.4.0"
+  },
+  "dependencies": {
+    "@dfinity/agent": "^1.2.0",
+    "@dfinity/candid": "^1.2.0",
+    "@dfinity/principal": "^1.2.0"
   }
 }

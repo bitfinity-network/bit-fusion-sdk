@@ -1,0 +1,102 @@
+type BftBridgeConfig = record {
+  decimals : nat8;
+  token_symbol : vec nat8;
+  token_address : text;
+  bridge_address : text;
+  erc20_chain_id : nat32;
+  token_name : vec nat8;
+};
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
+type BtcBridgeConfig = record {
+  admin : principal;
+  signing_strategy : SigningStrategy;
+  ck_btc_ledger_fee : nat64;
+  evm_link : EvmLink;
+  ck_btc_minter : principal;
+  network : BitcoinNetwork;
+  ck_btc_ledger : principal;
+  log_settings : LogSettings;
+};
+type Erc20MintError = variant {
+  Evm : text;
+  CkBtcMinter : UpdateBalanceError;
+  ValueTooSmall;
+  Tainted : Utxo;
+  Sign : text;
+  CkBtcLedger : TransferError;
+  NotInitialized;
+  NothingToMint;
+};
+type Erc20MintStatus = variant {
+  Minted : record { tx_id : text; amount : nat64 };
+  Scheduled : record {
+    required_confirmations : nat32;
+    pending_utxos : opt vec PendingUtxo;
+    current_confirmations : nat32;
+  };
+  Signed : vec nat8;
+};
+type EvmLink = variant { Ic : principal; Http : text };
+type Interval = variant {
+  PerHour;
+  PerWeek;
+  PerDay;
+  Period : record { seconds : nat64 };
+  PerMinute;
+};
+type LogSettings = record {
+  log_filter : opt text;
+  in_memory_records : opt nat64;
+  enable_console : bool;
+};
+type MetricsData = record {
+  stable_memory_size : nat64;
+  cycles : nat64;
+  heap_memory_size : nat64;
+};
+type MetricsMap = record {
+  map : vec record { nat64; MetricsData };
+  interval : Interval;
+  history_length_nanos : nat64;
+};
+type MetricsStorage = record { metrics : MetricsMap };
+type OutPoint = record { txid : vec nat8; vout : nat32 };
+type PendingUtxo = record {
+  confirmations : nat32;
+  value : nat64;
+  outpoint : OutPoint;
+};
+type Result = variant { Ok : Erc20MintStatus; Err : Erc20MintError };
+type SigningKeyId = variant { Dfx; Production; Test; PocketIc; Custom : text };
+type SigningStrategy = variant {
+  Local : record { private_key : vec nat8 };
+  ManagementCanister : record { key_id : SigningKeyId };
+};
+type TransferError = variant {
+  GenericError : record { message : text; error_code : nat };
+  TemporarilyUnavailable;
+  BadBurn : record { min_burn_amount : nat };
+  Duplicate : record { duplicate_of : nat };
+  BadFee : record { expected_fee : nat };
+  CreatedInFuture : record { ledger_time : nat64 };
+  TooOld;
+  InsufficientFunds : record { balance : nat };
+};
+type UpdateBalanceError = variant {
+  GenericError : record { error_message : text; error_code : nat64 };
+  TemporarilyUnavailable : text;
+  AlreadyProcessing;
+  NoNewUtxos : record {
+    required_confirmations : nat32;
+    pending_utxos : opt vec PendingUtxo;
+    current_confirmations : opt nat32;
+  };
+};
+type Utxo = record { height : nat32; value : nat64; outpoint : OutPoint };
+service : (BtcBridgeConfig) -> {
+  get_curr_metrics : () -> (MetricsData) query;
+  get_metrics : () -> (MetricsStorage) query;
+  admin_configure_bft_bridge : (BftBridgeConfig) -> ();
+  btc_to_erc20 : (text) -> (vec Result);
+  get_evm_address : () -> (opt text);
+}
