@@ -108,7 +108,12 @@ impl Inscriber {
             };
         }
 
-        if !SUPPORTED_ENDPOINTS.contains(&req.url.as_str()) {
+        let request = match req.decode_body() {
+            Ok(res) => res,
+            Err(err) => return *err,
+        };
+
+        if !SUPPORTED_ENDPOINTS.contains(&request.method.as_str()) {
             return HttpResponse::error(400, "endpoint not supported".to_owned());
         }
 
@@ -117,12 +122,12 @@ impl Inscriber {
 
     #[update]
     pub async fn http_request_update(&self, req: HttpRequest) -> HttpResponse {
-        let response = match req.decode_body() {
+        let request = match req.decode_body() {
             Ok(res) => res,
             Err(err) => return *err,
         };
 
-        let response = Rpc::process_request(response, &Rpc::handle_calls).await;
+        let response = Rpc::process_request(request, &Rpc::handle_calls).await;
 
         let response = http_response!(serde_json::to_vec(&response));
 
