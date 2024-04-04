@@ -29,6 +29,8 @@ pub enum InscribeError {
     FailedToCollectUtxos(String),
     #[error("signature error {0}")]
     SignatureError(String),
+    #[error("request error: {0}")]
+    RequestError(String),
 }
 
 impl From<OrdError> for InscribeError {
@@ -45,7 +47,7 @@ impl From<ethers_core::types::SignatureError> for InscribeError {
 
 impl From<jsonrpc_core::Error> for InscribeError {
     fn from(e: jsonrpc_core::Error) -> Self {
-        InscribeError::OrdError(e.to_string())
+        InscribeError::RequestError(e.to_string())
     }
 }
 

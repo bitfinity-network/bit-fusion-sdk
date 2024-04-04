@@ -12,6 +12,7 @@ use crate::{ops, Inscriber};
 
 pub type RpcResult = Result<Value, jsonrpc_core::Error>;
 
+/// RPC handler for the inscriber.
 pub struct Rpc;
 
 impl Rpc {
