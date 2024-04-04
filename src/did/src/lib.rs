@@ -31,6 +31,8 @@ pub enum InscribeError {
     SignatureError(String),
     #[error("request error: {0}")]
     RequestError(String),
+    #[error("address mismatch expected: {expected} actual: {actual}")]
+    AddressMismatch { expected: String, actual: String },
 }
 
 impl From<OrdError> for InscribeError {
@@ -51,7 +53,7 @@ impl From<jsonrpc_core::Error> for InscribeError {
     }
 }
 
-#[derive(Debug, Clone, CandidType)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct InscriptionFees {
     pub commit_fee: u64,
     pub reveal_fee: u64,

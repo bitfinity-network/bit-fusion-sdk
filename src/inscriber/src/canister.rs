@@ -6,14 +6,12 @@ use std::str::FromStr;
 use bitcoin::Address;
 use candid::Principal;
 use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
-use ethers_core::abi::ethereum_types::H520;
-use ethers_core::types::{Signature, H160};
+use ethers_core::types::H160;
 use ic_canister::{
     generate_idl, init, post_upgrade, pre_upgrade, query, update, Canister, Idl, PreUpdate,
 };
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
-use ord_rs::MultisigConfig;
 use serde_bytes::ByteBuf;
 
 use crate::build_data::canister_build_data;
@@ -71,15 +69,7 @@ impl Inscriber {
         inscription: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscriptionFees> {
-        let network = BITCOIN_NETWORK.with(|n| n.get());
-        let multisig_config = multisig_config.map(|m| MultisigConfig {
-            required: m.required,
-            total: m.total,
-        });
-
-        CanisterWallet::new(vec![], network)
-            .get_inscription_fees(inscription_type, inscription, multisig_config)
-            .await
+        ops::get_inscription_fees(inscription_type, inscription, multisig_config).await
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.
@@ -187,14 +177,6 @@ impl Inscriber {
             .map_err(|_| InscribeError::BadAddress(address.clone()))?
             .require_network(CanisterWallet::map_network(network))
             .map_err(|_| InscribeError::BadAddress(address))
-    }
-
-    /// Recovers the public key from the given message and signature
-    pub fn recover_pubkey(message: String, signature: H520) -> did::InscribeResult<H160> {
-        let signature = Signature::try_from(signature.as_bytes())?;
-        let address = signature.recover(message)?;
-
-        Ok(address)
     }
 }
 

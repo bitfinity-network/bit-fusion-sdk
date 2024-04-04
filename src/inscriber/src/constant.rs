@@ -2,5 +2,11 @@ pub const INSCRIBER_METHOD_NAME: &str = "inscribe";
 
 pub const GET_BTC_ADDRESS_METHOD_NAME: &str = "get_bitcoin_address";
 
+pub const GET_INSCRIBER_FEE_METHOD_NAME: &str = "get_inscription_fees";
+
 /// The supported endpoints.
-pub const SUPPORTED_ENDPOINTS: &[&str] = &[INSCRIBER_METHOD_NAME, GET_BTC_ADDRESS_METHOD_NAME];
+pub const SUPPORTED_ENDPOINTS: &[&str] = &[
+    INSCRIBER_METHOD_NAME,
+    GET_BTC_ADDRESS_METHOD_NAME,
+    GET_INSCRIBER_FEE_METHOD_NAME,
+];

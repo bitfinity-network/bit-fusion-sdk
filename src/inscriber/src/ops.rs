@@ -1,4 +1,4 @@
-use did::{InscribeResult, InscribeTransactions};
+use did::{InscribeResult, InscribeTransactions, InscriptionFees};
 use ord_rs::MultisigConfig;
 
 use crate::canister::BITCOIN_NETWORK;
@@ -48,4 +48,20 @@ pub async fn get_bitcoin_address(derivation_path: Vec<Vec<u8>>) -> String {
         .get_bitcoin_address()
         .await
         .to_string()
+}
+
+pub async fn get_inscription_fees(
+    inscription_type: Protocol,
+    inscription: String,
+    multisig_config: Option<Multisig>,
+) -> InscribeResult<InscriptionFees> {
+    let network = BITCOIN_NETWORK.with(|n| n.get());
+    let multisig_config = multisig_config.map(|m| MultisigConfig {
+        required: m.required,
+        total: m.total,
+    });
+
+    CanisterWallet::new(vec![], network)
+        .get_inscription_fees(inscription_type, inscription, multisig_config)
+        .await
 }
