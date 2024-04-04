@@ -119,3 +119,44 @@ pub async fn inscribe(
 ```
 
 which is why the above calls has `null` arguments for the `dst_address` and `multisig_config` optional parameters.
+
+## Http Request
+
+The canister also supports some of the endpoints communication via JSON-RPC calls. These endpoints are:
+
+- `get_bitcoin_address`
+- `inscribe`
+
+To communicate with the canister via JSON-RPC, you can use the `curl` command. For example,
+
+- To get the Bitcoin address, you can run:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"get_bitcoin_address","params":["expected_address", "signature", "signed_message"],"id":1}' http://localhost:8080/\?canisterId\=CANISTER_ID
+```
+
+The above command will return the following JSON-encoded data structure:
+
+```json
+{
+  "jsonrpc": "2.0"
+  "result": "bitcoin_address",
+  "id": 1
+}
+```
+
+- To inscribe a Sat, you can run:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"inscribe","params":["inscription_type","inscription", "leftover_address","expected_address","signature", "signed_message", "dst_address", "multisig_config" ],"id":1}' http://localhost:8080/\?canisterId\=CANISTER_ID
+```
+
+The above command will return the following JSON-encoded data structure:
+
+```bash
+{
+  "jsonrpc": "2.0"
+  "result": "inscriptions",
+  "id": 1
+}
+```
