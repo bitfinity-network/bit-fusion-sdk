@@ -26,6 +26,8 @@ pub enum InscribeError {
     OrdError(String),
     #[error("failed to collect utxos: {0}")]
     FailedToCollectUtxos(String),
+    #[error("not enough UTXOs allocated for fees: {0}")]
+    InsufficientFundsForFees(String),
 }
 
 impl From<OrdError> for InscribeError {

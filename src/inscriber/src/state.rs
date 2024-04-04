@@ -1,27 +1,28 @@
+// WIP
+#![allow(dead_code)]
+
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
 use bitcoin::{Address, Amount};
 use candid::{CandidType, Principal};
-use did::InscribeError;
+use did::{InscribeError, InscribeResult, InscriptionFees};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableCell, VirtualMemory};
+use ord_rs::MultisigConfig;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use serde::Deserialize;
 
-use crate::wallet::{bitcoin_api, inscription::InscriptionWrapper};
+use crate::wallet::inscription::Protocol;
+use crate::wallet::{bitcoin_api, CanisterWallet};
 
 thread_local! {
     pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
     pub static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
     pub static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
 }
-
-pub type Inscriptions = StableCell<InscriptionWrapper, VirtualMemory<DefaultMemoryImpl>>;
 
 /// State of the Inscriber
 #[derive(Default)]
@@ -41,60 +42,79 @@ impl State {
         self.config = config;
     }
 
-    // WIP
-    #[allow(unused)]
-    pub(crate) async fn fetch_and_manage_utxos(
+    /// Retrieves the UTXOs for an address and classifies each according to the purpose.
+    pub(crate) async fn fetch_and_classify_utxos(
         &mut self,
         own_address: Address,
-    ) -> Result<Vec<Utxo>, InscribeError> {
+        inscription_type: Protocol,
+        inscription: String,
+        multisig_config: Option<MultisigConfig>,
+    ) -> InscribeResult<ClassifiedUtxos> {
         let network = self.config.network;
+        let InscriptionFees {
+            postage,
+            commit_fee,
+            reveal_fee,
+        } = CanisterWallet::new(vec![], network)
+            .get_inscription_fees(inscription_type, inscription, multisig_config)
+            .await?;
 
         // Fetch the UTXOs for the canister's address.
         log::info!("Fetching UTXOs for address: {}", own_address);
-        let fetched_utxos = bitcoin_api::get_utxos(network, own_address.to_string())
-            .await
-            .map_err(InscribeError::FailedToCollectUtxos)?
-            .utxos;
+        let fetched_utxos = self.fetch_utxos(own_address, network).await?;
 
         let total_amount: u64 = fetched_utxos.iter().map(|utxo| utxo.value).sum();
-        // TODO: Get inscription fees
-        let fee_reserve_ratio = 0.1; // Reserve 10% of total for fees.
-        let fees_amount = (total_amount as f64 * fee_reserve_ratio).round() as u64;
-        let mut allocated_for_fees = 0u64;
+        let total_fees = postage + commit_fee + reveal_fee;
 
+        // Check if total UTXOs cover all fees + at least a minimal amount for inscription.
+        if total_amount < total_fees {
+            return Err(InscribeError::InsufficientFundsForFees(format!(
+                "Total amount: {total_amount}. Total fees: {total_fees}"
+            )));
+        }
+
+        let mut allocated_for_fees = 0u64;
         let mut utxos_for_inscription = Vec::new();
+        let mut utxos_for_fees = Vec::new();
 
         for utxo in fetched_utxos {
-            let purpose = if allocated_for_fees < fees_amount {
+            // Prioritize allocation to fees until all fees are covered.
+            if allocated_for_fees < total_fees {
                 allocated_for_fees += utxo.value;
-                UtxoType::Fees
+                utxos_for_fees.push(utxo.clone());
+                self.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
             } else {
-                UtxoType::Inscription
-            };
-
-            let amount = Amount::from_sat(utxo.value);
-            self.classify_utxo(utxo.clone(), purpose, amount);
-
-            // If this UTXO is earmarked for inscription, add it to the return list.
-            if purpose == UtxoType::Inscription {
-                utxos_for_inscription.push(utxo);
+                utxos_for_inscription.push(utxo.clone());
+                self.classify_utxo(&utxo, UtxoType::Inscription, Amount::from_sat(utxo.value));
             }
         }
 
-        Ok(utxos_for_inscription)
+        // Check if the separated UTXOs for fees adequately cover all required fees.
+        let fees_covered = utxos_for_fees.iter().map(|utxo| utxo.value).sum::<u64>() >= total_fees;
+        if !fees_covered {
+            return Err(InscribeError::InsufficientFundsForFees(format!(
+                "Total amount: {total_amount}. Total fees: {total_fees}"
+            )));
+        }
+
+        Ok(ClassifiedUtxos {
+            inscriptions: utxos_for_inscription,
+            fees: utxos_for_fees,
+            leftovers: vec![],
+        })
     }
 
     /// Classifies a new UTXO and adds it to the state.
-    pub fn classify_utxo(&mut self, utxo: Utxo, purpose: UtxoType, amount: Amount) {
+    pub(crate) fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, amount: Amount) {
         self.own_utxos.push(UtxoManager {
-            utxo,
+            utxo: utxo.clone(),
             purpose,
             amount,
         });
     }
 
     /// Selects UTXOs based on their purpose.
-    pub fn select_utxos(&self, purpose: UtxoType) -> Vec<UtxoManager> {
+    pub(crate) fn select_utxos(&self, purpose: UtxoType) -> Vec<UtxoManager> {
         self.own_utxos
             .iter()
             .filter(|c_utxo| c_utxo.purpose == purpose)
@@ -103,7 +123,7 @@ impl State {
     }
 
     /// Updates the purpose of a UTXO after usage.
-    pub fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
+    pub(crate) fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
         if let Some(utxo) = self.own_utxos.iter_mut().find(|c_utxo| {
             let txid = hex::encode(c_utxo.utxo.outpoint.txid.clone());
             txid == utxo_id
@@ -115,8 +135,15 @@ impl State {
         }
     }
 
-    pub fn utxo_type(&self) -> UtxoType {
-        self.utxo_type
+    async fn fetch_utxos(
+        &mut self,
+        own_address: Address,
+        network: BitcoinNetwork,
+    ) -> InscribeResult<Vec<Utxo>> {
+        Ok(bitcoin_api::get_utxos(network, own_address.to_string())
+            .await
+            .map_err(InscribeError::FailedToCollectUtxos)?
+            .utxos)
     }
 }
 
@@ -129,7 +156,7 @@ pub struct InscriberConfig {
 
 /// Classification of UTXOs based on their purpose.
 #[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq)]
-pub enum UtxoType {
+pub(crate) enum UtxoType {
     /// UTXO earmarked for inscription.
     #[default]
     Inscription,
@@ -142,10 +169,17 @@ pub enum UtxoType {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct UtxoManager {
-    pub utxo: Utxo,
-    pub purpose: UtxoType,
-    pub amount: Amount,
+pub(crate) struct ClassifiedUtxos {
+    pub(crate) inscriptions: Vec<Utxo>,
+    pub(crate) fees: Vec<Utxo>,
+    pub(crate) leftovers: Vec<Utxo>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct UtxoManager {
+    utxo: Utxo,
+    purpose: UtxoType,
+    amount: Amount,
 }
 
 // In the following, we register a custom `getrandom` implementation because

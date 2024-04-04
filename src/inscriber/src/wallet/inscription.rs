@@ -1,5 +1,4 @@
 use candid::{CandidType, Deserialize};
-use ic_stable_structures::{Bound, Storable};
 use ord_rs::Inscription;
 use serde::Serialize;
 
@@ -63,18 +62,6 @@ impl Inscription for InscriptionWrapper {
     {
         unimplemented!()
     }
-}
-
-impl Storable for InscriptionWrapper {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        todo!()
-    }
-
-    fn from_bytes(_bytes: std::borrow::Cow<[u8]>) -> Self {
-        todo!()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
 }
 
 /// Type of digital artifact being inscribed.
