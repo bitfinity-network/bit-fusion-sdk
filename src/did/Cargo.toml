@@ -10,11 +10,11 @@ export-api = []
 [dependencies]
 bitcoin = { workspace = true }
 candid = { workspace = true }
+ethers-core = { workspace = true }
+jsonrpc-core = { workspace = true }
 ord-rs = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-ethers-core = { workspace = true }
-jsonrpc-core = { workspace = true }
 
 [build-dependencies]
 vergen = { workspace = true }
