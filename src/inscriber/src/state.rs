@@ -9,7 +9,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo
 use ic_log::{init_log, LogSettings};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 thread_local! {
     pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
@@ -31,24 +31,24 @@ pub struct InscriberConfig {
     logger: LogSettings,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub(crate) struct UtxoManager {
     utxo: Utxo,
     purpose: UtxoType,
-    amount: Amount,
+    value: Amount,
 }
 
 /// Classification of UTXOs based on their purpose.
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
 pub(crate) enum UtxoType {
     /// UTXO earmarked for inscription.
-    #[default]
     Inscription,
     /// UTXO used to pay for transaction fees
+    #[default]
     Fees,
     /// UTXOs left after fees have been deducted
     Leftover,
-    /// Indicates UTXOs that have been sent in commit_tx
+    /// Indicates UTXOs that have been sent
     Spent,
     /// UTXOs for a BRC-20 `transfer` inscription
     Transfer,
@@ -113,16 +113,16 @@ impl State {
                 .find(|u| u.purpose == UtxoType::Fees)
             {
                 let leftover_value = accumulated_for_fees - total_fees;
-                utxo.amount = Amount::from_sat(leftover_value);
+                utxo.value = Amount::from_sat(leftover_value);
                 utxo.purpose = UtxoType::Leftover;
             }
         }
 
         let final_sum = remaining_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
-        if final_sum + total_fees < total_utxo_amount {
+        if final_sum < postage {
             return Err(InscribeError::InsufficientFundsForInscriptions(format!(
-                "Insufficient UTXOs for inscription after deducting fees. Available: {}, Required: {}",
-                final_sum, total_utxo_amount - total_fees
+                "Insufficient UTXOs for inscription after deducting fees. Available: {}, Required: >= {}",
+                final_sum, postage
             )));
         }
 
@@ -145,11 +145,11 @@ impl State {
     }
 
     /// Classifies a new UTXO and adds it to the state.
-    fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, amount: Amount) {
+    fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, value: Amount) {
         self.utxos.push(UtxoManager {
             utxo: utxo.clone(),
             purpose,
-            amount,
+            value,
         });
     }
 }
@@ -178,4 +178,114 @@ async fn set_rand() {
         *rng.borrow_mut() = Some(StdRng::from_seed(seed));
         log::debug!("rng: {:?}", *rng.borrow());
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
+    use ord_rs::constants::POSTAGE;
+
+    use super::*;
+
+    fn get_mock_utxos() -> Vec<Utxo> {
+        vec![
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0; 32],
+                    vout: 0,
+                },
+                value: 50000, // satoshis
+                height: 101,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![1; 32],
+                    vout: 1,
+                },
+                value: 100000, // satoshis
+                height: 102,
+            },
+        ]
+    }
+
+    #[test]
+    fn process_utxos_enough_funds_for_fees_and_inscriptions() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 15000,
+            reveal_fee: 10000,
+        };
+
+        let fetched_utxos = get_mock_utxos();
+        let classified_utxos = state.process_utxos(fees, fetched_utxos).unwrap();
+
+        // Expect that at least one UTXO is reserved for inscription
+        assert!(!classified_utxos.is_empty());
+        let total_spent = classified_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
+        assert!(total_spent >= POSTAGE);
+    }
+
+    #[test]
+    fn process_utxos_insufficient_funds_for_inscriptions() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 100000,
+            reveal_fee: 48000,
+        };
+
+        let fetched_utxos = get_mock_utxos();
+        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+
+        assert!(matches!(
+            classified_utxos,
+            Err(InscribeError::InsufficientFundsForInscriptions(_))
+        ));
+    }
+
+    #[test]
+    fn process_utxos_insufficient_funds_for_fees() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 250000,
+            reveal_fee: 150000,
+        };
+
+        let fetched_utxos = get_mock_utxos();
+        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+
+        assert!(matches!(
+            classified_utxos,
+            Err(InscribeError::InsufficientFundsForFees(_))
+        ));
+    }
+
+    #[test]
+    fn update_utxo_purpose_after_use() {
+        let mut state = State::default();
+        let fetched_utxos = get_mock_utxos();
+        for utxo in fetched_utxos.into_iter() {
+            state.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
+        }
+
+        let txid_hex = hex::encode([0; 32]);
+        let utxo_id = format!("{}:0", txid_hex);
+        state.update_utxo_purpose(&utxo_id, UtxoType::Inscription);
+
+        let updated_utxo = state
+            .utxos
+            .iter()
+            .find(|um| {
+                let txid_hex = hex::encode(um.utxo.outpoint.txid.clone());
+                format!("{}:{}", txid_hex, um.utxo.outpoint.vout) == utxo_id
+            })
+            .expect("UTXO should exist");
+
+        assert_eq!(updated_utxo.purpose, UtxoType::Inscription);
+    }
 }
