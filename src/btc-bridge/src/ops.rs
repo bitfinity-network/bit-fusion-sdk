@@ -275,7 +275,7 @@ async fn send_mint_order(
 
     state.borrow_mut().update_evm_params(|p| {
         if let Some(params) = p.as_mut() {
-            *params.nonce += 1;
+            params.nonce += 1;
         }
     });
 
