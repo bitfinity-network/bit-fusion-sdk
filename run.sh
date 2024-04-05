@@ -1,5 +1,7 @@
 #!/bin/bash
 
+arg=${1:-init}
+
 set -e
 
 echo "Starting the Bitcoin daemon in regtest mode..."
@@ -22,7 +24,7 @@ echo "Building all canisters..."
 ./scripts/build.sh
 
 # Step 3: Deploy with init argument
-echo "Deploying with 'init'... Other options <create | reinstall | upgrade>"
-./scripts/deploy.sh init
+echo "Deploying with '${arg}'... Other options <create | reinstall | upgrade>"
+./scripts/deploy.sh $arg
 
 echo "Deployment process complete."
