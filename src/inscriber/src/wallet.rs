@@ -21,7 +21,6 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
-use crate::ops;
 
 const DUMMY_BITCOIN_PUBKEY: &str =
     "02fcf0210771ec96a9e268783c192c9c0d2991d6e957f319b2aa56503ee15fafdd";
@@ -162,22 +161,22 @@ impl CanisterWallet {
         let own_address = Self::btc_address_from_public_key(self.bitcoin_network, &own_pk);
 
         log::info!("Fetching UTXOs...");
-        let fetched_utxos = bitcoin_api::get_utxos(self.bitcoin_network, own_address.to_string())
+        let own_utxos = bitcoin_api::get_utxos(self.bitcoin_network, own_address.to_string())
             .await
             .map_err(InscribeError::FailedToCollectUtxos)?
             .utxos;
 
-        log::info!("Getting inscription fees...");
-        let fees = self
-            .get_inscription_fees(
-                inscription_type,
-                inscription.clone(),
-                multisig_config.clone(),
-            )
-            .await?;
+        // log::info!("Getting inscription fees...");
+        // let fees = self
+        //     .get_inscription_fees(
+        //         inscription_type,
+        //         inscription.clone(),
+        //         multisig_config.clone(),
+        //     )
+        //     .await?;
 
-        log::info!("Processing UTXOs...");
-        let own_utxos = ops::process_utxos(fees, fetched_utxos)?;
+        // log::info!("Processing UTXOs...");
+        // let own_utxos = State::process_utxos(fees, fetched_utxos)?;
 
         // initialize a wallet (transaction signer) and a transaction builder
         let wallet = Self::with_ecdsa_signer(ecdsa_signer);
