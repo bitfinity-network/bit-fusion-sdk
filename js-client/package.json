@@ -36,6 +36,7 @@
     "eslint-plugin-jest": "^27.6.0",
     "eslint-plugin-prettier": "^5.0.1",
     "eslint-plugin-promise": "^6.1.1",
+    "ethers": "^6.11.1",
     "prettier": "^3.1.0",
     "tsup": "^8.0.2",
     "typescript": "^5.4.3",
@@ -44,6 +45,12 @@
   "dependencies": {
     "@dfinity/agent": "^1.2.0",
     "@dfinity/candid": "^1.2.0",
-    "@dfinity/principal": "^1.2.0"
+    "@dfinity/identity": "^1.2.0",
+    "@dfinity/identity-secp256k1": "^1.2.0",
+    "@dfinity/principal": "^1.2.0",
+    "bip39": "^3.1.0",
+    "dotenv": "^16.4.5",
+    "hdkey": "^2.1.0",
+    "web3-validator": "^2.0.5"
   }
 }
