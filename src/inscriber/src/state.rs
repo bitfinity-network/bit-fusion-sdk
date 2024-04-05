@@ -187,6 +187,17 @@ mod tests {
 
     use super::*;
 
+    fn get_mock_utxo(txid: &[u8; 32], vout: u32, value: u64) -> Utxo {
+        Utxo {
+            outpoint: Outpoint {
+                txid: txid.to_vec(),
+                vout,
+            },
+            value,
+            height: 100,
+        }
+    }
+
     fn get_mock_utxos() -> Vec<Utxo> {
         vec![
             Utxo {
@@ -268,6 +279,7 @@ mod tests {
     #[test]
     fn update_utxo_purpose_after_use() {
         let mut state = State::default();
+
         let fetched_utxos = get_mock_utxos();
         for utxo in fetched_utxos.into_iter() {
             state.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
@@ -287,5 +299,125 @@ mod tests {
             .expect("UTXO should exist");
 
         assert_eq!(updated_utxo.purpose, UtxoType::Inscription);
+    }
+
+    #[test]
+    fn process_utxos_with_all_funds_dedicated_to_fees() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 50000,
+            reveal_fee: 50000,
+        };
+        let fetched_utxos = vec![get_mock_utxo(&[2; 32], 1, 100000)];
+
+        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+
+        assert!(matches!(
+            classified_utxos,
+            Err(InscribeError::InsufficientFundsForFees(_))
+        ));
+    }
+
+    #[test]
+    fn process_utxos_exact_funds_for_fees_and_no_inscription() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 25000,
+            reveal_fee: 25000,
+        };
+        let fetched_utxos = vec![get_mock_utxo(&[3; 32], 2, 50333)];
+
+        assert!(state.process_utxos(fees, fetched_utxos).is_err());
+    }
+
+    #[test]
+    fn process_utxos_leftovers_properly_allocated() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 15000,
+            reveal_fee: 15000,
+        };
+        let fetched_utxos = vec![
+            get_mock_utxo(&[4; 32], 3, 30333),
+            get_mock_utxo(&[5; 32], 4, 50000),
+            get_mock_utxo(&[6; 32], 5, 25000),
+        ];
+
+        let classified_utxos = state.process_utxos(fees, fetched_utxos).unwrap();
+
+        assert!(
+            !classified_utxos.is_empty(),
+            "Should have UTXOs left for inscription"
+        );
+        // because we only need 1 for `UtxoType::Inscription`,
+        // while the other 1 goes to `UtxoType::Leftover`
+        assert_eq!(
+            classified_utxos.len(),
+            1,
+            "Expected 1 UTXO to be left for inscription"
+        );
+    }
+
+    #[test]
+    fn insufficient_funds_for_any_transaction() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 100000,
+            reveal_fee: 100000,
+        };
+        let fetched_utxos = vec![get_mock_utxo(&[7; 32], 6, 40000)];
+
+        assert!(state.process_utxos(fees, fetched_utxos).is_err());
+    }
+
+    #[test]
+    fn multiple_utxos_exact_funds_for_fees() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 20000,
+            reveal_fee: 20000,
+        };
+        let fetched_utxos = vec![
+            get_mock_utxo(&[8; 32], 7, POSTAGE),
+            get_mock_utxo(&[9; 32], 8, 20000),
+            get_mock_utxo(&[10; 32], 9, 20000),
+        ];
+
+        assert!(state.process_utxos(fees, fetched_utxos).is_err());
+    }
+
+    #[test]
+    fn process_utxos_with_leftover_less_than_postage() {
+        let mut state = State::default();
+
+        let fees = InscriptionFees {
+            postage: POSTAGE,
+            commit_fee: 30000,
+            reveal_fee: 30000,
+        };
+        let fetched_utxos = vec![
+            get_mock_utxo(&[11; 32], 10, 45000),
+            get_mock_utxo(&[12; 32], 11, 15444),
+        ];
+
+        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+
+        assert!(
+            matches!(
+                classified_utxos,
+                Err(InscribeError::InsufficientFundsForInscriptions(_))
+            ),
+            "Should return an error when leftover funds are less than postage"
+        );
     }
 }
