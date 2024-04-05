@@ -2,6 +2,7 @@ pub mod bitcoin_api;
 pub mod ecdsa_api;
 pub mod inscription;
 
+use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::consensus::serialize;
@@ -21,6 +22,7 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
+use crate::state::{State, UtxoType};
 
 const DUMMY_BITCOIN_PUBKEY: &str =
     "02fcf0210771ec96a9e268783c192c9c0d2991d6e957f319b2aa56503ee15fafdd";
@@ -147,6 +149,7 @@ impl CanisterWallet {
     /// Returns the transaction IDs for both the commit and reveal transactions.
     pub async fn inscribe(
         &self,
+        state: &RefCell<State>,
         inscription_type: Protocol,
         inscription: String,
         dst_address: Option<Address>,
@@ -166,21 +169,22 @@ impl CanisterWallet {
             .map_err(InscribeError::FailedToCollectUtxos)?
             .utxos;
 
-        // log::info!("Getting inscription fees...");
-        // let fees = self
-        //     .get_inscription_fees(
-        //         inscription_type,
-        //         inscription.clone(),
-        //         multisig_config.clone(),
-        //     )
-        //     .await?;
+        log::info!("Getting inscription fees...");
+        let fees = self
+            .get_inscription_fees(
+                inscription_type,
+                inscription.clone(),
+                multisig_config.clone(),
+            )
+            .await?;
 
-        // log::info!("Processing UTXOs...");
-        // let own_utxos = State::process_utxos(fees, fetched_utxos)?;
+        log::info!("Processing UTXOs...");
+        let own_utxos = state.borrow_mut().process_utxos(fees, own_utxos)?;
 
         // initialize a wallet (transaction signer) and a transaction builder
         let wallet = Self::with_ecdsa_signer(ecdsa_signer);
         // Hardcoded for debugging
+        // TODO: dynamically determine the `ScriptType`
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
@@ -231,9 +235,15 @@ impl CanisterWallet {
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&commit_tx)).await;
         log::info!("Done");
 
+        // Mark input UTXOs for commit_tx as `Spent`
+        self.mark_utxo_as_spent(state, &commit_tx);
+
         log::info!("Sending the reveal transaction...");
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
         log::info!("Done");
+
+        // Mark input UTXOs for reveal_tx as `Spent`
+        self.mark_utxo_as_spent(state, &reveal_tx);
 
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
@@ -348,6 +358,17 @@ impl CanisterWallet {
         };
 
         builder.build_reveal_transaction(reveal_tx_args).await
+    }
+
+    fn mark_utxo_as_spent(&self, state: &RefCell<State>, tx: &Transaction) {
+        for input in tx.input.iter() {
+            let txid_hex = hex::encode(input.previous_output.txid);
+            let utxo_id = format!("{}:{}", txid_hex, input.previous_output.vout);
+            state
+                .borrow_mut()
+                .update_utxo_purpose(&utxo_id, UtxoType::Spent);
+            log::info!("UTXO {} marked as 'Spent'.", utxo_id);
+        }
     }
 
     // Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.

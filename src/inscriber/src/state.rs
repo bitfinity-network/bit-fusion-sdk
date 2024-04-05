@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
@@ -29,11 +27,11 @@ pub struct State {
 /// Configuration at canister initialization
 #[derive(Debug, CandidType, Deserialize, Default)]
 pub struct InscriberConfig {
-    pub network: BitcoinNetwork,
-    pub logger: LogSettings,
+    network: BitcoinNetwork,
+    logger: LogSettings,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub(crate) struct UtxoManager {
     utxo: Utxo,
     purpose: UtxoType,
@@ -50,6 +48,8 @@ pub(crate) enum UtxoType {
     Fees,
     /// UTXOs left after fees have been deducted
     Leftover,
+    /// Indicates UTXOs that have been sent in commit_tx
+    Spent,
     /// UTXOs for a BRC-20 `transfer` inscription
     Transfer,
 }
@@ -81,7 +81,7 @@ impl State {
 
         // Sort UTXOs by value in ascending order to optimize for fee deduction.
         // This helps in using smaller UTXOs for fees, potentially leaving larger UTXOs for inscriptions.
-        fetched_utxos.sort_by_key(|utxo| utxo.value);
+        fetched_utxos.sort_unstable_by_key(|utxo| utxo.value);
 
         let total_utxo_amount = fetched_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
 
@@ -120,7 +120,7 @@ impl State {
 
         let final_sum = remaining_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
         if final_sum + total_fees < total_utxo_amount {
-            return Err(InscribeError::InsufficientFundsForFees(format!(
+            return Err(InscribeError::InsufficientFundsForInscriptions(format!(
                 "Insufficient UTXOs for inscription after deducting fees. Available: {}, Required: {}",
                 final_sum, total_utxo_amount - total_fees
             )));
@@ -129,35 +129,28 @@ impl State {
         Ok(remaining_utxos)
     }
 
-    /// Classifies a new UTXO and adds it to the state.
-    pub(crate) fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, amount: Amount) {
-        self.utxos.push(UtxoManager {
-            utxo: utxo.clone(),
-            purpose,
-            amount,
-        });
-    }
-
-    /// Selects UTXOs based on their purpose.
-    pub(crate) fn select_utxos(&self, purpose: UtxoType) -> Vec<UtxoManager> {
-        self.utxos
-            .iter()
-            .filter(|c_utxo| c_utxo.purpose == purpose)
-            .cloned()
-            .collect()
-    }
-
     /// Updates the purpose of a UTXO after usage.
     pub(crate) fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
         if let Some(utxo) = self.utxos.iter_mut().find(|c_utxo| {
-            let txid = hex::encode(c_utxo.utxo.outpoint.txid.clone());
-            txid == utxo_id
+            let txid_hex = hex::encode(c_utxo.utxo.outpoint.txid.clone());
+            // Create a unique identifier for each UTXO in the format "txid_hex:vout"
+            let txid_vout = format!("{}:{}", txid_hex, c_utxo.utxo.outpoint.vout);
+            txid_vout == utxo_id
         }) {
             utxo.purpose = new_purpose;
             log::info!("UTXO updated: {:?}", utxo);
         } else {
             log::warn!("UTXO not found for updating: {}", utxo_id);
         }
+    }
+
+    /// Classifies a new UTXO and adds it to the state.
+    fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, amount: Amount) {
+        self.utxos.push(UtxoManager {
+            utxo: utxo.clone(),
+            purpose,
+            amount,
+        });
     }
 }
 

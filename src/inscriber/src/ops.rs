@@ -30,6 +30,7 @@ pub async fn inscribe(
 
     CanisterWallet::new(derivation_path, network)
         .inscribe(
+            &Inscriber::get_inscriber_state(),
             inscription_type,
             inscription,
             dst_address,

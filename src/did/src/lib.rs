@@ -29,6 +29,8 @@ pub enum InscribeError {
     FailedToCollectUtxos(String),
     #[error("not enough UTXOs allocated for fees: {0}")]
     InsufficientFundsForFees(String),
+    #[error("not enough UTXOs allocated for inscriptions: {0}")]
+    InsufficientFundsForInscriptions(String),
     #[error("signature error {0}")]
     SignatureError(String),
     #[error("request error: {0}")]
