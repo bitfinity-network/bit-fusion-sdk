@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -48,7 +47,9 @@ impl Inscriber {
     #[update]
     pub async fn get_utxos(&mut self, address: String) -> GetUtxosResponse {
         let network = Self::get_network_config();
-        bitcoin_api::get_utxos(network, address).await.unwrap()
+        bitcoin_api::get_utxos(network, address)
+            .await
+            .expect("Failed to retrieve UTXOs")
     }
 
     /// Returns bech32 bitcoin `Address` of this canister at the given derivation path.
@@ -182,7 +183,7 @@ impl Inscriber {
     }
 
     #[inline]
-    fn get_network_config() -> BitcoinNetwork {
+    pub fn get_network_config() -> BitcoinNetwork {
         BITCOIN_NETWORK.with(|n| n.get())
     }
 
