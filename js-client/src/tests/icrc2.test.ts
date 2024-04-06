@@ -5,7 +5,8 @@ import {
   createAgent,
   generateOperationId,
   generateWallet,
-  getContract
+  getContract,
+  wait
 } from './utils';
 import { Address, Id256Factory } from '../validation';
 import canisters from '../../../.dfx/local/canister_ids.json';
@@ -22,7 +23,7 @@ const ICRC2_MINTER_CANISTER_ID = Principal.fromText(
 const ICRC2_TOKEN_CANISTER_ID = Principal.fromText(canisters.token2.local);
 
 test('bridge icrc2 token to evm', async () => {
-  const amount = BigInt(10);
+  const amount = BigInt(100);
 
   const wallet = generateWallet();
 
@@ -37,7 +38,7 @@ test('bridge icrc2 token to evm', async () => {
     memo: [],
     from_subaccount: [],
     created_at_time: [],
-    amount,
+    amount: amount,
     expected_allowance: [],
     expires_at: [],
     spender: {
@@ -56,17 +57,17 @@ test('bridge icrc2 token to evm', async () => {
     agent
   });
 
-  await icrc2Minter.burn_icrc2({
+  const burnIcrc2Response = await icrc2Minter.burn_icrc2({
     operation_id: generateOperationId(),
     from_subaccount: [],
-    icrc2_token_principal: ICRC2_MINTER_CANISTER_ID,
+    icrc2_token_principal: ICRC2_TOKEN_CANISTER_ID,
     recipient_address: wallet.address,
     amount: amount.toString()
   });
 
-  if ('Err' in response) {
+  if ('Err' in burnIcrc2Response) {
     expect.fail(
-      `ICRC2 Minter failed to burn the ${amount} ICRC2 tokens: ${JSON.stringify(response.Err)}`
+      `ICRC2 Minter failed to burn the ${amount} ICRC2 tokens: ${JSON.stringify(burnIcrc2Response.Err)}`
     );
   }
 
@@ -78,16 +79,14 @@ test('bridge icrc2 token to evm', async () => {
 
   const bftBridgeContract = getContract(bridgeAddress!, BftBridgeABI.abi);
 
-  // const baseTokenPrincipal = ICRC2_TOKEN_CANISTER_ID;
-  // console.log('baseTokenPrincipal:', baseTokenPrincipal.toText());
-  // const wrappedToken = await bftBridgeContract.getWrappedToken(
-  //   Id256Factory.fromPrincipal(baseTokenPrincipal)
-  // );
-  // console.log('wrappedToken:', wrappedToken);
-
-  const wrappedTokenAddress = new Address(
-    '0x7e88f71eae40198d08f237fcbed0a602971dd200'
+  const baseTokenPrincipal = ICRC2_TOKEN_CANISTER_ID;
+  console.log('baseTokenPrincipal:', baseTokenPrincipal.toText());
+  const wrappedToken = await bftBridgeContract.getWrappedToken(
+    Id256Factory.fromPrincipal(baseTokenPrincipal)
   );
+  console.log('wrappedToken:', wrappedToken);
+
+  const wrappedTokenAddress = new Address(wrappedToken);
   if (wrappedTokenAddress.isZero()) {
     expect.fail('Invalid wrapped token address');
   }
@@ -97,8 +96,10 @@ test('bridge icrc2 token to evm', async () => {
     WrappedTokenABI.abi
   );
 
+  await wait(2000);
+
   console.log('wallet address:', wallet.address);
   const balance = await wrappedTokenContract.balanceOf(wallet.address);
 
   expect(balance).toBe(amount);
-}, 10000);
+}, 15000);

@@ -4,7 +4,6 @@ import { mnemonicToSeed } from 'bip39';
 import { HttpAgent } from '@dfinity/agent';
 import { Secp256k1KeyIdentity } from '@dfinity/identity-secp256k1';
 import { IC_HOST, LOCAL_TEST_SEED_PHRASE, RPC_URL } from '../constants';
-import BftBridgeABI from '../abi/BFTBridge.json';
 
 export const createAgent = () => {
   const identity = identityFromSeed(LOCAL_TEST_SEED_PHRASE);
@@ -43,4 +42,8 @@ export const getContract = (address: string, abi: any) => {
   const provider = new ethers.JsonRpcProvider(RPC_URL);
   const contract = new ethers.Contract(address, abi, provider);
   return contract;
+};
+
+export const wait = (ms: number) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };

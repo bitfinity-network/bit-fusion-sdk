@@ -34,12 +34,14 @@ ADMIN_WALLET=$(./dfx identity get-wallet)
 ########## Deploy ckBTC canisters ##########
 
 ./dfx canister create token
+./dfx canister create token2
 ./dfx canister create ic-ckbtc-kyt
 ./dfx canister create ic-ckbtc-minter
 
 CKBTC_LEDGER=$(./dfx canister id token)
 CKBTC_KYT=$(./dfx canister id ic-ckbtc-kyt)
 CKBTC_MINTER=$(./dfx canister id ic-ckbtc-minter)
+ICRC2_TOKEN=$(./dfx canister id token2)
 
 ./dfx deploy token --argument "(variant {Init = record {
     minting_account = record { owner = principal \"$CKBTC_MINTER\" };
@@ -61,7 +63,7 @@ CKBTC_MINTER=$(./dfx canister id ic-ckbtc-minter)
 
 USER_PRINCIPICAL="qhjy5-udjmu-rqh6d-abbcl-63l4x-gbwoi-ip5qu-vocyn-docsu-fideu-eae"
 ./dfx deploy token2 --argument "(variant {Init = record {
-    minting_account = record { owner = principal \"$CKBTC_MINTER\" };
+    minting_account = record { owner = principal \"$ADMIN_PRINCIPAL\" };
     transfer_fee = 10;
     token_symbol = \"AUX\";
     token_name = \"Aux Token\";
@@ -216,17 +218,17 @@ echo "Minting ETH tokens for ICRC2 Minter canister"
 ICRC2_BRIDGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$ICRC2_MINTER_ECDSA_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "ICRC2 bridge contract address: $ICRC2_BRIDGE_CONTRACT_ADDRESS"
 
+echo "Register bft bridge contract address with icrc2-minter"
+./dfx canister call icrc2-minter register_evmc_bft_bridge "(\"$ICRC2_BRIDGE_CONTRACT_ADDRESS\")"
+
 ICRC2_WRAPPED_TOKEN_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
   --bft-bridge-address="$ICRC2_BRIDGE_CONTRACT_ADDRESS" \
   --token-name="Aux Token" \
-  --token-id="$ICRC2_MINTER" \
+  --token-id="$ICRC2_TOKEN" \
   --evm-canister="$EVM" \
   --wallet="$ETH_WALLET")
 
 echo "ICRC2 Wrapped token address: $ICRC2_WRAPPED_TOKEN_ADDRESS"
-
-echo "Register bft bridge contract address with icrc2-minter"
-./dfx canister call icrc2-minter register_evmc_bft_bridge "(\"$ICRC2_BRIDGE_CONTRACT_ADDRESS\")"
 
 ########## Create BTC and move them into wrapped EVM token ##########
 
