@@ -40,7 +40,7 @@ export const generateOperationId = () => {
   return uniqueId;
 };
 
-export const generateWallet = () => {
+export const generateEthWallet = () => {
   return ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
 };
 
