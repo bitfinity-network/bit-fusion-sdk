@@ -5,6 +5,12 @@ import { HttpAgent } from '@dfinity/agent';
 import { Secp256k1KeyIdentity } from '@dfinity/identity-secp256k1';
 import { IC_HOST, LOCAL_TEST_SEED_PHRASE, RPC_URL } from '../constants';
 
+export const createAnnonAgent = () => {
+  return new HttpAgent({
+    host: IC_HOST
+  });
+};
+
 export const createAgent = () => {
   const identity = identityFromSeed(LOCAL_TEST_SEED_PHRASE);
 

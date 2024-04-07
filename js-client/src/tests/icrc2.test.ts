@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { Principal } from '@dfinity/principal';
-import { createICRC1Actor, createICRC2MinterActor } from '..';
+import { createICRC1Actor, createICRC2MinterActor } from '../ic';
 import {
   createAgent,
   generateOperationId,

@@ -102,6 +102,10 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : Erc20MintStatus,
     'Err' : Erc20MintError,
   });
+  const GetBtcAddressArgs = IDL.Record({
+    'owner' : IDL.Opt(IDL.Principal),
+    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
   const MetricsData = IDL.Record({
     'stable_memory_size' : IDL.Nat64,
     'cycles' : IDL.Nat64,
@@ -123,6 +127,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'admin_configure_bft_bridge' : IDL.Func([BftBridgeConfig], [], []),
     'btc_to_erc20' : IDL.Func([IDL.Text], [IDL.Vec(Result)], []),
+    'get_btc_address' : IDL.Func([GetBtcAddressArgs], [IDL.Text], []),
     'get_curr_metrics' : IDL.Func([], [MetricsData], ['query']),
     'get_evm_address' : IDL.Func([], [IDL.Opt(IDL.Text)], []),
     'get_metrics' : IDL.Func([], [MetricsStorage], ['query']),

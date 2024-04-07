@@ -44,6 +44,10 @@ export type Erc20MintStatus = {
   { 'Signed' : Uint8Array | number[] };
 export type EvmLink = { 'Ic' : Principal } |
   { 'Http' : string };
+export interface GetBtcAddressArgs {
+  'owner' : [] | [Principal],
+  'subaccount' : [] | [Uint8Array | number[]],
+}
 export type Interval = { 'PerHour' : null } |
   { 'PerWeek' : null } |
   { 'PerDay' : null } |
@@ -112,6 +116,7 @@ export interface Utxo {
 export interface _SERVICE {
   'admin_configure_bft_bridge' : ActorMethod<[BftBridgeConfig], undefined>,
   'btc_to_erc20' : ActorMethod<[string], Array<Result>>,
+  'get_btc_address' : ActorMethod<[GetBtcAddressArgs], string>,
   'get_curr_metrics' : ActorMethod<[], MetricsData>,
   'get_evm_address' : ActorMethod<[], [] | [string]>,
   'get_metrics' : ActorMethod<[], MetricsStorage>,

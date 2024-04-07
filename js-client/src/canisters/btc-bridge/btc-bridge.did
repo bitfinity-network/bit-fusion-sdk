@@ -37,6 +37,10 @@ type Erc20MintStatus = variant {
   Signed : vec nat8;
 };
 type EvmLink = variant { Ic : principal; Http : text };
+type GetBtcAddressArgs = record {
+  owner : opt principal;
+  subaccount : opt vec nat8;
+};
 type Interval = variant {
   PerHour;
   PerWeek;
@@ -93,10 +97,11 @@ type UpdateBalanceError = variant {
   };
 };
 type Utxo = record { height : nat32; value : nat64; outpoint : OutPoint };
-service : (BtcBridgeConfig) -> {
-  get_curr_metrics : () -> (MetricsData) query;
-  get_metrics : () -> (MetricsStorage) query;
+service : {
   admin_configure_bft_bridge : (BftBridgeConfig) -> ();
   btc_to_erc20 : (text) -> (vec Result);
+  get_btc_address : (GetBtcAddressArgs) -> (text);
+  get_curr_metrics : () -> (MetricsData) query;
   get_evm_address : () -> (opt text);
+  get_metrics : () -> (MetricsStorage) query;
 }

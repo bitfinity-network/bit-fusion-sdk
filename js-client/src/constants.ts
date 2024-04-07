@@ -14,3 +14,5 @@ export const ICRC2_MINTER_CANISTER_ID =
 
 export const ICRC2_TOKEN_CANISTER_ID =
   process.env.ICRC2_TOKEN_CANISTER_ID || '';
+
+export const BTC_BRIDGE_CANISTER_ID = process.env.BTC_BRIDGE_CANISTER_ID || '';
