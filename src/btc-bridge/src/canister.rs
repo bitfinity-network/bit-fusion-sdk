@@ -4,8 +4,11 @@ use std::rc::Rc;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, init, post_upgrade, update, virtual_canister_call, Canister, Idl, PreUpdate, };
+use ic_canister::virtual_canister_call;
+use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_kit::ic;
+use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
@@ -13,7 +16,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::Deserialize;
-use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
@@ -148,17 +150,18 @@ impl BtcBridge {
         }
     }
 
+    #[query]
+    pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
+        let ck_btc_minter = get_state().borrow().ck_btc_minter();
+        return virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)
+            .await
+            .unwrap();
+    }
+
     #[update]
     pub fn admin_configure_bft_bridge(&self, config: BftBridgeConfig) {
         get_state().borrow().check_admin(ic::caller());
         get_state().borrow_mut().configure_bft(config);
-    }
-
-    #[update]
-    pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
-        let ck_btc_minter = get_state().borrow().ck_btc_minter();
-
-        return virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String).await.unwrap();
     }
 
     #[cfg(target_family = "wasm")]

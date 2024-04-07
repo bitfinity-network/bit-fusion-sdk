@@ -29,4 +29,5 @@ minter-did = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
-ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01" }
+
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01"}

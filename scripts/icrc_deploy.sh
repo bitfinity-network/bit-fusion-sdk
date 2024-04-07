@@ -1,5 +1,8 @@
-# Use the l;atest version of dfx 19 - should work 
-
+# Script to set up BTC bridge infrasturcture into local DFX replica and test BTC bridging flow
+# It uses dfx instead of dfx command as the current version of dfx (0.18) has a bug not allowing BTC operations to
+# work. To run the script download the dfx v0.17 from https://github.com/dfinity/sdk/releases and put it into the root
+# of the repo.
+#
 # For btc operations it uses bitcoin core. In Ubuntu this tool is ~/bitcoin-25.0/bin/bitcoin-cli and bitcoin-core.daemon, but on
 # other platforms it can be bitcoind and bitcoin.cli. Adjust accordingly. Before the script is run, the daemon must
 # be run:
@@ -30,33 +33,12 @@ ADMIN_WALLET=$(dfx identity get-wallet)
 
 ########## Deploy ckBTC canisters ##########
 
-dfx canister create token
 dfx canister create token2
-dfx canister create ic-ckbtc-kyt
-dfx canister create ic-ckbtc-minter
 
 CKBTC_LEDGER=$(dfx canister id token)
 CKBTC_KYT=$(dfx canister id ic-ckbtc-kyt)
 CKBTC_MINTER=$(dfx canister id ic-ckbtc-minter)
 ICRC2_TOKEN=$(dfx canister id token2)
-
-dfx deploy token --argument "(variant {Init = record {
-    minting_account = record { owner = principal \"$CKBTC_MINTER\" };
-    transfer_fee = 10;
-    token_symbol = \"ckTESTBTC\";
-    token_name = \"Chain key testnet Bitcoin\";
-    metadata = vec {};
-    initial_balances = vec {};
-    max_memo_length = opt 100;
-    archive_options = record {
-        num_blocks_to_archive = 1000;
-        trigger_threshold = 2000;
-        max_message_size_bytes = null;
-        cycles_for_archive_creation = opt 1_000_000_000_000;
-        node_max_memory_size_bytes = opt 3_221_225_472;
-        controller_id = principal \"$ADMIN_WALLET\"
-    }
-}})"
 
 USER_PRINCIPICAL="qhjy5-udjmu-rqh6d-abbcl-63l4x-gbwoi-ip5qu-vocyn-docsu-fideu-eae"
 dfx deploy token2 --argument "(variant {Init = record {
@@ -85,27 +67,6 @@ dfx deploy token2 --argument "(variant {Init = record {
     }
 }})"
 
-dfx deploy ic-ckbtc-kyt --argument "(variant {InitArg = record {
-    api_key = \"abcdef\";
-    maintainers = vec { principal \"$ADMIN_PRINCIPAL\"; };
-    mode = variant { AcceptAll };
-    minter_id = principal \"$CKBTC_MINTER\";
-} })"
-
-dfx canister call ic-ckbtc-kyt set_api_key "(record { api_key = \"abc\"; })"
-
-dfx deploy ic-ckbtc-minter --argument "(variant {Init = record {
-    btc_network = variant { Regtest };
-    ledger_id = principal \"$CKBTC_LEDGER\";
-    ecdsa_key_name = \"dfx_test_key\";
-    retrieve_btc_min_amount = 5_000;
-    max_time_in_queue_nanos = 420_000_000_000;
-    min_confirmations = opt 1;
-    kyt_fee = opt 1000;
-    kyt_principal = opt principal \"$CKBTC_KYT\";
-    mode = variant { GeneralAvailability };
-}})"
-
 ########## Deploy EVM, BTC bridge, ICRC2 Minter ##########
 
 dfx canister create evm_testnet
@@ -130,21 +91,6 @@ dfx deploy evm_testnet --argument "(record {
     genesis_accounts = vec { };
     chain_id = $CHAIN_ID;
     coinbase = \"0x0000000000000000000000000000000000000000\";
-})"
-
-dfx deploy btc-bridge --argument "(record {
-    admin = principal \"${ADMIN_PRINCIPAL}\";
-    signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
-    ck_btc_ledger_fee = 10;
-    evm_link = variant { Ic = principal \"${EVM}\" };
-    ck_btc_minter = principal \"${CKBTC_MINTER}\";
-    network = variant { regtest };
-    ck_btc_ledger = principal \"${CKBTC_LEDGER}\";
-    log_settings = record {
-       enable_console = true;
-       in_memory_records = opt 10000;
-       log_filter = opt \"trace\";
-    };
 })"
 
 dfx deploy icrc2-minter  --argument "(record {
