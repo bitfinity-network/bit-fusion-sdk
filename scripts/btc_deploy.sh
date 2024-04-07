@@ -1,8 +1,5 @@
-# Script to set up BTC bridge infrasturcture into local DFX replica and test BTC bridging flow
-# It uses ./dfx instead of dfx command as the current version of dfx (0.18) has a bug not allowing BTC operations to
-# work. To run the script download the dfx v0.17 from https://github.com/dfinity/sdk/releases and put it into the root
-# of the repo.
-#
+# Use the l;atest version of dfx 19 - should work 
+
 # For btc operations it uses bitcoin core. In Ubuntu this tool is ~/bitcoin-25.0/bin/bitcoin-cli and bitcoin-core.daemon, but on
 # other platforms it can be bitcoind and bitcoin.cli. Adjust accordingly. Before the script is run, the daemon must
 # be run:
@@ -13,7 +10,7 @@ start_icx() {
     killall icx-proxy
     sleep 2
     # Start ICX Proxy
-    dfx_local_port=$(./dfx info replica-port)
+    dfx_local_port=$(dfx info replica-port)
     icx-proxy --fetch-root-key --address 127.0.0.1:8545 --dns-alias 127.0.0.1:$EVM --replica http://localhost:$dfx_local_port &
     sleep 2
 
@@ -22,28 +19,28 @@ start_icx() {
 
 CHAIN_ID=355113
 
-./dfx stop
-./dfx start --host 127.0.0.1:4943 --background --clean --enable-bitcoin 2> dfx_stderr.log
+dfx stop
+dfx start --host 127.0.0.1:4943 --background --clean --enable-bitcoin 2> dfx_stderr.log
 
-./dfx identity new --force btc-admin
-./dfx identity use btc-admin
+dfx identity new --force btc-admin
+dfx identity use btc-admin
 
-ADMIN_PRINCIPAL=$(./dfx identity get-principal)
-ADMIN_WALLET=$(./dfx identity get-wallet)
+ADMIN_PRINCIPAL=$(dfx identity get-principal)
+ADMIN_WALLET=$(dfx identity get-wallet)
 
 ########## Deploy ckBTC canisters ##########
 
-./dfx canister create token
-./dfx canister create token2
-./dfx canister create ic-ckbtc-kyt
-./dfx canister create ic-ckbtc-minter
+dfx canister create token
+dfx canister create token2
+dfx canister create ic-ckbtc-kyt
+dfx canister create ic-ckbtc-minter
 
-CKBTC_LEDGER=$(./dfx canister id token)
-CKBTC_KYT=$(./dfx canister id ic-ckbtc-kyt)
-CKBTC_MINTER=$(./dfx canister id ic-ckbtc-minter)
-ICRC2_TOKEN=$(./dfx canister id token2)
+CKBTC_LEDGER=$(dfx canister id token)
+CKBTC_KYT=$(dfx canister id ic-ckbtc-kyt)
+CKBTC_MINTER=$(dfx canister id ic-ckbtc-minter)
+ICRC2_TOKEN=$(dfx canister id token2)
 
-./dfx deploy token --argument "(variant {Init = record {
+dfx deploy token --argument "(variant {Init = record {
     minting_account = record { owner = principal \"$CKBTC_MINTER\" };
     transfer_fee = 10;
     token_symbol = \"ckTESTBTC\";
@@ -62,7 +59,7 @@ ICRC2_TOKEN=$(./dfx canister id token2)
 }})"
 
 USER_PRINCIPICAL="qhjy5-udjmu-rqh6d-abbcl-63l4x-gbwoi-ip5qu-vocyn-docsu-fideu-eae"
-./dfx deploy token2 --argument "(variant {Init = record {
+dfx deploy token2 --argument "(variant {Init = record {
     minting_account = record { owner = principal \"$ADMIN_PRINCIPAL\" };
     transfer_fee = 10;
     token_symbol = \"AUX\";
@@ -88,16 +85,16 @@ USER_PRINCIPICAL="qhjy5-udjmu-rqh6d-abbcl-63l4x-gbwoi-ip5qu-vocyn-docsu-fideu-ea
     }
 }})"
 
-./dfx deploy ic-ckbtc-kyt --argument "(variant {InitArg = record {
+dfx deploy ic-ckbtc-kyt --argument "(variant {InitArg = record {
     api_key = \"abcdef\";
     maintainers = vec { principal \"$ADMIN_PRINCIPAL\"; };
     mode = variant { AcceptAll };
     minter_id = principal \"$CKBTC_MINTER\";
 } })"
 
-./dfx canister call ic-ckbtc-kyt set_api_key "(record { api_key = \"abc\"; })"
+dfx canister call ic-ckbtc-kyt set_api_key "(record { api_key = \"abc\"; })"
 
-./dfx deploy ic-ckbtc-minter --argument "(variant {Init = record {
+dfx deploy ic-ckbtc-minter --argument "(variant {Init = record {
     btc_network = variant { Regtest };
     ledger_id = principal \"$CKBTC_LEDGER\";
     ecdsa_key_name = \"dfx_test_key\";
@@ -111,17 +108,17 @@ USER_PRINCIPICAL="qhjy5-udjmu-rqh6d-abbcl-63l4x-gbwoi-ip5qu-vocyn-docsu-fideu-ea
 
 ########## Deploy EVM, BTC bridge, ICRC2 Minter ##########
 
-./dfx canister create evm_testnet
-./dfx canister create icrc2-minter
-./dfx canister create spender
-EVM=$(./dfx canister id evm_testnet)
-ICRC2_MINTER=$(./dfx canister id icrc2-minter)
-SPENDER=$(./dfx canister id spender)
+dfx canister create evm_testnet
+dfx canister create icrc2-minter
+dfx canister create spender
+EVM=$(dfx canister id evm_testnet)
+ICRC2_MINTER=$(dfx canister id icrc2-minter)
+SPENDER=$(dfx canister id spender)
 
-./dfx deploy signature_verification --argument "(vec { principal \"${EVM}\" })"
-SIGNATURE_VERIFICATION=$(./dfx canister id signature_verification)
+dfx deploy signature_verification --argument "(vec { principal \"${EVM}\" })"
+SIGNATURE_VERIFICATION=$(dfx canister id signature_verification)
 
-./dfx deploy evm_testnet --argument "(record {
+dfx deploy evm_testnet --argument "(record {
     min_gas_price = 10;
     signature_verification_principal = principal \"${SIGNATURE_VERIFICATION}\";
     log_settings = opt record {
@@ -135,7 +132,7 @@ SIGNATURE_VERIFICATION=$(./dfx canister id signature_verification)
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-./dfx deploy btc-bridge --argument "(record {
+dfx deploy btc-bridge --argument "(record {
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     ck_btc_ledger_fee = 10;
@@ -150,7 +147,7 @@ SIGNATURE_VERIFICATION=$(./dfx canister id signature_verification)
     };
 })"
 
-./dfx deploy icrc2-minter  --argument "(record {
+dfx deploy icrc2-minter  --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
         ManagementCanister = record {
@@ -161,7 +158,7 @@ SIGNATURE_VERIFICATION=$(./dfx canister id signature_verification)
     spender_principal = principal \"$SPENDER\";
 })"
 
-./dfx deploy spender --argument "(principal \"$ICRC2_MINTER\")"
+dfx deploy spender --argument "(principal \"$ICRC2_MINTER\")"
 
 start_icx
 
@@ -171,16 +168,16 @@ ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canis
 ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
 ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
 
-BTC_BRIDGE=$(./dfx canister id btc-bridge)
+BTC_BRIDGE=$(dfx canister id btc-bridge)
 
-res=$(./dfx canister call btc-bridge get_evm_address)
+res=$(dfx canister call btc-bridge get_evm_address)
 res=${res#*\"}
 BTC_BRIDGE_ECDSA_ADDRESS=${res%\"*}
 
 echo "BTC bridge ecdsa address: ${BTC_BRIDGE_ECDSA_ADDRESS}"
 
 echo "Minting ETH tokens for BTC bridge canister"
-./dfx canister call evm_testnet mint_native_tokens "(\"${BTC_BRIDGE_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
+dfx canister call evm_testnet mint_native_tokens "(\"${BTC_BRIDGE_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
 BTC_BRIDGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$BTC_BRIDGE_ECDSA_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "BTC bridge contract address: $BTC_BRIDGE_CONTRACT_ADDRESS"
@@ -195,7 +192,7 @@ TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
 echo "Wrapped token ETH address: $TOKEN_ETH_ADDRESS" 
 
 echo "Configuring BTC bridge canister"
-./dfx canister call btc-bridge admin_configure_bft_bridge "(record {
+dfx canister call btc-bridge admin_configure_bft_bridge "(record {
   decimals = 0;
   token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
   token_address = \"$TOKEN_ETH_ADDRESS\";
@@ -206,20 +203,20 @@ echo "Configuring BTC bridge canister"
 
 ######### Deploy BFT Bridge and Token Contract for ICRC2 Minter ###########
 
-res=$(./dfx canister call icrc2-minter get_minter_canister_evm_address)
+res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
 res=${res#*\"}
 ICRC2_MINTER_ECDSA_ADDRESS=${res%\"*}
 
 echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
 
 echo "Minting ETH tokens for ICRC2 Minter canister"
-./dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
+dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
 ICRC2_BRIDGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$ICRC2_MINTER_ECDSA_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "ICRC2 bridge contract address: $ICRC2_BRIDGE_CONTRACT_ADDRESS"
 
 echo "Register bft bridge contract address with icrc2-minter"
-./dfx canister call icrc2-minter register_evmc_bft_bridge "(\"$ICRC2_BRIDGE_CONTRACT_ADDRESS\")"
+dfx canister call icrc2-minter register_evmc_bft_bridge "(\"$ICRC2_BRIDGE_CONTRACT_ADDRESS\")"
 
 ICRC2_WRAPPED_TOKEN_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
   --bft-bridge-address="$ICRC2_BRIDGE_CONTRACT_ADDRESS" \
