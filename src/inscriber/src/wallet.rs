@@ -234,7 +234,7 @@ impl CanisterWallet {
 
         // Mark input UTXOs for commit_tx as `Spent`
         // and remove them from locked UTXOs.
-        self.mark_utxo_as_spent(state, &commit_tx);
+        state.borrow_mut().mark_utxos_as_spent(&commit_tx);
         state.borrow_mut().remove_utxos(UtxoType::Spent);
 
         log::info!("Sending the reveal transaction...");
@@ -243,7 +243,7 @@ impl CanisterWallet {
 
         // Mark input UTXOs for reveal_tx as `Spent`
         // and remove them from locked UTXOs.
-        self.mark_utxo_as_spent(state, &reveal_tx);
+        state.borrow_mut().mark_utxos_as_spent(&reveal_tx);
         state.borrow_mut().remove_utxos(UtxoType::Spent);
 
         Ok(InscribeTransactions {
@@ -359,17 +359,6 @@ impl CanisterWallet {
         };
 
         builder.build_reveal_transaction(reveal_tx_args).await
-    }
-
-    fn mark_utxo_as_spent(&self, state: &RefCell<State>, tx: &Transaction) {
-        for input in tx.input.iter() {
-            let txid_hex = hex::encode(input.previous_output.txid);
-            let utxo_id = format!("{}:{}", txid_hex, input.previous_output.vout);
-            state
-                .borrow_mut()
-                .update_utxo_purpose(&utxo_id, UtxoType::Spent);
-            log::info!("UTXO {} marked as 'Spent'.", utxo_id);
-        }
     }
 
     // Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.

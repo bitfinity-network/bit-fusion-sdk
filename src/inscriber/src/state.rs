@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
-use bitcoin::Amount;
+use bitcoin::{Amount, Transaction};
 use candid::{CandidType, Principal};
 use did::{InscribeError, InscribeResult, InscriptionFees};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
@@ -48,7 +48,8 @@ pub(crate) enum UtxoType {
     Fees,
     /// UTXOs left after fees have been deducted
     Leftover,
-    /// Indicates UTXOs that have been sent
+    /// Indicates UTXOs that have already been used in a
+    /// previous inscription
     Spent,
 }
 
@@ -68,8 +69,10 @@ impl State {
     pub(crate) fn process_utxos(
         &mut self,
         fees: InscriptionFees,
-        mut fetched_utxos: Vec<Utxo>,
+        fetched_utxos: Vec<Utxo>,
     ) -> InscribeResult<Vec<Utxo>> {
+        let mut fetched_utxos = self.validate_utxos(fetched_utxos);
+
         let InscriptionFees {
             postage,
             commit_fee,
@@ -142,6 +145,16 @@ impl State {
         }
     }
 
+    /// Tags the given transaction's input UTXOs as `UtxoType::Spent`,
+    /// effectively marking them for future removal.
+    pub(crate) fn mark_utxos_as_spent(&mut self, tx: &Transaction) {
+        for input in tx.input.iter() {
+            let txid_hex = hex::encode(input.previous_output.txid);
+            let utxo_id = format!("{}:{}", txid_hex, input.previous_output.vout);
+            self.update_utxo_purpose(&utxo_id, UtxoType::Spent);
+        }
+    }
+
     /// Removes UTXOs identified by `UtxoType`.
     pub(crate) fn remove_utxos(&mut self, purpose: UtxoType) {
         self.utxos
@@ -155,6 +168,19 @@ impl State {
             purpose,
             value,
         });
+    }
+
+    /// Filters out any `UtxoType::Spent` UTXOs.
+    fn validate_utxos(&self, utxos: Vec<Utxo>) -> Vec<Utxo> {
+        utxos
+            .into_iter()
+            .filter(|utxo| {
+                !self.utxos.iter().any(|managed_utxo| {
+                    managed_utxo.utxo.outpoint == utxo.outpoint
+                        && managed_utxo.purpose == UtxoType::Spent
+                })
+            })
+            .collect()
     }
 }
 
