@@ -22,11 +22,8 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
+use crate::constant::{DUMMY_BITCOIN_ADDRESS, DUMMY_BITCOIN_PUBKEY};
 use crate::state::{State, UtxoType};
-
-const DUMMY_BITCOIN_PUBKEY: &str =
-    "02fcf0210771ec96a9e268783c192c9c0d2991d6e957f319b2aa56503ee15fafdd";
-const DUMMY_BITCOIN_ADDRESS: &str = "1Q9ioXoxA7xMCHxsMz8z8MMn99kogyo3FS";
 
 #[derive(Clone)]
 pub struct EcdsaSigner {
@@ -236,14 +233,18 @@ impl CanisterWallet {
         log::info!("Done");
 
         // Mark input UTXOs for commit_tx as `Spent`
+        // and remove them from locked UTXOs.
         self.mark_utxo_as_spent(state, &commit_tx);
+        state.borrow_mut().remove_utxos(UtxoType::Spent);
 
         log::info!("Sending the reveal transaction...");
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
         log::info!("Done");
 
         // Mark input UTXOs for reveal_tx as `Spent`
+        // and remove them from locked UTXOs.
         self.mark_utxo_as_spent(state, &reveal_tx);
+        state.borrow_mut().remove_utxos(UtxoType::Spent);
 
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),

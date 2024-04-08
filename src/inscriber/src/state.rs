@@ -50,8 +50,6 @@ pub(crate) enum UtxoType {
     Leftover,
     /// Indicates UTXOs that have been sent
     Spent,
-    /// UTXOs for a BRC-20 `transfer` inscription
-    Transfer,
 }
 
 impl State {
@@ -142,6 +140,12 @@ impl State {
         } else {
             log::warn!("UTXO not found for updating: {}", utxo_id);
         }
+    }
+
+    /// Removes UTXOs identified by `UtxoType`.
+    pub(crate) fn remove_utxos(&mut self, purpose: UtxoType) {
+        self.utxos
+            .retain(|utxo_manager| utxo_manager.purpose != purpose);
     }
 
     /// Classifies a new UTXO and adds it to the state.
