@@ -71,12 +71,7 @@ impl State {
         fees: InscriptionFees,
         fetched_utxos: Vec<Utxo>,
     ) -> InscribeResult<Vec<Utxo>> {
-        // Extract leftover UTXOs from the state, if any.
-        let mut leftovers = self.extract_leftover_utxos();
-
-        // Append newly fetched UTXOs to the list of all UTXOs to be considered.
-        leftovers.extend(fetched_utxos);
-        let mut all_utxos = self.validate_utxos(leftovers);
+        let all_utxos = self.validate_utxos(fetched_utxos);
 
         let InscriptionFees {
             postage,
@@ -84,10 +79,6 @@ impl State {
             reveal_fee,
         } = fees;
         let total_fees = postage + commit_fee + reveal_fee;
-
-        // Sort UTXOs by value in ascending order to optimize for fee deduction.
-        // This helps in using smaller UTXOs for fees, potentially leaving larger UTXOs for inscriptions.
-        all_utxos.sort_unstable_by_key(|utxo| utxo.value);
 
         let total_utxo_amount = all_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
 
@@ -133,6 +124,32 @@ impl State {
         Ok(remaining_utxos)
     }
 
+    /// Filters out any `UtxoType::Spent` UTXOs.
+    ///
+    /// This method first extracts all `UtxoType::Leftover` UTXOs,
+    /// extending the collection with the newly-fetched UTXOs. This ensures that
+    /// leftover funds are prioritized in the next transaction.
+    fn validate_utxos(&mut self, utxos: Vec<Utxo>) -> Vec<Utxo> {
+        // Extract leftover UTXOs from the state, if any.
+        let mut all_utxos = self.extract_leftover_utxos();
+
+        let utxos = utxos
+            .into_iter()
+            .filter(|utxo| {
+                !self.utxos.iter().any(|managed_utxo| {
+                    managed_utxo.utxo.outpoint == utxo.outpoint
+                        && managed_utxo.purpose == UtxoType::Spent
+                })
+            })
+            .collect::<Vec<Utxo>>();
+        all_utxos.extend(utxos);
+
+        // Sort UTXOs by value in ascending order to optimize for fee deduction.
+        // This helps in using smaller UTXOs for fees, potentially leaving larger UTXOs for inscriptions.
+        all_utxos.sort_unstable_by_key(|utxo| utxo.value);
+        all_utxos
+    }
+
     /// Updates the purpose of a UTXO after usage.
     pub(crate) fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
         if let Some(utxo) = self.utxos.iter_mut().find(|c_utxo| {
@@ -171,19 +188,6 @@ impl State {
             purpose,
             value,
         });
-    }
-
-    /// Filters out any `UtxoType::Spent` UTXOs.
-    fn validate_utxos(&self, utxos: Vec<Utxo>) -> Vec<Utxo> {
-        utxos
-            .into_iter()
-            .filter(|utxo| {
-                !self.utxos.iter().any(|managed_utxo| {
-                    managed_utxo.utxo.outpoint == utxo.outpoint
-                        && managed_utxo.purpose == UtxoType::Spent
-                })
-            })
-            .collect()
     }
 
     /// Retrieves (and consequently removes) leftover UTXOs from the state, returning them for re-use.
