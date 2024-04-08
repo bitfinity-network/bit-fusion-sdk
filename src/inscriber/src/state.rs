@@ -12,9 +12,9 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 thread_local! {
-    pub static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
-    pub static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
-    pub static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
+    pub(crate) static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
+    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
+    pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
 }
 
 /// State of the Inscriber
@@ -150,6 +150,23 @@ impl State {
         all_utxos
     }
 
+    /// Retrieves (and consequently removes) leftover UTXOs from the state, returning them for re-use.
+    ///
+    /// This ensures that leftover funds are prioritized in the next transaction.
+    fn extract_leftover_utxos(&mut self) -> Vec<Utxo> {
+        let leftover_utxos = self
+            .utxos
+            .iter()
+            .filter(|u| u.purpose == UtxoType::Leftover)
+            .map(|u| u.utxo.clone())
+            .collect::<Vec<_>>();
+
+        // Remove the extracted leftovers from the state to prevent duplication.
+        self.remove_utxos(UtxoType::Leftover);
+
+        leftover_utxos
+    }
+
     /// Updates the purpose of a UTXO after usage.
     pub(crate) fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
         if let Some(utxo) = self.utxos.iter_mut().find(|c_utxo| {
@@ -188,23 +205,6 @@ impl State {
             purpose,
             value,
         });
-    }
-
-    /// Retrieves (and consequently removes) leftover UTXOs from the state, returning them for re-use.
-    ///
-    /// This ensures that leftover funds are prioritized in the next transaction.
-    fn extract_leftover_utxos(&mut self) -> Vec<Utxo> {
-        let leftover_utxos = self
-            .utxos
-            .iter()
-            .filter(|u| u.purpose == UtxoType::Leftover)
-            .map(|u| u.utxo.clone())
-            .collect::<Vec<_>>();
-
-        // Remove the extracted leftovers from the state to prevent duplication.
-        self.remove_utxos(UtxoType::Leftover);
-
-        leftover_utxos
     }
 }
 
