@@ -15,7 +15,6 @@ export {
   createActor as createICRC1Actor,
   idlFactory as Icrc1IdlFactory
 } from './canisters/icrc1';
-export { _SERVICE as Icrc1Service } from './canisters/icrc1/icrc1.did';
 
 export {
   BtcBridge as BtcBridgeActor,
