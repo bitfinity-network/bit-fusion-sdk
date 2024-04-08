@@ -71,7 +71,12 @@ impl State {
         fees: InscriptionFees,
         fetched_utxos: Vec<Utxo>,
     ) -> InscribeResult<Vec<Utxo>> {
-        let mut fetched_utxos = self.validate_utxos(fetched_utxos);
+        // Extract leftover UTXOs from the state, if any.
+        let mut leftovers = self.extract_leftover_utxos();
+
+        // Append newly fetched UTXOs to the list of all UTXOs to be considered.
+        leftovers.extend(fetched_utxos);
+        let mut all_utxos = self.validate_utxos(leftovers);
 
         let InscriptionFees {
             postage,
@@ -82,9 +87,9 @@ impl State {
 
         // Sort UTXOs by value in ascending order to optimize for fee deduction.
         // This helps in using smaller UTXOs for fees, potentially leaving larger UTXOs for inscriptions.
-        fetched_utxos.sort_unstable_by_key(|utxo| utxo.value);
+        all_utxos.sort_unstable_by_key(|utxo| utxo.value);
 
-        let total_utxo_amount = fetched_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
+        let total_utxo_amount = all_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
 
         if total_utxo_amount < total_fees {
             return Err(InscribeError::InsufficientFundsForFees(format!(
@@ -96,26 +101,24 @@ impl State {
         let mut accumulated_for_fees = 0u64;
         let mut remaining_utxos = Vec::new();
 
-        for utxo in fetched_utxos.into_iter() {
-            if accumulated_for_fees < total_fees {
+        // Distribute UTXOs between fees, inscriptions, and leftovers.
+        for utxo in all_utxos {
+            let needed_for_fees = total_fees.saturating_sub(accumulated_for_fees);
+
+            if needed_for_fees > 0 && utxo.value <= needed_for_fees {
+                // This UTXO is entirely used for fees.
                 accumulated_for_fees += utxo.value;
                 self.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
+            } else if needed_for_fees > 0 {
+                // This UTXO covers the remaining fees and has leftovers.
+                accumulated_for_fees += needed_for_fees;
+                let leftover_value = utxo.value - needed_for_fees;
+                self.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(needed_for_fees));
+                self.classify_utxo(&utxo, UtxoType::Leftover, Amount::from_sat(leftover_value));
             } else {
+                // All fees are covered; the rest are for inscriptions.
                 remaining_utxos.push(utxo.clone());
                 self.classify_utxo(&utxo, UtxoType::Inscription, Amount::from_sat(utxo.value));
-            }
-        }
-
-        if accumulated_for_fees > total_fees {
-            if let Some(utxo) = self
-                .utxos
-                .iter_mut()
-                .rev()
-                .find(|u| u.purpose == UtxoType::Fees)
-            {
-                let leftover_value = accumulated_for_fees - total_fees;
-                utxo.value = Amount::from_sat(leftover_value);
-                utxo.purpose = UtxoType::Leftover;
             }
         }
 
@@ -181,6 +184,23 @@ impl State {
                 })
             })
             .collect()
+    }
+
+    /// Retrieves (and consequently removes) leftover UTXOs from the state, returning them for re-use.
+    ///
+    /// This ensures that leftover funds are prioritized in the next transaction.
+    fn extract_leftover_utxos(&mut self) -> Vec<Utxo> {
+        let leftover_utxos = self
+            .utxos
+            .iter()
+            .filter(|u| u.purpose == UtxoType::Leftover)
+            .map(|u| u.utxo.clone())
+            .collect::<Vec<_>>();
+
+        // Remove the extracted leftovers from the state to prevent duplication.
+        self.remove_utxos(UtxoType::Leftover);
+
+        leftover_utxos
     }
 }
 
