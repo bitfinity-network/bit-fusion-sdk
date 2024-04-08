@@ -1,143 +1,188 @@
-import { BaseConnector as BtcConnector } from '@particle-network/btc-connectkit';
-import { WalletClient as EthConnector, getContract } from 'viem';
 import { Principal } from '@dfinity/principal';
+import * as ethers from 'ethers';
 
-// import { createBtcBridgeActor, BtcBridgeActor } from './ic';
+import { createICRC1Actor, createICRC2MinterActor, ICRC2Minter } from './ic';
 import {
-  createICRC1Actor,
-  createICRC2MinterActor,
-  ICRC1,
-  ICRC2Minter
-} from './ic';
-import { ICRC2_MINTER_CANISTER_ID, ICRC2_TOKEN_CANISTER_ID } from './constants';
-import { generateOperationId, wait } from './tests/utils';
-// import { expect } from 'vitest';
-import { Address, Id256Factory } from './validation';
-import BftBridgeABI from './abi/BFTBridge';
-import WrappedTokenABI from './abi/WrappedToken';
+  ICRC2_MINTER_CANISTER_ID,
+  ICRC2_TOKEN_CANISTER_ID,
+  IS_TEST
+} from './constants';
+import { createAgent, generateOperationId } from './tests/utils';
+import { Address, Id256, Id256Factory } from './validation';
+// import BftBridgeABI from './abi/BFTBridge';
+// import WrappedTokenABI from './abi/WrappedToken';
+import { Icrc1IdlFactory } from './ic';
+import canisters from '../../.dfx/local/canister_ids.json';
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { Icrc2Burn } from './canisters/icrc2-minter/icrc2-minter.did';
+// import BftBridgeJ from './abi/BFTBridge.json';
+
+export interface IcrcBridgeOptions {
+  wallet: ethers.Signer;
+  rpcURL?: string;
+  // agent?: HttpAgent;
+}
 
 export class IcrcBridge {
-  // protected btcBridgeActor: typeof BtcBridgeActor;
-  // protected ICRC1Actor: typeof ICRC1;
   icrc2Minter: typeof ICRC2Minter;
-  tokenId: Principal
+  infinityWallet: any;
+  wallet: ethers.Signer;
 
-  constructor(
-    protected id: string,
-    protected token: typeof ICRC1,
-    protected eth: EthConnector
-  ) {
-    this.icrc2Minter = createICRC2MinterActor(ICRC2_MINTER_CANISTER_ID);
-    this.tokenId = Principal.fromText(id)
-  }
+  constructor({ wallet }: IcrcBridgeOptions) {
+    this.wallet = wallet;
 
-  async getBftBridgeContract() {
-    const [bridgeAddress] = await this.icrc2Minter.get_bft_bridge_contract();
+    console.log('ICRC2_MINTER_CANISTER_ID:', ICRC2_MINTER_CANISTER_ID);
 
-    if (!bridgeAddress) {
-      // expect.fail('Failed to get bft bridge contract address');
-    }
-
-    return getContract({
-      address: bridgeAddress as `0x${string}`,
-      abi: BftBridgeABI,
-      client: { public: this.eth, wallet: this.eth }
-    });
-  }
-
-  async getWrappedTokenBalance() {
-    const wrappedTokenContract = await this.getWrappedTokenContract();
-
-    const [ethAddress] = await this.eth.getAddresses();
-
-    return await wrappedTokenContract.read.balanceOf([ethAddress]);
-  }
-
-  async getWrappedTokenContract() {
-    const bftBridgeContract = await this.getBftBridgeContract()
-
-    const wrappedTokenAddress = await bftBridgeContract.read.getWrappedToken(
-      [Id256Factory.fromPrincipal(this.tokenId)]
+    this.icrc2Minter = createICRC1Actor(
+      Principal.fromText(ICRC2_TOKEN_CANISTER_ID)
     );
 
-    return getContract({
-      address: wrappedTokenAddress as `0x${string}`,
-      abi: WrappedTokenABI,
-      client: { public: this.eth, wallet: this.eth }
-    });
+    // if (window != undefined) {
+    //   this.infinityWallet = (window as any).ic?.infinityWallet;
+    // }
   }
 
-  async bridgeIcrc(amount: bigint) {
-    const tokenFee = await this.token.icrc1_fee();
+  // async getBftBridgeContract() {
+  //   const [bridgeAddress] = await this.icrc2Minter.get_bft_bridge_contract();
 
-    const response = await this.token.icrc2_approve({
-      fee: [tokenFee],
-      memo: [],
-      from_subaccount: [],
-      created_at_time: [],
-      amount: amount,
-      expected_allowance: [],
-      expires_at: [],
-      spender: {
-        owner: Principal.fromText(ICRC2_MINTER_CANISTER_ID),
-        subaccount: []
-      }
-    });
+  //   if (!bridgeAddress) {
+  //     throw new Error('bridge address not found');
+  //   }
 
-    if ('Err' in response) {
-      // expect.fail(
-      //   `Failed to approve the ${amount} ICRC2 token: ${JSON.stringify(response.Err)}`
-      // );
-    }
+  //   if (new Address(bridgeAddress).isZero()) {
+  //     throw new Error('bridge contract not deployed');
+  //   }
 
-    const [ethAddress] = await this.eth.getAddresses();
+  //   return new ethers.Contract(
+  //     bridgeAddress,
+  //     BftBridgeJ.abi,
+  //     this.wallet.provider
+  //   );
+  // }
 
-    const burnIcrc2Response = await this.icrc2Minter.burn_icrc2({
-      operation_id: generateOperationId(),
-      from_subaccount: [],
-      icrc2_token_principal: this.tokenId,
-      recipient_address: ethAddress,
-      amount: amount.toString()
-    });
+  // async getWrappedTokenBalance() {
+  //   const wrappedTokenContract = await this.getWrappedTokenContract();
 
-    if ('Err' in burnIcrc2Response) {
-      // expect.fail(
-      //   `ICRC2 Minter failed to burn the ${amount} ICRC2 tokens: ${JSON.stringify(burnIcrc2Response.Err)}`
-      // );
-    }
+  //   const address = await this.wallet.getAddress();
 
+  //   return await wrappedTokenContract.balanceOf(address);
+  // }
 
+  // async getWrappedTokenContract() {
+  //   const bftBridgeContract = await this.getBftBridgeContract();
 
-    // const [bridgeAddress] = await this.icrc2Minter.get_bft_bridge_contract();
-    //
-    // if (!bridgeAddress) {
-    //   expect.fail('Failed to get bft bridge contract address');
-    // }
+  //   const wrappedTokenAddress = await bftBridgeContract.getWrappedToken([
+  //     Id256Factory.fromPrincipal(Principal.fromText(ICRC2_TOKEN_CANISTER_ID))
+  //   ]);
 
-    // const bftBridgeContract = getContract(bridgeAddress!, BftBridgeABI.abi);
+  //   if (new Address(wrappedTokenAddress).isZero()) {
+  //     throw new Error('Invalid Address');
+  //   }
 
-    // const bftBridgeContract = await this.getBftBridgeContract()
-    //
-    // const wrappedToken = await bftBridgeContract.read.getWrappedToken(
-    //   [Id256Factory.fromPrincipal(this.tokenId)]
-    // );
-    // console.log('wrappedToken:', wrappedToken);
-    //
-    // const wrappedTokenAddress = new Address(wrappedToken as string);
-    // if (wrappedTokenAddress.isZero()) {
-    //   expect.fail('Invalid wrapped token address');
-    // }
-    //
-    // const wrappedTokenContract = getContract(
-    //   wrappedTokenAddress.getAddress(),
-    //   WrappedTokenABI.abi
-    // );
-    //
-    // await wait(2000);
-    //
-    // console.log('wallet address:', wallet.address);
-    // const balance = await wrappedTokenContract.balanceOf(wallet.address);
-    //
-    // expect(balance).toBe(amount);
-  }
+  //   return new ethers.Contract(
+  //     wrappedTokenAddress,
+  //     WrappedTokenABI,
+  //     this.wallet.provider
+  //   );
+  // }
+
+  // async deployBftWrappedToken(name: string, symbol: string, fromToken: Id256) {
+  //   try {
+  //     const bridge = await this.getBftBridgeContract();
+
+  //     return await bridge.deployERC20(name, symbol, fromToken);
+  //   } catch (error: any) {
+  //     console.log('deployBftWrappedToken err', error);
+  //     throw new Error(error.message);
+  //   }
+  // }
+
+  // async bridgeIcrc2(amount: bigint, recipient: string) {
+  //   const Icrc2Burn: Icrc2Burn = {
+  //     operation_id: generateOperationId(),
+  //     from_subaccount: [],
+  //     icrc2_token_principal: Principal.fromText(ICRC2_TOKEN_CANISTER_ID),
+  //     recipient_address: recipient,
+  //     amount: amount.toString()
+  //   };
+
+  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //   const onApproveTxSucess = async (res: any) => {
+  //     console.log('approve icrc2 token res:', res);
+
+  //     if ('Ok' in res) {
+  //       const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
+
+  //       if ('Err' in burnResponse) {
+  //         throw new Error(
+  //           `icrc1 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
+  //         );
+  //       }
+
+  //       const wrappedToken = await this.getWrappedTokenContract();
+
+  //       return await wrappedToken.balanceOf(recipient);
+  //     }
+
+  //     if (IS_TEST) {
+  //       const agent = createAgent();
+  //       const tokenCanisterId = Principal.fromText(canisters.token2.local);
+  //       const token = createICRC1Actor(tokenCanisterId, {
+  //         agent
+  //       });
+
+  //       const response = await token.icrc2_approve({
+  //         fee: [],
+  //         memo: [],
+  //         from_subaccount: [],
+  //         created_at_time: [],
+  //         amount: amount,
+  //         expected_allowance: [],
+  //         expires_at: [],
+  //         spender: {
+  //           owner: Actor.canisterIdOf(this.icrc2Minter),
+  //           subaccount: []
+  //         }
+  //       });
+
+  //       if ('Err' in response) {
+  //         throw new Error(
+  //           `failed to approve tokens: ${JSON.stringify(response.Err)}`
+  //         );
+  //       }
+
+  //       const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
+
+  //       if ('Err' in burnResponse) {
+  //         throw new Error(
+  //           `failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
+  //         );
+  //       }
+  //     } else {
+  //       const APPROVE_TX = {
+  //         idl: Icrc1IdlFactory,
+  //         canisterId: ICRC2_TOKEN_CANISTER_ID,
+  //         methodName: 'icrc2_approve',
+  //         args: [
+  //           {
+  //             fee: [],
+  //             memo: [],
+  //             from_subaccount: [],
+  //             created_at_time: [],
+  //             amount,
+  //             expected_allowance: [],
+  //             expires_at: [],
+  //             spender: {
+  //               owner: this.icrc2Minter,
+  //               subaccount: []
+  //             }
+  //           }
+  //         ],
+  //         onSuccess: onApproveTxSucess
+  //       };
+
+  //       await this.infinityWallet.branchTransactions([APPROVE_TX]);
+  //     }
+  //   };
+  // }
 }
