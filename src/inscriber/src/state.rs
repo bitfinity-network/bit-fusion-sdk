@@ -101,11 +101,13 @@ impl State {
                 accumulated_for_fees += utxo.value;
                 self.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(utxo.value));
             } else if needed_for_fees > 0 {
-                // This UTXO covers the remaining fees and has leftovers.
+                // This UTXO covers the remaining fees and possibly has leftovers.
                 accumulated_for_fees += needed_for_fees;
-                let leftover_value = utxo.value - needed_for_fees;
+                let leftover_value = utxo.value.saturating_sub(needed_for_fees);
                 self.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(needed_for_fees));
-                self.classify_utxo(&utxo, UtxoType::Leftover, Amount::from_sat(leftover_value));
+                if leftover_value > 0 {
+                    self.classify_utxo(&utxo, UtxoType::Leftover, Amount::from_sat(leftover_value));
+                }
             } else {
                 // All fees are covered; the rest are for inscriptions.
                 remaining_utxos.push(utxo.clone());
