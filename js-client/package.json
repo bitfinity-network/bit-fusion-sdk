@@ -20,7 +20,7 @@
     "build-fast": "tsup src/index.ts --format cjs,esm",
     "build": "yarn build-fast -- --dts-resolve",
     "dev": "tsup src/index.ts --format cjs,esm --watch -- --dts-resolve",
-    "test": "bash ./scripts/set_env.sh && vitest run",
+    "test": "vitest run",
     "prepublishOnly": "yarn build"
   },
   "license": "MIT",

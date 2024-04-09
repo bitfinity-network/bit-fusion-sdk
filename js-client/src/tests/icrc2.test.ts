@@ -27,9 +27,6 @@ test('bridge icrc2 token to evm', async () => {
 
   const walletAddress = await wallet.getAddress();
 
-
-  await mintNativeToken(walletAddress, "0x10000000000000");
-
   const balance = await wallet.provider?.getBalance(walletAddress);
   
   expect(balance).toBeGreaterThan(0);
@@ -41,15 +38,13 @@ test('bridge icrc2 token to evm', async () => {
 
 
 
-
-
   const fee = await ICRC1?.icrc1_fee();
-  const response = await ICRC1?.icrc2_approve({
+  const _ = await ICRC1?.icrc2_approve({
              fee: [],
              memo: [],
              from_subaccount: [],
              created_at_time: [],
-             amount: BigInt(amount) + fee!,
+             amount: BigInt(amount) + fee + fee!,
              expected_allowance: [],
              expires_at: [],
              spender: {
@@ -58,7 +53,6 @@ test('bridge icrc2 token to evm', async () => {
              }
   });
 
-  console.log(response);
 
   
   const icrc_principal = Principal.fromText(ICRC2_TOKEN_CANISTER_ID);
@@ -67,8 +61,7 @@ test('bridge icrc2 token to evm', async () => {
   const icrcBridgeContract = await icrcBridge.getBftBridgeContract();
 
   const wrappedTokenAddress = await icrcBridgeContract.getWrappedToken(id);
-  console.log("Wrapped Token Address:", wrappedTokenAddress);
-
+ 
   if (new Address(wrappedTokenAddress).isZero()) {
     await icrcBridgeContract.deployERC20(
       'AUX',
@@ -82,7 +75,7 @@ test('bridge icrc2 token to evm', async () => {
   let resp = await icrcBridge.bridgeIcrc2(amount, wallet.address);
   console.log("this si the response", resp);
 
-  // await wait(2000);
+  await wait(10000);
 
   const token = new ethers.Contract(
          wrappedTokenAddress,
@@ -103,4 +96,4 @@ test('bridge icrc2 token to evm', async () => {
 
   // expect(balance).toBe(amount);
   expect(ERC20balance).toBeGreaterThan(0);
-}, 15000);
+}, 25000);

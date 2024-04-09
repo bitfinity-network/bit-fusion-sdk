@@ -83,6 +83,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
+
 dfx deploy icrc2-minter  --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
@@ -102,11 +103,14 @@ dfx deploy spender --argument "(principal \"$ICRC2_MINTER\")"
 
 start_icx
 
+
+
 ########## Deploy BFT and ICRC2 contracts ##########
 
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
 ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
 ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+TEST_WALLET="0x0950f5Fb5d0feeb0BD56351A66179F4fB2e3419f"
 
 res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
 res=${res#*\"}
@@ -116,6 +120,8 @@ echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
 
 echo "Minting ETH tokens for ICRC2 Minter canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
+dfx canister call evm_testnet mint_native_tokens "(\"${TEST_WALLET}\", \"1000000000000000000\")"
+
 
 ICRC2_BRIDGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$ICRC2_MINTER_ECDSA_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "ICRC2 bridge contract address: $ICRC2_BRIDGE_CONTRACT_ADDRESS"
