@@ -20,7 +20,7 @@
     "build-fast": "tsup src/index.ts --format cjs,esm",
     "build": "yarn build-fast -- --dts-resolve",
     "dev": "tsup src/index.ts --format cjs,esm --watch -- --dts-resolve",
-    "test": "vitest run",
+    "test": "bash ./scripts/set_env.sh && vitest run",
     "prepublishOnly": "yarn build"
   },
   "license": "MIT",
@@ -51,10 +51,11 @@
     "@dfinity/identity-secp256k1": "^1.2.0",
     "@dfinity/principal": "^1.2.0",
     "@particle-network/btc-connectkit": "^1.0.0-alpha.17",
-    "viem": "2.x",
     "bip39": "^3.1.0",
     "dotenv": "^16.4.5",
     "hdkey": "^2.1.0",
+    "viem": "2.x",
+    "web3-utils": "^4.2.2",
     "web3-validator": "^2.0.5"
   }
 }

@@ -9,13 +9,13 @@ import {
 } from './constants';
 import { createAgent, generateOperationId } from './tests/utils';
 import { Address, Id256, Id256Factory } from './validation';
-// import BftBridgeABI from './abi/BFTBridge';
-// import WrappedTokenABI from './abi/WrappedToken';
+import BftBridgeABI from './abi/BFTBridge';
+import WrappedTokenABI from './abi/WrappedToken';
 import { Icrc1IdlFactory } from './ic';
 import canisters from '../../.dfx/local/canister_ids.json';
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Icrc2Burn } from './canisters/icrc2-minter/icrc2-minter.did';
-// import BftBridgeJ from './abi/BFTBridge.json';
+import { numberToHex } from 'viem';
 
 export interface IcrcBridgeOptions {
   wallet: ethers.Signer;
@@ -24,41 +24,36 @@ export interface IcrcBridgeOptions {
 }
 
 export class IcrcBridge {
-  icrc2Minter: typeof ICRC2Minter;
-  infinityWallet: any;
+  icrc2Minter: any;
+  //infinityWallet: any;
   wallet: ethers.Signer;
 
   constructor({ wallet }: IcrcBridgeOptions) {
     this.wallet = wallet;
-
-    console.log('ICRC2_MINTER_CANISTER_ID:', ICRC2_MINTER_CANISTER_ID);
-
-    this.icrc2Minter = createICRC1Actor(
-      Principal.fromText(ICRC2_TOKEN_CANISTER_ID)
-    );
+   }
 
     // if (window != undefined) {
     //   this.infinityWallet = (window as any).ic?.infinityWallet;
     // }
-  }
 
-  // async getBftBridgeContract() {
-  //   const [bridgeAddress] = await this.icrc2Minter.get_bft_bridge_contract();
 
-  //   if (!bridgeAddress) {
-  //     throw new Error('bridge address not found');
-  //   }
+  async getBftBridgeContract() {
+     const [bridgeAddress] = await ICRC2Minter.get_bft_bridge_contract();
 
-  //   if (new Address(bridgeAddress).isZero()) {
-  //     throw new Error('bridge contract not deployed');
-  //   }
+     if (!bridgeAddress) {
+       throw new Error('bridge address not found');
+     }
 
-  //   return new ethers.Contract(
-  //     bridgeAddress,
-  //     BftBridgeJ.abi,
-  //     this.wallet.provider
-  //   );
-  // }
+     if (new Address(bridgeAddress).isZero()) {
+       throw new Error('bridge contract not deployed');
+     }
+
+     return new ethers.Contract(
+       bridgeAddress,
+       BftBridgeABI,
+       this.wallet
+     );
+   }
 
   // async getWrappedTokenBalance() {
   //   const wrappedTokenContract = await this.getWrappedTokenContract();
@@ -97,27 +92,25 @@ export class IcrcBridge {
   //   }
   // }
 
-  // async bridgeIcrc2(amount: bigint, recipient: string) {
-  //   const Icrc2Burn: Icrc2Burn = {
-  //     operation_id: generateOperationId(),
-  //     from_subaccount: [],
-  //     icrc2_token_principal: Principal.fromText(ICRC2_TOKEN_CANISTER_ID),
-  //     recipient_address: recipient,
-  //     amount: amount.toString()
-  //   };
+   async bridgeIcrc2(amount: bigint, recipient: string) {
+     const Icrc2Burn: Icrc2Burn = {
+       operation_id: generateOperationId(),
+       from_subaccount: [],
+       icrc2_token_principal: Principal.fromText(ICRC2_TOKEN_CANISTER_ID),
+       recipient_address: recipient,
+       amount: numberToHex(amount)
+     };
 
-  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  //   const onApproveTxSucess = async (res: any) => {
-  //     console.log('approve icrc2 token res:', res);
+  
+    const burnResponse = await ICRC2Minter.burn_icrc2(Icrc2Burn);
 
-  //     if ('Ok' in res) {
-  //       const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
-
-  //       if ('Err' in burnResponse) {
-  //         throw new Error(
-  //           `icrc1 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
-  //         );
-  //       }
+    if ('Err' in burnResponse) {
+      throw new Error(
+        `icrc1 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
+      );
+    }
+    return burnResponse;
+    }
 
   //       const wrappedToken = await this.getWrappedTokenContract();
 
@@ -183,6 +176,6 @@ export class IcrcBridge {
 
   //       await this.infinityWallet.branchTransactions([APPROVE_TX]);
   //     }
-  //   };
-  // }
-}
+     };
+  
+

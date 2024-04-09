@@ -19,6 +19,7 @@ export const createAgent = () => {
     identity
   });
 
+
   return agent;
 };
 
@@ -44,7 +45,8 @@ export const generateEthWallet = () => {
   const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
   const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-  return new ethers.Wallet(wallet.signingKey.privateKey, provider);
+  return wallet.connect(provider);
+
 };
 
 export const getContract = (address: string, abi: any) => {
@@ -56,3 +58,26 @@ export const getContract = (address: string, abi: any) => {
 export const wait = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
+
+
+// Function to mint tokens
+export async function mintNativeToken(toAddress: string, amount: string) {
+  const response = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "67",
+      method: "ic_mintNativeToken",
+      params: [toAddress, amount],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
