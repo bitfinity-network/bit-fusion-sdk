@@ -387,6 +387,8 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
         operation_id: u32,
+        approve_spender: H160,
+        approve_amount: U256,
     ) -> Result<u32> {
         self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
             .await?;
@@ -397,6 +399,8 @@ pub trait TestContext {
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
             operation_id,
+            approve_spender,
+            approve_amount,
         };
 
         Ok(self.minter_client(caller).burn_icrc2(reason).await??)

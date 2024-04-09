@@ -11,7 +11,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
@@ -77,9 +77,7 @@ impl EvmMinter {
         {
             let scheduler = get_scheduler();
             let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.set_failed_task_callback(|task, error| {
-                log::error!("task failed: {task:?}, error: {error:?}")
-            });
+            borrowed_scheduller.on_completion_callback(log_task_execution_error);
             borrowed_scheduller.append_tasks(tasks);
         }
 
@@ -184,8 +182,26 @@ impl Metrics for EvmMinter {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
+fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
+    match task.status() {
+        TaskStatus::Failed {
+            timestamp_secs,
+            error,
+        } => {
+            log::error!(
+                "task #{} execution failed: {error} at {timestamp_secs}",
+                task.id()
+            )
+        }
+        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
+            log::error!("task #{} panicked at {timestamp_secs}", task.id())
+        }
+        _ => (),
+    };
+}
 
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();

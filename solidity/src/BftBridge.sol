@@ -151,7 +151,9 @@ contract BFTBridge {
         uint32 operationID,
         bytes32 name,
         bytes16 symbol,
-        uint8 decimals
+        uint8 decimals,
+        address approveSpender,
+        uint256 approveAmount
     );
 
     // Event for new wrapped token creation
@@ -202,7 +204,7 @@ contract BFTBridge {
             "toToken address should be specified correctly"
         );
 
-        // Check the Token limits
+        // Update token's metadata
         WrappedToken(toToken).setMetaData(
             order.name,
             order.symbol,
@@ -249,7 +251,9 @@ contract BFTBridge {
     function burn(
         uint256 amount,
         address fromERC20,
-        bytes memory recipientID
+        bytes memory recipientID,
+        address approveSpender,
+        uint256 approveAmount
     ) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
 
@@ -260,26 +264,16 @@ contract BFTBridge {
         require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
 
-        RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-        _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
-        _lastUserDeposit[msg.sender] = increment(buffer);
+        // Update user information about burn operations.
+        // Additional scope required to save stack space and avoid StackTooDeep error.
+        {
+            RingBuffer memory buffer = _lastUserDeposit[msg.sender];
+            _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
+            _lastUserDeposit[msg.sender] = increment(buffer);
+        }
 
         // get the token details
-        bytes32 name;
-        bytes16 symbol;
-        uint8 decimals;
-
-        try IERC20Metadata(fromERC20).name() returns (string memory _name) {
-            name = truncateUTF8(_name);
-        } catch {}
-        try IERC20Metadata(fromERC20).symbol() returns (
-            string memory _symbol
-        ) {
-            symbol = bytes16(truncateUTF8(_symbol));
-        } catch {}
-        try IERC20Metadata(fromERC20).decimals() returns (uint8 _decimals) {
-            decimals = _decimals;
-        } catch {}
+        TokenMetadata memory meta = getTokenMetadata(fromERC20);
 
         uint32 operationID = operationIDCounter++;
 
@@ -290,12 +284,35 @@ contract BFTBridge {
             recipientID,
             toTokenID,
             operationID,
-            name,
-            symbol,
-            decimals
+            meta.name,
+            meta.symbol,
+            meta.decimals,
+            approveSpender,
+            approveAmount
         );
 
         return operationID;
+    }
+
+    struct TokenMetadata {
+        bytes32 name;
+        bytes16 symbol;
+        uint8 decimals;
+    }
+
+    // tries to query token metadata
+    function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
+        try IERC20Metadata(token).name() returns (string memory _name) {
+            meta.name = truncateUTF8(_name);
+        } catch {}
+        try IERC20Metadata(token).symbol() returns (
+            string memory _symbol
+        ) {
+            meta.symbol = bytes16(truncateUTF8(_symbol));
+        } catch {}
+        try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
+            meta.decimals = _decimals;
+        } catch {}
     }
 
     // Getter function for minter address

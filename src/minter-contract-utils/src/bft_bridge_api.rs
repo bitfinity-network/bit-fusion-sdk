@@ -271,6 +271,8 @@ pub struct BurntEventData {
     pub name: Vec<u8>,
     pub symbol: Vec<u8>,
     pub decimals: u8,
+    pub approve_spender: did::H160,
+    pub approve_amount: did::U256,
 }
 
 /// Builds `BurntEventData` from tokens.
@@ -281,10 +283,12 @@ struct BurntEventDataBuilder {
     pub from_erc20: Option<H160>,
     pub recipient_id: Option<Vec<u8>>,
     pub to_token: Option<Vec<u8>>,
-    operation_id: Option<u32>,
+    pub operation_id: Option<u32>,
     pub name: Option<Vec<u8>>,
     pub symbol: Option<Vec<u8>>,
     pub decimals: Option<u8>,
+    pub approve_spender: Option<H160>,
+    pub approve_amount: Option<U256>,
 }
 
 impl BurntEventDataBuilder {
@@ -306,6 +310,14 @@ impl BurntEventDataBuilder {
             name: self.name.ok_or_else(not_found("name"))?,
             symbol: self.symbol.ok_or_else(not_found("symbol"))?,
             decimals: self.decimals.ok_or_else(not_found("decimals"))?,
+            approve_spender: self
+                .approve_spender
+                .ok_or_else(not_found("approveSpender"))?
+                .into(),
+            approve_amount: self
+                .approve_amount
+                .ok_or_else(not_found("approveAmount"))?
+                .into(),
         })
     }
 
@@ -320,6 +332,8 @@ impl BurntEventDataBuilder {
             "name" => self.name = value.into_fixed_bytes(),
             "symbol" => self.symbol = value.into_fixed_bytes(),
             "decimals" => self.decimals = value.into_uint().map(|v| v.as_u32() as _),
+            "approveSpender" => self.approve_spender = value.into_address(),
+            "approveAmount" => self.approve_amount = value.into_uint(),
             _ => {}
         };
         self
@@ -540,6 +554,8 @@ mod tests {
         let name = vec![4; 32];
         let symbol = vec![5; 32];
         let decimals = 6u8.into();
+        let approve_spender = H160::from_slice(&[6; 20]);
+        let approve_amount = 1000.into();
 
         let event = BurntEventDataBuilder::default()
             .with_field_from_token("sender", Token::Address(sender.0))
@@ -551,6 +567,8 @@ mod tests {
             .with_field_from_token("name", Token::FixedBytes(name.clone()))
             .with_field_from_token("symbol", Token::FixedBytes(symbol.clone()))
             .with_field_from_token("decimals", Token::Uint(decimals))
+            .with_field_from_token("approveSpender", Token::Address(approve_spender.0))
+            .with_field_from_token("approveAmount", Token::Uint(approve_amount))
             .build()
             .unwrap();
 
@@ -563,6 +581,8 @@ mod tests {
         assert_eq!(event.name, name);
         assert_eq!(event.symbol, symbol);
         assert_eq!(event.decimals, decimals.as_u32() as u8);
+        assert_eq!(event.approve_spender, approve_spender);
+        assert_eq!(event.approve_amount.0, approve_amount);
     }
 
     #[test]

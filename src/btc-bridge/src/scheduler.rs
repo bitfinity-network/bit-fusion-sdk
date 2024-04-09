@@ -8,7 +8,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::canister::get_state;
 
 pub type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
 
 pub type PersistentScheduler = Scheduler<BtcTask, TasksStorage>;
 

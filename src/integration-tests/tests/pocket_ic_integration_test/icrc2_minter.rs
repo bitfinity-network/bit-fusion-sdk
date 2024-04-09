@@ -33,7 +33,14 @@ async fn test_icrc2_tokens_roundtrip() {
 
     println!("burning icrc tokens and creating mint order");
     let _operation_id = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, operation_id)
+        .burn_icrc2(
+            JOHN,
+            &john_wallet,
+            amount as _,
+            operation_id,
+            Default::default(),
+            Default::default(),
+        )
         .await
         .unwrap();
 

@@ -17,7 +17,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
@@ -131,9 +131,7 @@ impl MinterCanister {
         {
             let scheduler = get_scheduler();
             let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.set_failed_task_callback(|task, error| {
-                log::error!("task failed: {task:?}, error: {error:?}")
-            });
+            borrowed_scheduller.on_completion_callback(log_task_execution_error);
             borrowed_scheduller.append_task(Self::init_evm_info_task());
         }
 
@@ -381,6 +379,8 @@ impl MinterCanister {
                 decimals: token_info.decimals,
                 src_token: reason.icrc2_token_principal,
                 recipient_address: reason.recipient_address,
+                approve_spender: reason.approve_spender,
+                approve_amount: reason.approve_amount,
             })
             .into_scheduled(options),
         );
@@ -479,8 +479,26 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
+fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
+    match task.status() {
+        TaskStatus::Failed {
+            timestamp_secs,
+            error,
+        } => {
+            log::error!(
+                "task #{} execution failed: {error} at {timestamp_secs}",
+                task.id()
+            )
+        }
+        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
+            log::error!("task #{} panicked at {timestamp_secs}", task.id())
+        }
+        _ => (),
+    };
+}
 
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
