@@ -19,6 +19,8 @@ contract BFTBridge {
         bytes16 symbol;
         uint8 decimals;
         uint32 senderChainID;
+        address approveSpender;
+        uint256 approveAmount;
     }
 
     struct RingBuffer {
@@ -179,7 +181,7 @@ contract BFTBridge {
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
         MintOrderData memory order = _decodeAndValidateClaim(
-            encodedOrder[: 197]
+            encodedOrder[: 249]
         );
 
         _checkMintOrderSignature(encodedOrder);
@@ -381,6 +383,8 @@ contract BFTBridge {
         bytes32 name = bytes32(encodedOrder[148 : 180]);
         bytes16 symbol = bytes16(encodedOrder[180 : 196]);
         uint8 decimals = uint8(encodedOrder[196]);
+        address approveSpender = address(bytes20(encodedOrder[197 : 217]));
+        uint256 approveAmount = uint256(bytes32(encodedOrder[217 : 249]));
 
         // Assert recipient address is not zero
         require(recipient != address(0), "Invalid destination address");
@@ -413,7 +417,9 @@ contract BFTBridge {
             name,
             symbol,
             decimals,
-            senderChainId
+            senderChainId,
+            approveSpender,
+            approveAmount
         );
     }
 
@@ -422,10 +428,10 @@ contract BFTBridge {
         bytes calldata encodedOrder
     ) private view {
         // Create a hash of the order data
-        bytes32 hash = keccak256(encodedOrder[: 197]);
+        bytes32 hash = keccak256(encodedOrder[: 249]);
 
         // Recover signer from the signature
-        address signer = ECDSA.recover(hash, encodedOrder[197 :]);
+        address signer = ECDSA.recover(hash, encodedOrder[249 :]);
 
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
