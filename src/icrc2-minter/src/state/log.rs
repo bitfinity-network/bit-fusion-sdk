@@ -16,7 +16,7 @@ thread_local! {
         RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(LOG_SETTINGS_MEMORY_ID)), StorableLogSettings(LogSettings::default()))
         .expect("failed to initialize log settings cell"));
 
-    static LOGGER_CONFIG: RefCell<Option<LoggerConfig>> = RefCell::new(None);
+    static LOGGER_CONFIG: RefCell<Option<LoggerConfig>> = const { RefCell::new(None) };
 }
 
 #[derive(Debug, Clone)]
