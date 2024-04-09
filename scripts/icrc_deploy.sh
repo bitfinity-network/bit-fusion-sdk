@@ -16,7 +16,7 @@ start_icx() {
 CHAIN_ID=355113
 
 dfx stop
-dfx start --host 127.0.0.1:4943 --background --clean --enable-bitcoin 2> dfx_stderr.log
+dfx start --host 127.0.0.1:4943 --background --clean 2> dfx_stderr.log
 
 dfx identity new --force icrc-admin
 dfx identity use icrc-admin
@@ -86,9 +86,13 @@ dfx deploy evm_testnet --argument "(record {
 dfx deploy icrc2-minter  --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
-        ManagementCanister = record {
-            key_id = variant { Dfx };
+        Local = record {
+            private_key = blob \"\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\67\\01\";
         }
+    };
+    log_settings = opt record {
+        enable_console = true;
+        log_filter = opt \"trace\";
     };
     owner = principal \"$ADMIN_PRINCIPAL\";
     spender_principal = principal \"$SPENDER\";
