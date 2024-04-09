@@ -110,8 +110,11 @@ impl State {
                 }
             } else {
                 // All fees are covered; the rest are for inscriptions.
+                //
+                // Since we return `remaining_utxos` for inscriptions, there's
+                // no need to classify and store in state. They're subsequently
+                // marked `Spent` after the inscription transaction.
                 remaining_utxos.push(utxo.clone());
-                self.classify_utxo(&utxo, UtxoType::Inscription, Amount::from_sat(utxo.value));
             }
         }
 
