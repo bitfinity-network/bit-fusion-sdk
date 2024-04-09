@@ -10,7 +10,11 @@ export {
   createActor as createSpenderActor
 } from './canisters/spender';
 
-export { ICRC1, createActor as createICRC1Actor } from './canisters/icrc1';
+export {
+  ICRC1,
+  createActor as createICRC1Actor,
+  idlFactory as Icrc1IdlFactory
+} from './canisters/icrc1';
 
 export {
   BtcBridge as BtcBridgeActor,

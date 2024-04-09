@@ -41,7 +41,10 @@ export const generateOperationId = () => {
 };
 
 export const generateEthWallet = () => {
-  return ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
+  const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
+  const provider = new ethers.JsonRpcProvider(RPC_URL);
+
+  return new ethers.Wallet(wallet.signingKey.privateKey, provider);
 };
 
 export const getContract = (address: string, abi: any) => {
