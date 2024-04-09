@@ -38,18 +38,18 @@ pub(crate) struct UtxoManager {
     value: Amount,
 }
 
-/// Classification of UTXOs based on their purpose.
+/// Classification of a UTXO based on its purpose.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
 pub(crate) enum UtxoType {
-    /// UTXO earmarked for inscription.
+    /// Denotes a UTXO earmarked for inscription.
     Inscription,
-    /// UTXO used to pay for transaction fees
+    /// Denotes a UTXO used to pay for transaction fees
     #[default]
-    Fees,
-    /// UTXOs left after fees have been deducted
+    Fee,
+    /// Denotes a UTXO left after fees have been deducted
     Leftover,
-    /// Indicates UTXOs that have already been used in a
-    /// previous inscription
+    /// Denotes a UTXO that has already been used in a
+    /// previous inscription.
     Spent,
 }
 
@@ -99,12 +99,12 @@ impl State {
             if needed_for_fees > 0 && utxo.value <= needed_for_fees {
                 // This UTXO is entirely used for fees.
                 accumulated_for_fees += utxo.value;
-                self.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
+                self.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(utxo.value));
             } else if needed_for_fees > 0 {
                 // This UTXO covers the remaining fees and has leftovers.
                 accumulated_for_fees += needed_for_fees;
                 let leftover_value = utxo.value - needed_for_fees;
-                self.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(needed_for_fees));
+                self.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(needed_for_fees));
                 self.classify_utxo(&utxo, UtxoType::Leftover, Amount::from_sat(leftover_value));
             } else {
                 // All fees are covered; the rest are for inscriptions.
@@ -336,7 +336,7 @@ mod tests {
 
         let fetched_utxos = get_mock_utxos();
         for utxo in fetched_utxos.into_iter() {
-            state.classify_utxo(&utxo, UtxoType::Fees, Amount::from_sat(utxo.value));
+            state.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(utxo.value));
         }
 
         let txid_hex = hex::encode([0; 32]);
