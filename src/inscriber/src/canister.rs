@@ -162,8 +162,8 @@ impl Inscriber {
         generate_idl!()
     }
 
-    #[inline]
     /// Returns the derivation path to use for signing/verifying based on the caller principal or provided address.
+    #[inline]
     pub(crate) fn derivation_path(address: Option<H160>) -> Vec<Vec<u8>> {
         let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
 
@@ -173,8 +173,8 @@ impl Inscriber {
         }
     }
 
-    #[inline]
     /// Returns the parsed address given the string representation and the expected network.
+    #[inline]
     pub(crate) fn get_address(address: String, network: BitcoinNetwork) -> InscribeResult<Address> {
         Address::from_str(&address)
             .map_err(|_| InscribeError::BadAddress(address.clone()))?

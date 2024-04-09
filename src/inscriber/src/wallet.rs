@@ -22,7 +22,6 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
-use crate::constant::{DUMMY_BITCOIN_ADDRESS, DUMMY_BITCOIN_PUBKEY};
 use crate::state::{State, UtxoType};
 
 #[derive(Clone)]
@@ -101,6 +100,8 @@ impl CanisterWallet {
         inscription: String,
         multisig_config: Option<MultisigConfig>,
     ) -> InscribeResult<InscriptionFees> {
+        use crate::constant::{DUMMY_BITCOIN_ADDRESS, DUMMY_BITCOIN_PUBKEY};
+
         let ecdsa_signer = self.ecdsa_signer();
         let own_utxos = vec![OrdUtxo {
             id: Txid::all_zeros(),

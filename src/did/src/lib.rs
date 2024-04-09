@@ -9,8 +9,8 @@ pub use self::build_data::BuildData;
 
 pub type InscribeResult<T> = Result<T, InscribeError>;
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 /// The InscribeTransactions struct is used to return the commit and reveal transactions.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct InscribeTransactions {
     pub commit_tx: String,
     pub reveal_tx: String,
