@@ -167,6 +167,7 @@ start_icx
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
 ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
 ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+echo "ETH_WALLET: $ETH_WALLET"
 
 BTC_BRIDGE=$(dfx canister id btc-bridge)
 
@@ -249,7 +250,11 @@ sleep 5
 
 ########## Burn wrapped token and receive BTC to the current wallet ##########
 
+~/bitcoin-25.0/bin/bitcoin-cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" createwallet "default" &>1
+
 BTC_ADDRESS=$(~/bitcoin-25.0/bin/bitcoin-cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" getnewaddress)
+
+
 
 cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \

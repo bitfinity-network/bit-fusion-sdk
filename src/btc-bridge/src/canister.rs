@@ -137,6 +137,13 @@ impl BtcBridge {
         BtcTask::InitEvmState.into_scheduled(init_options)
     }
 
+    /// Returns bridge contract address for EVM.
+    /// If contract isn't initialized yet - returns None.
+    #[query]
+    pub fn get_bft_bridge_contract(&mut self) -> Option<H160> {
+        Some(get_state().borrow().bft_config.bridge_address.clone())
+    }
+
     /// Returns EVM address of the canister.
     #[update]
     pub async fn get_evm_address(&self) -> Option<H160> {
@@ -150,7 +157,7 @@ impl BtcBridge {
         }
     }
 
-    #[query]
+    #[update]
     pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
         let ck_btc_minter = get_state().borrow().ck_btc_minter();
         return virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)

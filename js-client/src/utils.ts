@@ -21,3 +21,9 @@ export const ethAddrToSubaccount = (ethAddr: string) => {
 
   return Uint8Array.from(y);
 };
+
+export const isBrowser = () => {
+  return (
+    typeof window !== 'undefined' && typeof window.document !== 'undefined'
+  );
+};

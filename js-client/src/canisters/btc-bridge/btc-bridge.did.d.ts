@@ -116,6 +116,7 @@ export interface Utxo {
 export interface _SERVICE {
   'admin_configure_bft_bridge' : ActorMethod<[BftBridgeConfig], undefined>,
   'btc_to_erc20' : ActorMethod<[string], Array<Result>>,
+  'get_bft_bridge_contract' : ActorMethod<[], [] | [string]>,
   'get_btc_address' : ActorMethod<[GetBtcAddressArgs], string>,
   'get_curr_metrics' : ActorMethod<[], MetricsData>,
   'get_evm_address' : ActorMethod<[], [] | [string]>,
