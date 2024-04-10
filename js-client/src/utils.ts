@@ -6,6 +6,8 @@ export const fromHexString = (hexString: string) =>
   );
 
 export const ethAddrToSubaccount = (ethAddr: string) => {
+  ethAddr = ethAddr.replace(/^0x/, '');
+
   const hex = fromHexString(ethAddr);
 
   const y = [];

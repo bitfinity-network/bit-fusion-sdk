@@ -5,6 +5,7 @@ import { idlFactory } from './btc-bridge.did.js';
 export { idlFactory } from './btc-bridge.did.js';
 
 export const canisterId = process.env.BTC_BRIDGE_CANISTER_ID;
+const host = process.env.IC_HOST;
 
 export const createActor = (canisterId, options = {}) => {
   const agent = options.agent || new HttpAgent({ ...options.agentOptions });
@@ -33,4 +34,6 @@ export const createActor = (canisterId, options = {}) => {
   });
 };
 
-export const BtcBridge = canisterId ? createActor(canisterId) : undefined;
+export const BtcBridge = canisterId
+  ? createActor(canisterId, host ? { agentOptions: { host } } : undefined)
+  : undefined;
