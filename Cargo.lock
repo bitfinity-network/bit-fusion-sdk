@@ -803,6 +803,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "brc20-bridge"
+version = "0.2.0"
+dependencies = [
+ "candid",
+ "ic-canister",
+ "ic-exports",
+ "ic-metrics 0.13.0",
+ "ic-storage",
+]
+
+[[package]]
 name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
