@@ -238,6 +238,9 @@ impl CanisterWallet {
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
         log::info!("Done");
 
+        // Clear the locked UTXO set
+        state.borrow_mut().reset_utxo_vault();
+
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
             reveal_tx: reveal_tx.txid().encode_hex(),
