@@ -54,7 +54,10 @@ export const getProvider = () => {
 };
 
 export const generateWallet = () => {
-  const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
+  // const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
+  const wallet = new ethers.Wallet(
+    '0xe96e898e18631ef63c31ae9349a332cced5075e04fd5bcf4e212b6ecea699ee3'
+  );
   const provider = getProvider();
 
   return wallet.connect(provider);
@@ -71,7 +74,7 @@ export const wait = (ms: number) => {
 };
 
 export const generateBitcoinToAddress = (address: string) => {
-  const command = `~/bitcoin-25.0/bin/bitcoin-cli -conf="\${PWD}/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 "${address}"`;
+  const command = `~/bitcoin-25.0/bin/bitcoin-cli -conf="/Users/andyosei/Desktop/projects/infinity_swap/ckERC20/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 "${address}"`;
 
   exec(command, (error, stdout, stderr) => {
     if (error) {

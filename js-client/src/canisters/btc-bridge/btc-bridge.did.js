@@ -127,6 +127,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'admin_configure_bft_bridge' : IDL.Func([BftBridgeConfig], [], []),
     'btc_to_erc20' : IDL.Func([IDL.Text], [IDL.Vec(Result)], []),
+    'get_bft_bridge_contract' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'get_btc_address' : IDL.Func([GetBtcAddressArgs], [IDL.Text], []),
     'get_curr_metrics' : IDL.Func([], [MetricsData], ['query']),
     'get_evm_address' : IDL.Func([], [IDL.Opt(IDL.Text)], []),

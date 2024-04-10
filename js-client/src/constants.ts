@@ -20,6 +20,9 @@ export const ICRC2_TOKEN_CANISTER_ID =
 export const BTC_BRIDGE_CANISTER_ID =
   process.env.BTC_BRIDGE_CANISTER_ID || canisters['btc-bridge'].local;
 
+export const CKBTC_TOKEN_CANISTER_ID =
+  process.env.CKBTC_TOKEN_CANISTER_ID || canisters.token.local;
+
 export const CK_BTC_CANISTER_ID =
   process.env.CK_BTC_CANISTER_ID || canisters['btc-bridge'].local;
 

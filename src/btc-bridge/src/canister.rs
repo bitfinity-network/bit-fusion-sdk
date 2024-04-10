@@ -157,7 +157,7 @@ impl BtcBridge {
         }
     }
 
-    #[query]
+    #[update]
     pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
         let ck_btc_minter = get_state().borrow().ck_btc_minter();
         return virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)

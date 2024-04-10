@@ -167,6 +167,7 @@ start_icx
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
 ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
 ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+echo "ETH_WALLET: $ETH_WALLET"
 
 BTC_BRIDGE=$(dfx canister id btc-bridge)
 
