@@ -32,7 +32,7 @@ pub struct InscriberConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub(crate) struct UtxoManager {
+struct UtxoManager {
     utxo: Utxo,
     purpose: UtxoType,
     value: Amount,
@@ -40,7 +40,7 @@ pub(crate) struct UtxoManager {
 
 /// Classification of a UTXO based on its purpose.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
-pub(crate) enum UtxoType {
+enum UtxoType {
     /// Denotes a UTXO earmarked for inscription.
     Inscription,
     /// Denotes a UTXO used to pay for transaction fees
@@ -170,7 +170,7 @@ impl State {
     }
 
     /// Removes UTXOs identified by `UtxoType`.
-    pub(crate) fn remove_utxos(&mut self, purpose: UtxoType) {
+    fn remove_utxos(&mut self, purpose: UtxoType) {
         self.utxos
             .retain(|utxo_manager| utxo_manager.purpose != purpose);
     }
