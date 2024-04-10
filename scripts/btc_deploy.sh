@@ -249,7 +249,11 @@ sleep 5
 
 ########## Burn wrapped token and receive BTC to the current wallet ##########
 
+~/bitcoin-25.0/bin/bitcoin-cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" createwallet "default" &>1
+
 BTC_ADDRESS=$(~/bitcoin-25.0/bin/bitcoin-cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" getnewaddress)
+
+
 
 cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \

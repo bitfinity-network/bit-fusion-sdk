@@ -2,8 +2,14 @@ import hdkey from 'hdkey';
 import { ethers } from 'ethers';
 import { mnemonicToSeed } from 'bip39';
 import { HttpAgent } from '@dfinity/agent';
+import { exec } from 'child_process';
 import { Secp256k1KeyIdentity } from '@dfinity/identity-secp256k1';
-import { IC_HOST, LOCAL_TEST_SEED_PHRASE, RPC_URL } from '../constants';
+import {
+  CHAIN_ID,
+  IC_HOST,
+  LOCAL_TEST_SEED_PHRASE,
+  RPC_URL
+} from '../constants';
 
 export const createAnnonAgent = () => {
   return new HttpAgent({
@@ -18,7 +24,6 @@ export const createAgent = () => {
     host: IC_HOST,
     identity
   });
-
 
   return agent;
 };
@@ -41,20 +46,42 @@ export const generateOperationId = () => {
   return uniqueId;
 };
 
-export const generateEthWallet = () => {
+export const getProvider = () => {
+  return new ethers.JsonRpcProvider(RPC_URL, {
+    name: 'Bitfinity',
+    chainId: CHAIN_ID
+  });
+};
+
+export const generateWallet = () => {
   const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
+  const provider = getProvider();
 
   return wallet.connect(provider);
-
 };
 
 export const getContract = (address: string, abi: any) => {
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
+  const provider = getProvider();
   const contract = new ethers.Contract(address, abi, provider);
   return contract;
 };
 
 export const wait = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const generateBitcoinToAddress = (address: string) => {
+  const command = `~/bitcoin-25.0/bin/bitcoin-cli -conf="\${PWD}/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 "${address}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`exec error: ${error}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`stderr: ${stderr}`);
+      return;
+    }
+    console.log(`stdout: ${stdout}`);
+  });
 };

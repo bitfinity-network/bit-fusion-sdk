@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import canisters from '../../.dfx/local/canister_ids.json';
 
-
 dotenv.config();
 
 export const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
@@ -12,14 +11,18 @@ export const LOCAL_TEST_SEED_PHRASE =
 
 export const IC_HOST = process.env.IC_HOST || 'http://127.0.0.1:4943';
 
-
 export const ICRC2_MINTER_CANISTER_ID =
   process.env.ICRC2_MINTER_CANISTER_ID || canisters['icrc2-minter'].local;
-
 
 export const ICRC2_TOKEN_CANISTER_ID =
   process.env.ICRC2_TOKEN_CANISTER_ID || canisters.token2.local;
 
-export const BTC_BRIDGE_CANISTER_ID = process.env.BTC_BRIDGE_CANISTER_ID || '';
+export const BTC_BRIDGE_CANISTER_ID =
+  process.env.BTC_BRIDGE_CANISTER_ID || canisters['btc-bridge'].local;
+
+export const CK_BTC_CANISTER_ID =
+  process.env.CK_BTC_CANISTER_ID || canisters['btc-bridge'].local;
+
+export const CHAIN_ID = 355113;
 
 export const IS_TEST = true;
