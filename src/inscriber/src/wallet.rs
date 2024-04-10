@@ -22,7 +22,7 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
-use crate::state::{State, UtxoType};
+use crate::state::State;
 
 #[derive(Clone)]
 pub struct EcdsaSigner {
@@ -139,6 +139,7 @@ impl CanisterWallet {
             commit_fee: commit_tx_result.commit_fee.to_sat(),
             reveal_fee: commit_tx_result.reveal_fee.to_sat(),
             postage: POSTAGE,
+            leftover_amount: commit_tx_result.leftover_amount.to_sat(),
         })
     }
 
@@ -233,19 +234,9 @@ impl CanisterWallet {
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&commit_tx)).await;
         log::info!("Done");
 
-        // Mark input UTXOs for commit_tx as `Spent`
-        // and remove them from locked UTXOs.
-        state.borrow_mut().mark_utxos_as_spent(&commit_tx);
-        state.borrow_mut().remove_utxos(UtxoType::Spent);
-
         log::info!("Sending the reveal transaction...");
         bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
         log::info!("Done");
-
-        // Mark input UTXOs for reveal_tx as `Spent`
-        // and remove them from locked UTXOs.
-        state.borrow_mut().mark_utxos_as_spent(&reveal_tx);
-        state.borrow_mut().remove_utxos(UtxoType::Spent);
 
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
@@ -285,8 +276,6 @@ impl CanisterWallet {
     }
 
     fn build_commit_transaction_inputs(&self, own_utxos: &[Utxo]) -> Vec<OrdUtxo> {
-        let total_spent = own_utxos.iter().map(|utxo| utxo.value).sum::<u64>();
-
         own_utxos
             .iter()
             .map(|utxo| OrdUtxo {
@@ -294,7 +283,7 @@ impl CanisterWallet {
                     Hash::from_slice(&utxo.outpoint.txid).expect("Failed to parse txid"),
                 ),
                 index: utxo.outpoint.vout,
-                amount: Amount::from_sat(total_spent),
+                amount: Amount::from_sat(utxo.value),
             })
             .collect()
     }

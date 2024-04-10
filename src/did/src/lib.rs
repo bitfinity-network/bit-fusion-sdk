@@ -57,9 +57,10 @@ impl From<jsonrpc_core::Error> for InscribeError {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, Default)]
 pub struct InscriptionFees {
     pub commit_fee: u64,
     pub reveal_fee: u64,
     pub postage: u64,
+    pub leftover_amount: u64,
 }
