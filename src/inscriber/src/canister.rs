@@ -7,7 +7,7 @@ use bitcoin::Address;
 use candid::Principal;
 use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
 use ethers_core::types::H160;
-use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_metrics::{Metrics, MetricsStorage};
 use serde_bytes::ByteBuf;
@@ -139,14 +139,6 @@ impl Inscriber {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
-    }
-
-    #[post_upgrade]
-    fn post_upgrade(&mut self) {
-        let config = ic_exports::ic_cdk::storage::stable_restore::<(InscriberConfig,)>()
-            .expect("Failed to read config from stable memory.")
-            .0;
-        self.init(config);
     }
 
     pub fn idl() -> Idl {

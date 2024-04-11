@@ -1,9 +1,9 @@
 mod accessor;
-#[allow(unused)]
 mod build_data;
 pub mod canister;
 mod constant;
 pub mod http;
+pub mod memory;
 pub mod ops;
 pub mod state;
 pub mod wallet;

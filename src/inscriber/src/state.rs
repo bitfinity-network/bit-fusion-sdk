@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
@@ -5,11 +6,16 @@ use std::time::Duration;
 use bitcoin::Amount;
 use candid::{CandidType, Principal};
 use did::{InscribeError, InscribeResult, InscriptionFees};
+use evm_sdk_did::codec;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
+
+use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 thread_local! {
     pub(crate) static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
@@ -17,46 +23,40 @@ thread_local! {
     pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
 }
 
+type ConfigStorage = StableCell<InscriberConfig, VirtualMemory<DefaultMemoryImpl>>;
+
 /// State of the Inscriber
-#[derive(Default)]
 pub struct State {
-    config: InscriberConfig,
+    config: ConfigStorage,
     utxos: Vec<UtxoManager>,
 }
 
-/// Configuration at canister initialization
-#[derive(Debug, CandidType, Deserialize, Default)]
-pub struct InscriberConfig {
-    network: BitcoinNetwork,
-    logger: LogSettings,
-}
+impl Default for State {
+    fn default() -> Self {
+        let config = ConfigStorage::new(
+            MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)),
+            InscriberConfig::default(),
+        )
+        .expect("Failed to init storage for the Inscriber config");
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-struct UtxoManager {
-    utxo: Utxo,
-    purpose: UtxoType,
-    value: Amount,
-}
-
-/// Classification of a UTXO based on its purpose.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
-enum UtxoType {
-    /// Denotes a UTXO earmarked for inscription.
-    Inscription,
-    /// Denotes a UTXO used to pay for transaction fees
-    #[default]
-    Fee,
-    /// Denotes a UTXO left after fees have been deducted
-    Leftover,
+        Self {
+            config,
+            utxos: vec![],
+        }
+    }
 }
 
 impl State {
     /// Initializes the Inscriber's state with configuration information.
     pub(crate) fn configure(&mut self, config: InscriberConfig) {
         register_custom_getrandom();
+
         BITCOIN_NETWORK.with(|n| n.set(config.network));
+
         init_log(&config.logger).expect("Failed to initialize the logger");
 
+        let config = ConfigStorage::new(MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)), config)
+            .expect("Failed to init storage for the Inscriber config");
         self.config = config;
     }
 
@@ -178,6 +178,44 @@ impl State {
             log::warn!("UTXO not found for updating: {}", utxo_id);
         }
     }
+}
+
+/// Configuration at canister initialization
+#[derive(Debug, CandidType, Deserialize, Default)]
+pub struct InscriberConfig {
+    network: BitcoinNetwork,
+    logger: LogSettings,
+}
+
+impl Storable for InscriberConfig {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        codec::encode(&self).into()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
+        codec::decode(bytes.as_ref())
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+struct UtxoManager {
+    utxo: Utxo,
+    purpose: UtxoType,
+    value: Amount,
+}
+
+/// Classification of a UTXO based on its purpose.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
+enum UtxoType {
+    /// Denotes a UTXO earmarked for inscription.
+    Inscription,
+    /// Denotes a UTXO used to pay for transaction fees
+    #[default]
+    Fee,
+    /// Denotes a UTXO left after fees have been deducted
+    Leftover,
 }
 
 // In the following, we register a custom `getrandom` implementation because
