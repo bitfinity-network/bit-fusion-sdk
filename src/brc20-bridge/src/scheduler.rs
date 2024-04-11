@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::future::Future;
 use std::pin::Pin;
 
@@ -23,7 +22,7 @@ pub enum Brc20Task {
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
     MintErc20(H160),
-    MintBrc20(BurntEventData),
+    InscribeBrc20(BurntEventData),
 }
 
 impl Brc20Task {
@@ -113,7 +112,7 @@ impl Brc20Task {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = Brc20Task::MintBrc20(burnt);
+                let mint_order_task = Brc20Task::InscribeBrc20(burnt);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
@@ -153,9 +152,59 @@ impl Brc20Task {
 impl Task for Brc20Task {
     fn execute(
         &self,
-        _task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
+        task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
-        todo!()
+        match self {
+            Self::InitEvmState => Box::pin(Self::init_evm_state()),
+            Self::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
+            Self::RemoveMintOrder(data) => {
+                let data = data.clone();
+                Box::pin(async move { Self::remove_mint_order(data) })
+            }
+            Self::MintErc20(address) => {
+                let address = address.clone();
+                Box::pin(async move {
+                    let result = crate::ops::brc20_to_erc20(get_state(), address).await;
+
+                    log::info!("ERC20 mint result from scheduler: {result:?}");
+
+                    Ok(())
+                })
+            }
+            Self::InscribeBrc20(BurntEventData {
+                operation_id,
+                recipient_id,
+                amount,
+                ..
+            }) => {
+                log::info!("ERC20 burn event received");
+
+                let amount = amount.0.as_u64();
+                let operation_id = *operation_id;
+
+                let Ok(address) = String::from_utf8(recipient_id.clone()) else {
+                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
+                        "Failed to decode recipient address".to_string(),
+                    )));
+                };
+
+                Box::pin(async move {
+                    let result =
+                        crate::ops::burn_brc20(&get_state(), operation_id, &address, amount)
+                            .await
+                            .map_err(|err| {
+                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
+                            })?;
+
+                    log::info!(
+                        "Created withdrawal transaction at block {}",
+                        result.inscription_index
+                    );
+
+                    Ok(())
+                })
+            }
+        }
     }
 }
 
