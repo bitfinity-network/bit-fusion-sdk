@@ -48,7 +48,6 @@ enum UtxoType {
     Fee,
     /// Denotes a UTXO left after fees have been deducted
     Leftover,
-    Spent,
 }
 
 impl State {
