@@ -159,8 +159,9 @@ impl State {
     fn select_utxos(&self, purpose: UtxoType) -> Vec<&Utxo> {
         self.utxos
             .iter()
-            .filter(|utxo_manager| utxo_manager.purpose == purpose)
-            .map(|utxo_manager| &utxo_manager.utxo)
+            .filter_map(|utxo_manager| {
+                (utxo_manager.purpose == purpose).then_some(&utxo_manager.utxo)
+            })
             .collect()
     }
 
