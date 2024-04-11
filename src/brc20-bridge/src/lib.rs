@@ -1,6 +1,7 @@
 pub mod canister;
 pub mod constant;
 pub mod memory;
+pub mod scheduler;
 pub mod state;
 pub mod store;
 

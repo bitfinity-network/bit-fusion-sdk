@@ -12,13 +12,16 @@ export-api = []
 [dependencies]
 candid = { workspace = true }
 did = { workspace = true }
+ethers-core = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
+futures = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
+ic-task-scheduler = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
