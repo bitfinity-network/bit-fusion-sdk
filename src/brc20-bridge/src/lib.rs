@@ -1,4 +1,8 @@
 pub mod canister;
+pub mod constant;
+pub mod memory;
+pub mod state;
+pub mod store;
 
 use ic_metrics::Metrics;
 

@@ -11,7 +11,15 @@ export-api = []
 
 [dependencies]
 candid = { workspace = true }
+did = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }
+ic-log = { workspace = true }
 ic-metrics = { workspace = true }
+ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
+log = { workspace = true }
+minter-contract-utils = { path = "../minter-contract-utils" }
+minter-did = { workspace = true }
+serde = { workspace = true }

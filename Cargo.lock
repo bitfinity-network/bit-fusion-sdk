@@ -807,10 +807,18 @@ name = "brc20-bridge"
 version = "0.2.0"
 dependencies = [
  "candid",
+ "did",
+ "eth-signer",
  "ic-canister",
  "ic-exports",
+ "ic-log",
  "ic-metrics 0.13.0",
+ "ic-stable-structures 0.13.0",
  "ic-storage",
+ "log",
+ "minter-contract-utils",
+ "minter-did",
+ "serde",
 ]
 
 [[package]]

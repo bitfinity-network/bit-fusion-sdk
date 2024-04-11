@@ -5,6 +5,8 @@ use candid::Principal;
 use ic_canister::{generate_idl, init, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 
+use crate::state::State;
+
 #[derive(Canister, Clone, Debug)]
 pub struct Brc20Bridge {
     #[id]
@@ -29,4 +31,12 @@ impl Metrics for Brc20Bridge {
         use ic_storage::IcStorage;
         MetricsStorage::get()
     }
+}
+
+thread_local! {
+    pub static STATE: Rc<RefCell<State>> = Rc::default();
+}
+
+pub fn get_state() -> Rc<RefCell<State>> {
+    STATE.with(|state| state.clone())
 }
