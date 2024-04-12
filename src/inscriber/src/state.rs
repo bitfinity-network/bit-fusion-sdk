@@ -1,24 +1,20 @@
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::Duration;
 
 use bitcoin::Amount;
-use candid::{CandidType, Principal};
+use candid::CandidType;
 use did::{InscribeError, InscribeResult, InscriptionFees};
 use evm_sdk_did::codec;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
-use rand::rngs::StdRng;
-use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 thread_local! {
-    pub(crate) static RNG: RefCell<Option<StdRng>> = const { RefCell::new(None) };
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
     pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
 }
@@ -49,7 +45,8 @@ impl Default for State {
 impl State {
     /// Initializes the Inscriber's state with configuration information.
     pub(crate) fn configure(&mut self, config: InscriberConfig) {
-        register_custom_getrandom();
+        #[cfg(target_family = "wasm")]
+        custom_getrandom_impl::register_custom_getrandom();
 
         BITCOIN_NETWORK.with(|n| n.set(config.network));
 
@@ -218,30 +215,24 @@ enum UtxoType {
     Leftover,
 }
 
-// In the following, we register a custom `getrandom` implementation because
-// otherwise `getrandom` (which is an indirect dependency of `bitcoin`) fails to compile.
-// This is necessary because `getrandom` by default fails to compile for the
-// `wasm32-unknown-unknown` target (which is required for deploying a canister).
-fn register_custom_getrandom() {
-    ic_exports::ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-        ic_exports::ic_cdk::spawn(set_rand())
-    });
-    getrandom::register_custom_getrandom!(custom_rand);
-}
+// // In the following, we register a custom `getrandom` implementation because
+// // otherwise `getrandom` (which is an indirect dependency of `bitcoin`) fails to compile.
+// // This is necessary because `getrandom` by default fails to compile for the
+// // `wasm32-unknown-unknown` target (which is required for deploying a canister).
 
-fn custom_rand(buf: &mut [u8]) -> Result<(), getrandom::Error> {
-    RNG.with(|rng| rng.borrow_mut().as_mut().unwrap().fill_bytes(buf));
-    Ok(())
-}
-
-async fn set_rand() {
-    let (seed,) = ic_exports::ic_cdk::call(Principal::management_canister(), "raw_rand", ())
-        .await
-        .unwrap();
-    RNG.with(|rng| {
-        *rng.borrow_mut() = Some(StdRng::from_seed(seed));
-        log::debug!("rng: {:?}", *rng.borrow());
-    });
+#[cfg(all(
+    target_family = "wasm",
+    target_vendor = "unknown",
+    target_os = "unknown"
+))]
+mod custom_getrandom_impl {
+    pub fn register_custom_getrandom() {
+        getrandom::register_custom_getrandom!(always_fail);
+    }
+    /// A getrandom implementation that always fails
+    fn always_fail(_buf: &mut [u8]) -> Result<(), getrandom::Error> {
+        Err(getrandom::Error::UNSUPPORTED)
+    }
 }
 
 #[cfg(test)]
