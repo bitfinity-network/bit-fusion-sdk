@@ -75,6 +75,9 @@ pub enum Erc20MintError {
     Evm(String),
     /// The inscription (BRC20) received is invalid.
     InvalidBrc20,
+    /// The BRC20's amount is smaller than the fee. The transaction will not
+    /// be precessed.
+    ValueTooSmall,
     /// Error while signing the mint order.
     Sign(String),
     /// No pending mint transactions.
