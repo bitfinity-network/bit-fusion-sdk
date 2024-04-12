@@ -4,10 +4,19 @@ import { Principal } from '@dfinity/principal';
 
 import { BtcBridgeActor } from './ic';
 import { BTC_BRIDGE_CANISTER_ID } from './constants';
-import { ethAddrToSubaccount } from './utils';
+import { encodeBtcAddress, ethAddrToSubaccount } from './utils';
 import WrappedTokenABI from './abi/WrappedToken';
+import BFTBridgeABI from './abi/BFTBridge';
+import { wait } from './tests/utils';
+
+type EthAddr = `0x${string}`;
 
 export class BtcBridge {
+  protected BTC_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS as EthAddr;
+  protected BFT_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS as EthAddr;
+  protected TOKEN_WRAPPED_ADDRESS = process.env
+    .BITCOIN_TOKEN_WRAPPED_ADDRESS as EthAddr;
+
   constructor(
     protected btc: BtcConnector,
     protected eth: EthConnector
@@ -19,16 +28,24 @@ export class BtcBridge {
     return ethAddress;
   }
 
-  async getWrappedTokenContract() {
+  getWrappedTokenContract() {
     return getContract({
-      address: process.env.BITCOIN_TOKEN_WRAPPED_ADDRESS as `0x${string}`,
+      address: this.TOKEN_WRAPPED_ADDRESS,
       abi: WrappedTokenABI,
       client: this.eth
     });
   }
 
+  getBftBridgeContract() {
+    return getContract({
+      address: this.BFT_ETH_ADDRESS,
+      abi: BFTBridgeABI,
+      client: this.eth
+    });
+  }
+
   async getWrappedTokenBalance() {
-    const wrappedTokenContract = await this.getWrappedTokenContract();
+    const wrappedTokenContract = this.getWrappedTokenContract();
 
     const ethAddress = await this.getAddress();
 
@@ -46,5 +63,21 @@ export class BtcBridge {
     await this.btc.sendBitcoin(btcAddress, satoshis);
 
     return await BtcBridgeActor.btc_to_erc20(ethAddress);
+  }
+
+  async bridgeEVMc(address: string, satoshis: number) {
+    const wrappedTokenContract = this.getWrappedTokenContract();
+
+    await wrappedTokenContract.write.approve([this.BFT_ETH_ADDRESS, satoshis]);
+
+    await wait(10000);
+
+    const bftBridgeContract = this.getBftBridgeContract();
+
+    await bftBridgeContract.write.burn([
+      satoshis,
+      this.TOKEN_WRAPPED_ADDRESS,
+      `0x${encodeBtcAddress(address)}`
+    ]);
   }
 }

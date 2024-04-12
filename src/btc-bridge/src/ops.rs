@@ -273,6 +273,12 @@ async fn send_mint_order(
         .await
         .map_err(|err| Erc20MintError::Evm(format!("{err:?}")))?;
 
+    state.borrow_mut().update_evm_params(|p| {
+        if let Some(params) = p.as_mut() {
+            params.nonce += 1;
+        }
+    });
+
     log::trace!("Mint transaction sent");
 
     Ok(id.into())

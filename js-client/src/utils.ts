@@ -1,4 +1,4 @@
-// TODO: probably move to validation.ts
+import { Buffer } from 'buffer';
 
 export const fromHexString = (hexString: string) =>
   Uint8Array.from(
@@ -20,6 +20,10 @@ export const ethAddrToSubaccount = (ethAddr: string) => {
   }
 
   return Uint8Array.from(y);
+};
+
+export const encodeBtcAddress = (address: string) => {
+  return Buffer.from(address, 'utf8').toString('hex');
 };
 
 export const isBrowser = () => {

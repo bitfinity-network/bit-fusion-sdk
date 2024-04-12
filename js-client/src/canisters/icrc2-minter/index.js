@@ -6,6 +6,7 @@ export { idlFactory } from './icrc2-minter.did.js';
 import { ICRC2_MINTER_CANISTER_ID } from '../../constants';
 
 const canisterId = ICRC2_MINTER_CANISTER_ID;
+const host = process.env.IC_HOST;
 
 export const createActor = (canisterId, options = {}) => {
   const agent = options.agent || new HttpAgent({ ...options.agentOptions });
@@ -34,4 +35,6 @@ export const createActor = (canisterId, options = {}) => {
   });
 };
 
-export const ICRC2Minter = canisterId ? createActor(canisterId) : undefined;
+export const ICRC2Minter = canisterId
+  ? createActor(canisterId, host ? { agentOptions: { host } } : undefined)
+  : undefined;
