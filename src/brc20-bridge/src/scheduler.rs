@@ -98,6 +98,24 @@ impl Brc20Task {
         Ok(())
     }
 
+    fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
+        let state = get_state();
+        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
+            SchedulerError::TaskExecutionFailed(
+                "failed to decode sender id256 from minted event".into(),
+            )
+        })?;
+
+        state
+            .borrow_mut()
+            .mint_orders_mut()
+            .remove(sender_id, minted_event.nonce);
+
+        log::trace!("Mint order removed");
+
+        Ok(())
+    }
+
     fn task_by_log(log: Log) -> Option<ScheduledTask<Brc20Task>> {
         log::trace!("creating task from the log: {log:?}");
 
@@ -124,24 +142,6 @@ impl Brc20Task {
         }
 
         None
-    }
-
-    fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
-        let state = get_state();
-        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
-            SchedulerError::TaskExecutionFailed(
-                "failed to decode sender id256 from minted event".into(),
-            )
-        })?;
-
-        state
-            .borrow_mut()
-            .mint_orders_mut()
-            .remove(sender_id, minted_event.nonce);
-
-        log::trace!("Mint order removed");
-
-        Ok(())
     }
 
     pub fn into_scheduled(self, options: TaskOptions) -> ScheduledTask<Self> {
@@ -190,14 +190,14 @@ impl Task for Brc20Task {
 
                 Box::pin(async move {
                     let result =
-                        crate::ops::burn_brc20(&get_state(), operation_id, &address, amount)
+                        crate::ops::erc20_to_brc20(&get_state(), operation_id, &address, amount)
                             .await
                             .map_err(|err| {
                                 SchedulerError::TaskExecutionFailed(format!("{err:?}"))
                             })?;
 
                     log::info!(
-                        "Created withdrawal transaction at block {}",
+                        "Created inscription transaction at block {}",
                         result.inscription_index
                     );
 

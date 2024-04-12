@@ -134,11 +134,11 @@ impl State {
         &mut self.mint_orders
     }
 
-    pub fn burn_request_store(&self) -> &BurnRequestStore {
+    pub fn burn_requests(&self) -> &BurnRequestStore {
         &self.burn_requests
     }
 
-    pub fn burn_request_store_mut(&mut self) -> &mut BurnRequestStore {
+    pub fn burn_requests_mut(&mut self) -> &mut BurnRequestStore {
         &mut self.burn_requests
     }
 
