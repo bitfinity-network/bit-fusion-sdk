@@ -153,9 +153,7 @@ contract BFTBridge {
         uint32 operationID,
         bytes32 name,
         bytes16 symbol,
-        uint8 decimals,
-        address approveSpender,
-        uint256 approveAmount
+        uint8 decimals
     );
 
     // Event for new wrapped token creation
@@ -217,6 +215,16 @@ contract BFTBridge {
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
+        
+        if (order.approveSpender != address(0) && order.approveAmount != 0) {
+            WrappedToken(toToken).approveByOwner(
+                order.recipient,
+                order.approveSpender,
+                order.approveAmount
+            );
+        }
+
+
         // Emit event
         emit MintTokenEvent(
             order.amount,
@@ -253,9 +261,7 @@ contract BFTBridge {
     function burn(
         uint256 amount,
         address fromERC20,
-        bytes memory recipientID,
-        address approveSpender,
-        uint256 approveAmount
+        bytes memory recipientID
     ) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
 
@@ -288,9 +294,7 @@ contract BFTBridge {
             operationID,
             meta.name,
             meta.symbol,
-            meta.decimals,
-            approveSpender,
-            approveAmount
+            meta.decimals
         );
 
         return operationID;

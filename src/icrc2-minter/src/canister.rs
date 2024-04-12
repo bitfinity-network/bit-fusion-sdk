@@ -340,6 +340,17 @@ impl MinterCanister {
         let state = get_state();
         MinterCanister::burn_icrc2_inspect_message_check(&reason)?;
 
+        let (approve_spender, approve_amount) = if let Some(approval) = reason.approve_minted_tokens
+        {
+            approval
+                .check_signature(&caller, &reason.recipient_address)
+                .ok_or_else(|| Error::InvalidBurnOperation("invalid principal signature".into()))?;
+
+            (approval.approve_spender, approval.approve_amount)
+        } else {
+            Default::default()
+        };
+
         let caller_account = Account {
             owner: caller,
             subaccount: reason.from_subaccount,
@@ -369,6 +380,7 @@ impl MinterCanister {
                 secs: TASK_RETRY_DELAY_SECS,
             })
             .with_max_retries_policy(u32::MAX);
+
         get_scheduler().borrow_mut().append_task(
             BridgeTask::PrepareMintOrder(BurntIcrc2Data {
                 sender: caller,
@@ -379,8 +391,8 @@ impl MinterCanister {
                 decimals: token_info.decimals,
                 src_token: reason.icrc2_token_principal,
                 recipient_address: reason.recipient_address,
-                approve_spender: reason.approve_spender,
-                approve_amount: reason.approve_amount,
+                approve_spender,
+                approve_amount,
             })
             .into_scheduled(options),
         );
@@ -496,7 +508,9 @@ fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
         TaskStatus::TimeoutOrPanic { timestamp_secs } => {
             log::error!("task #{} panicked at {timestamp_secs}", task.id())
         }
-        _ => (),
+        status_change => {
+            log::trace!("task #{} status changed: {status_change:?}", task.id())
+        }
     };
 }
 

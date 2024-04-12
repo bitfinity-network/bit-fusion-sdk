@@ -423,8 +423,7 @@ impl BridgeUser {
             icrc2_token_principal: icrc2_token,
             recipient_address: self.address.clone(),
             operation_id: 0,
-            approve_spender: H160::zero(),
-            approve_amount: U256::zero(),
+            approve_minted_tokens: None,
         };
 
         log::trace!("Burning ICRC-2 tokens by {} user", self.name);

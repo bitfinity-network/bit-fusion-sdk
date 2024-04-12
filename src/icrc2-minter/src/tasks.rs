@@ -415,7 +415,7 @@ impl BridgeTask {
 
         transfer_result.map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?;
 
-        log::trace!("Finished icrc2 mint");
+        log::trace!("Finished icrc2 mint to principal: {}", recipient);
 
         Ok(())
     }

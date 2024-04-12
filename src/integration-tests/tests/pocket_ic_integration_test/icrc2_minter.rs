@@ -31,19 +31,13 @@ async fn test_icrc2_tokens_roundtrip() {
     let amount = 300_000u64;
     let operation_id = 42;
 
-    println!("burning icrc tokens and creating mint order");
+    eprintln!("burning icrc tokens and creating mint order");
     let _operation_id = ctx
-        .burn_icrc2(
-            JOHN,
-            &john_wallet,
-            amount as _,
-            operation_id,
-            Default::default(),
-            Default::default(),
-        )
+        .burn_icrc2(JOHN, &john_wallet, amount as _, operation_id, None)
         .await
         .unwrap();
 
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
@@ -52,6 +46,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
 
+    eprintln!("checking wrapped token balance");
     let wrapped_balance = ctx
         .check_erc20_balance(&wrapped_token, &john_wallet)
         .await
@@ -74,6 +69,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap()
         .0;
 
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;

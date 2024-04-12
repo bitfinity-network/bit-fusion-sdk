@@ -27,7 +27,7 @@ use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
-use minter_did::reason::Icrc2Burn;
+use minter_did::reason::{ApproveMintedTokens, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -387,8 +387,7 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
         operation_id: u32,
-        approve_spender: H160,
-        approve_amount: U256,
+        approve_minted_tokens: Option<ApproveMintedTokens>,
     ) -> Result<u32> {
         self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
             .await?;
@@ -399,8 +398,7 @@ pub trait TestContext {
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
             operation_id,
-            approve_spender,
-            approve_amount,
+            approve_minted_tokens,
         };
 
         Ok(self.minter_client(caller).burn_icrc2(reason).await??)
