@@ -9,8 +9,8 @@ pub use self::build_data::BuildData;
 
 pub type InscribeResult<T> = Result<T, InscribeError>;
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 /// The InscribeTransactions struct is used to return the commit and reveal transactions.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct InscribeTransactions {
     pub commit_tx: String,
     pub reveal_tx: String,
@@ -27,6 +27,10 @@ pub enum InscribeError {
     OrdError(String),
     #[error("failed to collect utxos: {0}")]
     FailedToCollectUtxos(String),
+    #[error("not enough UTXOs allocated for fees: {0}")]
+    InsufficientFundsForFees(String),
+    #[error("not enough UTXOs allocated for inscriptions: {0}")]
+    InsufficientFundsForInscriptions(String),
     #[error("signature error {0}")]
     SignatureError(String),
     #[error("request error: {0}")]
@@ -53,9 +57,10 @@ impl From<jsonrpc_core::Error> for InscribeError {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, Default)]
 pub struct InscriptionFees {
     pub commit_fee: u64,
     pub reveal_fee: u64,
     pub postage: u64,
+    pub leftover_amount: u64,
 }

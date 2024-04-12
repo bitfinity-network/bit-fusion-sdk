@@ -65,7 +65,7 @@ impl Inscription for InscriptionWrapper {
 }
 
 /// Type of digital artifact being inscribed.
-#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+#[derive(CandidType, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Protocol {
     Brc20,
     Nft,

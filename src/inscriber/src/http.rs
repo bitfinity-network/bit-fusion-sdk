@@ -11,18 +11,18 @@ mod rpc;
 
 pub use rpc::*;
 
-#[repr(u16)]
 /// An enumeration of HTTP status codes.
 ///
 /// This enum represents some common HTTP status codes as defined in RFC 7231.
+#[repr(u16)]
 pub enum HttpStatusCode {
     Ok = 200,
     BadRequest = 400,
     InternalServerError = 500,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
 /// A request received by the HTTP server.
+#[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct HttpRequest {
     /// The HTTP method string.
     pub method: Cow<'static, str>,

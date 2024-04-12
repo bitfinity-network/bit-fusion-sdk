@@ -6,7 +6,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 
 /// Returns the balance of the given bitcoin address.
 ///
-/// Relies on the `bitcoin_get_balance` endpoint.
+/// NOTE: Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
 pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
     IcBtc::bitcoin_get_balance(GetBalanceRequest {
@@ -21,7 +21,6 @@ pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64
 
 /// Fetches all UTXOs for the given address using pagination.
 ///
-/// Returns a vector of all UTXOs for the given Bitcoin address.
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
 pub(crate) async fn get_utxos(
@@ -75,9 +74,10 @@ pub(crate) async fn get_utxos(
 }
 
 /// Returns the 100 fee percentiles measured in millisatoshi/byte.
+///
 /// Percentiles are computed from the last 10,000 transactions (if available).
 ///
-/// Relies on the `bitcoin_get_current_fee_percentiles` endpoint.
+/// NOTE: Relies on the `bitcoin_get_current_fee_percentiles` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_current_fee_percentiles
 pub(crate) async fn get_current_fee_percentiles(
     network: BitcoinNetwork,
@@ -90,7 +90,7 @@ pub(crate) async fn get_current_fee_percentiles(
 
 /// Sends a (signed) transaction to the bitcoin network.
 ///
-/// Relies on the `bitcoin_send_transaction` endpoint.
+/// NOTE: Relies on the `bitcoin_send_transaction` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_send_transaction
 pub(crate) async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
     IcBtc::bitcoin_send_transaction(SendTransactionRequest {

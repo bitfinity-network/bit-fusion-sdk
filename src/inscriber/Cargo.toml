@@ -14,10 +14,13 @@ bs58 = { workspace = true }
 candid = { workspace = true }
 did = { path = "../did" }
 ethers-core = { workspace = true }
+evm-sdk-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }
+ic-log = { workspace = true }
 ic-metrics = { workspace = true }
+ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }

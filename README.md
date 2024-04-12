@@ -20,7 +20,7 @@ After installing Rust, add the `wasm32` target via:
 rustup target add wasm32-unknown-unknown # Required for building IC canisters
 ```
 
-### Step 1: Init, Build, and Deploy
+### Init, Build, and Deploy
 
 ```bash
 ./run.sh
@@ -28,7 +28,25 @@ rustup target add wasm32-unknown-unknown # Required for building IC canisters
 
 The above command will start the Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode, and then build and deploy the canister. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
 
-### Step 2: Generate a Bitcoin Address for the Canister
+Aternatively, you may want to monitor execution logs, specifically from the IC's BTC-Integration canister. In that case, proceed as thus:
+
+First, execute the following commands in a separate terminal:
+
+```bash
+./scripts/init.sh
+./scripts/build.sh
+dfx start --clean --enable-bitcoin 2>&1 | grep -v "\[Canister g4xu7-jiaaa-aaaan-aaaaq-cai\]"
+```
+
+Then, execute the following in your "main" terminal:
+
+```bash
+./scripts/deploy.sh init
+```
+
+The canister is now deployed. You can interact with it.
+
+### Endpoint: Generate a Bitcoin Address for the Canister
 
 Bitcoin has different types of addresses (e.g. P2PKH, P2SH). Most of these addresses can be generated from an ECDSA public key. Currently, you can generate the native segwit address type (`P2WPKH`) via the following command:
 
@@ -38,7 +56,7 @@ dfx canister call inscriber get_bitcoin_address
 
 The above command will generate a unique Bitcoin address from the ECDSA public key of the canister.
 
-### Step 3: Send bitcoins to Canister's Bitcoin Address
+### Send bitcoins to Canister's Bitcoin Address
 
 Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions. To avoid UTXO clogging, and since the Bitcoin daemon already generates enough blocks when it starts, generate only 1 additional block and effectively reward the canister wallet with about `5 BTC`. Run the following command:
 
@@ -48,7 +66,21 @@ docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 1
 
 Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_bitcoin_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
 
-### Step 4: Check the Canister's bitcoin Balance
+### Endpoint: Get Inscription Fees
+
+To get the current fees for making a BRC-20 inscription, you can execute the following call:
+
+```bash
+dfx canister call inscriber get_inscription_fees '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null)'
+```
+
+To get the current fees for making an Ordinal (NFT) inscription, you can execute the following call:
+
+```bash
+dfx canister call inscriber get_inscription_fees '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", null)'
+```
+
+### Endpoint: Check the Canister's bitcoin Balance
 
 You can check a Bitcoin address's balance by using the `get_balance` endpoint on the canister via:
 
@@ -56,7 +88,7 @@ You can check a Bitcoin address's balance by using the `get_balance` endpoint on
 dfx canister call inscriber get_balance '("BITCOIN-ADDRESS")'
 ```
 
-### Step 5: Retrieve UTXOs for Canister's (or any Bitcoin) Address
+### Endpoint: Retrieve UTXOs for Canister's (or any Bitcoin) Address
 
 You can get a Bitcoin address's UTXOs by using the `get_utxos` endpoint on the canister via:
 
@@ -66,7 +98,7 @@ dfx canister call inscriber get_utxos '("BITCOIN-ADDRESS")'
 
 Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance) API.
 
-### Step 6: Inscribe and Send a Sat
+### Endpoint: Inscribe and Send a Sat
 
 To make an Ordinal (NFT) inscription, for example, you can call the canister's `inscribe` endpoint via:
 
@@ -120,9 +152,9 @@ pub async fn inscribe(
 
 which is why the above calls has `null` arguments for the `dst_address` and `multisig_config` optional parameters.
 
-## Http Request
+### Endpoint: Http Request
 
-The canister also supports some of the endpoints communication via JSON-RPC calls. These endpoints are:
+The canister also supports communication with the following endpoints via JSON-RPC calls:
 
 - `get_bitcoin_address`
 - `inscribe`
@@ -136,14 +168,14 @@ To communicate with the canister via JSON-RPC, you can use the `curl` command. F
 curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"get_bitcoin_address","params":["EXPECTED_ADDRESS", "SIGNATURE", "SIGNED_MESSAGE"],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
 ```
 
-Replace the parameters with the correct values.
+Replace the parameters with the actual values as needed.
 
 The above command will return the following JSON-encoded data structure:
 
 ```json
 {
-  "jsonrpc": "2.0"
-  "result": "bitcoin_address",
+  "jsonrpc": "2.0",
+  "result": "BITCOIN-ADDRESS",
   "id": 1
 }
 ```
@@ -156,10 +188,10 @@ curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"
 
 The above command will return the following JSON-encoded data structure:
 
-```bash
+```json
 {
-  "jsonrpc": "2.0"
-  "result": "inscriptions",
+  "jsonrpc": "2.0",
+  "result": "INSCRIPTIONS",
   "id": 1
 }
 ```
