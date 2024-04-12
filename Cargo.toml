@@ -24,6 +24,7 @@ ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", tag = "v0.13.x" }
 ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.13.x" }
 jsonrpc-core = "18"
+k256 = { version = "0.13", features = ["ecdsa"] }
 log = "0.4"
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
 ripemd = "0.1"
@@ -43,8 +44,6 @@ vergen = { version = "8.3", default-features = false, features = [
 # getrandom workaround
 getrandom = { version = "0.2", features = ["custom"] }
 rand = { version = "0.8", features = ["getrandom"] }
-
-k256 = { version = "0.13", features = ["ecdsa"] }
 
 [profile.dev]
 debug = false

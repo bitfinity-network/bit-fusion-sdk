@@ -23,6 +23,7 @@ ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 jsonrpc-core = { workspace = true }
+k256 = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
 ripemd = { workspace = true }
@@ -31,11 +32,12 @@ serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 
-# getrandom workaround
-getrandom = { workspace = true }
-rand = { workspace = true }
+[target.'cfg(target_family = "wasm")'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+rand = { workspace = true, features = ["getrandom"] }
 
-k256 = { workspace = true }
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+getrandom = { version = "0.2" }
 
 [build-dependencies]
 vergen = { workspace = true }
