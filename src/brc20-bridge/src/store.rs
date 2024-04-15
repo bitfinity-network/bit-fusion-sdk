@@ -16,7 +16,7 @@ use crate::memory::{
 const SRC_TOKEN: Id256 = Id256([0; 32]);
 
 pub struct Brc20Store {
-    inner: StableBTreeMap<Brc20Tick, Brc20Inscription, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<Brc20Hash, Brc20Inscription, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -32,43 +32,47 @@ impl Default for Brc20Store {
 impl Brc20Store {
     pub fn insert(&mut self, inscriptions: &[Brc20]) {
         for brc20 in inscriptions {
-            let tick = match brc20 {
-                Brc20::Deploy(deploy_func) => &deploy_func.tick,
-                Brc20::Mint(mint_func) => &mint_func.tick,
-                Brc20::Transfer(transfer_func) => &transfer_func.tick,
-            };
+            let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
 
             self.inner
-                .insert(Brc20Tick(tick.to_string()), Brc20Inscription(brc20.clone()));
+                .insert(Brc20Hash(digest), Brc20Inscription(brc20.clone()));
         }
     }
 }
 
-/// Represents the 4-letter name (tick) of the BRC-20 inscription.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Brc20Tick(String);
+fn sha256(input: &String) -> String {
+    use sha2::Digest;
 
-impl Storable for Brc20Tick {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(input.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+/// Represents the hex-encoded SHA2-256 digest of the BRC-20 inscription.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Brc20Hash(String);
+
+impl Storable for Brc20Hash {
     fn to_bytes(&self) -> Cow<[u8]> {
         let bytes = self.0.to_bytes().to_vec();
         Cow::Owned(bytes)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let tick = String::from_utf8(bytes.to_vec()).expect("Failed to convert bytes to String");
-        Self(tick)
+        let brc20 = String::from_utf8(bytes.to_vec()).expect("Failed to convert bytes to String");
+        Self(brc20)
     }
 
     const BOUND: Bound = Bound::Unbounded;
 }
 
-impl PartialOrd<Self> for Brc20Tick {
+impl PartialOrd<Self> for Brc20Hash {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Brc20Tick {
+impl Ord for Brc20Hash {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
     }

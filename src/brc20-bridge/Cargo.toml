@@ -29,3 +29,4 @@ minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
 serde = { workspace = true }
+sha2 = "0.10"
