@@ -1,15 +1,5 @@
 import dotenv from 'dotenv';
-import fs from 'fs';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const canisters = JSON.parse(
-  fs
-    .readFileSync(
-      `${dirname(fileURLToPath(import.meta.url))}/../../.dfx/local/canister_ids.json`
-    )
-    .toString()
-);
+import canisters from '../../.dfx/local/canister_ids.json';
 
 dotenv.config();
 
@@ -28,13 +18,13 @@ export const ICRC2_TOKEN_CANISTER_ID =
   process.env.ICRC2_TOKEN_CANISTER_ID || canisters.token2?.local;
 
 export const BTC_BRIDGE_CANISTER_ID =
-  process.env.BTC_BRIDGE_CANISTER_ID || canisters['btc-bridge'].local;
+  process.env.BTC_BRIDGE_CANISTER_ID || canisters['btc-bridge']?.local;
 
 export const CKBTC_TOKEN_CANISTER_ID =
-  process.env.CKBTC_TOKEN_CANISTER_ID || canisters.token.local;
+  process.env.CKBTC_TOKEN_CANISTER_ID || canisters.token?.local;
 
 export const CK_BTC_CANISTER_ID =
-  process.env.CK_BTC_CANISTER_ID || canisters['btc-bridge'].local;
+  process.env.CK_BTC_CANISTER_ID || canisters['btc-bridge']?.local;
 
 export const CHAIN_ID = 355113;
 

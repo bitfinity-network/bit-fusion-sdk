@@ -54,10 +54,10 @@ export const getProvider = () => {
 };
 
 export const generateWallet = () => {
-  // const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
-  const wallet = new ethers.Wallet(
-    '0xe96e898e18631ef63c31ae9349a332cced5075e04fd5bcf4e212b6ecea699ee3'
-  );
+  const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
+  // const wallet = new ethers.Wallet(
+  //   '0xe96e898e18631ef63c31ae9349a332cced5075e04fd5bcf4e212b6ecea699ee3'
+  // );
   const provider = getProvider();
 
   return wallet.connect(provider);
