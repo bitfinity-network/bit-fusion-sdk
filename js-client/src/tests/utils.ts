@@ -49,7 +49,7 @@ export const generateOperationId = () => {
 export const getProvider = () => {
   return new ethers.JsonRpcProvider(RPC_URL, {
     name: 'Bitfinity',
-    chainId: CHAIN_ID
+    chainId: Number(CHAIN_ID)
   });
 };
 
