@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
-use crate::store::{BurnRequestStore, MintOrdersStore};
+use crate::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
@@ -23,6 +23,7 @@ pub struct State {
     signer: SignerStorage,
     mint_orders: MintOrdersStore,
     burn_requests: BurnRequestStore,
+    inscriptions: Brc20Store,
     evm_params: Option<EvmParams>,
 }
 
@@ -83,6 +84,7 @@ impl Default for State {
             signer,
             mint_orders: Default::default(),
             burn_requests: Default::default(),
+            inscriptions: Brc20Store::default(),
             evm_params: None,
         }
     }
@@ -177,6 +179,14 @@ impl State {
 
     pub fn burn_requests_mut(&mut self) -> &mut BurnRequestStore {
         &mut self.burn_requests
+    }
+
+    pub fn inscriptions(&self) -> &Brc20Store {
+        &self.inscriptions
+    }
+
+    pub fn inscriptions_mut(&mut self) -> &mut Brc20Store {
+        &mut self.inscriptions
     }
 
     pub fn get_evm_info(&self) -> EvmInfo {
