@@ -26,6 +26,6 @@ export const CKBTC_TOKEN_CANISTER_ID =
 export const CK_BTC_CANISTER_ID =
   process.env.CK_BTC_CANISTER_ID || canisters['btc-bridge']?.local;
 
-export const CHAIN_ID = 355113;
+export const CHAIN_ID = process.env.CHAIN_ID || 355113;
 
 export const IS_TEST = process.env.IS_TEST || false;

@@ -1,13 +1,7 @@
 import { expect, test } from 'vitest';
-import {
-  createAgent,
-  generateWallet,
-  identityFromSeed,
-  wait
-} from './utils';
+import { createAgent, generateWallet, identityFromSeed, wait } from './utils';
 import { IcrcBridge } from '../icrc';
 import { LOCAL_TEST_SEED_PHRASE } from '../constants';
-import { Id256Factory } from '../validation';
 
 (BigInt as any).prototype.toJSON = function () {
   return this.toString();
@@ -37,7 +31,7 @@ test('bridge icrc2 token to evm', async () => {
 
   console.log('wallet.address', wallet.address);
 
-  await icrcBricdge.bridgeIcrc2(amount, wallet.address);
+  await icrcBricdge.bridgeIcrc2ToEmvc(amount, wallet.address);
 
   await wait(10000);
 
@@ -62,11 +56,6 @@ test('bridge evmc tokens to icrc2', async () => {
     agent
   });
 
-  const [bftBridgeAddress] =
-    await icrcBricdge.icrc2Minter.get_bft_bridge_contract();
-
-  const wrappedToken = await icrcBricdge.getWrappedTokenContract();
-
   const identity = identityFromSeed(LOCAL_TEST_SEED_PHRASE);
   const userPrincipal = (await identity).getPrincipal();
 
@@ -75,16 +64,7 @@ test('bridge evmc tokens to icrc2', async () => {
     subaccount: []
   });
 
-  await wrappedToken.approve(bftBridgeAddress, amount);
-
-  const wrappedTokenAddress = await wrappedToken.getAddress();
-
-  const tx = await icrcBricdge.bftBridge.burn(
-    amount,
-    wrappedTokenAddress,
-    Id256Factory.fromPrincipal(userPrincipal)
-  );
-  await tx.wait(2);
+  await icrcBricdge.bridgeEmvcToIcrc2(amount, userPrincipal);
 
   const finalBalance = await icrcBricdge.baseToken.icrc1_balance_of({
     owner: (await identity).getPrincipal(),

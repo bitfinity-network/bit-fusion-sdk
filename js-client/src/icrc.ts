@@ -134,7 +134,7 @@ export class IcrcBridge {
     return wrappedTokenAddress;
   }
 
-  async bridgeIcrc2(amount: bigint, recipient: string) {
+  async bridgeIcrc2ToEmvc(amount: bigint, recipient: string) {
     const Icrc2Burn: Icrc2Burn = {
       operation_id: generateOperationId(),
       from_subaccount: [],
@@ -219,5 +219,31 @@ export class IcrcBridge {
     }
 
     // return balance;
+  }
+
+  async bridgeEmvcToIcrc2(amount: bigint, recipient?: Principal) {
+    const [bftBridgeAddress] = await this.icrc2Minter.get_bft_bridge_contract();
+    if (!bftBridgeAddress) {
+      throw new Error('Bft Bridge contract not registered in the icrc2 minter');
+    } else if (bftBridgeAddress && new Address(bftBridgeAddress).isZero()) {
+      throw new Error('Invalid Address');
+    }
+
+    const wrappedToken = await this.getWrappedTokenContract();
+
+    await wrappedToken.approve(bftBridgeAddress, amount);
+
+    const wrappedTokenAddress = await wrappedToken.getAddress();
+
+    const userPrincipal = IS_TEST
+      ? recipient
+      : await this.infinityWallet.getPrincipal();
+
+    const tx = await this.bftBridge.burn(
+      amount,
+      wrappedTokenAddress,
+      Id256Factory.fromPrincipal(userPrincipal)
+    );
+    await tx.wait(2);
   }
 }
