@@ -97,6 +97,10 @@ export class IcrcBridge {
     return Actor.canisterIdOf(this.baseToken);
   }
 
+  get icrc2MinterId() {
+    return Actor.canisterIdOf(this.icrc2Minter);
+  }
+
   async getWrappedTokenContract() {
     const wrappedTokenAddress = await this.bftBridge.getWrappedToken(
       this.baseTokenId256
@@ -127,14 +131,10 @@ export class IcrcBridge {
       wrappedTokenAddress = await response.wait(2);
     }
 
-    console.log('wrappedTokenAddress:', wrappedTokenAddress);
-
     return wrappedTokenAddress;
   }
 
   async bridgeIcrc2(amount: bigint, recipient: string) {
-    // let balance: bigint | undefined;
-
     const Icrc2Burn: Icrc2Burn = {
       operation_id: generateOperationId(),
       from_subaccount: [],
@@ -155,10 +155,6 @@ export class IcrcBridge {
             `icrc1 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
           );
         }
-
-        // const wrappedToken = await this.getWrappedTokenContract();
-
-        // balance = await wrappedToken.balanceOf(recipient);
       }
     };
 
@@ -196,10 +192,6 @@ export class IcrcBridge {
       }
 
       console.log('burn_icrc2 res:', burnResponse);
-
-      // const wrappedToken = await this.getWrappedTokenContract();
-
-      // balance = await wrappedToken.balanceOf(recipient);
     } else {
       const APPROVE_TX = {
         idl: Icrc1IdlFactory,

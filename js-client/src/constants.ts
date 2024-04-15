@@ -28,4 +28,4 @@ export const CK_BTC_CANISTER_ID =
 
 export const CHAIN_ID = 355113;
 
-export const IS_TEST = true;
+export const IS_TEST = process.env.IS_TEST || false;
