@@ -9,13 +9,14 @@ default = []
 export-api = []
 
 [dependencies]
-async-recursion = "1.0.4"
 async-trait = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "ic-canister-client",
+] }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }

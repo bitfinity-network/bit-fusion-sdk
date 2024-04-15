@@ -60,7 +60,6 @@ pub struct Success {
 /// - If approval fails, returns `Error::Icrc2ApproveError`.
 ///
 /// - If token canister is not available, returns `Error::InternalError`.
-#[async_recursion::async_recursion]
 pub async fn approve_mint(
     token: Principal,
     spender: Account,
@@ -96,7 +95,8 @@ pub async fn approve_mint(
     if repeat_on_bad_fee {
         if let Err(ApproveError::BadFee { .. }) = &approve_result {
             icrc1::refresh_token_configuration(token).await?;
-            return approve_mint(token, spender, amount, false).await;
+
+            return Box::pin(approve_mint(token, spender, amount, false)).await;
         }
     }
 
@@ -107,7 +107,6 @@ pub async fn approve_mint(
 }
 
 /// Performs a transfer from the `from` account to the minter canister main account.
-#[async_recursion::async_recursion]
 pub async fn burn(
     token: Principal,
     from: Account,
@@ -133,7 +132,8 @@ pub async fn burn(
     if repeat_on_bad_fee {
         if let Err(TransferFromError::BadFee { .. }) = &transfer_result {
             icrc1::refresh_token_configuration(token).await?;
-            return burn(token, from, amount, false).await;
+
+            return Box::pin(burn(token, from, amount, false)).await;
         }
     }
 

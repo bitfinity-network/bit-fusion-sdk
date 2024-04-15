@@ -115,7 +115,7 @@ build_requested_canisters() {
         get_ckbtc_binaries
 
         # Build all canisters
-        
+
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
