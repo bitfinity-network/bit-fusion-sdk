@@ -806,11 +806,13 @@ dependencies = [
 name = "brc20-bridge"
 version = "0.2.0"
 dependencies = [
+ "bitcoin",
  "candid",
  "did",
  "eth-signer",
  "ethers-core",
  "futures",
+ "hex",
  "ic-canister",
  "ic-exports",
  "ic-log",

@@ -2,15 +2,46 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::str::FromStr;
 
+use bitcoin::{Address, Network, PublicKey};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{
+    self as IcBtc, GetUtxosRequest, GetUtxosResponse, Utxo, UtxoFilter,
+};
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{
+    self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
+};
 use ic_stable_structures::CellStructure;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 
-use crate::api::{Brc20InscribeError, Brc20InscribeStatus, Erc20MintError, Erc20MintStatus};
+use crate::api::{
+    Brc20InscribeError, Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
+};
 use crate::state::State;
+
+/// Returns the BRC20 deposit address
+pub(crate) async fn get_deposit_address(
+    state: &RefCell<State>,
+    eth_address: H160,
+) -> Result<Address, BridgeError> {
+    let (network, key_id, derivation_path) = {
+        let state = state.borrow();
+        (
+            state.btc_network(),
+            state.ecdsa_key_id(),
+            state.derivation_path(Some(eth_address)),
+        )
+    };
+
+    let public_key = { ecdsa_public_key(key_id, derivation_path).await? };
+    let public_key = PublicKey::from_str(&public_key)
+        .map_err(|e| BridgeError::PublicKeyFromStr(e.to_string()))?;
+
+    btc_address_from_public_key(network, &public_key)
+}
 
 /// Swap a BRC20 for an ERC20.
 ///
@@ -32,6 +63,60 @@ pub(crate) async fn erc20_to_brc20(
     _amount: u64,
 ) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
     todo!()
+}
+
+pub(crate) async fn get_utxos(
+    state: &RefCell<State>,
+    address: String,
+) -> Result<GetUtxosResponse, BridgeError> {
+    let network = {
+        let state = state.borrow();
+        state.ic_btc_network()
+    };
+    let mut utxos = Vec::<Utxo>::new();
+    let mut page_filter: Option<UtxoFilter> = None;
+    let mut tip_block_hash = Vec::<u8>::new();
+    let mut tip_height = 0u32;
+
+    let mut last_page: Option<Vec<u8>>;
+
+    loop {
+        let get_utxos_request = GetUtxosRequest {
+            address: address.clone(),
+            network,
+            filter: page_filter,
+        };
+
+        let utxos_res = IcBtc::bitcoin_get_utxos(get_utxos_request).await;
+
+        match utxos_res {
+            Ok(response) => {
+                let (get_utxos_response,) = response;
+                utxos.extend(get_utxos_response.utxos);
+                // Update tip_block_hash and tip_height only if they are not already set
+                if tip_block_hash.is_empty() {
+                    tip_block_hash = get_utxos_response.tip_block_hash;
+                }
+                if tip_height == 0 {
+                    tip_height = get_utxos_response.tip_height;
+                }
+                last_page = get_utxos_response.next_page.clone();
+                page_filter = last_page.clone().map(UtxoFilter::Page);
+            }
+            Err(e) => return Err(BridgeError::GetUtxos(e.1)),
+        }
+
+        if page_filter.is_none() {
+            break;
+        }
+    }
+
+    Ok(GetUtxosResponse {
+        utxos,
+        tip_block_hash,
+        tip_height,
+        next_page: last_page,
+    })
 }
 
 async fn mint_erc20(
@@ -179,4 +264,31 @@ async fn send_mint_order(
     log::trace!("Mint transaction sent");
 
     Ok(id.into())
+}
+
+/// Retrieves the ECDSA public key of this canister at the given derivation path
+/// from IC's ECDSA API.
+async fn ecdsa_public_key(
+    key_id: EcdsaKeyId,
+    derivation_path: Vec<Vec<u8>>,
+) -> Result<String, BridgeError> {
+    let arg = EcdsaPublicKeyArgument {
+        canister_id: None,
+        derivation_path,
+        key_id,
+    };
+
+    let (res,): (EcdsaPublicKeyResponse,) = IcEcdsa::ecdsa_public_key(arg)
+        .await
+        .map_err(|e| BridgeError::EcdsaPublicKey(e.1))?;
+
+    Ok(hex::encode(res.public_key))
+}
+
+fn btc_address_from_public_key(
+    network: Network,
+    public_key: &PublicKey,
+) -> Result<Address, BridgeError> {
+    Address::p2wpkh(public_key, network)
+        .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))
 }

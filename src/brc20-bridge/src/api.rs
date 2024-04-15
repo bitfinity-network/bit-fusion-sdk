@@ -4,6 +4,17 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
+#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub enum BridgeError {
+    GetDepositAddress(String),
+    GetUtxos(String),
+    GetBalance,
+    GetInscriptionFees,
+    PublicKeyFromStr(String),
+    AddressFromPublicKey(String),
+    EcdsaPublicKey(String),
+}
+
 /// Status of an ERC20 to a BRC20 swap
 #[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Brc20InscribeStatus {

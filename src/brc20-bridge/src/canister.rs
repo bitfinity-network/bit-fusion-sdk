@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use ic_canister::{generate_idl, init, post_upgrade, Canister, Idl, PreUpdate};
+use did::H160;
+use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
@@ -10,6 +11,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 
+use crate::api::BridgeError;
 use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
@@ -41,6 +43,13 @@ impl Brc20Bridge {
         }
 
         self.set_timers();
+    }
+
+    #[query]
+    pub async fn get_deposit_address(&self, eth_address: H160) -> Result<String, BridgeError> {
+        Ok(crate::ops::get_deposit_address(&get_state(), eth_address)
+            .await?
+            .to_string())
     }
 
     #[post_upgrade]

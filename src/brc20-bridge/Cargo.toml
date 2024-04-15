@@ -10,11 +10,13 @@ default = []
 export-api = []
 
 [dependencies]
+bitcoin = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
 ethers-core = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 futures = { workspace = true }
+hex = "0.4"
 ic-canister = { workspace = true }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }

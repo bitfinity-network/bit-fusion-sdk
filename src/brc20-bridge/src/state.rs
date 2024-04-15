@@ -1,7 +1,9 @@
+use bitcoin::Network;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
@@ -122,8 +124,43 @@ impl State {
         }
     }
 
+    pub fn btc_network(&self) -> Network {
+        match self.config.network {
+            BitcoinNetwork::Mainnet => Network::Bitcoin,
+            BitcoinNetwork::Testnet => Network::Testnet,
+            BitcoinNetwork::Regtest => Network::Regtest,
+        }
+    }
+
+    pub fn ic_btc_network(&self) -> BitcoinNetwork {
+        self.config.network
+    }
+
     pub fn signer(&self) -> &SignerStorage {
         &self.signer
+    }
+
+    #[inline]
+    pub(crate) fn derivation_path(&self, address: Option<H160>) -> Vec<Vec<u8>> {
+        let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
+
+        match address {
+            Some(address) => vec![address.0.as_bytes().to_vec()],
+            None => vec![caller_principal],
+        }
+    }
+
+    #[inline]
+    pub(crate) fn ecdsa_key_id(&self) -> EcdsaKeyId {
+        let name = match &self.config.signing_strategy {
+            SigningStrategy::Local { .. } => "none".to_string(),
+            SigningStrategy::ManagementCanister { key_id } => key_id.to_string(),
+        };
+
+        EcdsaKeyId {
+            curve: EcdsaCurve::Secp256k1,
+            name,
+        }
     }
 
     pub fn mint_orders(&self) -> &MintOrdersStore {
