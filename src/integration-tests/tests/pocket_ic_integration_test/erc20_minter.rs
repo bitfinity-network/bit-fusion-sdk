@@ -359,6 +359,8 @@ async fn test_external_bridging() {
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     // Chech the balance of the wrapped token.
     let data = utils::function_selector(
