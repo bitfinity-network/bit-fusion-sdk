@@ -692,16 +692,29 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitcoin"
+version = "0.30.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1945a5048598e4189e239d3f809b19bdad4845c4b2ba400d304d2dcf26d2c462"
+dependencies = [
+ "bech32 0.9.1",
+ "bitcoin-private",
+ "bitcoin_hashes 0.12.0",
+ "hex_lit",
+ "secp256k1 0.27.0",
+]
+
+[[package]]
+name = "bitcoin"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd00f3c09b5f21fb357abe32d29946eb8bb7a0862bae62c0b5e4a692acbbe73c"
 dependencies = [
  "bech32 0.10.0-beta",
  "bitcoin-internals",
- "bitcoin_hashes",
+ "bitcoin_hashes 0.13.0",
  "hex-conservative",
  "hex_lit",
- "secp256k1",
+ "secp256k1 0.28.2",
 ]
 
 [[package]]
@@ -709,6 +722,21 @@ name = "bitcoin-internals"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9425c3bf7089c983facbae04de54513cce73b41c7f9ff8c845b54e7bc64ebbfb"
+
+[[package]]
+name = "bitcoin-private"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73290177011694f38ec25e165d0387ab7ea749a4b81cd4c80dae5988229f7a57"
+
+[[package]]
+name = "bitcoin_hashes"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d7066118b13d4b20b23645932dfb3a81ce7e29f95726c2036fa33cd7b092501"
+dependencies = [
+ "bitcoin-private",
+]
 
 [[package]]
 name = "bitcoin_hashes"
@@ -1640,7 +1668,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "serde_with 3.6.1",
+ "serde_with 3.7.0",
  "sha2 0.10.8",
  "sha3",
  "thiserror",
@@ -5559,7 +5587,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bitcoin",
+ "bitcoin 0.31.1",
  "btc-bridge",
  "candid",
  "did",
@@ -5595,6 +5623,7 @@ dependencies = [
  "once_cell",
  "rand",
  "rlp",
+ "rune-bridge",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -6495,6 +6524,19 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "ordinals"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6f3b2919fe8ffd6aa09ac72138fd031527f9d57ddb0a01baf8725f13d798598"
+dependencies = [
+ "bitcoin 0.30.2",
+ "derive_more 0.99.17",
+ "serde",
+ "serde_with 3.7.0",
+ "thiserror",
+]
 
 [[package]]
 name = "os_str_bytes"
@@ -7464,6 +7506,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e666a5496a0b2186dbcd0ff6106e29e093c15591bde62c20d3842007c6978a09"
 
 [[package]]
+name = "rune-bridge"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "bitcoin 0.31.1",
+ "candid",
+ "did",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "futures",
+ "hex",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-metrics 0.13.0",
+ "ic-stable-structures 0.13.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "jsonrpc-core",
+ "log",
+ "minter-contract-utils",
+ "minter-did",
+ "ordinals",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7687,13 +7759,33 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25996b82292a7a57ed3508f052cfff8640d38d32018784acd714758b43da9c8f"
+dependencies = [
+ "bitcoin_hashes 0.12.0",
+ "rand",
+ "secp256k1-sys 0.8.1",
+]
+
+[[package]]
+name = "secp256k1"
 version = "0.28.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d24b59d129cdadea20aea4fb2352fa053712e5d713eee47d700cd4b2bc002f10"
 dependencies = [
- "bitcoin_hashes",
+ "bitcoin_hashes 0.13.0",
  "rand",
- "secp256k1-sys",
+ "secp256k1-sys 0.9.2",
+]
+
+[[package]]
+name = "secp256k1-sys"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70a129b9e9efbfb223753b9163c4ab3b13cff7fd9c7f010fbac25ab4099fa07e"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -7862,9 +7954,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.6.1"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15d167997bd841ec232f5b2b8e0e26606df2e7caa4c31b95ea9ca52b200bd270"
+checksum = "ee80b0e361bbf88fd2f6e242ccd19cfda072cb0faa6ae694ecee08199938569a"
 dependencies = [
  "base64 0.21.7",
  "chrono",
@@ -7874,7 +7966,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serde_with_macros 3.6.1",
+ "serde_with_macros 3.7.0",
  "time",
 ]
 
@@ -7892,9 +7984,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.6.1"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865f9743393e638991566a8b7a479043c2c8da94a33e0a31f18214c9cae0a64d"
+checksum = "6561dc161a9224638a31d876ccdfefbc1df91d3f3a8342eddb35f055d48c7655"
 dependencies = [
  "darling 0.20.6",
  "proc-macro2",

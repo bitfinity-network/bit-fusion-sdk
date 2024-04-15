@@ -15,6 +15,7 @@ use crate::context::{TestCanisters, TestContext};
 use crate::utils::error::TestError;
 
 mod btc;
+mod rune;
 
 pub struct StateMachineContext {
     env: Arc<StateMachine>,

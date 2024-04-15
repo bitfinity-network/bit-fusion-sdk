@@ -56,6 +56,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 erc20-minter = { path = "../erc20-minter" }
 signature-verification-canister-client = { workspace = true }
+rune-bridge = { path = "../rune-bridge" }
 
 # IC deps
 
