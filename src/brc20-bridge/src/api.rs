@@ -3,8 +3,11 @@ use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-#[derive(thiserror::Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+use crate::inscriber_api::{InscribeTransactions, Multisig, Protocol};
+
+#[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
     #[error("{0}")]
     InscriptionParsing(String),
@@ -22,6 +25,15 @@ pub enum BridgeError {
     EcdsaPublicKey(String),
 }
 
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct TransferBrc20Args {
+    pub inscription_type: Protocol,
+    pub inscription: String,
+    pub leftovers_address: String,
+    pub dst_address: String,
+    pub multisig_config: Option<Multisig>,
+}
+
 /// Arguments to `Brc20Task::MintErc20`
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MintErc20Args {
@@ -32,28 +44,29 @@ pub struct MintErc20Args {
 }
 
 /// Status of an ERC20 to a BRC20 swap
-#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(CandidType, Clone, Debug, Deserialize)]
 pub struct Brc20InscribeStatus {
-    /// Index of the inscription block
-    pub inscription_index: u64,
+    /// commit_txid and reveal_txid
+    pub tx_ids: InscribeTransactions,
 }
 
 /// Errors that occur during an ERC20 to a BRC20 swap.
-#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Error, CandidType, Clone, Debug, Deserialize)]
 pub enum Brc20InscribeError {
-    /// There is another request for this principal.
-    InscriberBusy,
+    /// Error from the Inscriber regarding a BRC20 transfer call
+    #[error("{0}")]
+    Brc20Transfer(String),
 
     /// The amount specified for the inscription is too low.
+    #[error("{0}")]
     LowPostage(u64),
 
     /// The bitcoin address is invalid.
+    #[error("{0}")]
     MalformedAddress(String),
 
-    /// The withdrawal account does not hold the requested amount.
-    InsufficientFunds { balance: u64 },
-
     /// There are too many concurrent requests, retry later.
+    #[error("{0}")]
     TemporarilyUnavailable(String),
 }
 
@@ -94,6 +107,8 @@ pub enum Erc20MintStatus {
 /// Errors that occur during a BRC20 to ERC20 swap.
 #[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintError {
+    /// Error from the Brc20Bridge
+    Brc20Bridge(String),
     /// The Brc20Bridge is not properly initialized.
     NotInitialized,
     /// Error while connecting to the Inscriber.

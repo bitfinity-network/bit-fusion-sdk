@@ -821,6 +821,7 @@ dependencies = [
  "ic-stable-structures 0.13.0",
  "ic-storage",
  "ic-task-scheduler",
+ "jsonrpc-core",
  "log",
  "minter-contract-utils",
  "minter-did",

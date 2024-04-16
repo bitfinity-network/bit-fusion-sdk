@@ -140,12 +140,19 @@ impl Default for BurnRequestStore {
 }
 
 impl BurnRequestStore {
-    pub fn insert(&mut self, request_id: BurnRequestId, address: String, amount: u64) {
+    pub fn insert(
+        &mut self,
+        request_id: BurnRequestId,
+        address: String,
+        reveal_txid: String,
+        inscription: String,
+    ) {
         self.inner.insert(
             request_id,
             BurnRequestInfo {
                 address,
-                amount,
+                reveal_txid,
+                inscription,
                 is_transferred: false,
             },
         );
@@ -171,7 +178,8 @@ impl BurnRequestStore {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 struct BurnRequestInfo {
     address: String,
-    amount: u64,
+    reveal_txid: String,
+    inscription: String,
     is_transferred: bool,
 }
 

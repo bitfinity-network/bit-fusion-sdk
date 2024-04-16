@@ -198,10 +198,7 @@ impl Task for Brc20Task {
                                 SchedulerError::TaskExecutionFailed(format!("{err:?}"))
                             })?;
 
-                    log::info!(
-                        "Created inscription transaction at block {}",
-                        result.inscription_index
-                    );
+                    log::info!("Created a BRC20 inscription. IDs: {:?}", result.tx_ids);
 
                     Ok(())
                 })

@@ -1,20 +1,59 @@
 use std::cell::RefCell;
 use std::str::FromStr;
 
-use anyhow::Ok;
 use bitcoin::absolute::LockTime;
+use bitcoin::hashes::Hash as _;
+use bitcoin::key::Secp256k1;
+use bitcoin::sighash::SighashCache;
 use bitcoin::transaction::Version;
 use bitcoin::{
-    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+    secp256k1, Amount, Network, OutPoint, PrivateKey, ScriptBuf, Sequence, Transaction, TxIn,
+    TxOut, Txid, Witness,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
+use ord_rs::{OrdError, Utxo};
 use serde::Deserialize;
 
 use crate::api::BridgeError;
 use crate::constant::{CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
 use crate::state::State;
+
+pub fn sign_transaction(
+    unsigned_tx: Transaction,
+    private_key: &PrivateKey,
+    secp: &Secp256k1<secp256k1::All>,
+    inputs: Vec<Utxo>,
+    sender_script_pubkey: &ScriptBuf,
+) -> anyhow::Result<Transaction> {
+    let mut hash = SighashCache::new(unsigned_tx);
+
+    for (index, input) in inputs.iter().enumerate() {
+        let signature_hash = hash.p2wpkh_signature_hash(
+            index,
+            sender_script_pubkey,
+            input.amount,
+            bitcoin::EcdsaSighashType::All,
+        )?;
+
+        let message = secp256k1::Message::from_digest(signature_hash.to_byte_array());
+        let signature = secp.sign_ecdsa(&message, &private_key.inner);
+
+        // verify sig
+        let secp_pubkey = private_key.inner.public_key(secp);
+        secp.verify_ecdsa(&message, &signature, &secp_pubkey)?;
+        let signature = bitcoin::ecdsa::Signature::sighash_all(signature);
+
+        // append witness to input
+        let witness = Witness::p2wpkh(&signature, &secp_pubkey);
+        *hash
+            .witness_mut(index)
+            .ok_or(OrdError::InputNotFound(index))? = witness;
+    }
+
+    Ok(hash.into_transaction())
+}
 
 /// Retrieves (and re-constructs) the reveal transaction by its ID.
 ///

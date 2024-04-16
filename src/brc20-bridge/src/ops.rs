@@ -3,8 +3,10 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::{Address, Network, PublicKey};
+use candid::Principal;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ic_canister::virtual_canister_call;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     self as IcBtc, GetUtxosRequest, GetUtxosResponse, Utxo, UtxoFilter,
 };
@@ -18,8 +20,10 @@ use ord_rs::{Brc20, OrdParser};
 
 use crate::api::{
     Brc20InscribeError, Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
+    TransferBrc20Args,
 };
 use crate::constant::NONCE;
+use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::state::State;
 
 /// Swap a BRC20 for an ERC20.
@@ -36,12 +40,7 @@ pub async fn brc20_to_erc20(
 
     state.borrow_mut().inscriptions_mut().insert(&inscription);
 
-    let amount = match inscription {
-        Brc20::Deploy(deploy_func) => deploy_func.max,
-        Brc20::Mint(mint_func) => mint_func.amt,
-        Brc20::Transfer(transfer_func) => transfer_func.amt,
-    };
-
+    let amount = get_brc20_amount(inscription);
     let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
 
     // TODO: implement `burn` mechanism
@@ -327,4 +326,117 @@ async fn send_mint_order(
     log::trace!("Mint transaction sent");
 
     Ok(id.into())
+}
+
+pub async fn burn_brc20(
+    state: &RefCell<State>,
+    eth_address: H160,
+    request_id: u32,
+    brc20: &str,
+    reveal_txid: &str,
+    amount: u64,
+) -> Result<Erc20MintStatus, Erc20MintError> {
+    let own_address = get_deposit_address(state, eth_address.clone())
+        .await
+        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?
+        .to_string();
+
+    let inscriber = state.borrow().inscriber();
+    let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+    let dst_address = get_inscriber_account(inscriber)
+        .await
+        .map_err(|e| Erc20MintError::Inscriber(e.to_string()))?;
+
+    log::trace!("Transferring BRC20 with reveal_txid ({reveal_txid}) to {dst_address} with request id {request_id}");
+
+    state.borrow_mut().burn_requests_mut().insert(
+        request_id,
+        dst_address.to_string(),
+        reveal_txid.to_string(),
+        brc20.to_string(),
+    );
+
+    let transfer_args = TransferBrc20Args {
+        inscription_type: Protocol::Brc20,
+        inscription: brc20.to_string(),
+        leftovers_address: own_address.clone(),
+        dst_address: dst_address.to_string(),
+        multisig_config: None,
+    };
+
+    let txids = transfer_brc20(inscriber, transfer_args)
+        .await
+        .map_err(|e| Erc20MintError::Inscriber(e.to_string()))?;
+    log::trace!("BRC20 with tx_ids ({txids:?}) sent to {dst_address}");
+
+    state
+        .borrow_mut()
+        .burn_requests_mut()
+        .set_transferred(request_id);
+
+    let result = mint_erc20(state, eth_address, amount, nonce).await;
+
+    if result.is_ok() {
+        state.borrow_mut().burn_requests_mut().remove(request_id);
+    }
+
+    result
+}
+
+async fn get_inscriber_account(inscriber: Principal) -> Result<String, BridgeError> {
+    log::trace!("Requesting the Inscriber canister's account");
+
+    let account = virtual_canister_call!(inscriber, "get_bitcoin_address", (), String)
+        .await
+        .map_err(|err| {
+            log::error!("Failed to retrieve Inscriber's BRC20 account: {err:?}");
+            BridgeError::GetDepositAddress("get bitcoin address".to_string())
+        })?;
+
+    log::trace!("Inscriber's BRC20 account: {account:?}");
+
+    Ok(account)
+}
+
+async fn transfer_brc20(
+    inscriber: Principal,
+    transfer_args: TransferBrc20Args,
+) -> Result<InscribeTransactions, Brc20InscribeError> {
+    log::trace!("Transferring BRC20 to the Inscriber");
+
+    let TransferBrc20Args {
+        inscription_type,
+        inscription,
+        leftovers_address,
+        dst_address,
+        multisig_config,
+    } = transfer_args;
+
+    let tx_ids = virtual_canister_call!(
+        inscriber,
+        "brc20_transfer",
+        (
+            inscription_type,
+            inscription,
+            leftovers_address,
+            dst_address.clone(),
+            multisig_config,
+        ),
+        InscribeResult<InscribeTransactions>
+    )
+    .await
+    .map_err(|e| Brc20InscribeError::TemporarilyUnavailable(e.1))?
+    .map_err(|e| Brc20InscribeError::Brc20Transfer(e.to_string()))?;
+
+    log::trace!("Transferred BRC20 with IDs {tx_ids:?} to {dst_address:?}");
+
+    Ok(tx_ids)
+}
+
+fn get_brc20_amount(inscription: Brc20) -> u64 {
+    match inscription {
+        Brc20::Deploy(deploy_func) => deploy_func.max,
+        Brc20::Mint(mint_func) => mint_func.amt,
+        Brc20::Transfer(transfer_func) => transfer_func.amt,
+    }
 }
