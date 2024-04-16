@@ -126,6 +126,9 @@ contract BFTBridge {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
+    // Mapping from user address to amount of native tokens on his deposit.
+    mapping(address => uint256) private _userNativeDeposit;
+
     // Constructor to initialize minterCanisterAddress
     constructor(address minterAddress) {
         minterCanisterAddress = minterAddress;
@@ -172,6 +175,42 @@ contract BFTBridge {
         bytes32 name;
         bytes16 symbol;
         uint8 decimals;
+    }
+
+    // Deposit `msg.value` amount of native token to user's address.
+    // The deposit could be used to pay fees.
+    // Returns user's balance after the operation.
+    function nativeTokenDeposit(address to) external payable returns (uint256 balance) {
+        if (to == address(0)) {
+            to = msg.sender;
+        }
+
+        balance = _userNativeDeposit[to];
+        balance += msg.value;
+        _userNativeDeposit[to] = balance;
+    }
+    
+    // Withdraw the `amount` of native token from user's address.
+    // Returns user's balance after the operation.
+    function nativeTokenWithdraw(address payable to, uint256 amount) external returns (uint256 balance) {
+        balance = _userNativeDeposit[msg.sender];
+        require(balance >= amount, "Not enough balance on deposit");
+        if (to == payable(0)) {
+            to = payable(msg.sender);
+        }
+
+        to.transfer(amount);
+
+        balance -= amount;
+        _userNativeDeposit[msg.sender] = balance;
+    }
+    
+    // Returns user's native token deposit balance. 
+    function nativeTokenBalance(address user) external view returns(uint256 balance) {
+        if (user == address(0)) {
+            user = msg.sender;
+        }
+        balance = _userNativeDeposit[user];
     }
 
     // Main function to withdraw funds
