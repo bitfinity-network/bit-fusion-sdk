@@ -36,7 +36,7 @@ pub(crate) async fn get_deposit_address(
         )
     };
 
-    let public_key = { ecdsa_public_key(key_id, derivation_path).await? };
+    let public_key = ecdsa_public_key(key_id, derivation_path).await?;
     let public_key = PublicKey::from_str(&public_key)
         .map_err(|e| BridgeError::PublicKeyFromStr(e.to_string()))?;
 

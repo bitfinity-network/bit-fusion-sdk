@@ -3,6 +3,7 @@ pub mod canister;
 pub mod constant;
 pub mod memory;
 pub mod ops;
+pub mod rpc;
 pub mod scheduler;
 pub mod state;
 pub mod store;

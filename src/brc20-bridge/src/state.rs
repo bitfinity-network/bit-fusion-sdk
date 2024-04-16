@@ -35,6 +35,7 @@ pub struct Brc20BridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub inscriber_fee: u64,
+    pub indexer_url: String,
     pub logger: LogSettings,
 }
 
@@ -49,8 +50,26 @@ impl Default for Brc20BridgeConfig {
             },
             admin: Principal::management_canister(),
             inscriber_fee: 10,
+            indexer_url: String::new(),
             logger: LogSettings::default(),
         }
+    }
+}
+
+impl Brc20BridgeConfig {
+    fn validate_indexer_url(&self) -> Result<(), String> {
+        if self.indexer_url.is_empty() {
+            return Err("Indexer URL is empty".to_string());
+        }
+
+        if !self.indexer_url.starts_with("https") {
+            return Err(format!(
+                "Indexer URL must be HTTPS. Given: {}",
+                self.indexer_url
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -92,6 +111,10 @@ impl Default for State {
 
 impl State {
     pub fn configure(&mut self, config: Brc20BridgeConfig) {
+        if let Err(err) = config.validate_indexer_url() {
+            panic!("Invalid configuration: {err}");
+        }
+
         let signer = config
             .signing_strategy
             .clone()
@@ -112,6 +135,14 @@ impl State {
 
     pub fn inscriber(&self) -> Principal {
         self.config.inscriber
+    }
+
+    pub fn indexer_url(&self) -> String {
+        self.config
+            .indexer_url
+            .strip_suffix('/')
+            .unwrap_or_else(|| &self.config.indexer_url)
+            .to_string()
     }
 
     pub fn erc20_chain_id(&self) -> u32 {

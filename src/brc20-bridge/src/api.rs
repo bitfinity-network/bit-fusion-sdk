@@ -4,14 +4,21 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
-#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(thiserror::Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
+    #[error("{0}")]
     GetDepositAddress(String),
+    #[error("{0}")]
     GetUtxos(String),
-    GetBalance,
-    GetInscriptionFees,
+    #[error("{0}")]
+    GetBalance(String),
+    #[error("{0}")]
+    GetTransactionById(String),
+    #[error("{0}")]
     PublicKeyFromStr(String),
+    #[error("{0}")]
     AddressFromPublicKey(String),
+    #[error("{0}")]
     EcdsaPublicKey(String),
 }
 

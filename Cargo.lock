@@ -806,6 +806,7 @@ dependencies = [
 name = "brc20-bridge"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "bitcoin",
  "candid",
  "did",
@@ -825,7 +826,9 @@ dependencies = [
  "minter-did",
  "ord-rs",
  "serde",
+ "serde_json",
  "sha2 0.10.8",
+ "thiserror",
 ]
 
 [[package]]
