@@ -1,6 +1,6 @@
 import { ApolloClient, NormalizedCacheObject } from '@apollo/client'
 import { SwapEventName } from '@uniswap/analytics-events'
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import { BigNumberish, providers } from 'ethers'
 import { Statsig } from 'statsig-react-native'
 import { call, delay, fork, put, race, select, take } from 'typed-redux-saga'
@@ -417,14 +417,14 @@ function* finalizeTransaction({
 
   const receipt: TransactionReceipt | undefined = ethersReceipt
     ? {
-        blockHash: ethersReceipt.blockHash,
-        blockNumber: ethersReceipt.blockNumber,
-        transactionIndex: ethersReceipt.transactionIndex,
-        confirmations: ethersReceipt.confirmations,
-        confirmedTime: Date.now(),
-        gasUsed: ethersReceipt.gasUsed?.toNumber(),
-        effectiveGasPrice: ethersReceipt.effectiveGasPrice?.toNumber(),
-      }
+      blockHash: ethersReceipt.blockHash,
+      blockNumber: ethersReceipt.blockNumber,
+      transactionIndex: ethersReceipt.transactionIndex,
+      confirmations: ethersReceipt.confirmations,
+      confirmedTime: Date.now(),
+      gasUsed: ethersReceipt.gasUsed?.toNumber(),
+      effectiveGasPrice: ethersReceipt.effectiveGasPrice?.toNumber(),
+    }
     : undefined
 
   const hash = transaction.hash

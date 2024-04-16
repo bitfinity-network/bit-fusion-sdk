@@ -1,4 +1,4 @@
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import {
   ConfirmedSwapTransactionInfo,
   ExactInputSwapTransactionInfo,
@@ -19,11 +19,11 @@ export function getAmountsFromTrade(
 
   return typeInfo.tradeType === TradeType.EXACT_OUTPUT
     ? {
-        inputCurrencyAmountRaw: typeInfo.expectedInputCurrencyAmountRaw,
-        outputCurrencyAmountRaw: typeInfo.outputCurrencyAmountRaw,
-      }
+      inputCurrencyAmountRaw: typeInfo.expectedInputCurrencyAmountRaw,
+      outputCurrencyAmountRaw: typeInfo.outputCurrencyAmountRaw,
+    }
     : {
-        inputCurrencyAmountRaw: typeInfo.inputCurrencyAmountRaw,
-        outputCurrencyAmountRaw: typeInfo.expectedOutputCurrencyAmountRaw,
-      }
+      inputCurrencyAmountRaw: typeInfo.inputCurrencyAmountRaw,
+      outputCurrencyAmountRaw: typeInfo.expectedOutputCurrencyAmountRaw,
+    }
 }

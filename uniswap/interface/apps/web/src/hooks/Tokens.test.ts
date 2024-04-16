@@ -1,4 +1,4 @@
-import { ChainId as MockChainId } from '@uniswap/sdk-core'
+import { ChainId as MockChainId } from 'sdk-core/src/index'
 import {
   DAI as MockDAI,
   USDC_MAINNET as MockUSDC_MAINNET,

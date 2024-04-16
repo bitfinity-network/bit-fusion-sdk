@@ -1,4 +1,4 @@
-import { ChainId, MaxUint256, UNI_ADDRESSES } from '@uniswap/sdk-core'
+import { ChainId, MaxUint256, UNI_ADDRESSES } from 'sdk-core/src/index'
 
 const UNI_MAINNET = UNI_ADDRESSES[ChainId.MAINNET]
 

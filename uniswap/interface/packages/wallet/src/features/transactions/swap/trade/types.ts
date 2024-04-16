@@ -1,7 +1,7 @@
 import { SerializedError } from '@reduxjs/toolkit'
 import { FetchBaseQueryError } from '@reduxjs/toolkit/dist/query'
 import { MixedRouteSDK, Trade as RouterSDKTrade } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, TradeType } from 'sdk-core/src/index'
 import { Route as V2RouteSDK } from '@uniswap/v2-sdk'
 import { Route as V3RouteSDK } from '@uniswap/v3-sdk'
 import { providers } from 'ethers'
@@ -107,10 +107,10 @@ export enum ApprovalAction {
 
 export type TokenApprovalInfo =
   | {
-      action: ApprovalAction.None | ApprovalAction.Permit | ApprovalAction.Unknown
-      txRequest: null
-    }
+    action: ApprovalAction.None | ApprovalAction.Permit | ApprovalAction.Unknown
+    txRequest: null
+  }
   | {
-      action: ApprovalAction.Approve | ApprovalAction.Permit2Approve
-      txRequest: providers.TransactionRequest
-    }
+    action: ApprovalAction.Approve | ApprovalAction.Permit2Approve
+    txRequest: providers.TransactionRequest
+  }

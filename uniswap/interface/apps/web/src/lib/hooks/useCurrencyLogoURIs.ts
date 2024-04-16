@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import useHttpLocations from 'hooks/useHttpLocations'
 import { useMemo } from 'react'
 import { isAddress } from 'utilities/src/addresses'
@@ -85,12 +85,12 @@ function getTokenLogoURI(address: string, chainId: ChainId = ChainId.MAINNET): s
 export default function useCurrencyLogoURIs(
   currency:
     | {
-        isNative?: boolean
-        isToken?: boolean
-        address?: string
-        chainId: number
-        logoURI?: string | null
-      }
+      isNative?: boolean
+      isToken?: boolean
+      address?: string
+      chainId: number
+      logoURI?: string | null
+    }
     | null
     | undefined
 ): string[] {

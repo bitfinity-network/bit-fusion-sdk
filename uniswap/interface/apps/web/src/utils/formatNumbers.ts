@@ -1,5 +1,5 @@
 import { formatEther as ethersFormatEther } from '@ethersproject/units'
-import { Currency, CurrencyAmount, Percent, Price, Token } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Price, Token } from 'sdk-core/src/index'
 import {
   DEFAULT_LOCAL_CURRENCY,
   LOCAL_CURRENCY_SYMBOL_DISPLAY_TYPE,
@@ -200,15 +200,15 @@ const SEVEN_SIG_FIGS__SCI_NOTATION_CURRENCY: NumberFormatOptions = {
 // if hardcodedinput is supplied it will override the input value or use the hardcoded output
 type HardCodedInputFormat =
   | {
-      input: number
-      prefix?: string
-      hardcodedOutput?: undefined
-    }
+    input: number
+    prefix?: string
+    hardcodedOutput?: undefined
+  }
   | {
-      input?: undefined
-      prefix?: undefined
-      hardcodedOutput: string
-    }
+    input?: undefined
+    prefix?: undefined
+    hardcodedOutput: string
+  }
 
 type FormatterBaseRule = { formatterOptions: NumberFormatOptions }
 type FormatterExactRule = { upperBound?: undefined; exact: number } & FormatterBaseRule

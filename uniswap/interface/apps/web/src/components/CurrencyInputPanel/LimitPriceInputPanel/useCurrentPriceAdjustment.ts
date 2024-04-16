@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Fraction, Price } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Fraction, Price } from 'sdk-core/src/index'
 import { parseUnits } from 'ethers/lib/utils'
 import JSBI from 'jsbi'
 import { useMemo } from 'react'

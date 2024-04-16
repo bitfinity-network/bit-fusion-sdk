@@ -1,11 +1,11 @@
-import { Currency } from '@uniswap/sdk-core'
-import AddressInputPanel from 'components/AddressInputPanel'
-import CurrencyInputPanel from 'components/CurrencyInputPanel'
-import { Trans } from 'i18n'
-import styled from 'styled-components'
+import { Currency } from "sdk-core/src/index";
+import AddressInputPanel from "components/AddressInputPanel";
+import CurrencyInputPanel from "components/CurrencyInputPanel";
+import { Trans } from "i18n";
+import styled from "styled-components";
 
-import { CurrencySearchFilters } from 'components/SearchModal/CurrencySearch'
-import { ProposalAction } from './ProposalActionSelector'
+import { CurrencySearchFilters } from "components/SearchModal/CurrencySearch";
+import { ProposalAction } from "./ProposalActionSelector";
 
 enum ProposalActionDetailField {
   ADDRESS,
@@ -23,12 +23,12 @@ const ProposalActionDetailContainer = styled.div`
   > :not(:last-child) {
     margin-bottom: 10px;
   }
-`
+`;
 
 const CREATE_PROPOSAL_CURRENCY_SEARCH_FILTERS: CurrencySearchFilters = {
   disableNonToken: true,
   showCommonBases: false,
-}
+};
 
 export const ProposalActionDetail = ({
   className,
@@ -40,14 +40,14 @@ export const ProposalActionDetail = ({
   onAmountInput,
   onToAddressInput,
 }: {
-  className?: string
-  proposalAction: ProposalAction
-  currency?: Currency
-  amount: string
-  toAddress: string
-  onCurrencySelect: (currency: Currency) => void
-  onAmountInput: (amount: string) => void
-  onToAddressInput: (address: string) => void
+  className?: string;
+  proposalAction: ProposalAction;
+  currency?: Currency;
+  amount: string;
+  toAddress: string;
+  onCurrencySelect: (currency: Currency) => void;
+  onAmountInput: (amount: string) => void;
+  onToAddressInput: (address: string) => void;
 }) => {
   const proposalActionsData = {
     [ProposalAction.TRANSFER_TOKEN]: [
@@ -68,20 +68,27 @@ export const ProposalActionDetail = ({
         type: ProposalActionDetailField.CURRENCY,
       },
     ],
-  }
+  };
 
   return (
     <ProposalActionDetailContainer className={className}>
       {proposalActionsData[proposalAction].map((field, i) =>
         field.type === ProposalActionDetailField.ADDRESS ? (
-          <AddressInputPanel key={i} label={field.label} value={toAddress} onChange={onToAddressInput} />
+          <AddressInputPanel
+            key={i}
+            label={field.label}
+            value={toAddress}
+            onChange={onToAddressInput}
+          />
         ) : field.type === ProposalActionDetailField.CURRENCY ? (
           <CurrencyInputPanel
             key={i}
             value={amount}
             currency={currency}
             onUserInput={(amount: string) => onAmountInput(amount)}
-            onCurrencySelect={(currency: Currency) => onCurrencySelect(currency)}
+            onCurrencySelect={(currency: Currency) =>
+              onCurrencySelect(currency)
+            }
             showMaxButton={false}
             showCurrencyAmount={false}
             hideBalance
@@ -91,5 +98,5 @@ export const ProposalActionDetail = ({
         ) : null
       )}
     </ProposalActionDetailContainer>
-  )
-}
+  );
+};

@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import { useWeb3React } from '@web3-react/core'
 import { useCallback, useMemo } from 'react'
 import { useDispatch } from 'react-redux'

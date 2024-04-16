@@ -1,4 +1,4 @@
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import { useWeb3React } from '@web3-react/core'
 import ms from 'ms'
 import { useEffect, useState } from 'react'

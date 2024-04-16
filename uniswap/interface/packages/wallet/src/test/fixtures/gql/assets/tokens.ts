@@ -1,4 +1,4 @@
-import { Token as SDKToken } from '@uniswap/sdk-core'
+import { Token as SDKToken } from 'sdk-core/src/index'
 import {
   Currency,
   HistoryDuration,

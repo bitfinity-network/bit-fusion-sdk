@@ -1,4 +1,4 @@
-import { Currency } from '@uniswap/sdk-core'
+import { Currency } from 'sdk-core/src/index'
 
 export function currencyId(currency?: Currency): string {
   if (currency?.isNative) return 'ETH'

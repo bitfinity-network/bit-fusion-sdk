@@ -1,4 +1,4 @@
-import { CurrencyAmount } from '@uniswap/sdk-core'
+import { CurrencyAmount } from 'sdk-core/src/index'
 import { hasSufficientFundsIncludingGas, isOffline } from 'wallet/src/features/transactions/utils'
 import { MAINNET_CURRENCY, networkDown, networkUnknown, networkUp } from 'wallet/src/test/fixtures'
 

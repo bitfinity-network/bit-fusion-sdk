@@ -1,4 +1,4 @@
-import { Currency } from '@uniswap/sdk-core'
+import { Currency } from 'sdk-core/src/index'
 import React, { useEffect, useRef } from 'react'
 import { AnyAction } from 'redux'
 import { NumberType } from 'utilities/src/format/types'

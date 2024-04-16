@@ -1,6 +1,6 @@
 import { BigNumber } from '@ethersproject/bignumber'
 import { MixedRouteSDK } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Token, TradeType } from 'sdk-core/src/index'
 import { DutchOrderInfo, DutchOrderInfoJSON } from '@uniswap/uniswapx-sdk'
 import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
 import { FeeAmount, Pool, Route as V3Route } from '@uniswap/v3-sdk'
@@ -142,23 +142,23 @@ function getTradeCurrencies(
   const currencyIn = tokenInIsNative
     ? nativeOnChain(tokenInChainId)
     : parseToken({
-        address: tokenInAddress,
-        chainId: tokenInChainId,
-        decimals: tokenInDecimals,
-        symbol: tokenInSymbol,
-        buyFeeBps: serializedTokenIn?.buyFeeBps,
-        sellFeeBps: serializedTokenIn?.sellFeeBps,
-      })
+      address: tokenInAddress,
+      chainId: tokenInChainId,
+      decimals: tokenInDecimals,
+      symbol: tokenInSymbol,
+      buyFeeBps: serializedTokenIn?.buyFeeBps,
+      sellFeeBps: serializedTokenIn?.sellFeeBps,
+    })
   const currencyOut = tokenOutIsNative
     ? nativeOnChain(tokenOutChainId)
     : parseToken({
-        address: tokenOutAddress,
-        chainId: tokenOutChainId,
-        decimals: tokenOutDecimals,
-        symbol: tokenOutSymbol,
-        buyFeeBps: serializedTokenOut?.buyFeeBps,
-        sellFeeBps: serializedTokenOut?.sellFeeBps,
-      })
+      address: tokenOutAddress,
+      chainId: tokenOutChainId,
+      decimals: tokenOutDecimals,
+      symbol: tokenOutSymbol,
+      buyFeeBps: serializedTokenOut?.buyFeeBps,
+      sellFeeBps: serializedTokenOut?.sellFeeBps,
+    })
 
   if (!isUniswapXTrade) {
     return [currencyIn, currencyOut]

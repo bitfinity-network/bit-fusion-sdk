@@ -37,7 +37,8 @@ async function main() {
       deployer.address,
       "0x21e19e0c9bab2400000",
     ]);
-    console.log("minted EVMC token: ", Web3.utils.hexToNumberString(res));
+
+    console.log("minted EVMC token: ", Web3.utils.hexToNumberString(res["amount"]));
   }
 
   const Weth9 = new ContractFactory(
@@ -47,7 +48,7 @@ async function main() {
   );
   const weth9Deploy = Weth9.getDeployTransaction();
   const wethTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...weth9Deploy,
   });
 
@@ -63,7 +64,7 @@ async function main() {
 
   const factoryDeploy = Factory.getDeployTransaction();
   const factoryTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...factoryDeploy,
   });
 
@@ -80,7 +81,7 @@ async function main() {
   const nftDescriptorLibraryDeploy =
     NftDescriptorLibrary.getDeployTransaction();
   const nftDescriptorLibraryTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...nftDescriptorLibraryDeploy,
   });
 
@@ -105,7 +106,7 @@ async function main() {
   );
 
   const nftDescriptorTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...nftDescriptorDeploy,
   });
 
@@ -125,7 +126,7 @@ async function main() {
     nftDescriptor.contractAddress
   );
   const positionManagerTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...positionManagerDeploy,
   });
   const positionManager = await positionManagerTx.wait();
@@ -145,7 +146,7 @@ async function main() {
     weth9.contractAddress
   );
   const routerTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...routerDeploy,
   });
   const router = await routerTx.wait();
@@ -160,7 +161,7 @@ async function main() {
   );
   const multicallDeploy = Multicall.getDeployTransaction();
   const multicallTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...multicallDeploy,
   });
   const multicall = await multicallTx.wait();
@@ -178,7 +179,7 @@ async function main() {
     weth9.contractAddress
   );
   const quoterTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...quoterDeploy,
   });
   const quoter = await quoterTx.wait();
@@ -197,7 +198,7 @@ async function main() {
     positionManager.contractAddress
   );
   const migratorTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...migratorDeploy,
   });
   const migrator = await migratorTx.wait();
@@ -212,7 +213,7 @@ async function main() {
 
   const ticklensDeploy = TickLens.getDeployTransaction();
   const ticklensTx = await deployer.sendTransaction({
-    nonce: await deployer.getTransactionCount(),
+    nonce: await deployer.getTransactionCount("pending"),
     ...ticklensDeploy,
   });
   const ticklens = await ticklensTx.wait();

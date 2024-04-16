@@ -1,66 +1,78 @@
-import { CurrencyAmount, Percent, Token } from '@uniswap/sdk-core'
-import { Pair } from '@uniswap/v2-sdk'
-import { useWeb3React } from '@web3-react/core'
-import { Trans } from 'i18n'
-import JSBI from 'jsbi'
-import { transparentize } from 'polished'
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'react-feather'
-import { Link } from 'react-router-dom'
-import { Text } from 'rebass'
-import styled from 'styled-components'
+import { CurrencyAmount, Percent, Token } from "sdk-core/src/index";
+import { Pair } from "@uniswap/v2-sdk";
+import { useWeb3React } from "@web3-react/core";
+import { Trans } from "i18n";
+import JSBI from "jsbi";
+import { transparentize } from "polished";
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "react-feather";
+import { Link } from "react-router-dom";
+import { Text } from "rebass";
+import styled from "styled-components";
 
-import { FixedHeightRow } from '.'
-import { BIG_INT_ZERO } from '../../constants/misc'
-import { useColor } from '../../hooks/useColor'
-import { useTotalSupply } from '../../hooks/useTotalSupply'
-import { useTokenBalance } from '../../state/connection/hooks'
-import { currencyId } from '../../utils/currencyId'
-import { unwrappedToken } from '../../utils/unwrappedToken'
-import { ButtonEmpty, ButtonPrimary, ButtonSecondary } from '../Button'
-import { LightCard } from '../Card'
-import { AutoColumn } from '../Column'
-import DoubleCurrencyLogo from '../DoubleLogo'
-import { CardNoise } from '../earn/styled'
-import CurrencyLogo from '../Logo/CurrencyLogo'
-import { AutoRow, RowBetween, RowFixed } from '../Row'
-import { Dots } from '../swap/styled'
+import { FixedHeightRow } from ".";
+import { BIG_INT_ZERO } from "../../constants/misc";
+import { useColor } from "../../hooks/useColor";
+import { useTotalSupply } from "../../hooks/useTotalSupply";
+import { useTokenBalance } from "../../state/connection/hooks";
+import { currencyId } from "../../utils/currencyId";
+import { unwrappedToken } from "../../utils/unwrappedToken";
+import { ButtonEmpty, ButtonPrimary, ButtonSecondary } from "../Button";
+import { LightCard } from "../Card";
+import { AutoColumn } from "../Column";
+import DoubleCurrencyLogo from "../DoubleLogo";
+import { CardNoise } from "../earn/styled";
+import CurrencyLogo from "../Logo/CurrencyLogo";
+import { AutoRow, RowBetween, RowFixed } from "../Row";
+import { Dots } from "../swap/styled";
 
 const StyledPositionCard = styled(LightCard)<{ bgColor: any }>`
   border: none;
   background: ${({ theme, bgColor }) =>
-    `radial-gradient(91.85% 100% at 1.84% 0%, ${transparentize(0.8, bgColor)} 0%, ${theme.surface2} 100%) `};
+    `radial-gradient(91.85% 100% at 1.84% 0%, ${transparentize(
+      0.8,
+      bgColor
+    )} 0%, ${theme.surface2} 100%) `};
   position: relative;
   overflow: hidden;
-`
+`;
 
 interface PositionCardProps {
-  pair: Pair
-  showUnwrapped?: boolean
-  border?: string
-  stakedBalance?: CurrencyAmount<Token> // optional balance to indicate that liquidity is deposited in mining pool
+  pair: Pair;
+  showUnwrapped?: boolean;
+  border?: string;
+  stakedBalance?: CurrencyAmount<Token>; // optional balance to indicate that liquidity is deposited in mining pool
 }
 
-export default function V2PositionCard({ pair, border, stakedBalance }: PositionCardProps) {
-  const { account } = useWeb3React()
+export default function V2PositionCard({
+  pair,
+  border,
+  stakedBalance,
+}: PositionCardProps) {
+  const { account } = useWeb3React();
 
-  const currency0 = unwrappedToken(pair.token0)
-  const currency1 = unwrappedToken(pair.token1)
+  const currency0 = unwrappedToken(pair.token0);
+  const currency1 = unwrappedToken(pair.token1);
 
-  const [showMore, setShowMore] = useState(false)
+  const [showMore, setShowMore] = useState(false);
 
-  const userDefaultPoolBalance = useTokenBalance(account ?? undefined, pair.liquidityToken)
-  const totalPoolTokens = useTotalSupply(pair.liquidityToken)
+  const userDefaultPoolBalance = useTokenBalance(
+    account ?? undefined,
+    pair.liquidityToken
+  );
+  const totalPoolTokens = useTotalSupply(pair.liquidityToken);
 
   // if staked balance balance provided, add to standard liquidity amount
-  const userPoolBalance = stakedBalance ? userDefaultPoolBalance?.add(stakedBalance) : userDefaultPoolBalance
+  const userPoolBalance = stakedBalance
+    ? userDefaultPoolBalance?.add(stakedBalance)
+    : userDefaultPoolBalance;
 
   const poolTokenPercentage =
     !!userPoolBalance &&
     !!totalPoolTokens &&
     JSBI.greaterThanOrEqual(totalPoolTokens.quotient, userPoolBalance.quotient)
       ? new Percent(userPoolBalance.quotient, totalPoolTokens.quotient)
-      : undefined
+      : undefined;
 
   const [token0Deposited, token1Deposited] =
     !!pair &&
@@ -69,12 +81,22 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
     // this condition is a short-circuit in the case where useTokenBalance updates sooner than useTotalSupply
     JSBI.greaterThanOrEqual(totalPoolTokens.quotient, userPoolBalance.quotient)
       ? [
-          pair.getLiquidityValue(pair.token0, totalPoolTokens, userPoolBalance, false),
-          pair.getLiquidityValue(pair.token1, totalPoolTokens, userPoolBalance, false),
+          pair.getLiquidityValue(
+            pair.token0,
+            totalPoolTokens,
+            userPoolBalance,
+            false
+          ),
+          pair.getLiquidityValue(
+            pair.token1,
+            totalPoolTokens,
+            userPoolBalance,
+            false
+          ),
         ]
-      : [undefined, undefined]
+      : [undefined, undefined];
 
-  const backgroundColor = useColor(pair?.token0)
+  const backgroundColor = useColor(pair?.token0);
 
   return (
     <StyledPositionCard border={border} bgColor={backgroundColor}>
@@ -82,7 +104,11 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
       <AutoColumn gap="md">
         <FixedHeightRow>
           <AutoRow gap="8px">
-            <DoubleCurrencyLogo currency0={currency0} currency1={currency1} size={20} />
+            <DoubleCurrencyLogo
+              currency0={currency0}
+              currency1={currency1}
+              size={20}
+            />
             <Text fontWeight={535} fontSize={20}>
               {!currency0 || !currency1 ? (
                 <Dots>
@@ -103,12 +129,12 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
               {showMore ? (
                 <>
                   <Trans>Manage</Trans>
-                  <ChevronUp size="20" style={{ marginLeft: '10px' }} />
+                  <ChevronUp size="20" style={{ marginLeft: "10px" }} />
                 </>
               ) : (
                 <>
                   <Trans>Manage</Trans>
-                  <ChevronDown size="20" style={{ marginLeft: '10px' }} />
+                  <ChevronDown size="20" style={{ marginLeft: "10px" }} />
                 </>
               )}
             </ButtonEmpty>
@@ -122,7 +148,7 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
                 <Trans>Your total pool tokens:</Trans>
               </Text>
               <Text fontSize={16} fontWeight={535}>
-                {userPoolBalance ? userPoolBalance.toSignificant(4) : '-'}
+                {userPoolBalance ? userPoolBalance.toSignificant(4) : "-"}
               </Text>
             </FixedHeightRow>
             {stakedBalance && (
@@ -146,10 +172,14 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
                   <Text fontSize={16} fontWeight={535} marginLeft="6px">
                     {token0Deposited?.toSignificant(6)}
                   </Text>
-                  <CurrencyLogo size="20px" style={{ marginLeft: '8px' }} currency={currency0} />
+                  <CurrencyLogo
+                    size="20px"
+                    style={{ marginLeft: "8px" }}
+                    currency={currency0}
+                  />
                 </RowFixed>
               ) : (
-                '-'
+                "-"
               )}
             </FixedHeightRow>
 
@@ -164,10 +194,14 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
                   <Text fontSize={16} fontWeight={535} marginLeft="6px">
                     {token1Deposited?.toSignificant(6)}
                   </Text>
-                  <CurrencyLogo size="20px" style={{ marginLeft: '8px' }} currency={currency1} />
+                  <CurrencyLogo
+                    size="20px"
+                    style={{ marginLeft: "8px" }}
+                    currency={currency1}
+                  />
                 </RowFixed>
               ) : (
-                '-'
+                "-"
               )}
             </FixedHeightRow>
 
@@ -177,36 +211,44 @@ export default function V2PositionCard({ pair, border, stakedBalance }: Position
               </Text>
               <Text fontSize={16} fontWeight={535}>
                 {poolTokenPercentage
-                  ? (poolTokenPercentage.toFixed(2) === '0.00' ? '<0.01' : poolTokenPercentage.toFixed(2)) + '%'
-                  : '-'}
+                  ? (poolTokenPercentage.toFixed(2) === "0.00"
+                      ? "<0.01"
+                      : poolTokenPercentage.toFixed(2)) + "%"
+                  : "-"}
               </Text>
             </FixedHeightRow>
 
-            {userDefaultPoolBalance && JSBI.greaterThan(userDefaultPoolBalance.quotient, BIG_INT_ZERO) && (
-              <RowBetween marginTop="10px">
-                <ButtonPrimary
-                  padding="8px"
-                  $borderRadius="8px"
-                  as={Link}
-                  to={`/migrate/v2/${pair.liquidityToken.address}`}
-                  width="64%"
-                >
-                  <Trans>Migrate</Trans>
-                </ButtonPrimary>
-                <ButtonSecondary
-                  padding="8px"
-                  $borderRadius="8px"
-                  as={Link}
-                  width="32%"
-                  to={`/remove/v2/${currencyId(currency0)}/${currencyId(currency1)}`}
-                >
-                  <Trans>Remove</Trans>
-                </ButtonSecondary>
-              </RowBetween>
-            )}
+            {userDefaultPoolBalance &&
+              JSBI.greaterThan(
+                userDefaultPoolBalance.quotient,
+                BIG_INT_ZERO
+              ) && (
+                <RowBetween marginTop="10px">
+                  <ButtonPrimary
+                    padding="8px"
+                    $borderRadius="8px"
+                    as={Link}
+                    to={`/migrate/v2/${pair.liquidityToken.address}`}
+                    width="64%"
+                  >
+                    <Trans>Migrate</Trans>
+                  </ButtonPrimary>
+                  <ButtonSecondary
+                    padding="8px"
+                    $borderRadius="8px"
+                    as={Link}
+                    width="32%"
+                    to={`/remove/v2/${currencyId(currency0)}/${currencyId(
+                      currency1
+                    )}`}
+                  >
+                    <Trans>Remove</Trans>
+                  </ButtonSecondary>
+                </RowBetween>
+              )}
           </AutoColumn>
         )}
       </AutoColumn>
     </StyledPositionCard>
-  )
+  );
 }

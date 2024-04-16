@@ -1,48 +1,68 @@
-import { BrowserEvent, InterfaceElementName, InterfaceEventName, SharedEventName } from '@uniswap/analytics-events'
-import { CurrencyAmount, Token } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { TraceEvent, sendAnalyticsEvent } from 'analytics'
-import { ButtonEmphasis, ButtonSize, ThemeButton } from 'components/Button'
-import Column from 'components/Column'
-import { CreditCardIcon } from 'components/Icons/CreditCard'
-import { ImagesIcon } from 'components/Icons/Images'
-import { Power } from 'components/Icons/Power'
-import { Settings } from 'components/Icons/Settings'
-import Row, { AutoRow } from 'components/Row'
-import { DeltaArrow } from 'components/Tokens/TokenDetails/Delta'
-import { LoadingBubble } from 'components/Tokens/loading'
-import { getConnection } from 'connection'
-import { useTokenBalancesQuery } from 'graphql/data/apollo/TokenBalancesProvider'
-import { useDisableNFTRoutes } from 'hooks/useDisableNFTRoutes'
-import useENSName from 'hooks/useENSName'
-import { Trans, t } from 'i18n'
-import { useProfilePageState, useSellAsset, useWalletCollections } from 'nft/hooks'
-import { ProfilePageStateType } from 'nft/types'
-import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAppDispatch } from 'state/hooks'
-import { setRecentConnectionDisconnected } from 'state/user/reducer'
-import styled from 'styled-components'
-import { ThemedText } from 'theme/components'
-import { useUnitagByAddressWithoutFlag } from 'uniswap/src/features/unitags/hooksWithoutFlags'
-import { isPathBlocked } from 'utils/blockedPaths'
-import { NumberType, useFormatter } from 'utils/formatNumbers'
-import { useCloseModal, useFiatOnrampAvailability, useOpenModal, useToggleModal } from '../../state/application/hooks'
-import { ApplicationModal } from '../../state/application/reducer'
-import { useUserHasAvailableClaim, useUserUnclaimedAmount } from '../../state/claim/hooks'
-import { ActionTile } from './ActionTile'
-import IconButton, { IconHoverText, IconWithConfirmTextButton } from './IconButton'
-import MiniPortfolio from './MiniPortfolio'
-import { portfolioFadeInAnimation } from './MiniPortfolio/PortfolioRow'
-import { useAccountDrawer } from './MiniPortfolio/hooks'
-import { Status } from './Status'
+import {
+  BrowserEvent,
+  InterfaceElementName,
+  InterfaceEventName,
+  SharedEventName,
+} from "@uniswap/analytics-events";
+import { CurrencyAmount, Token } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { TraceEvent, sendAnalyticsEvent } from "analytics";
+import { ButtonEmphasis, ButtonSize, ThemeButton } from "components/Button";
+import Column from "components/Column";
+import { CreditCardIcon } from "components/Icons/CreditCard";
+import { ImagesIcon } from "components/Icons/Images";
+import { Power } from "components/Icons/Power";
+import { Settings } from "components/Icons/Settings";
+import Row, { AutoRow } from "components/Row";
+import { DeltaArrow } from "components/Tokens/TokenDetails/Delta";
+import { LoadingBubble } from "components/Tokens/loading";
+import { getConnection } from "connection";
+import { useTokenBalancesQuery } from "graphql/data/apollo/TokenBalancesProvider";
+import { useDisableNFTRoutes } from "hooks/useDisableNFTRoutes";
+import useENSName from "hooks/useENSName";
+import { Trans, t } from "i18n";
+import {
+  useProfilePageState,
+  useSellAsset,
+  useWalletCollections,
+} from "nft/hooks";
+import { ProfilePageStateType } from "nft/types";
+import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAppDispatch } from "state/hooks";
+import { setRecentConnectionDisconnected } from "state/user/reducer";
+import styled from "styled-components";
+import { ThemedText } from "theme/components";
+import { useUnitagByAddressWithoutFlag } from "uniswap/src/features/unitags/hooksWithoutFlags";
+import { isPathBlocked } from "utils/blockedPaths";
+import { NumberType, useFormatter } from "utils/formatNumbers";
+import {
+  useCloseModal,
+  useFiatOnrampAvailability,
+  useOpenModal,
+  useToggleModal,
+} from "../../state/application/hooks";
+import { ApplicationModal } from "../../state/application/reducer";
+import {
+  useUserHasAvailableClaim,
+  useUserUnclaimedAmount,
+} from "../../state/claim/hooks";
+import { ActionTile } from "./ActionTile";
+import IconButton, {
+  IconHoverText,
+  IconWithConfirmTextButton,
+} from "./IconButton";
+import MiniPortfolio from "./MiniPortfolio";
+import { portfolioFadeInAnimation } from "./MiniPortfolio/PortfolioRow";
+import { useAccountDrawer } from "./MiniPortfolio/hooks";
+import { Status } from "./Status";
 
 const AuthenticatedHeaderWrapper = styled.div`
   padding: 20px 16px;
   display: flex;
   flex-direction: column;
   flex: 1;
-`
+`;
 
 const WalletButton = styled(ThemeButton)`
   border-radius: 12px;
@@ -51,7 +71,7 @@ const WalletButton = styled(ThemeButton)`
   margin-top: 4px;
   color: white;
   border: none;
-`
+`;
 
 const UNIButton = styled(WalletButton)`
   border-radius: 12px;
@@ -61,7 +81,7 @@ const UNIButton = styled(WalletButton)`
   color: white;
   border: none;
   background: linear-gradient(to right, #9139b0 0%, #4261d6 100%);
-`
+`;
 
 const IconContainer = styled.div`
   display: flex;
@@ -77,98 +97,131 @@ const IconContainer = styled.div`
       left: 0px;
     }
   }
-`
+`;
 
 const HeaderWrapper = styled.div`
   margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-`
+`;
 
 const FadeInColumn = styled(Column)`
   ${portfolioFadeInAnimation}
-`
+`;
 
 const PortfolioDrawerContainer = styled(Column)`
   flex: 1;
-`
+`;
 
-export default function AuthenticatedHeader({ account, openSettings }: { account: string; openSettings: () => void }) {
-  const { connector } = useWeb3React()
-  const { ENSName } = useENSName(account)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const closeModal = useCloseModal()
-  const setSellPageState = useProfilePageState((state) => state.setProfilePageState)
-  const resetSellAssets = useSellAsset((state) => state.reset)
-  const clearCollectionFilters = useWalletCollections((state) => state.clearCollectionFilters)
-  const shouldShowBuyFiatButton = !isPathBlocked('/buy')
-  const { formatNumber, formatDelta } = useFormatter()
+export default function AuthenticatedHeader({
+  account,
+  openSettings,
+}: {
+  account: string;
+  openSettings: () => void;
+}) {
+  const { connector } = useWeb3React();
+  const { ENSName } = useENSName(account);
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const closeModal = useCloseModal();
+  const setSellPageState = useProfilePageState(
+    (state) => state.setProfilePageState
+  );
+  const resetSellAssets = useSellAsset((state) => state.reset);
+  const clearCollectionFilters = useWalletCollections(
+    (state) => state.clearCollectionFilters
+  );
+  const shouldShowBuyFiatButton = !isPathBlocked("/buy");
+  const { formatNumber, formatDelta } = useFormatter();
 
-  const shouldDisableNFTRoutes = useDisableNFTRoutes()
+  const shouldDisableNFTRoutes = useDisableNFTRoutes();
 
-  const unclaimedAmount: CurrencyAmount<Token> | undefined = useUserUnclaimedAmount(account)
-  const isUnclaimed = useUserHasAvailableClaim(account)
-  const connection = getConnection(connector)
-  const openClaimModal = useToggleModal(ApplicationModal.ADDRESS_CLAIM)
+  const unclaimedAmount: CurrencyAmount<Token> | undefined =
+    useUserUnclaimedAmount(account);
+  const isUnclaimed = useUserHasAvailableClaim(account);
+  const connection = getConnection(connector);
+  const openClaimModal = useToggleModal(ApplicationModal.ADDRESS_CLAIM);
   const disconnect = useCallback(() => {
-    connector.deactivate?.()
-    connector.resetState()
-    dispatch(setRecentConnectionDisconnected())
-  }, [connector, dispatch])
+    connector.deactivate?.();
+    connector.resetState();
+    dispatch(setRecentConnectionDisconnected());
+  }, [connector, dispatch]);
 
-  const [accountDrawerOpen, toggleAccountDrawer] = useAccountDrawer()
+  const [accountDrawerOpen, toggleAccountDrawer] = useAccountDrawer();
 
   const navigateToProfile = useCallback(() => {
-    toggleAccountDrawer()
-    resetSellAssets()
-    setSellPageState(ProfilePageStateType.VIEWING)
-    clearCollectionFilters()
-    navigate('/nfts/profile')
-    closeModal()
-  }, [clearCollectionFilters, closeModal, navigate, resetSellAssets, setSellPageState, toggleAccountDrawer])
+    toggleAccountDrawer();
+    resetSellAssets();
+    setSellPageState(ProfilePageStateType.VIEWING);
+    clearCollectionFilters();
+    navigate("/nfts/profile");
+    closeModal();
+  }, [
+    clearCollectionFilters,
+    closeModal,
+    navigate,
+    resetSellAssets,
+    setSellPageState,
+    toggleAccountDrawer,
+  ]);
 
-  const openFiatOnrampModal = useOpenModal(ApplicationModal.FIAT_ONRAMP)
+  const openFiatOnrampModal = useOpenModal(ApplicationModal.FIAT_ONRAMP);
   const openFoRModalWithAnalytics = useCallback(() => {
-    toggleAccountDrawer()
-    sendAnalyticsEvent(InterfaceEventName.FIAT_ONRAMP_WIDGET_OPENED)
-    openFiatOnrampModal()
-  }, [openFiatOnrampModal, toggleAccountDrawer])
+    toggleAccountDrawer();
+    sendAnalyticsEvent(InterfaceEventName.FIAT_ONRAMP_WIDGET_OPENED);
+    openFiatOnrampModal();
+  }, [openFiatOnrampModal, toggleAccountDrawer]);
 
-  const [shouldCheck, setShouldCheck] = useState(false)
+  const [shouldCheck, setShouldCheck] = useState(false);
   const {
     available: fiatOnrampAvailable,
     availabilityChecked: fiatOnrampAvailabilityChecked,
     error,
     loading: fiatOnrampAvailabilityLoading,
-  } = useFiatOnrampAvailability(shouldCheck, openFoRModalWithAnalytics)
+  } = useFiatOnrampAvailability(shouldCheck, openFoRModalWithAnalytics);
 
   const handleBuyCryptoClick = useCallback(() => {
     if (!fiatOnrampAvailabilityChecked) {
-      setShouldCheck(true)
+      setShouldCheck(true);
     } else if (fiatOnrampAvailable) {
-      openFoRModalWithAnalytics()
+      openFoRModalWithAnalytics();
     }
-  }, [fiatOnrampAvailabilityChecked, fiatOnrampAvailable, openFoRModalWithAnalytics])
+  }, [
+    fiatOnrampAvailabilityChecked,
+    fiatOnrampAvailable,
+    openFoRModalWithAnalytics,
+  ]);
   const disableBuyCryptoButton = Boolean(
-    error || (!fiatOnrampAvailable && fiatOnrampAvailabilityChecked) || fiatOnrampAvailabilityLoading
-  )
+    error ||
+      (!fiatOnrampAvailable && fiatOnrampAvailabilityChecked) ||
+      fiatOnrampAvailabilityLoading
+  );
 
-  const { data: portfolioBalances } = useTokenBalancesQuery({ skip: !accountDrawerOpen })
-  const portfolio = portfolioBalances?.portfolios?.[0]
-  const totalBalance = portfolio?.tokensTotalDenominatedValue?.value
-  const absoluteChange = portfolio?.tokensTotalDenominatedValueChange?.absolute?.value
-  const percentChange = portfolio?.tokensTotalDenominatedValueChange?.percentage?.value
-  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  const { data: portfolioBalances } = useTokenBalancesQuery({
+    skip: !accountDrawerOpen,
+  });
+  const portfolio = portfolioBalances?.portfolios?.[0];
+  const totalBalance = portfolio?.tokensTotalDenominatedValue?.value;
+  const absoluteChange =
+    portfolio?.tokensTotalDenominatedValueChange?.absolute?.value;
+  const percentChange =
+    portfolio?.tokensTotalDenominatedValueChange?.percentage?.value;
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
-  const { unitag } = useUnitagByAddressWithoutFlag(account, Boolean(account))
-  const amount = unclaimedAmount?.toFixed(0, { groupSeparator: ',' } ?? '-')
+  const { unitag } = useUnitagByAddressWithoutFlag(account, Boolean(account));
+  const amount = unclaimedAmount?.toFixed(0, { groupSeparator: "," } ?? "-");
 
   return (
     <AuthenticatedHeaderWrapper>
       <HeaderWrapper>
-        <Status account={account} ensUsername={ENSName} uniswapUsername={unitag?.username} connection={connection} />
+        <Status
+          account={account}
+          ensUsername={ENSName}
+          uniswapUsername={unitag?.username}
+          connection={connection}
+        />
         <IconContainer>
           <IconButton
             hideHorizontal={showDisconnectConfirm}
@@ -195,7 +248,10 @@ export default function AuthenticatedHeader({ account, openSettings }: { account
       <PortfolioDrawerContainer>
         {totalBalance !== undefined ? (
           <FadeInColumn gap="xs">
-            <ThemedText.HeadlineLarge fontWeight={535} data-testid="portfolio-total-balance">
+            <ThemedText.HeadlineLarge
+              fontWeight={535}
+              data-testid="portfolio-total-balance"
+            >
               {formatNumber({
                 input: totalBalance,
                 type: NumberType.PortfolioBalance,
@@ -221,7 +277,14 @@ export default function AuthenticatedHeader({ account, openSettings }: { account
             <LoadingBubble height="16px" width="100px" margin="4px 0 20px 0" />
           </Column>
         )}
-        <Row gap="8px" marginBottom={!fiatOnrampAvailable && fiatOnrampAvailabilityChecked ? '20px' : '0px'}>
+        <Row
+          gap="8px"
+          marginBottom={
+            !fiatOnrampAvailable && fiatOnrampAvailabilityChecked
+              ? "20px"
+              : "0px"
+          }
+        >
           {shouldShowBuyFiatButton && (
             <ActionTile
               dataTestId="wallet-buy-crypto"
@@ -230,7 +293,9 @@ export default function AuthenticatedHeader({ account, openSettings }: { account
               onClick={handleBuyCryptoClick}
               disabled={disableBuyCryptoButton}
               loading={fiatOnrampAvailabilityLoading}
-              error={Boolean(!fiatOnrampAvailable && fiatOnrampAvailabilityChecked)}
+              error={Boolean(
+                !fiatOnrampAvailable && fiatOnrampAvailabilityChecked
+              )}
               errorMessage={t`Restricted region`}
               errorTooltip={t`Moonpay is not available in some regions. Click to learn more.`}
             />
@@ -246,11 +311,15 @@ export default function AuthenticatedHeader({ account, openSettings }: { account
         </Row>
         <MiniPortfolio account={account} />
         {isUnclaimed && (
-          <UNIButton onClick={openClaimModal} size={ButtonSize.medium} emphasis={ButtonEmphasis.medium}>
+          <UNIButton
+            onClick={openClaimModal}
+            size={ButtonSize.medium}
+            emphasis={ButtonEmphasis.medium}
+          >
             <Trans>Claim {{ amount }} reward</Trans>
           </UNIButton>
         )}
       </PortfolioDrawerContainer>
     </AuthenticatedHeaderWrapper>
-  )
+  );
 }

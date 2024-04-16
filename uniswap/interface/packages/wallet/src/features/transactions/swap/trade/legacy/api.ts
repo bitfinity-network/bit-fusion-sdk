@@ -1,5 +1,5 @@
 import { ApolloError, QueryHookOptions } from '@apollo/client'
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import { BigNumber } from 'ethers'
 import { useMemo } from 'react'
 import { ROUTING_API_PATH } from 'uniswap/src/data/constants'
@@ -85,10 +85,10 @@ export function useQuoteQuery(
 
     const recipientParams = recipient
       ? {
-          recipient,
-          slippageTolerance,
-          deadline,
-        }
+        recipient,
+        slippageTolerance,
+        deadline,
+      }
       : undefined
 
     const simulatedParams =
@@ -97,16 +97,16 @@ export function useQuoteQuery(
     // permit2 signature data if applicable
     const permit2Params = permitSignatureInfo
       ? {
-          permitSignature: permitSignatureInfo.signature,
-          permitAmount: BigNumber.from(permitSignatureInfo.permitMessage.details.amount).toString(),
-          permitExpiration: BigNumber.from(
-            permitSignatureInfo.permitMessage.details.expiration
-          ).toString(),
-          permitSigDeadline: BigNumber.from(
-            permitSignatureInfo.permitMessage.sigDeadline
-          ).toString(),
-          permitNonce: BigNumber.from(permitSignatureInfo.permitMessage.details.nonce).toString(),
-        }
+        permitSignature: permitSignatureInfo.signature,
+        permitAmount: BigNumber.from(permitSignatureInfo.permitMessage.details.amount).toString(),
+        permitExpiration: BigNumber.from(
+          permitSignatureInfo.permitMessage.details.expiration
+        ).toString(),
+        permitSigDeadline: BigNumber.from(
+          permitSignatureInfo.permitMessage.sigDeadline
+        ).toString(),
+        permitNonce: BigNumber.from(permitSignatureInfo.permitMessage.details.nonce).toString(),
+      }
       : undefined
 
     return {

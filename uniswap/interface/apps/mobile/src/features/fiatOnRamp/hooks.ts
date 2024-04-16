@@ -1,5 +1,5 @@
 import { skipToken } from '@reduxjs/toolkit/query/react'
-import { Currency } from '@uniswap/sdk-core'
+import { Currency } from 'sdk-core/src/index'
 import { useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppDispatch } from 'src/app/hooks'
@@ -156,10 +156,10 @@ export function useMoonpayFiatOnRamp({
   } = useFiatOnRampLimitsQuery(
     quoteCurrencyCode
       ? {
-          baseCurrencyCode,
-          quoteCurrencyCode,
-          areFeesIncluded: MOONPAY_FEES_INCLUDED,
-        }
+        baseCurrencyCode,
+        quoteCurrencyCode,
+        areFeesIncluded: MOONPAY_FEES_INCLUDED,
+      }
       : skipToken
   )
 
@@ -188,16 +188,15 @@ export function useMoonpayFiatOnRamp({
     // as-is, avoids waterfalling requests => better ux
     quoteCurrencyCode
       ? {
-          ownerAddress: activeAccountAddress,
-          colorCode: colors.accent1.val,
-          externalTransactionId,
-          amount: baseCurrencyAmount,
-          currencyCode: quoteCurrencyCode,
-          baseCurrencyCode,
-          redirectUrl: `${
-            isAndroid ? uniswapUrls.appUrl : uniswapUrls.appBaseUrl
+        ownerAddress: activeAccountAddress,
+        colorCode: colors.accent1.val,
+        externalTransactionId,
+        amount: baseCurrencyAmount,
+        currencyCode: quoteCurrencyCode,
+        baseCurrencyCode,
+        redirectUrl: `${isAndroid ? uniswapUrls.appUrl : uniswapUrls.appBaseUrl
           }/?screen=transaction&fiatOnRamp=true&userAddress=${activeAccountAddress}`,
-        }
+      }
       : skipToken
   )
   const {
@@ -214,11 +213,11 @@ export function useMoonpayFiatOnRamp({
       isBaseCurrencyAmountValid &&
       debouncedBaseCurrencyAmount === baseCurrencyAmount
       ? {
-          baseCurrencyCode,
-          baseCurrencyAmount: debouncedBaseCurrencyAmount,
-          quoteCurrencyCode,
-          areFeesIncluded: MOONPAY_FEES_INCLUDED,
-        }
+        baseCurrencyCode,
+        baseCurrencyAmount: debouncedBaseCurrencyAmount,
+        quoteCurrencyCode,
+        areFeesIncluded: MOONPAY_FEES_INCLUDED,
+      }
       : skipToken
   )
 

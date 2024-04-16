@@ -1,87 +1,120 @@
-import { Contract } from '@ethersproject/contracts'
-import type { TransactionResponse } from '@ethersproject/providers'
-import { LiquidityEventName, LiquiditySource } from '@uniswap/analytics-events'
-import { CurrencyAmount, Fraction, Percent, Price, Token, V2_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
-import { FeeAmount, Pool, Position, TickMath, priceToClosestTick } from '@uniswap/v3-sdk'
-import { useWeb3React } from '@web3-react/core'
-import { sendAnalyticsEvent, useTrace } from 'analytics'
-import Badge from 'components/Badge'
-import { ButtonConfirmed } from 'components/Button'
-import { BlueCard, DarkGrayCard, LightCard, YellowCard } from 'components/Card'
-import DoubleCurrencyLogo from 'components/DoubleLogo'
-import FeeSelector from 'components/FeeSelector'
-import RangeSelector from 'components/RangeSelector'
-import RateToggle from 'components/RateToggle'
-import SettingsTab from 'components/Settings'
-import { V2Unsupported } from 'components/V2Unsupported'
-import { Dots } from 'components/swap/styled'
-import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
-import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
-import { PoolState, usePool } from 'hooks/usePools'
-import { useGetTransactionDeadline } from 'hooks/useTransactionDeadline'
-import { useV2LiquidityTokenPermit } from 'hooks/useV2LiquidityTokenPermit'
-import { Trans, t } from 'i18n'
-import JSBI from 'jsbi'
-import { NEVER_RELOAD, useSingleCallResult } from 'lib/hooks/multicall'
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, AlertTriangle, ArrowDown } from 'react-feather'
-import { Navigate, useParams } from 'react-router-dom'
-import { Text } from 'rebass'
-import { useAppDispatch } from 'state/hooks'
-import { Bound, resetMintState } from 'state/mint/v3/actions'
-import { useRangeHopCallbacks, useV3DerivedMintInfo, useV3MintActionHandlers } from 'state/mint/v3/hooks'
-import { useIsTransactionPending, useTransactionAdder } from 'state/transactions/hooks'
-import { useUserSlippageToleranceWithDefault } from 'state/user/hooks'
-import { useTheme } from 'styled-components'
-import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
-import { unwrappedToken } from 'utils/unwrappedToken'
+import { Contract } from "@ethersproject/contracts";
+import type { TransactionResponse } from "@ethersproject/providers";
+import { LiquidityEventName, LiquiditySource } from "@uniswap/analytics-events";
+import {
+  CurrencyAmount,
+  Fraction,
+  Percent,
+  Price,
+  Token,
+  V2_FACTORY_ADDRESSES,
+} from "sdk-core/src/index";
+import {
+  FeeAmount,
+  Pool,
+  Position,
+  TickMath,
+  priceToClosestTick,
+} from "@uniswap/v3-sdk";
+import { useWeb3React } from "@web3-react/core";
+import { sendAnalyticsEvent, useTrace } from "analytics";
+import Badge from "components/Badge";
+import { ButtonConfirmed } from "components/Button";
+import { BlueCard, DarkGrayCard, LightCard, YellowCard } from "components/Card";
+import DoubleCurrencyLogo from "components/DoubleLogo";
+import FeeSelector from "components/FeeSelector";
+import RangeSelector from "components/RangeSelector";
+import RateToggle from "components/RateToggle";
+import SettingsTab from "components/Settings";
+import { V2Unsupported } from "components/V2Unsupported";
+import { Dots } from "components/swap/styled";
+import { ApprovalState, useApproveCallback } from "hooks/useApproveCallback";
+import { useNetworkSupportsV2 } from "hooks/useNetworkSupportsV2";
+import { PoolState, usePool } from "hooks/usePools";
+import { useGetTransactionDeadline } from "hooks/useTransactionDeadline";
+import { useV2LiquidityTokenPermit } from "hooks/useV2LiquidityTokenPermit";
+import { Trans, t } from "i18n";
+import JSBI from "jsbi";
+import { NEVER_RELOAD, useSingleCallResult } from "lib/hooks/multicall";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, AlertTriangle, ArrowDown } from "react-feather";
+import { Navigate, useParams } from "react-router-dom";
+import { Text } from "rebass";
+import { useAppDispatch } from "state/hooks";
+import { Bound, resetMintState } from "state/mint/v3/actions";
+import {
+  useRangeHopCallbacks,
+  useV3DerivedMintInfo,
+  useV3MintActionHandlers,
+} from "state/mint/v3/hooks";
+import {
+  useIsTransactionPending,
+  useTransactionAdder,
+} from "state/transactions/hooks";
+import { useUserSlippageToleranceWithDefault } from "state/user/hooks";
+import { useTheme } from "styled-components";
+import { formatCurrencyAmount } from "utils/formatCurrencyAmount";
+import { unwrappedToken } from "utils/unwrappedToken";
 
-import { isAddress } from 'utilities/src/addresses'
-import { MigrateHeader } from '.'
-import { AutoColumn } from '../../components/Column'
-import FormattedCurrencyAmount from '../../components/FormattedCurrencyAmount'
-import CurrencyLogo from '../../components/Logo/CurrencyLogo'
-import { AutoRow, RowBetween, RowFixed } from '../../components/Row'
-import { WRAPPED_NATIVE_CURRENCY } from '../../constants/tokens'
-import { useToken } from '../../hooks/Tokens'
-import { usePairContract, useV2MigratorContract } from '../../hooks/useContract'
-import useIsArgentWallet from '../../hooks/useIsArgentWallet'
-import { useTotalSupply } from '../../hooks/useTotalSupply'
-import { useTokenBalance } from '../../state/connection/hooks'
-import { TransactionType } from '../../state/transactions/types'
-import { BackArrowLink, ExternalLink, ThemedText } from '../../theme/components'
-import { calculateGasMargin } from '../../utils/calculateGasMargin'
-import { currencyId } from '../../utils/currencyId'
-import { ExplorerDataType, getExplorerLink } from '../../utils/getExplorerLink'
-import { BodyWrapper } from '../AppBody'
+import { isAddress } from "utilities/src/addresses";
+import { MigrateHeader } from ".";
+import { AutoColumn } from "../../components/Column";
+import FormattedCurrencyAmount from "../../components/FormattedCurrencyAmount";
+import CurrencyLogo from "../../components/Logo/CurrencyLogo";
+import { AutoRow, RowBetween, RowFixed } from "../../components/Row";
+import { WRAPPED_NATIVE_CURRENCY } from "../../constants/tokens";
+import { useToken } from "../../hooks/Tokens";
+import {
+  usePairContract,
+  useV2MigratorContract,
+} from "../../hooks/useContract";
+import useIsArgentWallet from "../../hooks/useIsArgentWallet";
+import { useTotalSupply } from "../../hooks/useTotalSupply";
+import { useTokenBalance } from "../../state/connection/hooks";
+import { TransactionType } from "../../state/transactions/types";
+import {
+  BackArrowLink,
+  ExternalLink,
+  ThemedText,
+} from "../../theme/components";
+import { calculateGasMargin } from "../../utils/calculateGasMargin";
+import { currencyId } from "../../utils/currencyId";
+import { ExplorerDataType, getExplorerLink } from "../../utils/getExplorerLink";
+import { BodyWrapper } from "../AppBody";
 
-const ZERO = JSBI.BigInt(0)
+const ZERO = JSBI.BigInt(0);
 
-const DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE = new Percent(75, 10_000)
+const DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE = new Percent(75, 10_000);
 
 function EmptyState({ message }: { message: ReactNode }) {
   return (
-    <AutoColumn style={{ minHeight: 200, justifyContent: 'center', alignItems: 'center' }}>
+    <AutoColumn
+      style={{ minHeight: 200, justifyContent: "center", alignItems: "center" }}
+    >
       <ThemedText.DeprecatedBody>{message}</ThemedText.DeprecatedBody>
     </AutoColumn>
-  )
+  );
 }
 
 function LiquidityInfo({
   token0Amount,
   token1Amount,
 }: {
-  token0Amount: CurrencyAmount<Token>
-  token1Amount: CurrencyAmount<Token>
+  token0Amount: CurrencyAmount<Token>;
+  token1Amount: CurrencyAmount<Token>;
 }) {
-  const currency0 = unwrappedToken(token0Amount.currency)
-  const currency1 = unwrappedToken(token1Amount.currency)
+  const currency0 = unwrappedToken(token0Amount.currency);
+  const currency1 = unwrappedToken(token1Amount.currency);
 
   return (
     <AutoColumn gap="sm">
       <RowBetween>
         <RowFixed>
-          <CurrencyLogo size="20px" style={{ marginRight: '8px' }} currency={currency0} />
+          <CurrencyLogo
+            size="20px"
+            style={{ marginRight: "8px" }}
+            currency={currency0}
+          />
           <Text fontSize={16} fontWeight={535}>
             {currency0.symbol}
           </Text>
@@ -92,7 +125,11 @@ function LiquidityInfo({
       </RowBetween>
       <RowBetween>
         <RowFixed>
-          <CurrencyLogo size="20px" style={{ marginRight: '8px' }} currency={currency1} />
+          <CurrencyLogo
+            size="20px"
+            style={{ marginRight: "8px" }}
+            currency={currency1}
+          />
           <Text fontSize={16} fontWeight={535}>
             {currency1.symbol}
           </Text>
@@ -103,11 +140,11 @@ function LiquidityInfo({
         </Text>
       </RowBetween>
     </AutoColumn>
-  )
+  );
 }
 
 // hard-code this for now
-const percentageToMigrate = 100
+const percentageToMigrate = 100;
 
 function V2PairMigration({
   pair,
@@ -118,177 +155,225 @@ function V2PairMigration({
   token0,
   token1,
 }: {
-  pair: Contract
-  pairBalance: CurrencyAmount<Token>
-  totalSupply: CurrencyAmount<Token>
-  reserve0: CurrencyAmount<Token>
-  reserve1: CurrencyAmount<Token>
-  token0: Token
-  token1: Token
+  pair: Contract;
+  pairBalance: CurrencyAmount<Token>;
+  totalSupply: CurrencyAmount<Token>;
+  reserve0: CurrencyAmount<Token>;
+  reserve1: CurrencyAmount<Token>;
+  token0: Token;
+  token1: Token;
 }) {
-  const { chainId, account } = useWeb3React()
-  const theme = useTheme()
-  const v2FactoryAddress = chainId ? V2_FACTORY_ADDRESSES[chainId] : undefined
-  const trace = useTrace()
+  const { chainId, account } = useWeb3React();
+  const theme = useTheme();
+  const v2FactoryAddress = chainId ? V2_FACTORY_ADDRESSES[chainId] : undefined;
+  const trace = useTrace();
 
-  const pairFactory = useSingleCallResult(pair, 'factory')
-  const isNotUniswap = pairFactory.result?.[0] && pairFactory.result[0] !== v2FactoryAddress
+  const pairFactory = useSingleCallResult(pair, "factory");
+  const isNotUniswap =
+    pairFactory.result?.[0] && pairFactory.result[0] !== v2FactoryAddress;
 
-  const getDeadline = useGetTransactionDeadline() // custom from users settings
-  const allowedSlippage = useUserSlippageToleranceWithDefault(DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE) // custom from users
+  const getDeadline = useGetTransactionDeadline(); // custom from users settings
+  const allowedSlippage = useUserSlippageToleranceWithDefault(
+    DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE
+  ); // custom from users
 
-  const currency0 = unwrappedToken(token0)
-  const currency1 = unwrappedToken(token1)
+  const currency0 = unwrappedToken(token0);
+  const currency1 = unwrappedToken(token1);
 
   // this is just getLiquidityValue with the fee off, but for the passed pair
   const token0Value = useMemo(
     () =>
       CurrencyAmount.fromRawAmount(
         token0,
-        JSBI.divide(JSBI.multiply(pairBalance.quotient, reserve0.quotient), totalSupply.quotient)
+        JSBI.divide(
+          JSBI.multiply(pairBalance.quotient, reserve0.quotient),
+          totalSupply.quotient
+        )
       ),
     [token0, pairBalance, reserve0, totalSupply]
-  )
+  );
   const token1Value = useMemo(
     () =>
       CurrencyAmount.fromRawAmount(
         token1,
-        JSBI.divide(JSBI.multiply(pairBalance.quotient, reserve1.quotient), totalSupply.quotient)
+        JSBI.divide(
+          JSBI.multiply(pairBalance.quotient, reserve1.quotient),
+          totalSupply.quotient
+        )
       ),
     [token1, pairBalance, reserve1, totalSupply]
-  )
+  );
 
   // set up v3 pool
-  const [feeAmount, setFeeAmount] = useState(FeeAmount.MEDIUM)
-  const [poolState, pool] = usePool(token0, token1, feeAmount)
-  const noLiquidity = poolState === PoolState.NOT_EXISTS
+  const [feeAmount, setFeeAmount] = useState(FeeAmount.MEDIUM);
+  const [poolState, pool] = usePool(token0, token1, feeAmount);
+  const noLiquidity = poolState === PoolState.NOT_EXISTS;
 
   // get spot prices + price difference
   const v2SpotPrice = useMemo(
     () => new Price(token0, token1, reserve0.quotient, reserve1.quotient),
     [token0, token1, reserve0, reserve1]
-  )
-  const v3SpotPrice = poolState === PoolState.EXISTS ? pool?.token0Price : undefined
+  );
+  const v3SpotPrice =
+    poolState === PoolState.EXISTS ? pool?.token0Price : undefined;
 
   let priceDifferenceFraction: Fraction | undefined =
-    v2SpotPrice && v3SpotPrice ? v3SpotPrice.divide(v2SpotPrice).subtract(1).multiply(100) : undefined
+    v2SpotPrice && v3SpotPrice
+      ? v3SpotPrice.divide(v2SpotPrice).subtract(1).multiply(100)
+      : undefined;
   if (priceDifferenceFraction?.lessThan(ZERO)) {
-    priceDifferenceFraction = priceDifferenceFraction.multiply(-1)
+    priceDifferenceFraction = priceDifferenceFraction.multiply(-1);
   }
 
-  const largePriceDifference = priceDifferenceFraction && !priceDifferenceFraction?.lessThan(JSBI.BigInt(2))
+  const largePriceDifference =
+    priceDifferenceFraction &&
+    !priceDifferenceFraction?.lessThan(JSBI.BigInt(2));
 
   // the following is a small hack to get access to price range data/input handlers
-  const [baseToken, setBaseToken] = useState(token0)
-  const { ticks, pricesAtTicks, invertPrice, invalidRange, outOfRange, ticksAtLimit } = useV3DerivedMintInfo(
-    token0,
-    token1,
-    feeAmount,
-    baseToken
-  )
+  const [baseToken, setBaseToken] = useState(token0);
+  const {
+    ticks,
+    pricesAtTicks,
+    invertPrice,
+    invalidRange,
+    outOfRange,
+    ticksAtLimit,
+  } = useV3DerivedMintInfo(token0, token1, feeAmount, baseToken);
 
   // get value and prices at ticks
-  const { [Bound.LOWER]: tickLower, [Bound.UPPER]: tickUpper } = ticks
-  const { [Bound.LOWER]: priceLower, [Bound.UPPER]: priceUpper } = pricesAtTicks
+  const { [Bound.LOWER]: tickLower, [Bound.UPPER]: tickUpper } = ticks;
+  const { [Bound.LOWER]: priceLower, [Bound.UPPER]: priceUpper } =
+    pricesAtTicks;
 
-  const { getDecrementLower, getIncrementLower, getDecrementUpper, getIncrementUpper } = useRangeHopCallbacks(
+  const {
+    getDecrementLower,
+    getIncrementLower,
+    getDecrementUpper,
+    getIncrementUpper,
+  } = useRangeHopCallbacks(
     baseToken,
     baseToken.equals(token0) ? token1 : token0,
     feeAmount,
     tickLower,
     tickUpper
-  )
+  );
 
-  const { onLeftRangeInput, onRightRangeInput } = useV3MintActionHandlers(noLiquidity)
+  const { onLeftRangeInput, onRightRangeInput } =
+    useV3MintActionHandlers(noLiquidity);
 
   // the v3 tick is either the pool's tickCurrent, or the tick closest to the v2 spot price
-  const tick = pool?.tickCurrent ?? priceToClosestTick(v2SpotPrice)
+  const tick = pool?.tickCurrent ?? priceToClosestTick(v2SpotPrice);
   // the price is either the current v3 price, or the price at the tick
-  const sqrtPrice = pool?.sqrtRatioX96 ?? TickMath.getSqrtRatioAtTick(tick)
+  const sqrtPrice = pool?.sqrtRatioX96 ?? TickMath.getSqrtRatioAtTick(tick);
   const position =
-    typeof tickLower === 'number' && typeof tickUpper === 'number' && !invalidRange
+    typeof tickLower === "number" &&
+    typeof tickUpper === "number" &&
+    !invalidRange
       ? Position.fromAmounts({
-          pool: pool ?? new Pool(token0, token1, feeAmount, sqrtPrice, 0, tick, []),
+          pool:
+            pool ?? new Pool(token0, token1, feeAmount, sqrtPrice, 0, tick, []),
           tickLower,
           tickUpper,
           amount0: token0Value.quotient,
           amount1: token1Value.quotient,
           useFullPrecision: true, // we want full precision for the theoretical position
         })
-      : undefined
+      : undefined;
 
   const { amount0: v3Amount0Min, amount1: v3Amount1Min } = useMemo(
-    () => (position ? position.mintAmountsWithSlippage(allowedSlippage) : { amount0: undefined, amount1: undefined }),
+    () =>
+      position
+        ? position.mintAmountsWithSlippage(allowedSlippage)
+        : { amount0: undefined, amount1: undefined },
     [position, allowedSlippage]
-  )
+  );
 
   const refund0 = useMemo(
     () =>
-      position && CurrencyAmount.fromRawAmount(token0, JSBI.subtract(token0Value.quotient, position.amount0.quotient)),
+      position &&
+      CurrencyAmount.fromRawAmount(
+        token0,
+        JSBI.subtract(token0Value.quotient, position.amount0.quotient)
+      ),
     [token0Value, position, token0]
-  )
+  );
   const refund1 = useMemo(
     () =>
-      position && CurrencyAmount.fromRawAmount(token1, JSBI.subtract(token1Value.quotient, position.amount1.quotient)),
+      position &&
+      CurrencyAmount.fromRawAmount(
+        token1,
+        JSBI.subtract(token1Value.quotient, position.amount1.quotient)
+      ),
     [token1Value, position, token1]
-  )
+  );
 
-  const [confirmingMigration, setConfirmingMigration] = useState<boolean>(false)
-  const [pendingMigrationHash, setPendingMigrationHash] = useState<string | null>(null)
+  const [confirmingMigration, setConfirmingMigration] =
+    useState<boolean>(false);
+  const [pendingMigrationHash, setPendingMigrationHash] = useState<
+    string | null
+  >(null);
 
-  const migrator = useV2MigratorContract()
+  const migrator = useV2MigratorContract();
 
   // approvals
-  const [approval, approveManually] = useApproveCallback(pairBalance, migrator?.address)
-  const { signatureData, gatherPermitSignature } = useV2LiquidityTokenPermit(pairBalance, migrator?.address)
+  const [approval, approveManually] = useApproveCallback(
+    pairBalance,
+    migrator?.address
+  );
+  const { signatureData, gatherPermitSignature } = useV2LiquidityTokenPermit(
+    pairBalance,
+    migrator?.address
+  );
 
-  const isArgentWallet = useIsArgentWallet()
+  const isArgentWallet = useIsArgentWallet();
 
   const approve = useCallback(async () => {
     if (isNotUniswap || isArgentWallet) {
       // sushi has to be manually approved
-      await approveManually()
+      await approveManually();
     } else if (gatherPermitSignature) {
       try {
-        await gatherPermitSignature()
+        await gatherPermitSignature();
       } catch (error) {
         // try to approve if gatherPermitSignature failed for any reason other than the user rejecting it
         if (error?.code !== 4001) {
-          await approveManually()
+          await approveManually();
         }
       }
     } else {
-      await approveManually()
+      await approveManually();
     }
-  }, [isNotUniswap, isArgentWallet, gatherPermitSignature, approveManually])
+  }, [isNotUniswap, isArgentWallet, gatherPermitSignature, approveManually]);
 
-  const addTransaction = useTransactionAdder()
-  const isMigrationPending = useIsTransactionPending(pendingMigrationHash ?? undefined)
+  const addTransaction = useTransactionAdder();
+  const isMigrationPending = useIsTransactionPending(
+    pendingMigrationHash ?? undefined
+  );
 
-  const networkSupportsV2 = useNetworkSupportsV2()
+  const networkSupportsV2 = useNetworkSupportsV2();
 
   const migrate = useCallback(async () => {
     if (
       !migrator ||
       !account ||
-      typeof tickLower !== 'number' ||
-      typeof tickUpper !== 'number' ||
+      typeof tickLower !== "number" ||
+      typeof tickUpper !== "number" ||
       !v3Amount0Min ||
       !v3Amount1Min ||
       !chainId ||
       !networkSupportsV2
     )
-      return
+      return;
 
-    const deadline = signatureData?.deadline ?? (await getDeadline())
-    if (!deadline) throw new Error('could not get deadline')
+    const deadline = signatureData?.deadline ?? (await getDeadline());
+    if (!deadline) throw new Error("could not get deadline");
 
-    const data: string[] = []
+    const data: string[] = [];
 
     // permit if necessary
     if (signatureData) {
       data.push(
-        migrator.interface.encodeFunctionData('selfPermit', [
+        migrator.interface.encodeFunctionData("selfPermit", [
           pair.address,
           `0x${pairBalance.quotient.toString(16)}`,
           deadline,
@@ -296,24 +381,27 @@ function V2PairMigration({
           signatureData.r,
           signatureData.s,
         ])
-      )
+      );
     }
 
     // create/initialize pool if necessary
     if (noLiquidity) {
       data.push(
-        migrator.interface.encodeFunctionData('createAndInitializePoolIfNecessary', [
-          token0.address,
-          token1.address,
-          feeAmount,
-          `0x${sqrtPrice.toString(16)}`,
-        ])
-      )
+        migrator.interface.encodeFunctionData(
+          "createAndInitializePoolIfNecessary",
+          [
+            token0.address,
+            token1.address,
+            feeAmount,
+            `0x${sqrtPrice.toString(16)}`,
+          ]
+        )
+      );
     }
 
     // TODO could save gas by not doing this in multicall
     data.push(
-      migrator.interface.encodeFunctionData('migrate', [
+      migrator.interface.encodeFunctionData("migrate", [
         {
           pair: pair.address,
           liquidityToMigrate: `0x${pairBalance.quotient.toString(16)}`,
@@ -330,9 +418,9 @@ function V2PairMigration({
           refundAsETH: true, // hard-code this for now
         },
       ])
-    )
+    );
 
-    setConfirmingMigration(true)
+    setConfirmingMigration(true);
 
     migrator.estimateGas
       .multicall(data)
@@ -341,23 +429,25 @@ function V2PairMigration({
           .multicall(data, { gasLimit: calculateGasMargin(gasEstimate) })
           .then((response: TransactionResponse) => {
             sendAnalyticsEvent(LiquidityEventName.MIGRATE_LIQUIDITY_SUBMITTED, {
-              action: `${isNotUniswap ? LiquiditySource.SUSHISWAP : LiquiditySource.V2}->${LiquiditySource.V3}`,
+              action: `${
+                isNotUniswap ? LiquiditySource.SUSHISWAP : LiquiditySource.V2
+              }->${LiquiditySource.V3}`,
               label: `${currency0.symbol}/${currency1.symbol}`,
               ...trace,
-            })
+            });
 
             addTransaction(response, {
               type: TransactionType.MIGRATE_LIQUIDITY_V3,
               baseCurrencyId: currencyId(currency0),
               quoteCurrencyId: currencyId(currency1),
               isFork: isNotUniswap,
-            })
-            setPendingMigrationHash(response.hash)
-          })
+            });
+            setPendingMigrationHash(response.hash);
+          });
       })
       .catch(() => {
-        setConfirmingMigration(false)
-      })
+        setConfirmingMigration(false);
+      });
   }, [
     migrator,
     account,
@@ -381,21 +471,32 @@ function V2PairMigration({
     currency1,
     trace,
     addTransaction,
-  ])
+  ]);
 
-  const isSuccessfullyMigrated = !!pendingMigrationHash && JSBI.equal(pairBalance.quotient, ZERO)
+  const isSuccessfullyMigrated =
+    !!pendingMigrationHash && JSBI.equal(pairBalance.quotient, ZERO);
 
-  if (!networkSupportsV2) return <V2Unsupported />
+  if (!networkSupportsV2) return <V2Unsupported />;
 
   return (
     <AutoColumn gap="20px">
-      <ThemedText.DeprecatedBody my={9} style={{ fontWeight: 485, textAlign: 'center' }}>
+      <ThemedText.DeprecatedBody
+        my={9}
+        style={{ fontWeight: 485, textAlign: "center" }}
+      >
         <Trans>
-          This tool will safely migrate your {{ noun: isNotUniswap ? `SushiSwap` : `V2` }} liquidity to V3. The process
-          is completely trustless thanks to the
-        </Trans>{' '}
+          This tool will safely migrate your{" "}
+          {{ noun: isNotUniswap ? `SushiSwap` : `V2` }} liquidity to V3. The
+          process is completely trustless thanks to the
+        </Trans>{" "}
         {chainId && migrator && (
-          <ExternalLink href={getExplorerLink(chainId, migrator.address, ExplorerDataType.ADDRESS)}>
+          <ExternalLink
+            href={getExplorerLink(
+              chainId,
+              migrator.address,
+              ExplorerDataType.ADDRESS
+            )}
+          >
             <ThemedText.DeprecatedBlue display="inline">
               <Trans>Uniswap migration contract</Trans> ↗
             </ThemedText.DeprecatedBlue>
@@ -407,50 +508,78 @@ function V2PairMigration({
       <LightCard>
         <AutoColumn gap="lg">
           <RowBetween>
-            <RowFixed style={{ marginLeft: '8px' }}>
-              <DoubleCurrencyLogo currency0={currency0} currency1={currency1} margin={false} size={20} />
-              <ThemedText.DeprecatedMediumHeader style={{ marginLeft: '8px' }}>
+            <RowFixed style={{ marginLeft: "8px" }}>
+              <DoubleCurrencyLogo
+                currency0={currency0}
+                currency1={currency1}
+                margin={false}
+                size={20}
+              />
+              <ThemedText.DeprecatedMediumHeader style={{ marginLeft: "8px" }}>
                 <Trans>
-                  {{ symA: currency0.symbol }}/{{ symB: currency1.symbol }} LP Tokens
+                  {{ symA: currency0.symbol }}/{{ symB: currency1.symbol }} LP
+                  Tokens
                 </Trans>
               </ThemedText.DeprecatedMediumHeader>
             </RowFixed>
-            <Badge>{isNotUniswap ? 'Sushi' : 'V2'}</Badge>
+            <Badge>{isNotUniswap ? "Sushi" : "V2"}</Badge>
           </RowBetween>
-          <LiquidityInfo token0Amount={token0Value} token1Amount={token1Value} />
+          <LiquidityInfo
+            token0Amount={token0Value}
+            token1Amount={token1Value}
+          />
         </AutoColumn>
       </LightCard>
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: "flex", justifyContent: "center" }}>
         <ArrowDown size={24} />
       </div>
 
       <LightCard>
         <AutoColumn gap="lg">
           <RowBetween>
-            <RowFixed style={{ marginLeft: '8px' }}>
-              <DoubleCurrencyLogo currency0={currency0} currency1={currency1} margin={false} size={20} />
-              <ThemedText.DeprecatedMediumHeader style={{ marginLeft: '8px' }}>
+            <RowFixed style={{ marginLeft: "8px" }}>
+              <DoubleCurrencyLogo
+                currency0={currency0}
+                currency1={currency1}
+                margin={false}
+                size={20}
+              />
+              <ThemedText.DeprecatedMediumHeader style={{ marginLeft: "8px" }}>
                 <Trans>
-                  {{ symA: currency0.symbol }}/{{ symB: currency1.symbol }} LP NFT
+                  {{ symA: currency0.symbol }}/{{ symB: currency1.symbol }} LP
+                  NFT
                 </Trans>
               </ThemedText.DeprecatedMediumHeader>
             </RowFixed>
             <Badge>V3</Badge>
           </RowBetween>
 
-          <FeeSelector feeAmount={feeAmount} handleFeePoolSelect={setFeeAmount} />
+          <FeeSelector
+            feeAmount={feeAmount}
+            handleFeePoolSelect={setFeeAmount}
+          />
           {noLiquidity && (
-            <BlueCard style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <AlertCircle color={theme.neutral1} style={{ marginBottom: '12px', opacity: 0.8 }} />
+            <BlueCard
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <AlertCircle
+                color={theme.neutral1}
+                style={{ marginBottom: "12px", opacity: 0.8 }}
+              />
               <ThemedText.DeprecatedBody
                 fontSize={14}
                 style={{ marginBottom: 8, fontWeight: 535, opacity: 0.8 }}
                 textAlign="center"
               >
                 <Trans>
-                  You are the first liquidity provider for this Uniswap V3 pool. Your liquidity will migrate at the
-                  current {{ name: isNotUniswap ? 'SushiSwap' : 'V2' }} price.
+                  You are the first liquidity provider for this Uniswap V3 pool.
+                  Your liquidity will migrate at the current{" "}
+                  {{ name: isNotUniswap ? "SushiSwap" : "V2" }} price.
                 </Trans>
               </ThemedText.DeprecatedBody>
 
@@ -458,22 +587,34 @@ function V2PairMigration({
                 fontWeight={535}
                 textAlign="center"
                 fontSize={14}
-                style={{ marginTop: '8px', opacity: 0.8 }}
+                style={{ marginTop: "8px", opacity: 0.8 }}
               >
-                <Trans>Your transaction cost will be much higher as it includes the gas to create the pool.</Trans>
+                <Trans>
+                  Your transaction cost will be much higher as it includes the
+                  gas to create the pool.
+                </Trans>
               </ThemedText.DeprecatedBody>
 
               {v2SpotPrice && (
-                <AutoColumn gap="sm" style={{ marginTop: '12px' }}>
+                <AutoColumn gap="sm" style={{ marginTop: "12px" }}>
                   <RowBetween>
                     <ThemedText.DeprecatedBody fontWeight={535} fontSize={14}>
                       <Trans>
-                        {{ name: { name: isNotUniswap ? 'SushiSwap' : 'V2' } }}{' '}
-                        {{ sym: invertPrice ? currency1.symbol : currency0.symbol }} Price:
-                      </Trans>{' '}
+                        {{ name: { name: isNotUniswap ? "SushiSwap" : "V2" } }}{" "}
+                        {{
+                          sym: invertPrice
+                            ? currency1.symbol
+                            : currency0.symbol,
+                        }}{" "}
+                        Price:
+                      </Trans>{" "}
                       {invertPrice
-                        ? `${v2SpotPrice?.invert()?.toSignificant(6)} ${currency0.symbol}`
-                        : `${v2SpotPrice?.toSignificant(6)} ${currency1.symbol}`}
+                        ? `${v2SpotPrice?.invert()?.toSignificant(6)} ${
+                            currency0.symbol
+                          }`
+                        : `${v2SpotPrice?.toSignificant(6)} ${
+                            currency1.symbol
+                          }`}
                     </ThemedText.DeprecatedBody>
                   </RowBetween>
                 </AutoColumn>
@@ -487,24 +628,32 @@ function V2PairMigration({
                 <RowBetween>
                   <ThemedText.DeprecatedBody fontSize={14}>
                     <Trans>
-                      {{ name: isNotUniswap ? 'SushiSwap' : 'V2' }}{' '}
-                      {{ sym: invertPrice ? currency1.symbol : currency0.symbol }} Price:
+                      {{ name: isNotUniswap ? "SushiSwap" : "V2" }}{" "}
+                      {{
+                        sym: invertPrice ? currency1.symbol : currency0.symbol,
+                      }}{" "}
+                      Price:
                     </Trans>
                   </ThemedText.DeprecatedBody>
                   <ThemedText.DeprecatedBlack fontSize={14}>
                     {invertPrice
-                      ? `${v2SpotPrice?.invert()?.toSignificant(6)} ${currency0.symbol}`
+                      ? `${v2SpotPrice?.invert()?.toSignificant(6)} ${
+                          currency0.symbol
+                        }`
                       : `${v2SpotPrice?.toSignificant(6)} ${currency1.symbol}`}
                   </ThemedText.DeprecatedBlack>
                 </RowBetween>
 
                 <RowBetween>
                   <ThemedText.DeprecatedBody fontSize={14}>
-                    V3 {invertPrice ? currency1.symbol : currency0.symbol} {t(`Price`)}:
+                    V3 {invertPrice ? currency1.symbol : currency0.symbol}{" "}
+                    {t(`Price`)}:
                   </ThemedText.DeprecatedBody>
                   <ThemedText.DeprecatedBlack fontSize={14}>
                     {invertPrice
-                      ? `${v3SpotPrice?.invert()?.toSignificant(6)} ${currency0.symbol}`
+                      ? `${v3SpotPrice?.invert()?.toSignificant(6)} ${
+                          currency0.symbol
+                        }`
                       : `${v3SpotPrice?.toSignificant(6)} ${currency1.symbol}`}
                   </ThemedText.DeprecatedBlack>
                 </RowBetween>
@@ -518,22 +667,32 @@ function V2PairMigration({
                   </ThemedText.DeprecatedBlack>
                 </RowBetween>
               </AutoColumn>
-              <ThemedText.DeprecatedBody fontSize={14} style={{ marginTop: 8, fontWeight: 485 }}>
+              <ThemedText.DeprecatedBody
+                fontSize={14}
+                style={{ marginTop: 8, fontWeight: 485 }}
+              >
                 <Trans>
-                  You should only deposit liquidity into Uniswap V3 at a price you believe is correct. <br />
-                  If the price seems incorrect, you can either make a swap to move the price or wait for someone else to
-                  do so.
+                  You should only deposit liquidity into Uniswap V3 at a price
+                  you believe is correct. <br />
+                  If the price seems incorrect, you can either make a swap to
+                  move the price or wait for someone else to do so.
                 </Trans>
               </ThemedText.DeprecatedBody>
             </YellowCard>
           ) : !noLiquidity && v3SpotPrice ? (
             <RowBetween>
               <ThemedText.DeprecatedBody fontSize={14}>
-                <Trans>V3 {{ sym: invertPrice ? currency1.symbol : currency0.symbol }} Price:</Trans>
+                <Trans>
+                  V3{" "}
+                  {{ sym: invertPrice ? currency1.symbol : currency0.symbol }}{" "}
+                  Price:
+                </Trans>
               </ThemedText.DeprecatedBody>
               <ThemedText.DeprecatedBlack fontSize={14}>
                 {invertPrice
-                  ? `${v3SpotPrice?.invert()?.toSignificant(6)} ${currency0.symbol}`
+                  ? `${v3SpotPrice?.invert()?.toSignificant(6)} ${
+                      currency0.symbol
+                    }`
                   : `${v3SpotPrice?.toSignificant(6)} ${currency1.symbol}`}
               </ThemedText.DeprecatedBlack>
             </RowBetween>
@@ -547,9 +706,9 @@ function V2PairMigration({
               currencyA={invertPrice ? currency1 : currency0}
               currencyB={invertPrice ? currency0 : currency1}
               handleRateToggle={() => {
-                onLeftRangeInput('')
-                onRightRangeInput('')
-                setBaseToken((base) => (base.equals(token0) ? token1 : token0))
+                onLeftRangeInput("");
+                onRightRangeInput("");
+                setBaseToken((base) => (base.equals(token0) ? token1 : token0));
               }}
             />
           </RowBetween>
@@ -575,7 +734,8 @@ function V2PairMigration({
                 <AlertTriangle stroke={theme.deprecated_yellow3} size="16px" />
                 <ThemedText.DeprecatedYellow ml="12px" fontSize="12px">
                   <Trans>
-                    Your position will not earn fees or be used in trades until the market price moves into your range.
+                    Your position will not earn fees or be used in trades until
+                    the market price moves into your range.
                   </Trans>
                 </ThemedText.DeprecatedYellow>
               </RowBetween>
@@ -587,7 +747,10 @@ function V2PairMigration({
               <RowBetween>
                 <AlertTriangle stroke={theme.deprecated_yellow3} size="16px" />
                 <ThemedText.DeprecatedYellow ml="12px" fontSize="12px">
-                  <Trans>Invalid range selected. The min price must be lower than the max price.</Trans>
+                  <Trans>
+                    Invalid range selected. The min price must be lower than the
+                    max price.
+                  </Trans>
                 </ThemedText.DeprecatedYellow>
               </RowBetween>
             </YellowCard>
@@ -596,15 +759,31 @@ function V2PairMigration({
           {position ? (
             <DarkGrayCard>
               <AutoColumn gap="md">
-                <LiquidityInfo token0Amount={position.amount0} token1Amount={position.amount1} />
+                <LiquidityInfo
+                  token0Amount={position.amount0}
+                  token1Amount={position.amount1}
+                />
                 {chainId && refund0 && refund1 ? (
                   <ThemedText.DeprecatedBlack fontSize={12}>
                     <Trans>
-                      At least {{ amtA: formatCurrencyAmount(refund0, 4) }}{' '}
-                      {{ symA: chainId && WRAPPED_NATIVE_CURRENCY[chainId]?.equals(token0) ? 'ETH' : token0.symbol }}{' '}
-                      and {{ amtB: formatCurrencyAmount(refund1, 4) }}{' '}
-                      {{ symB: chainId && WRAPPED_NATIVE_CURRENCY[chainId]?.equals(token1) ? 'ETH' : token1.symbol }}{' '}
-                      will be refunded to your wallet due to selected price range.
+                      At least {{ amtA: formatCurrencyAmount(refund0, 4) }}{" "}
+                      {{
+                        symA:
+                          chainId &&
+                          WRAPPED_NATIVE_CURRENCY[chainId]?.equals(token0)
+                            ? "ETH"
+                            : token0.symbol,
+                      }}{" "}
+                      and {{ amtB: formatCurrencyAmount(refund1, 4) }}{" "}
+                      {{
+                        symB:
+                          chainId &&
+                          WRAPPED_NATIVE_CURRENCY[chainId]?.equals(token1)
+                            ? "ETH"
+                            : token1.symbol,
+                      }}{" "}
+                      will be refunded to your wallet due to selected price
+                      range.
                     </Trans>
                   </ThemedText.DeprecatedBlack>
                 ) : null}
@@ -614,7 +793,7 @@ function V2PairMigration({
 
           <AutoColumn gap="md">
             {!isSuccessfullyMigrated && !isMigrationPending ? (
-              <AutoColumn gap="md" style={{ flex: '1' }}>
+              <AutoColumn gap="md" style={{ flex: "1" }}>
                 <ButtonConfirmed
                   disabled={
                     approval !== ApprovalState.NOT_APPROVED ||
@@ -630,7 +809,8 @@ function V2PairMigration({
                     <Dots>
                       <Trans>Approving</Trans>
                     </Dots>
-                  ) : approval === ApprovalState.APPROVED || signatureData !== null ? (
+                  ) : approval === ApprovalState.APPROVED ||
+                    signatureData !== null ? (
                     <Trans>Allowed</Trans>
                   ) : (
                     <Trans>Allow LP token migration</Trans>
@@ -638,14 +818,15 @@ function V2PairMigration({
                 </ButtonConfirmed>
               </AutoColumn>
             ) : null}
-            <AutoColumn gap="md" style={{ flex: '1' }}>
+            <AutoColumn gap="md" style={{ flex: "1" }}>
               <ButtonConfirmed
                 confirmed={isSuccessfullyMigrated}
                 disabled={
                   !v3Amount0Min ||
                   !v3Amount1Min ||
                   invalidRange ||
-                  (approval !== ApprovalState.APPROVED && signatureData === null) ||
+                  (approval !== ApprovalState.APPROVED &&
+                    signatureData === null) ||
                   confirmingMigration ||
                   isMigrationPending ||
                   isSuccessfullyMigrated
@@ -653,7 +834,7 @@ function V2PairMigration({
                 onClick={migrate}
               >
                 {isSuccessfullyMigrated ? (
-                  'Success!'
+                  "Success!"
                 ) : isMigrationPending ? (
                   <Dots>
                     <Trans>Migrating</Trans>
@@ -667,53 +848,73 @@ function V2PairMigration({
         </AutoColumn>
       </LightCard>
     </AutoColumn>
-  )
+  );
 }
 
 export default function MigrateV2Pair() {
-  const { address } = useParams<{ address: string }>()
+  const { address } = useParams<{ address: string }>();
   // reset mint state on component mount, and as a cleanup (on unmount)
-  const dispatch = useAppDispatch()
+  const dispatch = useAppDispatch();
   useEffect(() => {
-    dispatch(resetMintState())
+    dispatch(resetMintState());
     return () => {
-      dispatch(resetMintState())
-    }
-  }, [dispatch])
+      dispatch(resetMintState());
+    };
+  }, [dispatch]);
 
-  const { chainId, account } = useWeb3React()
+  const { chainId, account } = useWeb3React();
 
   // get pair contract
-  const validatedAddress = isAddress(address)
-  const pair = usePairContract(validatedAddress ? validatedAddress : undefined)
+  const validatedAddress = isAddress(address);
+  const pair = usePairContract(validatedAddress ? validatedAddress : undefined);
 
   // get token addresses from pair contract
-  const token0AddressCallState = useSingleCallResult(pair, 'token0', undefined, NEVER_RELOAD)
-  const token0Address = token0AddressCallState?.result?.[0]
-  const token1Address = useSingleCallResult(pair, 'token1', undefined, NEVER_RELOAD)?.result?.[0]
+  const token0AddressCallState = useSingleCallResult(
+    pair,
+    "token0",
+    undefined,
+    NEVER_RELOAD
+  );
+  const token0Address = token0AddressCallState?.result?.[0];
+  const token1Address = useSingleCallResult(
+    pair,
+    "token1",
+    undefined,
+    NEVER_RELOAD
+  )?.result?.[0];
 
   // get tokens
-  const token0 = useToken(token0Address)
-  const token1 = useToken(token1Address)
+  const token0 = useToken(token0Address);
+  const token1 = useToken(token1Address);
 
   // get liquidity token balance
   const liquidityToken: Token | undefined = useMemo(
-    () => (chainId && validatedAddress ? new Token(chainId, validatedAddress, 18) : undefined),
+    () =>
+      chainId && validatedAddress
+        ? new Token(chainId, validatedAddress, 18)
+        : undefined,
     [chainId, validatedAddress]
-  )
+  );
 
   // get data required for V2 pair migration
-  const pairBalance = useTokenBalance(account ?? undefined, liquidityToken)
-  const totalSupply = useTotalSupply(liquidityToken)
-  const [reserve0Raw, reserve1Raw] = useSingleCallResult(pair, 'getReserves')?.result ?? []
+  const pairBalance = useTokenBalance(account ?? undefined, liquidityToken);
+  const totalSupply = useTotalSupply(liquidityToken);
+  const [reserve0Raw, reserve1Raw] =
+    useSingleCallResult(pair, "getReserves")?.result ?? [];
   const reserve0 = useMemo(
-    () => (token0 && reserve0Raw ? CurrencyAmount.fromRawAmount(token0, reserve0Raw) : undefined),
+    () =>
+      token0 && reserve0Raw
+        ? CurrencyAmount.fromRawAmount(token0, reserve0Raw)
+        : undefined,
     [token0, reserve0Raw]
-  )
+  );
   const reserve1 = useMemo(
-    () => (token1 && reserve1Raw ? CurrencyAmount.fromRawAmount(token1, reserve1Raw) : undefined),
+    () =>
+      token1 && reserve1Raw
+        ? CurrencyAmount.fromRawAmount(token1, reserve1Raw)
+        : undefined,
     [token1, reserve1Raw]
-  )
+  );
 
   // redirect for invalid url params
   if (
@@ -725,26 +926,38 @@ export default function MigrateV2Pair() {
       !token0AddressCallState?.error &&
       !token0Address)
   ) {
-    console.error('Invalid pair address')
-    return <Navigate to="/migrate/v2" replace />
+    console.error("Invalid pair address");
+    return <Navigate to="/migrate/v2" replace />;
   }
 
   return (
     <BodyWrapper style={{ padding: 24 }}>
       <AutoColumn gap="16px">
-        <AutoRow style={{ alignItems: 'center', justifyContent: 'space-between' }} gap="8px">
+        <AutoRow
+          style={{ alignItems: "center", justifyContent: "space-between" }}
+          gap="8px"
+        >
           <BackArrowLink to="/migrate/v2" />
           <MigrateHeader>
             <Trans>Migrate V2 liquidity</Trans>
           </MigrateHeader>
-          <SettingsTab autoSlippage={DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE} chainId={chainId} hideRoutingSettings />
+          <SettingsTab
+            autoSlippage={DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE}
+            chainId={chainId}
+            hideRoutingSettings
+          />
         </AutoRow>
 
         {!account ? (
           <ThemedText.DeprecatedLargeHeader>
             <Trans>You must connect an account.</Trans>
           </ThemedText.DeprecatedLargeHeader>
-        ) : pairBalance && totalSupply && reserve0 && reserve1 && token0 && token1 ? (
+        ) : pairBalance &&
+          totalSupply &&
+          reserve0 &&
+          reserve1 &&
+          token0 &&
+          token1 ? (
           <V2PairMigration
             pair={pair}
             pairBalance={pairBalance}
@@ -759,5 +972,5 @@ export default function MigrateV2Pair() {
         )}
       </AutoColumn>
     </BodyWrapper>
-  )
+  );
 }

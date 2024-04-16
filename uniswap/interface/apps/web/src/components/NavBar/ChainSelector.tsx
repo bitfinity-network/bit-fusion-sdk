@@ -1,25 +1,33 @@
-import { ChainId } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { showTestnetsAtom } from 'components/AccountDrawer/TestnetsToggle'
-import { ChainLogo } from 'components/Logo/ChainLogo'
-import { getConnection } from 'connection'
-import { ConnectionType } from 'connection/types'
-import { WalletConnectV2 } from 'connection/WalletConnectV2'
-import { getChainInfo } from 'constants/chainInfo'
-import { getChainPriority, L1_CHAIN_IDS, L2_CHAIN_IDS, TESTNET_CHAIN_IDS } from 'constants/chains'
-import useSelectChain from 'hooks/useSelectChain'
-import useSyncChainQuery from 'hooks/useSyncChainQuery'
-import { t } from 'i18n'
-import { useAtomValue } from 'jotai/utils'
-import { useCallback, useMemo, useState } from 'react'
-import { AlertTriangle } from 'react-feather'
-import { css, useTheme } from 'styled-components'
-import { getSupportedChainIdsFromWalletConnectSession } from 'utils/getSupportedChainIdsFromWalletConnectSession'
+import { ChainId } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { showTestnetsAtom } from "components/AccountDrawer/TestnetsToggle";
+import { ChainLogo } from "components/Logo/ChainLogo";
+import { getConnection } from "connection";
+import { ConnectionType } from "connection/types";
+import { WalletConnectV2 } from "connection/WalletConnectV2";
+import { getChainInfo } from "constants/chainInfo";
+import {
+  getChainPriority,
+  L1_CHAIN_IDS,
+  L2_CHAIN_IDS,
+  TESTNET_CHAIN_IDS,
+} from "constants/chains";
+import useSelectChain from "hooks/useSelectChain";
+import useSyncChainQuery from "hooks/useSyncChainQuery";
+import { t } from "i18n";
+import { useAtomValue } from "jotai/utils";
+import { useCallback, useMemo, useState } from "react";
+import { AlertTriangle } from "react-feather";
+import { css, useTheme } from "styled-components";
+import { getSupportedChainIdsFromWalletConnectSession } from "utils/getSupportedChainIdsFromWalletConnectSession";
 
-import { DropdownSelector, StyledMenuContent } from 'components/DropdownSelector'
-import ChainSelectorRow from './ChainSelectorRow'
+import {
+  DropdownSelector,
+  StyledMenuContent,
+} from "components/DropdownSelector";
+import ChainSelectorRow from "./ChainSelectorRow";
 
-const NETWORK_SELECTOR_CHAINS = [...L1_CHAIN_IDS, ...L2_CHAIN_IDS]
+const NETWORK_SELECTOR_CHAINS = [...L1_CHAIN_IDS, ...L2_CHAIN_IDS];
 
 const StyledDropdownButton = css`
   display: flex;
@@ -31,82 +39,88 @@ const StyledDropdownButton = css`
   & ${StyledMenuContent} {
     gap: 4px;
   }
-`
+`;
 
 const styledMobileMenuCss = css`
   @media screen and (max-width: ${({ theme }) => theme.breakpoint.xs}px) {
     bottom: 50px;
   }
-`
+`;
 
 function useWalletSupportedChains(): ChainId[] {
-  const { connector } = useWeb3React()
-  const connectionType = getConnection(connector).type
+  const { connector } = useWeb3React();
+  const connectionType = getConnection(connector).type;
 
   switch (connectionType) {
     case ConnectionType.WALLET_CONNECT_V2:
     case ConnectionType.UNISWAP_WALLET_V2:
-      return getSupportedChainIdsFromWalletConnectSession((connector as WalletConnectV2).provider?.session)
+      return getSupportedChainIdsFromWalletConnectSession(
+        (connector as WalletConnectV2).provider?.session
+      );
     default:
-      return NETWORK_SELECTOR_CHAINS
+      return NETWORK_SELECTOR_CHAINS;
   }
 }
 
 export const ChainSelector = ({ leftAlign }: { leftAlign?: boolean }) => {
-  const { chainId } = useWeb3React()
-  const [isOpen, setIsOpen] = useState<boolean>(false)
+  const { chainId } = useWeb3React();
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
-  const theme = useTheme()
+  const theme = useTheme();
 
-  const showTestnets = useAtomValue(showTestnetsAtom)
-  const walletSupportsChain = useWalletSupportedChains()
+  const showTestnets = useAtomValue(showTestnetsAtom);
+  const walletSupportsChain = useWalletSupportedChains();
 
   const [supportedChains, unsupportedChains] = useMemo(() => {
-    const { supported, unsupported } = NETWORK_SELECTOR_CHAINS.filter((chain: number) => {
-      return showTestnets || !TESTNET_CHAIN_IDS.includes(chain)
-    })
+    const { supported, unsupported } = NETWORK_SELECTOR_CHAINS.filter(
+      (chain: number) => {
+        return showTestnets || !TESTNET_CHAIN_IDS.includes(chain);
+      }
+    )
       .sort((a, b) => getChainPriority(a) - getChainPriority(b))
       .reduce(
         (acc, chain) => {
           if (walletSupportsChain.includes(chain)) {
-            acc.supported.push(chain)
+            acc.supported.push(chain);
           } else {
-            acc.unsupported.push(chain)
+            acc.unsupported.push(chain);
           }
-          return acc
+          return acc;
         },
         { supported: [], unsupported: [] } as Record<string, ChainId[]>
-      )
-    return [supported, unsupported]
-  }, [showTestnets, walletSupportsChain])
+      );
+    return [supported, unsupported];
+  }, [showTestnets, walletSupportsChain]);
 
-  const info = getChainInfo(chainId)
+  const info = getChainInfo(chainId);
 
-  const selectChain = useSelectChain()
-  useSyncChainQuery()
+  const selectChain = useSelectChain();
+  useSyncChainQuery();
 
-  const [pendingChainId, setPendingChainId] = useState<ChainId | undefined>(undefined)
+  const [pendingChainId, setPendingChainId] = useState<ChainId | undefined>(
+    undefined
+  );
 
   const onSelectChain = useCallback(
     async (targetChainId: ChainId) => {
-      setPendingChainId(targetChainId)
-      await selectChain(targetChainId)
-      setPendingChainId(undefined)
-      setIsOpen(false)
+      setPendingChainId(targetChainId);
+      await selectChain(targetChainId);
+      setPendingChainId(undefined);
+      setIsOpen(false);
     },
     [selectChain, setIsOpen]
-  )
+  );
 
   if (!chainId) {
-    return null
+    return null;
   }
 
-  const isSupported = !!info
+  const isSupported = !!info;
 
   const styledMenuCss = css`
-    ${leftAlign ? 'left: 0;' : 'right: 0;'}
+    ${leftAlign ? "left: 0;" : "right: 0;"}
     ${styledMobileMenuCss};
-  `
+  `;
 
   return (
     <DropdownSelector
@@ -119,7 +133,11 @@ export const ChainSelector = ({ leftAlign }: { leftAlign?: boolean }) => {
           <ChainLogo chainId={chainId} size={20} testId="chain-selector-logo" />
         )
       }
-      tooltipText={isSupported ? undefined : t`Your wallet's current network is unsupported.`}
+      tooltipText={
+        isSupported
+          ? undefined
+          : t`Your wallet's current network is unsupported.`
+      }
       dataTestId="chain-selector"
       optionsContainerTestId="chain-selector-options"
       internalMenuItems={
@@ -147,5 +165,5 @@ export const ChainSelector = ({ leftAlign }: { leftAlign?: boolean }) => {
       buttonCss={StyledDropdownButton}
       menuFlyoutCss={styledMenuCss}
     />
-  )
-}
+  );
+};

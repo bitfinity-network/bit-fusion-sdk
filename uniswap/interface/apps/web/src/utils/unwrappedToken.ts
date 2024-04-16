@@ -1,4 +1,4 @@
-import { Currency } from '@uniswap/sdk-core'
+import { Currency } from 'sdk-core/src/index'
 import { asSupportedChain } from 'constants/chains'
 
 import { nativeOnChain, WRAPPED_NATIVE_CURRENCY } from '../constants/tokens'

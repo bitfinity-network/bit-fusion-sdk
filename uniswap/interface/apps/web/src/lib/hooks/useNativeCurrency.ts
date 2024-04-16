@@ -1,4 +1,4 @@
-import { ChainId, NativeCurrency, Token } from '@uniswap/sdk-core'
+import { ChainId, NativeCurrency, Token } from 'sdk-core/src/index'
 import { nativeOnChain } from 'constants/tokens'
 import { useMemo } from 'react'
 
@@ -8,7 +8,7 @@ export default function useNativeCurrency(chainId: ChainId | null | undefined): 
       chainId
         ? nativeOnChain(chainId)
         : // display mainnet when not connected
-          nativeOnChain(ChainId.MAINNET),
+        nativeOnChain(ChainId.MAINNET),
     [chainId]
   )
 }

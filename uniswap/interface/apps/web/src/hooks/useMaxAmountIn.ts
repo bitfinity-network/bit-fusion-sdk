@@ -1,4 +1,4 @@
-import { CurrencyAmount, Percent, Token } from '@uniswap/sdk-core'
+import { CurrencyAmount, Percent, Token } from 'sdk-core/src/index'
 import { useMemo } from 'react'
 import { InterfaceTrade } from 'state/routing/types'
 

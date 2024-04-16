@@ -1,6 +1,6 @@
 import { AnyAction } from '@reduxjs/toolkit'
 import { Protocol } from '@uniswap/router-sdk'
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import { providers } from 'ethers'
 import { Dispatch } from 'react'
 import { TransactionListQuery } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
@@ -285,7 +285,7 @@ export function isConfirmedSwapTypeInfo(
 ): typeInfo is ConfirmedSwapTransactionInfo {
   return Boolean(
     (typeInfo as ConfirmedSwapTransactionInfo).inputCurrencyAmountRaw &&
-      (typeInfo as ConfirmedSwapTransactionInfo).outputCurrencyAmountRaw
+    (typeInfo as ConfirmedSwapTransactionInfo).outputCurrencyAmountRaw
   )
 }
 

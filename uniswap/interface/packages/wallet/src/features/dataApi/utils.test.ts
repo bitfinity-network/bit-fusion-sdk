@@ -1,5 +1,5 @@
 import { ApolloError } from '@apollo/client'
-import { Token } from '@uniswap/sdk-core'
+import { Token } from 'sdk-core/src/index'
 import {
   Chain,
   Token as GQLToken,
@@ -41,18 +41,18 @@ describe(tokenProjectToCurrencyInfos, () => {
   const project = usdcTokenProject()
 
   const getExpectedResult = (proj: TokenProject, token: GQLToken): CurrencyInfo =>
-    ({
-      logoUrl: project.logoUrl,
-      safetyLevel: project.safetyLevel,
-      currencyId: `${fromGraphQLChain(token.chain)}-${token.address}`,
-      currency: buildCurrency({
-        chainId: fromGraphQLChain(token.chain),
-        address: token.address,
-        decimals: token.decimals,
-        symbol: token.symbol,
-        name: project.name,
-      }),
-    } as CurrencyInfo)
+  ({
+    logoUrl: project.logoUrl,
+    safetyLevel: project.safetyLevel,
+    currencyId: `${fromGraphQLChain(token.chain)}-${token.address}`,
+    currency: buildCurrency({
+      chainId: fromGraphQLChain(token.chain),
+      address: token.address,
+      decimals: token.decimals,
+      symbol: token.symbol,
+      name: project.name,
+    }),
+  } as CurrencyInfo)
 
   it('converts tokenProject to CurrencyInfo', () => {
     const result = tokenProjectToCurrencyInfos([project])

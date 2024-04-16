@@ -1,4 +1,4 @@
-import { TradeType } from '@uniswap/sdk-core'
+import { TradeType } from 'sdk-core/src/index'
 import { createStore, Store } from 'redux'
 import { UniswapXOrderStatus } from 'types/uniswapx'
 import { TransactionType } from '../transactions/types'

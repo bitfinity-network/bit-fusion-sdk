@@ -1,5 +1,5 @@
 import { MixedRouteSDK } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Token, TradeType } from 'sdk-core/src/index'
 import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
 import { FeeAmount, Pool, Route as V3Route } from '@uniswap/v3-sdk'
 import { BigNumber } from 'ethers'
@@ -32,10 +32,10 @@ export function transformQuoteToTrade(
   const swapFee: SwapFee | undefined =
     quoteResult?.portionAmount !== undefined && quoteResult?.portionBips !== undefined
       ? {
-          recipient: quoteResult.portionRecipient,
-          percent: new Percent(quoteResult.portionBips, '10000'),
-          amount: quoteResult.portionAmount,
-        }
+        recipient: quoteResult.portionRecipient,
+        percent: new Percent(quoteResult.portionBips, '10000'),
+        amount: quoteResult.portionAmount,
+      }
       : undefined
 
   return new Trade({
@@ -87,12 +87,12 @@ export function computeRoutes(
   quoteResult?: Pick<QuoteResult, 'route'>
 ):
   | {
-      routev3: V3Route<Currency, Currency> | null
-      routev2: V2Route<Currency, Currency> | null
-      mixedRoute: MixedRouteSDK<Currency, Currency> | null
-      inputAmount: CurrencyAmount<Currency>
-      outputAmount: CurrencyAmount<Currency>
-    }[]
+    routev3: V3Route<Currency, Currency> | null
+    routev2: V2Route<Currency, Currency> | null
+    mixedRoute: MixedRouteSDK<Currency, Currency> | null
+    inputAmount: CurrencyAmount<Currency>
+    outputAmount: CurrencyAmount<Currency>
+  }[]
   | undefined {
   if (!quoteResult || !quoteResult.route) {
     return

@@ -1,13 +1,13 @@
-import { Price, WETH9 } from '@uniswap/sdk-core'
-import { FeeAmount, Pool } from '@uniswap/v3-sdk'
-import { PositionInfo } from 'components/AccountDrawer/MiniPortfolio/Pools/cache'
-import { USDC_MAINNET } from 'constants/tokens'
-import { render, screen } from 'test-utils/render'
+import { Price, WETH9 } from "sdk-core/src/index";
+import { FeeAmount, Pool } from "@uniswap/v3-sdk";
+import { PositionInfo } from "components/AccountDrawer/MiniPortfolio/Pools/cache";
+import { USDC_MAINNET } from "constants/tokens";
+import { render, screen } from "test-utils/render";
 
-import { PoolDetailsPositionsTable } from './PoolDetailsPositionsTable'
+import { PoolDetailsPositionsTable } from "./PoolDetailsPositionsTable";
 
 const mockPositionInfo: PositionInfo = {
-  owner: '0x1234',
+  owner: "0x1234",
   chainId: 1,
   pool: {
     token0: WETH9[1],
@@ -24,28 +24,38 @@ const mockPositionInfo: PositionInfo = {
   },
   inRange: true,
   closed: false,
-} as PositionInfo
+} as PositionInfo;
 
-describe('PoolDetailsPositionsTable', () => {
-  it('renders with PositionStatus In Range', () => {
-    const { asFragment } = render(<PoolDetailsPositionsTable positions={[mockPositionInfo]} />)
-    expect(screen.getByText('In range')).not.toBeNull()
-    expect(screen.getByTestId('position-min-0')).not.toBeNull()
-    expect(screen.getByTestId('position-max-1')).not.toBeNull()
-    expect(asFragment()).toMatchSnapshot()
-  })
+describe("PoolDetailsPositionsTable", () => {
+  it("renders with PositionStatus In Range", () => {
+    const { asFragment } = render(
+      <PoolDetailsPositionsTable positions={[mockPositionInfo]} />
+    );
+    expect(screen.getByText("In range")).not.toBeNull();
+    expect(screen.getByTestId("position-min-0")).not.toBeNull();
+    expect(screen.getByTestId("position-max-1")).not.toBeNull();
+    expect(asFragment()).toMatchSnapshot();
+  });
 
-  it('renders with PositionStatus Closed', () => {
-    const closedMockPositionInfo = { ...mockPositionInfo, closed: true, inRange: false }
-    const { asFragment } = render(<PoolDetailsPositionsTable positions={[closedMockPositionInfo]} />)
-    expect(screen.getByText('Closed')).not.toBeNull()
-    expect(asFragment()).toMatchSnapshot()
-  })
+  it("renders with PositionStatus Closed", () => {
+    const closedMockPositionInfo = {
+      ...mockPositionInfo,
+      closed: true,
+      inRange: false,
+    };
+    const { asFragment } = render(
+      <PoolDetailsPositionsTable positions={[closedMockPositionInfo]} />
+    );
+    expect(screen.getByText("Closed")).not.toBeNull();
+    expect(asFragment()).toMatchSnapshot();
+  });
 
-  it('renders with PositionStatus Out Of Range', () => {
-    const outOfRangeMockPositionInfo = { ...mockPositionInfo, inRange: false }
-    const { asFragment } = render(<PoolDetailsPositionsTable positions={[outOfRangeMockPositionInfo]} />)
-    expect(screen.getByText('Out of range')).not.toBeNull()
-    expect(asFragment()).toMatchSnapshot()
-  })
-})
+  it("renders with PositionStatus Out Of Range", () => {
+    const outOfRangeMockPositionInfo = { ...mockPositionInfo, inRange: false };
+    const { asFragment } = render(
+      <PoolDetailsPositionsTable positions={[outOfRangeMockPositionInfo]} />
+    );
+    expect(screen.getByText("Out of range")).not.toBeNull();
+    expect(asFragment()).toMatchSnapshot();
+  });
+});

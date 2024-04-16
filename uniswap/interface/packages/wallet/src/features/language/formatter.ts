@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount } from 'sdk-core/src/index'
 import { useCallback, useMemo } from 'react'
 // eslint-disable-next-line no-restricted-imports
 import {

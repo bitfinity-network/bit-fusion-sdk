@@ -1,4 +1,4 @@
-import { Percent } from '@uniswap/sdk-core'
+import { Percent } from 'sdk-core/src/index'
 
 import { largerPercentValue } from './percent'
 
