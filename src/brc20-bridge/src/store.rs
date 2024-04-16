@@ -30,13 +30,11 @@ impl Default for Brc20Store {
 }
 
 impl Brc20Store {
-    pub fn insert(&mut self, inscriptions: &[Brc20]) {
-        for brc20 in inscriptions {
-            let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
+    pub fn insert(&mut self, brc20: &Brc20) {
+        let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
 
-            self.inner
-                .insert(Brc20Hash(digest), Brc20Inscription(brc20.clone()));
-        }
+        self.inner
+            .insert(Brc20Hash(digest), Brc20Inscription(brc20.clone()));
     }
 }
 
@@ -50,7 +48,7 @@ fn sha256(input: &String) -> String {
 
 /// Represents the hex-encoded SHA2-256 digest of the BRC-20 inscription.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Brc20Hash(String);
+struct Brc20Hash(String);
 
 impl Storable for Brc20Hash {
     fn to_bytes(&self) -> Cow<[u8]> {

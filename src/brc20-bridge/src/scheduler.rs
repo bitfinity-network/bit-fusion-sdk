@@ -1,7 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::CellStructure;
@@ -14,6 +13,7 @@ use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
+use crate::api::MintErc20Args;
 use crate::canister::get_state;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ pub enum Brc20Task {
     InitEvmState,
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
-    MintErc20(H160),
+    MintErc20(MintErc20Args),
     InscribeBrc20(BurntEventData),
 }
 
@@ -161,10 +161,12 @@ impl Task for Brc20Task {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            Self::MintErc20(address) => {
-                let address = address.clone();
+            Self::MintErc20(args) => {
+                let address = args.address.clone();
+                let reveal_txid = args.reveal_txid.clone();
                 Box::pin(async move {
-                    let result = crate::ops::brc20_to_erc20(get_state(), address).await;
+                    let result =
+                        crate::ops::brc20_to_erc20(&get_state(), address, &reveal_txid).await;
 
                     log::info!("ERC20 mint result from scheduler: {result:?}");
 

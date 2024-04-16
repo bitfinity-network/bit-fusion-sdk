@@ -1,17 +1,17 @@
 use candid::CandidType;
-use did::H256;
+use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use minter_did::order::SignedMintOrder;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
     #[error("{0}")]
+    InscriptionParsing(String),
+    #[error("{0}")]
     GetDepositAddress(String),
     #[error("{0}")]
     GetUtxos(String),
-    #[error("{0}")]
-    GetBalance(String),
     #[error("{0}")]
     GetTransactionById(String),
     #[error("{0}")]
@@ -20,6 +20,15 @@ pub enum BridgeError {
     AddressFromPublicKey(String),
     #[error("{0}")]
     EcdsaPublicKey(String),
+}
+
+/// Arguments to `Brc20Task::MintErc20`
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MintErc20Args {
+    /// User's ETH address
+    pub address: H160,
+    /// ID of the reveal transaction
+    pub reveal_txid: String,
 }
 
 /// Status of an ERC20 to a BRC20 swap
@@ -92,7 +101,7 @@ pub enum Erc20MintError {
     /// Error connecting to the EVM.
     Evm(String),
     /// The inscription (BRC20) received is invalid.
-    InvalidBrc20,
+    InvalidBrc20(String),
     /// The BRC20's amount is smaller than the fee. The transaction will not
     /// be precessed.
     ValueTooSmall,
