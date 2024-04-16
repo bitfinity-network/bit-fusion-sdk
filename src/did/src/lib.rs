@@ -14,6 +14,16 @@ pub type InscribeResult<T> = Result<T, InscribeError>;
 pub struct InscribeTransactions {
     pub commit_tx: String,
     pub reveal_tx: String,
+    pub leftover_amount: u64,
+}
+
+/// The InscribeTransactions struct is used to return the commit and reveal transactions.
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+pub struct Brc20TransferTransactions {
+    pub commit_tx: String,
+    pub reveal_tx: String,
+    pub transfer_tx: String,
+    pub leftover_amount: u64,
 }
 
 /// Error type for inscribe endpoint.
@@ -27,6 +37,8 @@ pub enum InscribeError {
     OrdError(String),
     #[error("failed to collect utxos: {0}")]
     FailedToCollectUtxos(String),
+    #[error("no such utxo: {0}")]
+    NoSuchUtxo(String),
     #[error("not enough UTXOs allocated for fees: {0}")]
     InsufficientFundsForFees(String),
     #[error("not enough UTXOs allocated for inscriptions: {0}")]
@@ -61,6 +73,7 @@ impl From<jsonrpc_core::Error> for InscribeError {
 pub struct InscriptionFees {
     pub commit_fee: u64,
     pub reveal_fee: u64,
+    pub transfer_fee: Option<u64>,
     pub postage: u64,
     pub leftover_amount: u64,
 }

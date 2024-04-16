@@ -5,7 +5,10 @@ use std::str::FromStr;
 
 use bitcoin::Address;
 use candid::Principal;
-use did::{BuildData, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
+use did::{
+    Brc20TransferTransactions, BuildData, InscribeError, InscribeResult, InscribeTransactions,
+    InscriptionFees,
+};
 use ethers_core::types::H160;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
@@ -76,12 +79,32 @@ impl Inscriber {
         inscription_type: Protocol,
         inscription: String,
         leftovers_address: String,
-        dst_address: Option<String>,
+        dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
         let derivation_path = Self::derivation_path(None);
         ops::inscribe(
             inscription_type,
+            inscription,
+            leftovers_address,
+            dst_address,
+            multisig_config,
+            derivation_path,
+        )
+        .await
+    }
+
+    /// Inscribes and sends the inscribed sat from this canister to the given address.
+    #[update]
+    pub async fn brc20_transfer(
+        &mut self,
+        inscription: String,
+        leftovers_address: String,
+        dst_address: String,
+        multisig_config: Option<Multisig>,
+    ) -> InscribeResult<Brc20TransferTransactions> {
+        let derivation_path = Self::derivation_path(None);
+        ops::brc20_transfer(
             inscription,
             leftovers_address,
             dst_address,

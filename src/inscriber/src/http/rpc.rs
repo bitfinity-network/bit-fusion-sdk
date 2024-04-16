@@ -8,7 +8,8 @@ use serde_json::{json, Value};
 
 use crate::accessor::ParamsAccessors;
 use crate::constant::{
-    GET_BTC_ADDRESS_METHOD_NAME, GET_INSCRIBER_FEE_METHOD_NAME, INSCRIBER_METHOD_NAME,
+    HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME, HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME,
+    HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME, HTTP_METHOD_INSCRIBER_METHOD_NAME,
 };
 use crate::wallet::inscription::{Multisig, Protocol};
 use crate::{ops, Inscriber};
@@ -56,9 +57,12 @@ impl Rpc {
     /// Handles JSON-RPC method dispatch by matching the method name to handler functions
     pub async fn handle_calls(method_call: MethodCall) -> RpcResult {
         match method_call.method.as_str() {
-            INSCRIBER_METHOD_NAME => Self::inscribe(method_call).await,
-            GET_BTC_ADDRESS_METHOD_NAME => Self::get_bitcoin_address(method_call).await,
-            GET_INSCRIBER_FEE_METHOD_NAME => Self::get_inscription_fees(method_call).await,
+            HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME => Self::brc20_transfer(method_call).await,
+            HTTP_METHOD_INSCRIBER_METHOD_NAME => Self::inscribe(method_call).await,
+            HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME => Self::get_bitcoin_address(method_call).await,
+            HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME => {
+                Self::get_inscription_fees(method_call).await
+            }
             _ => Err(jsonrpc_core::Error::method_not_found().into()),
         }
     }
@@ -87,6 +91,7 @@ impl Rpc {
                 "inscription_type",
                 "inscription",
                 "leftovers_address",
+                "dst_address",
                 "expected_address",
                 "signature",
                 "signed_message",
@@ -97,11 +102,11 @@ impl Rpc {
         let inscription_type: Protocol = method_call.get_from_vec(0)?;
         let inscription: String = method_call.get_from_vec(1)?;
         let leftovers_address: String = method_call.get_from_vec(2)?;
-        let expected_address: H160 = method_call.get_from_vec(3)?;
-        let signature: H520 = method_call.get_from_vec(4)?;
-        let signed_message: String = method_call.get_from_vec(5)?;
-        let multisig_config: Option<Multisig> = method_call.get_from_vec(6).ok();
-        let dst_address: Option<String> = method_call.get_from_vec(7).ok();
+        let dst_address: String = method_call.get_from_vec(3)?;
+        let expected_address: H160 = method_call.get_from_vec(4)?;
+        let signature: H520 = method_call.get_from_vec(5)?;
+        let signed_message: String = method_call.get_from_vec(6)?;
+        let multisig_config: Option<Multisig> = method_call.get_from_vec(7).ok();
 
         let actual_address = Self::recover_pubkey(signed_message, signature)?;
 
@@ -120,6 +125,45 @@ impl Rpc {
         .await?;
 
         Ok(json!(inscription))
+    }
+
+    pub async fn brc20_transfer(method_call: MethodCall) -> RpcResult {
+        method_call.validate_params(
+            &[
+                "inscription",
+                "leftovers_address",
+                "recipient_address",
+                "expected_address",
+                "signature",
+                "signed_message",
+            ],
+            6,
+        )?;
+
+        let inscription: String = method_call.get_from_vec(0)?;
+        let leftovers_address: String = method_call.get_from_vec(1)?;
+        let dst_address: String = method_call.get_from_vec(2)?;
+        let expected_address: H160 = method_call.get_from_vec(3)?;
+        let signature: H520 = method_call.get_from_vec(4)?;
+        let signed_message: String = method_call.get_from_vec(5)?;
+        let multisig_config: Option<Multisig> = method_call.get_from_vec(6).ok();
+
+        let actual_address = Self::recover_pubkey(signed_message, signature)?;
+
+        Self::verify_address(actual_address, expected_address)?;
+
+        let derivation_path = Inscriber::derivation_path(Some(actual_address));
+
+        let result = ops::brc20_transfer(
+            inscription,
+            leftovers_address,
+            dst_address,
+            multisig_config,
+            derivation_path,
+        )
+        .await?;
+
+        Ok(json!(result))
     }
 
     pub async fn get_inscription_fees(method_call: MethodCall) -> RpcResult {

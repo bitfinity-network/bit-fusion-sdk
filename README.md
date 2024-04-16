@@ -56,6 +56,27 @@ dfx canister call inscriber get_bitcoin_address
 
 The above command will generate a unique Bitcoin address from the ECDSA public key of the canister.
 
+### Get inscription fees
+
+Now we require to get the fees we are going to pay for our inscription, and so the amount of sats to deposit to the Canister BTC address.
+
+```bash
+dfx canister call inscriber get_inscription_fees '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null)'
+```
+
+This will return an object containing the amount we need to deposit to accomplish the entire inscription process:
+
+```rust
+pub struct InscriptionFees {
+    pub commit_fee: u64,
+    pub reveal_fee: u64,
+    pub transfer_fee: Option<u64>,
+    pub postage: u64,
+}
+```
+
+It's then just enough to sum all the amounts to get the total sats amount we needd to deposit.
+
 ### Send bitcoins to Canister's Bitcoin Address
 
 Now that the canister is deployed and you have a Bitcoin address, you need to top up its balance so it can send transactions. To avoid UTXO clogging, and since the Bitcoin daemon already generates enough blocks when it starts, generate only 1 additional block and effectively reward the canister wallet with about `5 BTC`. Run the following command:
@@ -66,21 +87,7 @@ docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 1
 
 Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_bitcoin_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
 
-### Endpoint: Get Inscription Fees
-
-To get the current fees for making a BRC-20 inscription, you can execute the following call:
-
-```bash
-dfx canister call inscriber get_inscription_fees '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", null)'
-```
-
-To get the current fees for making an Ordinal (NFT) inscription, you can execute the following call:
-
-```bash
-dfx canister call inscriber get_inscription_fees '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", null)'
-```
-
-### Endpoint: Check the Canister's bitcoin Balance
+### Check the Canister's bitcoin Balance
 
 You can check a Bitcoin address's balance by using the `get_balance` endpoint on the canister via:
 
@@ -88,7 +95,7 @@ You can check a Bitcoin address's balance by using the `get_balance` endpoint on
 dfx canister call inscriber get_balance '("BITCOIN-ADDRESS")'
 ```
 
-### Endpoint: Retrieve UTXOs for Canister's (or any Bitcoin) Address
+### Retrieve UTXOs for Canister's (or any Bitcoin) Address
 
 You can get a Bitcoin address's UTXOs by using the `get_utxos` endpoint on the canister via:
 
@@ -98,12 +105,12 @@ dfx canister call inscriber get_utxos '("BITCOIN-ADDRESS")'
 
 Checking the balance of a Bitcoin address relies on the [bitcoin_get_balance](https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance) API.
 
-### Endpoint: Inscribe and Send a Sat
+### Inscribe and Send a Sat
 
 To make an Ordinal (NFT) inscription, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", "LEFTOVERS-ADDRESS", null, null)'
+dfx canister call inscriber inscribe '(variant { Nft }, "{\"content_type\": \"text/plain\",\"body\":\"demo\"}", "LEFTOVERS-ADDRESS", "DEST-ADDRESS", null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -118,7 +125,7 @@ This effectively inscribes the following JSON-encoded data structure:
 To inscribe a BRC20 `deploy` function onto a Satoshi, for example, you can call the canister's `inscribe` endpoint via:
 
 ```bash
-dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", "LEFTOVERS-ADDRESS", null, null)'
+dfx canister call inscriber inscribe '(variant { Brc20 }, "{\"p\": \"brc-20\",\"op\":\"deploy\",\"tick\":\"demo\",\"max\":\"1000\",\"lim\":\"10\",\"dec\":\"8\"}", "LEFTOVERS-ADDRESS", "DEST-ADDRESS", null)'
 ```
 
 This effectively inscribes the following JSON-encoded data structure:
@@ -145,53 +152,110 @@ pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     leftovers_address: String,
-    dst_address: Option<String>,
+    dst_address: String,
     multisig_config: Option<Multisig>,
-) -> (String, String)
+) -> InscribeResult<InscribeTransactions>
 ```
 
-which is why the above calls has `null` arguments for the `dst_address` and `multisig_config` optional parameters.
+which is why the above calls has `null` arguments for the `multisig_config` optional parameter.
+
+## BRC20 Transfer
+
+The previous steps can be used also to perform a BRC20 transfer. The BRC20 transfer requires an additional step which is the transfer of the reveal UTXO to the final recipient. For this reason the `brc20_transfer` endpoint must be used instead.
+
+```rust
+/// Inscribes a BRC20 transfer and sends the inscribed sat from this canister to the given address.
+#[update]
+pub async fn brc20_transfer(
+    &mut self,
+    inscription: String,
+    leftovers_address: String,
+    dst_address: String,
+    multisig_config: Option<Multisig>,
+) -> InscribeResult<Brc20TransferTransactions>;
+```
+
+```bash
+dfx canister call inscriber brc20_transfer '("{\"p\": \"brc-20\",\"op\":\"transfer\",\"tick\":\"demo\",\"amt\":\"1000\"}", "LEFTOVERS-ADDRESS", "DEST-ADDRESS", null)'
+```
+
+This effectively inscribes the following JSON-encoded data structure:
+
+```json
+{ 
+    "p": "brc-20",     // protocol,
+    "op": "transfer",  // function
+    "tick": "demo",    // name of token
+    "amt": "1000",     // amount to transfer
+}
+```
 
 ### Endpoint: Http Request
 
 The canister also supports communication with the following endpoints via JSON-RPC calls:
 
-- `get_bitcoin_address`
+- `brc20_transfer`
 - `inscribe`
+- `get_bitcoin_address`
 - `get_inscriptions_fees`
 
 To communicate with the canister via JSON-RPC, you can use the `curl` command. For example,
 
 - To get the Bitcoin address, you can run:
 
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"get_bitcoin_address","params":["EXPECTED_ADDRESS", "SIGNATURE", "SIGNED_MESSAGE"],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
-```
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"get_bitcoin_address","params":["EXPECTED_ADDRESS", "SIGNATURE", "SIGNED_MESSAGE"],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
+    ```
 
-Replace the parameters with the actual values as needed.
+    Replace the parameters with the correct values.
 
-The above command will return the following JSON-encoded data structure:
+    The above command will return the following JSON-encoded data structure:
 
-```json
-{
-  "jsonrpc": "2.0",
-  "result": "BITCOIN-ADDRESS",
-  "id": 1
-}
-```
+    ```json
+    {
+      "jsonrpc": "2.0"
+      "result": "bitcoin_address",
+      "id": 1
+    }
+    ```
 
 - To inscribe a Sat, you can run:
 
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"inscribe","params":["inscription_type","inscription", "leftover_address","expected_address","signature", "signed_message", "dst_address", "multisig_config" ],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
-```
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"inscribe","params":["inscription_type","inscription", "leftover_address", "dst_address", "expected_address","signature", "signed_message", "multisig_config" ],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
+    ```
 
-The above command will return the following JSON-encoded data structure:
+    The above command will return the following JSON-encoded data structure:
 
-```json
-{
-  "jsonrpc": "2.0",
-  "result": "INSCRIPTIONS",
-  "id": 1
-}
-```
+    ```json
+    {
+        "jsonrpc": "2.0",
+        "result": {
+            "commit_tx": "txid",
+            "reveal_tx": "txid",
+            "leftover_amount": 10
+        },
+        "id": 1
+    }
+    ```
+
+- To inscribe a BRC20 transfer and then transfer the inscription, you can run:
+
+    ```bash
+    curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"brc20_transfer","params":["inscription", "leftover_address", "dst_address", "expected_address","signature", "signed_message", "multisig_config" ],"id":1}' http://localhost:8000/\?canisterId\=CANISTER_ID
+    ```
+
+    The above command will return the following JSON-encoded data structure:
+
+    ```json
+    {
+        "jsonrpc": "2.0",
+        "result": {
+            "commit_tx": "txid",
+            "reveal_tx": "txid",
+            "transfer_tx": "txid",
+            "leftover_amount": 10
+        },
+        "id": 1
+    }
+    ```

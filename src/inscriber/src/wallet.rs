@@ -1,16 +1,23 @@
 pub mod bitcoin_api;
 pub mod ecdsa_api;
+mod fees;
 pub mod inscription;
+mod signer;
 
 use std::cell::RefCell;
 use std::str::FromStr;
 
+use bitcoin::absolute::LockTime;
 use bitcoin::consensus::serialize;
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, FeeRate, Network, PublicKey, ScriptBuf, Transaction, Txid};
+use bitcoin::transaction::Version;
+use bitcoin::{
+    Address, Amount, FeeRate, Network, OutPoint, PublicKey, ScriptBuf, Sequence, Transaction, TxIn,
+    TxOut, Txid, Witness,
+};
 use did::{InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
 use hex::ToHex;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Outpoint, Utxo};
 use inscription::Nft as CandidNft;
 use ord_rs::constants::POSTAGE;
 use ord_rs::wallet::ScriptType;
@@ -22,6 +29,7 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::inscription::{InscriptionWrapper, Protocol};
+use self::signer::{Signer, Spender};
 use crate::state::State;
 
 #[derive(Clone)]
@@ -124,6 +132,11 @@ impl CanisterWallet {
         let fee_rate = self.get_fee_rate().await;
 
         let inscription = self.build_inscription(inscription_type, inscription)?;
+        let transfer_fee = if matches!(inscription, InscriptionWrapper::Brc20(Brc20::Transfer(_))) {
+            Some(fees::inscription_tranfer_fees(&fee_rate, &dst_address))
+        } else {
+            None
+        };
         let commit_tx_result = self.build_commit_transaction(
             &mut builder,
             inscription,
@@ -138,6 +151,7 @@ impl CanisterWallet {
         Ok(InscriptionFees {
             commit_fee: commit_tx_result.commit_fee.to_sat(),
             reveal_fee: commit_tx_result.reveal_fee.to_sat(),
+            transfer_fee: transfer_fee.map(|amt| amt.to_sat()),
             postage: POSTAGE,
             leftover_amount: commit_tx_result.leftover_amount.to_sat(),
         })
@@ -151,7 +165,7 @@ impl CanisterWallet {
         state: &RefCell<State>,
         inscription_type: Protocol,
         inscription: String,
-        dst_address: Option<Address>,
+        dst_address: Address,
         leftovers_address: Address,
         multisig_config: Option<MultisigConfig>,
     ) -> InscribeResult<InscribeTransactions> {
@@ -187,8 +201,6 @@ impl CanisterWallet {
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(own_pk, script_type, wallet);
 
-        let dst_address = dst_address.unwrap_or_else(|| own_address.clone());
-        log::info!("Getting fee rate...");
         let fee_rate = self.get_fee_rate().await;
 
         log::info!("Building commit transaction inputs...");
@@ -244,7 +256,102 @@ impl CanisterWallet {
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
             reveal_tx: reveal_tx.txid().encode_hex(),
+            leftover_amount: commit_tx_result.leftover_amount.to_sat(),
         })
+    }
+
+    /// Transfer a UTXO from the canister to a recipient address.
+    pub async fn transfer_utxo(
+        &self,
+        commit_txid: Txid,
+        reveal_txid: Txid,
+        recipient_address: Address,
+        leftovers_address: Address,
+        leftover_amount: u64,
+    ) -> InscribeResult<(Txid, u64)> {
+        let own_address = self.get_bitcoin_address().await;
+
+        let fee_rate = self.get_fee_rate().await;
+        let fee_utxo = Utxo {
+            outpoint: Outpoint {
+                txid: commit_txid.as_byte_array().to_vec(),
+                vout: 1,
+            },
+            value: leftover_amount,
+            height: 0,
+        };
+        let inscription_utxo = Utxo {
+            outpoint: Outpoint {
+                txid: reveal_txid.as_byte_array().to_vec(),
+                vout: 0,
+            },
+            value: POSTAGE,
+            height: 0,
+        };
+
+        let transfer_fee = fees::inscription_tranfer_fees(&fee_rate, &recipient_address);
+        let leftover_amount = Amount::from_sat(fee_utxo.value) - transfer_fee;
+
+        // build transaction
+        let input = [&inscription_utxo, &fee_utxo]
+            .map(|utxo| TxIn {
+                previous_output: OutPoint {
+                    txid: Txid::from_slice(&utxo.outpoint.txid).expect("Failed to parse txid"),
+                    vout: utxo.outpoint.vout,
+                },
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::from_consensus(0xffffffff),
+                witness: Witness::new(),
+            })
+            .to_vec();
+
+        let output = vec![
+            TxOut {
+                value: Amount::from_sat(inscription_utxo.value),
+                script_pubkey: recipient_address.script_pubkey(),
+            },
+            TxOut {
+                value: leftover_amount,
+                script_pubkey: leftovers_address.script_pubkey(),
+            },
+        ];
+
+        let unsigned_tx = Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input,
+            output,
+        };
+
+        // sign transaction
+        let ecdsa_signer = EcdsaSigner {
+            derivation_path: self.derivation_path.clone(),
+        };
+
+        let own_pk = PublicKey::from_str(&ecdsa_signer.ecdsa_public_key().await)
+            .map_err(OrdError::PubkeyConversion)?;
+        let signer = Signer::new(ecdsa_signer);
+
+        let utxos_to_sign = [inscription_utxo, fee_utxo]
+            .map(|utxo| OrdUtxo {
+                id: Txid::from_slice(&utxo.outpoint.txid).expect("Failed to parse txid"),
+                index: utxo.outpoint.vout,
+                amount: Amount::from_sat(utxo.value),
+            })
+            .to_vec();
+
+        let spender = Spender {
+            pubkey: own_pk,
+            script: own_address.script_pubkey(),
+        };
+        let signed_tx = signer
+            .sign_transaction_ecdsa(unsigned_tx, &utxos_to_sign, spender)
+            .await?;
+
+        // send transaction
+        bitcoin_api::send_transaction(self.bitcoin_network, serialize(&signed_tx)).await;
+
+        Ok((signed_tx.txid(), leftover_amount.to_sat()))
     }
 
     fn build_inscription(
