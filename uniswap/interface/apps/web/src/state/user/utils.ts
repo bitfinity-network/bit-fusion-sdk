@@ -1,4 +1,4 @@
-import { Token } from '@uniswap/sdk-core'
+import { Token } from 'sdk-core/src/index'
 import { SerializedToken } from 'state/user/types'
 
 export function serializeToken(token: Token): SerializedToken {

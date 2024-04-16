@@ -1,17 +1,20 @@
-import { Percent, Token, V2_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
-import { Pair, computePairAddress } from '@uniswap/v2-sdk'
-import { useWeb3React } from '@web3-react/core'
-import { L2_CHAIN_IDS } from 'constants/chains'
-import { SupportedLocale } from 'constants/locales'
-import { L2_DEADLINE_FROM_NOW } from 'constants/misc'
-import JSBI from 'jsbi'
-import { useCallback, useMemo } from 'react'
-import { useAppDispatch, useAppSelector } from 'state/hooks'
-import { RouterPreference } from 'state/routing/types'
+import { Percent, Token, V2_FACTORY_ADDRESSES } from "sdk-core/src/index";
+import { Pair, computePairAddress } from "@uniswap/v2-sdk";
+import { useWeb3React } from "@web3-react/core";
+import { L2_CHAIN_IDS } from "constants/chains";
+import { SupportedLocale } from "constants/locales";
+import { L2_DEADLINE_FROM_NOW } from "constants/misc";
+import JSBI from "jsbi";
+import { useCallback, useMemo } from "react";
+import { useAppDispatch, useAppSelector } from "state/hooks";
+import { RouterPreference } from "state/routing/types";
 
-import { useDefaultActiveTokens } from 'hooks/Tokens'
-import { deserializeToken, serializeToken } from 'state/user/utils'
-import { BASES_TO_TRACK_LIQUIDITY_FOR, PINNED_PAIRS } from '../../constants/routing'
+import { useDefaultActiveTokens } from "hooks/Tokens";
+import { deserializeToken, serializeToken } from "state/user/utils";
+import {
+  BASES_TO_TRACK_LIQUIDITY_FOR,
+  PINNED_PAIRS,
+} from "../../constants/routing";
 import {
   addSerializedPair,
   addSerializedToken,
@@ -20,40 +23,52 @@ import {
   updateUserLocale,
   updateUserRouterPreference,
   updateUserSlippageTolerance,
-} from './reducer'
-import { SerializedPair, SlippageTolerance } from './types'
+} from "./reducer";
+import { SerializedPair, SlippageTolerance } from "./types";
 
 export function useUserLocale(): SupportedLocale | null {
-  return useAppSelector((state) => state.user.userLocale)
+  return useAppSelector((state) => state.user.userLocale);
 }
 
-export function useUserLocaleManager(): [SupportedLocale | null, (newLocale: SupportedLocale) => void] {
-  const dispatch = useAppDispatch()
-  const locale = useUserLocale()
+export function useUserLocaleManager(): [
+  SupportedLocale | null,
+  (newLocale: SupportedLocale) => void
+] {
+  const dispatch = useAppDispatch();
+  const locale = useUserLocale();
 
   const setLocale = useCallback(
     (newLocale: SupportedLocale) => {
-      dispatch(updateUserLocale({ userLocale: newLocale }))
+      dispatch(updateUserLocale({ userLocale: newLocale }));
     },
     [dispatch]
-  )
+  );
 
-  return [locale, setLocale]
+  return [locale, setLocale];
 }
 
-export function useRouterPreference(): [RouterPreference, (routerPreference: RouterPreference) => void] {
-  const dispatch = useAppDispatch()
+export function useRouterPreference(): [
+  RouterPreference,
+  (routerPreference: RouterPreference) => void
+] {
+  const dispatch = useAppDispatch();
 
-  const routerPreference = useAppSelector((state) => state.user.userRouterPreference)
+  const routerPreference = useAppSelector(
+    (state) => state.user.userRouterPreference
+  );
 
   const setRouterPreference = useCallback(
     (newRouterPreference: RouterPreference) => {
-      dispatch(updateUserRouterPreference({ userRouterPreference: newRouterPreference }))
+      dispatch(
+        updateUserRouterPreference({
+          userRouterPreference: newRouterPreference,
+        })
+      );
     },
     [dispatch]
-  )
+  );
 
-  return [routerPreference, setRouterPreference]
+  return [routerPreference, setRouterPreference];
 }
 
 /**
@@ -64,8 +79,8 @@ export function useUserSlippageTolerance(): [
   (slippageTolerance: Percent | SlippageTolerance.Auto) => void
 ] {
   const userSlippageToleranceRaw = useAppSelector((state) => {
-    return state.user.userSlippageTolerance
-  })
+    return state.user.userSlippageTolerance;
+  });
 
   // TODO(WEB-1985): Keep `userSlippageTolerance` as Percent in Redux store and remove this conversion
   const userSlippageTolerance = useMemo(
@@ -74,99 +89,112 @@ export function useUserSlippageTolerance(): [
         ? SlippageTolerance.Auto
         : new Percent(userSlippageToleranceRaw, 10_000),
     [userSlippageToleranceRaw]
-  )
+  );
 
-  const dispatch = useAppDispatch()
+  const dispatch = useAppDispatch();
   const setUserSlippageTolerance = useCallback(
     (userSlippageTolerance: Percent | SlippageTolerance.Auto) => {
-      let value: SlippageTolerance.Auto | number
+      let value: SlippageTolerance.Auto | number;
       try {
         value =
           userSlippageTolerance === SlippageTolerance.Auto
             ? SlippageTolerance.Auto
-            : JSBI.toNumber(userSlippageTolerance.multiply(10_000).quotient)
+            : JSBI.toNumber(userSlippageTolerance.multiply(10_000).quotient);
       } catch (error) {
-        value = SlippageTolerance.Auto
+        value = SlippageTolerance.Auto;
       }
       dispatch(
         updateUserSlippageTolerance({
           userSlippageTolerance: value,
         })
-      )
+      );
     },
     [dispatch]
-  )
+  );
 
-  return [userSlippageTolerance, setUserSlippageTolerance]
+  return [userSlippageTolerance, setUserSlippageTolerance];
 }
 
 /**
  *Returns user slippage tolerance, replacing the auto with a default value
  * @param defaultSlippageTolerance the value to replace auto with
  */
-export function useUserSlippageToleranceWithDefault(defaultSlippageTolerance: Percent): Percent {
-  const [allowedSlippage] = useUserSlippageTolerance()
-  return allowedSlippage === SlippageTolerance.Auto ? defaultSlippageTolerance : allowedSlippage
+export function useUserSlippageToleranceWithDefault(
+  defaultSlippageTolerance: Percent
+): Percent {
+  const [allowedSlippage] = useUserSlippageTolerance();
+  return allowedSlippage === SlippageTolerance.Auto
+    ? defaultSlippageTolerance
+    : allowedSlippage;
 }
 
-export function useUserHideClosedPositions(): [boolean, (newHideClosedPositions: boolean) => void] {
-  const dispatch = useAppDispatch()
+export function useUserHideClosedPositions(): [
+  boolean,
+  (newHideClosedPositions: boolean) => void
+] {
+  const dispatch = useAppDispatch();
 
-  const hideClosedPositions = useAppSelector((state) => state.user.userHideClosedPositions)
+  const hideClosedPositions = useAppSelector(
+    (state) => state.user.userHideClosedPositions
+  );
 
   const setHideClosedPositions = useCallback(
     (newHideClosedPositions: boolean) => {
-      dispatch(updateHideClosedPositions({ userHideClosedPositions: newHideClosedPositions }))
+      dispatch(
+        updateHideClosedPositions({
+          userHideClosedPositions: newHideClosedPositions,
+        })
+      );
     },
     [dispatch]
-  )
+  );
 
-  return [hideClosedPositions, setHideClosedPositions]
+  return [hideClosedPositions, setHideClosedPositions];
 }
 
 export function useUserTransactionTTL(): [number, (slippage: number) => void] {
-  const { chainId } = useWeb3React()
-  const dispatch = useAppDispatch()
-  const userDeadline = useAppSelector((state) => state.user.userDeadline)
-  const onL2 = Boolean(chainId && L2_CHAIN_IDS.includes(chainId))
-  const deadline = onL2 ? L2_DEADLINE_FROM_NOW : userDeadline
+  const { chainId } = useWeb3React();
+  const dispatch = useAppDispatch();
+  const userDeadline = useAppSelector((state) => state.user.userDeadline);
+  const onL2 = Boolean(chainId && L2_CHAIN_IDS.includes(chainId));
+  const deadline = onL2 ? L2_DEADLINE_FROM_NOW : userDeadline;
 
   const setUserDeadline = useCallback(
     (userDeadline: number) => {
-      dispatch(updateUserDeadline({ userDeadline }))
+      dispatch(updateUserDeadline({ userDeadline }));
     },
     [dispatch]
-  )
+  );
 
-  return [deadline, setUserDeadline]
+  return [deadline, setUserDeadline];
 }
 
 export function useAddUserToken(): (token: Token) => void {
-  const dispatch = useAppDispatch()
+  const dispatch = useAppDispatch();
   return useCallback(
     (token: Token) => {
-      dispatch(addSerializedToken({ serializedToken: serializeToken(token) }))
+      dispatch(addSerializedToken({ serializedToken: serializeToken(token) }));
     },
     [dispatch]
-  )
+  );
 }
 
 function serializePair(pair: Pair): SerializedPair {
   return {
     token0: serializeToken(pair.token0),
     token1: serializeToken(pair.token1),
-  }
+  };
 }
 
 export function usePairAdder(): (pair: Pair) => void {
-  const dispatch = useAppDispatch()
+  const dispatch = useAppDispatch();
 
   return useCallback(
     (pair: Pair) => {
-      dispatch(addSerializedPair({ serializedPair: serializePair(pair) }))
+      dispatch(addSerializedPair({ serializedPair: serializePair(pair) }));
     },
     [dispatch]
-  )
+  );
 }
 
 /**
@@ -175,35 +203,44 @@ export function usePairAdder(): (pair: Pair) => void {
  * @param tokenB the other token
  */
 export function toV2LiquidityToken([tokenA, tokenB]: [Token, Token]): Token {
-  if (tokenA.chainId !== tokenB.chainId) throw new Error('Not matching chain IDs')
-  if (tokenA.equals(tokenB)) throw new Error('Tokens cannot be equal')
-  if (!V2_FACTORY_ADDRESSES[tokenA.chainId]) throw new Error('No V2 factory address on this chain')
+  if (tokenA.chainId !== tokenB.chainId)
+    throw new Error("Not matching chain IDs");
+  if (tokenA.equals(tokenB)) throw new Error("Tokens cannot be equal");
+  if (!V2_FACTORY_ADDRESSES[tokenA.chainId])
+    throw new Error("No V2 factory address on this chain");
 
   return new Token(
     tokenA.chainId,
-    computePairAddress({ factoryAddress: V2_FACTORY_ADDRESSES[tokenA.chainId], tokenA, tokenB }),
+    computePairAddress({
+      factoryAddress: V2_FACTORY_ADDRESSES[tokenA.chainId],
+      tokenA,
+      tokenB,
+    }),
     18,
-    'UNI-V2',
-    'Uniswap V2'
-  )
+    "UNI-V2",
+    "Uniswap V2"
+  );
 }
 
 /**
  * Returns all the pairs of tokens that are tracked by the user for the current chain ID.
  */
 export function useTrackedTokenPairs(): [Token, Token][] {
-  const { chainId } = useWeb3React()
-  const tokens = useDefaultActiveTokens(chainId)
+  const { chainId } = useWeb3React();
+  const tokens = useDefaultActiveTokens(chainId);
 
   // pinned pairs
-  const pinnedPairs = useMemo(() => (chainId ? PINNED_PAIRS[chainId] ?? [] : []), [chainId])
+  const pinnedPairs = useMemo(
+    () => (chainId ? PINNED_PAIRS[chainId] ?? [] : []),
+    [chainId]
+  );
 
   // pairs for every token against every base
   const generatedPairs: [Token, Token][] = useMemo(
     () =>
       chainId
         ? Object.keys(tokens).flatMap((tokenAddress) => {
-            const token = tokens[tokenAddress]
+            const token = tokens[tokenAddress];
             // for each token on the current chain,
             return (
               // loop though all bases on the current chain
@@ -211,46 +248,54 @@ export function useTrackedTokenPairs(): [Token, Token][] {
                 // to construct pairs of the given token with each base
                 .map((base) => {
                   if (base.address === token.address) {
-                    return null
+                    return null;
                   } else {
-                    return [base, token]
+                    return [base, token];
                   }
                 })
                 .filter((p): p is [Token, Token] => p !== null)
-            )
+            );
           })
         : [],
     [tokens, chainId]
-  )
+  );
 
   // pairs saved by users
-  const savedSerializedPairs = useAppSelector(({ user: { pairs } }) => pairs)
+  const savedSerializedPairs = useAppSelector(({ user: { pairs } }) => pairs);
 
   const userPairs: [Token, Token][] = useMemo(() => {
-    if (!chainId || !savedSerializedPairs) return []
-    const forChain = savedSerializedPairs[chainId]
-    if (!forChain) return []
+    if (!chainId || !savedSerializedPairs) return [];
+    const forChain = savedSerializedPairs[chainId];
+    if (!forChain) return [];
 
     return Object.keys(forChain).map((pairId) => {
-      return [deserializeToken(forChain[pairId].token0), deserializeToken(forChain[pairId].token1)]
-    })
-  }, [savedSerializedPairs, chainId])
+      return [
+        deserializeToken(forChain[pairId].token0),
+        deserializeToken(forChain[pairId].token1),
+      ];
+    });
+  }, [savedSerializedPairs, chainId]);
 
   const combinedList = useMemo(
     () => userPairs.concat(generatedPairs).concat(pinnedPairs),
     [generatedPairs, pinnedPairs, userPairs]
-  )
+  );
 
   return useMemo(() => {
     // dedupes pairs of tokens in the combined list
-    const keyed = combinedList.reduce<{ [key: string]: [Token, Token] }>((memo, [tokenA, tokenB]) => {
-      const sorted = tokenA.sortsBefore(tokenB)
-      const key = sorted ? `${tokenA.address}:${tokenB.address}` : `${tokenB.address}:${tokenA.address}`
-      if (memo[key]) return memo
-      memo[key] = sorted ? [tokenA, tokenB] : [tokenB, tokenA]
-      return memo
-    }, {})
+    const keyed = combinedList.reduce<{ [key: string]: [Token, Token] }>(
+      (memo, [tokenA, tokenB]) => {
+        const sorted = tokenA.sortsBefore(tokenB);
+        const key = sorted
+          ? `${tokenA.address}:${tokenB.address}`
+          : `${tokenB.address}:${tokenA.address}`;
+        if (memo[key]) return memo;
+        memo[key] = sorted ? [tokenA, tokenB] : [tokenB, tokenA];
+        return memo;
+      },
+      {}
+    );
 
-    return Object.keys(keyed).map((key) => keyed[key])
-  }, [combinedList])
+    return Object.keys(keyed).map((key) => keyed[key]);
+  }, [combinedList]);
 }

@@ -1,4 +1,4 @@
-import { ChainId, TradeType as MockTradeType, Token } from '@uniswap/sdk-core'
+import { ChainId, TradeType as MockTradeType, Token } from 'sdk-core/src/index'
 import { PERMIT2_ADDRESS } from '@uniswap/universal-router-sdk'
 import { DAI as MockDAI, USDC_MAINNET as MockUSDC_MAINNET, USDT as MockUSDT, nativeOnChain } from 'constants/tokens'
 import { ChainTokenMap } from 'hooks/Tokens'
@@ -69,9 +69,9 @@ function mockCommonFields(id: string, account = mockAccount2, status: MockTxStat
       status === MockTxStatus.Pending
         ? undefined
         : {
-            transactionHash: hash,
-            status: status === MockTxStatus.Confirmed ? 1 : 0,
-          },
+          transactionHash: hash,
+          status: status === MockTxStatus.Confirmed ? 1 : 0,
+        },
     addedTime: 0,
   }
 }

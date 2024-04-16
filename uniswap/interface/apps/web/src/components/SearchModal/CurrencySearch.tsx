@@ -1,31 +1,45 @@
-import { InterfaceEventName, InterfaceModalName } from '@uniswap/analytics-events'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { Trace } from 'analytics'
-import { ChainSelector } from 'components/NavBar/ChainSelector'
-import { useCurrencySearchResults } from 'components/SearchModal/useCurrencySearchResults'
-import useDebounce from 'hooks/useDebounce'
-import { useOnClickOutside } from 'hooks/useOnClickOutside'
-import useSelectChain from 'hooks/useSelectChain'
-import useToggle from 'hooks/useToggle'
-import { useTokenBalances } from 'hooks/useTokenBalances'
-import { Trans, t } from 'i18n'
-import useNativeCurrency from 'lib/hooks/useNativeCurrency'
-import tryParseCurrencyAmount from 'lib/utils/tryParseCurrencyAmount'
-import { ChangeEvent, KeyboardEvent, RefObject, useCallback, useEffect, useRef, useState } from 'react'
-import AutoSizer from 'react-virtualized-auto-sizer'
-import { FixedSizeList } from 'react-window'
-import { Text } from 'rebass'
-import styled, { useTheme } from 'styled-components'
-import { CloseIcon, ThemedText } from 'theme/components'
-import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
-import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
-import { isAddress } from 'utilities/src/addresses'
-import Column from '../Column'
-import Row, { RowBetween } from '../Row'
-import CommonBases from './CommonBases'
-import CurrencyList, { CurrencyRow, formatAnalyticsEventProperties } from './CurrencyList'
-import { PaddedColumn, SearchInput, Separator } from './styled'
+import {
+  InterfaceEventName,
+  InterfaceModalName,
+} from "@uniswap/analytics-events";
+import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { Trace } from "analytics";
+import { ChainSelector } from "components/NavBar/ChainSelector";
+import { useCurrencySearchResults } from "components/SearchModal/useCurrencySearchResults";
+import useDebounce from "hooks/useDebounce";
+import { useOnClickOutside } from "hooks/useOnClickOutside";
+import useSelectChain from "hooks/useSelectChain";
+import useToggle from "hooks/useToggle";
+import { useTokenBalances } from "hooks/useTokenBalances";
+import { Trans, t } from "i18n";
+import useNativeCurrency from "lib/hooks/useNativeCurrency";
+import tryParseCurrencyAmount from "lib/utils/tryParseCurrencyAmount";
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import AutoSizer from "react-virtualized-auto-sizer";
+import { FixedSizeList } from "react-window";
+import { Text } from "rebass";
+import styled, { useTheme } from "styled-components";
+import { CloseIcon, ThemedText } from "theme/components";
+import { FeatureFlags } from "uniswap/src/features/experiments/flags";
+import { useFeatureFlag } from "uniswap/src/features/experiments/hooks";
+import { isAddress } from "utilities/src/addresses";
+import Column from "../Column";
+import Row, { RowBetween } from "../Row";
+import CommonBases from "./CommonBases";
+import CurrencyList, {
+  CurrencyRow,
+  formatAnalyticsEventProperties,
+} from "./CurrencyList";
+import { PaddedColumn, SearchInput, Separator } from "./styled";
 
 const ContentWrapper = styled(Column)`
   background-color: ${({ theme }) => theme.surface1};
@@ -34,33 +48,33 @@ const ContentWrapper = styled(Column)`
   flex: 1 1;
   position: relative;
   border-radius: 20px;
-`
+`;
 
 const ChainSelectorWrapper = styled.div`
   background-color: ${({ theme }) => theme.surface2};
   border-radius: 12px;
-`
+`;
 
 export interface CurrencySearchFilters {
-  showCommonBases?: boolean
-  disableNonToken?: boolean
-  onlyShowCurrenciesWithBalance?: boolean
+  showCommonBases?: boolean;
+  disableNonToken?: boolean;
+  onlyShowCurrenciesWithBalance?: boolean;
 }
 
 const DEFAULT_CURRENCY_SEARCH_FILTERS: CurrencySearchFilters = {
   showCommonBases: true,
   disableNonToken: false,
   onlyShowCurrenciesWithBalance: false,
-}
+};
 
 interface CurrencySearchProps {
-  isOpen: boolean
-  onDismiss: () => void
-  selectedCurrency?: Currency | null
-  onCurrencySelect: (currency: Currency, hasWarning?: boolean) => void
-  otherSelectedCurrency?: Currency | null
-  showCurrencyAmount?: boolean
-  filters?: CurrencySearchFilters
+  isOpen: boolean;
+  onDismiss: () => void;
+  selectedCurrency?: Currency | null;
+  onCurrencySelect: (currency: Currency, hasWarning?: boolean) => void;
+  otherSelectedCurrency?: Currency | null;
+  showCurrencyAmount?: boolean;
+  filters?: CurrencySearchFilters;
 }
 
 export function CurrencySearch({
@@ -75,18 +89,18 @@ export function CurrencySearch({
   const { showCommonBases } = {
     ...DEFAULT_CURRENCY_SEARCH_FILTERS,
     ...filters,
-  }
-  const { chainId } = useWeb3React()
-  const theme = useTheme()
+  };
+  const { chainId } = useWeb3React();
+  const theme = useTheme();
 
-  const [tokenLoaderTimerElapsed, setTokenLoaderTimerElapsed] = useState(false)
+  const [tokenLoaderTimerElapsed, setTokenLoaderTimerElapsed] = useState(false);
 
   // refs for fixed size lists
-  const fixedList = useRef<FixedSizeList>()
+  const fixedList = useRef<FixedSizeList>();
 
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const debouncedQuery = useDebounce(searchQuery, 200)
-  const isAddressSearch = isAddress(debouncedQuery)
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const debouncedQuery = useDebounce(searchQuery, 200);
+  const isAddressSearch = isAddress(debouncedQuery);
 
   const {
     searchCurrency,
@@ -97,86 +111,91 @@ export function CurrencySearch({
     filters,
     selectedCurrency,
     otherSelectedCurrency,
-  })
+  });
 
-  const { balanceMap } = useTokenBalances()
+  const { balanceMap } = useTokenBalances();
 
-  const gqlTokenListsEnabled = useFeatureFlag(FeatureFlags.GqlTokenLists)
+  const gqlTokenListsEnabled = useFeatureFlag(FeatureFlags.GqlTokenLists);
   const isLoading = Boolean(
-    gqlTokenListsEnabled ? currencySearchResultsLoading : currencySearchResultsLoading && !tokenLoaderTimerElapsed
-  )
+    gqlTokenListsEnabled
+      ? currencySearchResultsLoading
+      : currencySearchResultsLoading && !tokenLoaderTimerElapsed
+  );
 
-  const native = useNativeCurrency(chainId)
+  const native = useNativeCurrency(chainId);
 
-  const selectChain = useSelectChain()
+  const selectChain = useSelectChain();
   const handleCurrencySelect = useCallback(
     async (currency: Currency, hasWarning?: boolean) => {
       if (currency.chainId !== chainId) {
-        const result = await selectChain(currency.chainId)
+        const result = await selectChain(currency.chainId);
         if (!result) {
           // failed to switch chains, don't select the currency
-          return
+          return;
         }
       }
-      onCurrencySelect(currency, hasWarning)
-      if (!hasWarning) onDismiss()
+      onCurrencySelect(currency, hasWarning);
+      if (!hasWarning) onDismiss();
     },
     [chainId, onCurrencySelect, onDismiss, selectChain]
-  )
+  );
 
   // clear the input on open
   useEffect(() => {
-    if (isOpen) setSearchQuery('')
-  }, [isOpen])
+    if (isOpen) setSearchQuery("");
+  }, [isOpen]);
 
   // manage focus on modal show
-  const inputRef = useRef<HTMLInputElement>()
+  const inputRef = useRef<HTMLInputElement>();
   const handleInput = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.target.value
-    const checksummedInput = isAddress(input)
-    setSearchQuery(checksummedInput || input)
-    fixedList.current?.scrollTo(0)
-  }, [])
+    const input = event.target.value;
+    const checksummedInput = isAddress(input);
+    setSearchQuery(checksummedInput || input);
+    fixedList.current?.scrollTo(0);
+  }, []);
 
   // Allows the user to select a currency by pressing Enter if it's the only currency in the list.
   const handleEnter = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        const currencyResults = allCurrencyRows.filter((currencyRow) => !!currencyRow.currency)
-        const s = debouncedQuery.toLowerCase().trim()
+      if (e.key === "Enter") {
+        const currencyResults = allCurrencyRows.filter(
+          (currencyRow) => !!currencyRow.currency
+        );
+        const s = debouncedQuery.toLowerCase().trim();
         if (s === native?.symbol?.toLowerCase()) {
-          handleCurrencySelect(native)
+          handleCurrencySelect(native);
         } else if (currencyResults.length > 0) {
           if (
             currencyResults[0]?.currency &&
-            (currencyResults[0].currency.symbol?.toLowerCase() === debouncedQuery.trim().toLowerCase() ||
+            (currencyResults[0].currency.symbol?.toLowerCase() ===
+              debouncedQuery.trim().toLowerCase() ||
               currencyResults.length === 1)
           ) {
-            handleCurrencySelect(currencyResults[0].currency)
+            handleCurrencySelect(currencyResults[0].currency);
           }
         }
       }
     },
     [allCurrencyRows, debouncedQuery, native, handleCurrencySelect]
-  )
+  );
 
   // menu ui
-  const [open, toggle] = useToggle(false)
-  const node = useRef<HTMLDivElement>()
-  useOnClickOutside(node, open ? toggle : undefined)
+  const [open, toggle] = useToggle(false);
+  const node = useRef<HTMLDivElement>();
+  useOnClickOutside(node, open ? toggle : undefined);
 
   // Timeout token loader after 3 seconds to avoid hanging in a loading state.
   useEffect(() => {
     const tokenLoaderTimer = setTimeout(() => {
-      setTokenLoaderTimerElapsed(true)
-    }, 3000)
-    return () => clearTimeout(tokenLoaderTimer)
-  }, [])
+      setTokenLoaderTimerElapsed(true);
+    }, 3000);
+    return () => clearTimeout(tokenLoaderTimer);
+  }, []);
 
   useEffect(() => {
     // Reset token loading timer when search query changes, since new search terms fire new backend requests.
-    setTokenLoaderTimerElapsed(false)
-  }, [searchQuery])
+    setTokenLoaderTimerElapsed(false);
+  }, [searchQuery]);
 
   return (
     <ContentWrapper>
@@ -220,13 +239,22 @@ export function CurrencySearch({
         </PaddedColumn>
         <Separator />
         {searchCurrency ? (
-          <Column style={{ padding: '20px 0', height: '100%' }}>
+          <Column style={{ padding: "20px 0", height: "100%" }}>
             <CurrencyRow
               currency={searchCurrency}
-              isSelected={Boolean(searchCurrency && selectedCurrency && selectedCurrency.equals(searchCurrency))}
-              onSelect={(hasWarning: boolean) => searchCurrency && handleCurrencySelect(searchCurrency, hasWarning)}
+              isSelected={Boolean(
+                searchCurrency &&
+                  selectedCurrency &&
+                  selectedCurrency.equals(searchCurrency)
+              )}
+              onSelect={(hasWarning: boolean) =>
+                searchCurrency &&
+                handleCurrencySelect(searchCurrency, hasWarning)
+              }
               otherSelected={Boolean(
-                searchCurrency && otherSelectedCurrency && otherSelectedCurrency.equals(searchCurrency)
+                searchCurrency &&
+                  otherSelectedCurrency &&
+                  otherSelectedCurrency.equals(searchCurrency)
               )}
               showCurrencyAmount={showCurrencyAmount}
               eventProperties={formatAnalyticsEventProperties(
@@ -239,15 +267,20 @@ export function CurrencySearch({
               balance={
                 tryParseCurrencyAmount(
                   String(
-                    balanceMap[searchCurrency.isNative ? 'ETH' : searchCurrency.address?.toLowerCase()]?.balance ?? 0
+                    balanceMap[
+                      searchCurrency.isNative
+                        ? "ETH"
+                        : searchCurrency.address?.toLowerCase()
+                    ]?.balance ?? 0
                   ),
                   searchCurrency
                 ) ?? CurrencyAmount.fromRawAmount(searchCurrency, 0)
               }
             />
           </Column>
-        ) : allCurrencyRows.some((currencyRow) => !!currencyRow.currency) || isLoading ? (
-          <div style={{ flex: '1' }}>
+        ) : allCurrencyRows.some((currencyRow) => !!currencyRow.currency) ||
+          isLoading ? (
+          <div style={{ flex: "1" }}>
             <AutoSizer disableWidth>
               {({ height }: { height: number }) => (
                 <CurrencyList
@@ -267,13 +300,17 @@ export function CurrencySearch({
             </AutoSizer>
           </div>
         ) : (
-          <Column style={{ padding: '20px', height: '100%' }}>
-            <ThemedText.DeprecatedMain color={theme.neutral3} textAlign="center" mb="20px">
+          <Column style={{ padding: "20px", height: "100%" }}>
+            <ThemedText.DeprecatedMain
+              color={theme.neutral3}
+              textAlign="center"
+              mb="20px"
+            >
               <Trans>No results found.</Trans>
             </ThemedText.DeprecatedMain>
           </Column>
         )}
       </Trace>
     </ContentWrapper>
-  )
+  );
 }

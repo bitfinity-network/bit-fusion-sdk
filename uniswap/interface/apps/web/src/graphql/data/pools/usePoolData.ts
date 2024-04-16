@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import { V2_BIPS } from 'graphql/data/pools/useTopPools'
 import { chainIdToBackendName } from 'graphql/data/util'
 import ms from 'ms'
@@ -102,21 +102,21 @@ export function usePoolData(
     return {
       data: pool
         ? {
-            address: pool.address,
-            txCount: pool.txCount,
-            protocolVersion: pool.protocolVersion,
-            token0: pool.token0 as Token,
-            tvlToken0: pool.token0Supply,
-            token0Price: pool.token0?.project?.markets?.[0]?.price?.value,
-            token1: pool.token1 as Token,
-            tvlToken1: pool.token1Supply,
-            token1Price: pool.token1?.project?.markets?.[0]?.price?.value,
-            feeTier,
-            volumeUSD24H: pool.volume24h?.value,
-            volumeUSD24HChange: calc24HVolChange(pool.historicalVolume?.concat()),
-            tvlUSD: pool.totalLiquidity?.value,
-            tvlUSDChange: pool.totalLiquidityPercentChange24h?.value,
-          }
+          address: pool.address,
+          txCount: pool.txCount,
+          protocolVersion: pool.protocolVersion,
+          token0: pool.token0 as Token,
+          tvlToken0: pool.token0Supply,
+          token0Price: pool.token0?.project?.markets?.[0]?.price?.value,
+          token1: pool.token1 as Token,
+          tvlToken1: pool.token1Supply,
+          token1Price: pool.token1?.project?.markets?.[0]?.price?.value,
+          feeTier,
+          volumeUSD24H: pool.volume24h?.value,
+          volumeUSD24HChange: calc24HVolChange(pool.historicalVolume?.concat()),
+          tvlUSD: pool.totalLiquidity?.value,
+          tvlUSDChange: pool.totalLiquidityPercentChange24h?.value,
+        }
         : undefined,
       error: anyError,
       loading: anyLoading,

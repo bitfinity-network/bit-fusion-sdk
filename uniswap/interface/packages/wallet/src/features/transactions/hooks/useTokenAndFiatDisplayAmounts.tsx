@@ -1,17 +1,17 @@
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
-import { useMemo } from 'react'
-import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
-import { NumberType } from 'utilities/src/format/types'
-import { useAppFiatCurrencyInfo } from 'wallet/src/features/fiatCurrency/hooks'
-import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
-import { getSymbolDisplayText } from 'wallet/src/utils/currency'
+import { useMemo } from "react";
+import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { CurrencyInfo } from "uniswap/src/features/dataApi/types";
+import { NumberType } from "utilities/src/format/types";
+import { useAppFiatCurrencyInfo } from "wallet/src/features/fiatCurrency/hooks";
+import { useLocalizationContext } from "wallet/src/features/language/LocalizationContext";
+import { getSymbolDisplayText } from "wallet/src/utils/currency";
 
 interface FormattedDisplayAmountsProps {
-  value: Maybe<string>
-  currencyInfo: Maybe<CurrencyInfo>
-  currencyAmount: Maybe<CurrencyAmount<Currency>>
-  usdValue: Maybe<CurrencyAmount<Currency>>
-  isFiatMode: boolean
+  value: Maybe<string>;
+  currencyInfo: Maybe<CurrencyInfo>;
+  currencyAmount: Maybe<CurrencyAmount<Currency>>;
+  usdValue: Maybe<CurrencyAmount<Currency>>;
+  isFiatMode: boolean;
 }
 
 /**
@@ -29,22 +29,27 @@ export function useTokenAndFiatDisplayAmounts({
   usdValue,
   isFiatMode,
 }: FormattedDisplayAmountsProps): string {
-  const appFiatCurrency = useAppFiatCurrencyInfo()
-  const { convertFiatAmountFormatted, formatCurrencyAmount, addFiatSymbolToNumber } =
-    useLocalizationContext()
+  const appFiatCurrency = useAppFiatCurrencyInfo();
+  const {
+    convertFiatAmountFormatted,
+    formatCurrencyAmount,
+    addFiatSymbolToNumber,
+  } = useLocalizationContext();
 
   const formattedCurrencyAmount = currencyAmount
     ? formatCurrencyAmount({ value: currencyAmount, type: NumberType.TokenTx })
-    : ''
+    : "";
 
   const formattedFiatValue: string = convertFiatAmountFormatted(
     usdValue?.toExact(),
     NumberType.FiatTokenQuantity
-  )
+  );
 
   // In fiat mode, show equivalent token amount. In token mode, show equivalent fiat amount
   return useMemo((): string => {
-    const currencySymbol = currencyInfo ? getSymbolDisplayText(currencyInfo.currency.symbol) : ''
+    const currencySymbol = currencyInfo
+      ? getSymbolDisplayText(currencyInfo.currency.symbol)
+      : "";
 
     // handle no value case
     if (!value) {
@@ -54,21 +59,21 @@ export function useTokenAndFiatDisplayAmounts({
             value: 0,
             currencyCode: appFiatCurrency.code,
             currencySymbol: appFiatCurrency.symbol,
-          }).toString() as string)
+          }).toString() as string);
     }
 
     // Handle value
     if (isFiatMode) {
       if (formattedCurrencyAmount) {
-        return `${formattedCurrencyAmount} ${currencySymbol}`
+        return `${formattedCurrencyAmount} ${currencySymbol}`;
       }
     } else {
       if (formattedFiatValue && usdValue) {
-        return formattedFiatValue
+        return formattedFiatValue;
       }
     }
     // Fallback for no formatted value case
-    return ''
+    return "";
   }, [
     addFiatSymbolToNumber,
     appFiatCurrency.code,
@@ -79,5 +84,5 @@ export function useTokenAndFiatDisplayAmounts({
     isFiatMode,
     usdValue,
     value,
-  ])
+  ]);
 }

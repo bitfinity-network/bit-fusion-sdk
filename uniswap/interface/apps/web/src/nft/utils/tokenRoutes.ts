@@ -1,5 +1,5 @@
 import { IRoute, Protocol } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount } from 'sdk-core/src/index'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool } from '@uniswap/v3-sdk'
 import { ClassicTrade } from 'state/routing/types'
@@ -58,45 +58,45 @@ function buildPool(pool: Pair | Pool): TradePoolInput {
   return {
     pair: !isPool
       ? {
-          tokenAmountA: {
-            amount: pool.reserve0.quotient.toString(),
-            token: {
-              address: pool.token0.address,
-              chainId: pool.token0.chainId,
-              decimals: pool.token0.decimals,
-              isNative: pool.token0.isNative,
-            },
-          },
-          tokenAmountB: {
-            amount: pool.reserve1.quotient.toString(),
-            token: {
-              address: pool.token1.address,
-              chainId: pool.token1.chainId,
-              decimals: pool.token1.decimals,
-              isNative: pool.token1.isNative,
-            },
-          },
-        }
-      : undefined,
-    pool: isPool
-      ? {
-          fee: pool.fee,
-          liquidity: pool.liquidity.toString(),
-          sqrtRatioX96: pool.sqrtRatioX96.toString(),
-          tickCurrent: pool.tickCurrent.toString(),
-          tokenA: {
+        tokenAmountA: {
+          amount: pool.reserve0.quotient.toString(),
+          token: {
             address: pool.token0.address,
             chainId: pool.token0.chainId,
             decimals: pool.token0.decimals,
             isNative: pool.token0.isNative,
           },
-          tokenB: {
+        },
+        tokenAmountB: {
+          amount: pool.reserve1.quotient.toString(),
+          token: {
             address: pool.token1.address,
             chainId: pool.token1.chainId,
             decimals: pool.token1.decimals,
             isNative: pool.token1.isNative,
           },
-        }
+        },
+      }
+      : undefined,
+    pool: isPool
+      ? {
+        fee: pool.fee,
+        liquidity: pool.liquidity.toString(),
+        sqrtRatioX96: pool.sqrtRatioX96.toString(),
+        tickCurrent: pool.tickCurrent.toString(),
+        tokenA: {
+          address: pool.token0.address,
+          chainId: pool.token0.chainId,
+          decimals: pool.token0.decimals,
+          isNative: pool.token0.isNative,
+        },
+        tokenB: {
+          address: pool.token1.address,
+          chainId: pool.token1.chainId,
+          decimals: pool.token1.decimals,
+          isNative: pool.token1.isNative,
+        },
+      }
       : undefined,
   }
 }

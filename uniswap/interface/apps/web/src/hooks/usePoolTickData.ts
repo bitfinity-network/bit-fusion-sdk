@@ -1,4 +1,4 @@
-import { ChainId, Currency, Price, Token, V3_CORE_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
+import { ChainId, Currency, Price, Token, V3_CORE_FACTORY_ADDRESSES } from 'sdk-core/src/index'
 import { FeeAmount, Pool, TICK_SPACINGS, tickToPrice } from '@uniswap/v3-sdk'
 import { useWeb3React } from '@web3-react/core'
 import { TickData, Ticks } from 'graphql/thegraph/AllV3TicksQuery'
@@ -36,12 +36,12 @@ function useTicksFromSubgraph(
   const poolAddress =
     currencyA && currencyB && feeAmount
       ? Pool.getAddress(
-          currencyA?.wrapped,
-          currencyB?.wrapped,
-          feeAmount,
-          undefined,
-          chainId ? V3_CORE_FACTORY_ADDRESSES[chainId] : undefined
-        )
+        currencyA?.wrapped,
+        currencyB?.wrapped,
+        feeAmount,
+        undefined,
+        chainId ? V3_CORE_FACTORY_ADDRESSES[chainId] : undefined
+      )
       : undefined
 
   return useAllV3TicksQuery({

@@ -1,5 +1,5 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount } from 'sdk-core/src/index'
 import { Pool } from '@uniswap/v3-sdk'
 import { useSingleCallResult } from 'lib/hooks/multicall'
 import useBlockNumber from 'lib/hooks/useBlockNumber'
@@ -27,7 +27,7 @@ export function useV3PositionFees(
   // latestBlockNumber is included to ensure data stays up-to-date every block
   const [amounts, setAmounts] = useState<[BigNumber, BigNumber] | undefined>()
   useEffect(() => {
-    ;(async function getFees() {
+    ; (async function getFees() {
       if (positionManager && tokenIdHexString && owner) {
         try {
           const results = await positionManager.callStatic.collect(

@@ -1,4 +1,4 @@
-import { ChainId, Percent } from '@uniswap/sdk-core'
+import { ChainId, Percent } from 'sdk-core/src/index'
 import { exploreSearchStringAtom } from 'components/Tokens/state'
 import { BIPS_BASE } from 'constants/misc'
 import { OrderDirection, chainIdToBackendName } from 'graphql/data/util'
@@ -28,8 +28,8 @@ export function sortPools(pools: TablePool[], sortState: PoolTableSortState) {
             ? 1
             : -1
           : a.oneDayApr.greaterThan(b.oneDayApr)
-          ? 1
-          : -1
+            ? 1
+            : -1
       default:
         return sortState.sortDirection === OrderDirection.Desc ? b.tvl - a.tvl : a.tvl - b.tvl
     }

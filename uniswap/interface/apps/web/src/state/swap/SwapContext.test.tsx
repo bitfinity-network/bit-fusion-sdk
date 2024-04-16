@@ -1,25 +1,28 @@
-import { ChainId, Percent } from '@uniswap/sdk-core'
-import { Field, SwapTab } from 'components/swap/constants'
-import { nativeOnChain } from 'constants/tokens'
-import { render } from 'test-utils/render'
+import { ChainId, Percent } from "sdk-core/src/index";
+import { Field, SwapTab } from "components/swap/constants";
+import { nativeOnChain } from "constants/tokens";
+import { render } from "test-utils/render";
 
-import { useSwapAndLimitContext, useSwapContext } from 'state/swap/hooks'
-import { SwapAndLimitContext, SwapInfo } from 'state/swap/types'
-import { SwapAndLimitContextProvider, SwapContextProvider } from './SwapContext'
+import { useSwapAndLimitContext, useSwapContext } from "state/swap/hooks";
+import { SwapAndLimitContext, SwapInfo } from "state/swap/types";
+import {
+  SwapAndLimitContextProvider,
+  SwapContextProvider,
+} from "./SwapContext";
 
-describe('Swap Context', () => {
-  test('should use context', () => {
-    let swapContext
+describe("Swap Context", () => {
+  test("should use context", () => {
+    let swapContext;
     const TestComponent = () => {
-      swapContext = useSwapContext()
-      return <div />
-    }
+      swapContext = useSwapContext();
+      return <div />;
+    };
 
     render(
       <SwapContextProvider>
         <TestComponent />
       </SwapContextProvider>
-    )
+    );
 
     expect(swapContext).toEqual({
       derivedSwapInfo: {
@@ -41,32 +44,32 @@ describe('Swap Context', () => {
         trade: {
           currentTrade: undefined,
           error: undefined,
-          state: 'invalid',
+          state: "invalid",
           trade: undefined,
         },
       },
       setSwapState: expect.any(Function),
       swapState: {
-        independentField: 'INPUT',
-        typedValue: '',
+        independentField: "INPUT",
+        typedValue: "",
       },
-    })
-  })
-})
+    });
+  });
+});
 
-describe('SwapAndLimitContext', () => {
-  test('should use context', () => {
-    let swapAndLimitContext
+describe("SwapAndLimitContext", () => {
+  test("should use context", () => {
+    let swapAndLimitContext;
     const TestComponent = () => {
-      swapAndLimitContext = useSwapAndLimitContext()
-      return <div />
-    }
+      swapAndLimitContext = useSwapAndLimitContext();
+      return <div />;
+    };
 
     render(
       <SwapAndLimitContextProvider>
         <TestComponent />
       </SwapAndLimitContextProvider>
-    )
+    );
 
     expect(swapAndLimitContext).toEqual({
       currencyState: {
@@ -81,18 +84,18 @@ describe('SwapAndLimitContext', () => {
       currentTab: SwapTab.Swap,
       setCurrentTab: expect.any(Function),
       chainId: undefined,
-    })
-  })
-})
+    });
+  });
+});
 
-describe('Combined contexts', () => {
-  test('should use combined contexts', () => {
-    let derivedSwapInfo: SwapInfo
+describe("Combined contexts", () => {
+  test("should use combined contexts", () => {
+    let derivedSwapInfo: SwapInfo;
 
     const TestComponent = () => {
-      derivedSwapInfo = useSwapContext().derivedSwapInfo
-      return <div />
-    }
+      derivedSwapInfo = useSwapContext().derivedSwapInfo;
+      return <div />;
+    };
 
     render(
       <SwapAndLimitContext.Provider
@@ -115,12 +118,12 @@ describe('Combined contexts', () => {
           <TestComponent />
         </SwapContextProvider>
       </SwapAndLimitContext.Provider>
-    )
+    );
 
     // @ts-ignore rendering TestComponent sets derivedSwapInfo value
     expect(derivedSwapInfo?.currencies).toEqual({
       [Field.INPUT]: nativeOnChain(ChainId.MAINNET),
       [Field.OUTPUT]: undefined,
-    })
-  })
-})
+    });
+  });
+});

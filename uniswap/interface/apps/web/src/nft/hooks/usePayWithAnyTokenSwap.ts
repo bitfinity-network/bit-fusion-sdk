@@ -1,4 +1,4 @@
-import { Percent } from '@uniswap/sdk-core'
+import { Percent } from 'sdk-core/src/index'
 import { Allowance } from 'hooks/usePermit2Allowance'
 import { buildAllTradeRouteInputs } from 'nft/utils/tokenRoutes'
 import { useEffect } from 'react'
@@ -43,16 +43,16 @@ export default function usePayWithAnyTokenSwap(
     const permitInput: PermitInput | undefined =
       'permitSignature' in allowance && allowance.permitSignature
         ? {
-            details: {
-              amount: allowance.permitSignature.details.amount.toString(),
-              expiration: allowance.permitSignature.details.expiration.toString(),
-              nonce: allowance.permitSignature.details.nonce.toString(),
-              token: allowance.permitSignature.details.token,
-            },
-            sigDeadline: allowance.permitSignature.sigDeadline.toString(),
-            signature: allowance.permitSignature.signature,
-            spender: allowance.permitSignature.spender,
-          }
+          details: {
+            amount: allowance.permitSignature.details.amount.toString(),
+            expiration: allowance.permitSignature.details.expiration.toString(),
+            nonce: allowance.permitSignature.details.nonce.toString(),
+            token: allowance.permitSignature.details.token,
+          },
+          sigDeadline: allowance.permitSignature.sigDeadline.toString(),
+          signature: allowance.permitSignature.signature,
+          spender: allowance.permitSignature.spender,
+        }
         : undefined
 
     setTokenTradeInput({

@@ -117,7 +117,8 @@
     "wallet": "yarn workspace wallet",
     "web": "yarn workspace @uniswap/interface",
     "uniswap": "yarn workspace uniswap",
-    "utilities": "yarn workspace utilities"
+    "utilities": "yarn workspace utilities",
+    "sdk-core": "yarn workspace sdk-core"
   },
   "workspaces": [
     "apps/*",

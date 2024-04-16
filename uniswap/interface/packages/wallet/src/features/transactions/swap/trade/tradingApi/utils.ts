@@ -1,5 +1,5 @@
 import { MixedRouteSDK } from '@uniswap/router-sdk'
-import { Currency, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount, Percent, Token, TradeType } from 'sdk-core/src/index'
 import { Pair, Route as V2Route } from '@uniswap/v2-sdk'
 import { FeeAmount, Pool, Route as V3Route } from '@uniswap/v3-sdk'
 import { BigNumber } from 'ethers'
@@ -49,10 +49,10 @@ export function transformTradingApiResponseToTrade(
   const swapFee: SwapFee | undefined =
     data?.quote.portionAmount !== undefined && data?.quote?.portionBips !== undefined
       ? {
-          recipient: data.quote.portionRecipient,
-          percent: new Percent(data.quote.portionBips, '10000'),
-          amount: data?.quote.portionAmount,
-        }
+        recipient: data.quote.portionRecipient,
+        percent: new Percent(data.quote.portionBips, '10000'),
+        amount: data?.quote.portionAmount,
+      }
       : undefined
 
   return new Trade({
@@ -78,12 +78,12 @@ export function computeRoutesTradingApi(
   quoteResponse?: QuoteResponse
 ):
   | {
-      routev3: V3Route<Currency, Currency> | null
-      routev2: V2Route<Currency, Currency> | null
-      mixedRoute: MixedRouteSDK<Currency, Currency> | null
-      inputAmount: CurrencyAmount<Currency>
-      outputAmount: CurrencyAmount<Currency>
-    }[]
+    routev3: V3Route<Currency, Currency> | null
+    routev2: V2Route<Currency, Currency> | null
+    mixedRoute: MixedRouteSDK<Currency, Currency> | null
+    inputAmount: CurrencyAmount<Currency>
+    outputAmount: CurrencyAmount<Currency>
+  }[]
   | undefined {
   // TODO : remove quote type check for Uniswap X integration
   if (!quoteResponse || !quoteResponse.quote || !isClassicQuote(quoteResponse.quote)) {
@@ -313,10 +313,10 @@ export function validateTrade({
         ? trade.quoteData.quote?.quote
         : trade.quoteData.quote?.amount
       : isClassicQuote(trade.quoteData?.quote?.quote)
-      ? exactCurrencyField === CurrencyField.INPUT
-        ? trade.quoteData.quote.quote.input?.amount
-        : trade.quoteData.quote.quote.output?.amount
-      : undefined
+        ? exactCurrencyField === CurrencyField.INPUT
+          ? trade.quoteData.quote.quote.input?.amount
+          : trade.quoteData.quote.quote.output?.amount
+        : undefined
 
   const tokenAddressesMatch = inputsMatch && outputsMatch
   const exactAmountsMatch = exactAmount?.toExact() !== exactAmountFromQuote

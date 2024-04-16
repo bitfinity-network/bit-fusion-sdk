@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount } from 'sdk-core/src/index'
 import { Contract, providers } from 'ethers'
 import { call } from 'typed-redux-saga'
 import { Weth } from 'uniswap/src/abis/types'

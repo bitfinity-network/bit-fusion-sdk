@@ -1,44 +1,46 @@
-import { Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
-import { DetailLineItem, LineItemData } from 'components/swap/DetailLineItem'
-import TradePrice from 'components/swap/TradePrice'
-import { Trans } from 'i18n'
-import { UniswapXOrderDetails } from 'state/signatures/types'
-import { ExternalLink } from 'theme/components'
-import { ellipseMiddle } from 'utilities/src/addresses'
-import { NumberType, useFormatter } from 'utils/formatNumbers'
+import { Currency, CurrencyAmount, Price } from "sdk-core/src/index";
+import { DetailLineItem, LineItemData } from "components/swap/DetailLineItem";
+import TradePrice from "components/swap/TradePrice";
+import { Trans } from "i18n";
+import { UniswapXOrderDetails } from "state/signatures/types";
+import { ExternalLink } from "theme/components";
+import { ellipseMiddle } from "utilities/src/addresses";
+import { NumberType, useFormatter } from "utils/formatNumbers";
 
-import { formatTimestamp } from '../formatTimestamp'
+import { formatTimestamp } from "../formatTimestamp";
 
 export enum OffchainOrderLineItemType {
-  EXCHANGE_RATE = 'EXCHANGE_RATE',
-  EXPIRY = 'EXPIRY',
-  NETWORK_COST = 'NETWORK_COST',
-  TRANSACTION_ID = 'TRANSACTION_ID',
+  EXCHANGE_RATE = "EXCHANGE_RATE",
+  EXPIRY = "EXPIRY",
+  NETWORK_COST = "NETWORK_COST",
+  TRANSACTION_ID = "TRANSACTION_ID",
 }
 
 export type OffchainOrderLineItemProps =
   | {
-      type: OffchainOrderLineItemType.EXCHANGE_RATE
+      type: OffchainOrderLineItemType.EXCHANGE_RATE;
       amounts: {
-        inputAmount: CurrencyAmount<Currency>
-        outputAmount: CurrencyAmount<Currency>
-      }
+        inputAmount: CurrencyAmount<Currency>;
+        outputAmount: CurrencyAmount<Currency>;
+      };
     }
   | {
-      type: OffchainOrderLineItemType.EXPIRY
-      order: UniswapXOrderDetails
+      type: OffchainOrderLineItemType.EXPIRY;
+      order: UniswapXOrderDetails;
     }
   | {
-      type: OffchainOrderLineItemType.TRANSACTION_ID
-      explorerLink: string
-      order: UniswapXOrderDetails
+      type: OffchainOrderLineItemType.TRANSACTION_ID;
+      explorerLink: string;
+      order: UniswapXOrderDetails;
     }
   | {
-      type: OffchainOrderLineItemType.NETWORK_COST
-    }
+      type: OffchainOrderLineItemType.NETWORK_COST;
+    };
 
-function useLineItem(details: OffchainOrderLineItemProps): LineItemData | undefined {
-  const { formatNumber } = useFormatter()
+function useLineItem(
+  details: OffchainOrderLineItemProps
+): LineItemData | undefined {
+  const { formatNumber } = useFormatter();
   switch (details.type) {
     case OffchainOrderLineItemType.EXCHANGE_RATE:
       return {
@@ -55,32 +57,43 @@ function useLineItem(details: OffchainOrderLineItemProps): LineItemData | undefi
             }
           />
         ),
-      }
+      };
     case OffchainOrderLineItemType.EXPIRY:
       return {
         Label: () => <Trans>Expiry</Trans>,
-        Value: () => <span>{details.order.expiry && formatTimestamp(details.order.expiry * 1000)}</span>,
-      }
+        Value: () => (
+          <span>
+            {details.order.expiry &&
+              formatTimestamp(details.order.expiry * 1000)}
+          </span>
+        ),
+      };
     case OffchainOrderLineItemType.NETWORK_COST:
       return {
         Label: () => <Trans>Network cost</Trans>,
-        Value: () => <span>{formatNumber({ input: 0, type: NumberType.FiatGasPrice })}</span>,
-      }
+        Value: () => (
+          <span>
+            {formatNumber({ input: 0, type: NumberType.FiatGasPrice })}
+          </span>
+        ),
+      };
     case OffchainOrderLineItemType.TRANSACTION_ID:
       return {
         Label: () => <Trans>Transaction ID</Trans>,
         Value: () => (
-          <ExternalLink href={details.explorerLink}>{ellipseMiddle(details.order.txHash ?? '')}</ExternalLink>
+          <ExternalLink href={details.explorerLink}>
+            {ellipseMiddle(details.order.txHash ?? "")}
+          </ExternalLink>
         ),
-      }
+      };
     default:
-      return undefined
+      return undefined;
   }
 }
 
 export function OffchainOrderLineItem(props: OffchainOrderLineItemProps) {
-  const LineItem = useLineItem(props)
-  if (!LineItem) return null
+  const LineItem = useLineItem(props);
+  if (!LineItem) return null;
 
-  return <DetailLineItem LineItem={LineItem} />
+  return <DetailLineItem LineItem={LineItem} />;
 }

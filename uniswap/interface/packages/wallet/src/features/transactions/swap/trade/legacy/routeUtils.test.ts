@@ -1,5 +1,5 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import { Token } from '@uniswap/sdk-core'
+import { Token } from 'sdk-core/src/index'
 import { NativeCurrency } from 'wallet/src/features/tokens/NativeCurrency'
 import { PoolType } from 'wallet/src/features/transactions/swap/trade/legacy/types'
 import { computeRoutes } from './routeUtils'

@@ -1,19 +1,23 @@
-import { ChainId, Currency } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { PortfolioLogo } from 'components/AccountDrawer/MiniPortfolio/PortfolioLogo'
-import { getTokenDetailsURL, gqlToCurrency, supportedChainIdFromGQLChain } from 'graphql/data/util'
-import { Trans } from 'i18n'
-import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import styled from 'styled-components'
-import { ThemedText } from 'theme/components'
+import { ChainId, Currency } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { PortfolioLogo } from "components/AccountDrawer/MiniPortfolio/PortfolioLogo";
+import {
+  getTokenDetailsURL,
+  gqlToCurrency,
+  supportedChainIdFromGQLChain,
+} from "graphql/data/util";
+import { Trans } from "i18n";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import { ThemedText } from "theme/components";
 import {
   Chain,
   PortfolioTokenBalancePartsFragment,
-} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
-import { NumberType, useFormatter } from 'utils/formatNumbers'
+} from "uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks";
+import { NumberType, useFormatter } from "utils/formatNumbers";
 
-import { useTDPContext } from 'pages/TokenDetails/TDPContext'
+import { useTDPContext } from "pages/TokenDetails/TDPContext";
 
 const BalancesCard = styled.div`
   color: ${({ theme }) => theme.neutral1};
@@ -29,21 +33,21 @@ const BalancesCard = styled.div`
   @media screen and (min-width: 768px) {
     display: flex;
   }
-`
+`;
 const BalanceSection = styled.div`
   height: fit-content;
   width: 100%;
-`
+`;
 const BalanceRow = styled.div`
   align-items: center;
   display: flex;
   flex-direction: row;
   margin-top: 12px;
-`
+`;
 const BalanceItem = styled.div`
   display: flex;
   align-items: center;
-`
+`;
 
 const BalanceAmountsContainer = styled.div`
   display: flex;
@@ -52,26 +56,31 @@ const BalanceAmountsContainer = styled.div`
   align-items: center;
   width: 100%;
   margin-left: 12px;
-`
+`;
 
 interface BalanceProps {
-  currency?: Currency
-  chainId?: ChainId
-  gqlBalance?: PortfolioTokenBalancePartsFragment
-  onClick?: () => void
+  currency?: Currency;
+  chainId?: ChainId;
+  gqlBalance?: PortfolioTokenBalancePartsFragment;
+  onClick?: () => void;
 }
-const Balance = ({ currency, chainId = ChainId.MAINNET, gqlBalance, onClick }: BalanceProps) => {
-  const { formatNumber } = useFormatter()
-  const currencies = useMemo(() => [currency], [currency])
+const Balance = ({
+  currency,
+  chainId = ChainId.MAINNET,
+  gqlBalance,
+  onClick,
+}: BalanceProps) => {
+  const { formatNumber } = useFormatter();
+  const currencies = useMemo(() => [currency], [currency]);
 
   const formattedGqlBalance = formatNumber({
     input: gqlBalance?.quantity,
     type: NumberType.TokenNonTx,
-  })
+  });
   const formattedUsdGqlValue = formatNumber({
     input: gqlBalance?.denominatedValue?.value,
     type: NumberType.PortfolioBalance,
-  })
+  });
 
   return (
     <BalanceRow onClick={onClick}>
@@ -83,39 +92,51 @@ const Balance = ({ currency, chainId = ChainId.MAINNET, gqlBalance, onClick }: B
       />
       <BalanceAmountsContainer>
         <BalanceItem>
-          <ThemedText.BodyPrimary>{formattedUsdGqlValue}</ThemedText.BodyPrimary>
+          <ThemedText.BodyPrimary>
+            {formattedUsdGqlValue}
+          </ThemedText.BodyPrimary>
         </BalanceItem>
         <BalanceItem>
-          <ThemedText.BodySecondary>{formattedGqlBalance}</ThemedText.BodySecondary>
+          <ThemedText.BodySecondary>
+            {formattedGqlBalance}
+          </ThemedText.BodySecondary>
         </BalanceItem>
       </BalanceAmountsContainer>
     </BalanceRow>
-  )
-}
+  );
+};
 
-const PageChainBalanceSummary = ({ pageChainBalance }: { pageChainBalance?: PortfolioTokenBalancePartsFragment }) => {
-  if (!pageChainBalance || !pageChainBalance.token) return null
-  const currency = gqlToCurrency(pageChainBalance.token)
+const PageChainBalanceSummary = ({
+  pageChainBalance,
+}: {
+  pageChainBalance?: PortfolioTokenBalancePartsFragment;
+}) => {
+  if (!pageChainBalance || !pageChainBalance.token) return null;
+  const currency = gqlToCurrency(pageChainBalance.token);
   return (
     <BalanceSection>
       <ThemedText.HeadlineSmall color="neutral1">
         <Trans>Your balance</Trans>
       </ThemedText.HeadlineSmall>
-      <Balance currency={currency} chainId={currency?.chainId} gqlBalance={pageChainBalance} />
+      <Balance
+        currency={currency}
+        chainId={currency?.chainId}
+        gqlBalance={pageChainBalance}
+      />
     </BalanceSection>
-  )
-}
+  );
+};
 
 const OtherChainsBalanceSummary = ({
   otherChainBalances,
   hasPageChainBalance,
 }: {
-  otherChainBalances: readonly PortfolioTokenBalancePartsFragment[]
-  hasPageChainBalance: boolean
+  otherChainBalances: readonly PortfolioTokenBalancePartsFragment[];
+  hasPageChainBalance: boolean;
 }) => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  if (!otherChainBalances.length) return null
+  if (!otherChainBalances.length) return null;
   return (
     <BalanceSection>
       {hasPageChainBalance ? (
@@ -128,8 +149,11 @@ const OtherChainsBalanceSummary = ({
         </ThemedText.HeadlineSmall>
       )}
       {otherChainBalances.map((balance) => {
-        const currency = balance.token && gqlToCurrency(balance.token)
-        const chainId = (balance.token && supportedChainIdFromGQLChain(balance.token.chain)) ?? ChainId.MAINNET
+        const currency = balance.token && gqlToCurrency(balance.token);
+        const chainId =
+          (balance.token &&
+            supportedChainIdFromGQLChain(balance.token.chain)) ??
+          ChainId.MAINNET;
         return (
           <Balance
             key={balance.id}
@@ -145,32 +169,35 @@ const OtherChainsBalanceSummary = ({
               )
             }
           />
-        )
+        );
       })}
     </BalanceSection>
-  )
-}
+  );
+};
 
 export default function BalanceSummary() {
-  const { account } = useWeb3React()
-  const { currencyChain, multiChainMap } = useTDPContext()
+  const { account } = useWeb3React();
+  const { currencyChain, multiChainMap } = useTDPContext();
 
-  const pageChainBalance = multiChainMap[currencyChain]?.balance
-  const otherChainBalances: PortfolioTokenBalancePartsFragment[] = []
+  const pageChainBalance = multiChainMap[currencyChain]?.balance;
+  const otherChainBalances: PortfolioTokenBalancePartsFragment[] = [];
   for (const [key, value] of Object.entries(multiChainMap)) {
     if (key !== currencyChain && value?.balance !== undefined) {
-      otherChainBalances.push(value.balance)
+      otherChainBalances.push(value.balance);
     }
   }
-  const hasBalances = pageChainBalance || Boolean(otherChainBalances.length)
+  const hasBalances = pageChainBalance || Boolean(otherChainBalances.length);
 
   if (!account || !hasBalances) {
-    return null
+    return null;
   }
   return (
     <BalancesCard>
       <PageChainBalanceSummary pageChainBalance={pageChainBalance} />
-      <OtherChainsBalanceSummary otherChainBalances={otherChainBalances} hasPageChainBalance={!!pageChainBalance} />
+      <OtherChainsBalanceSummary
+        otherChainBalances={otherChainBalances}
+        hasPageChainBalance={!!pageChainBalance}
+      />
     </BalancesCard>
-  )
+  );
 }

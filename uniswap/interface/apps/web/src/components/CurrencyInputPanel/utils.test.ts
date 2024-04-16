@@ -1,4 +1,4 @@
-import { ChainId, Token } from '@uniswap/sdk-core'
+import { ChainId, Token } from 'sdk-core/src/index'
 import { DAI } from 'constants/tokens'
 
 import { formatCurrencySymbol } from './utils'

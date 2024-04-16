@@ -1,5 +1,5 @@
 import { createSlice, nanoid } from '@reduxjs/toolkit'
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import { DEFAULT_TXN_DISMISS_MS } from 'constants/misc'
 
 export enum PopupType {
@@ -10,17 +10,17 @@ export enum PopupType {
 
 export type PopupContent =
   | {
-      type: PopupType.Transaction
-      hash: string
-    }
+    type: PopupType.Transaction
+    hash: string
+  }
   | {
-      type: PopupType.Order
-      orderHash: string
-    }
+    type: PopupType.Order
+    orderHash: string
+  }
   | {
-      type: PopupType.FailedSwitchNetwork
-      failedSwitchNetwork: ChainId
-    }
+    type: PopupType.FailedSwitchNetwork
+    failedSwitchNetwork: ChainId
+  }
 
 export enum ApplicationModal {
   ADDRESS_CLAIM,

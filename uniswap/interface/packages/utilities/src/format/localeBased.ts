@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
+import { Currency, CurrencyAmount } from 'sdk-core/src/index'
 import {
   FormatterRule,
   StandardCurrency,
@@ -119,8 +119,8 @@ export function addFiatSymbolToNumber({
       ? parts[1]?.value
       : ''
     : parts[parts.length - 2]?.type === 'literal'
-    ? parts[parts.length - 2]?.value
-    : ''
+      ? parts[parts.length - 2]?.value
+      : ''
 
   return isSymbolAtFront ? `${currencySymbol}${extra}${value}` : `${value}${extra}${currencySymbol}`
 }

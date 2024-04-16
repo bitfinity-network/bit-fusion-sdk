@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import { TokenList } from '@uniswap/token-lists'
 import { RecentConnectionMeta } from 'connection/types'
 import { SupportedLocale } from 'constants/locales'
@@ -172,16 +172,16 @@ interface ExpectedLogsState {
       listeners: number
       fetchingBlockNumber?: number
       results?:
-        | {
-            blockNumber: number
-            logs: Log[]
-            error?: undefined
-          }
-        | {
-            blockNumber: number
-            logs?: undefined
-            error: true
-          }
+      | {
+        blockNumber: number
+        logs: Log[]
+        error?: undefined
+      }
+      | {
+        blockNumber: number
+        logs?: undefined
+        error: true
+      }
     }
   }
 }

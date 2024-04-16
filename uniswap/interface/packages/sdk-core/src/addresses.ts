@@ -1,5 +1,8 @@
 import { ChainId, SUPPORTED_CHAINS, SupportedChainsType } from './chains'
 
+const CONTRACTS_ADDRESSES = JSON.parse(localStorage.getItem('CONTRACTS_ADDRESSES') || '[]')
+
+
 type AddressMap = { [chainId: number]: string }
 
 type ChainAddresses = {
@@ -235,14 +238,15 @@ const BLAST_ADDRESSES: ChainAddresses = {
   swapRouter02Address: '0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66'
 }
 
+
 const BITFINITY_TESTNET_ADDRESSES: ChainAddresses = {
-  v3CoreFactoryAddress: '0x792edAdE80af5fC680d96a2eD80A44247D2Cf6Fd',
-  multicallAddress: '0xdC7f370de7631cE9e2c2e1DCDA6B3B5744Cf4705',
-  quoterAddress: '0x6Cdcd65e03c1CEc3730AeeCd45bc140D57A25C77',
-  v3MigratorAddress: '0x15CA7043CD84C5D21Ae76Ba0A1A967d42c40ecE0',
-  nonfungiblePositionManagerAddress: '0xB218e4f7cF0533d4696fDfC419A0023D33345F28',
-  tickLensAddress: '0x2E95185bCdD928a3e984B7e2D6560Ab1b17d7274',
-  swapRouter02Address: '0x549FEB8c9bd4c12Ad2AB27022dA12492aC452B66'
+  v3CoreFactoryAddress: CONTRACTS_ADDRESSES["FACTORY"],
+  multicallAddress: CONTRACTS_ADDRESSES['MULTICALL'],
+  quoterAddress: CONTRACTS_ADDRESSES['QUOTER'],
+  v3MigratorAddress: CONTRACTS_ADDRESSES['MIGRATOR'],
+  nonfungiblePositionManagerAddress: CONTRACTS_ADDRESSES['POSITIONMANAGER'],
+  tickLensAddress: CONTRACTS_ADDRESSES['TICKLENS'],
+  swapRouter02Address: CONTRACTS_ADDRESSES['SWAPROUTER02'],
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {

@@ -1,4 +1,4 @@
-import { Token } from '@uniswap/sdk-core'
+import { Token } from 'sdk-core/src/index'
 import dayjs from 'dayjs'
 import {
   Amount,
@@ -180,8 +180,8 @@ export function deriveCurrencyAmountFromAssetResponse(
     tokenStandard === TokenStandard.Native
       ? NativeCurrency.onChain(chainId)
       : address && decimals
-      ? new Token(chainId, address, decimals)
-      : undefined
+        ? new Token(chainId, address, decimals)
+        : undefined
 
   const currencyAmount = getCurrencyAmount({
     value: quantity,

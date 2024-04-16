@@ -1,6 +1,6 @@
 import { AddressZero } from '@ethersproject/constants'
 import { MixedRouteSDK, ONE, Protocol, Trade } from '@uniswap/router-sdk'
-import { ChainId, Currency, CurrencyAmount, Fraction, Percent, Price, Token, TradeType } from '@uniswap/sdk-core'
+import { ChainId, Currency, CurrencyAmount, Fraction, Percent, Price, Token, TradeType } from 'sdk-core/src/index'
 import { DutchOrderInfo, DutchOrderInfoJSON, DutchOrderTrade as IDutchOrderTrade } from '@uniswap/uniswapx-sdk'
 import { Route as V2Route } from '@uniswap/v2-sdk'
 import { Route as V3Route } from '@uniswap/v3-sdk'
@@ -617,37 +617,37 @@ export enum QuoteState {
 
 export type QuoteResult =
   | {
-      state: QuoteState.NOT_FOUND
-      data?: undefined
-    }
+    state: QuoteState.NOT_FOUND
+    data?: undefined
+  }
   | {
-      state: QuoteState.SUCCESS
-      data: URAQuoteResponse
-    }
+    state: QuoteState.SUCCESS
+    data: URAQuoteResponse
+  }
 
 export type TradeResult =
   | {
-      state: QuoteState.NOT_FOUND
-      trade?: undefined
-      latencyMs?: number
-    }
+    state: QuoteState.NOT_FOUND
+    trade?: undefined
+    latencyMs?: number
+  }
   | {
-      state: QuoteState.SUCCESS
-      trade: SubmittableTrade
-      latencyMs?: number
-    }
+    state: QuoteState.SUCCESS
+    trade: SubmittableTrade
+    latencyMs?: number
+  }
 
 export type PreviewTradeResult =
   | {
-      state: QuoteState.NOT_FOUND
-      trade?: undefined
-      latencyMs?: number
-    }
+    state: QuoteState.NOT_FOUND
+    trade?: undefined
+    latencyMs?: number
+  }
   | {
-      state: QuoteState.SUCCESS
-      trade: PreviewTrade
-      latencyMs?: number
-    }
+    state: QuoteState.SUCCESS
+    trade: PreviewTrade
+    latencyMs?: number
+  }
 
 export enum PoolType {
   V2Pool = 'v2-pool',

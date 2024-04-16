@@ -1,3 +1,3 @@
-import { Token } from '@uniswap/sdk-core'
+import { Token } from 'sdk-core/src/index'
 
-export class UserAddedToken extends Token {}
+export class UserAddedToken extends Token { }

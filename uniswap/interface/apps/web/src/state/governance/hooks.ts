@@ -14,7 +14,7 @@ import {
   GOVERNANCE_ALPHA_V1_ADDRESSES,
   GOVERNANCE_BRAVO_ADDRESSES,
   Token,
-} from '@uniswap/sdk-core'
+} from 'sdk-core/src/index'
 import { useWeb3React } from '@web3-react/core'
 import { LATEST_GOVERNOR_INDEX } from 'constants/governance'
 import { POLYGON_PROPOSAL_TITLE } from 'constants/proposals/polygon_proposal_title'
@@ -205,7 +205,7 @@ function useFormattedProposalCreatedLogs(
               const fourbyte = calldata.slice(0, 10)
               const sig = FOUR_BYTES_DIR[fourbyte] ?? 'UNKNOWN()'
               if (!sig) throw new Error('Missing four byte sig')
-              ;[name, types] = sig.substring(0, sig.length - 1).split('(')
+                ;[name, types] = sig.substring(0, sig.length - 1).split('(')
               calldata = `0x${calldata.slice(10)}`
             } else {
               ;[name, types] = signature.substring(0, signature.length - 1).split('(')

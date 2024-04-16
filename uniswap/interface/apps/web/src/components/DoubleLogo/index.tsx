@@ -1,29 +1,30 @@
-import { Currency } from '@uniswap/sdk-core'
-import styled from 'styled-components'
+import { Currency } from "sdk-core/src/index";
+import styled from "styled-components";
 
-import CurrencyLogo from '../Logo/CurrencyLogo'
+import CurrencyLogo from "../Logo/CurrencyLogo";
 
 const Wrapper = styled.div<{ margin: boolean; sizeraw: number }>`
   position: relative;
   display: flex;
   flex-direction: row;
-  margin-left: ${({ sizeraw, margin }) => margin && (sizeraw / 3 + 8).toString() + 'px'};
-`
+  margin-left: ${({ sizeraw, margin }) =>
+    margin && (sizeraw / 3 + 8).toString() + "px"};
+`;
 
 interface DoubleCurrencyLogoProps {
-  margin?: boolean
-  size?: number
-  currency0?: Currency
-  currency1?: Currency
+  margin?: boolean;
+  size?: number;
+  currency0?: Currency;
+  currency1?: Currency;
 }
 
 const HigherLogoWrapper = styled.div`
   z-index: 1;
-`
+`;
 const CoveredLogoWapper = styled.div<{ sizeraw: number }>`
   position: absolute;
-  left: ${({ sizeraw }) => '-' + (sizeraw / 2).toString() + 'px'} !important;
-`
+  left: ${({ sizeraw }) => "-" + (sizeraw / 2).toString() + "px"} !important;
+`;
 
 export default function DoubleCurrencyLogo({
   currency0,
@@ -44,5 +45,5 @@ export default function DoubleCurrencyLogo({
         </CoveredLogoWapper>
       )}
     </Wrapper>
-  )
+  );
 }

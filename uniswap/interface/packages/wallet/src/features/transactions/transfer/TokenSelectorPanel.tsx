@@ -1,29 +1,33 @@
-import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
-import { useTranslation } from 'react-i18next'
-import { Flex, Icons, Text, TouchableArea } from 'ui/src'
-import { iconSizes } from 'ui/src/theme'
-import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
-import { NumberType } from 'utilities/src/format/types'
-import { CurrencyLogo } from 'wallet/src/components/CurrencyLogo/CurrencyLogo'
+import { useTranslation } from "react-i18next";
+import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { Flex, Icons, Text, TouchableArea } from "ui/src";
+import { iconSizes } from "ui/src/theme";
+import { CurrencyInfo } from "uniswap/src/features/dataApi/types";
+import { NumberType } from "utilities/src/format/types";
+import { CurrencyLogo } from "wallet/src/components/CurrencyLogo/CurrencyLogo";
 import {
   TokenSelector,
   TokenSelectorVariation,
-} from 'wallet/src/components/TokenSelector/TokenSelector'
-import { MaxAmountButton } from 'wallet/src/components/input/MaxAmountButton'
-import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
-import { SearchContext } from 'wallet/src/features/search/SearchContext'
-import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
-import { TokenSelectorFlow } from 'wallet/src/features/transactions/transfer/types'
+} from "wallet/src/components/TokenSelector/TokenSelector";
+import { MaxAmountButton } from "wallet/src/components/input/MaxAmountButton";
+import { useLocalizationContext } from "wallet/src/features/language/LocalizationContext";
+import { SearchContext } from "wallet/src/features/search/SearchContext";
+import { CurrencyField } from "wallet/src/features/transactions/transactionState/types";
+import { TokenSelectorFlow } from "wallet/src/features/transactions/transfer/types";
 
 interface TokenSelectorPanelProps {
-  currencyInfo: Maybe<CurrencyInfo>
-  currencyBalance: Maybe<CurrencyAmount<Currency>>
-  currencyAmount: Maybe<CurrencyAmount<Currency>>
-  showTokenSelector: boolean
-  onSelectCurrency: (currency: Currency, field: CurrencyField, context: SearchContext) => void
-  onHideTokenSelector: () => void
-  onShowTokenSelector: () => void
-  onSetMax: (amount: string) => void
+  currencyInfo: Maybe<CurrencyInfo>;
+  currencyBalance: Maybe<CurrencyAmount<Currency>>;
+  currencyAmount: Maybe<CurrencyAmount<Currency>>;
+  showTokenSelector: boolean;
+  onSelectCurrency: (
+    currency: Currency,
+    field: CurrencyField,
+    context: SearchContext
+  ) => void;
+  onHideTokenSelector: () => void;
+  onShowTokenSelector: () => void;
+  onSetMax: (amount: string) => void;
 }
 
 export function TokenSelectorPanel({
@@ -36,14 +40,14 @@ export function TokenSelectorPanel({
   onShowTokenSelector,
   showTokenSelector,
 }: TokenSelectorPanelProps): JSX.Element {
-  const { t } = useTranslation()
-  const { formatCurrencyAmount } = useLocalizationContext()
+  const { t } = useTranslation();
+  const { formatCurrencyAmount } = useLocalizationContext();
 
-  const showMaxButton = currencyBalance && !currencyBalance.equalTo(0)
+  const showMaxButton = currencyBalance && !currencyBalance.equalTo(0);
   const formattedCurrencyBalance = formatCurrencyAmount({
     value: currencyBalance,
     type: NumberType.TokenNonTx,
-  })
+  });
 
   if (showTokenSelector) {
     return (
@@ -57,7 +61,7 @@ export function TokenSelectorPanel({
           onSelectCurrency={onSelectCurrency}
         />
       </Flex>
-    )
+    );
   }
 
   return (
@@ -71,7 +75,7 @@ export function TokenSelectorPanel({
             </Text>
             {currencyInfo && (
               <Text color="$neutral2" variant="body3">
-                {t('send.input.token.balance.title', {
+                {t("send.input.token.balance.title", {
                   balance: formattedCurrencyBalance,
                   symbol: currencyInfo.currency.symbol,
                 })}
@@ -97,5 +101,5 @@ export function TokenSelectorPanel({
         </Flex>
       </Flex>
     </TouchableArea>
-  )
+  );
 }

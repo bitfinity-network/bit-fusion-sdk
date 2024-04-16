@@ -1,28 +1,33 @@
-import { ChainId } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { PortfolioLogo } from 'components/AccountDrawer/MiniPortfolio/PortfolioLogo'
-import { ButtonPrimary } from 'components/Button'
-import GetHelp from 'components/Button/GetHelp'
-import Column, { ColumnCenter } from 'components/Column'
-import Identicon from 'components/Identicon'
-import { ChainLogo } from 'components/Logo/ChainLogo'
-import Modal from 'components/Modal'
-import Row from 'components/Row'
-import { UniTagProfilePicture } from 'components/UniTag/UniTagProfilePicture'
-import { Unicon } from 'components/Unicon'
-import { useStablecoinValue } from 'hooks/useStablecoinPrice'
-import { Trans } from 'i18n'
-import { ReactNode } from 'react'
-import { useSendContext } from 'state/send/SendContext'
-import styled from 'styled-components'
-import { ClickableStyle, CloseIcon, Separator, ThemedText } from 'theme/components'
-import { UniconV2 } from 'ui/src/components/UniconV2'
-import { Unitag } from 'ui/src/components/icons/Unitag'
-import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
-import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
-import { useUnitagByNameWithoutFlag } from 'uniswap/src/features/unitags/hooksWithoutFlags'
-import { shortenAddress } from 'utilities/src/addresses'
-import { NumberType, useFormatter } from 'utils/formatNumbers'
+import { ChainId } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { PortfolioLogo } from "components/AccountDrawer/MiniPortfolio/PortfolioLogo";
+import { ButtonPrimary } from "components/Button";
+import GetHelp from "components/Button/GetHelp";
+import Column, { ColumnCenter } from "components/Column";
+import Identicon from "components/Identicon";
+import { ChainLogo } from "components/Logo/ChainLogo";
+import Modal from "components/Modal";
+import Row from "components/Row";
+import { UniTagProfilePicture } from "components/UniTag/UniTagProfilePicture";
+import { Unicon } from "components/Unicon";
+import { useStablecoinValue } from "hooks/useStablecoinPrice";
+import { Trans } from "i18n";
+import { ReactNode } from "react";
+import { useSendContext } from "state/send/SendContext";
+import styled from "styled-components";
+import {
+  ClickableStyle,
+  CloseIcon,
+  Separator,
+  ThemedText,
+} from "theme/components";
+import { UniconV2 } from "ui/src/components/UniconV2";
+import { Unitag } from "ui/src/components/icons/Unitag";
+import { FeatureFlags } from "uniswap/src/features/experiments/flags";
+import { useFeatureFlag } from "uniswap/src/features/experiments/hooks";
+import { useUnitagByNameWithoutFlag } from "uniswap/src/features/unitags/hooksWithoutFlags";
+import { shortenAddress } from "utilities/src/addresses";
+import { NumberType, useFormatter } from "utils/formatNumbers";
 
 const ModalWrapper = styled(ColumnCenter)`
   background-color: ${({ theme }) => theme.surface1};
@@ -30,17 +35,17 @@ const ModalWrapper = styled(ColumnCenter)`
   outline: 1px solid ${({ theme }) => theme.surface3};
   width: 100%;
   padding: 8px;
-`
+`;
 
 const StyledReviewCloseIcon = styled(CloseIcon)`
   ${ClickableStyle}
-`
+`;
 
 const ReviewContentContainer = styled(Column)`
   width: 100%;
   padding: 12px 16px;
   gap: 16px;
-`
+`;
 
 const SendModalHeader = ({
   label,
@@ -48,10 +53,10 @@ const SendModalHeader = ({
   subheader,
   image,
 }: {
-  label: ReactNode
-  header: ReactNode
-  subheader: ReactNode
-  image: ReactNode
+  label: ReactNode;
+  header: ReactNode;
+  subheader: ReactNode;
+  image: ReactNode;
 }) => {
   return (
     <Row justify="space-between" align="center">
@@ -59,47 +64,66 @@ const SendModalHeader = ({
         <ThemedText.BodySmall color="neutral2" lineHeight="20px">
           {label}
         </ThemedText.BodySmall>
-        <ThemedText.HeadlineLarge lineHeight="44px">{header}</ThemedText.HeadlineLarge>
+        <ThemedText.HeadlineLarge lineHeight="44px">
+          {header}
+        </ThemedText.HeadlineLarge>
         <ThemedText.BodySmall lineHeight="20px" color="neutral2">
           {subheader}
         </ThemedText.BodySmall>
       </Column>
-      <div style={{ height: '36px' }}>{image}</div>
+      <div style={{ height: "36px" }}>{image}</div>
     </Row>
-  )
-}
+  );
+};
 
-export function SendReviewModal({ onConfirm, onDismiss }: { onConfirm: () => void; onDismiss: () => void }) {
-  const { chainId } = useWeb3React()
+export function SendReviewModal({
+  onConfirm,
+  onDismiss,
+}: {
+  onConfirm: () => void;
+  onDismiss: () => void;
+}) {
+  const { chainId } = useWeb3React();
   const {
     sendState: { inputCurrency, inputInFiat, exactAmountFiat },
-    derivedSendInfo: { parsedTokenAmount, exactAmountOut, gasFeeCurrencyAmount, recipientData },
-  } = useSendContext()
-  const { unitag: recipientUnitag } = useUnitagByNameWithoutFlag(recipientData?.unitag, Boolean(recipientData?.unitag))
+    derivedSendInfo: {
+      parsedTokenAmount,
+      exactAmountOut,
+      gasFeeCurrencyAmount,
+      recipientData,
+    },
+  } = useSendContext();
+  const { unitag: recipientUnitag } = useUnitagByNameWithoutFlag(
+    recipientData?.unitag,
+    Boolean(recipientData?.unitag)
+  );
 
-  const { formatConvertedFiatNumberOrString, formatCurrencyAmount } = useFormatter()
+  const { formatConvertedFiatNumberOrString, formatCurrencyAmount } =
+    useFormatter();
   const formattedInputAmount = formatCurrencyAmount({
     amount: parsedTokenAmount,
     type: NumberType.TokenNonTx,
-  })
+  });
   const formattedFiatInputAmount = formatConvertedFiatNumberOrString({
-    input: (inputInFiat ? exactAmountFiat : exactAmountOut) || '0',
+    input: (inputInFiat ? exactAmountFiat : exactAmountOut) || "0",
     type: NumberType.PortfolioBalance,
-  })
+  });
 
-  const gasFeeUSD = useStablecoinValue(gasFeeCurrencyAmount)
+  const gasFeeUSD = useStablecoinValue(gasFeeCurrencyAmount);
   const gasFeeFormatted = formatCurrencyAmount({
     amount: gasFeeUSD,
     type: NumberType.PortfolioBalance,
-  })
+  });
 
-  const currencySymbolAmount = `${formattedInputAmount} ${inputCurrency?.symbol ?? inputCurrency?.name}`
+  const currencySymbolAmount = `${formattedInputAmount} ${
+    inputCurrency?.symbol ?? inputCurrency?.name
+  }`;
 
   const [primaryInputView, secondaryInputView] = inputInFiat
     ? [formattedFiatInputAmount, currencySymbolAmount]
-    : [currencySymbolAmount, formattedFiatInputAmount]
+    : [currencySymbolAmount, formattedFiatInputAmount];
 
-  const uniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2)
+  const uniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2);
 
   return (
     <Modal $scrollOverlay isOpen onDismiss={onDismiss} maxHeight={90}>
@@ -121,30 +145,44 @@ export function SendReviewModal({ onConfirm, onDismiss }: { onConfirm: () => voi
               label={<Trans>You&apos;re sending</Trans>}
               header={primaryInputView}
               subheader={secondaryInputView}
-              image={<PortfolioLogo currencies={[inputCurrency]} size="36px" chainId={chainId ?? ChainId.MAINNET} />}
+              image={
+                <PortfolioLogo
+                  currencies={[inputCurrency]}
+                  size="36px"
+                  chainId={chainId ?? ChainId.MAINNET}
+                />
+              }
             />
             <SendModalHeader
               label={<Trans>To</Trans>}
               header={
                 recipientData?.unitag || recipientData?.ensName ? (
                   <Row gap="xs">
-                    <ThemedText.HeadlineLarge>{recipientData.unitag ?? recipientData.ensName}</ThemedText.HeadlineLarge>
+                    <ThemedText.HeadlineLarge>
+                      {recipientData.unitag ?? recipientData.ensName}
+                    </ThemedText.HeadlineLarge>
                     {recipientData?.unitag && <Unitag size={18} />}
                   </Row>
                 ) : (
                   shortenAddress(recipientData?.address)
                 )
               }
-              subheader={(recipientData?.unitag || recipientData?.ensName) && shortenAddress(recipientData.address)}
+              subheader={
+                (recipientData?.unitag || recipientData?.ensName) &&
+                shortenAddress(recipientData.address)
+              }
               image={
                 recipientUnitag?.metadata?.avatar ? (
-                  <UniTagProfilePicture account={recipientData?.address ?? ''} size={36} />
+                  <UniTagProfilePicture
+                    account={recipientData?.address ?? ""}
+                    size={36}
+                  />
                 ) : recipientData?.ensName ? (
                   <Identicon account={recipientData.address} size={36} />
                 ) : uniconsV2Enabled ? (
-                  <UniconV2 address={recipientData?.address ?? ''} size={36} />
+                  <UniconV2 address={recipientData?.address ?? ""} size={36} />
                 ) : (
-                  <Unicon address={recipientData?.address ?? ''} size={36} />
+                  <Unicon address={recipientData?.address ?? ""} size={36} />
                 )
               }
             />
@@ -165,5 +203,5 @@ export function SendReviewModal({ onConfirm, onDismiss }: { onConfirm: () => voi
         </ButtonPrimary>
       </ModalWrapper>
     </Modal>
-  )
+  );
 }

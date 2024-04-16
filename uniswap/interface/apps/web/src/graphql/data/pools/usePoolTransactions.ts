@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'sdk-core/src/index'
 import { chainIdToBackendName } from 'graphql/data/util'
 import { useCallback, useMemo, useRef } from 'react'
 import {
@@ -94,23 +94,23 @@ export function usePoolTransactions(
           const mergedData =
             protocolVersion === ProtocolVersion.V3
               ? {
-                  v3Pool: {
-                    ...fetchMoreResult.v3Pool,
-                    transactions: [
-                      ...((prev as V3PoolTransactionsQuery).v3Pool?.transactions ?? []),
-                      ...fetchMoreResult.v3Pool.transactions,
-                    ],
-                  },
-                }
+                v3Pool: {
+                  ...fetchMoreResult.v3Pool,
+                  transactions: [
+                    ...((prev as V3PoolTransactionsQuery).v3Pool?.transactions ?? []),
+                    ...fetchMoreResult.v3Pool.transactions,
+                  ],
+                },
+              }
               : {
-                  v2Pair: {
-                    ...fetchMoreResult.v2Pair,
-                    transactions: [
-                      ...((prev as V2PairTransactionsQuery).v2Pair?.transactions ?? []),
-                      ...fetchMoreResult.v2Pair.transactions,
-                    ],
-                  },
-                }
+                v2Pair: {
+                  ...fetchMoreResult.v2Pair,
+                  transactions: [
+                    ...((prev as V2PairTransactionsQuery).v2Pair?.transactions ?? []),
+                    ...fetchMoreResult.v2Pair.transactions,
+                  ],
+                },
+              }
           loadingMore.current = false
           return mergedData
         },
@@ -133,8 +133,8 @@ export function usePoolTransactions(
               ? PoolTableTransactionType.SELL
               : PoolTableTransactionType.BUY
             : tx.type === PoolTransactionType.Remove
-            ? PoolTableTransactionType.BURN
-            : PoolTableTransactionType.MINT
+              ? PoolTableTransactionType.BURN
+              : PoolTableTransactionType.MINT
         if (!filter.includes(type)) return undefined
         return {
           timestamp: tx.timestamp,

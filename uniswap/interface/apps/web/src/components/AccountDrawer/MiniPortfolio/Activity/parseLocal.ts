@@ -1,5 +1,5 @@
 import { BigNumber } from '@ethersproject/bignumber'
-import { ChainId, Currency, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
+import { ChainId, Currency, CurrencyAmount, TradeType } from 'sdk-core/src/index'
 import UniswapXBolt from 'assets/svg/bolt.svg'
 import { nativeOnChain } from 'constants/tokens'
 import { ChainTokenMap, useAllTokensMultichain } from 'hooks/Tokens'
@@ -46,16 +46,16 @@ function buildCurrencyDescriptor(
 ) {
   const formattedA = currencyA
     ? formatNumber({
-        input: parseFloat(CurrencyAmount.fromRawAmount(currencyA, amtA).toSignificant()),
-        type: NumberType.TokenNonTx,
-      })
+      input: parseFloat(CurrencyAmount.fromRawAmount(currencyA, amtA).toSignificant()),
+      type: NumberType.TokenNonTx,
+    })
     : t`Unknown`
   const symbolA = currencyA?.symbol ?? ''
   const formattedB = currencyB
     ? formatNumber({
-        input: parseFloat(CurrencyAmount.fromRawAmount(currencyB, amtB).toSignificant()),
-        type: NumberType.TokenNonTx,
-      })
+      input: parseFloat(CurrencyAmount.fromRawAmount(currencyB, amtB).toSignificant()),
+      type: NumberType.TokenNonTx,
+    })
     : t`Unknown`
   const symbolB = currencyB?.symbol ?? ''
   return [formattedA, symbolA, delimiter, formattedB, symbolB].filter(Boolean).join(' ')
@@ -186,9 +186,9 @@ function parseSend(
   const currency = getCurrency(currencyId, chainId, tokens)
   const formattedAmount = currency
     ? formatNumber({
-        input: parseFloat(CurrencyAmount.fromRawAmount(currency, amount).toSignificant()),
-        type: NumberType.TokenNonTx,
-      })
+      input: parseFloat(CurrencyAmount.fromRawAmount(currency, amount).toSignificant()),
+      type: NumberType.TokenNonTx,
+    })
     : t`Unknown`
 
   return {
@@ -202,8 +202,8 @@ export function getTransactionStatus(details: TransactionDetails): TransactionSt
   return !details.receipt
     ? TransactionStatus.Pending
     : details.receipt.status === 1 || details.receipt?.status === undefined
-    ? TransactionStatus.Confirmed
-    : TransactionStatus.Failed
+      ? TransactionStatus.Confirmed
+      : TransactionStatus.Failed
 }
 
 export function transactionToActivity(

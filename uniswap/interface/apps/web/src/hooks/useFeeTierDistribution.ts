@@ -1,4 +1,4 @@
-import { Currency, Token } from '@uniswap/sdk-core'
+import { Currency, Token } from 'sdk-core/src/index'
 import { FeeAmount } from '@uniswap/v3-sdk'
 import useBlockNumber from 'lib/hooks/useBlockNumber'
 import ms from 'ms'
@@ -47,21 +47,21 @@ export function useFeeTierDistribution(
 
     const percentages =
       !isLoading &&
-      !error &&
-      distributions &&
-      poolStateVeryLow !== PoolState.LOADING &&
-      poolStateLow !== PoolState.LOADING &&
-      poolStateMedium !== PoolState.LOADING &&
-      poolStateHigh !== PoolState.LOADING
+        !error &&
+        distributions &&
+        poolStateVeryLow !== PoolState.LOADING &&
+        poolStateLow !== PoolState.LOADING &&
+        poolStateMedium !== PoolState.LOADING &&
+        poolStateHigh !== PoolState.LOADING
         ? {
-            [FeeAmount.LOWEST]:
-              poolStateVeryLow === PoolState.EXISTS ? (distributions[FeeAmount.LOWEST] ?? 0) * 100 : undefined,
-            [FeeAmount.LOW]: poolStateLow === PoolState.EXISTS ? (distributions[FeeAmount.LOW] ?? 0) * 100 : undefined,
-            [FeeAmount.MEDIUM]:
-              poolStateMedium === PoolState.EXISTS ? (distributions[FeeAmount.MEDIUM] ?? 0) * 100 : undefined,
-            [FeeAmount.HIGH]:
-              poolStateHigh === PoolState.EXISTS ? (distributions[FeeAmount.HIGH] ?? 0) * 100 : undefined,
-          }
+          [FeeAmount.LOWEST]:
+            poolStateVeryLow === PoolState.EXISTS ? (distributions[FeeAmount.LOWEST] ?? 0) * 100 : undefined,
+          [FeeAmount.LOW]: poolStateLow === PoolState.EXISTS ? (distributions[FeeAmount.LOW] ?? 0) * 100 : undefined,
+          [FeeAmount.MEDIUM]:
+            poolStateMedium === PoolState.EXISTS ? (distributions[FeeAmount.MEDIUM] ?? 0) * 100 : undefined,
+          [FeeAmount.HIGH]:
+            poolStateHigh === PoolState.EXISTS ? (distributions[FeeAmount.HIGH] ?? 0) * 100 : undefined,
+        }
         : undefined
 
     return {

@@ -1,5 +1,5 @@
 import { Protocol } from '@uniswap/router-sdk'
-import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
+import { Currency, Percent, TradeType } from 'sdk-core/src/index'
 import {
   FlatFeeOptions,
   SwapOptions as UniversalRouterSwapOptions,
@@ -98,25 +98,25 @@ export function tradeToTransactionInfo(
 
   return trade.tradeType === TradeType.EXACT_INPUT
     ? {
-        ...baseTransactionInfo,
-        type: TransactionType.Swap,
-        tradeType: TradeType.EXACT_INPUT,
-        inputCurrencyAmountRaw: trade.inputAmount.quotient.toString(),
-        expectedOutputCurrencyAmountRaw: trade.outputAmount.quotient.toString(),
-        minimumOutputCurrencyAmountRaw: trade
-          .minimumAmountOut(slippageTolerancePercent)
-          .quotient.toString(),
-      }
+      ...baseTransactionInfo,
+      type: TransactionType.Swap,
+      tradeType: TradeType.EXACT_INPUT,
+      inputCurrencyAmountRaw: trade.inputAmount.quotient.toString(),
+      expectedOutputCurrencyAmountRaw: trade.outputAmount.quotient.toString(),
+      minimumOutputCurrencyAmountRaw: trade
+        .minimumAmountOut(slippageTolerancePercent)
+        .quotient.toString(),
+    }
     : {
-        ...baseTransactionInfo,
-        type: TransactionType.Swap,
-        tradeType: TradeType.EXACT_OUTPUT,
-        outputCurrencyAmountRaw: trade.outputAmount.quotient.toString(),
-        expectedInputCurrencyAmountRaw: trade.inputAmount.quotient.toString(),
-        maximumInputCurrencyAmountRaw: trade
-          .maximumAmountIn(slippageTolerancePercent)
-          .quotient.toString(),
-      }
+      ...baseTransactionInfo,
+      type: TransactionType.Swap,
+      tradeType: TradeType.EXACT_OUTPUT,
+      outputCurrencyAmountRaw: trade.outputAmount.quotient.toString(),
+      expectedInputCurrencyAmountRaw: trade.inputAmount.quotient.toString(),
+      maximumInputCurrencyAmountRaw: trade
+        .maximumAmountIn(slippageTolerancePercent)
+        .quotient.toString(),
+    }
 }
 
 function parseQuoteTypeSpecificParms(quoteData: QuoteData | undefined): {
@@ -211,15 +211,15 @@ export const prepareSwapFormState = ({
 }): TransactionState | undefined => {
   return inputCurrencyId
     ? {
-        exactCurrencyField: CurrencyField.INPUT,
-        exactAmountToken: '',
-        [CurrencyField.INPUT]: {
-          address: currencyIdToAddress(inputCurrencyId),
-          chainId: currencyIdToChain(inputCurrencyId) ?? ChainId.Mainnet,
-          type: AssetType.Currency,
-        },
-        [CurrencyField.OUTPUT]: null,
-      }
+      exactCurrencyField: CurrencyField.INPUT,
+      exactAmountToken: '',
+      [CurrencyField.INPUT]: {
+        address: currencyIdToAddress(inputCurrencyId),
+        chainId: currencyIdToChain(inputCurrencyId) ?? ChainId.Mainnet,
+        type: AssetType.Currency,
+      },
+      [CurrencyField.OUTPUT]: null,
+    }
     : undefined
 }
 
@@ -255,12 +255,12 @@ export const getSwapMethodParameters = ({
 
   const universalRouterSwapOptions: UniversalRouterSwapOptions = permit2Signature
     ? {
-        ...baseOptions,
-        inputTokenPermit: {
-          signature: permit2Signature.signature,
-          ...permit2Signature.permitMessage,
-        },
-      }
+      ...baseOptions,
+      inputTokenPermit: {
+        signature: permit2Signature.signature,
+        ...permit2Signature.permitMessage,
+      },
+    }
     : baseOptions
   return UniversalSwapRouter.swapERC20CallParameters(trade, universalRouterSwapOptions)
 }

@@ -3,7 +3,6 @@
   "license": "MIT",
   "version": "4.2.0",
   "description": "⚒️ An SDK for building applications on top of Uniswap V3",
-  "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist"
@@ -13,12 +12,11 @@
     "uniswap",
     "ethereum"
   ],
-  "module": "dist/sdk-core.esm.js",
   "scripts": {
-    "build": "tsdx build",
-    "start": "tsdx watch",
-    "test": "tsdx test",
-    "prepublishOnly": "tsdx build"
+    "build": "tsc -b",
+    "start": "tsc watch",
+    "test": "tsc test",
+    "prepublishOnly": "tsc build"
   },
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
@@ -40,5 +38,7 @@
     "printWidth": 120,
     "semi": false,
     "singleQuote": true
-  }
+  },
+  "main": "src/index.ts",
+  "private": true
 }

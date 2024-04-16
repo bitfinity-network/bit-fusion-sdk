@@ -1,57 +1,64 @@
-import { ChainId } from '@uniswap/sdk-core'
-import { useWeb3React } from '@web3-react/core'
-import { OrderContent } from 'components/AccountDrawer/MiniPortfolio/Activity/OffchainActivityModal'
-import Column, { ColumnCenter } from 'components/Column'
-import Row from 'components/Row'
-import { SupportArticleURL } from 'constants/supportArticles'
-import { SwapResult } from 'hooks/useSwapCallback'
-import { useUnmountingAnimation } from 'hooks/useUnmountingAnimation'
-import { t, Trans } from 'i18n'
-import { ReactNode, useMemo, useRef } from 'react'
-import { InterfaceTrade, TradeFillType } from 'state/routing/types'
-import { useOrder } from 'state/signatures/hooks'
-import { useIsTransactionConfirmed, useSwapTransactionStatus } from 'state/transactions/hooks'
-import styled, { css } from 'styled-components'
-import { ExternalLink } from 'theme/components'
-import { AnimationType } from 'theme/components/FadePresence'
-import { ThemedText } from 'theme/components/text'
-import { UniswapXOrderStatus } from 'types/uniswapx'
-import { TransactionStatus } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
-import { ExplorerDataType, getExplorerLink } from 'utils/getExplorerLink'
+import { ChainId } from "sdk-core/src/index";
+import { useWeb3React } from "@web3-react/core";
+import { OrderContent } from "components/AccountDrawer/MiniPortfolio/Activity/OffchainActivityModal";
+import Column, { ColumnCenter } from "components/Column";
+import Row from "components/Row";
+import { SupportArticleURL } from "constants/supportArticles";
+import { SwapResult } from "hooks/useSwapCallback";
+import { useUnmountingAnimation } from "hooks/useUnmountingAnimation";
+import { t, Trans } from "i18n";
+import { ReactNode, useMemo, useRef } from "react";
+import { InterfaceTrade, TradeFillType } from "state/routing/types";
+import { useOrder } from "state/signatures/hooks";
+import {
+  useIsTransactionConfirmed,
+  useSwapTransactionStatus,
+} from "state/transactions/hooks";
+import styled, { css } from "styled-components";
+import { ExternalLink } from "theme/components";
+import { AnimationType } from "theme/components/FadePresence";
+import { ThemedText } from "theme/components/text";
+import { UniswapXOrderStatus } from "types/uniswapx";
+import { TransactionStatus } from "uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks";
+import { ExplorerDataType, getExplorerLink } from "utils/getExplorerLink";
 
-import { isLimitTrade } from 'state/routing/utils'
+import { isLimitTrade } from "state/routing/utils";
 import {
   AnimatedEntranceConfirmationIcon,
   AnimatedEntranceSubmittedIcon,
   LoadingIndicatorOverlay,
   LogoContainer,
-} from '../AccountDrawer/MiniPortfolio/Activity/Logos'
-import { slideInAnimation, slideOutAnimation } from './animations'
-import { TradeSummary } from './TradeSummary'
+} from "../AccountDrawer/MiniPortfolio/Activity/Logos";
+import { slideInAnimation, slideOutAnimation } from "./animations";
+import { TradeSummary } from "./TradeSummary";
 
 const Container = styled(ColumnCenter)`
   margin: 48px 0 8px;
-`
+`;
 const HeaderContainer = styled(ColumnCenter)<{ $disabled?: boolean }>`
   ${({ $disabled }) => $disabled && `opacity: 0.5;`}
   padding: 0 32px;
   overflow: visible;
-`
+`;
 const AnimationWrapper = styled.div`
   position: relative;
   width: 100%;
   min-height: 72px;
   display: flex;
   flex-grow: 1;
-`
-const StepTitleAnimationContainer = styled(Column)<{ disableEntranceAnimation?: boolean }>`
+`;
+const StepTitleAnimationContainer = styled(Column)<{
+  disableEntranceAnimation?: boolean;
+}>`
   position: absolute;
   width: 100%;
   height: 100%;
   align-items: center;
   display: flex;
   flex-direction: column;
-  transition: display ${({ theme }) => `${theme.transition.duration.medium} ${theme.transition.timing.inOut}`};
+  transition: display
+    ${({ theme }) =>
+      `${theme.transition.duration.medium} ${theme.transition.timing.inOut}`};
   ${({ disableEntranceAnimation }) =>
     !disableEntranceAnimation &&
     css`
@@ -61,28 +68,28 @@ const StepTitleAnimationContainer = styled(Column)<{ disableEntranceAnimation?: 
   &.${AnimationType.EXITING} {
     ${slideOutAnimation}
   }
-`
+`;
 
 function getTitle({
   trade,
   swapPending,
   swapConfirmed,
 }: {
-  trade?: InterfaceTrade
-  swapPending: boolean
-  swapConfirmed: boolean
+  trade?: InterfaceTrade;
+  swapPending: boolean;
+  swapConfirmed: boolean;
 }): ReactNode {
   if (isLimitTrade(trade)) {
-    if (swapPending) return t`Limit submitted`
-    if (swapConfirmed) return t`Limit filled!`
+    if (swapPending) return t`Limit submitted`;
+    if (swapConfirmed) return t`Limit filled!`;
 
-    return t`Confirm limit`
+    return t`Confirm limit`;
   }
 
-  if (swapPending) return t`Swap submitted`
-  if (swapConfirmed) return t`Swap success!`
+  if (swapPending) return t`Swap submitted`;
+  if (swapConfirmed) return t`Swap success!`;
 
-  return t`Confirm swap`
+  return t`Confirm swap`;
 }
 
 export function Pending({
@@ -92,48 +99,65 @@ export function Pending({
   tokenApprovalPending = false,
   revocationPending = false,
 }: {
-  trade?: InterfaceTrade
-  swapResult?: SwapResult
-  wrapTxHash?: string
-  tokenApprovalPending?: boolean
-  revocationPending?: boolean
+  trade?: InterfaceTrade;
+  swapResult?: SwapResult;
+  wrapTxHash?: string;
+  tokenApprovalPending?: boolean;
+  revocationPending?: boolean;
 }) {
   // This component is only rendered after the user signs, so we don't want to
   // accept new trades with different quotes. We should only display the quote
   // price that the user actually submitted.
   // TODO(WEB-3854): Stop requesting new swap quotes after the user submits the transaction.
-  const initialTrade = useRef(trade).current
-  const { chainId } = useWeb3React()
+  const initialTrade = useRef(trade).current;
+  const { chainId } = useWeb3React();
 
-  const swapStatus = useSwapTransactionStatus(swapResult)
-  const uniswapXOrder = useOrder(swapResult?.type === TradeFillType.UniswapX ? swapResult.response.orderHash : '')
+  const swapStatus = useSwapTransactionStatus(swapResult);
+  const uniswapXOrder = useOrder(
+    swapResult?.type === TradeFillType.UniswapX
+      ? swapResult.response.orderHash
+      : ""
+  );
 
-  const limitPlaced = isLimitTrade(initialTrade) && uniswapXOrder?.status === UniswapXOrderStatus.OPEN
+  const limitPlaced =
+    isLimitTrade(initialTrade) &&
+    uniswapXOrder?.status === UniswapXOrderStatus.OPEN;
   const swapConfirmed =
-    swapStatus === TransactionStatus.Confirmed || uniswapXOrder?.status === UniswapXOrderStatus.FILLED
-  const wrapConfirmed = useIsTransactionConfirmed(wrapTxHash)
+    swapStatus === TransactionStatus.Confirmed ||
+    uniswapXOrder?.status === UniswapXOrderStatus.FILLED;
+  const wrapConfirmed = useIsTransactionConfirmed(wrapTxHash);
 
-  const swapPending = swapResult !== undefined && !swapConfirmed
-  const wrapPending = wrapTxHash != undefined && !wrapConfirmed
-  const transactionPending = revocationPending || tokenApprovalPending || wrapPending || swapPending
+  const swapPending = swapResult !== undefined && !swapConfirmed;
+  const wrapPending = wrapTxHash != undefined && !wrapConfirmed;
+  const transactionPending =
+    revocationPending || tokenApprovalPending || wrapPending || swapPending;
 
-  const showSubmitted = swapPending && !swapConfirmed && chainId === ChainId.MAINNET
-  const showSuccess = swapConfirmed || (chainId !== ChainId.MAINNET && swapPending)
+  const showSubmitted =
+    swapPending && !swapConfirmed && chainId === ChainId.MAINNET;
+  const showSuccess =
+    swapConfirmed || (chainId !== ChainId.MAINNET && swapPending);
 
-  const currentStepContainerRef = useRef<HTMLDivElement>(null)
-  useUnmountingAnimation(currentStepContainerRef, () => AnimationType.EXITING)
+  const currentStepContainerRef = useRef<HTMLDivElement>(null);
+  useUnmountingAnimation(currentStepContainerRef, () => AnimationType.EXITING);
 
   const explorerLink = useMemo(() => {
-    let txHash
+    let txHash;
     if (swapResult && swapResult.type === TradeFillType.Classic) {
-      txHash = swapResult.response.hash
-    } else if (uniswapXOrder && uniswapXOrder.status === UniswapXOrderStatus.FILLED) {
-      txHash = uniswapXOrder.orderHash
+      txHash = swapResult.response.hash;
+    } else if (
+      uniswapXOrder &&
+      uniswapXOrder.status === UniswapXOrderStatus.FILLED
+    ) {
+      txHash = uniswapXOrder.orderHash;
     } else {
-      return
+      return;
     }
-    return getExplorerLink(chainId || ChainId.MAINNET, txHash, ExplorerDataType.TRANSACTION)
-  }, [chainId, swapResult, uniswapXOrder])
+    return getExplorerLink(
+      chainId || ChainId.MAINNET,
+      txHash,
+      ExplorerDataType.TRANSACTION
+    );
+  }, [chainId, swapResult, uniswapXOrder]);
 
   // Handle special statuses for UniswapX orders
   if (
@@ -141,7 +165,7 @@ export function Pending({
     uniswapXOrder.status !== UniswapXOrderStatus.OPEN &&
     uniswapXOrder.status !== UniswapXOrderStatus.FILLED
   ) {
-    return <OrderContent order={uniswapXOrder} />
+    return <OrderContent order={uniswapXOrder} />;
   }
 
   return (
@@ -157,8 +181,16 @@ export function Pending({
       </LogoContainer>
       <HeaderContainer gap="md" $disabled={transactionPending && !limitPlaced}>
         <AnimationWrapper>
-          <StepTitleAnimationContainer gap="md" ref={currentStepContainerRef} disableEntranceAnimation>
-            <ThemedText.SubHeader width="100%" textAlign="center" data-testid="pending-modal-content-title">
+          <StepTitleAnimationContainer
+            gap="md"
+            ref={currentStepContainerRef}
+            disableEntranceAnimation
+          >
+            <ThemedText.SubHeader
+              width="100%"
+              textAlign="center"
+              data-testid="pending-modal-content-title"
+            >
               {getTitle({ trade: initialTrade, swapPending, swapConfirmed })}
             </ThemedText.SubHeader>
             {initialTrade && (
@@ -206,5 +238,5 @@ export function Pending({
         )}
       </HeaderContainer>
     </Container>
-  )
+  );
 }

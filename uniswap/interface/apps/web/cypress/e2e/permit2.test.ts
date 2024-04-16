@@ -1,6 +1,6 @@
 import { BigNumber } from '@ethersproject/bignumber'
 import { MaxUint160, MaxUint256 } from '@uniswap/permit2-sdk'
-import { CurrencyAmount, Token } from '@uniswap/sdk-core'
+import { CurrencyAmount, Token } from 'sdk-core/src/index'
 
 import { DAI, USDC_MAINNET, USDT } from '../../src/constants/tokens'
 

@@ -1,4 +1,4 @@
-import { Currency } from '@uniswap/sdk-core'
+import { Currency } from 'sdk-core/src/index'
 
 export const getTestSelector = (selectorId: string) => `[data-testid=${selectorId}]`
 
