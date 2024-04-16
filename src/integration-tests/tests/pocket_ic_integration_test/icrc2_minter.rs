@@ -169,13 +169,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .unwrap()
         .unwrap();
 
-    // let allowance = ctx
-    //     .call_contract(&john_wallet, &bft_bridge, input, 0)
-    //     .await
-    //     .unwrap()
-    //     .1
-    //     .output;
-
     let allowance_data = hex::decode(allowance_response.trim_start_matches("0x")).unwrap();
     let allowance = ERC_20_ALLOWANCE
         .decode_output(&allowance_data)
