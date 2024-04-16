@@ -1010,7 +1010,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-proposal-private-property-in-object@npm:^7.16.0":
+"@babel/plugin-proposal-private-property-in-object@npm:^7.16.7":
   version: 7.21.11
   resolution: "@babel/plugin-proposal-private-property-in-object@npm:7.21.11"
   dependencies:
@@ -13845,6 +13845,7 @@ __metadata:
     "@uniswap/permit2-sdk": 1.2.0
     "@uniswap/redux-multicall": 1.1.8
     "@uniswap/router-sdk": 1.9.0
+    "@uniswap/sdk-core": 4.2.0
     "@uniswap/smart-order-router": 3.17.3
     "@uniswap/token-lists": 1.0.0-beta.33
     "@uniswap/uniswapx-sdk": 2.0.1-alpha.4
@@ -14211,9 +14212,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@npm:4.2.0, @uniswap/sdk-core@npm:>= 3, @uniswap/sdk-core@npm:^4.0.3, @uniswap/sdk-core@npm:^4.0.7, @uniswap/sdk-core@npm:^4.2.0":
+"@uniswap/sdk-core@file:./packages/sdk-core::locator=universe%40workspace%3A.":
   version: 4.2.0
-  resolution: "@uniswap/sdk-core@npm:4.2.0"
+  resolution: "@uniswap/sdk-core@file:./packages/sdk-core#./packages/sdk-core::hash=1d6dc6&locator=universe%40workspace%3A."
   dependencies:
     "@ethersproject/address": ^5.0.2
     big.js: ^5.2.2
@@ -14221,7 +14222,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: fc38a3b9ab9b4984c4b2e011bf0883278563e327218a85482644af14a67452fb9d7d20e703ef5e3376e56a62e39df59db93d6161257460e9c9a1cf6a89dc3fae
+  checksum: 94b7815af1fd5b4956a2a9d8f0835740352ffe9d8ec1bca9c73d9d9b78c9245ef7005fd8a6d39cc859a6aa142f35c7c0899a88ee8b842f26785506f50d725b81
   languageName: node
   linkType: hard
 
@@ -14544,7 +14545,7 @@ __metadata:
 
 "@vercel/og@patch:@vercel/og@npm%3A0.5.8#./.yarn/patches/@vercel-og-npm-0.5.8-83a79f2744.patch::locator=universe%40workspace%3A.":
   version: 0.5.8
-  resolution: "@vercel/og@patch:@vercel/og@npm%3A0.5.8#./.yarn/patches/@vercel-og-npm-0.5.8-83a79f2744.patch::version=0.5.8&hash=161abb&locator=universe%40workspace%3A."
+  resolution: "@vercel/og@patch:@vercel/og@npm%3A0.5.8#./.yarn/patches/@vercel-og-npm-0.5.8-83a79f2744.patch::version=0.5.8&hash=90463a&locator=universe%40workspace%3A."
   dependencies:
     "@resvg/resvg-wasm": 2.4.1
     satori: 0.10.1
@@ -15177,7 +15178,7 @@ __metadata:
 
 "@web3-react/coinbase-wallet@patch:@web3-react/coinbase-wallet@npm%3A8.2.3#./.yarn/patches/@web3-react-coinbase-wallet-npm-8.2.3-9c7073f079.patch::locator=universe%40workspace%3A.":
   version: 8.2.3
-  resolution: "@web3-react/coinbase-wallet@patch:@web3-react/coinbase-wallet@npm%3A8.2.3#./.yarn/patches/@web3-react-coinbase-wallet-npm-8.2.3-9c7073f079.patch::version=8.2.3&hash=6bf686&locator=universe%40workspace%3A."
+  resolution: "@web3-react/coinbase-wallet@patch:@web3-react/coinbase-wallet@npm%3A8.2.3#./.yarn/patches/@web3-react-coinbase-wallet-npm-8.2.3-9c7073f079.patch::version=8.2.3&hash=7ea46c&locator=universe%40workspace%3A."
   dependencies:
     "@web3-react/types": ^8.2.3
   peerDependencies:
@@ -15235,7 +15236,7 @@ __metadata:
 
 "@web3-react/gnosis-safe@patch:@web3-react/gnosis-safe@npm%3A8.2.4#./.yarn/patches/@web3-react-gnosis-safe-npm-8.2.4-a7e2850335.patch::locator=universe%40workspace%3A.":
   version: 8.2.4
-  resolution: "@web3-react/gnosis-safe@patch:@web3-react/gnosis-safe@npm%3A8.2.4#./.yarn/patches/@web3-react-gnosis-safe-npm-8.2.4-a7e2850335.patch::version=8.2.4&hash=f8a083&locator=universe%40workspace%3A."
+  resolution: "@web3-react/gnosis-safe@patch:@web3-react/gnosis-safe@npm%3A8.2.4#./.yarn/patches/@web3-react-gnosis-safe-npm-8.2.4-a7e2850335.patch::version=8.2.4&hash=243686&locator=universe%40workspace%3A."
   dependencies:
     "@safe-global/safe-apps-provider": ^0.17.1
     "@safe-global/safe-apps-sdk": ^8.0.0
@@ -15256,7 +15257,7 @@ __metadata:
 
 "@web3-react/metamask@patch:@web3-react/metamask@npm%3A8.2.4#./.yarn/patches/@web3-react-metamask-npm-8.2.4-84b10de2d2.patch::locator=universe%40workspace%3A.":
   version: 8.2.4
-  resolution: "@web3-react/metamask@patch:@web3-react/metamask@npm%3A8.2.4#./.yarn/patches/@web3-react-metamask-npm-8.2.4-84b10de2d2.patch::version=8.2.4&hash=6d8e56&locator=universe%40workspace%3A."
+  resolution: "@web3-react/metamask@patch:@web3-react/metamask@npm%3A8.2.4#./.yarn/patches/@web3-react-metamask-npm-8.2.4-84b10de2d2.patch::version=8.2.4&hash=c866b0&locator=universe%40workspace%3A."
   dependencies:
     "@metamask/detect-provider": ^1.2.0
     "@web3-react/types": ^8.2.3
@@ -15308,7 +15309,7 @@ __metadata:
 
 "@web3-react/walletconnect-v2@patch:@web3-react/walletconnect-v2@npm%3A8.5.1#./.yarn/patches/@web3-react-walletconnect-v2-npm-8.5.1-933cac0534.patch::locator=universe%40workspace%3A.":
   version: 8.5.1
-  resolution: "@web3-react/walletconnect-v2@patch:@web3-react/walletconnect-v2@npm%3A8.5.1#./.yarn/patches/@web3-react-walletconnect-v2-npm-8.5.1-933cac0534.patch::version=8.5.1&hash=bfeb27&locator=universe%40workspace%3A."
+  resolution: "@web3-react/walletconnect-v2@patch:@web3-react/walletconnect-v2@npm%3A8.5.1#./.yarn/patches/@web3-react-walletconnect-v2-npm-8.5.1-933cac0534.patch::version=8.5.1&hash=db55a1&locator=universe%40workspace%3A."
   dependencies:
     "@walletconnect/ethereum-provider": ^2.10.1
     "@walletconnect/modal": ^2.6.2
@@ -22145,7 +22146,7 @@ __metadata:
 
 "detox@patch:detox@npm%3A20.18.1#./.yarn/patches/detox-npm-20.18.1-b532b310b4.patch::locator=universe%40workspace%3A.":
   version: 20.18.1
-  resolution: "detox@patch:detox@npm%3A20.18.1#./.yarn/patches/detox-npm-20.18.1-b532b310b4.patch::version=20.18.1&hash=9e679b&locator=universe%40workspace%3A."
+  resolution: "detox@patch:detox@npm%3A20.18.1#./.yarn/patches/detox-npm-20.18.1-b532b310b4.patch::version=20.18.1&hash=78b9d4&locator=universe%40workspace%3A."
   dependencies:
     ajv: ^8.6.3
     bunyan: ^1.8.12
@@ -24927,7 +24928,7 @@ __metadata:
 
 "expo-local-authentication@patch:expo-local-authentication@npm%3A13.0.2#./.yarn/patches/expo-local-authentication-npm-13.0.2-e7639a51e4.patch::locator=universe%40workspace%3A.":
   version: 13.0.2
-  resolution: "expo-local-authentication@patch:expo-local-authentication@npm%3A13.0.2#./.yarn/patches/expo-local-authentication-npm-13.0.2-e7639a51e4.patch::version=13.0.2&hash=a13792&locator=universe%40workspace%3A."
+  resolution: "expo-local-authentication@patch:expo-local-authentication@npm%3A13.0.2#./.yarn/patches/expo-local-authentication-npm-13.0.2-e7639a51e4.patch::version=13.0.2&hash=ef63cc&locator=universe%40workspace%3A."
   dependencies:
     invariant: ^2.2.4
   peerDependencies:
@@ -26241,7 +26242,7 @@ __metadata:
 
 "fsevents@patch:fsevents@^2.1.2#~builtin<compat/fsevents>, fsevents@patch:fsevents@^2.3.2#~builtin<compat/fsevents>, fsevents@patch:fsevents@~2.3.2#~builtin<compat/fsevents>":
   version: 2.3.3
-  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=18f3a7"
+  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=df0bf1"
   dependencies:
     node-gyp: latest
   conditions: os=darwin
@@ -32538,7 +32539,7 @@ __metadata:
 
 "lightweight-charts@patch:lightweight-charts@npm%3A4.1.1#./.yarn/patches/lightweight-charts-npm-4.1.1-01f161d9b6.patch::locator=universe%40workspace%3A.":
   version: 4.1.1
-  resolution: "lightweight-charts@patch:lightweight-charts@npm%3A4.1.1#./.yarn/patches/lightweight-charts-npm-4.1.1-01f161d9b6.patch::version=4.1.1&hash=0e1706&locator=universe%40workspace%3A."
+  resolution: "lightweight-charts@patch:lightweight-charts@npm%3A4.1.1#./.yarn/patches/lightweight-charts-npm-4.1.1-01f161d9b6.patch::version=4.1.1&hash=ba0fce&locator=universe%40workspace%3A."
   dependencies:
     fancy-canvas: 2.1.0
   checksum: 045bd0eacddb5f73d66a2ddf9aefa8fe9073167c460aba2116a6d2bb33d1c2302f568b70f27c2dd03c2404e72a604c5186d660c81d5ba84e08a7cdcf5876e3c1
@@ -34794,7 +34795,7 @@ __metadata:
 
 "multiformats@patch:multiformats@npm%3A9.4.2#./.yarn/patches/multiformats-npm-9.4.2-44b8a13c1d.patch::locator=universe%40workspace%3A.":
   version: 9.4.2
-  resolution: "multiformats@patch:multiformats@npm%3A9.4.2#./.yarn/patches/multiformats-npm-9.4.2-44b8a13c1d.patch::version=9.4.2&hash=6e4024&locator=universe%40workspace%3A."
+  resolution: "multiformats@patch:multiformats@npm%3A9.4.2#./.yarn/patches/multiformats-npm-9.4.2-44b8a13c1d.patch::version=9.4.2&hash=25beb8&locator=universe%40workspace%3A."
   checksum: 17e7e5e3aa3b3f10ab45794837627f2e2d3c04bc69356102bb2e3ab254f043c34edf03769664c04a24892d22ad8ee3aa01203e36ca0645ad3a7256f7f9aa1988
   languageName: node
   linkType: hard
@@ -39283,7 +39284,7 @@ __metadata:
 
 "react-native-context-menu-view@patch:react-native-context-menu-view@npm%3A1.6.0#./.yarn/patches/react-native-context-menu-view-npm-1.6.0-f5f5410f50.patch::locator=universe%40workspace%3A.":
   version: 1.6.0
-  resolution: "react-native-context-menu-view@patch:react-native-context-menu-view@npm%3A1.6.0#./.yarn/patches/react-native-context-menu-view-npm-1.6.0-f5f5410f50.patch::version=1.6.0&hash=ddea74&locator=universe%40workspace%3A."
+  resolution: "react-native-context-menu-view@patch:react-native-context-menu-view@npm%3A1.6.0#./.yarn/patches/react-native-context-menu-view-npm-1.6.0-f5f5410f50.patch::version=1.6.0&hash=830914&locator=universe%40workspace%3A."
   peerDependencies:
     react: ^16.8.1 || ^17.0.0
     react-native: ">=0.60.0-rc.0 <1.0.x"
@@ -39321,7 +39322,7 @@ __metadata:
 
 "react-native-fast-image@patch:react-native-fast-image@npm%3A8.6.3#./.yarn/patches/react-native-fast-image-npm-8.6.3-03ee2d23c0.patch::locator=universe%40workspace%3A.":
   version: 8.6.3
-  resolution: "react-native-fast-image@patch:react-native-fast-image@npm%3A8.6.3#./.yarn/patches/react-native-fast-image-npm-8.6.3-03ee2d23c0.patch::version=8.6.3&hash=47a2df&locator=universe%40workspace%3A."
+  resolution: "react-native-fast-image@patch:react-native-fast-image@npm%3A8.6.3#./.yarn/patches/react-native-fast-image-npm-8.6.3-03ee2d23c0.patch::version=8.6.3&hash=ab6567&locator=universe%40workspace%3A."
   peerDependencies:
     react: ^17 || ^18
     react-native: ">=0.60.0"
@@ -39661,7 +39662,7 @@ __metadata:
 
 "react-native-wagmi-charts@patch:react-native-wagmi-charts@npm%3A2.3.0#./.yarn/patches/react-native-wagmi-charts-npm-2.3.0-8e836a8f3c.patch::locator=universe%40workspace%3A.":
   version: 2.3.0
-  resolution: "react-native-wagmi-charts@patch:react-native-wagmi-charts@npm%3A2.3.0#./.yarn/patches/react-native-wagmi-charts-npm-2.3.0-8e836a8f3c.patch::version=2.3.0&hash=947134&locator=universe%40workspace%3A."
+  resolution: "react-native-wagmi-charts@patch:react-native-wagmi-charts@npm%3A2.3.0#./.yarn/patches/react-native-wagmi-charts-npm-2.3.0-8e836a8f3c.patch::version=2.3.0&hash=f7d24f&locator=universe%40workspace%3A."
   dependencies:
     d3-interpolate-path: ^2.2.3
     d3-scale: ^2
@@ -39798,7 +39799,7 @@ __metadata:
 
 "react-native@patch:react-native@npm%3A0.71.13#./.yarn/patches/react-native-npm-0.71.13-e260a84bbf.patch::locator=universe%40workspace%3A.":
   version: 0.71.13
-  resolution: "react-native@patch:react-native@npm%3A0.71.13#./.yarn/patches/react-native-npm-0.71.13-e260a84bbf.patch::version=0.71.13&hash=2312d0&locator=universe%40workspace%3A."
+  resolution: "react-native@patch:react-native@npm%3A0.71.13#./.yarn/patches/react-native-npm-0.71.13-e260a84bbf.patch::version=0.71.13&hash=9ea78a&locator=universe%40workspace%3A."
   dependencies:
     "@jest/create-cache-key-function": ^29.2.1
     "@react-native-community/cli": 10.2.4
@@ -41224,7 +41225,7 @@ __metadata:
 
 "resolve@patch:resolve@npm%3A1.22.4#~builtin<compat/resolve>":
   version: 1.22.4
-  resolution: "resolve@patch:resolve@npm%3A1.22.4#~builtin<compat/resolve>::version=1.22.4&hash=07638b"
+  resolution: "resolve@patch:resolve@npm%3A1.22.4#~builtin<compat/resolve>::version=1.22.4&hash=c3c19d"
   dependencies:
     is-core-module: ^2.13.0
     path-parse: ^1.0.7
@@ -41400,7 +41401,7 @@ __metadata:
 
 "rive-react-native@patch:rive-react-native@npm%3A6.1.1#./.yarn/patches/rive-react-native-npm-6.1.1-39035aee2b.patch::locator=universe%40workspace%3A.":
   version: 6.1.1
-  resolution: "rive-react-native@patch:rive-react-native@npm%3A6.1.1#./.yarn/patches/rive-react-native-npm-6.1.1-39035aee2b.patch::version=6.1.1&hash=1ac508&locator=universe%40workspace%3A."
+  resolution: "rive-react-native@patch:rive-react-native@npm%3A6.1.1#./.yarn/patches/rive-react-native-npm-6.1.1-39035aee2b.patch::version=6.1.1&hash=1c48d6&locator=universe%40workspace%3A."
   peerDependencies:
     react: "*"
     react-native: "*"
@@ -45756,17 +45757,17 @@ __metadata:
 
 "typescript@patch:typescript@5.3.3#~builtin<compat/typescript>, typescript@patch:typescript@^4.6.4 || ^5.0.0#~builtin<compat/typescript>, typescript@patch:typescript@^5.0.4#~builtin<compat/typescript>":
   version: 5.3.3
-  resolution: "typescript@patch:typescript@npm%3A5.3.3#~builtin<compat/typescript>::version=5.3.3&hash=a1c5e5"
+  resolution: "typescript@patch:typescript@npm%3A5.3.3#~builtin<compat/typescript>::version=5.3.3&hash=e012d7"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: f61375590b3162599f0f0d5b8737877ac0a7bc52761dbb585d67e7b8753a3a4c42d9a554c4cc929f591ffcf3a2b0602f65ae3ce74714fd5652623a816862b610
+  checksum: 4e604a9e107ce0c23b16a2f8d79d0531d4d8fe9ebbb7a8c395c66998c39892f0e0a071ef0b0d4e66420a8ec2b8d6cfd9cdb29ba24f25b37cba072e9282376df9
   languageName: node
   linkType: hard
 
 "typescript@patch:typescript@^3.7.3#~builtin<compat/typescript>, typescript@patch:typescript@^3.9.10#~builtin<compat/typescript>, typescript@patch:typescript@^3.9.7#~builtin<compat/typescript>":
   version: 3.9.10
-  resolution: "typescript@patch:typescript@npm%3A3.9.10#~builtin<compat/typescript>::version=3.9.10&hash=a1c5e5"
+  resolution: "typescript@patch:typescript@npm%3A3.9.10#~builtin<compat/typescript>::version=3.9.10&hash=3bd3d3"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
@@ -45776,11 +45777,11 @@ __metadata:
 
 "typescript@patch:typescript@^4.0.0#~builtin<compat/typescript>, typescript@patch:typescript@^4.9.5#~builtin<compat/typescript>":
   version: 4.9.5
-  resolution: "typescript@patch:typescript@npm%3A4.9.5#~builtin<compat/typescript>::version=4.9.5&hash=a1c5e5"
+  resolution: "typescript@patch:typescript@npm%3A4.9.5#~builtin<compat/typescript>::version=4.9.5&hash=289587"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 2eee5c37cad4390385db5db5a8e81470e42e8f1401b0358d7390095d6f681b410f2c4a0c496c6ff9ebd775423c7785cdace7bcdad76c7bee283df3d9718c0f20
+  checksum: 1f8f3b6aaea19f0f67cba79057674ba580438a7db55057eb89cc06950483c5d632115c14077f6663ea76fd09fce3c190e6414bb98582ec80aa5a4eaf345d5b68
   languageName: node
   linkType: hard
 
