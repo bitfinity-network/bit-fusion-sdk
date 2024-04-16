@@ -1,4 +1,4 @@
-import { ChainId } from '@uniswap/sdk-core'
+import { ChainId } from 'packages/sdk-core'
 import AppJsonRpcProvider from 'rpc/AppJsonRpcProvider'
 
 import ConfiguredJsonRpcProvider from 'rpc/ConfiguredJsonRpcProvider'
