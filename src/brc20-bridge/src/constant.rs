@@ -9,3 +9,4 @@ pub(crate) const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
 pub(crate) const MAX_HTTP_RESPONSE_BYTES: u64 = 10_000;
 pub(crate) const CYCLES_PER_HTTP_REQUEST: u128 = 100_000_000;
 pub(crate) static NONCE: AtomicU32 = AtomicU32::new(0);
+pub(crate) const BRC20_TICK_LEN: usize = 4;

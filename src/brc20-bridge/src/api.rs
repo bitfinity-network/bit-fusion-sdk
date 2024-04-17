@@ -12,6 +12,8 @@ pub enum BridgeError {
     #[error("{0}")]
     InscriptionParsing(String),
     #[error("{0}")]
+    InscriptionValidation(String),
+    #[error("{0}")]
     GetDepositAddress(String),
     #[error("{0}")]
     GetUtxos(String),
@@ -23,10 +25,14 @@ pub enum BridgeError {
     AddressFromPublicKey(String),
     #[error("{0}")]
     EcdsaPublicKey(String),
+    #[error("{0}")]
+    SetTokenSymbol(String),
+    #[error("{0}")]
+    Brc20Burn(String),
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct TransferBrc20Args {
+pub struct InscribeBrc20Args {
     pub inscription_type: Protocol,
     pub inscription: String,
     pub leftovers_address: String,
@@ -56,15 +62,12 @@ pub enum Brc20InscribeError {
     /// Error from the Inscriber regarding a BRC20 transfer call
     #[error("{0}")]
     Brc20Transfer(String),
-
-    /// The amount specified for the inscription is too low.
+    /// Error returned by the `inscribe` endpoint of the Inscriber.
     #[error("{0}")]
-    LowPostage(u64),
-
+    Inscribe(String),
     /// The bitcoin address is invalid.
     #[error("{0}")]
     MalformedAddress(String),
-
     /// There are too many concurrent requests, retry later.
     #[error("{0}")]
     TemporarilyUnavailable(String),
@@ -122,6 +125,4 @@ pub enum Erc20MintError {
     ValueTooSmall,
     /// Error while signing the mint order.
     Sign(String),
-    /// No pending mint transactions.
-    MintQueueEmpty,
 }

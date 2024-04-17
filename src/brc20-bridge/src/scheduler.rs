@@ -198,7 +198,7 @@ impl Task for Brc20Task {
                                 SchedulerError::TaskExecutionFailed(format!("{err:?}"))
                             })?;
 
-                    log::info!("Created a BRC20 inscription. IDs: {:?}", result.tx_ids);
+                    log::info!("Created a BRC20 inscription with IDs: {:?}", result.tx_ids);
 
                     Ok(())
                 })

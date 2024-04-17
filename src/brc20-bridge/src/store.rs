@@ -36,6 +36,12 @@ impl Brc20Store {
         self.inner
             .insert(Brc20Hash(digest), Brc20Inscription(brc20.clone()));
     }
+
+    pub fn remove(&mut self, brc20: &Brc20) -> Option<Brc20Inscription> {
+        let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
+
+        self.inner.remove(&Brc20Hash(digest))
+    }
 }
 
 fn sha256(input: &String) -> String {
@@ -78,7 +84,7 @@ impl Ord for Brc20Hash {
 
 /// Represents the full BRC-20 inscription object.
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct Brc20Inscription(Brc20);
+pub struct Brc20Inscription(pub Brc20);
 
 impl From<Brc20> for Brc20Inscription {
     fn from(inscription: Brc20) -> Self {

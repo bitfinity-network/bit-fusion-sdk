@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use bitcoin::Network;
 use candid::{CandidType, Principal};
 use did::H160;
@@ -11,6 +13,7 @@ use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
+use crate::api::BridgeError;
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
@@ -242,6 +245,24 @@ impl State {
 
     pub fn token_symbol(&self) -> [u8; 16] {
         self.bft_config.token_symbol
+    }
+
+    pub(crate) fn set_token_symbol(&mut self, brc20_tick: &str) -> Result<(), BridgeError> {
+        let bytes = brc20_tick.as_bytes();
+
+        match bytes.len().cmp(&16usize) {
+            Ordering::Equal => {
+                self.bft_config.token_symbol.copy_from_slice(bytes);
+                Ok(())
+            }
+            Ordering::Less => {
+                self.bft_config.token_symbol[..bytes.len()].copy_from_slice(bytes);
+                Ok(())
+            }
+            Ordering::Greater => Err(BridgeError::SetTokenSymbol(
+                "Input string is longer than 16 bytes and needs truncation.".to_string(),
+            )),
+        }
     }
 
     pub fn decimals(&self) -> u8 {
