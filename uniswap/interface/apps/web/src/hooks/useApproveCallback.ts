@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { ApprovalState, useApproval } from 'lib/hooks/useApproval'
 import { useCallback } from 'react'
 

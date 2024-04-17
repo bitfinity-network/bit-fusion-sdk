@@ -1,4 +1,4 @@
-import { Percent, TradeType } from "sdk-core/src/index";
+import { Percent, TradeType } from "@uniswap/sdk-core";
 import { FlatFeeOptions } from "@uniswap/universal-router-sdk";
 import { FeeOptions } from "@uniswap/v3-sdk";
 import { useWeb3React } from "@web3-react/core";

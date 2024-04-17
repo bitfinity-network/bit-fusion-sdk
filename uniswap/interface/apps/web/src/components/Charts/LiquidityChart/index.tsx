@@ -5,7 +5,7 @@ import {
 } from "components/Charts/ChartModel";
 import { ISeriesApi, UTCTimestamp } from "lightweight-charts";
 
-import { ChainId, CurrencyAmount, Token } from "sdk-core/src/index";
+import { ChainId, CurrencyAmount, Token } from "sdk-core/src";
 import {
   FeeAmount,
   Pool,

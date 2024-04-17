@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Fraction, Percent } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, Fraction, Percent } from '@uniswap/sdk-core'
 import JSBI from 'jsbi'
 
 const ONE = new Fraction(1, 1)

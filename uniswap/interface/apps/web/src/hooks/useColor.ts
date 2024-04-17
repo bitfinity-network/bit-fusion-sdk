@@ -1,4 +1,4 @@
-import { Currency } from 'sdk-core/src/index'
+import { Currency } from '@uniswap/sdk-core'
 import useTokenLogoSource from 'hooks/useAssetLogoSource'
 import { useMemo } from 'react'
 import { useTheme } from 'styled-components'

@@ -1,4 +1,4 @@
-import { Percent } from 'sdk-core/src/index'
+import { Percent } from '@uniswap/sdk-core'
 
 import validateUserSlippageTolerance, {
   MAXIMUM_RECOMMENDED_SLIPPAGE,

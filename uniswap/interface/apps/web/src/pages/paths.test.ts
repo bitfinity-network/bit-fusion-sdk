@@ -1,4 +1,4 @@
-import { ChainId, WETH9 } from 'sdk-core/src/index'
+import { ChainId, WETH9 } from '@uniswap/sdk-core'
 
 import { routes } from './RouteDefinitions'
 import { getDefaultTokensTitle } from './getDefaultTokensTitle'

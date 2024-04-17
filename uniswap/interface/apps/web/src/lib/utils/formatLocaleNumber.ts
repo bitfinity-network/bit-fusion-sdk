@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Price } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, Price } from '@uniswap/sdk-core'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from 'constants/locales'
 
 interface FormatLocaleNumberArgs {

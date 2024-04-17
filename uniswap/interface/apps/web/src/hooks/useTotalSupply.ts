@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Token } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, Token } from '@uniswap/sdk-core'
 import { useSingleCallResult } from 'lib/hooks/multicall'
 import { useMemo } from 'react'
 

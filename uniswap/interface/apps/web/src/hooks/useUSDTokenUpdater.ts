@@ -1,4 +1,4 @@
-import { Currency } from 'sdk-core/src/index'
+import { Currency } from '@uniswap/sdk-core'
 import tryParseCurrencyAmount from 'lib/utils/tryParseCurrencyAmount'
 import { useMemo } from 'react'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
