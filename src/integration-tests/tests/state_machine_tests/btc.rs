@@ -839,6 +839,7 @@ impl CkBtcSetup {
                 }
                 status => {
                     last_status = Some(status);
+                    self.env().advance_time(Duration::from_secs(2));
                     self.env().tick();
                 }
             }

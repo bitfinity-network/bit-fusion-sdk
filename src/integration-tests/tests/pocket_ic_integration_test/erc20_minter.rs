@@ -352,9 +352,11 @@ async fn test_external_bridging() {
 
     let bob_address_id = Id256::from_evm_address(&bob_address, CHAIN_ID as _);
 
-    // Advance time twice to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;

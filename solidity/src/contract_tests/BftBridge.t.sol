@@ -15,11 +15,13 @@ contract BftBridgeTest is Test {
         address recipient;
         address toERC20;
         uint32 nonce;
-        uint32 senderChainId;
-        uint32 recipientChainId;
+        uint32 senderChainID;
+        uint32 recipientChainID;
         bytes32 name;
         bytes16 symbol;
         uint8 decimals;
+        address approveSpender;
+        uint256 approveAmount;
     }
 
     uint256 constant _OWNER_KEY = 1;
@@ -144,7 +146,7 @@ contract BftBridgeTest is Test {
 
     function testMintERC20FromICRC2InvalidChainID() public {
         MintOrder memory order = _createDefaultMintOrder();
-        order.recipientChainId = 31000;
+        order.recipientChainID = 31000;
 
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
@@ -200,8 +202,7 @@ contract BftBridgeTest is Test {
 
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
         // make signature corrupted
-        encodedOrder[220] = 0;
-        encodedOrder[221] = 0;
+        encodedOrder[0] = bytes1(uint8(42));
 
         vm.expectRevert(bytes("Invalid signature"));
         _bridge.mint(encodedOrder);
@@ -276,17 +277,19 @@ contract BftBridgeTest is Test {
         order.recipient = _alice;
         order.toERC20 = _bridge.deployERC20("Token", "TKN", order.fromTokenID);
         order.nonce = 0;
-        order.senderChainId = 0;
-        order.recipientChainId = _CHAIN_ID;
+        order.senderChainID = 0;
+        order.recipientChainID = _CHAIN_ID;
         order.name = _bridge.truncateUTF8("Token");
         order.symbol = bytes16(_bridge.truncateUTF8("Token"));
         order.decimals = 18;
+        order.approveSpender = address(0);
+        order.approveAmount = 0;
     }
 
     function _encodeMintOrder(MintOrder memory order, uint256 privateKey) private pure returns (bytes memory) {
         bytes memory encodedOrder = abi.encodePacked(order.amount, order.senderID, order.fromTokenID,
-            order.recipient, order.toERC20, order.nonce, order.senderChainId, order.recipientChainId,
-            order.name, order.symbol, order.decimals);
+            order.recipient, order.toERC20, order.nonce, order.senderChainID, order.recipientChainID,
+            order.name, order.symbol, order.decimals, order.approveSpender, order.approveAmount);
         bytes32 hash = keccak256(encodedOrder);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hash);
 

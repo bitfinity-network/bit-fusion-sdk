@@ -56,4 +56,16 @@ impl From<CallError> for TestError {
     }
 }
 
+impl From<String> for TestError {
+    fn from(value: String) -> Self {
+        Self::Generic(value)
+    }
+}
+
+impl From<&str> for TestError {
+    fn from(value: &str) -> Self {
+        Self::Generic(value.into())
+    }
+}
+
 pub type Result<T> = std::result::Result<T, TestError>;
