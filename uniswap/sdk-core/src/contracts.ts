@@ -1,27 +1,27 @@
 import contracts from "../contracts/contractAddresses.json"
 import tokenAddress from "../contracts/tokenAddresses.json"
 
-interface Contracts {
-  date: Date
-  contracts: ContractsClass
-}
+// interface Contracts {
+//   date: Date
+//   contracts: ContractsClass
+// }
 
-interface ContractsClass {
-  weth9: Factory
-  factory: Factory
-  nftDescriptorLibrary: Factory
-  nftDescriptor: Factory
-  positionManager: Factory
-  router: Factory
-  multicall: Factory
-  quoter: Factory
-  migrator: Factory
-  ticklens: Factory
-}
-
-interface Factory {
-  address: string
-}
+// interface ContractsClass {
+//   weth9: Factory
+//   factory: Factory
+//   nftDescriptorLibrary: Factory
+//   nftDescriptor: Factory
+//   positionManager: Factory
+//   router: Factory
+//   multicall: Factory
+//   quoter: Factory
+//   migrator: Factory
+//   ticklens: Factory
+// }
+//
+// interface Factory {
+//   address: string
+// }
 
 export interface Tokens {
   date: Date
@@ -50,7 +50,7 @@ interface TokenInfo {
 const getContractAddresses = () => {
   const contractAddresses: { [key: string]: string } = {};
 
-  Object.entries(contracts).forEach(([key, value]) => {
+  Object.entries(contracts).forEach(([key, value]: any) => {
     if (typeof value === 'object' && value !== null) {
       contractAddresses[key.toUpperCase()] = value.address;
     }
@@ -64,7 +64,7 @@ const getContractAddresses = () => {
 const getTokens = () => {
   const tokens: { [key: string]: TokenInfo } = {};
 
-  Object.entries(tokenAddress).forEach(([key, value]) => {
+  Object.entries(tokenAddress).forEach(([key, value]: any) => {
     if (typeof value === 'object' && value !== null) {
       tokens[key] = {
         address: value.address,

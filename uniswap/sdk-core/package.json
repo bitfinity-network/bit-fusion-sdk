@@ -13,10 +13,10 @@
     "ethereum"
   ],
   "scripts": {
-    "build": "tsc -b",
-    "start": "tsc watch",
-    "test": "tsc test",
-    "prepublishOnly": "tsc build"
+    "build": "tsdx build",
+    "start": "tsdx watch",
+    "test": "tsdx test",
+    "prepublishOnly": "tsdx build"
   },
   "dependencies": {
     "@ethersproject/address": "^5.0.2",
