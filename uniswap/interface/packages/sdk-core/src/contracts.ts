@@ -1,5 +1,5 @@
-import { contracts } from "../contracts/contractAddresses.json"
-import { tokens as tokenAddress } from "../contracts/tokenAddresses.json"
+import contracts from "../contracts/contractAddresses.json"
+import tokenAddress from "../contracts/tokenAddresses.json"
 
 interface Contracts {
   date: Date
