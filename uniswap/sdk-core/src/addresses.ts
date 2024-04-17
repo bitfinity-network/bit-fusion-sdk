@@ -246,7 +246,7 @@ const BITFINITY_TESTNET_ADDRESSES: ChainAddresses = {
   v3MigratorAddress: CONTRACTS_ADDRESSES['MIGRATOR'],
   nonfungiblePositionManagerAddress: CONTRACTS_ADDRESSES['POSITIONMANAGER'],
   tickLensAddress: CONTRACTS_ADDRESSES['TICKLENS'],
-  swapRouter02Address: CONTRACTS_ADDRESSES['SWAPROUTER02'],
+  swapRouter02Address: CONTRACTS_ADDRESSES['ROUTER'],
 }
 
 export const CHAIN_TO_ADDRESSES_MAP: Record<SupportedChainsType, ChainAddresses> = {

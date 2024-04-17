@@ -1,6 +1,10 @@
 import { ChainId, Currency, NativeCurrency, Token, UNI_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
 
+const CONTRACTS_ADDRESSES = JSON.parse(localStorage.getItem('CONTRACTS_ADDRESSES') || '[]')
+const TOKENS_ADDRESSES = JSON.parse(localStorage.getItem('TOKENS_ADDRESSES') || '[]')
+
+
 // eslint-disable-next-line no-restricted-syntax
 export const NATIVE_CHAIN_ID = 'NATIVE'
 
@@ -278,6 +282,14 @@ export const WRAPPED_NATIVE_CURRENCY: { [chainId: number]: Token | undefined } =
     'WETH',
     'Wrapped Ether'
   ),
+
+  [ChainId.BITFINITY_TESTNET]: new Token(
+    ChainId.BITFINITY_TESTNET,
+    CONTRACTS_ADDRESSES['WETH9'],
+    18,
+    'WETH',
+    'Wrapped Ether'
+  ),
   [ChainId.OPTIMISM_GOERLI]: new Token(
     ChainId.OPTIMISM_GOERLI,
     '0x4200000000000000000000000000000000000006',
@@ -346,6 +358,32 @@ export const WRAPPED_NATIVE_CURRENCY: { [chainId: number]: Token | undefined } =
   [ChainId.BLAST]: new Token(ChainId.BLAST, '0x4300000000000000000000000000000000000004', 18, 'WETH', 'Wrapped Ether'),
 }
 
+export const Arcoin = new Token(ChainId.BITFINITY_TESTNET, TOKENS_ADDRESSES['ARCOIN'], 18, 'ARC', 'Arcoin')
+export const Cashium = new Token(ChainId.BITFINITY_TESTNET, TOKENS_ADDRESSES['CASHIUM'], 18, 'CSM', 'Cashium')
+export const Coinaro = new Token(ChainId.BITFINITY_TESTNET, TOKENS_ADDRESSES['COINARO'], 18, 'CNR', 'Coinaro')
+export const Coinverse = new Token(ChainId.BITFINITY_TESTNET, TOKENS_ADDRESSES['COINVERSE'], 18, 'CVS', 'Coinverse')
+export const Coinicious = new Token(ChainId.BITFINITY_TESTNET, TOKENS_ADDRESSES['COINICIOUS'], 18, 'CNS', 'Coinicious')
+export const Incoingnito = new Token(
+  ChainId.BITFINITY_TESTNET,
+  TOKENS_ADDRESSES["INCOINGNITO"],
+  18,
+  "ICG",
+  "Incoingnito"
+)
+export const Intellicoin = new Token(
+  ChainId.BITFINITY_TESTNET,
+  TOKENS_ADDRESSES["INTELLICOIN"],
+  18,
+  "ITC",
+  "Intellicoin"
+);
+export const Coinovation = new Token(
+  ChainId.BITFINITY_TESTNET,
+  TOKENS_ADDRESSES["COINOVATION"],
+  18,
+  "COV",
+  "Coinovation"
+)
 export function isCelo(chainId: number): chainId is ChainId.CELO | ChainId.CELO_ALFAJORES {
   return chainId === ChainId.CELO_ALFAJORES || chainId === ChainId.CELO
 }
