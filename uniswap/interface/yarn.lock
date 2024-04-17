@@ -14211,9 +14211,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/sdk-core@file:./packages/sdk-core::locator=universe%40workspace%3A.":
-  version: 4.2.0
-  resolution: "@uniswap/sdk-core@file:./packages/sdk-core#./packages/sdk-core::hash=560109&locator=universe%40workspace%3A."
+"@uniswap/sdk-core@portal:./packages/sdk-core::locator=universe%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@uniswap/sdk-core@portal:./packages/sdk-core::locator=universe%40workspace%3A."
   dependencies:
     "@ethersproject/address": ^5.0.2
     big.js: ^5.2.2
@@ -14221,9 +14221,8 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: 56fb2d345aac2036de26de32def001d5c87350c94fd2358b5a9311f2a93a3d6be673ce6799139891dd3fc1c84e376c228117a79dbd42ec9353d853dfb7bd8e6a
   languageName: node
-  linkType: hard
+  linkType: soft
 
 "@uniswap/smart-order-router@npm:3.17.3":
   version: 3.17.3
