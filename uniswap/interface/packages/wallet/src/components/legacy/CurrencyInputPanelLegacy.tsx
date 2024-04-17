@@ -6,7 +6,7 @@ import {
   TextInputProps,
   TextInputSelectionChangeEventData,
 } from "react-native";
-import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { Currency, CurrencyAmount } from "@uniswap/sdk-core";
 import { Flex, FlexProps, SpaceTokens, Text } from "ui/src";
 import { fonts } from "ui/src/theme";
 import { CurrencyInfo } from "uniswap/src/features/dataApi/types";

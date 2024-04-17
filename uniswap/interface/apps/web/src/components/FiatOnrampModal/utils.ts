@@ -1,4 +1,4 @@
-import { ChainId, WETH9 } from 'sdk-core/src/index'
+import { ChainId, WETH9 } from '@uniswap/sdk-core'
 import {
   MATIC_MAINNET,
   USDC_ARBITRUM,

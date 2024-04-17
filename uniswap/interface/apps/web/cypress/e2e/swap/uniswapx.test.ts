@@ -1,4 +1,4 @@
-import { ChainId, CurrencyAmount } from 'sdk-core/src/index'
+import { ChainId, CurrencyAmount } from '@uniswap/sdk-core'
 import { CyHttpMessages } from 'cypress/types/net-stubbing'
 import { DAI, USDC_MAINNET, nativeOnChain } from '../../../src/constants/tokens'
 import { getTestSelector } from '../../utils'

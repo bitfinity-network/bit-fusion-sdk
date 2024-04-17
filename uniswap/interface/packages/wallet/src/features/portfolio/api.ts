@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, NativeCurrency as NativeCurrencyClass } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, NativeCurrency as NativeCurrencyClass } from '@uniswap/sdk-core'
 import { useMemo } from 'react'
 import ERC20_ABI from 'uniswap/src/abis/erc20.json'
 import { useRestQuery } from 'uniswap/src/data/rest'

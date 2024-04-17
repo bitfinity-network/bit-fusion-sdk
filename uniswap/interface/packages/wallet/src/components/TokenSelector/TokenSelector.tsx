@@ -2,7 +2,7 @@ import { hasStringAsync } from "expo-clipboard";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard } from "react-native";
-import { Currency } from "sdk-core/src/index";
+import { Currency } from "@uniswap/sdk-core";
 import { Flex, isWeb, useSporeColors } from "ui/src";
 import { zIndices } from "ui/src/theme";
 import { CurrencyInfo } from "uniswap/src/features/dataApi/types";

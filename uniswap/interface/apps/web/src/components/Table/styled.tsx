@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { PortfolioLogo } from "components/AccountDrawer/MiniPortfolio/PortfolioLogo";
 import { ButtonLight } from "components/Button";
 import Column from "components/Column";

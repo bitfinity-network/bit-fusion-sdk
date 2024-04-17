@@ -1,4 +1,4 @@
-import { Currency } from "sdk-core/src/index";
+import { Currency } from "@uniswap/sdk-core";
 import styled from "styled-components";
 
 import CurrencyLogo from "../Logo/CurrencyLogo";

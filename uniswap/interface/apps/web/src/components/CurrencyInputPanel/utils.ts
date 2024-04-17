@@ -1,4 +1,4 @@
-import { Currency } from 'sdk-core/src/index'
+import { Currency } from '@uniswap/sdk-core'
 
 export function formatCurrencySymbol(currency?: Currency): string | undefined {
   return currency && currency.symbol && currency.symbol.length > 20

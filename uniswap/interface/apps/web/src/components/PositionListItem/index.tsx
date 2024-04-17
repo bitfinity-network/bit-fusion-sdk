@@ -1,5 +1,5 @@
 import { BigNumber } from "@ethersproject/bignumber";
-import { Percent, Price, Token } from "sdk-core/src/index";
+import { Percent, Price, Token } from "@uniswap/sdk-core";
 import { Position } from "@uniswap/v3-sdk";
 import RangeBadge from "components/Badge/RangeBadge";
 import DoubleCurrencyLogo from "components/DoubleLogo";

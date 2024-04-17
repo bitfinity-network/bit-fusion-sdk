@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { Currency, CurrencyAmount } from "@uniswap/sdk-core";
 import Column from "components/Column";
 import CurrencyLogo from "components/Logo/CurrencyLogo";
 import Row from "components/Row";

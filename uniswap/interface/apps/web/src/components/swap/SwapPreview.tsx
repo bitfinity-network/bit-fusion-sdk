@@ -1,4 +1,4 @@
-import { Currency, Percent, TradeType } from "sdk-core/src/index";
+import { Currency, Percent, TradeType } from "@uniswap/sdk-core";
 import Column, { AutoColumn } from "components/Column";
 import { useUSDPrice } from "hooks/useUSDPrice";
 import { Trans } from "i18n";

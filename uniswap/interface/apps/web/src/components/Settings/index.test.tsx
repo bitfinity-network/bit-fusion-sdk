@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import { isSupportedChain, isUniswapXSupportedChain } from "constants/chains";
 import { mocked } from "test-utils/mocked";
 import { fireEvent, render, screen, waitFor } from "test-utils/render";

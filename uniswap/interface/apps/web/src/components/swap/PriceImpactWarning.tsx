@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import { OutlineCard } from "components/Card";
 import { Trans } from "i18n";
 import styled, { useTheme } from "styled-components";

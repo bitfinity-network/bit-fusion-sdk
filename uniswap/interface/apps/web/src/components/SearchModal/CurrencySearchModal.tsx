@@ -1,4 +1,4 @@
-import { Currency, Token } from "sdk-core/src/index";
+import { Currency, Token } from "@uniswap/sdk-core";
 import TokenSafety from "components/TokenSafety";
 import { memo, useCallback, useEffect, useState } from "react";
 

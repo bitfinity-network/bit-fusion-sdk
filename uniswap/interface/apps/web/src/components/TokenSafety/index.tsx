@@ -1,4 +1,4 @@
-import { Token } from "sdk-core/src/index";
+import { Token } from "@uniswap/sdk-core";
 import { ButtonPrimary } from "components/Button";
 import { AutoColumn } from "components/Column";
 import CurrencyLogo from "components/Logo/CurrencyLogo";

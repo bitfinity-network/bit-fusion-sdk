@@ -3,7 +3,7 @@ import {
   InterfaceElementName,
   InterfaceEventName,
 } from "@uniswap/analytics-events";
-import { Currency } from "sdk-core/src/index";
+import { Currency } from "@uniswap/sdk-core";
 import { TraceEvent } from "analytics";
 import CurrencyLogo from "components/Logo/CurrencyLogo";
 import { AutoRow } from "components/Row";

@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import Row from "components/Row";
 import { LoadingBubble } from "components/Tokens/loading";
 import { MouseoverTooltip } from "components/Tooltip";

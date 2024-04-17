@@ -1,4 +1,4 @@
-import { Currency } from "sdk-core/src/index";
+import { Currency } from "@uniswap/sdk-core";
 import { AutoColumn } from "components/Column";
 import UniswapXRouterLabel, {
   UniswapXGradient,

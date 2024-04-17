@@ -1,4 +1,4 @@
-import { Token } from "sdk-core/src/index";
+import { Token } from "@uniswap/sdk-core";
 import Badge, { BadgeVariant } from "components/Badge";
 import { Trans } from "i18n";
 import { transparentize } from "polished";

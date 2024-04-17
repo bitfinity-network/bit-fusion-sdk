@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { GestureResponderEvent, StyleProp, ViewStyle } from "react-native";
-import { Currency, CurrencyAmount } from "sdk-core/src/index";
+import { Currency, CurrencyAmount } from "@uniswap/sdk-core";
 import { Text, TouchableArea } from "ui/src";
 import { Trace } from "utilities/src/telemetry/trace/Trace";
 import { CurrencyField } from "wallet/src/features/transactions/transactionState/types";

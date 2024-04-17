@@ -1,4 +1,4 @@
-import { ChainId, WETH9 } from "sdk-core/src/index";
+import { ChainId, WETH9 } from "@uniswap/sdk-core";
 import { Pending } from "components/ConfirmSwapModal/Pending";
 import { BigNumber } from "ethers/lib/ethers";
 import { SwapResult } from "hooks/useSwapCallback";

@@ -1,4 +1,4 @@
-import { TradeType } from 'sdk-core/src/index'
+import { TradeType } from '@uniswap/sdk-core'
 import {
   ConfirmedSwapTransactionInfo,
   ExactInputSwapTransactionInfo,

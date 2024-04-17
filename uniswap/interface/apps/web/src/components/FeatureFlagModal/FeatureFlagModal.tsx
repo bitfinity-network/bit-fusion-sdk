@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { SmallButtonPrimary } from "components/Button";
 import Column from "components/Column";
 import {

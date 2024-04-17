@@ -4,7 +4,7 @@ import {
   InterfaceEventName,
   SharedEventName,
 } from "@uniswap/analytics-events";
-import { CurrencyAmount, Token } from "sdk-core/src/index";
+import { CurrencyAmount, Token } from "@uniswap/sdk-core";
 import { useWeb3React } from "@web3-react/core";
 import { TraceEvent, sendAnalyticsEvent } from "analytics";
 import { ButtonEmphasis, ButtonSize, ThemeButton } from "components/Button";
