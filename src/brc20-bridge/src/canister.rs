@@ -9,7 +9,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
 use crate::api::BridgeError;
 use crate::constant::{
@@ -36,9 +36,7 @@ impl Brc20Bridge {
         {
             let scheduler = get_scheduler();
             let mut borrowed_scheduler = scheduler.borrow_mut();
-            borrowed_scheduler.set_failed_task_callback(|task, error| {
-                log::error!("task failed: {task:?}, error: {error:?}")
-            });
+            borrowed_scheduler.on_completion_callback(log_task_execution_error);
             borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
@@ -115,8 +113,26 @@ impl Metrics for Brc20Bridge {
     }
 }
 
+fn log_task_execution_error(task: InnerScheduledTask<Brc20Task>) {
+    match task.status() {
+        TaskStatus::Failed {
+            timestamp_secs,
+            error,
+        } => {
+            log::error!(
+                "task #{} execution failed: {error} at {timestamp_secs}",
+                task.id()
+            )
+        }
+        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
+            log::error!("task #{} panicked at {timestamp_secs}", task.id())
+        }
+        _ => (),
+    };
+}
+
 pub type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<Brc20Task>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<Brc20Task>, VirtualMemory<DefaultMemoryImpl>>;
 
 pub type PersistentScheduler = Scheduler<Brc20Task, TasksStorage>;
 
