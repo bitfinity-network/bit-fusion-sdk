@@ -16,7 +16,7 @@ use crate::memory::{
 const SRC_TOKEN: Id256 = Id256([0; 32]);
 
 pub struct Brc20Store {
-    inner: StableBTreeMap<Brc20Hash, Brc20Inscription, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<RevealTxId, Brc20Inscription, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -30,33 +30,34 @@ impl Default for Brc20Store {
 }
 
 impl Brc20Store {
-    pub fn insert(&mut self, brc20: &Brc20) {
-        let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
-
+    pub fn retrieve_brc20(&self, reveal_txid: &str) -> Option<Brc20> {
         self.inner
-            .insert(Brc20Hash(digest), Brc20Inscription(brc20.clone()));
+            .get(&RevealTxId(reveal_txid.to_string()))
+            .map(|inner| inner.0)
     }
 
-    pub fn remove(&mut self, brc20: &Brc20) -> Option<Brc20Inscription> {
-        let digest = sha256(&brc20.encode().expect("Failed to encode BRC-20 as string"));
+    pub fn insert(&mut self, brc20: &Brc20, reveal_txid: String) {
+        self.inner
+            .insert(RevealTxId(reveal_txid), Brc20Inscription(brc20.clone()));
+    }
 
-        self.inner.remove(&Brc20Hash(digest))
+    pub fn remove(&mut self, reveal_txid: String) -> Result<(), String> {
+        match self.inner.remove(&RevealTxId(reveal_txid)) {
+            Some(_v) => Ok(()),
+            None => Err("Token not found in store".to_string()),
+        }
+    }
+
+    pub(crate) fn has_inscription(&self, reveal_txid: &str) -> bool {
+        self.retrieve_brc20(reveal_txid).is_some()
     }
 }
 
-fn sha256(input: &String) -> String {
-    use sha2::Digest;
-
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(input.as_bytes());
-    hex::encode(hasher.finalize())
-}
-
-/// Represents the hex-encoded SHA2-256 digest of the BRC-20 inscription.
+/// Represents the reveal transaction ID of the BRC-20 inscription.
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct Brc20Hash(String);
+struct RevealTxId(String);
 
-impl Storable for Brc20Hash {
+impl Storable for RevealTxId {
     fn to_bytes(&self) -> Cow<[u8]> {
         let bytes = self.0.to_bytes().to_vec();
         Cow::Owned(bytes)
@@ -70,13 +71,13 @@ impl Storable for Brc20Hash {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-impl PartialOrd<Self> for Brc20Hash {
+impl PartialOrd<Self> for RevealTxId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Brc20Hash {
+impl Ord for RevealTxId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
     }
@@ -146,19 +147,12 @@ impl Default for BurnRequestStore {
 }
 
 impl BurnRequestStore {
-    pub fn insert(
-        &mut self,
-        request_id: BurnRequestId,
-        address: String,
-        reveal_txid: String,
-        inscription: String,
-    ) {
+    pub fn insert(&mut self, request_id: BurnRequestId, address: String, reveal_txid: String) {
         self.inner.insert(
             request_id,
             BurnRequestInfo {
                 address,
                 reveal_txid,
-                inscription,
                 is_transferred: false,
             },
         );
@@ -185,7 +179,6 @@ impl BurnRequestStore {
 struct BurnRequestInfo {
     address: String,
     reveal_txid: String,
-    inscription: String,
     is_transferred: bool,
 }
 

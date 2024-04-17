@@ -13,7 +13,7 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 use ic_stable_structures::CellStructure;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use ord_rs::{Brc20, OrdParser};
+use ord_rs::{Brc20, Inscription, OrdParser};
 
 use crate::api::{
     Brc20InscribeError, Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
@@ -36,7 +36,10 @@ pub async fn brc20_to_erc20(
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    state.borrow_mut().inscriptions_mut().insert(&brc20);
+    state
+        .borrow_mut()
+        .inscriptions_mut()
+        .insert(&brc20, reveal_txid.to_string());
 
     let (amount, tick) = get_brc20_data(&brc20);
     // Set the token symbol using the tick (symbol) from the BRC20
@@ -256,6 +259,7 @@ pub async fn erc20_to_brc20_v2(
     _eth_address: &str,
     _amount: u64,
     brc20_args: InscribeBrc20Args,
+    reveal_txid: &str,
 ) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
     let inscriber = state.borrow().inscriber();
 
@@ -270,7 +274,10 @@ pub async fn erc20_to_brc20_v2(
     let brc20: Brc20 =
         serde_json::from_str(&inscription).expect("Failed to deserialize BRC20 from string");
 
-    state.borrow_mut().inscriptions_mut().insert(&brc20);
+    state
+        .borrow_mut()
+        .inscriptions_mut()
+        .insert(&brc20, reveal_txid.to_string());
     let (_amount, _tick) = get_brc20_data(&brc20);
 
     log::info!("Creating a BRC20 inscription");
@@ -343,50 +350,67 @@ fn btc_address_from_public_key(
         .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))
 }
 
-// WIP
 pub async fn burn_brc20(
     state: &RefCell<State>,
-    eth_address: H160,
+    address: &str,
     request_id: u32,
-    brc20: &str,
     reveal_txid: &str,
 ) -> Result<InscribeTransactions, BridgeError> {
-    // TODO: Check that the BRC20 being burned is indeed in the store.
-    // Then remove from store before burn.
+    let (brc20, inscriber_principal) = {
+        let mut state = state.borrow_mut();
+        if !state.has_brc20(reveal_txid) {
+            return Err(BridgeError::Brc20Burn(format!(
+                "Specified tx ID ({}) not associated with any BRC20 inscription",
+                reveal_txid
+            )));
+        }
 
-    let own_address = get_deposit_address(state, eth_address.clone()).await?;
+        let brc20 = state
+            .inscriptions()
+            .retrieve_brc20(reveal_txid)
+            .ok_or_else(|| BridgeError::Brc20Burn("Inscription not found".to_string()))?
+            .encode()
+            .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
 
-    let inscriber = state.borrow().inscriber();
-    let dst_address = get_inscriber_account(inscriber).await?;
+        state
+            .burn_requests_mut()
+            .insert(request_id, address.to_string(), reveal_txid.to_string());
 
-    log::trace!("Transferring BRC20 with reveal_txid ({reveal_txid}) to {dst_address} with request id {request_id}");
+        (brc20, state.inscriber())
+    };
 
-    state.borrow_mut().burn_requests_mut().insert(
-        request_id,
-        dst_address.to_string(),
-        reveal_txid.to_string(),
-        brc20.to_string(),
+    let inscriber_btc_address = get_inscriber_account(inscriber_principal).await?;
+
+    log::trace!(
+        "Transferring BRC20 with reveal_txid ({}) to {} with request id {}",
+        reveal_txid,
+        inscriber_btc_address,
+        request_id
     );
 
     let transfer_args = InscribeBrc20Args {
         inscription_type: Protocol::Brc20,
-        inscription: brc20.to_string(),
-        leftovers_address: own_address.to_string(),
-        dst_address: dst_address.to_string(),
+        inscription: brc20,
+        leftovers_address: inscriber_btc_address.clone(),
+        dst_address: inscriber_btc_address,
         multisig_config: None,
     };
 
-    let result = transfer_brc20(inscriber, transfer_args)
+    let result = transfer_brc20(inscriber_principal, transfer_args)
         .await
         .map_err(|e| BridgeError::Brc20Burn(e.to_string()));
 
-    state
-        .borrow_mut()
-        .burn_requests_mut()
-        .set_transferred(request_id);
-
+    let mut state = state.borrow_mut();
     if result.is_ok() {
-        state.borrow_mut().burn_requests_mut().remove(request_id);
+        state
+            .inscriptions_mut()
+            .remove(reveal_txid.to_string())
+            .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
+
+        state.burn_requests_mut().set_transferred(request_id);
+        state.burn_requests_mut().remove(request_id);
+    } else {
+        log::error!("Failed to transfer BRC20 for request {}", request_id);
     }
 
     result
