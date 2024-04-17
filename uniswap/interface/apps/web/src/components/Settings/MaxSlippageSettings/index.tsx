@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import Expand from "components/Expand";
 import QuestionHelper from "components/QuestionHelper";
 import Row, { RowBetween } from "components/Row";

@@ -1,4 +1,4 @@
-import { ChainId, Percent } from "sdk-core/src/index";
+import { ChainId, Percent } from "@uniswap/sdk-core";
 import blankTokenUrl from "assets/svg/blank_token.svg";
 import {
   BreadcrumbNavContainer,

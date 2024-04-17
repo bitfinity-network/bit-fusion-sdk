@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Currency, TradeType } from "sdk-core/src/index";
+import { Currency, TradeType } from "@uniswap/sdk-core";
 import { Flex, Icons, Text, useSporeColors } from "ui/src";
 import { fonts, spacing } from "ui/src/theme";
 import { NumberType } from "utilities/src/format/types";

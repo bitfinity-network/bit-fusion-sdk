@@ -1,4 +1,4 @@
-import { ChainId, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, WETH9 } from 'sdk-core/src/index'
+import { ChainId, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
 import { DAI } from 'constants/tokens'
 import {
   AssetActivityPartsFragment,

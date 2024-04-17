@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { EtherscanLogo } from "components/Icons/Etherscan";
 import { ExplorerIcon } from "components/Icons/ExplorerIcon";
 import CurrencyLogo from "components/Logo/CurrencyLogo";

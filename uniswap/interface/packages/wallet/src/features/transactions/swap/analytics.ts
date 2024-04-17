@@ -1,5 +1,5 @@
 import { SwapEventName } from '@uniswap/analytics-events'
-import { Currency, TradeType } from 'sdk-core/src/index'
+import { Currency, TradeType } from '@uniswap/sdk-core'
 import { useEffect } from 'react'
 import { NumberType } from 'utilities/src/format/types'
 import {

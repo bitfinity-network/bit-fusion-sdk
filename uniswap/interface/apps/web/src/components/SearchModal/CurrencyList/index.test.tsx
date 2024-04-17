@@ -3,7 +3,7 @@ import {
   Currency,
   CurrencyAmount as mockCurrencyAmount,
   Token as mockToken,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import { useWeb3React } from "@web3-react/core";
 import { DAI, USDC_MAINNET, WBTC } from "constants/tokens";
 import * as mockJSBI from "jsbi";

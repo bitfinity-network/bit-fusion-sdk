@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, TradeType } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { Route } from '@uniswap/v3-sdk'
 import { ChainId } from 'wallet/src/constants/chains'
 import { UNI, WBTC, wrappedNativeCurrency } from 'wallet/src/constants/tokens'

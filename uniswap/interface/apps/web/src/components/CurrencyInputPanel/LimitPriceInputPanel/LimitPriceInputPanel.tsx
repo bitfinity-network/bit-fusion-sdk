@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Price } from "sdk-core/src/index";
+import { Currency, CurrencyAmount, Price } from "@uniswap/sdk-core";
 import { InputPanel } from "components/CurrencyInputPanel/SwapCurrencyInputPanel";
 import CurrencyLogo from "components/Logo/CurrencyLogo";
 import { StyledNumericalInput } from "components/NumericalInput";

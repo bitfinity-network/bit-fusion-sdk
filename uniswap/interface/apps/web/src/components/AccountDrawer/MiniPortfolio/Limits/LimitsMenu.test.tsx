@@ -1,4 +1,4 @@
-import { ChainId, WETH9 } from "sdk-core/src/index";
+import { ChainId, WETH9 } from "@uniswap/sdk-core";
 import { useOpenLimitOrders } from "components/AccountDrawer/MiniPortfolio/Activity/hooks";
 import { Activity } from "components/AccountDrawer/MiniPortfolio/Activity/types";
 import { LimitsMenu } from "components/AccountDrawer/MiniPortfolio/Limits/LimitsMenu";

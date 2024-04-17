@@ -1,4 +1,4 @@
-import { Token } from 'sdk-core/src/index'
+import { Token } from '@uniswap/sdk-core'
 import { ChainId } from 'wallet/src/constants/chains'
 import { Trade } from 'wallet/src/features/transactions/swap/trade/types'
 

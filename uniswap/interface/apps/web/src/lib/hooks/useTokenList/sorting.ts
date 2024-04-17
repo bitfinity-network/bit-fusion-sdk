@@ -1,4 +1,4 @@
-import { ChainId, Token } from 'sdk-core/src/index'
+import { ChainId, Token } from '@uniswap/sdk-core'
 import { nativeOnChain } from 'constants/tokens'
 import { supportedChainIdFromGQLChain } from 'graphql/data/util'
 import { PortfolioTokenBalancePartsFragment } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'

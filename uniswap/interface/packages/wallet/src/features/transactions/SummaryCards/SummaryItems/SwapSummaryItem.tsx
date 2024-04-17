@@ -1,5 +1,5 @@
 import { createElement, useMemo } from "react";
-import { TradeType } from "sdk-core/src/index";
+import { TradeType } from "@uniswap/sdk-core";
 import { ONE_MINUTE_MS } from "utilities/src/time/time";
 import { SplitLogo } from "wallet/src/components/CurrencyLogo/SplitLogo";
 import { useLocalizationContext } from "wallet/src/features/language/LocalizationContext";

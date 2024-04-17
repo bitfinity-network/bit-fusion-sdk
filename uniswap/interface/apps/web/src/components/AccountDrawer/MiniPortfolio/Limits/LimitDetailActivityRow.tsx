@@ -1,4 +1,4 @@
-import { CurrencyAmount, Price } from "sdk-core/src/index";
+import { CurrencyAmount, Price } from "@uniswap/sdk-core";
 import {
   useOpenOffchainActivityModal,
   useOrderAmounts,

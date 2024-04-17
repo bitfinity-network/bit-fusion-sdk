@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount, Price } from "sdk-core/src/index";
+import { Currency, CurrencyAmount, Price } from "@uniswap/sdk-core";
 import { DetailLineItem, LineItemData } from "components/swap/DetailLineItem";
 import TradePrice from "components/swap/TradePrice";
 import { Trans } from "i18n";

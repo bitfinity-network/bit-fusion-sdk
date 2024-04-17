@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { USDC_MAINNET } from "constants/tokens";
 import { render } from "test-utils/render";
 

@@ -4,7 +4,7 @@ import {
   Price,
   Rounding,
   Token,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import {
   FeeAmount,
   Pool,

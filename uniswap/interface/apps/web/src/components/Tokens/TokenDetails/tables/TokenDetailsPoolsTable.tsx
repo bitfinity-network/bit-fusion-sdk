@@ -1,5 +1,5 @@
 import { ApolloError } from "@apollo/client";
-import { ChainId, Token } from "sdk-core/src/index";
+import { ChainId, Token } from "@uniswap/sdk-core";
 import {
   PoolTableColumns,
   PoolsTable,

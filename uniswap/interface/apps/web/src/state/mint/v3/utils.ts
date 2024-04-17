@@ -1,4 +1,4 @@
-import { Price, Token } from 'sdk-core/src/index'
+import { Price, Token } from '@uniswap/sdk-core'
 import {
   FeeAmount,
   TICK_SPACINGS,

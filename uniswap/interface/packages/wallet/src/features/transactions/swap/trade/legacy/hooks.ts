@@ -1,7 +1,7 @@
 import { MaxUint256 } from '@ethersproject/constants'
 import { SwapEventName } from '@uniswap/analytics-events'
 import { PERMIT2_ADDRESS } from '@uniswap/permit2-sdk'
-import { Currency, CurrencyAmount, TradeType } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount, TradeType } from '@uniswap/sdk-core'
 import { FlatFeeOptions, UNIVERSAL_ROUTER_ADDRESS } from '@uniswap/universal-router-sdk'
 import { FeeOptions } from '@uniswap/v3-sdk'
 import { providers } from 'ethers'

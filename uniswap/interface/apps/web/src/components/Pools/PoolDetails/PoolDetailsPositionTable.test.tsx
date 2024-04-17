@@ -1,4 +1,4 @@
-import { Price, WETH9 } from "sdk-core/src/index";
+import { Price, WETH9 } from "@uniswap/sdk-core";
 import { FeeAmount, Pool } from "@uniswap/v3-sdk";
 import { PositionInfo } from "components/AccountDrawer/MiniPortfolio/Pools/cache";
 import { USDC_MAINNET } from "constants/tokens";

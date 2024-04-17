@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import store from "state";
 import { updateUserSlippageTolerance } from "state/user/reducer";
 import { SlippageTolerance } from "state/user/types";

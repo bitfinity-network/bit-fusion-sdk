@@ -1,5 +1,5 @@
 import { ApolloError, QueryHookOptions } from '@apollo/client'
-import { TradeType } from 'sdk-core/src/index'
+import { TradeType } from '@uniswap/sdk-core'
 import { BigNumber } from 'ethers'
 import { useMemo } from 'react'
 import { ROUTING_API_PATH } from 'uniswap/src/data/constants'

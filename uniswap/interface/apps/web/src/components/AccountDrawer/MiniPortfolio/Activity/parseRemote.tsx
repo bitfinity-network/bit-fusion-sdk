@@ -4,7 +4,7 @@ import {
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   TradeType,
   UNI_ADDRESSES,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import UniswapXBolt from "assets/svg/bolt.svg";
 import moonpayLogoSrc from "assets/svg/moonpay.svg";
 import { NATIVE_CHAIN_ID, nativeOnChain } from "constants/tokens";

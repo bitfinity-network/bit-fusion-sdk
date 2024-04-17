@@ -1,4 +1,4 @@
-import { ChainId, CurrencyAmount, Token } from "sdk-core/src/index";
+import { ChainId, CurrencyAmount, Token } from "@uniswap/sdk-core";
 import { FeeAmount } from "@uniswap/v3-sdk";
 import { ChartHeader } from "components/Charts/ChartHeader";
 import { Chart } from "components/Charts/ChartModel";

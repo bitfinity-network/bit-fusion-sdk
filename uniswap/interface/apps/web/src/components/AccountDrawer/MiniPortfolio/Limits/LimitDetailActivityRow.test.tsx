@@ -1,4 +1,4 @@
-import { ChainId, WETH9 } from "sdk-core/src/index";
+import { ChainId, WETH9 } from "@uniswap/sdk-core";
 import { Activity } from "components/AccountDrawer/MiniPortfolio/Activity/types";
 import { LimitDetailActivityRow } from "components/AccountDrawer/MiniPortfolio/Limits/LimitDetailActivityRow";
 import { DAI } from "constants/tokens";

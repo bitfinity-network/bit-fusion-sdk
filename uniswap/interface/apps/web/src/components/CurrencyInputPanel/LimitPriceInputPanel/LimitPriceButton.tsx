@@ -1,4 +1,4 @@
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import Row from "components/Row";
 import { Trans } from "i18n";
 import { X } from "react-feather";

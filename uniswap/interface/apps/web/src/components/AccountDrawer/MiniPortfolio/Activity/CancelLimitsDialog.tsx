@@ -1,4 +1,4 @@
-import { ChainId, CurrencyAmount } from "sdk-core/src/index";
+import { ChainId, CurrencyAmount } from "@uniswap/sdk-core";
 import {
   ConfirmedIcon,
   LogoContainer,

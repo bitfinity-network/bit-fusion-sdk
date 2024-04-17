@@ -1,5 +1,5 @@
 import { ApolloError } from "@apollo/client";
-import { Percent } from "sdk-core/src/index";
+import { Percent } from "@uniswap/sdk-core";
 import { useTopPools } from "graphql/data/pools/useTopPools";
 import Router from "react-router-dom";
 import { mocked } from "test-utils/mocked";

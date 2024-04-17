@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import React from "react";
-import { TradeType } from "sdk-core/src/index";
+import { TradeType } from "@uniswap/sdk-core";
 import { TokenDocument } from "uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks";
 import { ChainId } from "wallet/src/constants/chains";
 import { SwapSummaryItem } from "wallet/src/features/transactions/SummaryCards/SummaryItems/SwapSummaryItem";
