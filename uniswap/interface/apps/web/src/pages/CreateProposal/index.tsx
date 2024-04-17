@@ -1,7 +1,7 @@
 import { defaultAbiCoder } from "@ethersproject/abi";
 import { getAddress, isAddress } from "@ethersproject/address";
 import { InterfacePageName } from "@uniswap/analytics-events";
-import { Currency, CurrencyAmount, Token } from "sdk-core/src/index";
+import { Currency, CurrencyAmount, Token } from "@uniswap/sdk-core";
 import { useWeb3React } from "@web3-react/core";
 import { Trace } from "analytics";
 import { ButtonError } from "components/Button";

@@ -1,4 +1,4 @@
-import { ChainId, Currency, Token, TradeType } from 'sdk-core/src/index'
+import { ChainId, Currency, Token, TradeType } from '@uniswap/sdk-core'
 import { nativeOnChain } from 'constants/tokens'
 
 import { GetQuoteArgs, PoolType, RouterPreference, TokenInRoute } from './types'

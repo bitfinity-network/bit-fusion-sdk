@@ -1,4 +1,4 @@
-import { Currency, Percent, Price } from "sdk-core/src/index";
+import { Currency, Percent, Price } from "@uniswap/sdk-core";
 import { Trans } from "i18n";
 import { Text } from "rebass";
 import { useTheme } from "styled-components";

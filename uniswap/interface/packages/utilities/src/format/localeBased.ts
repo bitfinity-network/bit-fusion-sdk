@@ -1,4 +1,4 @@
-import { Currency, CurrencyAmount } from 'sdk-core/src/index'
+import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import {
   FormatterRule,
   StandardCurrency,

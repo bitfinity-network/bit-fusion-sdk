@@ -3,7 +3,7 @@ import {
   CurrencyAmount,
   Percent,
   TradeType,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import { formatTimestamp } from "components/AccountDrawer/MiniPortfolio/formatTimestamp";
 import { LoadingRow } from "components/Loader/styled";
 import RouterLabel from "components/RouterLabel";

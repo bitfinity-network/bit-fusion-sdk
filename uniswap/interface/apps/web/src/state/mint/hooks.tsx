@@ -4,7 +4,7 @@ import {
   Percent,
   Price,
   Token,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import { Pair } from "@uniswap/v2-sdk";
 import { useWeb3React } from "@web3-react/core";
 import { Trans } from "i18n";

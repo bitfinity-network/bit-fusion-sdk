@@ -1,4 +1,4 @@
-import { ChainId } from 'sdk-core/src/index'
+import { ChainId } from '@uniswap/sdk-core'
 import { UNIVERSAL_ROUTER_CREATION_BLOCK } from '@uniswap/universal-router-sdk'
 
 /* eslint-env node */

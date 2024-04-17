@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { getChainInfo } from "constants/chainInfo";
 import { isSupportedChain, SupportedInterfaceChain } from "constants/chains";
 import { CSSProperties, FunctionComponent } from "react";

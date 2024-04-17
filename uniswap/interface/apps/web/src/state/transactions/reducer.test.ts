@@ -1,4 +1,4 @@
-import { ChainId } from 'sdk-core/src/index'
+import { ChainId } from '@uniswap/sdk-core'
 import { createStore, Store } from 'redux'
 
 import reducer, {

@@ -3,7 +3,7 @@ import {
   CurrencyAmount,
   Fraction,
   Percent,
-} from "sdk-core/src/index";
+} from "@uniswap/sdk-core";
 import { Trans } from "i18n";
 import { Text } from "rebass";
 import { ThemedText } from "theme/components";

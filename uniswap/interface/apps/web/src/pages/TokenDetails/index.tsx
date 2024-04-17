@@ -1,4 +1,4 @@
-import { ChainId } from "sdk-core/src/index";
+import { ChainId } from "@uniswap/sdk-core";
 import { useWeb3React } from "@web3-react/core";
 import TokenDetails from "components/Tokens/TokenDetails";
 import { useCreateTDPChartState } from "components/Tokens/TokenDetails/ChartSection";

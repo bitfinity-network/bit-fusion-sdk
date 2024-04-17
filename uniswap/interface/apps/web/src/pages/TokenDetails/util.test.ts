@@ -1,4 +1,4 @@
-import { Token } from 'sdk-core/src/index'
+import { Token } from '@uniswap/sdk-core'
 import { ZERO_ADDRESS } from 'constants/misc'
 import { getTokenPageTitle } from './utils'
 

@@ -7,7 +7,7 @@ import {
   InterfaceEventName,
   LiquidityEventName,
 } from "@uniswap/analytics-events";
-import { Currency, Percent } from "sdk-core/src/index";
+import { Currency, Percent } from "@uniswap/sdk-core";
 import { useWeb3React } from "@web3-react/core";
 import { sendAnalyticsEvent, TraceEvent, useTrace } from "analytics";
 import { useToggleAccountDrawer } from "components/AccountDrawer/MiniPortfolio/hooks";

@@ -1,4 +1,4 @@
-import { ChainId } from 'sdk-core/src/index'
+import { ChainId } from '@uniswap/sdk-core'
 
 /** Chains supported by the AssetActivity subscription service */
 export const SUBSCRIPTION_CHAINIDS = [
