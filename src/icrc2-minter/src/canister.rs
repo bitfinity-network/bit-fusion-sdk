@@ -17,7 +17,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
@@ -131,9 +131,7 @@ impl MinterCanister {
         {
             let scheduler = get_scheduler();
             let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.set_failed_task_callback(|task, error| {
-                log::error!("task failed: {task:?}, error: {error:?}")
-            });
+            borrowed_scheduller.on_completion_callback(log_task_execution_error);
             borrowed_scheduller.append_task(Self::init_evm_info_task());
         }
 
@@ -342,6 +340,17 @@ impl MinterCanister {
         let state = get_state();
         MinterCanister::burn_icrc2_inspect_message_check(&reason)?;
 
+        let (approve_spender, approve_amount) = if let Some(approval) = reason.approve_minted_tokens
+        {
+            approval
+                .check_signature(&caller, &reason.recipient_address)
+                .ok_or_else(|| Error::InvalidBurnOperation("invalid principal signature".into()))?;
+
+            (approval.approve_spender, approval.approve_amount)
+        } else {
+            Default::default()
+        };
+
         let caller_account = Account {
             owner: caller,
             subaccount: reason.from_subaccount,
@@ -371,6 +380,7 @@ impl MinterCanister {
                 secs: TASK_RETRY_DELAY_SECS,
             })
             .with_max_retries_policy(u32::MAX);
+
         get_scheduler().borrow_mut().append_task(
             BridgeTask::PrepareMintOrder(BurntIcrc2Data {
                 sender: caller,
@@ -381,6 +391,8 @@ impl MinterCanister {
                 decimals: token_info.decimals,
                 src_token: reason.icrc2_token_principal,
                 recipient_address: reason.recipient_address,
+                approve_spender,
+                approve_amount,
             })
             .into_scheduled(options),
         );
@@ -479,8 +491,28 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, ScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+
+fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
+    match task.status() {
+        TaskStatus::Failed {
+            timestamp_secs,
+            error,
+        } => {
+            log::error!(
+                "task #{} execution failed: {error} at {timestamp_secs}",
+                task.id()
+            )
+        }
+        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
+            log::error!("task #{} panicked at {timestamp_secs}", task.id())
+        }
+        status_change => {
+            log::trace!("task #{} status changed: {status_change:?}", task.id())
+        }
+    };
+}
 
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
