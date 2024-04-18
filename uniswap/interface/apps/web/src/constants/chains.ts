@@ -87,7 +87,6 @@ export const TESTNET_CHAIN_IDS = [
   ChainId.ARBITRUM_GOERLI,
   ChainId.OPTIMISM_GOERLI,
   ChainId.CELO_ALFAJORES,
-  ChainId.BITFINITY_TESTNET,
 ] as const
 
 /**

@@ -101,6 +101,18 @@ export function getChainUI(
             bgColor: "rgba(252, 252, 3, 0.16)",
             textColor: "rgba(17, 20, 12, 1)",
           };
+    case ChainId.BITFINITY_TESTNET:
+      return darkMode
+        ? {
+            Symbol: blast,
+            bgColor: "rgba(252, 252, 3, 0.12)",
+            textColor: "rgba(252, 252, 3, 1) ",
+          }
+        : {
+            Symbol: blastLight,
+            bgColor: "rgba(252, 252, 3, 0.16)",
+            textColor: "rgba(17, 20, 12, 1)",
+          };
     default:
       return undefined;
   }
