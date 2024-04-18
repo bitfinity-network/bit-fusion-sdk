@@ -37,7 +37,7 @@ pub struct Brc20BridgeConfig {
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
-    pub inscriber_fee: u64,
+    pub erc20_minter_fee: u64,
     pub ordinals_indexer: String,
     pub general_indexer: String,
     pub logger: LogSettings,
@@ -53,7 +53,7 @@ impl Default for Brc20BridgeConfig {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
-            inscriber_fee: 10,
+            erc20_minter_fee: 10,
             ordinals_indexer: String::new(),
             general_indexer: String::new(),
             logger: LogSettings::default(),
@@ -298,7 +298,7 @@ impl State {
         }
     }
 
-    pub fn inscriber_fee(&self) -> u64 {
-        self.config.inscriber_fee
+    pub fn erc20_minter_fee(&self) -> u64 {
+        self.config.erc20_minter_fee
     }
 }

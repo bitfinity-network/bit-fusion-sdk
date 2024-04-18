@@ -16,8 +16,8 @@ use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::{Brc20, Inscription, OrdParser};
 
 use crate::api::{
-    Brc20InscribeError, Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
-    InscribeBrc20Args,
+    Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
+    Erc20MintStatus, InscribeBrc20Args,
 };
 use crate::constant::{BRC20_TICKER_LEN, NONCE};
 use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
@@ -29,17 +29,26 @@ use crate::state::State;
 pub async fn brc20_to_erc20(
     state: &RefCell<State>,
     eth_address: H160,
-    reveal_txid: &str,
+    brc20_ticker: String,
+    holder_btc_addr: String,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    log::trace!("Parsing and validating a BRC20 inscription from transaction ID: {reveal_txid}");
-    let brc20 = parse_and_validate_inscription(state, reveal_txid)
+    let Brc20TokenDetails {
+        ticker: _,
+        holder: _,
+        tx_id,
+    } = crate::rpc::fetch_brc20_token_details(state, brc20_ticker, holder_btc_addr)
+        .await
+        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
+
+    log::trace!("Parsing and validating a BRC20 inscription from transaction ID: {tx_id}");
+    let brc20 = parse_and_validate_inscription(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
     state
         .borrow_mut()
         .inscriptions_mut()
-        .insert(&brc20, reveal_txid.to_string());
+        .insert(&brc20, tx_id.clone());
 
     let (amount, tick) = get_brc20_data(&brc20);
     // Set the token symbol using the tick (symbol) from the BRC20
@@ -97,10 +106,10 @@ pub async fn mint_erc20(
     amount: u64,
     nonce: u32,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    let fee = state.borrow().inscriber_fee();
+    let fee = state.borrow().erc20_minter_fee();
     let amount_minus_fee = amount
         .checked_sub(fee)
-        .ok_or(Erc20MintError::ValueTooSmall)?;
+        .ok_or(Erc20MintError::ValueTooSmall(amount.to_string()))?;
 
     let mint_order =
         prepare_mint_order(state, eth_address.clone(), amount_minus_fee, nonce).await?;
@@ -199,7 +208,9 @@ async fn send_mint_order(
         let evm_params = state
             .get_evm_params()
             .clone()
-            .ok_or(Erc20MintError::NotInitialized)?;
+            .ok_or(Erc20MintError::NotInitialized(
+                "Bridge must be initialized first".to_string(),
+            ))?;
 
         (evm_info, evm_params)
     };

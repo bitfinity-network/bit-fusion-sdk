@@ -4,7 +4,8 @@ use std::str::FromStr;
 use bitcoin::absolute::LockTime;
 use bitcoin::transaction::Version;
 use bitcoin::{
-    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+    Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
+    Witness,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -16,15 +17,19 @@ use crate::constant::{CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
 use crate::state::State;
 
 /// Retrieves and validates the details of a BRC20 token given its ticker.
-pub async fn fetch_brc20_token_details(
+pub(crate) async fn fetch_brc20_token_details(
     state: &RefCell<State>,
-    tick: &str,
-    holder: &str,
+    tick: String,
+    holder: String,
 ) -> anyhow::Result<Brc20TokenDetails> {
-    let indexer_url = {
+    let (network, indexer_url) = {
         let state = state.borrow();
-        state.ordinals_indexer_url()
+        (state.btc_network(), state.ordinals_indexer_url())
     };
+
+    // check that BTC address is valid and/or
+    // corresponds to the network.
+    is_valid_btc_address(&holder, network)?;
 
     let url = format!("{indexer_url}/{tick}");
 
@@ -46,6 +51,11 @@ pub async fn fetch_brc20_token_details(
         .await
         .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
         .0;
+
+    if result.status.to_string() != "200" {
+        log::error!("Failed to fetch data: HTTP status {}", result.status);
+        return Err(BridgeError::FetchBrc20TokenDetails("Failed to fetch data".to_string()).into());
+    }
 
     log::trace!(
         "Response from indexer: Status: {} Headers: {:?} Body: {}",
@@ -103,8 +113,6 @@ pub(crate) async fn fetch_reveal_transaction(
 
     let url = format!("{indexer_url}{network_str}/api/tx/{reveal_tx_id}");
 
-    log::trace!("Retrieving reveal transaction from: {url}");
-
     let request_params = CanisterHttpRequestArgument {
         url,
         max_response_bytes: Some(MAX_HTTP_RESPONSE_BYTES),
@@ -122,6 +130,11 @@ pub(crate) async fn fetch_reveal_transaction(
         .map_err(|err| BridgeError::GetTransactionById(format!("{err:?}")))?
         .0;
 
+    if result.status.to_string() != "200" {
+        log::error!("Failed to fetch data: HTTP status {}", result.status);
+        return Err(BridgeError::FetchBrc20TokenDetails("Failed to fetch data".to_string()).into());
+    }
+
     log::trace!(
         "Response from indexer: Status: {} Headers: {:?} Body: {}",
         result.status,
@@ -138,7 +151,7 @@ pub(crate) async fn fetch_reveal_transaction(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub(crate) struct Brc20TokenResponse {
+struct Brc20TokenResponse {
     token: Token,
     supply: Supply,
 }
@@ -258,4 +271,18 @@ fn network_as_str(network: Network) -> &'static str {
         Network::Signet => "/signet",
         _ => "",
     }
+}
+
+fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeError> {
+    let network_str = network_as_str(network);
+
+    if !Address::from_str(addr)
+        .expect("Failed to convert to bitcoin address")
+        .is_valid_for_network(network)
+    {
+        log::error!("The given bitcoin address {addr} is not valid for {network_str}");
+        return Err(BridgeError::MalformedAddress(addr.to_string()));
+    }
+
+    Ok(true)
 }

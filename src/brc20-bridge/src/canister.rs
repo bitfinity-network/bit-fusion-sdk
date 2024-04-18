@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::H160;
-use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
@@ -11,7 +11,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
-use crate::api::BridgeError;
+use crate::api::{BridgeError, Erc20MintStatus};
 use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
@@ -48,6 +48,18 @@ impl Brc20Bridge {
         Ok(crate::ops::get_deposit_address(&get_state(), eth_address)
             .await?
             .to_string())
+    }
+
+    #[update]
+    pub async fn brc20_to_erc20(
+        &mut self,
+        eth_address: H160,
+        brc20_ticker: String,
+        holder_btc_addr: String,
+    ) -> Result<Erc20MintStatus, BridgeError> {
+        crate::ops::brc20_to_erc20(&get_state(), eth_address, brc20_ticker, holder_btc_addr)
+            .await
+            .map_err(BridgeError::Erc20Mint)
     }
 
     #[post_upgrade]

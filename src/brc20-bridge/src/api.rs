@@ -12,7 +12,7 @@ pub enum BridgeError {
     #[error("{0}")]
     InscriptionParsing(String),
     #[error("{0}")]
-    InscriptionValidation(String),
+    MalformedAddress(String),
     #[error("{0}")]
     GetDepositAddress(String),
     #[error("{0}")]
@@ -29,6 +29,8 @@ pub enum BridgeError {
     SetTokenSymbol(String),
     #[error("{0}")]
     Brc20Burn(String),
+    #[error("{0}")]
+    Erc20Mint(#[from] Erc20MintError),
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
@@ -51,9 +53,11 @@ pub struct InscribeBrc20Args {
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MintErc20Args {
     /// User's ETH address
-    pub address: H160,
-    /// ID of the reveal transaction
-    pub reveal_txid: String,
+    pub eth_address: H160,
+    /// User's BTC address
+    pub btc_address: String,
+    /// BRC20 token name (ticker)
+    pub brc20_token: String,
 }
 
 /// Status of an ERC20 to a BRC20 swap
@@ -115,21 +119,25 @@ pub enum Erc20MintStatus {
 }
 
 /// Errors that occur during a BRC20 to ERC20 swap.
-#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintError {
     /// Error from the Brc20Bridge
+    #[error("{0}")]
     Brc20Bridge(String),
     /// The Brc20Bridge is not properly initialized.
-    NotInitialized,
-    /// Error while connecting to the Inscriber.
-    Inscriber(String),
+    #[error("{0}")]
+    NotInitialized(String),
     /// Error connecting to the EVM.
+    #[error("{0}")]
     Evm(String),
     /// The inscription (BRC20) received is invalid.
+    #[error("{0}")]
     InvalidBrc20(String),
-    /// The BRC20's amount is smaller than the fee. The transaction will not
-    /// be precessed.
-    ValueTooSmall,
+    /// The specified amount for the ERC20 is smaller than the fee.
+    /// The transaction will not be precessed.
+    #[error("{0}")]
+    ValueTooSmall(String),
     /// Error while signing the mint order.
+    #[error("{0}")]
     Sign(String),
 }
