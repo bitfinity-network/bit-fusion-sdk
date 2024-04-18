@@ -45,10 +45,9 @@ import ListsUpdater from "./state/lists/updater";
 import LogsUpdater from "./state/logs/updater";
 import { ThemeProvider, ThemedGlobalStyle } from "./theme";
 import RadialGradientByChainUpdater from "./theme/components/RadialGradientByChainUpdater";
-import { initContracts } from "./contracts";
+import { UNIVERSAL_ROUTER_ADDRESS } from '@uniswap/universal-router-sdk'
 
-// Initialize the contracts in localStorage
-initContracts();
+console.log(UNIVERSAL_ROUTER_ADDRESS);
 
 if (window.ethereum) {
   window.ethereum.autoRefreshOnNetworkChange = false;

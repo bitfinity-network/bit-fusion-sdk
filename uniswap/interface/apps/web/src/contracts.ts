@@ -111,7 +111,7 @@ interface TokenInfo {
   decimals: number;
 }
 
-const getContractAddresses = () => {
+export const getContractAddresses = () => {
   const contractAddresses: { [key: string]: string } = {};
 
   Object.entries(contracts.contracts).forEach(([key, value]) => {
@@ -120,17 +120,15 @@ const getContractAddresses = () => {
     }
   });
 
-  localStorage.setItem("CONTRACT_ADDRESSES", JSON.stringify(contractAddresses));
-
-  console.log("Saved contract addresses to localStorage");
+  return contractAddresses;
 };
 
-const getTokens = () => {
+export const getTokens = () => {
   const tokens: { [key: string]: TokenInfo } = {};
 
   Object.entries(tokenAddress.tokens).forEach(([key, value]) => {
     if (typeof value === "object" && value !== null) {
-      tokens[key] = {
+      tokens[key.toUpperCase()] = {
         address: value.address,
         name: value.name,
         symbol: value.symbol,
@@ -139,16 +137,5 @@ const getTokens = () => {
     }
   });
 
-  localStorage.setItem("TOKENS", JSON.stringify(tokens));
-
-  console.log("Saved tokens to localStorage");
-};
-
-export const initContracts = () => {
-  try {
-    getContractAddresses();
-    getTokens();
-  } catch (e) {
-    console.log(e);
-  }
+  return tokens;
 };

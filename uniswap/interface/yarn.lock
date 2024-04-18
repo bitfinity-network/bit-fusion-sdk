@@ -13902,7 +13902,7 @@ __metadata:
 
 "@uniswap/sdk-core@file:../sdk-core::locator=universe%40workspace%3A.":
   version: 4.2.0
-  resolution: "@uniswap/sdk-core@file:../sdk-core#../sdk-core::hash=e78a1e&locator=universe%40workspace%3A."
+  resolution: "@uniswap/sdk-core@file:../sdk-core#../sdk-core::hash=6e8354&locator=universe%40workspace%3A."
   dependencies:
     "@ethersproject/address": ^5.0.2
     big.js: ^5.2.2
@@ -13910,7 +13910,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: 3fbacef8663bb845b6c277a15beb16ada60bd3e738e7d8dd7cdee81efd1f5f94ab57b4330a359b934a71f7530035b633e874dea1fdddf4017e1bc2e838603325
+  checksum: ba626f9d2264c10db7b90227742963659e6119c60faf2bb18edfa7ba2c7bb91c7ea27d2a5fb7a8436a924c3d68b59836c92d7e65658676d374e1a519e3a53a46
   languageName: node
   linkType: hard
 
@@ -13980,19 +13980,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@uniswap/universal-router-sdk@npm:1.8.2, @uniswap/universal-router-sdk@npm:^1.5.4, @uniswap/universal-router-sdk@npm:^1.5.8":
-  version: 1.8.2
-  resolution: "@uniswap/universal-router-sdk@npm:1.8.2"
+"@uniswap/universal-router-sdk@file:../universal-router-sdk::locator=universe%40workspace%3A.":
+  version: 1.9.0
+  resolution: "@uniswap/universal-router-sdk@file:../universal-router-sdk#../universal-router-sdk::hash=205000&locator=universe%40workspace%3A."
   dependencies:
     "@uniswap/permit2-sdk": ^1.2.0
     "@uniswap/router-sdk": ^1.9.0
     "@uniswap/sdk-core": ^4.2.0
     "@uniswap/universal-router": 1.6.0
-    "@uniswap/v2-sdk": ^4.2.0
+    "@uniswap/v2-sdk": ^4.3.0
     "@uniswap/v3-sdk": ^3.11.0
     bignumber.js: ^9.0.2
     ethers: ^5.3.1
-  checksum: 87f7d9781ff22e71ecb38efb9cdf39408fed719c7fd6c301d33db0282b0f579b159fcd1b033bc3fb2aba92a551bafb33df2ae8aec7515524b8979c50b5d42b02
+  checksum: 9af183d8c799ef6c1709af1edc1d41470fe623ade4ddf3c3e2bd93ce661aa5452478533bf985d24b7e6c75f6c41ad6f3c90c7cc2e47a39dd8cac179df9fb699d
   languageName: node
   linkType: hard
 
