@@ -22,6 +22,7 @@ use crate::api::{
 use crate::constant::{BRC20_TICKER_LEN, NONCE};
 use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::state::State;
+use crate::store::{Brc20TokenInfo, RevealTxId};
 
 /// Swap a BRC20 for an ERC20.
 ///
@@ -33,8 +34,8 @@ pub async fn brc20_to_erc20(
     holder_btc_addr: String,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
     let Brc20TokenDetails {
-        ticker: _,
-        holder: _,
+        ticker,
+        holder,
         tx_id,
     } = crate::rpc::fetch_brc20_token_details(state, brc20_ticker, holder_btc_addr)
         .await
@@ -48,7 +49,11 @@ pub async fn brc20_to_erc20(
     state
         .borrow_mut()
         .inscriptions_mut()
-        .insert(&brc20, tx_id.clone());
+        .insert(Brc20TokenInfo {
+            tx_id: RevealTxId(tx_id.clone()),
+            ticker,
+            holder,
+        });
 
     let (amount, tick) = get_brc20_data(&brc20);
     // Set the token symbol using the tick (symbol) from the BRC20
@@ -270,7 +275,7 @@ pub async fn erc20_to_brc20_v2(
     _eth_address: &str,
     _amount: u64,
     brc20_args: InscribeBrc20Args,
-    reveal_txid: &str,
+    _reveal_txid: &str,
 ) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
     let inscriber = state.borrow().inscriber();
 
@@ -285,10 +290,10 @@ pub async fn erc20_to_brc20_v2(
     let brc20: Brc20 =
         serde_json::from_str(&inscription).expect("Failed to deserialize BRC20 from string");
 
-    state
-        .borrow_mut()
-        .inscriptions_mut()
-        .insert(&brc20, reveal_txid.to_string());
+    // state
+    //     .borrow_mut()
+    //     .inscriptions_mut()
+    //     .insert(&brc20, reveal_txid.to_string());
     let (_amount, _tick) = get_brc20_data(&brc20);
 
     log::info!("Creating a BRC20 inscription");
@@ -368,26 +373,30 @@ pub async fn burn_brc20(
     reveal_txid: &str,
 ) -> Result<InscribeTransactions, BridgeError> {
     let (brc20, inscriber_principal) = {
-        let mut state = state.borrow_mut();
-        if !state.has_brc20(reveal_txid) {
+        let mut state_mut = state.borrow_mut();
+        if !state_mut.has_brc20(reveal_txid) {
             return Err(BridgeError::Brc20Burn(format!(
                 "Specified tx ID ({}) not associated with any BRC20 inscription",
                 reveal_txid
             )));
         }
 
-        let brc20 = state
-            .inscriptions()
-            .retrieve_brc20(reveal_txid)
-            .ok_or_else(|| BridgeError::Brc20Burn("Inscription not found".to_string()))?
+        log::trace!(
+            "Parsing and validating a BRC20 inscription from transaction ID: {reveal_txid}"
+        );
+        let brc20 = parse_and_validate_inscription(state, reveal_txid)
+            .await
+            .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
             .encode()
             .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
 
-        state
-            .burn_requests_mut()
-            .insert(request_id, address.to_string(), reveal_txid.to_string());
+        state_mut.burn_requests_mut().insert(
+            request_id,
+            address.to_string(),
+            reveal_txid.to_string(),
+        );
 
-        (brc20, state.inscriber())
+        (brc20, state_mut.inscriber())
     };
 
     let inscriber_btc_address = get_inscriber_account(inscriber_principal).await?;

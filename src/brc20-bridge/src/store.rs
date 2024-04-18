@@ -7,7 +7,6 @@ use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, V
 use minter_contract_utils::mint_orders::MintOrders;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
-use ord_rs::{Brc20, Inscription};
 
 use crate::memory::{
     BRC20_STORE_MEMORY_ID, BURN_REQUEST_MEMORY_ID, MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID,
@@ -16,7 +15,7 @@ use crate::memory::{
 const SRC_TOKEN: Id256 = Id256([0; 32]);
 
 pub struct Brc20Store {
-    inner: StableBTreeMap<RevealTxId, Brc20Inscription, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<RevealTxId, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -28,32 +27,30 @@ impl Default for Brc20Store {
 }
 
 impl Brc20Store {
-    pub fn retrieve_brc20(&self, reveal_txid: &str) -> Option<Brc20> {
-        self.inner
-            .get(&RevealTxId(reveal_txid.to_string()))
-            .map(|inner| inner.0)
+    pub(crate) fn get_token_info(&self, txid: &str) -> Option<Brc20TokenInfo> {
+        self.inner.get(&RevealTxId(txid.to_string()))
     }
 
-    pub fn insert(&mut self, brc20: &Brc20, reveal_txid: String) {
+    pub(crate) fn insert(&mut self, token_info: Brc20TokenInfo) {
         self.inner
-            .insert(RevealTxId(reveal_txid), Brc20Inscription(brc20.clone()));
+            .insert(token_info.tx_id.clone(), token_info.clone());
     }
 
-    pub fn remove(&mut self, reveal_txid: String) -> Result<(), String> {
-        match self.inner.remove(&RevealTxId(reveal_txid)) {
+    pub fn remove(&mut self, txid: String) -> Result<(), String> {
+        match self.inner.remove(&RevealTxId(txid)) {
             Some(_v) => Ok(()),
             None => Err("Token not found in store".to_string()),
         }
     }
 
-    pub(crate) fn has_inscription(&self, reveal_txid: &str) -> bool {
-        self.retrieve_brc20(reveal_txid).is_some()
+    pub(crate) fn has_inscription(&self, txid: &str) -> bool {
+        self.get_token_info(txid).is_some()
     }
 }
 
 /// Represents the reveal transaction ID of the BRC-20 inscription.
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct RevealTxId(String);
+pub(crate) struct RevealTxId(pub(crate) String);
 
 impl Storable for RevealTxId {
     fn to_bytes(&self) -> Cow<[u8]> {
@@ -62,8 +59,7 @@ impl Storable for RevealTxId {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let brc20 = String::from_utf8(bytes.to_vec()).expect("Failed to convert bytes to String");
-        Self(brc20)
+        Self(String::from_utf8(bytes.to_vec()).expect("Failed to convert bytes to String"))
     }
 
     const BOUND: Bound = Bound::Unbounded;
@@ -81,30 +77,33 @@ impl Ord for RevealTxId {
     }
 }
 
-/// Represents the full BRC-20 inscription object.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Brc20Inscription(pub Brc20);
-
-impl From<Brc20> for Brc20Inscription {
-    fn from(inscription: Brc20) -> Self {
-        Self(inscription)
-    }
+pub(crate) struct Brc20TokenInfo {
+    pub(crate) tx_id: RevealTxId,
+    pub(crate) ticker: String,
+    pub(crate) holder: String,
 }
 
-impl Storable for Brc20Inscription {
+impl Storable for Brc20TokenInfo {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let bytes = self
-            .0
-            .encode()
-            .expect("Failed to encode BRC20")
-            .to_bytes()
-            .to_vec();
+        let mut bytes = self.tx_id.0.as_bytes().to_vec();
+        bytes.append(&mut self.ticker.as_bytes().to_vec());
+        bytes.append(&mut self.holder.as_bytes().to_vec());
 
         Cow::Owned(bytes)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Self(Brc20::parse(&bytes).expect("Failed to parse BRC20"))
+        let tx_id =
+            RevealTxId(String::from_utf8(bytes[0..32].to_vec()).expect("Invalid bytes length"));
+        let ticker = String::from_utf8(bytes[32..36].to_vec()).expect("Invalid bytes length");
+        let holder = String::from_utf8(bytes[36..].to_vec()).expect("Invalid bytes length");
+
+        Self {
+            tx_id,
+            ticker,
+            holder,
+        }
     }
 
     const BOUND: Bound = Bound::Unbounded;
