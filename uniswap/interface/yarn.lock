@@ -13902,7 +13902,7 @@ __metadata:
 
 "@uniswap/sdk-core@file:../sdk-core::locator=universe%40workspace%3A.":
   version: 4.2.0
-  resolution: "@uniswap/sdk-core@file:../sdk-core#../sdk-core::hash=f977df&locator=universe%40workspace%3A."
+  resolution: "@uniswap/sdk-core@file:../sdk-core#../sdk-core::hash=edbb70&locator=universe%40workspace%3A."
   dependencies:
     "@ethersproject/address": ^5.0.2
     big.js: ^5.2.2
@@ -13910,7 +13910,7 @@ __metadata:
     jsbi: ^3.1.4
     tiny-invariant: ^1.1.0
     toformat: ^2.0.0
-  checksum: c40d2fd69cedef13af22578b877806bafed496a83c788af8a9c10882e32c34e6406de759ab1285657ead3376d80298a4e8d894ef0ee38dcc3467f93a08e7a8ce
+  checksum: 16b04698781f10a2d8424ef9b7689f1ac95f4cb29c1fd0d46222ba0d5fe086b90dd6d63b625635ebd182bf5ab624839c32fbf286f65ce34144e3c178dd228ba5
   languageName: node
   linkType: hard
 

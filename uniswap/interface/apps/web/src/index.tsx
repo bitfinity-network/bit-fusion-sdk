@@ -45,11 +45,8 @@ import ListsUpdater from "./state/lists/updater";
 import LogsUpdater from "./state/logs/updater";
 import { ThemeProvider, ThemedGlobalStyle } from "./theme";
 import RadialGradientByChainUpdater from "./theme/components/RadialGradientByChainUpdater";
-import initContracts from "@uniswap/sdk-core/src/contracts";
-
-// Initialize the contracts in localStorage
+import { initContracts } from "@uniswap/sdk-core";
 initContracts();
-
 if (window.ethereum) {
   window.ethereum.autoRefreshOnNetworkChange = false;
 }
