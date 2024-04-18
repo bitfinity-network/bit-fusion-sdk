@@ -1,13 +1,11 @@
-pub mod api;
 pub mod canister;
 pub mod constant;
-pub mod inscriber_api;
+pub mod interface;
 pub mod memory;
 pub mod ops;
 pub mod rpc;
 pub mod scheduler;
 pub mod state;
-pub mod store;
 
 use ic_metrics::Metrics;
 

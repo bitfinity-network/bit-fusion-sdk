@@ -15,14 +15,14 @@ use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::{Brc20, Inscription, OrdParser};
 
-use crate::api::{
+use crate::constant::{BRC20_TICKER_LEN, NONCE};
+use crate::interface::bridge_api::{
     Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
     Erc20MintStatus, InscribeBrc20Args,
 };
-use crate::constant::{BRC20_TICKER_LEN, NONCE};
-use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
+use crate::interface::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
+use crate::interface::store::Brc20TokenInfo;
 use crate::state::State;
-use crate::store::Brc20TokenInfo;
 
 /// Swap a BRC20 for an ERC20.
 ///

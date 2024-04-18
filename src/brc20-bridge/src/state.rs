@@ -13,10 +13,10 @@ use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
-use crate::api::BridgeError;
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
+use crate::interface::bridge_api::BridgeError;
+use crate::interface::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
-use crate::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 

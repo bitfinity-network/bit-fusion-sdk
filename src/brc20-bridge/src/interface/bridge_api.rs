@@ -4,7 +4,7 @@ use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::inscriber_api::{InscribeTransactions, Multisig, Protocol};
+use super::inscriber_api::{InscribeTransactions, Multisig, Protocol};
 
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {

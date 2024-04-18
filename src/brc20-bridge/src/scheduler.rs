@@ -13,8 +13,8 @@ use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
-use crate::api::MintErc20Args;
 use crate::canister::get_state;
+use crate::interface::bridge_api::MintErc20Args;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Brc20Task {

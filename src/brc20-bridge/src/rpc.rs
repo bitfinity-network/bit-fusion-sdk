@@ -12,8 +12,8 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 };
 use serde::Deserialize;
 
-use crate::api::{Brc20TokenDetails, BridgeError};
 use crate::constant::{CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
+use crate::interface::bridge_api::{Brc20TokenDetails, BridgeError};
 use crate::state::State;
 
 /// Retrieves and validates the details of a BRC20 token given its ticker.
