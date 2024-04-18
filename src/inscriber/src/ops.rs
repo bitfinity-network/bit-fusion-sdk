@@ -3,7 +3,7 @@ use std::str::FromStr as _;
 use bitcoin::Txid;
 use ord_rs::MultisigConfig;
 
-use crate::interface::inscriber_api::{
+use crate::interface::{
     Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
     Protocol,
 };

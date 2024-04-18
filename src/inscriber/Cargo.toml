@@ -13,9 +13,10 @@ bitcoin = { version = "0.31", features = ["serde"] }
 bs58 = "0.5"
 candid = { workspace = true }
 ethers-core = { workspace = true }
-evm-sdk-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
+did = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
+ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-crypto-getrandom-for-wasm", tag = "v0.15.x" }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
@@ -31,13 +32,6 @@ serde_bytes = "0.11"
 serde_json = { workspace = true }
 sha2 = "0.10"
 thiserror = { workspace = true }
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-getrandom = { version = "0.2", features = ["custom"] }
-rand = { workspace = true, features = ["getrandom"] }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-getrandom = { version = "0.2" }
 
 [build-dependencies]
 vergen = { workspace = true }

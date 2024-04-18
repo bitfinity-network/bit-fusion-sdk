@@ -4,7 +4,7 @@ use bitcoin::{PublicKey, ScriptBuf, Transaction, Witness};
 use ord_rs::{ExternalSigner as _, Utxo};
 
 use super::EcdsaSigner;
-use crate::interface::inscriber_api::{InscribeError, InscribeResult};
+use crate::interface::{InscribeError, InscribeResult};
 
 pub struct Spender {
     pub pubkey: PublicKey,

@@ -117,6 +117,9 @@ impl Default for State {
 
 impl State {
     pub fn configure(&mut self, config: Brc20BridgeConfig) {
+        #[cfg(target_family = "wasm")]
+        ic_crypto_getrandom_for_wasm::register_custom_getrandom();
+
         if let Err(err) = config.validate_indexer_urls() {
             panic!("Invalid configuration: {err}");
         }

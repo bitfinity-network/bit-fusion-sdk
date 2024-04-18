@@ -4,14 +4,14 @@ use std::rc::Rc;
 
 use bitcoin::Amount;
 use candid::CandidType;
-use evm_sdk_did::codec;
+use did::codec;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
 
-use crate::interface::inscriber_api::{InscribeError, InscribeResult, InscriptionFees};
+use crate::interface::{InscribeError, InscribeResult, InscriptionFees};
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 thread_local! {
@@ -46,7 +46,7 @@ impl State {
     /// Initializes the Inscriber's state with configuration information.
     pub(crate) fn configure(&mut self, config: InscriberConfig) {
         #[cfg(target_family = "wasm")]
-        custom_getrandom_impl::register_custom_getrandom();
+        ic_crypto_getrandom_for_wasm::register_custom_getrandom();
 
         BITCOIN_NETWORK.with(|n| n.set(config.network));
 
@@ -213,26 +213,6 @@ enum UtxoType {
     Fee,
     /// Denotes a UTXO left after fees have been deducted
     Leftover,
-}
-
-// // In the following, we register a custom `getrandom` implementation because
-// // otherwise `getrandom` (which is an indirect dependency of `bitcoin`) fails to compile.
-// // This is necessary because `getrandom` by default fails to compile for the
-// // `wasm32-unknown-unknown` target (which is required for deploying a canister).
-
-#[cfg(all(
-    target_family = "wasm",
-    target_vendor = "unknown",
-    target_os = "unknown"
-))]
-mod custom_getrandom_impl {
-    pub fn register_custom_getrandom() {
-        getrandom::register_custom_getrandom!(always_fail);
-    }
-    /// A getrandom implementation that always fails
-    fn always_fail(_buf: &mut [u8]) -> Result<(), getrandom::Error> {
-        Err(getrandom::Error::UNSUPPORTED)
-    }
 }
 
 #[cfg(test)]

@@ -14,10 +14,9 @@ use serde_bytes::ByteBuf;
 use crate::build_data::canister_build_data;
 use crate::constant::SUPPORTED_ENDPOINTS;
 use crate::http::{HttpRequest, HttpResponse, Rpc};
-use crate::interface::bitcoin_api;
-use crate::interface::inscriber_api::{
-    Brc20TransferTransactions, BuildData, InscribeError, InscribeResult, InscribeTransactions,
-    InscriptionFees, Multisig, Protocol,
+use crate::interface::{
+    bitcoin_api, Brc20TransferTransactions, BuildData, InscribeError, InscribeResult,
+    InscribeTransactions, InscriptionFees, Multisig, Protocol,
 };
 use crate::state::{InscriberConfig, State, BITCOIN_NETWORK, INSCRIBER_STATE};
 use crate::wallet::CanisterWallet;

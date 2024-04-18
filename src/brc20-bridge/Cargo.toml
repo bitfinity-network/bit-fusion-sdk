@@ -19,12 +19,14 @@ eth-signer = { workspace = true, features = ["ic_sign"] }
 futures = { workspace = true }
 hex = "0.4"
 ic-canister = { workspace = true }
+ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-crypto-getrandom-for-wasm", tag = "v0.15.x" }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
+inscriber = { path = "../inscriber" }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }

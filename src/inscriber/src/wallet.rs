@@ -24,11 +24,10 @@ use ord_rs::{
 use serde::de::DeserializeOwned;
 
 use self::signer::{Signer, Spender};
-use crate::interface::inscriber_api::{
-    InscribeError, InscribeResult, InscribeTransactions, InscriptionFees, InscriptionWrapper,
-    Nft as CandidNft, Protocol,
+use crate::interface::{
+    bitcoin_api, ecdsa_api, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
+    InscriptionWrapper, Nft as CandidNft, Protocol,
 };
-use crate::interface::{bitcoin_api, ecdsa_api};
 use crate::state::State;
 
 #[derive(Clone)]

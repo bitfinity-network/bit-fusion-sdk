@@ -10,7 +10,7 @@ use crate::constant::{
     HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME, HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME,
     HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME, HTTP_METHOD_INSCRIBER_METHOD_NAME,
 };
-use crate::interface::inscriber_api::{InscribeError, InscribeResult, Multisig, Protocol};
+use crate::interface::{InscribeError, InscribeResult, Multisig, Protocol};
 use crate::{ops, Inscriber};
 
 pub type RpcResult = Result<Value, InscribeError>;
