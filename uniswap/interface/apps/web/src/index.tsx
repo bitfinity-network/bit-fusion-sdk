@@ -45,7 +45,7 @@ import ListsUpdater from "./state/lists/updater";
 import LogsUpdater from "./state/logs/updater";
 import { ThemeProvider, ThemedGlobalStyle } from "./theme";
 import RadialGradientByChainUpdater from "./theme/components/RadialGradientByChainUpdater";
-import initContracts from "@uniswap/sdk-core/src/contracts";
+import { initContracts } from "./contracts";
 
 // Initialize the contracts in localStorage
 initContracts();
