@@ -1,6 +1,5 @@
 use std::future::Future;
 
-use did::InscribeError;
 use ethers_core::abi::ethereum_types::H520;
 use ethers_core::types::{Signature, H160};
 use jsonrpc_core::{Failure, MethodCall, Output, Success};
@@ -12,6 +11,7 @@ use crate::constant::{
     HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME, HTTP_METHOD_INSCRIBER_METHOD_NAME,
 };
 use crate::wallet::inscription::{Multisig, Protocol};
+use crate::wallet::interface::{InscribeError, InscribeResult};
 use crate::{ops, Inscriber};
 
 pub type RpcResult = Result<Value, InscribeError>;
@@ -180,7 +180,7 @@ impl Rpc {
     }
 
     /// Recovers the public key from a signed message and signature.
-    pub fn recover_pubkey(message: String, signature: H520) -> did::InscribeResult<H160> {
+    pub fn recover_pubkey(message: String, signature: H520) -> InscribeResult<H160> {
         let signature = Signature::try_from(signature.as_bytes())?;
         let address = signature.recover(message)?;
 
@@ -188,7 +188,7 @@ impl Rpc {
     }
 
     /// Verifies that the actual address matches the expected address.
-    pub fn verify_address(actual_address: H160, expected_address: H160) -> did::InscribeResult<()> {
+    pub fn verify_address(actual_address: H160, expected_address: H160) -> InscribeResult<()> {
         if actual_address != expected_address {
             return Err(InscribeError::AddressMismatch {
                 expected: expected_address.to_string(),

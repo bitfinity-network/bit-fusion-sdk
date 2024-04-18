@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 use bitcoin::Amount;
 use candid::CandidType;
-use did::{InscribeError, InscribeResult, InscriptionFees};
 use evm_sdk_did::codec;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_log::{init_log, LogSettings};
@@ -13,6 +12,7 @@ use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
 
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
+use crate::wallet::interface::{InscribeError, InscribeResult, InscriptionFees};
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };

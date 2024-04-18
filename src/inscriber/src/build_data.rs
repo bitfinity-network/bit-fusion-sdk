@@ -1,4 +1,5 @@
-use did::BuildData;
+use candid::CandidType;
+use serde::{Deserialize, Serialize};
 
 // E.g.: x86_64-unknown-linux-gnu
 const CARGO_TARGET_TRIPLE: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");
@@ -20,6 +21,21 @@ const GIT_BRANCH: &str = env!("VERGEN_GIT_BRANCH");
 const GIT_SHA: &str = env!("VERGEN_GIT_SHA");
 // E.g.: 2022-12-23T15:29:20.000000000Z
 const GIT_COMMIT_TIMESTAMP: &str = env!("VERGEN_GIT_COMMIT_TIMESTAMP");
+
+/// Contains the build data.
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+pub struct BuildData {
+    pub cargo_target_triple: String,
+    pub cargo_features: String,
+    pub pkg_name: String,
+    pub pkg_version: String,
+    pub rustc_semver: String,
+    pub build_timestamp: String,
+    pub cargo_debug: String,
+    pub git_branch: String,
+    pub git_sha: String,
+    pub git_commit_timestamp: String,
+}
 
 /// Returns the build data.
 pub fn canister_build_data() -> BuildData {

@@ -9,10 +9,9 @@ export-api = []
 
 [dependencies]
 async-trait = { workspace = true }
-bitcoin = { workspace = true }
-bs58 = { workspace = true }
+bitcoin = { version = "0.31", features = ["serde"] }
+bs58 = "0.5"
 candid = { workspace = true }
-did = { path = "../did" }
 ethers-core = { workspace = true }
 evm-sdk-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
 hex = { workspace = true }
@@ -23,14 +22,15 @@ ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 jsonrpc-core = { workspace = true }
-k256 = { workspace = true }
+k256 = { version = "0.13", features = ["ecdsa"] }
 log = { workspace = true }
-ord-rs = { workspace = true }
-ripemd = { workspace = true }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
+ripemd = "0.1"
 serde = { workspace = true }
-serde_bytes = { workspace = true }
+serde_bytes = "0.11"
 serde_json = { workspace = true }
-sha2 = { workspace = true }
+sha2 = "0.10"
+thiserror = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }

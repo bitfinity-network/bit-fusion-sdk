@@ -1,10 +1,10 @@
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::sighash::SighashCache;
 use bitcoin::{PublicKey, ScriptBuf, Transaction, Witness};
-use did::{InscribeError, InscribeResult};
 use ord_rs::{ExternalSigner as _, Utxo};
 
 use super::EcdsaSigner;
+use crate::wallet::interface::{InscribeError, InscribeResult};
 
 pub struct Spender {
     pub pubkey: PublicKey,
@@ -66,7 +66,7 @@ impl Signer {
             log::debug!("signature: {}", signature.serialize_der());
 
             // append witness
-            let signature = bitcoin::ecdsa::Signature::sighash_all(signature).into();
+            let signature = bitcoin::ecdsa::Signature::sighash_all(signature);
             let witness = Witness::p2wpkh(&signature, &spender.pubkey.inner);
             *hash
                 .witness_mut(index)

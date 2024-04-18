@@ -1,11 +1,9 @@
-mod build_data;
-
 use candid::CandidType;
 use ord_rs::OrdError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub use self::build_data::BuildData;
+pub use crate::build_data::BuildData;
 
 pub type InscribeResult<T> = Result<T, InscribeError>;
 

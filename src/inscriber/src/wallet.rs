@@ -2,6 +2,7 @@ pub mod bitcoin_api;
 pub mod ecdsa_api;
 mod fees;
 pub mod inscription;
+pub mod interface;
 mod signer;
 
 use std::cell::RefCell;
@@ -15,7 +16,6 @@ use bitcoin::{
     Address, Amount, FeeRate, Network, OutPoint, PublicKey, ScriptBuf, Sequence, Transaction, TxIn,
     TxOut, Txid, Witness,
 };
-use did::{InscribeError, InscribeResult, InscribeTransactions, InscriptionFees};
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Outpoint, Utxo};
 use inscription::Nft as CandidNft;
@@ -31,6 +31,9 @@ use serde::de::DeserializeOwned;
 use self::inscription::{InscriptionWrapper, Protocol};
 use self::signer::{Signer, Spender};
 use crate::state::State;
+use crate::wallet::interface::{
+    InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
+};
 
 #[derive(Clone)]
 pub struct EcdsaSigner {

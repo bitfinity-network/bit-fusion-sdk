@@ -5,10 +5,6 @@ use std::str::FromStr;
 
 use bitcoin::Address;
 use candid::Principal;
-use did::{
-    Brc20TransferTransactions, BuildData, InscribeError, InscribeResult, InscribeTransactions,
-    InscriptionFees,
-};
 use ethers_core::types::H160;
 use ic_canister::{generate_idl, init, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
@@ -20,6 +16,10 @@ use crate::constant::SUPPORTED_ENDPOINTS;
 use crate::http::{HttpRequest, HttpResponse, Rpc};
 use crate::state::{InscriberConfig, State, BITCOIN_NETWORK, INSCRIBER_STATE};
 use crate::wallet::inscription::{Multisig, Protocol};
+use crate::wallet::interface::{
+    Brc20TransferTransactions, BuildData, InscribeError, InscribeResult, InscribeTransactions,
+    InscriptionFees,
+};
 use crate::wallet::{bitcoin_api, CanisterWallet};
 use crate::{http_response, ops};
 
