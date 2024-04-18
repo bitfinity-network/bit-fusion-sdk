@@ -19,7 +19,7 @@ use crate::api::{
     Brc20InscribeError, Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
     InscribeBrc20Args,
 };
-use crate::constant::{BRC20_TICK_LEN, NONCE};
+use crate::constant::{BRC20_TICKER_LEN, NONCE};
 use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::state::State;
 
@@ -68,10 +68,10 @@ async fn parse_and_validate_inscription(
 
     match inscription {
         Some(brc20) => {
-            let (_amount, tick) = get_brc20_data(&brc20);
-            if tick.len() != BRC20_TICK_LEN {
+            let (_amount, ticker) = get_brc20_data(&brc20);
+            if ticker.len() != BRC20_TICKER_LEN {
                 return Err(BridgeError::InscriptionParsing(
-                    "BRC20 tick(symbol) should only be 4 letters".to_string(),
+                    "BRC20 ticker (symbol) should be only 4 letters".to_string(),
                 ));
             }
             log::info!("BRC20 inscription validated");

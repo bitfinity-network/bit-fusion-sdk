@@ -10,7 +10,7 @@ use minter_did::order::SignedMintOrder;
 use ord_rs::{Brc20, Inscription};
 
 use crate::memory::{
-    BRC20_INSCRIPTIONS_MEMORY_ID, BURN_REQUEST_MEMORY_ID, MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID,
+    BRC20_STORE_MEMORY_ID, BURN_REQUEST_MEMORY_ID, MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID,
 };
 
 const SRC_TOKEN: Id256 = Id256([0; 32]);
@@ -22,9 +22,7 @@ pub struct Brc20Store {
 impl Default for Brc20Store {
     fn default() -> Self {
         Self {
-            inner: StableBTreeMap::new(
-                MEMORY_MANAGER.with(|mm| mm.get(BRC20_INSCRIPTIONS_MEMORY_ID)),
-            ),
+            inner: StableBTreeMap::new(MEMORY_MANAGER.with(|mm| mm.get(BRC20_STORE_MEMORY_ID))),
         }
     }
 }

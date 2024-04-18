@@ -16,7 +16,7 @@ pub enum BridgeError {
     #[error("{0}")]
     GetDepositAddress(String),
     #[error("{0}")]
-    GetUtxos(String),
+    FetchBrc20TokenDetails(String),
     #[error("{0}")]
     GetTransactionById(String),
     #[error("{0}")]
@@ -29,6 +29,13 @@ pub enum BridgeError {
     SetTokenSymbol(String),
     #[error("{0}")]
     Brc20Burn(String),
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct Brc20TokenDetails {
+    pub ticker: String,
+    pub holder: String,
+    pub tx_id: String,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]

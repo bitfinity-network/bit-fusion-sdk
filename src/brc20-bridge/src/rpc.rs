@@ -11,29 +11,95 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 };
 use serde::Deserialize;
 
-use crate::api::BridgeError;
+use crate::api::{Brc20TokenDetails, BridgeError};
 use crate::constant::{CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
 use crate::state::State;
+
+/// Retrieves and validates the details of a BRC20 token given its ticker.
+pub async fn fetch_brc20_token_details(
+    state: &RefCell<State>,
+    tick: &str,
+    holder: &str,
+) -> anyhow::Result<Brc20TokenDetails> {
+    let indexer_url = {
+        let state = state.borrow();
+        state.ordinals_indexer_url()
+    };
+
+    let url = format!("{indexer_url}/{tick}");
+
+    log::trace!("Retrieving {tick} token details from: {url}");
+
+    let request_params = CanisterHttpRequestArgument {
+        url,
+        max_response_bytes: Some(MAX_HTTP_RESPONSE_BYTES),
+        method: HttpMethod::GET,
+        headers: vec![HttpHeader {
+            name: "Accept".to_string(),
+            value: "application/json".to_string(),
+        }],
+        body: None,
+        transform: None,
+    };
+
+    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+        .await
+        .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
+        .0;
+
+    log::trace!(
+        "Response from indexer: Status: {} Headers: {:?} Body: {}",
+        result.status,
+        result.headers,
+        String::from_utf8_lossy(&result.body)
+    );
+
+    let token_details: Brc20TokenResponse =
+        serde_json::from_slice(&result.body).map_err(|err| {
+            log::error!("Failed to retrieve {tick} token details from the indexer: {err:?}");
+            BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
+        })?;
+
+    let Token {
+        tx_id,
+        address,
+        ticker,
+        ..
+    } = token_details.token;
+
+    if address != holder && tick != ticker {
+        log::error!(
+            "Token details mismatch. Given: {:?}. Expectd: {:?}",
+            (tick, holder),
+            (ticker, address)
+        );
+
+        return Err(
+            BridgeError::FetchBrc20TokenDetails("Incorrect token details".to_string()).into(),
+        );
+    }
+
+    Ok(Brc20TokenDetails {
+        ticker,
+        holder: address,
+        tx_id,
+    })
+}
 
 /// Retrieves (and re-constructs) the reveal transaction by its ID.
 ///
 /// We use the reveal transaction (as opposed to the commit transaction)
 /// because it contains the actual BRC20 inscription that needs to be parsed.
-pub async fn fetch_reveal_transaction(
+pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
     let (network, indexer_url) = {
         let state = state.borrow();
-        (state.btc_network(), state.indexer_url())
+        (state.btc_network(), state.general_indexer_url())
     };
 
-    let network_str = match network {
-        Network::Testnet => "/testnet",
-        Network::Regtest => "/regtest",
-        Network::Signet => "/signet",
-        _ => "",
-    };
+    let network_str = network_as_str(network);
 
     let url = format!("{indexer_url}{network_str}/api/tx/{reveal_tx_id}");
 
@@ -72,11 +138,41 @@ pub async fn fetch_reveal_transaction(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct TxInfo {
-    pub version: i32,
-    pub locktime: u32,
-    pub vin: Vec<Vin>,
-    pub vout: Vec<Vout>,
+pub(crate) struct Brc20TokenResponse {
+    token: Token,
+    supply: Supply,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct Token {
+    id: String,
+    number: u32,
+    block_height: u32,
+    tx_id: String,
+    address: String,
+    ticker: String,
+    max_supply: String,
+    mint_limit: String,
+    decimals: u8,
+    deploy_timestamp: u64,
+    minted_supply: String,
+    tx_count: u32,
+    self_mint: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct Supply {
+    max_supply: String,
+    minted_supply: String,
+    holders: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct TxInfo {
+    version: i32,
+    locktime: u32,
+    vin: Vec<Vin>,
+    vout: Vec<Vout>,
 }
 
 impl TryFrom<TxInfo> for Transaction {
@@ -128,29 +224,38 @@ impl TryFrom<TxInfo> for Transaction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Vin {
-    pub txid: String,
-    pub vout: u32,
-    pub sequence: u32,
-    pub is_coinbase: bool,
-    pub prevout: Prevout,
-    pub witness: Vec<String>,
+struct Vin {
+    txid: String,
+    vout: u32,
+    sequence: u32,
+    is_coinbase: bool,
+    prevout: Prevout,
+    witness: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Prevout {
-    pub scriptpubkey: String,
-    pub scriptpubkey_asm: String,
-    pub scriptpubkey_type: String,
-    pub scriptpubkey_address: Option<String>,
-    pub value: u64,
+struct Prevout {
+    scriptpubkey: String,
+    scriptpubkey_asm: String,
+    scriptpubkey_type: String,
+    scriptpubkey_address: Option<String>,
+    value: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Vout {
-    pub scriptpubkey: String,
-    pub scriptpubkey_asm: String,
-    pub scriptpubkey_type: String,
-    pub scriptpubkey_address: Option<String>,
-    pub value: u64,
+struct Vout {
+    scriptpubkey: String,
+    scriptpubkey_asm: String,
+    scriptpubkey_type: String,
+    scriptpubkey_address: Option<String>,
+    value: u64,
+}
+
+fn network_as_str(network: Network) -> &'static str {
+    match network {
+        Network::Testnet => "/testnet",
+        Network::Regtest => "/regtest",
+        Network::Signet => "/signet",
+        _ => "",
+    }
 }

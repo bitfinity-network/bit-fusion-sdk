@@ -38,7 +38,8 @@ pub struct Brc20BridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub inscriber_fee: u64,
-    pub indexer_url: String,
+    pub ordinals_indexer: String,
+    pub general_indexer: String,
     pub logger: LogSettings,
 }
 
@@ -53,22 +54,24 @@ impl Default for Brc20BridgeConfig {
             },
             admin: Principal::management_canister(),
             inscriber_fee: 10,
-            indexer_url: String::new(),
+            ordinals_indexer: String::new(),
+            general_indexer: String::new(),
             logger: LogSettings::default(),
         }
     }
 }
 
 impl Brc20BridgeConfig {
-    fn validate_indexer_url(&self) -> Result<(), String> {
-        if self.indexer_url.is_empty() {
-            return Err("Indexer URL is empty".to_string());
+    fn validate_indexer_urls(&self) -> Result<(), String> {
+        if self.ordinals_indexer.is_empty() && self.general_indexer.is_empty() {
+            return Err("Indexer URLs are empty".to_string());
         }
 
-        if !self.indexer_url.starts_with("https") {
+        if !self.ordinals_indexer.starts_with("https") && !self.general_indexer.starts_with("https")
+        {
             return Err(format!(
-                "Indexer URL must be HTTPS. Given: {}",
-                self.indexer_url
+                "Indexer URLs must be HTTPS. Given: {} and {}",
+                self.ordinals_indexer, self.general_indexer
             ));
         }
 
@@ -114,7 +117,7 @@ impl Default for State {
 
 impl State {
     pub fn configure(&mut self, config: Brc20BridgeConfig) {
-        if let Err(err) = config.validate_indexer_url() {
+        if let Err(err) = config.validate_indexer_urls() {
             panic!("Invalid configuration: {err}");
         }
 
@@ -144,11 +147,19 @@ impl State {
         self.config.inscriber
     }
 
-    pub fn indexer_url(&self) -> String {
+    pub fn general_indexer_url(&self) -> String {
         self.config
-            .indexer_url
+            .general_indexer
             .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.indexer_url)
+            .unwrap_or_else(|| &self.config.general_indexer)
+            .to_string()
+    }
+
+    pub fn ordinals_indexer_url(&self) -> String {
+        self.config
+            .ordinals_indexer
+            .strip_suffix('/')
+            .unwrap_or_else(|| &self.config.ordinals_indexer)
             .to_string()
     }
 
