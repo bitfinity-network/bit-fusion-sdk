@@ -1,0 +1,43 @@
+[package]
+name = "inscriber"
+version.workspace = true
+edition.workspace = true
+
+
+[features]
+export-api = []
+
+[dependencies]
+async-trait = { workspace = true }
+bitcoin = { workspace = true }
+bs58 = { workspace = true }
+candid = { workspace = true }
+did = { path = "../did" }
+ethers-core = { workspace = true }
+evm-sdk-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.14.x" }
+hex = { workspace = true }
+ic-canister = { workspace = true }
+ic-exports = { workspace = true }
+ic-log = { workspace = true }
+ic-metrics = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-storage = { workspace = true }
+jsonrpc-core = { workspace = true }
+k256 = { workspace = true }
+log = { workspace = true }
+ord-rs = { workspace = true }
+ripemd = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+rand = { workspace = true, features = ["getrandom"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+getrandom = { version = "0.2" }
+
+[build-dependencies]
+vergen = { workspace = true }
