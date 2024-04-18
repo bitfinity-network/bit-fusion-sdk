@@ -209,6 +209,8 @@ mod tests {
             name: fit_str_to_array("name"),
             symbol: fit_str_to_array("symbol"),
             decimals: 18,
+            approve_spender: Default::default(),
+            approve_amount: Default::default(),
         };
 
         let encoded = order.encode_and_sign(&signer).await.unwrap();

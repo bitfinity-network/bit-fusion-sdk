@@ -281,7 +281,7 @@ struct BurntEventDataBuilder {
     pub from_erc20: Option<H160>,
     pub recipient_id: Option<Vec<u8>>,
     pub to_token: Option<Vec<u8>>,
-    operation_id: Option<u32>,
+    pub operation_id: Option<u32>,
     pub name: Option<Vec<u8>>,
     pub symbol: Option<Vec<u8>>,
     pub decimals: Option<u8>,

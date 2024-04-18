@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
-use did::H160;
+use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_canister::virtual_canister_call;
@@ -177,6 +177,8 @@ impl BridgeTask {
             name: burnt_data.name,
             symbol: burnt_data.symbol,
             decimals: burnt_data.decimals,
+            approve_spender: burnt_data.approve_spender,
+            approve_amount: burnt_data.approve_amount,
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
@@ -413,7 +415,7 @@ impl BridgeTask {
 
         transfer_result.map_err(|e| SchedulerError::TaskExecutionFailed(format!("{:?}", e)))?;
 
-        log::trace!("Finished icrc2 mint");
+        log::trace!("Finished icrc2 mint to principal: {}", recipient);
 
         Ok(())
     }
@@ -443,4 +445,6 @@ pub struct BurntIcrc2Data {
     pub name: [u8; 32],
     pub symbol: [u8; 16],
     pub decimals: u8,
+    pub approve_spender: H160,
+    pub approve_amount: U256,
 }

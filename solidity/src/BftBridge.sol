@@ -19,6 +19,8 @@ contract BFTBridge {
         bytes16 symbol;
         uint8 decimals;
         uint32 senderChainID;
+        address approveSpender;
+        uint256 approveAmount;
     }
 
     struct RingBuffer {
@@ -216,7 +218,7 @@ contract BFTBridge {
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
         MintOrderData memory order = _decodeAndValidateClaim(
-            encodedOrder[: 197]
+            encodedOrder[: 249]
         );
 
         _checkMintOrderSignature(encodedOrder);
@@ -241,7 +243,7 @@ contract BFTBridge {
             "toToken address should be specified correctly"
         );
 
-        // Check the Token limits
+        // Update token's metadata
         WrappedToken(toToken).setMetaData(
             order.name,
             order.symbol,
@@ -251,6 +253,16 @@ contract BFTBridge {
         // Execute the withdrawal
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
+
+        
+        if (order.approveSpender != address(0) && order.approveAmount != 0) {
+            WrappedToken(toToken).approveByOwner(
+                order.recipient,
+                order.approveSpender,
+                order.approveAmount
+            );
+        }
+
 
         // Emit event
         emit MintTokenEvent(
@@ -299,26 +311,16 @@ contract BFTBridge {
         require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
 
-        RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-        _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
-        _lastUserDeposit[msg.sender] = increment(buffer);
+        // Update user information about burn operations.
+        // Additional scope required to save stack space and avoid StackTooDeep error.
+        {
+            RingBuffer memory buffer = _lastUserDeposit[msg.sender];
+            _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
+            _lastUserDeposit[msg.sender] = increment(buffer);
+        }
 
         // get the token details
-        bytes32 name;
-        bytes16 symbol;
-        uint8 decimals;
-
-        try IERC20Metadata(fromERC20).name() returns (string memory _name) {
-            name = truncateUTF8(_name);
-        } catch {}
-        try IERC20Metadata(fromERC20).symbol() returns (
-            string memory _symbol
-        ) {
-            symbol = bytes16(truncateUTF8(_symbol));
-        } catch {}
-        try IERC20Metadata(fromERC20).decimals() returns (uint8 _decimals) {
-            decimals = _decimals;
-        } catch {}
+        TokenMetadata memory meta = getTokenMetadata(fromERC20);
 
         uint32 operationID = operationIDCounter++;
 
@@ -329,12 +331,33 @@ contract BFTBridge {
             recipientID,
             toTokenID,
             operationID,
-            name,
-            symbol,
-            decimals
+            meta.name,
+            meta.symbol,
+            meta.decimals
         );
 
         return operationID;
+    }
+
+    struct TokenMetadata {
+        bytes32 name;
+        bytes16 symbol;
+        uint8 decimals;
+    }
+
+    // tries to query token metadata
+    function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
+        try IERC20Metadata(token).name() returns (string memory _name) {
+            meta.name = truncateUTF8(_name);
+        } catch {}
+        try IERC20Metadata(token).symbol() returns (
+            string memory _symbol
+        ) {
+            meta.symbol = bytes16(truncateUTF8(_symbol));
+        } catch {}
+        try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
+            meta.decimals = _decimals;
+        } catch {}
     }
 
     // Getter function for minter address
@@ -403,6 +426,8 @@ contract BFTBridge {
         bytes32 name = bytes32(encodedOrder[148 : 180]);
         bytes16 symbol = bytes16(encodedOrder[180 : 196]);
         uint8 decimals = uint8(encodedOrder[196]);
+        address approveSpender = address(bytes20(encodedOrder[197 : 217]));
+        uint256 approveAmount = uint256(bytes32(encodedOrder[217 : 249]));
 
         // Assert recipient address is not zero
         require(recipient != address(0), "Invalid destination address");
@@ -435,7 +460,9 @@ contract BFTBridge {
             name,
             symbol,
             decimals,
-            senderChainId
+            senderChainId,
+            approveSpender,
+            approveAmount
         );
     }
 
@@ -444,10 +471,10 @@ contract BFTBridge {
         bytes calldata encodedOrder
     ) private view {
         // Create a hash of the order data
-        bytes32 hash = keccak256(encodedOrder[: 197]);
+        bytes32 hash = keccak256(encodedOrder[: 249]);
 
         // Recover signer from the signature
-        address signer = ECDSA.recover(hash, encodedOrder[197 :]);
+        address signer = ECDSA.recover(hash, encodedOrder[249 :]);
 
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
