@@ -22,7 +22,7 @@ use crate::api::{
 use crate::constant::{BRC20_TICKER_LEN, NONCE};
 use crate::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::state::State;
-use crate::store::{Brc20TokenInfo, RevealTxId};
+use crate::store::Brc20TokenInfo;
 
 /// Swap a BRC20 for an ERC20.
 ///
@@ -50,7 +50,7 @@ pub async fn brc20_to_erc20(
         .borrow_mut()
         .inscriptions_mut()
         .insert(Brc20TokenInfo {
-            tx_id: RevealTxId(tx_id.clone()),
+            tx_id,
             ticker,
             holder,
         });

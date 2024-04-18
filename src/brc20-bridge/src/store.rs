@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cmp::Ordering;
 
 use candid::{CandidType, Decode, Deserialize, Encode};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -15,7 +14,7 @@ use crate::memory::{
 const SRC_TOKEN: Id256 = Id256([0; 32]);
 
 pub struct Brc20Store {
-    inner: StableBTreeMap<RevealTxId, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<String, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -28,7 +27,7 @@ impl Default for Brc20Store {
 
 impl Brc20Store {
     pub(crate) fn get_token_info(&self, txid: &str) -> Option<Brc20TokenInfo> {
-        self.inner.get(&RevealTxId(txid.to_string()))
+        self.inner.get(&txid.to_string())
     }
 
     pub(crate) fn insert(&mut self, token_info: Brc20TokenInfo) {
@@ -37,7 +36,7 @@ impl Brc20Store {
     }
 
     pub fn remove(&mut self, txid: String) -> Result<(), String> {
-        match self.inner.remove(&RevealTxId(txid)) {
+        match self.inner.remove(&txid) {
             Some(_v) => Ok(()),
             None => Err("Token not found in store".to_string()),
         }
@@ -48,56 +47,64 @@ impl Brc20Store {
     }
 }
 
-/// Represents the reveal transaction ID of the BRC-20 inscription.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct RevealTxId(pub(crate) String);
-
-impl Storable for RevealTxId {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let bytes = self.0.to_bytes().to_vec();
-        Cow::Owned(bytes)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Self(String::from_utf8(bytes.to_vec()).expect("Failed to convert bytes to String"))
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-impl PartialOrd<Self> for RevealTxId {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for RevealTxId {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Brc20TokenInfo {
-    pub(crate) tx_id: RevealTxId,
+    pub(crate) tx_id: String,
     pub(crate) ticker: String,
     pub(crate) holder: String,
 }
 
 impl Storable for Brc20TokenInfo {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let mut bytes = self.tx_id.0.as_bytes().to_vec();
-        bytes.append(&mut self.ticker.as_bytes().to_vec());
-        bytes.append(&mut self.holder.as_bytes().to_vec());
+        let mut bytes = Vec::new();
+
+        let tx_id_bytes = self.tx_id.as_bytes();
+        let ticker_bytes = self.ticker.as_bytes();
+        let holder_bytes = self.holder.as_bytes();
+
+        bytes.extend_from_slice(&(tx_id_bytes.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(tx_id_bytes);
+
+        bytes.extend_from_slice(&(ticker_bytes.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(ticker_bytes);
+
+        bytes.extend_from_slice(&(holder_bytes.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(holder_bytes);
 
         Cow::Owned(bytes)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let mut offset = 0;
+
+        let tx_id_len = u32::from_be_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .expect("Invalid bytes length"),
+        ) as usize;
+        offset += 4;
         let tx_id =
-            RevealTxId(String::from_utf8(bytes[0..32].to_vec()).expect("Invalid bytes length"));
-        let ticker = String::from_utf8(bytes[32..36].to_vec()).expect("Invalid bytes length");
-        let holder = String::from_utf8(bytes[36..].to_vec()).expect("Invalid bytes length");
+            String::from_utf8(bytes[offset..offset + tx_id_len].to_vec()).expect("Invalid bytes");
+        offset += tx_id_len;
+
+        let ticker_len = u32::from_be_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .expect("Invalid bytes length"),
+        ) as usize;
+        offset += 4;
+        let ticker =
+            String::from_utf8(bytes[offset..offset + ticker_len].to_vec()).expect("Invalid bytes");
+        offset += ticker_len;
+
+        let holder_len = u32::from_be_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .expect("Invalid bytes length"),
+        ) as usize;
+        offset += 4;
+        let holder =
+            String::from_utf8(bytes[offset..offset + holder_len].to_vec()).expect("Invalid bytes");
 
         Self {
             tx_id,
