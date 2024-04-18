@@ -39,6 +39,6 @@
     "semi": false,
     "singleQuote": true
   },
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "private": true
 }
