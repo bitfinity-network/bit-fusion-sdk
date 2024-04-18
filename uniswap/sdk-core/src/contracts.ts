@@ -82,7 +82,7 @@ const getTokens = () => {
 
 
 
-const initContracts = () => {
+export const initContracts = () => {
   try {
     getContractAddresses()
     getTokens()
@@ -92,6 +92,6 @@ const initContracts = () => {
 }
 
 
-initContracts();
 
-export default initContracts
+
+
