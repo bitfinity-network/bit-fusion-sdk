@@ -13,8 +13,10 @@ use crate::memory::{
 
 const SRC_TOKEN: Id256 = Id256([0; 32]);
 
+pub type RevealTxId = String;
+
 pub struct Brc20Store {
-    inner: StableBTreeMap<String, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<RevealTxId, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -26,11 +28,11 @@ impl Default for Brc20Store {
 }
 
 impl Brc20Store {
-    pub(crate) fn get_token_info(&self, txid: &str) -> Option<Brc20TokenInfo> {
+    pub fn get_token_info(&self, txid: &str) -> Option<Brc20TokenInfo> {
         self.inner.get(&txid.to_string())
     }
 
-    pub(crate) fn insert(&mut self, token_info: Brc20TokenInfo) {
+    pub fn insert(&mut self, token_info: Brc20TokenInfo) {
         self.inner
             .insert(token_info.tx_id.clone(), token_info.clone());
     }
@@ -47,70 +49,20 @@ impl Brc20Store {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Brc20TokenInfo {
-    pub(crate) tx_id: String,
-    pub(crate) ticker: String,
-    pub(crate) holder: String,
+#[derive(Debug, CandidType, Deserialize, Clone, Eq, PartialEq)]
+pub struct Brc20TokenInfo {
+    pub tx_id: RevealTxId,
+    pub ticker: String,
+    pub holder: String,
 }
 
 impl Storable for Brc20TokenInfo {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let mut bytes = Vec::new();
-
-        let tx_id_bytes = self.tx_id.as_bytes();
-        let ticker_bytes = self.ticker.as_bytes();
-        let holder_bytes = self.holder.as_bytes();
-
-        bytes.extend_from_slice(&(tx_id_bytes.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(tx_id_bytes);
-
-        bytes.extend_from_slice(&(ticker_bytes.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(ticker_bytes);
-
-        bytes.extend_from_slice(&(holder_bytes.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(holder_bytes);
-
-        Cow::Owned(bytes)
+        Cow::Owned(Encode!(&(self,)).expect("serialization failed"))
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let mut offset = 0;
-
-        let tx_id_len = u32::from_be_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .expect("Invalid bytes length"),
-        ) as usize;
-        offset += 4;
-        let tx_id =
-            String::from_utf8(bytes[offset..offset + tx_id_len].to_vec()).expect("Invalid bytes");
-        offset += tx_id_len;
-
-        let ticker_len = u32::from_be_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .expect("Invalid bytes length"),
-        ) as usize;
-        offset += 4;
-        let ticker =
-            String::from_utf8(bytes[offset..offset + ticker_len].to_vec()).expect("Invalid bytes");
-        offset += ticker_len;
-
-        let holder_len = u32::from_be_bytes(
-            bytes[offset..offset + 4]
-                .try_into()
-                .expect("Invalid bytes length"),
-        ) as usize;
-        offset += 4;
-        let holder =
-            String::from_utf8(bytes[offset..offset + holder_len].to_vec()).expect("Invalid bytes");
-
-        Self {
-            tx_id,
-            ticker,
-            holder,
-        }
+        Decode!(&bytes, (Self,)).expect("deserialization failed").0
     }
 
     const BOUND: Bound = Bound::Unbounded;
@@ -182,7 +134,7 @@ impl BurnRequestStore {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 struct BurnRequestInfo {
     address: String,
-    reveal_txid: String,
+    reveal_txid: RevealTxId,
     is_transferred: bool,
 }
 

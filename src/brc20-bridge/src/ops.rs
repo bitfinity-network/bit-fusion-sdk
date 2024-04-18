@@ -41,7 +41,7 @@ pub async fn brc20_to_erc20(
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    log::trace!("Parsing and validating a BRC20 inscription from transaction ID: {tx_id}");
+    log::trace!("Parsing and validating BRC20 inscription from transaction ID: {tx_id}");
     let brc20 = parse_and_validate_inscription(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
@@ -372,31 +372,28 @@ pub async fn burn_brc20(
     request_id: u32,
     reveal_txid: &str,
 ) -> Result<InscribeTransactions, BridgeError> {
-    let (brc20, inscriber_principal) = {
-        let mut state_mut = state.borrow_mut();
-        if !state_mut.has_brc20(reveal_txid) {
-            return Err(BridgeError::Brc20Burn(format!(
-                "Specified tx ID ({}) not associated with any BRC20 inscription",
-                reveal_txid
-            )));
-        }
+    if !state.borrow().has_brc20(reveal_txid) {
+        return Err(BridgeError::Brc20Burn(format!(
+            "Specified tx ID ({}) not associated with any BRC20 inscription",
+            reveal_txid
+        )));
+    }
 
-        log::trace!(
-            "Parsing and validating a BRC20 inscription from transaction ID: {reveal_txid}"
-        );
-        let brc20 = parse_and_validate_inscription(state, reveal_txid)
-            .await
-            .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
-            .encode()
-            .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
+    log::trace!("Parsing and validating a BRC20 inscription from transaction ID: {reveal_txid}");
+    let brc20 = parse_and_validate_inscription(state, reveal_txid)
+        .await
+        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
+        .encode()
+        .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
 
-        state_mut.burn_requests_mut().insert(
-            request_id,
-            address.to_string(),
-            reveal_txid.to_string(),
-        );
+    let inscriber_principal = {
+        let mut state = state.borrow_mut();
 
-        (brc20, state_mut.inscriber())
+        state
+            .burn_requests_mut()
+            .insert(request_id, address.to_string(), reveal_txid.to_string());
+
+        state.inscriber()
     };
 
     let inscriber_btc_address = get_inscriber_account(inscriber_principal).await?;

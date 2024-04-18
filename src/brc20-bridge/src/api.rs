@@ -1,6 +1,5 @@
 use candid::CandidType;
 use did::{H160, H256};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -76,35 +75,14 @@ pub enum Brc20InscribeError {
     /// Error returned by the `inscribe` endpoint of the Inscriber.
     #[error("{0}")]
     Inscribe(String),
-    /// The bitcoin address is invalid.
-    #[error("{0}")]
-    MalformedAddress(String),
     /// There are too many concurrent requests, retry later.
     #[error("{0}")]
     TemporarilyUnavailable(String),
 }
 
-#[derive(CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct PendingUtxo {
-    pub outpoint: Outpoint,
-    pub value: u64,
-    pub confirmations: u32,
-}
-
 /// Status of a BRC20 to ERC20 swap
 #[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintStatus {
-    /// The BTC transfer is found, but it doesn't have enough confirmations yet. After enough
-    /// confirmations are received, the transaction will be precessed automatically, no additional
-    /// actions are required from the user.
-    Scheduled {
-        /// Current number of confirmations for the transaction.
-        current_confirmations: u32,
-        /// Number of confirmations required by the inscriber canister to create the BRC20.
-        required_confirmations: u32,
-        /// Pending transactions.
-        pending_utxos: Option<Vec<PendingUtxo>>,
-    },
     /// This happens when the transaction is processed, the BRC20 inscription is parsed and validated,
     /// and the mint order is created; however, there is a problem sending the mint order to the EVM.
     /// The signed mint order can be sent manually to the BftBridge to mint wrapped tokens.

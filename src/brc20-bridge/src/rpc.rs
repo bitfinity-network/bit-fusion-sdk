@@ -70,7 +70,7 @@ pub(crate) async fn fetch_brc20_token_details(
             BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
         })?;
 
-    let Token {
+    let TokenInfo {
         tx_id,
         address,
         ticker,
@@ -152,12 +152,12 @@ pub(crate) async fn fetch_reveal_transaction(
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct Brc20TokenResponse {
-    token: Token,
-    supply: Supply,
+    token: TokenInfo,
+    supply: TokenSupply,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct Token {
+struct TokenInfo {
     id: String,
     number: u32,
     block_height: u32,
@@ -174,7 +174,7 @@ struct Token {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct Supply {
+struct TokenSupply {
     max_supply: String,
     minted_supply: String,
     holders: u32,
