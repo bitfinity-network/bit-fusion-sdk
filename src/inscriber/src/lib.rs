@@ -1,8 +1,8 @@
-mod accessor;
 mod build_data;
 pub mod canister;
 mod constant;
 pub mod http;
+pub mod interface;
 pub mod memory;
 pub mod ops;
 pub mod state;

@@ -5,13 +5,12 @@ use ethers_core::types::{Signature, H160};
 use jsonrpc_core::{Failure, MethodCall, Output, Success};
 use serde_json::{json, Value};
 
-use crate::accessor::ParamsAccessors;
+use super::accessor::ParamsAccessors;
 use crate::constant::{
     HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME, HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME,
     HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME, HTTP_METHOD_INSCRIBER_METHOD_NAME,
 };
-use crate::wallet::inscription::{Multisig, Protocol};
-use crate::wallet::interface::{InscribeError, InscribeResult};
+use crate::interface::inscriber_api::{InscribeError, InscribeResult, Multisig, Protocol};
 use crate::{ops, Inscriber};
 
 pub type RpcResult = Result<Value, InscribeError>;

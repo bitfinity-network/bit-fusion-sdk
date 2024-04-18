@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde_bytes::ByteBuf;
 use serde_json::Value;
 
+mod accessor;
 mod rpc;
 
 pub use rpc::*;

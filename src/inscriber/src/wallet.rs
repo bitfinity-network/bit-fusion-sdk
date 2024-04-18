@@ -1,8 +1,4 @@
-pub mod bitcoin_api;
-pub mod ecdsa_api;
 mod fees;
-pub mod inscription;
-pub mod interface;
 mod signer;
 
 use std::cell::RefCell;
@@ -18,7 +14,6 @@ use bitcoin::{
 };
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Outpoint, Utxo};
-use inscription::Nft as CandidNft;
 use ord_rs::constants::POSTAGE;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
@@ -28,12 +23,13 @@ use ord_rs::{
 };
 use serde::de::DeserializeOwned;
 
-use self::inscription::{InscriptionWrapper, Protocol};
 use self::signer::{Signer, Spender};
-use crate::state::State;
-use crate::wallet::interface::{
-    InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
+use crate::interface::inscriber_api::{
+    InscribeError, InscribeResult, InscribeTransactions, InscriptionFees, InscriptionWrapper,
+    Nft as CandidNft, Protocol,
 };
+use crate::interface::{bitcoin_api, ecdsa_api};
+use crate::state::State;
 
 #[derive(Clone)]
 pub struct EcdsaSigner {

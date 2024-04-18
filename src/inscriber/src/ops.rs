@@ -3,9 +3,9 @@ use std::str::FromStr as _;
 use bitcoin::Txid;
 use ord_rs::MultisigConfig;
 
-use crate::wallet::inscription::{Multisig, Protocol};
-use crate::wallet::interface::{
-    Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees,
+use crate::interface::inscriber_api::{
+    Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
+    Protocol,
 };
 use crate::wallet::CanisterWallet;
 use crate::Inscriber;

@@ -1,0 +1,24 @@
+{
+  "canisters": {
+    "inscriber": {
+      "build": "",
+      "candid": ".artifact/inscriber.did",
+      "wasm": ".artifact/inscriber.wasm.gz",
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "defaults": {
+        "bitcoin": {
+          "enabled": true,
+          "nodes": [
+            "127.0.0.1:18444"
+          ],
+          "log_level": "info"
+        }
+      }
+    }
+  }
+}

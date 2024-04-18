@@ -11,8 +11,8 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
 
+use crate::interface::inscriber_api::{InscribeError, InscribeResult, InscriptionFees};
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
-use crate::wallet::interface::{InscribeError, InscribeResult, InscriptionFees};
 
 thread_local! {
     pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
