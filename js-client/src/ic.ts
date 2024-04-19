@@ -1,5 +1,6 @@
 export {
   ICRC2Minter,
+  idlFactory as Icrc2MinterIdlFactory,
   createActor as createICRC2MinterActor
 } from './canisters/icrc2-minter';
 
@@ -23,7 +24,8 @@ export {
 
 export {
   ERC20Minter,
-  createActor as createERC20MinterActor
+  createActor as createERC20MinterActor,
+  idlFactory as Erc20MinterFactory
 } from './canisters/erc20-minter';
 
 export {
