@@ -4,7 +4,7 @@ use std::time::Duration;
 use candid::{CandidType, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{Transaction, TransactionReceipt, H256};
+use did::{BlockNumber, Transaction, TransactionReceipt, H256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethereum_types::H160;
@@ -238,10 +238,16 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         )
         .unwrap();
 
+    let nonce = client
+        .eth_get_transaction_count(wallet.address().into(), BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap();
+
     let create_contract_tx = TransactionBuilder {
         from: &wallet.address().into(),
         to: None,
-        nonce: 0u64.into(),
+        nonce: nonce,
         value: 0u64.into(),
         gas: 3_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
