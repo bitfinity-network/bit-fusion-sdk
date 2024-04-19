@@ -17,7 +17,7 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::Deserialize;
 
-use crate::interface::{DepositError, DepositResponse, Erc20MintStatus, GetAddressError};
+use crate::interface::{DepositError, Erc20MintStatus, GetAddressError};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};

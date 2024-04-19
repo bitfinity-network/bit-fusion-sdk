@@ -1,11 +1,16 @@
-use crate::interface::{DepositError, DepositResponse, Erc20MintStatus};
-use crate::key::get_deposit_address;
+use crate::interface::{DepositError, Erc20MintStatus, WithdrawError};
+use crate::key::{get_deposit_address, get_derivation_path_ic};
+use crate::ledger::StoredUtxo;
 use crate::state::State;
-use bitcoin::Address;
+use bitcoin::consensus::Encodable;
+use bitcoin::hashes::Hash;
+use bitcoin::{Address, FeeRate, Transaction, Txid};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    bitcoin_get_utxos, GetUtxosRequest, GetUtxosResponse, Outpoint, Utxo,
+    bitcoin_get_current_fee_percentiles, bitcoin_get_utxos, bitcoin_send_transaction,
+    GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse, Outpoint,
+    SendTransactionRequest, Utxo,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -14,13 +19,15 @@ use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
+use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
+use ord_rs::OrdTransactionBuilder;
 use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-const CYCLES_PER_HTTP_REQUEST: u128 = 100_000_000;
+const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
 static NONCE: AtomicU32 = AtomicU32::new(0);
 
 pub async fn deposit(
@@ -54,10 +61,11 @@ pub async fn deposit(
         .borrow_mut()
         .mint_orders_mut()
         .push(sender, nonce, mint_order.clone());
-    state
-        .borrow_mut()
-        .ledger_mut()
-        .deposit(&utxo_response.utxos, rune_amount);
+    state.borrow_mut().ledger_mut().deposit(
+        &utxo_response.utxos,
+        &deposit_address,
+        get_derivation_path_ic(eth_address),
+    );
 
     Ok(match send_mint_order(&state, mint_order).await {
         Ok(tx_id) => Erc20MintStatus::Minted {
@@ -69,6 +77,140 @@ pub async fn deposit(
             Erc20MintStatus::Signed(Box::new(mint_order))
         }
     })
+}
+
+pub async fn withdraw(
+    state: &RefCell<State>,
+    amount: u128,
+    address: Address,
+) -> Result<Txid, WithdrawError> {
+    let current_utxos = state.borrow().ledger().load_all();
+    let tx = build_withdraw_transaction(state, amount, address, current_utxos).await?;
+    send_tx(state, &tx).await?;
+
+    Ok(tx.txid())
+}
+
+async fn build_withdraw_transaction(
+    state: &RefCell<State>,
+    amount: u128,
+    address: Address,
+    inputs: Vec<StoredUtxo>,
+) -> Result<Transaction, WithdrawError> {
+    if inputs.is_empty() {
+        return Err(WithdrawError::NoInputs);
+    }
+
+    if !inputs
+        .iter()
+        .all(|input| input.derivation_path == inputs[0].derivation_path)
+    {
+        todo!();
+    }
+
+    let derivation_path = &inputs[0].derivation_path;
+    let public_key = state.borrow().der_public_key(&derivation_path);
+    let signer = state.borrow().wallet(derivation_path.clone());
+    let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
+
+    let change_address = get_change_address(state)?;
+    let rune_change_address = change_address.clone();
+
+    let fee_rate = get_fee_rate(state).await?;
+
+    let inputs = inputs.into_iter().map(|v| v.tx_input_info).collect();
+    let args = CreateEdictTxArgs {
+        rune: state.borrow().rune_id(),
+        inputs,
+        destination: address,
+        change_address,
+        rune_change_address,
+        amount,
+        fee_rate,
+    };
+    let unsigned_tx = builder.create_edict_transaction(&args).map_err(|err| {
+        log::warn!("Failed to create withdraw transaction: {err:?}");
+        WithdrawError::TransactionCreation
+    })?;
+    let signed_tx = builder
+        .sign_transaction(&unsigned_tx, &args.inputs)
+        .await
+        .map_err(|err| {
+            log::error!("Failed to sign withdraw transaction: {err:?}");
+            WithdrawError::TransactionSigning
+        })?;
+
+    Ok(signed_tx)
+}
+
+fn get_change_address(state: &RefCell<State>) -> Result<Address, WithdrawError> {
+    get_deposit_address(state, &H160::default()).map_err(|err| {
+        log::error!("Failed to get change address: {err:?}");
+        WithdrawError::ChangeAddress
+    })
+}
+
+async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawError> {
+    let args = GetCurrentFeePercentilesRequest {
+        network: state.borrow().ic_btc_network(),
+    };
+    let response = bitcoin_get_current_fee_percentiles(args)
+        .await
+        .map_err(|err| {
+            log::error!("Failed to get current fee rate: {err:?}");
+            WithdrawError::FeeRateRequest
+        })?
+        .0;
+
+    if response.is_empty() {
+        log::error!("Empty response for fee rate request");
+        return Err(WithdrawError::FeeRateRequest);
+    }
+
+    log::trace!("Received fee rate percentiles: {response:?}");
+
+    let middle_percentile = &response[response.len() / 2];
+
+    log::info!("Using fee rate {}", middle_percentile / 1000);
+
+    FeeRate::from_sat_per_vb(middle_percentile / 1000).ok_or_else(|| {
+        log::error!("Invalid fee rate received from IC: {middle_percentile}");
+        WithdrawError::FeeRateRequest
+    })
+}
+
+async fn send_tx(state: &RefCell<State>, transaction: &Transaction) -> Result<(), WithdrawError> {
+    log::trace!(
+        "Sending transaction {} to the bitcoin addapter",
+        transaction.txid()
+    );
+
+    let mut serialized = vec![];
+    transaction
+        .consensus_encode(&mut serialized)
+        .map_err(|err| {
+            log::error!("Failed to serialize transaction: {err:?}");
+            WithdrawError::TransactionSerialization
+        })?;
+
+    log::trace!(
+        "Serialized transaction {}: {}",
+        transaction.txid(),
+        hex::encode(&serialized)
+    );
+
+    let request = SendTransactionRequest {
+        transaction: serialized,
+        network: state.borrow().ic_btc_network(),
+    };
+    bitcoin_send_transaction(request).await.map_err(|err| {
+        log::error!("Failed to send transaction: {err:?}");
+        WithdrawError::TransactionSending
+    })?;
+
+    log::trace!("Transaction {} sent to the adapter", transaction.txid());
+
+    Ok(())
 }
 
 async fn get_utxos(
@@ -83,19 +225,32 @@ async fn get_utxos(
 
     log::trace!("Requesting UTXO list for address {address}");
 
-    let response = bitcoin_get_utxos(args)
+    let mut response = bitcoin_get_utxos(args)
         .await
         .map(|value| value.0)
         .map_err(|err| {
             DepositError::Unavailable(format!(
                 "Unexpected response from management canister: {err:?}"
             ))
-        });
+        })?;
 
     log::trace!("Got UTXO list result for address {address}:");
     log::trace!("{response:?}");
 
-    response
+    filter_out_used_utxos(state, &mut response);
+
+    Ok(response)
+}
+
+fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtxosResponse) {
+    let existing = state.borrow().ledger().load_all();
+
+    get_utxos_response.utxos.retain(|utxo| {
+        !existing.iter().any(|v| {
+            &v.tx_input_info.outpoint.txid.as_byte_array()[..] == &utxo.outpoint.txid
+                && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
+        })
+    })
 }
 
 fn validate_utxo_confirmations(

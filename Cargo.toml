@@ -45,11 +45,14 @@ ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.13.x" }
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.13.x" }
 jsonrpc-core = "18.0"
+k256 = { version = "0.13", features = ["ecdsa"] }
 log = "0.4"
 minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.14.x" }
 minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.14.x" }
 mockall = "0.12"
 once_cell = "1.16"
+#ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.1.1" }
+ord-rs = { path = "../ord-rs" }
 ordinals = "0.0.7"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.11", default-features = false }

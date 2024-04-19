@@ -1,5 +1,7 @@
+use bitcoin::Address;
 use std::future::Future;
 use std::pin::Pin;
+use std::str::FromStr;
 
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -185,28 +187,31 @@ impl Task for BtcTask {
             }) => {
                 log::info!("ERC20 burn event received");
 
-                let amount = amount.0.as_u64();
-                let operation_id = *operation_id;
+                let amount = amount.0.as_u128();
 
-                let Ok(address) = String::from_utf8(recipient_id.clone()) else {
+                let Ok(address_string) = String::from_utf8(recipient_id.clone()) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
-                        "Failed to decode recipient address".to_string(),
+                        format!(
+                            "Failed to decode recipient address from raw data: {recipient_id:?}"
+                        ),
+                    )));
+                };
+
+                let Ok(address) = Address::from_str(&address_string) else {
+                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
+                        format!("Failed to decode recipient address from string: {address_string}"),
                     )));
                 };
 
                 Box::pin(async move {
-                    todo!();
-                    // let result =
-                    //     crate::ops::burn_ckbtc(&get_state(), operation_id, &address, amount)
-                    //         .await
-                    //         .map_err(|err| {
-                    //             SchedulerError::TaskExecutionFailed(format!("{err:?}"))
-                    //         })?;
-                    //
-                    // log::info!(
-                    //     "Created withdrawal transaction at block {}",
-                    //     result.block_index
-                    // );
+                    let tx_id =
+                        crate::ops::withdraw(&get_state(), amount, address.assume_checked())
+                            .await
+                            .map_err(|err| {
+                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
+                            })?;
+
+                    log::info!("Created withdrawal transaction: {tx_id}",);
 
                     Ok(())
                 })

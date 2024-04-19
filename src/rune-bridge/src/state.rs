@@ -1,5 +1,5 @@
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PublicKey};
+use bitcoin::{Network, PrivateKey, PublicKey};
 use candid::{CandidType, Deserialize, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
@@ -10,12 +10,15 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
+use ord_rs::{Wallet, WalletType};
+use ordinals::RuneId;
 
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 
 use crate::burn_request_store::BurnRequestStore;
-use crate::ledger::Ledger;
+use crate::key::IcSigner;
+use crate::ledger::UtxoLedger;
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::orders_store::MintOrdersStore;
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
@@ -32,12 +35,14 @@ pub struct State {
     burn_request_store: BurnRequestStore,
     evm_params: Option<EvmParams>,
     master_key: Option<MasterKey>,
-    ledger: Ledger,
+    ledger: UtxoLedger,
 }
 
-struct MasterKey {
-    public_key: PublicKey,
-    chain_code: ChainCode,
+#[derive(Debug, Clone)]
+pub struct MasterKey {
+    pub public_key: PublicKey,
+    pub chain_code: ChainCode,
+    pub key_id: EcdsaKeyId,
 }
 
 impl Default for State {
@@ -75,9 +80,25 @@ pub struct RuneBridgeConfig {
     pub admin: Principal,
     pub log_settings: LogSettings,
     pub min_confirmations: u32,
-    pub rune_name: String,
+    pub rune_info: RuneInfo,
     pub indexer_url: String,
     pub deposit_fee: u64,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RuneInfo {
+    pub name: String,
+    pub block: u64,
+    pub tx: u32,
+}
+
+impl RuneInfo {
+    pub fn id(&self) -> RuneId {
+        RuneId {
+            block: self.block,
+            tx: self.tx,
+        }
+    }
 }
 
 impl Default for RuneBridgeConfig {
@@ -91,7 +112,11 @@ impl Default for RuneBridgeConfig {
             admin: Principal::management_canister(),
             log_settings: LogSettings::default(),
             min_confirmations: 12,
-            rune_name: String::new(),
+            rune_info: RuneInfo {
+                name: "".to_string(),
+                block: 0,
+                tx: 0,
+            },
             indexer_url: String::new(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
         }
@@ -100,7 +125,7 @@ impl Default for RuneBridgeConfig {
 
 impl RuneBridgeConfig {
     fn validate(&self) -> Result<(), String> {
-        if self.rune_name.is_empty() {
+        if self.rune_info.name.is_empty() {
             return Err("Rune name is empty".to_string());
         }
 
@@ -175,7 +200,39 @@ impl State {
     }
 
     pub fn rune_name(&self) -> String {
-        self.config.rune_name.clone()
+        self.config.rune_info.name.clone()
+    }
+
+    pub fn rune_id(&self) -> RuneId {
+        self.config.rune_info.id()
+    }
+
+    fn master_key(&self) -> MasterKey {
+        self.master_key.clone().expect("ecdsa is not initialized")
+    }
+
+    pub fn der_public_key(&self, derivation_path: &Vec<Vec<u8>>) -> PublicKey {
+        IcSigner::new(self.master_key(), self.network(), derivation_path.clone()).public_key()
+    }
+
+    pub fn wallet_type(&self, derivation_path: Vec<Vec<u8>>) -> WalletType {
+        match &self.config.signing_strategy {
+            SigningStrategy::Local { private_key } => WalletType::Local {
+                private_key: PrivateKey::from_slice(private_key, self.network())
+                    .expect("Invalid PK"),
+            },
+            SigningStrategy::ManagementCanister { .. } => WalletType::External {
+                signer: Box::new(IcSigner::new(
+                    self.master_key(),
+                    self.network(),
+                    derivation_path,
+                )),
+            },
+        }
+    }
+
+    pub fn wallet(&self, derivation_path: Vec<Vec<u8>>) -> Wallet {
+        Wallet::new_with_signer(self.wallet_type(derivation_path))
     }
 
     pub fn deposit_fee(&self) -> u64 {
@@ -190,7 +247,11 @@ impl State {
             .to_string()
     }
 
-    pub fn ledger_mut(&mut self) -> &mut Ledger {
+    pub fn ledger(&self) -> &UtxoLedger {
+        &self.ledger
+    }
+
+    pub fn ledger_mut(&mut self) -> &mut UtxoLedger {
         &mut self.ledger
     }
 
@@ -261,6 +322,7 @@ impl State {
             public_key: PublicKey::from_slice(&master_key.public_key)
                 .expect("invalid public key slice"),
             chain_code: ChainCode::try_from(chain_code).expect("invalid chain code slice"),
+            key_id: self.ecdsa_key_id(),
         });
     }
 

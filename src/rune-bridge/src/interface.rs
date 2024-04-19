@@ -77,3 +77,14 @@ pub enum DepositError {
     NotInitialized,
     Evm(String),
 }
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub enum WithdrawError {
+    NoInputs,
+    TransactionCreation,
+    TransactionSigning,
+    TransactionSerialization,
+    TransactionSending,
+    FeeRateRequest,
+    ChangeAddress,
+}
