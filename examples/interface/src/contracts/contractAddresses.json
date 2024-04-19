@@ -1,0 +1,35 @@
+{
+    "date": "2024-04-19T11:59:02.222Z",
+    "contracts": {
+        "weth9": {
+            "address": "0x637F877db257ccba80B1fe06b0bEA039cd92C736"
+        },
+        "factory": {
+            "address": "0x5d1fe823127eE6381D3b4752cF56B41373e198a2"
+        },
+        "nftDescriptorLibrary": {
+            "address": "0x34F2244548C31C09e25921769245E567715385f9"
+        },
+        "nftDescriptor": {
+            "address": "0x099Beb079CeA1B48D62c9b9bc7694a5f0BEC0A5A"
+        },
+        "positionManager": {
+            "address": "0xF1bab8a1fB49309fF82c267F742746Fd11636774"
+        },
+        "router": {
+            "address": "0x6880f7FeC512777659d52DA04E2b8bB8d9676a87"
+        },
+        "multicall": {
+            "address": "0xa87a02F12571Dd0B972Ea1A84f4F8961e60bE684"
+        },
+        "quoter": {
+            "address": "0x4b36116855a0aA9F70C9EB646C4b23860231b5A6"
+        },
+        "migrator": {
+            "address": "0x87D8D72876fCaA4580B961563c2E6802371bd56F"
+        },
+        "ticklens": {
+            "address": "0xAD662954110B46Cb91dD83c664C0f9983D2fA75c"
+        }
+    }
+}

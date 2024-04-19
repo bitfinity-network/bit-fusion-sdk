@@ -24,6 +24,14 @@ import writeLogFile from "../helpers/write-files";
 import getNetworkInfo from "../helpers/get-network-info";
 import Web3 from "web3";
 
+function wait() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(true);
+    }, 2000);
+  })
+}
+
 async function main() {
   const addresses: any = {};
 
@@ -31,15 +39,14 @@ async function main() {
   const deployer = actors[0];
   const networkID = await getNetworkInfo(deployer);
 
+  const res = await ethers.provider.send("ic_mintNativeToken", [
+    deployer.address,
+    "0x21e19e0c9bab2400000",
+  ]);
 
-  if (networkID === 355113) {
-    const res = await ethers.provider.send("ic_mintNativeToken", [
-      deployer.address,
-      "0x21e19e0c9bab2400000",
-    ]);
+  console.log("minted EVMC token: ", Web3.utils.hexToNumberString(res["amount"]));
 
-    console.log("minted EVMC token: ", Web3.utils.hexToNumberString(res["amount"]));
-  }
+  await wait();
 
   const Weth9 = new ContractFactory(
     WETH9.abi,

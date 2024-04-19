@@ -16,7 +16,7 @@ start_icx() {
 CHAIN_ID=355113
 
 dfx stop
-dfx start --host 127.0.0.1:4943 --background --clean 2> dfx_stderr.log
+dfx start --host 127.0.0.1:4943 --background --clean 2>dfx_stderr.log
 
 dfx identity new --force icrc-admin
 dfx identity use icrc-admin
@@ -83,8 +83,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-
-dfx deploy icrc2-minter  --argument "(record {
+dfx deploy icrc2-minter --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
         Local = record {
@@ -103,8 +102,6 @@ dfx deploy spender --argument "(principal \"$ICRC2_MINTER\")"
 
 start_icx
 
-
-
 ########## Deploy BFT and ICRC2 contracts ##########
 
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
@@ -122,10 +119,18 @@ echo "Minting ETH tokens for ICRC2 Minter canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 dfx canister call evm_testnet mint_native_tokens "(\"${TEST_WALLET}\", \"1000000000000000000\")"
 
-
 ICRC2_BRIDGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$ICRC2_MINTER_ECDSA_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "ICRC2 bridge contract address: $ICRC2_BRIDGE_CONTRACT_ADDRESS"
 
 echo "Register bft bridge contract address with icrc2-minter"
 dfx canister call icrc2-minter register_evmc_bft_bridge "(\"$ICRC2_BRIDGE_CONTRACT_ADDRESS\")"
 echo "Finished!!!!!"
+
+######## Deploy Uniswap and contracts #####
+cd examples/contracts && yarn install && yarn deploy:local
+
+## use node 16
+nvm use 16
+
+## Get Uniswap Interface up and running
+cd ../interface && yarn install && yarn start

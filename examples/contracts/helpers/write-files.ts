@@ -12,7 +12,7 @@ function ensureDirectoryExistence(filePath: string) {
 
 // write values to json file logs
 const writeLogFile = (filePath: string, input: Object): void => {
-  const fullPath = "../../interface/src/contracts" + filePath;
+  const fullPath = "../interface/src/contracts/" + filePath;
 
   console.log('writing log file...');
 

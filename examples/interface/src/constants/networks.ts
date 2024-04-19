@@ -87,8 +87,8 @@ export const FALLBACK_URLS: { [key in SupportedChainId]: string[] } = {
     // "Safe" URLs
     `https://alfajores-forno.celo-testnet.org`,
   ],
-  [SupportedChainId.BITFINITY]: ['https://4fe7g-7iaaa-aaaak-aegcq-cai.raw.ic0.app'],
-  // [SupportedChainId.BITFINITY]: ['http://127.0.0.1:8545'],
+  // [SupportedChainId.BITFINITY]: ['https://4fe7g-7iaaa-aaaak-aegcq-cai.raw.ic0.app'],
+  [SupportedChainId.BITFINITY]: ['http://127.0.0.1:8545'],
 }
 
 /**

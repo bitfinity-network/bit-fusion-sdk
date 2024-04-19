@@ -9,7 +9,7 @@ interface Faucet {
 
 // const FAUCET_GCS_FILE_PATH = 'https://evmc.storage.googleapis.com/Addresses/logs/faucetAddress.json'
 
-import { faucetAddress as faucetAddresses } from '../../contracts/faucetAddresses.json';
+import { faucetAddress as faucetAddresses } from '../../contracts/faucetAddress.json';
 
 export function FaucetProvider({ children }: { children: ReactNode }) {
   const [faucets, setFaucets] = useState<string>('');
