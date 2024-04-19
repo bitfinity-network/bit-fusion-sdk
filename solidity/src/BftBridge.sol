@@ -21,6 +21,7 @@ contract BFTBridge {
         uint32 senderChainID;
         address approveSpender;
         uint256 approveAmount;
+        address feePayer;
     }
 
     struct RingBuffer {
@@ -428,6 +429,7 @@ contract BFTBridge {
         uint8 decimals = uint8(encodedOrder[196]);
         address approveSpender = address(bytes20(encodedOrder[197 : 217]));
         uint256 approveAmount = uint256(bytes32(encodedOrder[217 : 249]));
+        address feePayer = address(bytes20(encodedOrder[249 : 269]));
 
         // Assert recipient address is not zero
         require(recipient != address(0), "Invalid destination address");
@@ -462,7 +464,8 @@ contract BFTBridge {
             decimals,
             senderChainId,
             approveSpender,
-            approveAmount
+            approveAmount,
+            feePayer
         );
     }
 
