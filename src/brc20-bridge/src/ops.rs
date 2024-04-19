@@ -11,6 +11,7 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
 };
 use ic_stable_structures::CellStructure;
+use inscriber::interface::{InscribeResult, InscribeTransactions, Protocol};
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::{Brc20, Inscription, OrdParser};
@@ -20,7 +21,6 @@ use crate::interface::bridge_api::{
     Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
     Erc20MintStatus, InscribeBrc20Args,
 };
-use crate::interface::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::interface::store::Brc20TokenInfo;
 use crate::state::State;
 
