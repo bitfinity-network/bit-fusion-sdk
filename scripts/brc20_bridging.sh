@@ -116,43 +116,43 @@ dfx deploy brc20-bridge --argument "(record {
     ordinals_indexer = \"${ORDINALS_INDEXER_URL}\";
 })"
 
-######################### Deploy BFT and Token Contracts ######################
+######################## Deploy BFT and Token Contracts ######################
 
-# ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
-# ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
-# ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
+ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
 
-# BRC20_BRIDGE=$(dfx canister id brc20-bridge)
+BRC20_BRIDGE=$(dfx canister id brc20-bridge)
 
-# res=$(dfx canister call brc20-bridge get_evm_address)
-# res=${res#*\"}
-# BRC20_BRIDGE_ETH_ADDRESS=${res%\"*}
+res=$(dfx canister call brc20-bridge get_evm_address)
+res=${res#*\"}
+BRC20_BRIDGE_ETH_ADDRESS=${res%\"*}
 
-# echo "BRC20 bridge eth address: ${BRC20_BRIDGE_ETH_ADDRESS}"
+echo "BRC20 bridge eth address: ${BRC20_BRIDGE_ETH_ADDRESS}"
 
-# echo "Minting ETH tokens for BRC20 bridge canister"
-# dfx canister call evm_testnet mint_native_tokens "(\"${BRC20_BRIDGE_ETH_ADDRESS}\", \"340282366920938463463374607431768211455\")"
+echo "Minting ETH tokens for BRC20 bridge canister"
+dfx canister call evm_testnet mint_native_tokens "(\"${BRC20_BRIDGE_ETH_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
-# BFT_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$BRC20_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
-# echo "BFT ETH address: $BFT_ETH_ADDRESS"
+BFT_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$BRC20_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
+echo "BFT ETH address: $BFT_ETH_ADDRESS"
 
-# TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
-#   --bft-bridge-address="$BFT_ETH_ADDRESS" \
-#   --token-name=BRC20 \
-#   --token-id="$BRC20_BRIDGE" \
-#   --evm-canister="$EVM" \
-#   --wallet="$ETH_WALLET")
+TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
+  --bft-bridge-address="$BFT_ETH_ADDRESS" \
+  --token-name=BRC20 \
+  --token-id="$BRC20_BRIDGE" \
+  --evm-canister="$EVM" \
+  --wallet="$ETH_WALLET")
 
-# echo "Wrapped token ETH address: $TOKEN_ETH_ADDRESS"
+echo "Wrapped token ETH address: $TOKEN_ETH_ADDRESS"
 
-# echo "Configuring BRC20 bridge canister"
-# dfx canister call brc20-bridge admin_configure_bft_bridge "(record {
-#   decimals = 0;
-#   token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
-#   token_address = \"$TOKEN_ETH_ADDRESS\";
-#   bridge_address = \"$BFT_ETH_ADDRESS\";
-#   erc20_chain_id = 355113;
-#   token_name = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
-# })"
+echo "Configuring BRC20 bridge canister"
+dfx canister call brc20-bridge admin_configure_bft_bridge "(record {
+  decimals = 0;
+  token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
+  token_address = \"$TOKEN_ETH_ADDRESS\";
+  bridge_address = \"$BFT_ETH_ADDRESS\";
+  erc20_chain_id = 355113;
+  token_name = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
+})"
 
 echo "All canisters successfully deployed."
