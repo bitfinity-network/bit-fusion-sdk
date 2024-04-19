@@ -458,6 +458,29 @@ impl CkBtcSetup {
         );
     }
 
+    pub fn get_btc_address_from_bridge(&self, account: impl Into<Account>) -> String {
+        let account = account.into();
+        Decode!(
+            &assert_reply(
+                self.env()
+                    .execute_ingress_as(
+                        self.caller,
+                        CanisterId::try_from(PrincipalId(self.context.canisters.btc_bridge()))
+                            .unwrap(),
+                        "get_btc_address",
+                        Encode!(&GetBtcAddressArgs {
+                            owner: Some(account.owner),
+                            subaccount: account.subaccount,
+                        })
+                        .unwrap(),
+                    )
+                    .expect("failed to get btc address")
+            ),
+            String
+        )
+        .unwrap()
+    }
+
     pub fn get_btc_address(&self, account: impl Into<Account>) -> String {
         let account = account.into();
         Decode!(
@@ -1169,6 +1192,7 @@ async fn btc_to_erc20_test() {
         owner: ckbtc.context.canisters.btc_bridge(),
         subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
     };
+
     let deposit_address = ckbtc.get_btc_address(deposit_account);
     ckbtc.push_utxo(deposit_address, utxo.clone());
 
@@ -1286,4 +1310,29 @@ fn generate_btc_address() -> String {
 
     let address = BtcAddress::p2pkh(&public_key, BtcNetwork::Bitcoin);
     address.to_string()
+}
+
+#[tokio::test]
+async fn test_get_btc_address_from_bridge() {
+    let ckbtc = CkBtcSetup::new().await;
+
+    let wallet = (&ckbtc.context)
+        .new_wallet(u128::MAX)
+        .await
+        .expect("Failed to create a wallet");
+
+    ckbtc.set_tip_height(12);
+    let caller_eth_address = wallet.address().0.into();
+
+    let deposit_account = Account {
+        owner: ckbtc.context.canisters.btc_bridge(),
+        subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+    };
+    let deposit_address = ckbtc.get_btc_address(deposit_account);
+
+    let deposit_address_anonymous = ckbtc.get_btc_address_from_bridge(deposit_account);
+
+    assert_eq!(deposit_address, deposit_address_anonymous);
+
+    ckbtc.async_drop().await;
 }
