@@ -70,6 +70,17 @@
       "wasm": ".artifact/ic-ckbtc-minter.wasm.gz",
       "type": "custom"
     },
+    "brc20-bridge": {
+      "build": "",
+      "candid": ".artifact/brc20-bridge.did",
+      "wasm": ".artifact/brc20-bridge.wasm.gz",
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    },
     "inscriber": {
       "build": "",
       "candid": ".artifact/inscriber.did",

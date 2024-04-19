@@ -3,10 +3,11 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::H160;
+use eth_signer::sign_strategy::TransactionSigner as _;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{CellStructure as _, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -18,7 +19,7 @@ use crate::constant::{
 use crate::interface::bridge_api::{BridgeError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
-use crate::state::{Brc20BridgeConfig, State};
+use crate::state::{BftBridgeConfig, Brc20BridgeConfig, State};
 
 #[derive(Canister, Clone, Debug)]
 pub struct Brc20Bridge {
@@ -44,8 +45,8 @@ impl Brc20Bridge {
     }
 
     #[query]
-    pub async fn get_deposit_address(&self, eth_address: H160) -> Result<String, BridgeError> {
-        Ok(crate::ops::get_deposit_address(&get_state(), eth_address)
+    pub async fn get_deposit_address(&self) -> Result<String, BridgeError> {
+        Ok(crate::ops::get_deposit_address(&get_state())
             .await?
             .to_string())
     }
@@ -53,13 +54,34 @@ impl Brc20Bridge {
     #[update]
     pub async fn brc20_to_erc20(
         &mut self,
-        eth_address: H160,
         brc20_ticker: String,
         holder_btc_addr: String,
+        dst_eth_addr: H160,
     ) -> Result<Erc20MintStatus, BridgeError> {
-        crate::ops::brc20_to_erc20(&get_state(), eth_address, brc20_ticker, holder_btc_addr)
+        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20_ticker, holder_btc_addr)
             .await
             .map_err(BridgeError::Erc20Mint)
+    }
+
+    /// Returns EVM address of the canister.
+    #[update]
+    pub async fn get_evm_address(&self) -> Option<H160> {
+        let signer = get_state().borrow().signer().get().clone();
+        match signer.get_address().await {
+            Ok(address) => Some(address),
+            Err(e) => {
+                log::error!("failed to get EVM address of the canister: {e}");
+                None
+            }
+        }
+    }
+
+    #[update]
+    pub fn admin_configure_bft_bridge(&self, config: BftBridgeConfig) {
+        get_state()
+            .borrow()
+            .check_admin(ic_exports::ic_kit::ic::caller());
+        get_state().borrow_mut().configure_bft(config);
     }
 
     #[post_upgrade]

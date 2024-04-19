@@ -1,9 +1,10 @@
 use candid::CandidType;
 use did::{H160, H256};
-use inscriber::interface::{InscribeTransactions, Multisig, Protocol};
 use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::interface::inscriber_api::{InscribeTransactions, Multisig, Protocol};
 
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {

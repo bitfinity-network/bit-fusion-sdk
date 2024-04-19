@@ -833,7 +833,6 @@ dependencies = [
  "ic-stable-structures 0.14.0",
  "ic-storage",
  "ic-task-scheduler",
- "inscriber",
  "jsonrpc-core",
  "log",
  "minter-contract-utils",

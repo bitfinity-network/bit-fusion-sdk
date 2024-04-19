@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   bitcoind:
     container_name: bitcoind
@@ -9,8 +8,8 @@ services:
       - ./docker/bitcoin.conf:/data/.bitcoin/bitcoin.conf
       - bitcoin_data:/data/.bitcoin
     ports:
-      - "18443:18443"  # Bitcoin RPC port
-      - "18444:18444"  # Bitcoin P2P port
+      - "18443:18443" # Bitcoin RPC port
+      - "18444:18444" # Bitcoin P2P port
     networks:
       - bitcoin_network
 
@@ -19,7 +18,17 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile
-    command:  ["--regtest", "--data-dir", "/index-data", "--rpc-url", "bitcoind:18443", "server", "--http-port", "8080"]
+    command:
+      [
+        "--regtest",
+        "--data-dir",
+        "/index-data",
+        "--rpc-url",
+        "bitcoind:18443",
+        "server",
+        "--http-port",
+        "8080",
+      ]
     volumes:
       - index_data:/index-data
     environment:

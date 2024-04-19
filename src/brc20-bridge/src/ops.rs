@@ -11,7 +11,6 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
 };
 use ic_stable_structures::CellStructure;
-use inscriber::interface::{InscribeResult, InscribeTransactions, Protocol};
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::{Brc20, Inscription, OrdParser};
@@ -21,6 +20,7 @@ use crate::interface::bridge_api::{
     Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
     Erc20MintStatus, InscribeBrc20Args,
 };
+use crate::interface::inscriber_api::{InscribeResult, InscribeTransactions, Protocol};
 use crate::interface::store::Brc20TokenInfo;
 use crate::state::State;
 
@@ -321,14 +321,15 @@ pub async fn erc20_to_brc20_v2(
 /// Returns the BRC20 deposit address
 pub async fn get_deposit_address(
     state: &RefCell<State>,
-    eth_address: H160,
+    // eth_address: H160,
 ) -> Result<Address, BridgeError> {
     let (network, key_id, derivation_path) = {
         let state = state.borrow();
         (
             state.btc_network(),
             state.ecdsa_key_id(),
-            state.derivation_path(Some(eth_address)),
+            // state.derivation_path(Some(eth_address)),
+            state.derivation_path(None),
         )
     };
 

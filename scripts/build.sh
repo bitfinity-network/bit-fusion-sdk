@@ -90,7 +90,15 @@ build_canister() {
 
     echo "Building $canister_name Canister with features: $features"
 
-    cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
+    # Check for macOS-specific requirements before building
+    if [ "$(uname)" == "Darwin" ]; then
+        LLVM_PATH=$(brew --prefix llvm)
+        # On macOS, use the brew versions of llvm-ar and clang
+        AR="${LLVM_PATH}/bin/llvm-ar" CC="${LLVM_PATH}/bin/clang" cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
+    else
+        cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
+    fi
+
     ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm" shrink
     gzip -k "$WASM_DIR/$output_wasm" --force
 }
@@ -129,6 +137,8 @@ build_requested_canisters() {
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
+        build_canister "inscriber" "export-api" "inscriber.wasm" "inscriber"
+        build_canister "brc20-bridge" "export-api" "brc20-bridge.wasm" "brc20-bridge"
 
         # Build tools
         build_create_bft_bridge_tool
