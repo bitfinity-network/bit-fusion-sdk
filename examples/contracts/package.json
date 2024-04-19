@@ -7,7 +7,8 @@
     "deploy:testnet": "hardhat run scripts/deploy-uniswap.ts --network testnet && hardhat run scripts/deploy-tokens.ts --network testnet",
     "deploy:mainnet": "hardhat run scripts/deploy-uniswap.ts --network mainnet && hardhat run scripts/deploy-tokens.ts --network mainnet",
     "deploy:devnet": "hardhat run scripts/deploy-uniswap.ts --network devnet && hardhat run scripts/deploy-tokens.ts --network devnet",
-    "deploy:localhost": "hardhat run scripts/deploy-uniswap.ts --network localhost && hardhat run scripts/deploy-tokens.ts --network localhost"
+    "deploy:localhost": "hardhat run scripts/deploy-uniswap.ts --network localhost && hardhat run scripts/deploy-tokens.ts --network localhost",
+    "deploy:local": "hardhat run scripts/deploy-uniswap.ts --network local && hardhat run scripts/deploy-tokens.ts --network local"
   },
   "keywords": [],
   "author": "",

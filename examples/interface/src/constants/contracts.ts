@@ -1,6 +1,6 @@
 // const CONTRACT_GCS_FILE_PATH = 'https://evmc.storage.googleapis.com/Addresses/logs/contractAddresses.json'
 
-import { contracts as contractAddresses } from "./contracts/contractAddresses.json"
+import { contracts as contractAddresses } from "../contracts/contractAddresses.json"
 
 interface Contracts {
   date: Date

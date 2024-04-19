@@ -52,6 +52,12 @@ const config: HardhatUserConfig = {
         ...(process.env.UNISWAP_DEPLOYER ? [process.env.UNISWAP_DEPLOYER] : []),
       ],
     },
+    local: {
+      url: LOCAL,
+      accounts: [
+        ...(process.env.UNISWAP_DEPLOYER ? [process.env.UNISWAP_DEPLOYER] : []),
+      ]
+    }
   },
 };
 
