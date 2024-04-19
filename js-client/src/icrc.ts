@@ -2,7 +2,11 @@ import { Principal } from '@dfinity/principal';
 import * as ethers from 'ethers';
 import { numberToHex } from 'viem';
 
-import { createICRC1Actor, createICRC2MinterActor } from './ic';
+import {
+  Icrc2MinterIdlFactory,
+  createICRC1Actor,
+  createICRC2MinterActor
+} from './ic';
 import {
   ICRC2_MINTER_CANISTER_ID,
   ICRC2_TOKEN_CANISTER_ID,
@@ -28,7 +32,9 @@ export interface IcrcBridgeOptions {
   agent?: HttpAgent;
 }
 
-type CreateOptions = Pick<IcrcBridgeOptions, 'wallet' | 'agent'>;
+type CreateOptions = Pick<IcrcBridgeOptions, 'wallet' | 'agent'> & {
+  baseTokenId?: string;
+};
 
 export class IcrcBridge {
   bftBridge: any;
@@ -56,14 +62,14 @@ export class IcrcBridge {
     }
   }
 
-  static async create({ wallet, agent }: CreateOptions) {
+  static async create({ wallet, agent, baseTokenId }: CreateOptions) {
     const icrc2Minter = createICRC2MinterActor(
       Principal.fromText(ICRC2_MINTER_CANISTER_ID),
       agent ? { agent } : undefined
     );
 
     const baseToken = createICRC1Actor(
-      Principal.fromText(ICRC2_TOKEN_CANISTER_ID),
+      Principal.fromText(baseTokenId || ICRC2_TOKEN_CANISTER_ID),
       agent ? { agent } : undefined
     );
 
@@ -118,6 +124,7 @@ export class IcrcBridge {
   }
 
   async deployBftWrappedToken(name: string, symbol: string) {
+    console.log('name & symbol', name + ' ' + symbol);
     let wrappedTokenAddress = await this.bftBridge.getWrappedToken(
       this.baseTokenId256
     );
@@ -135,90 +142,104 @@ export class IcrcBridge {
   }
 
   async bridgeIcrc2ToEmvc(amount: bigint, recipient: string) {
-    const Icrc2Burn: Icrc2Burn = {
-      operation_id: generateOperationId(),
-      from_subaccount: [],
-      icrc2_token_principal: this.baseTokenId,
-      recipient_address: recipient,
-      amount: numberToHex(amount)
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const onApproveTxSucess = async (res: any) => {
-      console.log('approve icrc2 token res:', res);
-
-      if ('Ok' in res) {
-        const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
-
-        if ('Err' in burnResponse) {
-          throw new Error(
-            `icrc1 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
-          );
-        }
-      }
-    };
-
-    if (IS_TEST) {
+    try {
       const fee = await this.baseToken.icrc1_fee();
 
-      const response = await this.baseToken.icrc2_approve({
-        fee: [],
-        memo: [],
+      const Icrc2Burn: Icrc2Burn = {
+        operation_id: generateOperationId(),
         from_subaccount: [],
-        created_at_time: [],
-        amount: amount + fee * 2n,
-        expected_allowance: [],
-        expires_at: [],
-        spender: {
-          owner: Actor.canisterIdOf(this.icrc2Minter),
-          subaccount: []
-        }
-      });
-
-      if ('Err' in response) {
-        throw new Error(
-          `failed to approve tokens: ${JSON.stringify(response.Err)}`
-        );
-      }
-
-      console.log('icrc2_approve res:', response);
-
-      const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
-
-      if ('Err' in burnResponse) {
-        throw new Error(
-          `icrc2 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
-        );
-      }
-
-      console.log('burn_icrc2 res:', burnResponse);
-    } else {
-      const APPROVE_TX = {
-        idl: Icrc1IdlFactory,
-        canisterId: ICRC2_TOKEN_CANISTER_ID,
-        methodName: 'icrc2_approve',
-        args: [
-          {
-            fee: [],
-            memo: [],
-            from_subaccount: [],
-            created_at_time: [],
-            amount,
-            expected_allowance: [],
-            expires_at: [],
-            spender: {
-              owner: Actor.canisterIdOf(this.icrc2Minter),
-              subaccount: []
-            }
-          }
-        ],
-        onSuccess: onApproveTxSucess
+        icrc2_token_principal: this.baseTokenId,
+        recipient_address: recipient,
+        amount: numberToHex(amount)
       };
 
-      await this.infinityWallet.branchTransactions([APPROVE_TX]);
-    }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const onApproveTxSucess = async (res: any) => {
+        console.log('approve icrc2 token res: after change', res);
 
-    // return balance;
+        if ('Ok' in res) {
+          console.log('res - icrc2', res);
+        }
+      };
+      if (IS_TEST) {
+        console.log('test is running', IS_TEST);
+
+        const response = await this.baseToken.icrc2_approve({
+          fee: [],
+          memo: [],
+          from_subaccount: [],
+          created_at_time: [],
+          amount: amount + fee * 2n,
+          expected_allowance: [],
+          expires_at: [],
+          spender: {
+            owner: Actor.canisterIdOf(this.icrc2Minter),
+            subaccount: []
+          }
+        });
+
+        if ('Err' in response) {
+          throw new Error(
+            `failed to approve tokens: ${JSON.stringify(response.Err)}`
+          );
+        }
+        const burnResponse = await this.icrc2Minter.burn_icrc2(Icrc2Burn);
+        if ('Err' in burnResponse) {
+          throw new Error(
+            `icrc2 minter failed to burn tokens: ${JSON.stringify(burnResponse.Err)}`
+          );
+        }
+      } else {
+        const tokenId = this.baseTokenId.toText();
+        await this.infinityWallet.requestConnect({
+          whitelist: [tokenId, ICRC2_MINTER_CANISTER_ID]
+        });
+        const APPROVE_TX = [
+          {
+            idl: Icrc1IdlFactory,
+            canisterId: tokenId,
+            methodName: 'icrc2_approve',
+            args: [
+              {
+                fee: [],
+                memo: [],
+                from_subaccount: [],
+                created_at_time: [],
+                amount: amount + fee * 2n,
+                expected_allowance: [],
+                expires_at: [],
+                spender: {
+                  owner: Actor.canisterIdOf(this.icrc2Minter),
+                  subaccount: []
+                }
+              }
+            ],
+            onSuccess: onApproveTxSucess,
+            onFail: (error: any) => {
+              console.log('error in burn', error);
+            }
+          },
+          {
+            idl: Icrc2MinterIdlFactory,
+            canisterId: ICRC2_MINTER_CANISTER_ID,
+            methodName: 'burn_icrc2',
+            args: [Icrc2Burn],
+            onSuccess: (res: any) => {
+              console.log('burn response', res);
+            },
+            onFail: (error: any) => {
+              console.log('error in burn', error);
+            }
+          }
+        ];
+        await this.infinityWallet.batchTransactions(APPROVE_TX);
+        return 1;
+      }
+
+      // return balance;
+    } catch (error) {
+      console.log('error occurec', error);
+    }
   }
 
   async bridgeEmvcToIcrc2(amount: bigint, recipient?: Principal) {
