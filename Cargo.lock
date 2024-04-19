@@ -873,6 +873,7 @@ dependencies = [
  "futures",
  "ic-canister",
  "ic-canister-client",
+ "ic-ckbtc-minter",
  "ic-exports",
  "ic-log",
  "ic-metrics 0.14.0",
