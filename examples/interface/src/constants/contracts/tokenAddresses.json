@@ -1,0 +1,53 @@
+{
+    "date": "2024-04-16T10:50:49.834Z",
+    "tokens": {
+        "Cashium": {
+            "address": "0x6ef0184AEF0De2E176B30BEb79ebD1d6be6B1B62",
+            "name": "Cashium",
+            "symbol": "CSM",
+            "decimals": 18
+        },
+        "Coinaro": {
+            "address": "0x2CF1dF9aB7b0467be009e13Fee94f6Dfcd160fB1",
+            "name": "Coinaro",
+            "symbol": "CNR",
+            "decimals": 18
+        },
+        "Coinverse": {
+            "address": "0x048B0c91C15d7b11ab9Bc2bb4B8368d4ddD155F3",
+            "name": "Coinverse",
+            "symbol": "CVS",
+            "decimals": 18
+        },
+        "Coinovation": {
+            "address": "0xC6Ad32B924927d5071BE7c16dA0F1Eb0c42699F6",
+            "name": "Coinovation",
+            "symbol": "COV",
+            "decimals": 18
+        },
+        "Intellicoin": {
+            "address": "0x87ccaC5BDf6cb5A1704142aFA1696ed2F51688D0",
+            "name": "Intellicoin",
+            "symbol": "ITC",
+            "decimals": 18
+        },
+        "Incoingnito": {
+            "address": "0xA13AC1Af146DF4A4502700253a94C2F1844eEDA5",
+            "name": "Incoingnito",
+            "symbol": "ICG",
+            "decimals": 18
+        },
+        "Arcoin": {
+            "address": "0xD33aEd3f0E79Ac7CA29c13e39F33B1B61b6e4313",
+            "name": "Arcoin",
+            "symbol": "ARC",
+            "decimals": 18
+        },
+        "Coinicious": {
+            "address": "0x56d8D4f7d99CFf9692082984E624d1E8D207ed04",
+            "name": "Coinicious",
+            "symbol": "CNS",
+            "decimals": 18
+        }
+    }
+}

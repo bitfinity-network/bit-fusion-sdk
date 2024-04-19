@@ -1,0 +1,14 @@
+node_modules
+.idea
+coverage
+coverage.json
+typechain
+dist
+typechain-types
+
+#Hardhat files
+cache
+artifacts
+logs
+
+.vscode
