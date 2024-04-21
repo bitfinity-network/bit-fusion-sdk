@@ -11,6 +11,10 @@ use ic_stable_structures::{CellStructure as _, StableUnboundedMap, VirtualMemory
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
+use inscriber::interface::{
+    Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
+    Protocol,
+};
 
 use crate::build_data::BuildData;
 use crate::constant::{
@@ -50,6 +54,62 @@ impl Brc20Bridge {
         Ok(crate::ops::get_deposit_address(&get_state())
             .await?
             .to_string())
+    }
+
+    #[update]
+    pub async fn get_inscription_fees(
+        &self,
+        inscription_type: Protocol,
+        inscription: String,
+        multisig_config: Option<Multisig>,
+    ) -> InscribeResult<InscriptionFees> {
+        crate::ops::get_inscription_fees(
+            &get_state(),
+            inscription_type,
+            inscription,
+            multisig_config,
+        )
+        .await
+    }
+
+    /// Inscribes and sends the inscribed sat from this canister to the given address.
+    /// Returns the commit and reveal transaction IDs.
+    #[update]
+    pub async fn inscribe(
+        &mut self,
+        inscription_type: Protocol,
+        inscription: String,
+        leftovers_address: String,
+        dst_address: String,
+        multisig_config: Option<Multisig>,
+    ) -> InscribeResult<InscribeTransactions> {
+        crate::ops::inscribe(
+            &get_state(),
+            inscription_type,
+            inscription,
+            leftovers_address,
+            dst_address,
+            multisig_config,
+        )
+        .await
+    }
+
+    #[update]
+    pub async fn brc20_transfer(
+        &mut self,
+        inscription: String,
+        leftovers_address: String,
+        dst_address: String,
+        multisig_config: Option<Multisig>,
+    ) -> InscribeResult<Brc20TransferTransactions> {
+        crate::ops::brc20_transfer(
+            &get_state(),
+            inscription,
+            leftovers_address,
+            dst_address,
+            multisig_config,
+        )
+        .await
     }
 
     #[update]
