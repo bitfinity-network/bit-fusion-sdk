@@ -85,17 +85,6 @@
         {
           "name": "candid:service"
         }
-      ]
-    },
-    "inscriber": {
-      "build": "",
-      "candid": ".artifact/inscriber.did",
-      "wasm": ".artifact/inscriber.wasm.gz",
-      "type": "custom",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
       ],
       "defaults": {
         "bitcoin": {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to deploy the Inscriber and Brc20Bridge canisters to perform a complete bridging flow (BRC20 <> ERC20).
+# Script to deploy the Brc20Bridge canister to perform a complete bridging flow (BRC20 <> ERC20).
 #
 # NOTE: Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
 # Until then, this script uses dfx version 0.17.
@@ -60,22 +60,6 @@ dfx identity use brc20-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 
-######################### Deploy the Inscriber Canister ######################
-
-echo "Deploying the Inscriber canister"
-dfx canister create inscriber
-
-INSCRIBER=$(dfx canister id inscriber)
-
-dfx deploy inscriber --argument "(record {
-    network = variant { regtest };
-    logger = record {
-        enable_console = true;
-        in_memory_records = opt 10000;
-        log_filter = opt \"info\";
-    };
-})"
-
 ######################### Deploy EVM and BRC20 Bridge ######################
 
 echo "Deploying EVMc testnet"
@@ -105,7 +89,6 @@ dfx deploy brc20-bridge --argument "(record {
     erc20_minter_fee = 10;
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
-    inscriber = principal \"${INSCRIBER}\";
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
     logger = record {

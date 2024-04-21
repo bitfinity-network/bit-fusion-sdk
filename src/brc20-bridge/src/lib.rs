@@ -1,3 +1,4 @@
+pub mod build_data;
 pub mod canister;
 pub mod constant;
 pub mod interface;

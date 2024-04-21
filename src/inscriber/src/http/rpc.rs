@@ -2,6 +2,7 @@ use std::future::Future;
 
 use ethers_core::abi::ethereum_types::H520;
 use ethers_core::types::{Signature, H160};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use jsonrpc_core::{Failure, MethodCall, Output, Success};
 use serde_json::{json, Value};
 
@@ -11,7 +12,7 @@ use crate::constant::{
     HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME, HTTP_METHOD_INSCRIBER_METHOD_NAME,
 };
 use crate::interface::{InscribeError, InscribeResult, Multisig, Protocol};
-use crate::{ops, Inscriber};
+use crate::ops;
 
 pub type RpcResult = Result<Value, InscribeError>;
 
@@ -54,19 +55,26 @@ impl Rpc {
     }
 
     /// Handles JSON-RPC method dispatch by matching the method name to handler functions
-    pub async fn handle_calls(method_call: MethodCall) -> RpcResult {
+    pub async fn handle_calls(method_call: MethodCall, network: BitcoinNetwork) -> RpcResult {
         match method_call.method.as_str() {
-            HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME => Self::brc20_transfer(method_call).await,
-            HTTP_METHOD_INSCRIBER_METHOD_NAME => Self::inscribe(method_call).await,
-            HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME => Self::get_bitcoin_address(method_call).await,
+            HTTP_METHOD_BRC20_TRANSFER_METHOD_NAME => {
+                Self::brc20_transfer(method_call, network).await
+            }
+            HTTP_METHOD_INSCRIBER_METHOD_NAME => Self::inscribe(method_call, network).await,
+            HTTP_METHOD_GET_BTC_ADDRESS_METHOD_NAME => {
+                Self::get_bitcoin_address(method_call, network).await
+            }
             HTTP_METHOD_GET_INSCRIBER_FEE_METHOD_NAME => {
-                Self::get_inscription_fees(method_call).await
+                Self::get_inscription_fees(method_call, network).await
             }
             _ => Err(jsonrpc_core::Error::method_not_found().into()),
         }
     }
 
-    pub async fn get_bitcoin_address(method_call: MethodCall) -> RpcResult {
+    pub async fn get_bitcoin_address(
+        method_call: MethodCall,
+        network: BitcoinNetwork,
+    ) -> RpcResult {
         method_call.validate_params(&["expected_address", "signature", "signed_message"], 3)?;
 
         let expected_address: H160 = method_call.get_from_vec(0)?;
@@ -77,14 +85,14 @@ impl Rpc {
 
         Self::verify_address(actual_address, expected_address)?;
 
-        let derivation_path = Inscriber::derivation_path(Some(actual_address));
+        let derivation_path = ops::derivation_path(Some(actual_address));
 
-        let address = ops::get_bitcoin_address(derivation_path).await;
+        let address = ops::get_bitcoin_address(derivation_path, network).await;
 
         Ok(json!(address))
     }
 
-    pub async fn inscribe(method_call: MethodCall) -> RpcResult {
+    pub async fn inscribe(method_call: MethodCall, network: BitcoinNetwork) -> RpcResult {
         method_call.validate_params(
             &[
                 "inscription_type",
@@ -111,7 +119,7 @@ impl Rpc {
 
         Self::verify_address(actual_address, expected_address)?;
 
-        let derivation_path = Inscriber::derivation_path(Some(actual_address));
+        let derivation_path = ops::derivation_path(Some(actual_address));
 
         let inscription = ops::inscribe(
             inscription_type,
@@ -120,13 +128,14 @@ impl Rpc {
             dst_address,
             multisig_config,
             derivation_path,
+            network,
         )
         .await?;
 
         Ok(json!(inscription))
     }
 
-    pub async fn brc20_transfer(method_call: MethodCall) -> RpcResult {
+    pub async fn brc20_transfer(method_call: MethodCall, network: BitcoinNetwork) -> RpcResult {
         method_call.validate_params(
             &[
                 "inscription",
@@ -151,7 +160,7 @@ impl Rpc {
 
         Self::verify_address(actual_address, expected_address)?;
 
-        let derivation_path = Inscriber::derivation_path(Some(actual_address));
+        let derivation_path = ops::derivation_path(Some(actual_address));
 
         let result = ops::brc20_transfer(
             inscription,
@@ -159,13 +168,17 @@ impl Rpc {
             dst_address,
             multisig_config,
             derivation_path,
+            network,
         )
         .await?;
 
         Ok(json!(result))
     }
 
-    pub async fn get_inscription_fees(method_call: MethodCall) -> RpcResult {
+    pub async fn get_inscription_fees(
+        method_call: MethodCall,
+        network: BitcoinNetwork,
+    ) -> RpcResult {
         method_call.validate_params(&["inscription_type", "inscription"], 2)?;
 
         let inscription_type: Protocol = method_call.get_from_vec(0)?;
@@ -173,7 +186,8 @@ impl Rpc {
         let multisig_config: Option<Multisig> = method_call.get_from_vec(2).ok();
 
         let fees =
-            ops::get_inscription_fees(inscription_type, inscription, multisig_config).await?;
+            ops::get_inscription_fees(inscription_type, inscription, multisig_config, network)
+                .await?;
 
         Ok(json!(fees))
     }

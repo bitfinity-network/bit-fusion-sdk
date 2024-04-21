@@ -32,7 +32,6 @@ pub struct State {
 
 #[derive(Debug, CandidType, Deserialize)]
 pub struct Brc20BridgeConfig {
-    pub inscriber: Principal,
     pub network: BitcoinNetwork,
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
@@ -46,7 +45,6 @@ pub struct Brc20BridgeConfig {
 impl Default for Brc20BridgeConfig {
     fn default() -> Self {
         Self {
-            inscriber: Principal::anonymous(),
             network: BitcoinNetwork::Regtest,
             evm_link: EvmLink::default(),
             signing_strategy: SigningStrategy::Local {
@@ -144,10 +142,6 @@ impl State {
 
     pub fn has_brc20(&self, reveal_txid: &str) -> bool {
         self.inscriptions.has_inscription(reveal_txid)
-    }
-
-    pub fn inscriber(&self) -> Principal {
-        self.config.inscriber
     }
 
     pub fn general_indexer_url(&self) -> String {

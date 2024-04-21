@@ -79,7 +79,7 @@ pub(crate) async fn fetch_brc20_token_details(
 
     if address != holder && tick != ticker {
         log::error!(
-            "Token details mismatch. Given: {:?}. Expectd: {:?}",
+            "Token details mismatch. Given: {:?}. Expected: {:?}",
             (tick, holder),
             (ticker, address)
         );

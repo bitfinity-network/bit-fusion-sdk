@@ -1,62 +1,34 @@
-use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
 use bitcoin::Amount;
-use candid::CandidType;
-use did::codec;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
-use ic_log::{init_log, LogSettings};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{Bound, StableCell, Storable, VirtualMemory};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::{InscribeError, InscribeResult, InscriptionFees};
-use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
-thread_local! {
-    pub(crate) static BITCOIN_NETWORK: Cell<BitcoinNetwork> = const { Cell::new(BitcoinNetwork::Regtest) };
-    pub(crate) static INSCRIBER_STATE: Rc<RefCell<State>> = Rc::default();
+#[derive(Default)]
+pub struct UtxoStore {
+    inner: Vec<UtxoManager>,
 }
 
-type ConfigStorage = StableCell<InscriberConfig, VirtualMemory<DefaultMemoryImpl>>;
-
-/// State of the Inscriber
-pub struct State {
-    config: ConfigStorage,
-    utxos: Vec<UtxoManager>,
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+struct UtxoManager {
+    utxo: Utxo,
+    purpose: UtxoType,
+    value: Amount,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        let config = ConfigStorage::new(
-            MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)),
-            InscriberConfig::default(),
-        )
-        .expect("Failed to init storage for the Inscriber config");
-
-        Self {
-            config,
-            utxos: vec![],
-        }
-    }
+/// Classification of a UTXO based on its purpose.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
+enum UtxoType {
+    /// Denotes a UTXO earmarked for inscription.
+    Inscription,
+    /// Denotes a UTXO used to pay for transaction fees
+    #[default]
+    Fee,
+    /// Denotes a UTXO left after fees have been deducted
+    Leftover,
 }
 
-impl State {
-    /// Initializes the Inscriber's state with configuration information.
-    pub(crate) fn configure(&mut self, config: InscriberConfig) {
-        #[cfg(target_family = "wasm")]
-        ic_crypto_getrandom_for_wasm::register_custom_getrandom();
-
-        BITCOIN_NETWORK.with(|n| n.set(config.network));
-
-        init_log(&config.logger).expect("Failed to initialize the logger");
-
-        let config = ConfigStorage::new(MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)), config)
-            .expect("Failed to init storage for the Inscriber config");
-        self.config = config;
-    }
-
+impl UtxoStore {
     /// Prepares UTXOs for a commit transaction and classifies leftovers.
     ///
     /// # Arguments
@@ -128,7 +100,7 @@ impl State {
     /// it's necessary to refresh the UTXO set received from `Inscriber::get_utxos`, ensuring the
     /// the state operates with the most current UTXO information available.
     pub(crate) fn reset_utxo_vault(&mut self) {
-        self.utxos.clear();
+        self.inner.clear();
         log::info!("UTXO vault has been reset.");
     }
 
@@ -144,7 +116,7 @@ impl State {
 
     /// Classifies a new UTXO and adds it to the state.
     fn classify_utxo(&mut self, utxo: &Utxo, purpose: UtxoType, value: Amount) {
-        self.utxos.push(UtxoManager {
+        self.inner.push(UtxoManager {
             utxo: utxo.clone(),
             purpose,
             value,
@@ -153,7 +125,7 @@ impl State {
 
     #[cfg(test)]
     fn select_utxos(&self, purpose: UtxoType) -> Vec<&Utxo> {
-        self.utxos
+        self.inner
             .iter()
             .filter_map(|utxo_manager| {
                 (utxo_manager.purpose == purpose).then_some(&utxo_manager.utxo)
@@ -163,7 +135,7 @@ impl State {
 
     #[cfg(test)]
     fn update_utxo_purpose(&mut self, utxo_id: &str, new_purpose: UtxoType) {
-        if let Some(utxo) = self.utxos.iter_mut().find(|c_utxo| {
+        if let Some(utxo) = self.inner.iter_mut().find(|c_utxo| {
             let txid_hex = hex::encode(c_utxo.utxo.outpoint.txid.clone());
             // Create a unique identifier for each UTXO in the format "txid_hex:vout"
             let txid_vout = format!("{}:{}", txid_hex, c_utxo.utxo.outpoint.vout);
@@ -175,44 +147,6 @@ impl State {
             log::warn!("UTXO not found for updating: {}", utxo_id);
         }
     }
-}
-
-/// Configuration at canister initialization
-#[derive(Debug, CandidType, Deserialize, Default)]
-pub struct InscriberConfig {
-    network: BitcoinNetwork,
-    logger: LogSettings,
-}
-
-impl Storable for InscriberConfig {
-    fn to_bytes(&self) -> Cow<'_, [u8]> {
-        codec::encode(&self).into()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        codec::decode(bytes.as_ref())
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-struct UtxoManager {
-    utxo: Utxo,
-    purpose: UtxoType,
-    value: Amount,
-}
-
-/// Classification of a UTXO based on its purpose.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq)]
-enum UtxoType {
-    /// Denotes a UTXO earmarked for inscription.
-    Inscription,
-    /// Denotes a UTXO used to pay for transaction fees
-    #[default]
-    Fee,
-    /// Denotes a UTXO left after fees have been deducted
-    Leftover,
 }
 
 #[cfg(test)]
@@ -256,7 +190,7 @@ mod tests {
 
     #[test]
     fn process_utxos_enough_funds_for_fees_and_inscriptions() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -268,7 +202,7 @@ mod tests {
 
         let fetched_utxos = get_mock_utxos();
 
-        let classified_utxos = state.process_utxos(fees, fetched_utxos).unwrap();
+        let classified_utxos = utxo_store.process_utxos(fees, fetched_utxos).unwrap();
 
         // Expect that at least one UTXO is reserved for inscription
         assert!(!classified_utxos.is_empty());
@@ -278,7 +212,7 @@ mod tests {
 
     #[test]
     fn process_utxos_just_enough_funds_for_inscriptions() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -290,7 +224,7 @@ mod tests {
 
         let fetched_utxos = get_mock_utxos();
 
-        let classified_utxos = state.process_utxos(fees, fetched_utxos).unwrap();
+        let classified_utxos = utxo_store.process_utxos(fees, fetched_utxos).unwrap();
 
         // Expect that at least one UTXO is reserved for inscription
         assert!(!classified_utxos.is_empty());
@@ -300,7 +234,7 @@ mod tests {
 
     #[test]
     fn process_utxos_insufficient_funds_for_fees() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -311,7 +245,7 @@ mod tests {
 
         let fetched_utxos = get_mock_utxos();
 
-        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+        let classified_utxos = utxo_store.process_utxos(fees, fetched_utxos);
 
         assert!(matches!(
             classified_utxos,
@@ -321,19 +255,19 @@ mod tests {
 
     #[test]
     fn update_utxo_purpose_after_use() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fetched_utxos = get_mock_utxos();
         for utxo in fetched_utxos.into_iter() {
-            state.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(utxo.value));
+            utxo_store.classify_utxo(&utxo, UtxoType::Fee, Amount::from_sat(utxo.value));
         }
 
         let txid_hex = hex::encode([0; 32]);
         let utxo_id = format!("{}:0", txid_hex);
-        state.update_utxo_purpose(&utxo_id, UtxoType::Inscription);
+        utxo_store.update_utxo_purpose(&utxo_id, UtxoType::Inscription);
 
-        let updated_utxo = state
-            .utxos
+        let updated_utxo = utxo_store
+            .inner
             .iter()
             .find(|um| {
                 let txid_hex = hex::encode(um.utxo.outpoint.txid.clone());
@@ -346,7 +280,7 @@ mod tests {
 
     #[test]
     fn process_utxos_with_all_funds_dedicated_to_fees() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -357,7 +291,7 @@ mod tests {
 
         let fetched_utxos = vec![get_mock_utxo(&[2; 32], 1, 100000)];
 
-        let classified_utxos = state.process_utxos(fees, fetched_utxos);
+        let classified_utxos = utxo_store.process_utxos(fees, fetched_utxos);
 
         assert!(matches!(
             classified_utxos,
@@ -367,7 +301,7 @@ mod tests {
 
     #[test]
     fn process_utxos_one_leftover_utxo_properly_allocated() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -384,8 +318,8 @@ mod tests {
             get_mock_utxo(&[6; 32], 5, 25000),
         ];
 
-        let utxos_for_inscription = state.process_utxos(fees, fetched_utxos).unwrap();
-        let leftover_utxos = state.select_utxos(UtxoType::Leftover);
+        let utxos_for_inscription = utxo_store.process_utxos(fees, fetched_utxos).unwrap();
+        let leftover_utxos = utxo_store.select_utxos(UtxoType::Leftover);
 
         assert!(
             !utxos_for_inscription.is_empty(),
@@ -406,7 +340,7 @@ mod tests {
 
     #[test]
     fn insufficient_funds_for_any_transaction() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -417,12 +351,12 @@ mod tests {
 
         let fetched_utxos = vec![get_mock_utxo(&[7; 32], 6, 40000)];
 
-        assert!(state.process_utxos(fees, fetched_utxos).is_err());
+        assert!(utxo_store.process_utxos(fees, fetched_utxos).is_err());
     }
 
     #[test]
     fn multiple_utxos_exact_funds_for_fees_and_postage() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -437,12 +371,12 @@ mod tests {
             get_mock_utxo(&[10; 32], 9, 20000),
         ];
 
-        assert!(state.process_utxos(fees, fetched_utxos).is_ok());
+        assert!(utxo_store.process_utxos(fees, fetched_utxos).is_ok());
     }
 
     #[test]
     fn process_utxos_two_leftover_utxos_properly_allocated() {
-        let mut state = State::default();
+        let mut utxo_store = UtxoStore::default();
 
         let fees = InscriptionFees {
             postage: POSTAGE,
@@ -459,8 +393,8 @@ mod tests {
             get_mock_utxo(&[6; 32], 5, 60000),
         ];
 
-        let utxos_for_inscription = state.process_utxos(fees, fetched_utxos).unwrap();
-        let leftover_utxos = state.select_utxos(UtxoType::Leftover);
+        let utxos_for_inscription = utxo_store.process_utxos(fees, fetched_utxos).unwrap();
+        let leftover_utxos = utxo_store.select_utxos(UtxoType::Leftover);
 
         assert!(
             !utxos_for_inscription.is_empty(),

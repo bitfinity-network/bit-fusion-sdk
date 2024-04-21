@@ -32,6 +32,10 @@ minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
 serde = { workspace = true }
+serde_bytes = "0.11"
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 sha2 = "0.10"
+
+[build-dependencies]
+vergen = { workspace = true }

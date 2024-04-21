@@ -1,14 +1,15 @@
 use std::str::FromStr as _;
 
-use bitcoin::Txid;
+use bitcoin::{Address, Txid};
+use ethers_core::types::H160;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::MultisigConfig;
 
 use crate::interface::{
-    Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
-    Protocol,
+    Brc20TransferTransactions, InscribeError, InscribeResult, InscribeTransactions,
+    InscriptionFees, Multisig, Protocol,
 };
 use crate::wallet::CanisterWallet;
-use crate::Inscriber;
 
 /// Inscribes a message onto the Bitcoin blockchain using the given inscription
 /// type.
@@ -19,11 +20,11 @@ pub async fn inscribe(
     dst_address: String,
     multisig_config: Option<Multisig>,
     derivation_path: Vec<Vec<u8>>,
+    network: BitcoinNetwork,
 ) -> InscribeResult<InscribeTransactions> {
-    let network = Inscriber::get_network_config();
-    let leftovers_address = Inscriber::get_address(leftovers_address, network)?;
+    let leftovers_address = get_address(leftovers_address, network)?;
 
-    let dst_address = Inscriber::get_address(dst_address, network)?;
+    let dst_address = get_address(dst_address, network)?;
 
     let multisig_config = multisig_config.map(|m| MultisigConfig {
         required: m.required,
@@ -32,7 +33,6 @@ pub async fn inscribe(
 
     CanisterWallet::new(derivation_path, network)
         .inscribe(
-            &Inscriber::get_inscriber_state(),
             inscription_type,
             inscription,
             dst_address,
@@ -49,10 +49,10 @@ pub async fn brc20_transfer(
     dst_address: String,
     multisig_config: Option<Multisig>,
     derivation_path: Vec<Vec<u8>>,
+    network: BitcoinNetwork,
 ) -> InscribeResult<Brc20TransferTransactions> {
-    let network = Inscriber::get_network_config();
-    let leftovers_address = Inscriber::get_address(leftovers_address, network)?;
-    let transfer_dst_address = Inscriber::get_address(dst_address, network)?;
+    let leftovers_address = get_address(leftovers_address, network)?;
+    let transfer_dst_address = get_address(dst_address, network)?;
 
     let wallet = CanisterWallet::new(derivation_path.clone(), network);
     let inscription_dst_address = wallet.get_bitcoin_address().await;
@@ -65,6 +65,7 @@ pub async fn brc20_transfer(
         inscription_leftovers_address.to_string(),
         multisig_config,
         derivation_path,
+        network,
     )
     .await?;
 
@@ -87,9 +88,7 @@ pub async fn brc20_transfer(
 }
 
 /// Gets the Bitcoin address for the given derivation path.
-pub async fn get_bitcoin_address(derivation_path: Vec<Vec<u8>>) -> String {
-    let network = Inscriber::get_network_config();
-
+pub async fn get_bitcoin_address(derivation_path: Vec<Vec<u8>>, network: BitcoinNetwork) -> String {
     CanisterWallet::new(derivation_path, network)
         .get_bitcoin_address()
         .await
@@ -100,8 +99,8 @@ pub async fn get_inscription_fees(
     inscription_type: Protocol,
     inscription: String,
     multisig_config: Option<Multisig>,
+    network: BitcoinNetwork,
 ) -> InscribeResult<InscriptionFees> {
-    let network = Inscriber::get_network_config();
     let multisig_config = multisig_config.map(|m| MultisigConfig {
         required: m.required,
         total: m.total,
@@ -110,4 +109,24 @@ pub async fn get_inscription_fees(
     CanisterWallet::new(vec![], network)
         .get_inscription_fees(inscription_type, inscription, multisig_config)
         .await
+}
+
+/// Returns the derivation path to use for signing/verifying based on the caller principal or provided address.
+#[inline]
+pub(crate) fn derivation_path(address: Option<H160>) -> Vec<Vec<u8>> {
+    let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
+
+    match address {
+        Some(address) => vec![address.as_bytes().to_vec()],
+        None => vec![caller_principal],
+    }
+}
+
+/// Returns the parsed address given the string representation and the expected network.
+#[inline]
+pub(crate) fn get_address(address: String, network: BitcoinNetwork) -> InscribeResult<Address> {
+    Address::from_str(&address)
+        .map_err(|_| InscribeError::BadAddress(address.clone()))?
+        .require_network(CanisterWallet::map_network(network))
+        .map_err(|_| InscribeError::BadAddress(address))
 }

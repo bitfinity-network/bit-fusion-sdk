@@ -16,7 +16,6 @@ ethers-core = { workspace = true }
 did = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-crypto-getrandom-for-wasm", tag = "v0.15.x" }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }
 ic-metrics = { workspace = true }
@@ -32,6 +31,3 @@ serde_bytes = "0.11"
 serde_json = { workspace = true }
 sha2 = "0.10"
 thiserror = { workspace = true }
-
-[build-dependencies]
-vergen = { workspace = true }

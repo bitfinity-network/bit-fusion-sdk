@@ -8,7 +8,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 ///
 /// NOTE: Relies on the `bitcoin_get_balance` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_balance
-pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
+pub async fn get_balance(network: BitcoinNetwork, address: String) -> u64 {
     IcBtc::bitcoin_get_balance(GetBalanceRequest {
         address,
         network,
@@ -23,7 +23,7 @@ pub(crate) async fn get_balance(network: BitcoinNetwork, address: String) -> u64
 ///
 /// NOTE: Relies on the `bitcoin_get_utxos` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_utxos
-pub(crate) async fn get_utxos(
+pub async fn get_utxos(
     network: BitcoinNetwork,
     address: String,
 ) -> Result<GetUtxosResponse, String> {
@@ -79,9 +79,7 @@ pub(crate) async fn get_utxos(
 ///
 /// NOTE: Relies on the `bitcoin_get_current_fee_percentiles` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_get_current_fee_percentiles
-pub(crate) async fn get_current_fee_percentiles(
-    network: BitcoinNetwork,
-) -> Vec<MillisatoshiPerByte> {
+pub async fn get_current_fee_percentiles(network: BitcoinNetwork) -> Vec<MillisatoshiPerByte> {
     IcBtc::bitcoin_get_current_fee_percentiles(GetCurrentFeePercentilesRequest { network })
         .await
         .expect("Failed to retrieve current fee percentiles")
@@ -92,7 +90,7 @@ pub(crate) async fn get_current_fee_percentiles(
 ///
 /// NOTE: Relies on the `bitcoin_send_transaction` endpoint.
 /// See https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-bitcoin_send_transaction
-pub(crate) async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
+pub async fn send_transaction(network: BitcoinNetwork, transaction: Vec<u8>) {
     IcBtc::bitcoin_send_transaction(SendTransactionRequest {
         network,
         transaction,

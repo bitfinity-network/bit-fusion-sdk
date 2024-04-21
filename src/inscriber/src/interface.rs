@@ -6,8 +6,6 @@ use ord_rs::{Inscription, OrdError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub use crate::build_data::BuildData;
-
 #[derive(Serialize, Deserialize)]
 pub enum InscriptionWrapper {
     Brc20(ord_rs::Brc20),

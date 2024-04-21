@@ -12,6 +12,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
+use crate::build_data::BuildData;
 use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
@@ -87,6 +88,11 @@ impl Brc20Bridge {
     #[post_upgrade]
     pub fn post_upgrade(&mut self) {
         self.set_timers();
+    }
+
+    #[query]
+    pub fn get_canister_build_data(&self) -> BuildData {
+        crate::build_data::canister_build_data()
     }
 
     pub fn idl() -> Idl {

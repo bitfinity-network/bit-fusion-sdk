@@ -1,7 +1,7 @@
 mod fees;
 mod signer;
+mod utxo_store;
 
-use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::absolute::LockTime;
@@ -28,7 +28,7 @@ use crate::interface::{
     bitcoin_api, ecdsa_api, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
     InscriptionWrapper, Nft as CandidNft, Protocol,
 };
-use crate::state::State;
+use crate::wallet::utxo_store::UtxoStore;
 
 #[derive(Clone)]
 pub struct EcdsaSigner {
@@ -160,7 +160,6 @@ impl CanisterWallet {
     /// Returns the transaction IDs for both the commit and reveal transactions.
     pub async fn inscribe(
         &self,
-        state: &RefCell<State>,
         inscription_type: Protocol,
         inscription: String,
         dst_address: Address,
@@ -190,7 +189,8 @@ impl CanisterWallet {
             .await?;
 
         log::info!("Processing UTXOs...");
-        let own_utxos = state.borrow_mut().process_utxos(fees, own_utxos)?;
+        let mut utxo_store = UtxoStore::default();
+        let own_utxos = utxo_store.process_utxos(fees, own_utxos)?;
 
         // initialize a wallet (transaction signer) and a transaction builder
         let wallet = Self::with_ecdsa_signer(ecdsa_signer);
@@ -249,7 +249,7 @@ impl CanisterWallet {
         log::info!("Done");
 
         // Clear the locked UTXO set
-        state.borrow_mut().reset_utxo_vault();
+        utxo_store.reset_utxo_vault();
 
         Ok(InscribeTransactions {
             commit_tx: commit_tx.txid().encode_hex(),
