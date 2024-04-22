@@ -15,6 +15,7 @@ use inscriber::interface::{
     Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
     Protocol,
 };
+use inscriber::ops as Inscriber;
 
 use crate::build_data::BuildData;
 use crate::constant::{
@@ -63,13 +64,9 @@ impl Brc20Bridge {
         inscription: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscriptionFees> {
-        crate::ops::get_inscription_fees(
-            &get_state(),
-            inscription_type,
-            inscription,
-            multisig_config,
-        )
-        .await
+        let network = get_state().borrow().ic_btc_network();
+        Inscriber::get_inscription_fees(inscription_type, inscription, multisig_config, network)
+            .await
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.
@@ -83,13 +80,22 @@ impl Brc20Bridge {
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
-        crate::ops::inscribe(
-            &get_state(),
+        let state = get_state();
+        let (network, derivation_path) = {
+            (
+                state.borrow().ic_btc_network(),
+                state.borrow().derivation_path(None),
+            )
+        };
+
+        Inscriber::inscribe(
             inscription_type,
             inscription,
             leftovers_address,
             dst_address,
             multisig_config,
+            derivation_path,
+            network,
         )
         .await
     }
@@ -102,12 +108,20 @@ impl Brc20Bridge {
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<Brc20TransferTransactions> {
-        crate::ops::brc20_transfer(
-            &get_state(),
+        let state = get_state();
+        let (network, derivation_path) = {
+            (
+                state.borrow().ic_btc_network(),
+                state.borrow().derivation_path(None),
+            )
+        };
+        Inscriber::brc20_transfer(
             inscription,
             leftovers_address,
             dst_address,
             multisig_config,
+            derivation_path,
+            network,
         )
         .await
     }

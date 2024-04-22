@@ -9,10 +9,7 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
 };
 use ic_stable_structures::CellStructure;
-use inscriber::interface::{
-    Brc20TransferTransactions, InscribeResult, InscribeTransactions, InscriptionFees, Multisig,
-    Protocol,
-};
+use inscriber::interface::Brc20TransferTransactions;
 use inscriber::ops as Inscriber;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
@@ -426,65 +423,4 @@ pub async fn burn_brc20(
     }
 
     result
-}
-
-/// Inscribes a message onto the Bitcoin blockchain using the given inscription
-/// type.
-pub(crate) async fn inscribe(
-    state: &RefCell<State>,
-    inscription_type: Protocol,
-    inscription: String,
-    leftovers_address: String,
-    dst_address: String,
-    multisig_config: Option<Multisig>,
-) -> InscribeResult<InscribeTransactions> {
-    let (network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
-
-    Inscriber::inscribe(
-        inscription_type,
-        inscription,
-        leftovers_address,
-        dst_address,
-        multisig_config,
-        derivation_path,
-        network,
-    )
-    .await
-}
-
-/// Inscribes and sends the inscribed sat from this canister to the given address.
-pub(crate) async fn brc20_transfer(
-    state: &RefCell<State>,
-    inscription: String,
-    leftovers_address: String,
-    dst_address: String,
-    multisig_config: Option<Multisig>,
-) -> InscribeResult<Brc20TransferTransactions> {
-    let (network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
-
-    Inscriber::brc20_transfer(
-        inscription,
-        leftovers_address,
-        dst_address,
-        multisig_config,
-        derivation_path,
-        network,
-    )
-    .await
-}
-
-pub(crate) async fn get_inscription_fees(
-    state: &RefCell<State>,
-    inscription_type: Protocol,
-    inscription: String,
-    multisig_config: Option<Multisig>,
-) -> InscribeResult<InscriptionFees> {
-    let network = state.borrow().ic_btc_network();
-    Inscriber::get_inscription_fees(inscription_type, inscription, multisig_config, network).await
 }
