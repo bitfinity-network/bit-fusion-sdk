@@ -18,7 +18,7 @@ use ord_rs::{Brc20, Inscription, OrdParser};
 use crate::constant::{BRC20_TICKER_LEN, NONCE};
 use crate::interface::bridge_api::{
     Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
-    Erc20MintStatus, InscribeBrc20Args,
+    Erc20MintStatus,
 };
 use crate::interface::store::Brc20TokenInfo;
 use crate::state::State;
@@ -264,55 +264,6 @@ pub async fn erc20_to_brc20(
     _address: &str,
     _amount: u64,
 ) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
-    todo!()
-}
-
-// WIP
-pub async fn erc20_to_brc20_v2(
-    state: &RefCell<State>,
-    _request_id: u32,
-    _eth_address: &str,
-    _amount: u64,
-    brc20_args: InscribeBrc20Args,
-    _reveal_txid: &str,
-) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
-    let (network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
-
-    let InscribeBrc20Args {
-        inscription_type,
-        inscription,
-        leftovers_address,
-        dst_address,
-        multisig_config,
-    } = brc20_args;
-
-    let brc20: Brc20 =
-        serde_json::from_str(&inscription).expect("Failed to deserialize BRC20 from string");
-
-    // state
-    //     .borrow_mut()
-    //     .inscriptions_mut()
-    //     .insert(&brc20, reveal_txid.to_string());
-    let (_amount, _tick) = get_brc20_data(&brc20);
-
-    log::info!("Creating a BRC20 inscription");
-    let tx_ids = Inscriber::inscribe(
-        inscription_type,
-        inscription,
-        leftovers_address,
-        dst_address,
-        multisig_config,
-        derivation_path,
-        network,
-    )
-    .await
-    .map_err(|e| Brc20InscribeError::Inscribe(e.to_string()))?;
-
-    log::trace!("Created a BRC20 inscription with IDs: {tx_ids:?}");
-
     todo!()
 }
 

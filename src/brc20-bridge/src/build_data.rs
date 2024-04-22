@@ -62,7 +62,7 @@ mod tests {
     fn should_create_build_data() {
         let build_data = canister_build_data();
 
-        assert_eq!(build_data.pkg_name, "inscriber");
+        assert_eq!(build_data.pkg_name, "brc20-bridge");
 
         assert_eq!(build_data.cargo_target_triple, CARGO_TARGET_TRIPLE);
         assert_eq!(build_data.cargo_features, CARGO_FEATURES);

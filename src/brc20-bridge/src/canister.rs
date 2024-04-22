@@ -50,11 +50,20 @@ impl Brc20Bridge {
         self.set_timers();
     }
 
-    #[query]
-    pub async fn get_deposit_address(&self) -> Result<String, BridgeError> {
+    #[update]
+    pub async fn get_deposit_address(&mut self) -> Result<String, BridgeError> {
         Ok(crate::ops::get_deposit_address(&get_state())
             .await?
             .to_string())
+    }
+
+    /// Returns the balance of the given bitcoin address.
+    #[update]
+    pub async fn get_balance(&mut self, address: String) -> u64 {
+        use inscriber::interface::bitcoin_api;
+
+        let network = get_state().borrow().ic_btc_network();
+        bitcoin_api::get_balance(network, address).await
     }
 
     #[update]

@@ -3,10 +3,6 @@ name = "inscriber"
 version.workspace = true
 edition.workspace = true
 
-
-[features]
-export-api = []
-
 [dependencies]
 async-trait = { workspace = true }
 bitcoin = { version = "0.31", features = ["serde"] }
