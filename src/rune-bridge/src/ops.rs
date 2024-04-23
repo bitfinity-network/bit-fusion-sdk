@@ -111,6 +111,13 @@ async fn build_withdraw_transaction(
     let derivation_path = &inputs[0].derivation_path;
     let public_key = state.borrow().der_public_key(&derivation_path);
     let signer = state.borrow().wallet(derivation_path.clone());
+
+    let pk_address = Address::p2wpkh(&public_key, state.borrow().network()).unwrap();
+    assert_eq!(
+        pk_address.script_pubkey(),
+        inputs[0].tx_input_info.tx_out.script_pubkey
+    );
+
     let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
 
     let change_address = get_change_address(state)?;
