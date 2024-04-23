@@ -8,7 +8,7 @@ This canister provides the mechanism for executing Bitcoin [BRC-20](https://domo
 
 - Use `dfx` version <= `0.17.x` (for now). [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if you don't have it already.
 - [Install the Rust toolchain](https://www.rust-lang.org/tools/install) if it's not already installed.
-- [Download and install Docker, with Compose](https://www.docker.com/products/docker-desktop/) if you don't already have it.
+- To facilitate BRC20 inscriptions and indexing, [get the `ord` CLI toolchain](https://github.com/ordinals/ord?tab=readme-ov-file#installation)
 
 After installing Rust, add the `wasm32` target via:
 
@@ -16,26 +16,26 @@ After installing Rust, add the `wasm32` target via:
 rustup target add wasm32-unknown-unknown # Required for building IC canisters
 ```
 
-### Init, Build, and Deploy
+### Start a Regtest `ord` and `bitcoind` Instance
 
-First, ensure your Docker engine is running, and then start the Bitcoin daemon and dfx in one terminal instance via:
+In one terminal instance start the `ord` toolchain via:
 
 ```bash
-./scripts/brc20_init.sh
+ord env <DIRECTORY>
 ```
 
-The above command will start the Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, and start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode. Logs from running ops will be shown here. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
+The default directory is `env`. In the deploy script, we use `target/brc20`, so it's best to use that.
 
-Then, in a separate terminal instance, build and deploy via:
+Then, in a separate terminal instance, build and deploy the relevant canisters via:
 
 ```bash
 ./scripts/build.sh
 ./scripts/brc20_deploy.sh
 ```
 
-Once the canister is deployed, you can interact with it.
+Once the relevant canisters (`evm`, `bft-bridge`, etc.) are deployed, you can interact with the `brc20-bridge`.
 
-**NOTE**: Before proceeding to make a BRC20 inscription, ensure that your intended token's ticker (e.g. `ordi`, `abcd`, etc.) has not already been deployed by someone else. You can check the status of a BRC20 token here: <https://docs.hiro.so/ordinals/brc-20-token-details>.
+**NOTE**: Before proceeding to make a BRC20 inscription, ensure that your intended token's ticker (e.g. `ordi`, `abcd`, etc.) has not already been deployed by someone else. You can check the status of a BRC20 token here: <https://docs.hiro.so/ordinals/brc-20-token-details>. In `regtest` mode, this doesn't really matter, but it's best practice to keep this in mind, in case you wish to make an inscription on `testnet` or `mainnet`.
 
 ### Endpoint: Generate a Bitcoin Address for the Canister
 
@@ -72,10 +72,10 @@ pub struct InscriptionFees {
 Now that the canister is deployed and you have its deposit address, you need to top up its balance so it can send transactions. To avoid UTXO clogging, and since the Bitcoin daemon already generates enough blocks when it starts, generate only 1 additional block and effectively reward the canister wallet with some BTC. Run the following command:
 
 ```bash
-docker exec -it <BITCOIND-CONTAINER-ID> bitcoin-cli -regtest generatetoaddress 1 <CANISTER-BITCOIN-ADDRESS>
+bitcoin-cli -regtest generatetoaddress 1 <CANISTER-BITCOIN-ADDRESS>
 ```
 
-Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_deposit_address` call. Replace `BITCOIN-CONTAINER-ID` with the Docker container ID for `bitcoind`. (You can retrieve this by running `docker container ls -a` to see all running containers, and then copy the one for `bitcoind`).
+Replace `CANISTER-BITCOIN-ADDRESS` with the address returned from the `get_deposit_address` call.
 
 ### Endpoint: Check Balance
 

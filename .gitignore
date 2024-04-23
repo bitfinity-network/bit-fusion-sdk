@@ -67,3 +67,7 @@ rust-toolchain.toml
 # misc
 .build.sh.swp
 dfx_log.txt
+brc_20.json
+
+# Default directory created by the `ord env` command
+env

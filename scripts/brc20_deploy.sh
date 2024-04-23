@@ -6,6 +6,27 @@
 # Until then, this script uses dfx version 0.17.
 set +e
 
+############################### Create a BRC20 inscription with `ord` #################################
+
+bitcoind -conf=${PWD}/src/create_bft_bridge_tool/bitcoin.conf -datadir=${PWD}/target/brc20 -txindex -fallbackfee=0.000001
+
+dst_addr_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 receive)
+DST_ADDRESS=$(echo $dst_addr_res | jq .addresses[0])
+DST_ADDRESS=$(echo $DST_ADDRESS | tr -d '"')
+
+BRC20_JSON="brc_20.json"
+
+inscribe_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 \
+  inscribe --fee-rate 10 --destination $DST_ADDRESS --file $BRC20_JSON)
+
+BRC20_TICKER="kobp"
+destination=$(echo $inscribe_res | jq .inscriptions[0].destination)
+BRC20_HOLDER=$(echo $destination | tr -d '"')
+reveal=$(echo $inscribe_res | jq .reveal)
+REVEAL_TXID=$(echo $reveal | tr -d '"')
+
+################################################################
+
 CHAIN_ID=355113
 
 GENERAL_INDEXER_URL="https://blockstream.info"
@@ -14,6 +35,13 @@ ORDINALS_INDEXER_URL="https://api.hiro.so/ordinals/v1/brc-20/tokens"
 RPC_URL=${"http://127.0.0.1:18444"}
 RPC_USER=${"icp"}
 RPC_PASSWORD=${"test"}
+
+############################### Configure Dfx #################################
+
+echo "Starting dfx in a clean state"
+dfx stop
+rm -f dfx_log.txt
+dfx start --clean --background --enable-bitcoin >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -34,34 +62,38 @@ dfx deploy evm_testnet --argument "(record {
     min_gas_price = 10;
     signature_verification_principal = principal \"${SIGNATURE_VERIFICATION}\";
     log_settings = opt record {
-        enable_console = true;
-        in_memory_records = opt 10000;
-        log_filter = null;
+      enable_console = true;
+      in_memory_records = opt 10000;
+      log_filter = opt \"trace,brc20_bridge::scheduler=warn\";
     };
     owner = principal \"${ADMIN_PRINCIPAL}\";
     genesis_accounts = vec { };
     chain_id = $CHAIN_ID;
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
-# log_filter = opt \"error,did=debug,evm_core=debug,evm=debug\";
 
 echo "Deploying BRC20 bridge"
 dfx deploy brc20-bridge --argument "(record {
     general_indexer = \"${GENERAL_INDEXER_URL}\";
     erc20_minter_fee = 10;
+    brc20_token = record {
+      tx_id = \"{$REVEAL_TXID}\";
+      ticker = \"{$BRC20_TICKER}\";
+      holder = \"{$BRC20_HOLDER}\";
+    };
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
     regtest_rpc = record {
-        url = \"${RPC_URL}\";
-        user = \"${RPC_USER}\";
-        password = \"${RPC_PASSWORD}\";
+      url = \"${RPC_URL}\";
+      user = \"${RPC_USER}\";
+      password = \"${RPC_PASSWORD}\";
     };
     logger = record {
-       enable_console = true;
-       in_memory_records = opt 10000;
-       log_filter = opt \"info\";
+      enable_console = true;
+      in_memory_records = opt 10000;
+      log_filter = opt \"info\";
     };
     ordinals_indexer = \"${ORDINALS_INDEXER_URL}\";
 })"
@@ -101,7 +133,7 @@ dfx canister call brc20-bridge admin_configure_bft_bridge "(record {
   token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
   token_address = \"$TOKEN_ETH_ADDRESS\";
   bridge_address = \"$BFT_ETH_ADDRESS\";
-  erc20_chain_id = 355113;
+  erc20_chain_id = \"$CHAIN_ID\";
   token_name = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
 })"
 
@@ -117,26 +149,16 @@ addr=${brc20_bridge_addr#*\"}
 DEPOSIT_ADDRESS=${addr%\"*}
 echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
 
-# 2. Top up canister's wallet
-CONTAINER_ID=$(docker ps -q --filter "name=bitcoind")
-docker exec -it $CONTAINER_ID bitcoin-cli -regtest generatetoaddress 1 $DEPOSIT_ADDRESS
+# 2. Send a BRC20 inscription to the deposit address
+ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= \
+  --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_TICKER
 
-# 3. Send a BRC20 inscription to the deposit address
-TX_IDS=$(dfx canister call brc20-bridge inscribe "(variant { Brc20 },
-  \"{\\"p\\": \\"brc-20\\",\\"op\\":\\"deploy\\",\\"tick\\":\\"kobp\\",\\"max\\":\\"1000\\",\\"lim\\":\\"10\\",\\"dec\\":\\"8\\"}\",
-  \"$DEPOSIT_ADDRESS\",
-  \"$DEPOSIT_ADDRESS\",
-  null
-)")
-
-echo "Inscription transaction IDs: $TX_IDS"
-
-# 4. Swap the BRC20 inscription for an ERC20 token
+# 3. Swap the BRC20 inscription for an ERC20 token
 for i in 1 2 3
 do
   sleep 5
   echo "Trying to deposit"
-  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"kobp\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
   echo "Result: $mint_status"
 
   if [[ $mint_status == *"Minted"* ]]; then
@@ -151,3 +173,19 @@ do
 done
 
 sleep 5
+
+######################## Swap ERC20 for BRC20 ######################
+
+recipient_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 receive)
+RECIPIENT=$(echo $recipient_res | jq .addresses[0])
+RECIPIENT=$(echo $RECIPIENT | tr -d '"')
+
+echo "BRC20 inscription recipient: $RECIPIENT"
+
+cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+ --wallet="$ETH_WALLET" \
+ --evm-canister="$EVM" \
+ --bft-bridge="$BFT_ETH_ADDRESS" \
+ --token-address="$TOKEN_ETH_ADDRESS" \
+ --address="$RECEIVER" \
+ --amount=10
