@@ -1,4 +1,4 @@
-use crate::interface::{DepositError, Erc20MintStatus, WithdrawError};
+use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
 use crate::key::{get_deposit_address, get_derivation_path_ic};
 use crate::ledger::StoredUtxo;
 use crate::state::State;
@@ -21,7 +21,7 @@ use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
 use ord_rs::OrdTransactionBuilder;
-use ordinals::{Pile, SpacedRune};
+use ordinals::{Pile, RuneId, SpacedRune};
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -91,7 +91,7 @@ pub async fn withdraw(
     Ok(tx.txid())
 }
 
-async fn build_withdraw_transaction(
+pub async fn build_withdraw_transaction(
     state: &RefCell<State>,
     amount: u128,
     address: Address,
@@ -111,12 +111,6 @@ async fn build_withdraw_transaction(
     let derivation_path = &inputs[0].derivation_path;
     let public_key = state.borrow().der_public_key(&derivation_path);
     let signer = state.borrow().wallet(derivation_path.clone());
-
-    let pk_address = Address::p2wpkh(&public_key, state.borrow().network()).unwrap();
-    assert_eq!(
-        pk_address.script_pubkey(),
-        inputs[0].tx_input_info.tx_out.script_pubkey
-    );
 
     let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
 
@@ -157,7 +151,7 @@ fn get_change_address(state: &RefCell<State>) -> Result<Address, WithdrawError> 
     })
 }
 
-async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawError> {
+pub async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawError> {
     let args = GetCurrentFeePercentilesRequest {
         network: state.borrow().ic_btc_network(),
     };
@@ -220,7 +214,7 @@ async fn send_tx(state: &RefCell<State>, transaction: &Transaction) -> Result<()
     Ok(())
 }
 
-async fn get_utxos(
+pub async fn get_utxos(
     state: &RefCell<State>,
     address: &Address,
 ) -> Result<GetUtxosResponse, DepositError> {
@@ -312,7 +306,66 @@ async fn get_rune_amount(state: &RefCell<State>, utxos: &[Utxo]) -> Result<u128,
     Ok(amount)
 }
 
-async fn get_tx_rune_amount(state: &RefCell<State>, utxo: &Utxo) -> Result<u128, DepositError> {
+pub async fn get_rune_list(
+    state: &RefCell<State>,
+) -> Result<Vec<(RuneId, SpacedRune)>, DepositError> {
+    #[derive(Debug, Clone, Deserialize)]
+    struct RuneInfo {
+        spaced_rune: SpacedRune,
+    };
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct RunesResponse {
+        entries: Vec<(RuneId, RuneInfo)>,
+    }
+
+    const MAX_RESPONSE_BYTES: u64 = 10_000;
+
+    let indexer_url = state.borrow().indexer_url();
+    let url = format!("{indexer_url}/runes");
+
+    log::trace!("Requesting rune balance from url: {url}");
+
+    let request_params = CanisterHttpRequestArgument {
+        url,
+        max_response_bytes: Some(MAX_RESPONSE_BYTES),
+        method: HttpMethod::GET,
+        headers: vec![HttpHeader {
+            name: "Accept".to_string(),
+            value: "application/json".to_string(),
+        }],
+        body: None,
+        transform: None,
+    };
+
+    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+        .await
+        .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?
+        .0;
+
+    log::trace!(
+        "Indexer responded with: {} {:?} BODY: {}",
+        result.status,
+        result.headers,
+        String::from_utf8_lossy(&result.body)
+    );
+
+    let response: RunesResponse = serde_json::from_slice(&result.body).map_err(|err| {
+        log::error!("Failed to get rune balance from the indexer: {err:?}");
+        DepositError::Unavailable(format!("Unexpected response from indexer: {err:?}"))
+    })?;
+
+    Ok(response
+        .entries
+        .into_iter()
+        .map(|(rune_id, info)| (rune_id, info.spaced_rune))
+        .collect())
+}
+
+pub async fn get_tx_outputs(
+    state: &RefCell<State>,
+    utxo: &Utxo,
+) -> Result<OutputResponse, DepositError> {
     const MAX_RESPONSE_BYTES: u64 = 10_000;
 
     let indexer_url = state.borrow().indexer_url();
@@ -333,14 +386,6 @@ async fn get_tx_rune_amount(state: &RefCell<State>, utxo: &Utxo) -> Result<u128,
         transform: None,
     };
 
-    #[derive(Debug, Clone, Deserialize)]
-    struct OutputResponse {
-        address: String,
-        #[serde(default)]
-        runes: Vec<(SpacedRune, Pile)>,
-        spent: bool,
-    }
-
     let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
         .await
         .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?
@@ -353,11 +398,14 @@ async fn get_tx_rune_amount(state: &RefCell<State>, utxo: &Utxo) -> Result<u128,
         String::from_utf8_lossy(&result.body)
     );
 
-    let response: OutputResponse = serde_json::from_slice(&result.body).map_err(|err| {
+    serde_json::from_slice(&result.body).map_err(|err| {
         log::error!("Failed to get rune balance from the indexer: {err:?}");
         DepositError::Unavailable(format!("Unexpected response from indexer: {err:?}"))
-    })?;
+    })
+}
 
+async fn get_tx_rune_amount(state: &RefCell<State>, utxo: &Utxo) -> Result<u128, DepositError> {
+    let response = get_tx_outputs(state, utxo).await?;
     let mut amount = 0;
     let self_rune_name = state.borrow().rune_name();
     for (rune_id, pile) in response.runes {

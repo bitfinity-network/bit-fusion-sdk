@@ -1,6 +1,7 @@
 use candid::CandidType;
 use did::H256;
 use minter_did::order::SignedMintOrder;
+use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
@@ -87,4 +88,27 @@ pub enum WithdrawError {
     TransactionSending,
     FeeRateRequest,
     ChangeAddress,
+}
+
+#[derive(Debug, Copy, Clone, CandidType, Deserialize, Hash, PartialEq, Eq)]
+pub struct RuneIdDid {
+    pub block_id: u64,
+    pub txid: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OutputResponse {
+    pub address: String,
+    #[serde(default)]
+    pub runes: Vec<(SpacedRune, Pile)>,
+    pub spent: bool,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct CreateEdictTxArgs {
+    pub from_address: String,
+    pub destination: String,
+    pub rune_name: String,
+    pub amount: u128,
+    pub change_address: Option<String>,
 }

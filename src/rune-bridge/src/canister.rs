@@ -1,5 +1,10 @@
+use bitcoin::consensus::Encodable;
+use bitcoin::hashes::sha256d::Hash;
+use bitcoin::{Address, Amount, OutPoint, PublicKey, TxOut, Txid};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use candid::{CandidType, Principal};
 use did::H160;
@@ -15,10 +20,16 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ord_rs::wallet::{ScriptType, TxInputInfo};
+use ord_rs::OrdTransactionBuilder;
+use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
 
-use crate::interface::{DepositError, Erc20MintStatus, GetAddressError};
+use crate::interface::{
+    CreateEdictTxArgs, DepositError, Erc20MintStatus, GetAddressError, WithdrawError,
+};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::ops::{get_fee_rate, get_rune_list, get_tx_outputs, get_utxos};
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
 use crate::{
@@ -149,6 +160,116 @@ impl RuneBridge {
             });
 
         BtcTask::CollectEvmEvents.into_scheduled(options)
+    }
+
+    #[update]
+    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(String, u128)> {
+        let address = Address::from_str(&btc_address)
+            .expect("invalid address")
+            .assume_checked();
+        let state = get_state();
+        let utxos = get_utxos(&state, &address)
+            .await
+            .expect("failed to get utxos");
+
+        let mut amounts: HashMap<String, u128> = HashMap::new();
+        for utxo in &utxos.utxos {
+            let outputs = get_tx_outputs(&state, &utxo)
+                .await
+                .expect("failed to get utxo outputs");
+            for rune in outputs.runes {
+                let mut entry = amounts.entry(rune.0.rune.to_string()).or_default();
+                *entry += rune.1.amount;
+            }
+        }
+
+        amounts.into_iter().collect()
+    }
+
+    #[update]
+    pub async fn create_edict_tx(&self, args: CreateEdictTxArgs) -> Vec<u8> {
+        let from_addr = Address::from_str(&args.from_address)
+            .expect("failed to parse from address")
+            .assume_checked();
+        let to_addr = Address::from_str(&args.destination)
+            .expect("failed to parse destination address")
+            .assume_checked();
+        let change_addr = args
+            .change_address
+            .map(|addr| {
+                Address::from_str(&addr)
+                    .expect("failed to parse change address")
+                    .assume_checked()
+            })
+            .unwrap_or_else(|| from_addr.clone());
+
+        let state = get_state();
+        let runes_list = get_rune_list(&state)
+            .await
+            .expect("failed to get rune list");
+        let rune_id = runes_list
+            .into_iter()
+            .find(|(id, spaced_rune)| args.rune_name == spaced_rune.to_string())
+            .expect(&format!(
+                "rune {} is not in the list of runes",
+                args.rune_name
+            ))
+            .0;
+
+        let input_utxos = get_utxos(&state, &from_addr)
+            .await
+            .expect("failed to get input utxos");
+        let inputs = input_utxos
+            .utxos
+            .iter()
+            .map(|utxo| TxInputInfo {
+                outpoint: OutPoint {
+                    txid: Txid::from_raw_hash(
+                        Hash::from_bytes_ref(
+                            &utxo.outpoint.txid.clone().try_into().expect("invalid txid"),
+                        )
+                        .clone(),
+                    ),
+                    vout: utxo.outpoint.vout,
+                },
+                tx_out: TxOut {
+                    value: Amount::from_sat(utxo.value),
+                    script_pubkey: from_addr.script_pubkey(),
+                },
+            })
+            .collect();
+
+        let fee_rate = get_fee_rate(&state).await.expect("failed to get fee rate");
+
+        let args = ord_rs::wallet::CreateEdictTxArgs {
+            rune: rune_id,
+            inputs,
+            destination: to_addr,
+            change_address: change_addr.clone(),
+            rune_change_address: change_addr,
+            amount: args.amount,
+            fee_rate,
+        };
+
+        let builder = OrdTransactionBuilder::new(
+            state.borrow().public_key(),
+            ScriptType::P2WSH,
+            state.borrow().wallet(vec![]),
+        );
+        let unsigned_tx = builder
+            .create_edict_transaction(&args)
+            .map_err(|err| {
+                log::warn!("Failed to create withdraw transaction: {err:?}");
+                WithdrawError::TransactionCreation
+            })
+            .expect("failed to create transaction");
+
+        let mut bytes = vec![];
+        unsigned_tx
+            .consensus_encode(&mut bytes)
+            .expect("failed to encode transaction");
+
+        bytes
     }
 
     pub fn idl() -> Idl {

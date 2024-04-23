@@ -121,47 +121,47 @@ dfx canister call rune-bridge admin_configure_bft_bridge "(record {
 
 ########### Deposit runes ##########
 
-deposit_addr_resp=$(dfx canister call rune-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
-res=${deposit_addr_resp#*\"}
-DEPOSIT_ADDRESS=${res%\"*}
-echo "Deposit address: $DEPOSIT_ADDRESS"
-
-ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= \
-  --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 send --fee-rate 10 \
-  $DEPOSIT_ADDRESS 10:$RUNE_NAME
-
-bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" sendtoaddress $DEPOSIT_ADDRESS 0.0049
-bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
-
-
-for i in 1 2 3
-do
-  sleep 5
-  echo "Trying to deposit"
-  response=$(dfx canister call rune-bridge deposit "(\"$ETH_WALLET_ADDRESS\")")
-  echo "Response: $response"
-
-  if [[ $response == *"Minted"* ]]; then
-    break
-  fi
-
-  if [[ i = 3 ]]; then
-    return "Failed to mint after 3 retries"
-  fi
-done
-
-sleep 5
-
-receiver_resp=$(ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 receive)
-RECEIVER=$(echo $receiver_resp | jq .addresses[0])
-RECEIVER=$(echo $RECEIVER | tr -d '"')
-
-echo "Runes withdrawal receiver: $RECEIVER"
-
-cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
-  --wallet="$ETH_WALLET" \
-  --evm-canister="$EVM" \
-  --bft-bridge="$BFT_ETH_ADDRESS" \
-  --token-address="$TOKEN_ETH_ADDRESS" \
-  --address="$RECEIVER" \
-  --amount=10
+#deposit_addr_resp=$(dfx canister call rune-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
+#res=${deposit_addr_resp#*\"}
+#DEPOSIT_ADDRESS=${res%\"*}
+#echo "Deposit address: $DEPOSIT_ADDRESS"
+#
+#ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= \
+#  --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 send --fee-rate 10 \
+#  $DEPOSIT_ADDRESS 10:$RUNE_NAME
+#
+#bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" sendtoaddress $DEPOSIT_ADDRESS 0.0049
+#bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
+#
+#
+#for i in 1 2 3
+#do
+#  sleep 5
+#  echo "Trying to deposit"
+#  response=$(dfx canister call rune-bridge deposit "(\"$ETH_WALLET_ADDRESS\")")
+#  echo "Response: $response"
+#
+#  if [[ $response == *"Minted"* ]]; then
+#    break
+#  fi
+#
+#  if [[ i = 3 ]]; then
+#    return "Failed to mint after 3 retries"
+#  fi
+#done
+#
+#sleep 5
+#
+#receiver_resp=$(ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 receive)
+#RECEIVER=$(echo $receiver_resp | jq .addresses[0])
+#RECEIVER=$(echo $RECEIVER | tr -d '"')
+#
+#echo "Runes withdrawal receiver: $RECEIVER"
+#
+#cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+#  --wallet="$ETH_WALLET" \
+#  --evm-canister="$EVM" \
+#  --bft-bridge="$BFT_ETH_ADDRESS" \
+#  --token-address="$TOKEN_ETH_ADDRESS" \
+#  --address="$RECEIVER" \
+#  --amount=10
