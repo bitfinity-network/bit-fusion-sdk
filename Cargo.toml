@@ -65,6 +65,7 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
+zerocopy = "0.7"
 
 [profile.dev]
 debug = false
