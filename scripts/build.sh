@@ -155,8 +155,8 @@ build_requested_canisters() {
             signature_verification | spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
-            brc20-bridge)
-                build_canister "${canister}" "$EVM_FEATURES" "${canister}.wasm" "${canister}"
+            brc20-bridge| ircr2-minter | erc20-minter | btc-bridge)
+                build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."

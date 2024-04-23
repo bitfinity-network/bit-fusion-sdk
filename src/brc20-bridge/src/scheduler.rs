@@ -184,13 +184,12 @@ impl Task for Brc20Task {
             Self::InscribeBrc20(BurntEventData {
                 operation_id,
                 recipient_id,
-                amount,
+                name,
                 ..
             }) => {
                 log::info!("ERC20 burn event received");
-
-                let amount = amount.0.as_u64();
                 let operation_id = *operation_id;
+                let brc20_ticker = hex::encode(name);
 
                 let Ok(address) = String::from_utf8(recipient_id.clone()) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
@@ -199,12 +198,14 @@ impl Task for Brc20Task {
                 };
 
                 Box::pin(async move {
-                    let result =
-                        crate::ops::erc20_to_brc20(&get_state(), operation_id, &address, amount)
-                            .await
-                            .map_err(|err| {
-                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
-                            })?;
+                    let result = crate::ops::erc20_to_brc20(
+                        &get_state(),
+                        operation_id,
+                        brc20_ticker,
+                        &address,
+                    )
+                    .await
+                    .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
                     log::info!("Created a BRC20 inscription with IDs: {:?}", result.tx_ids);
 

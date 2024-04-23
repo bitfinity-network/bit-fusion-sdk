@@ -7,52 +7,13 @@
 set +e
 
 CHAIN_ID=355113
+
 GENERAL_INDEXER_URL="https://blockstream.info"
 ORDINALS_INDEXER_URL="https://api.hiro.so/ordinals/v1/brc-20/tokens"
 
-######################## Start the Bitcoin Daemon #####################
-
-# Start bitcoind 
-echo "Starting the Bitcoin daemon"
-COMPOSE_FILE="../ckERC20/ord-testnet/bridging-flow/docker-compose.yml"
-
-docker compose -f $COMPOSE_FILE up bitcoind -d
-sleep 2
-
-# Check if the wallet already exists
-wallet_exists=$(docker compose -f $COMPOSE_FILE exec -T bitcoind bitcoin-cli -regtest listwallets | grep -q "testwallet" && echo "exists" || echo "not exists")
-
-if [ "$wallet_exists" = "not exists" ]; then
-    docker compose -f $COMPOSE_FILE exec -T bitcoind bitcoin-cli -regtest createwallet "testwallet"
-fi
-
-load_output=$(docker compose -f $COMPOSE_FILE exec -T bitcoind bitcoin-cli -regtest loadwallet "testwallet" 2>&1)
-
-if echo "$load_output" | grep -q "Wallet file verification failed"; then
-    echo "Wallet already exists but could not be loaded due to verification failure."
-elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
-    echo "Wallet loaded successfully."
-else
-    echo "Unexpected wallet load output: $load_output"
-fi
-
-# Generate 101 blocks to make sure we have some coins to spend
-height=$(docker compose -f $COMPOSE_FILE exec -T bitcoind bitcoin-cli -regtest getblockcount)
-if [ $height -lt 101 ]; then
-    docker compose -f $COMPOSE_FILE exec -T bitcoind bitcoin-cli -regtest generate 101
-fi
-
-# Start the ord service.
-docker compose -f $COMPOSE_FILE up ord -d
-if [ $? -ne 0 ]; then
-    echo "Failed to start 'ord' service. Attempting to continue script..."
-fi
-
-############################### Configure Dfx #################################
-
-echo "Starting dfx in a clean state"
-dfx stop
-dfx start --background --clean --enable-bitcoin >dfx_log.txt 2>&1
+RPC_URL=${"http://127.0.0.1:18444"}
+RPC_USER=${"icp"}
+RPC_PASSWORD=${"test"}
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -75,13 +36,14 @@ dfx deploy evm_testnet --argument "(record {
     log_settings = opt record {
         enable_console = true;
         in_memory_records = opt 10000;
-        log_filter = opt \"error,did=debug,evm_core=debug,evm=debug\";
+        log_filter = null;
     };
     owner = principal \"${ADMIN_PRINCIPAL}\";
     genesis_accounts = vec { };
     chain_id = $CHAIN_ID;
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
+# log_filter = opt \"error,did=debug,evm_core=debug,evm=debug\";
 
 echo "Deploying BRC20 bridge"
 dfx deploy brc20-bridge --argument "(record {
@@ -91,10 +53,15 @@ dfx deploy brc20-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
+    regtest_rpc = record {
+        url = \"${RPC_URL}\";
+        user = \"${RPC_USER}\";
+        password = \"${RPC_PASSWORD}\";
+    };
     logger = record {
        enable_console = true;
        in_memory_records = opt 10000;
-       log_filter = opt \"trace\";
+       log_filter = opt \"info\";
     };
     ordinals_indexer = \"${ORDINALS_INDEXER_URL}\";
 })"
@@ -139,3 +106,48 @@ dfx canister call brc20-bridge admin_configure_bft_bridge "(record {
 })"
 
 echo "All canisters successfully deployed."
+
+######################## Swap BRC20 for ERC20 ######################
+
+echo "Bridging a BRC20 inscription to an ERC20 token"
+
+# 1. Get deposit address
+brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
+addr=${brc20_bridge_addr#*\"}
+DEPOSIT_ADDRESS=${addr%\"*}
+echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
+
+# 2. Top up canister's wallet
+CONTAINER_ID=$(docker ps -q --filter "name=bitcoind")
+docker exec -it $CONTAINER_ID bitcoin-cli -regtest generatetoaddress 1 $DEPOSIT_ADDRESS
+
+# 3. Send a BRC20 inscription to the deposit address
+TX_IDS=$(dfx canister call brc20-bridge inscribe "(variant { Brc20 },
+  \"{\\"p\\": \\"brc-20\\",\\"op\\":\\"deploy\\",\\"tick\\":\\"kobp\\",\\"max\\":\\"1000\\",\\"lim\\":\\"10\\",\\"dec\\":\\"8\\"}\",
+  \"$DEPOSIT_ADDRESS\",
+  \"$DEPOSIT_ADDRESS\",
+  null
+)")
+
+echo "Inscription transaction IDs: $TX_IDS"
+
+# 4. Swap the BRC20 inscription for an ERC20 token
+for i in 1 2 3
+do
+  sleep 5
+  echo "Trying to deposit"
+  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"kobp\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  echo "Result: $mint_status"
+
+  if [[ $mint_status == *"Minted"* ]]; then
+    echo "Minting of ERC20 token successful."
+    break
+  fi
+
+  if [[ $i -eq 3 ]]; then
+    echo "Failed to mint after 3 retries"
+    exit 1
+  fi
+done
+
+sleep 5

@@ -15,7 +15,7 @@ use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use crate::interface::bridge_api::BridgeError;
-use crate::interface::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
+use crate::interface::store::{Brc20Store, Brc20TokenInfo, BurnRequestStore, MintOrdersStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
@@ -33,10 +33,12 @@ pub struct State {
 #[derive(Debug, CandidType, Deserialize)]
 pub struct Brc20BridgeConfig {
     pub network: BitcoinNetwork,
+    pub regtest_rpc: RegtestRpcConfig,
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub erc20_minter_fee: u64,
+    pub brc20_token: Brc20TokenInfo,
     pub ordinals_indexer: String,
     pub general_indexer: String,
     pub logger: LogSettings,
@@ -46,12 +48,14 @@ impl Default for Brc20BridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
+            regtest_rpc: RegtestRpcConfig::default(),
             evm_link: EvmLink::default(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
             erc20_minter_fee: 10,
+            brc20_token: Brc20TokenInfo::default(),
             ordinals_indexer: String::new(),
             general_indexer: String::new(),
             logger: LogSettings::default(),
@@ -297,5 +301,30 @@ impl State {
 
     pub fn erc20_minter_fee(&self) -> u64 {
         self.config.erc20_minter_fee
+    }
+
+    pub(crate) fn regtest_rpc_config(&self) -> RegtestRpcConfig {
+        self.config.regtest_rpc.clone()
+    }
+
+    pub(crate) fn brc20_token_info(&self) -> Brc20TokenInfo {
+        self.config.brc20_token.clone()
+    }
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RegtestRpcConfig {
+    pub url: String,
+    pub user: String,
+    pub password: String,
+}
+
+impl Default for RegtestRpcConfig {
+    fn default() -> Self {
+        Self {
+            url: "http://127.0.0.1:18444".to_string(),
+            user: "icp".to_string(),
+            password: "test".to_string(),
+        }
     }
 }

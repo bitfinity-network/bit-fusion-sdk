@@ -49,7 +49,7 @@ impl Brc20Store {
     }
 }
 
-#[derive(Debug, CandidType, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, CandidType, Deserialize, Clone, Eq, PartialEq, Default)]
 pub struct Brc20TokenInfo {
     pub tx_id: RevealTxId,
     pub ticker: String,

@@ -2,9 +2,10 @@ use core::sync::atomic::Ordering;
 use std::cell::RefCell;
 use std::str::FromStr;
 
-use bitcoin::{Address, Network, PublicKey};
+use bitcoin::{Address, Network, PublicKey, Transaction};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
 };
@@ -13,14 +14,14 @@ use inscriber::interface::Brc20TransferTransactions;
 use inscriber::ops as Inscriber;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use ord_rs::{Brc20, Inscription, OrdParser};
+use ord_rs::Inscription as _;
 
-use crate::constant::{BRC20_TICKER_LEN, NONCE};
+use crate::constant::NONCE;
 use crate::interface::bridge_api::{
-    Brc20InscribeError, Brc20InscribeStatus, Brc20TokenDetails, BridgeError, Erc20MintError,
-    Erc20MintStatus,
+    Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
 };
 use crate::interface::store::Brc20TokenInfo;
+use crate::rpc;
 use crate::state::State;
 
 /// Swap a BRC20 for an ERC20.
@@ -32,16 +33,19 @@ pub async fn brc20_to_erc20(
     brc20_ticker: String,
     holder_btc_addr: String,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    let Brc20TokenDetails {
+    let Brc20TokenInfo {
+        tx_id,
         ticker,
         holder,
-        tx_id,
-    } = crate::rpc::fetch_brc20_token_details(state, brc20_ticker, holder_btc_addr)
+    } = rpc::get_brc20_token_info(state, brc20_ticker, holder_btc_addr)
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    log::trace!("Parsing and validating BRC20 inscription from transaction ID: {tx_id}");
-    let brc20 = parse_and_validate_inscription(state, &tx_id)
+    let reveal_tx = get_reveal_transaction(state, &tx_id)
+        .await
+        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+
+    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
@@ -54,7 +58,7 @@ pub async fn brc20_to_erc20(
             holder,
         });
 
-    let (amount, tick) = get_brc20_data(&brc20);
+    let (amount, tick) = rpc::get_brc20_data(&brc20);
     // Set the token symbol using the tick (symbol) from the BRC20
     state
         .borrow_mut()
@@ -67,41 +71,29 @@ pub async fn brc20_to_erc20(
     mint_erc20(state, eth_address, amount, nonce).await
 }
 
-async fn parse_and_validate_inscription(
+async fn get_reveal_transaction(
     state: &RefCell<State>,
-    reveal_txid: &str,
-) -> Result<Brc20, BridgeError> {
-    log::trace!("Fetching the reveal transaction by its ID: {reveal_txid}");
-    let reveal_tx = crate::rpc::fetch_reveal_transaction(state, reveal_txid)
-        .await
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
+    tx_id: &str,
+) -> anyhow::Result<Transaction> {
+    let network = state.borrow().ic_btc_network();
 
-    let inscription = OrdParser::parse::<Brc20>(&reveal_tx)
-        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
+    let reveal_tx = match network {
+        BitcoinNetwork::Regtest => {
+            let bridge_addr = get_deposit_address(state)
+                .await
+                .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))?
+                .to_string();
 
-    match inscription {
-        Some(brc20) => {
-            let (_amount, ticker) = get_brc20_data(&brc20);
-            if ticker.len() != BRC20_TICKER_LEN {
-                return Err(BridgeError::InscriptionParsing(
-                    "BRC20 ticker (symbol) should be only 4 letters".to_string(),
-                ));
-            }
-            log::info!("BRC20 inscription validated");
-            Ok(brc20)
+            rpc::fetch_reveal_transaction_regtest(state, bridge_addr, tx_id)
+                .await
+                .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
         }
-        None => Err(BridgeError::InscriptionParsing(
-            "No BRC20 inscription associated with this transaction".to_string(),
-        )),
-    }
-}
+        _ => rpc::fetch_reveal_transaction(state, tx_id)
+            .await
+            .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?,
+    };
 
-fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
-    match inscription {
-        Brc20::Deploy(deploy_func) => (deploy_func.max, &deploy_func.tick),
-        Brc20::Mint(mint_func) => (mint_func.amt, &mint_func.tick),
-        Brc20::Transfer(transfer_func) => (transfer_func.amt, &transfer_func.tick),
-    }
+    Ok(reveal_tx)
 }
 
 pub async fn mint_erc20(
@@ -137,7 +129,7 @@ async fn prepare_mint_order(
     amount: u64,
     nonce: u32,
 ) -> Result<SignedMintOrder, Erc20MintError> {
-    log::trace!("preparing mint order");
+    log::info!("preparing mint order");
 
     let (signer, mint_order) = {
         let state_ref = state.borrow();
@@ -197,7 +189,7 @@ async fn send_mint_order(
     state: &RefCell<State>,
     mint_order: SignedMintOrder,
 ) -> Result<H256, Erc20MintError> {
-    log::trace!("Sending mint transaction");
+    log::info!("Sending mint transaction");
 
     let signer = state.borrow().signer().get().clone();
     let sender = signer
@@ -250,7 +242,7 @@ async fn send_mint_order(
         }
     });
 
-    log::trace!("Mint transaction sent");
+    log::info!("Mint transaction sent");
 
     Ok(id.into())
 }
@@ -259,12 +251,86 @@ async fn send_mint_order(
 ///
 /// This burns an ERC20 and inscribes an equivalent BRC20.
 pub async fn erc20_to_brc20(
-    _state: &RefCell<State>,
-    _request_id: u32,
-    _address: &str,
-    _amount: u64,
-) -> Result<Brc20InscribeStatus, Brc20InscribeError> {
-    todo!()
+    state: &RefCell<State>,
+    request_id: u32,
+    brc20_ticker: String,
+    dst_addr: &str,
+) -> Result<Brc20InscribeStatus, BridgeError> {
+    let bridge_addr = get_deposit_address(state)
+        .await
+        .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))?
+        .to_string();
+
+    let Brc20TokenInfo { tx_id, .. } = rpc::get_brc20_token_info(state, brc20_ticker, bridge_addr)
+        .await
+        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
+
+    let tx_ids = withdraw_brc20(state, request_id, &tx_id, dst_addr)
+        .await
+        .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
+
+    Ok(Brc20InscribeStatus { tx_ids })
+}
+
+async fn withdraw_brc20(
+    state: &RefCell<State>,
+    request_id: u32,
+    reveal_txid: &str,
+    dst_addr: &str,
+) -> Result<Brc20TransferTransactions, BridgeError> {
+    if !state.borrow().has_brc20(reveal_txid) {
+        return Err(BridgeError::Brc20Withdraw(format!(
+            "Specified tx ID ({}) not associated with any BRC20 inscription",
+            reveal_txid
+        )));
+    }
+
+    let reveal_tx = get_reveal_transaction(state, reveal_txid)
+        .await
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
+
+    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
+        .await
+        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
+        .encode()
+        .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
+
+    let (network, derivation_path) = {
+        let state = state.borrow();
+        (state.ic_btc_network(), state.derivation_path(None))
+    };
+
+    log::info!(
+        "Transferring requested BRC20 token to {} with request id {}",
+        dst_addr,
+        request_id
+    );
+
+    let result = Inscriber::brc20_transfer(
+        brc20,
+        dst_addr.to_string(),
+        dst_addr.to_string(),
+        None,
+        derivation_path,
+        network,
+    )
+    .await
+    .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()));
+
+    let mut state = state.borrow_mut();
+    if result.is_ok() {
+        state
+            .inscriptions_mut()
+            .remove(reveal_txid.to_string())
+            .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
+
+        state.burn_requests_mut().set_transferred(request_id);
+        state.burn_requests_mut().remove(request_id);
+    } else {
+        log::error!("Failed to transfer BRC20 for request {}", request_id);
+    }
+
+    result
 }
 
 /// Returns the BRC20 deposit address
@@ -314,64 +380,4 @@ fn btc_address_from_public_key(
 ) -> Result<Address, BridgeError> {
     Address::p2wpkh(public_key, network)
         .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))
-}
-
-pub async fn burn_brc20(
-    state: &RefCell<State>,
-    request_id: u32,
-    reveal_txid: &str,
-) -> Result<Brc20TransferTransactions, BridgeError> {
-    if !state.borrow().has_brc20(reveal_txid) {
-        return Err(BridgeError::Brc20Burn(format!(
-            "Specified tx ID ({}) not associated with any BRC20 inscription",
-            reveal_txid
-        )));
-    }
-
-    log::trace!("Parsing and validating a BRC20 inscription from transaction ID: {reveal_txid}");
-    let brc20 = parse_and_validate_inscription(state, reveal_txid)
-        .await
-        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
-        .encode()
-        .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
-
-    let (network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
-
-    let bridge_address = get_deposit_address(state).await?.to_string();
-
-    log::trace!(
-        "Transferring BRC20 with reveal_txid ({}) to {} with request id {}",
-        reveal_txid,
-        bridge_address,
-        request_id
-    );
-
-    let result = Inscriber::brc20_transfer(
-        brc20,
-        bridge_address.clone(),
-        bridge_address,
-        None,
-        derivation_path,
-        network,
-    )
-    .await
-    .map_err(|e| BridgeError::Brc20Burn(e.to_string()));
-
-    let mut state = state.borrow_mut();
-    if result.is_ok() {
-        state
-            .inscriptions_mut()
-            .remove(reveal_txid.to_string())
-            .map_err(|e| BridgeError::Brc20Burn(e.to_string()))?;
-
-        state.burn_requests_mut().set_transferred(request_id);
-        state.burn_requests_mut().remove(request_id);
-    } else {
-        log::error!("Failed to transfer BRC20 for request {}", request_id);
-    }
-
-    result
 }

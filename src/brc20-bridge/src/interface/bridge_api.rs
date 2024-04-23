@@ -1,6 +1,6 @@
 use candid::CandidType;
 use did::{H160, H256};
-use inscriber::interface::{InscribeTransactions, Multisig, Protocol};
+use inscriber::interface::{Brc20TransferTransactions, Multisig, Protocol};
 use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -11,8 +11,6 @@ pub enum BridgeError {
     InscriptionParsing(String),
     #[error("{0}")]
     MalformedAddress(String),
-    #[error("{0}")]
-    GetDepositAddress(String),
     #[error("{0}")]
     FetchBrc20TokenDetails(String),
     #[error("{0}")]
@@ -26,16 +24,11 @@ pub enum BridgeError {
     #[error("{0}")]
     SetTokenSymbol(String),
     #[error("{0}")]
-    Brc20Burn(String),
+    Brc20Withdraw(String),
     #[error("{0}")]
     Erc20Mint(#[from] Erc20MintError),
-}
-
-#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct Brc20TokenDetails {
-    pub ticker: String,
-    pub holder: String,
-    pub tx_id: String,
+    #[error("{0}")]
+    RegtestRpc(String),
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
@@ -61,8 +54,7 @@ pub struct MintErc20Args {
 /// Status of an ERC20 to a BRC20 swap
 #[derive(CandidType, Clone, Debug, Deserialize)]
 pub struct Brc20InscribeStatus {
-    /// commit_txid and reveal_txid
-    pub tx_ids: InscribeTransactions,
+    pub tx_ids: Brc20TransferTransactions,
 }
 
 /// Errors that occur during an ERC20 to a BRC20 swap.

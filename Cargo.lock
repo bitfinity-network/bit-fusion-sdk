@@ -732,6 +732,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoincore-rpc"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb70725a621848c83b3809913d5314c0d20ca84877d99dd909504b564edab00"
+dependencies = [
+ "bitcoincore-rpc-json",
+ "jsonrpc",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "bitcoincore-rpc-json"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "856ffbee2e492c23bca715d72ea34aae80d58400f2bda26a82015d6bc2ec3662"
+dependencies = [
+ "bitcoin",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bitfinity-benchmark"
 version = "0.2.0"
 dependencies = [
@@ -819,6 +843,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "bitcoin",
+ "bitcoincore-rpc",
  "candid",
  "did",
  "eth-signer",
@@ -5853,6 +5878,17 @@ dependencies = [
  "pest",
  "pest_derive",
  "serde",
+]
+
+[[package]]
+name = "jsonrpc"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8128f36b47411cd3f044be8c1f5cc0c9e24d1d1bfdc45f0a57897b32513053f2"
+dependencies = [
+ "base64 0.13.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

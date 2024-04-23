@@ -18,13 +18,24 @@ rustup target add wasm32-unknown-unknown # Required for building IC canisters
 
 ### Init, Build, and Deploy
 
+First, ensure your Docker engine is running, and then start the Bitcoin daemon and dfx in one terminal instance via:
+
 ```bash
-./scripts/brc20_bridging.sh
+./scripts/brc20_init.sh
 ```
 
-The above command will start the Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode, and then build and deploy the canister. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
+The above command will start the Bitcoin daemon in a Docker container, create a wallet called "testwallet", generate enough blocks to make sure the wallet has enough bitcoins to spend, and start the local IC replica in the background, connecting it to the Bitcoin daemon in `regtest` mode. Logs from running ops will be shown here. You might see an error in the logs if the "testwallet" already exists, but this is not a problem.
+
+Then, in a separate terminal instance, build and deploy via:
+
+```bash
+./scripts/build.sh
+./scripts/brc20_deploy.sh
+```
 
 Once the canister is deployed, you can interact with it.
+
+**NOTE**: Before proceeding to make a BRC20 inscription, ensure that your intended token's ticker (e.g. `ordi`, `abcd`, etc.) has not already been deployed by someone else. You can check the status of a BRC20 token here: <https://docs.hiro.so/ordinals/brc-20-token-details>.
 
 ### Endpoint: Generate a Bitcoin Address for the Canister
 
