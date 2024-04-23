@@ -12,9 +12,12 @@ services:
       - "18444:18444" # Bitcoin P2P port
     networks:
       - bitcoin_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   ord:
     container_name: ord
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./docker/Dockerfile
@@ -23,8 +26,12 @@ services:
         "--regtest",
         "--data-dir",
         "/index-data",
-        "--rpc-url",
-        "bitcoind:18443",
+        "--bitcoin-rpc-password",
+        "pass",
+        "--bitcoin-rpc-username",
+        "user",
+        "--bitcoin-rpc-url",
+        "host.docker.internal:18443",
         "server",
         "--http-port",
         "8080",
