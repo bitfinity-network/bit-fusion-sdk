@@ -1912,6 +1912,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "erc721-minter"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "candid",
+ "did",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-metrics 0.14.0",
+ "ic-stable-structures 0.14.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "jsonrpc-core",
+ "log",
+ "minter-contract-utils",
+ "minter-did",
+ "serde",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6152,7 +6177,6 @@ dependencies = [
  "once_cell",
  "serde",
  "solidity-helper",
- "zerocopy",
 ]
 
 [[package]]
@@ -9830,7 +9854,6 @@ version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74d4d3961e53fa4c9a25a8637fc2bfaf2595b3d3ae34875568a5cf64787716be"
 dependencies = [
- "byteorder",
  "zerocopy-derive",
 ]
 

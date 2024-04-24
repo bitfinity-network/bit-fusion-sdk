@@ -1,14 +1,15 @@
 use std::borrow::Cow;
 
+use candid::CandidType;
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::{Signature, H160};
+use ethers_core::types::Signature;
 use ethers_core::utils::keccak256;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storable};
 use minter_did::id256::Id256;
-use zerocopy::AsBytes as _;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, CandidType, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SignedMintOrder(pub Vec<u8>);
 
 /// Data which should be signed and provided to the `BftBridge.mint()` call

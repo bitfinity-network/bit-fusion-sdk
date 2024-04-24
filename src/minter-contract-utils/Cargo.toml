@@ -24,8 +24,6 @@ minter-did = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 
-zerocopy = { workspace = true }
-
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }
 

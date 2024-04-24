@@ -6,6 +6,7 @@ members = [
     "src/integration-tests",
     "src/icrc2-minter",
     "src/erc20-minter",
+    "src/erc721-minter",
     "src/spender-canister",
     "src/solidity-helper",
     "src/btc-bridge",
@@ -65,7 +66,6 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
-zerocopy = "0.7"
 
 [profile.dev]
 debug = false

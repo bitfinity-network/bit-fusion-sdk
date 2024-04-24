@@ -16,7 +16,7 @@ contract ERC721Bridge {
         bytes16 symbol;
         uint32 senderChainID;
         address approveSpender;
-        string tokenUri;
+        string tokenURI;
     }
 
     struct RingBuffer {
@@ -146,7 +146,8 @@ contract ERC721Bridge {
         bytes32 toToken,
         uint32 operationID,
         bytes32 name,
-        bytes16 symbol
+        bytes16 symbol,
+        string tokenURI
     );
 
     // Event for new wrapped token creation
@@ -202,7 +203,7 @@ contract ERC721Bridge {
         _isNonceUsed[order.senderID][order.nonce] = true;
         uint256 tokenId = WrappedERC721(toToken).safeMint(
             order.recipient,
-            order.tokenUri
+            order.tokenURI
         );
 
         if (order.approveSpender != address(0)) {
@@ -262,6 +263,7 @@ contract ERC721Bridge {
         );
 
         bytes32 toTokenID = _baseTokenRegistry[fromERC721];
+        string memory tokenURI = WrappedERC721(fromERC721).tokenURI(tokenID);
         require(fromERC721 != address(0), "Invalid from address");
 
         // Update user information about burn operations.
@@ -284,7 +286,8 @@ contract ERC721Bridge {
             toTokenID,
             operationID,
             meta.name,
-            meta.symbol
+            meta.symbol,
+            tokenURI
         );
 
         return operationID;
