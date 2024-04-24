@@ -29,6 +29,8 @@ destination=$(echo $inscribe_res | jq .inscriptions[0].destination)
 BRC20_HOLDER=$(echo $destination | tr -d '"')
 reveal=$(echo $inscribe_res | jq .reveal)
 REVEAL_TXID=$(echo $reveal | tr -d '"')
+id=$(echo $inscribe_res | jq .inscriptions[0].id)
+BRC20_ID=$(echo $id | tr -d '"')
 
 ################################################################
 
@@ -37,7 +39,7 @@ CHAIN_ID=355113
 GENERAL_INDEXER_URL="https://blockstream.info"
 ORDINALS_INDEXER_URL="https://api.hiro.so/ordinals/v1/brc-20/tokens"
 
-RPC_URL=$"http://127.0.0.1:18444"
+RPC_URL=$"http://127.0.0.1:9000"
 RPC_USER=$"icp"
 RPC_PASSWORD=$"test"
 
@@ -155,7 +157,7 @@ DEPOSIT_ADDRESS=${addr%\"*}
 echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
 
 # 2. Send a BRC20 inscription to the deposit address
-ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_TICKER
+ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_ID
 
 # 3. Swap the BRC20 inscription for an ERC20 token
 for i in 1 2 3
