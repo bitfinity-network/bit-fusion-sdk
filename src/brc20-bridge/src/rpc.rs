@@ -178,7 +178,6 @@ pub(crate) async fn fetch_reveal_transaction_regtest(
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
     use bitcoin::consensus::encode::deserialize;
-    use hex::FromHex;
 
     let network = state.borrow().ic_btc_network();
 
@@ -191,9 +190,7 @@ pub(crate) async fn fetch_reveal_transaction_regtest(
     let rpc_client = Client::new(&url, Auth::UserPass(user, password))
         .map_err(|e| BridgeError::RegtestRpc(format!("Failed to connect to {:?}", e)))?;
 
-    let txid = Vec::<u8>::from_hex(reveal_tx_id).expect("Failed to parse Txid from string");
-
-    let brc20_utxo = find_inscription_utxo(network, bridge_addr, txid)
+    let brc20_utxo = find_inscription_utxo(network, bridge_addr, reveal_tx_id.as_bytes().to_vec())
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to deploy the Brc20Bridge canister to perform a complete bridging flow (BRC20 <> ERC20).
+# Script to deploy and test the Brc20Bridge canister to perform a complete bridging flow (BRC20 <> ERC20).
 #
 # NOTE: Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
 # Until then, this script uses dfx version 0.17.
@@ -8,16 +8,21 @@ set +e
 
 ############################### Create a BRC20 inscription with `ord` #################################
 
-bitcoind -conf=${PWD}/src/create_bft_bridge_tool/bitcoin.conf -datadir=${PWD}/target/brc20 -txindex -fallbackfee=0.000001
+echo "Generating a receiving address"
 
-dst_addr_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 receive)
+dst_addr_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
 DST_ADDRESS=$(echo $dst_addr_res | jq .addresses[0])
 DST_ADDRESS=$(echo $DST_ADDRESS | tr -d '"')
 
+echo "Receiving address: $DST_ADDRESS"
+
 BRC20_JSON="brc_20.json"
 
-inscribe_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 \
+echo "Inscribing $BRC20_JSON"
+inscribe_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 \
   inscribe --fee-rate 10 --destination $DST_ADDRESS --file $BRC20_JSON)
+
+echo "Inscription result: $inscribe_res"
 
 BRC20_TICKER="kobp"
 destination=$(echo $inscribe_res | jq .inscriptions[0].destination)
@@ -32,9 +37,9 @@ CHAIN_ID=355113
 GENERAL_INDEXER_URL="https://blockstream.info"
 ORDINALS_INDEXER_URL="https://api.hiro.so/ordinals/v1/brc-20/tokens"
 
-RPC_URL=${"http://127.0.0.1:18444"}
-RPC_USER=${"icp"}
-RPC_PASSWORD=${"test"}
+RPC_URL=$"http://127.0.0.1:18444"
+RPC_USER=$"icp"
+RPC_PASSWORD=$"test"
 
 ############################### Configure Dfx #################################
 
@@ -120,7 +125,7 @@ echo "BFT ETH address: $BFT_ETH_ADDRESS"
 
 TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
   --bft-bridge-address="$BFT_ETH_ADDRESS" \
-  --token-name=BRC20 \
+  --token-name=KOBP \
   --token-id="$BRC20_BRIDGE" \
   --evm-canister="$EVM" \
   --wallet="$ETH_WALLET")
@@ -133,7 +138,7 @@ dfx canister call brc20-bridge admin_configure_bft_bridge "(record {
   token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
   token_address = \"$TOKEN_ETH_ADDRESS\";
   bridge_address = \"$BFT_ETH_ADDRESS\";
-  erc20_chain_id = \"$CHAIN_ID\";
+  erc20_chain_id = 355113;
   token_name = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
 })"
 
@@ -150,14 +155,13 @@ DEPOSIT_ADDRESS=${addr%\"*}
 echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
 
 # 2. Send a BRC20 inscription to the deposit address
-ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= \
-  --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_TICKER
+ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_TICKER
 
 # 3. Swap the BRC20 inscription for an ERC20 token
 for i in 1 2 3
 do
   sleep 5
-  echo "Trying to deposit"
+  echo "Trying to bridge from BRC20 to ERC20"
   mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
   echo "Result: $mint_status"
 
@@ -176,7 +180,7 @@ sleep 5
 
 ######################## Swap ERC20 for BRC20 ######################
 
-recipient_res=$(ord -regtest --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --data-dir target/brc20 wallet --server-url http://127.0.0.0:9001 receive)
+recipient_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
 RECIPIENT=$(echo $recipient_res | jq .addresses[0])
 RECIPIENT=$(echo $RECIPIENT | tr -d '"')
 

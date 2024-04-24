@@ -322,7 +322,7 @@ pub struct RegtestRpcConfig {
 impl Default for RegtestRpcConfig {
     fn default() -> Self {
         Self {
-            url: "http://127.0.0.1:18444".to_string(),
+            url: "http://127.0.0.1:9000".to_string(),
             user: "icp".to_string(),
             password: "test".to_string(),
         }
