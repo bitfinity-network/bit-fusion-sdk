@@ -7,10 +7,9 @@
 set +e
 
 ############################### Create a BRC20 inscription with `ord` #################################
-
 echo "Generating a receiving address"
 
-dst_addr_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
+dst_addr_res=$(ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
 DST_ADDRESS=$(echo $dst_addr_res | jq .addresses[0])
 DST_ADDRESS=$(echo $DST_ADDRESS | tr -d '"')
 
@@ -19,7 +18,7 @@ echo "Receiving address: $DST_ADDRESS"
 BRC20_JSON="brc_20.json"
 
 echo "Inscribing $BRC20_JSON"
-inscribe_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 \
+inscribe_res=$(ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 \
   inscribe --fee-rate 10 --destination $DST_ADDRESS --file $BRC20_JSON)
 
 echo "Inscription result: $inscribe_res"
@@ -157,7 +156,7 @@ DEPOSIT_ADDRESS=${addr%\"*}
 echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
 
 # 2. Send a BRC20 inscription to the deposit address
-ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_ID
+ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_ID
 
 # 3. Swap the BRC20 inscription for an ERC20 token
 for i in 1 2 3
@@ -182,7 +181,7 @@ sleep 5
 
 ######################## Swap ERC20 for BRC20 ######################
 
-recipient_res=$(ord --bitcoin-rpc-username icp --bitcoin-rpc-password test --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
+recipient_res=$(ord --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
 RECIPIENT=$(echo $recipient_res | jq .addresses[0])
 RECIPIENT=$(echo $RECIPIENT | tr -d '"')
 
