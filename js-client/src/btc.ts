@@ -1,47 +1,71 @@
 import { BaseConnector as BtcConnector } from '@particle-network/btc-connectkit';
-import { WalletClient as EthConnector, getContract } from 'viem';
 import { Principal } from '@dfinity/principal';
 
 import { BtcBridgeActor } from './ic';
-import { BTC_BRIDGE_CANISTER_ID } from './constants';
+import {
+  BFT_BRIDGE_ETH_ADDRESS,
+  BTC_BRIDGE_CANISTER_ID,
+  BTC_BRIDGE_ETH_ADDRESS,
+  BITCOIN_TOKEN_WRAPPED_ADDRESS
+} from './constants';
 import { encodeBtcAddress, ethAddrToSubaccount } from './utils';
 import WrappedTokenABI from './abi/WrappedToken';
 import BFTBridgeABI from './abi/BFTBridge';
 import { wait } from './tests/utils';
+import * as ethers from 'ethers';
+
+const p = new ethers.JsonRpcProvider();
+const s = await p.getSigner();
+s.getAddress();
 
 type EthAddr = `0x${string}`;
 
-export class BtcBridge {
-  protected BTC_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS as EthAddr;
-  protected BFT_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS as EthAddr;
-  protected TOKEN_WRAPPED_ADDRESS = process.env
-    .BITCOIN_TOKEN_WRAPPED_ADDRESS as EthAddr;
+interface BtcBridgeOptions {
+  btc: BtcConnector;
+  ethWallet: ethers.BaseWallet;
+  btcAddress?: EthAddr;
+  bftAddress?: EthAddr;
+  wrappedTokenAddress?: EthAddr;
+}
 
-  constructor(
-    protected btc: BtcConnector,
-    protected eth: EthConnector
-  ) {}
+export class BtcBridge {
+  protected btc: BtcConnector;
+  protected ethWallet: ethers.BaseWallet;
+  protected btcAddress?: string;
+  protected bftAddress?: string;
+  protected wrappedTokenAddress: string;
+
+  constructor({
+    btc,
+    ethWallet,
+    bftAddress,
+    btcAddress,
+    wrappedTokenAddress
+  }: BtcBridgeOptions) {
+    this.btc = btc;
+    this.ethWallet = ethWallet;
+    this.btcAddress = btcAddress || BTC_BRIDGE_ETH_ADDRESS!;
+    this.bftAddress = bftAddress || BFT_BRIDGE_ETH_ADDRESS!;
+    this.wrappedTokenAddress =
+      wrappedTokenAddress || BITCOIN_TOKEN_WRAPPED_ADDRESS!;
+  }
 
   async getAddress() {
-    const [ethAddress] = await this.eth.getAddresses();
+    const ethAddress = await this.ethWallet.getAddress();
 
     return ethAddress;
   }
 
   getWrappedTokenContract() {
-    return getContract({
-      address: this.TOKEN_WRAPPED_ADDRESS,
-      abi: WrappedTokenABI,
-      client: this.eth
-    });
+    return new ethers.Contract(
+      this.wrappedTokenAddress,
+      WrappedTokenABI,
+      this.ethWallet
+    );
   }
 
   getBftBridgeContract() {
-    return getContract({
-      address: this.BFT_ETH_ADDRESS,
-      abi: BFTBridgeABI,
-      client: this.eth
-    });
+    return new ethers.Contract(this.bftAddress!, BFTBridgeABI, this.ethWallet);
   }
 
   async getWrappedTokenBalance() {
@@ -49,7 +73,7 @@ export class BtcBridge {
 
     const ethAddress = await this.getAddress();
 
-    return await wrappedTokenContract.read.balanceOf([ethAddress]);
+    return await wrappedTokenContract.balanceOf(ethAddress);
   }
 
   async bridgeBtc(satoshis: number) {
@@ -68,16 +92,18 @@ export class BtcBridge {
   async bridgeEVMc(address: string, satoshis: number) {
     const wrappedTokenContract = this.getWrappedTokenContract();
 
-    await wrappedTokenContract.write.approve([this.BFT_ETH_ADDRESS, satoshis]);
+    let tx = await wrappedTokenContract.approve(this.bftAddress, satoshis);
+    await tx.wait(2);
 
     await wait(10000);
 
     const bftBridgeContract = this.getBftBridgeContract();
 
-    await bftBridgeContract.write.burn([
+    tx = await bftBridgeContract.burn(
       satoshis,
-      this.TOKEN_WRAPPED_ADDRESS,
+      this.wrappedTokenAddress,
       `0x${encodeBtcAddress(address)}`
-    ]);
+    );
+    await tx.wait(2);
   }
 }

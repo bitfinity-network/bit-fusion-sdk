@@ -28,3 +28,10 @@ export const CK_BTC_CANISTER_ID =
 export const CHAIN_ID = process.env.CHAIN_ID || 355113;
 
 export const IS_TEST = process.env.IS_TEST || false;
+
+export const BTC_BRIDGE_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS;
+
+export const BFT_BRIDGE_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS;
+
+export const BITCOIN_TOKEN_WRAPPED_ADDRESS =
+  process.env.BITCOIN_TOKEN_WRAPPED_ADDRESS;

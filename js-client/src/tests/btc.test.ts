@@ -1,13 +1,11 @@
 import 'dotenv/config';
 import { describe, expect, test, vi } from 'vitest';
 import { OKXConnector as BtcConnector } from '@particle-network/btc-connectkit';
-import { createWalletClient, http, defineChain } from 'viem';
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { exec } from 'child_process';
 import bitcore from 'bitcore-lib';
 
 import { BtcBridge } from '../btc';
-import { wait } from './utils';
+import { generateWallet, wait } from './utils';
 
 export const execCmd = (cmd: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -24,24 +22,6 @@ export const execCmd = (cmd: string): Promise<string> => {
 export const execBitcoinCmd = (cmd: string) => {
   return execCmd(`${process.env.BITCOIN_CMD} ${cmd}`);
 };
-
-const account = privateKeyToAccount(generatePrivateKey());
-
-export const evmc = defineChain({
-  id: 355113,
-  name: 'EVMc',
-  testnet: true,
-  nativeCurrency: {
-    decimals: 18,
-    name: 'BTF',
-    symbol: 'BTF'
-  },
-  rpcUrls: {
-    default: {
-      http: [process.env.ETH_RPC_URL!]
-    }
-  }
-});
 
 export async function mintNativeToken(toAddress: string, amount: string) {
   const response = await fetch(process.env.ETH_RPC_URL!, {
@@ -67,11 +47,7 @@ export async function mintNativeToken(toAddress: string, amount: string) {
 describe.sequential(
   'btc',
   () => {
-    const eth = createWalletClient({
-      account,
-      chain: evmc,
-      transport: http()
-    });
+    const wallet = generateWallet();
 
     const btc = new BtcConnector();
 
@@ -86,11 +62,11 @@ describe.sequential(
       return result;
     });
 
-    const btcBridge = new BtcBridge(btc, eth);
+    const btcBridge = new BtcBridge({ btc, ethWallet: wallet });
 
     test('get balance', async () => {
       const ethAddress = await btcBridge.getAddress();
-      expect(ethAddress).toStrictEqual(account.address);
+      expect(ethAddress).toStrictEqual(wallet.address);
 
       await mintNativeToken(ethAddress, '10000000000000000');
 
