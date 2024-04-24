@@ -47,7 +47,7 @@ RPC_PASSWORD=$"test"
 echo "Starting dfx in a clean state"
 dfx stop
 rm -f dfx_log.txt
-dfx start --clean --background --enable-bitcoin >dfx_log.txt 2>&1
+dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -70,7 +70,7 @@ dfx deploy evm_testnet --argument "(record {
     log_settings = opt record {
       enable_console = true;
       in_memory_records = opt 10000;
-      log_filter = opt \"trace,brc20_bridge::scheduler=warn\";
+      log_filter = opt \"info,brc20_bridge::scheduler=warn\";
     };
     owner = principal \"${ADMIN_PRINCIPAL}\";
     genesis_accounts = vec { };
@@ -159,8 +159,7 @@ echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
 ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_ID
 
 # 3. Swap the BRC20 inscription for an ERC20 token
-for i in 1 2 3
-do
+for i in 1 2 3; do
   sleep 5
   echo "Trying to bridge from BRC20 to ERC20"
   mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
@@ -188,9 +187,9 @@ RECIPIENT=$(echo $RECIPIENT | tr -d '"')
 echo "BRC20 inscription recipient: $RECIPIENT"
 
 cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
- --wallet="$ETH_WALLET" \
- --evm-canister="$EVM" \
- --bft-bridge="$BFT_ETH_ADDRESS" \
- --token-address="$TOKEN_ETH_ADDRESS" \
- --address="$RECEIVER" \
- --amount=10
+  --wallet="$ETH_WALLET" \
+  --evm-canister="$EVM" \
+  --bft-bridge="$BFT_ETH_ADDRESS" \
+  --token-address="$TOKEN_ETH_ADDRESS" \
+  --address="$RECEIVER" \
+  --amount=10
