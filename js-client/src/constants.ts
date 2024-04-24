@@ -1,7 +1,6 @@
-import dotenv from 'dotenv';
-import canisters from '../../.dfx/local/canister_ids.json';
+import canistersLocal from '../../.dfx/local/canister_ids.json';
 
-dotenv.config();
+const canisters: Record<string, Record<string, string>> = canistersLocal;
 
 export const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
 

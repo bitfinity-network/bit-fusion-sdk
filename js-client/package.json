@@ -17,9 +17,9 @@
   },
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build-fast": "tsup src/index.ts --format cjs,esm",
-    "build": "yarn build-fast -- --dts-resolve",
-    "dev": "tsup src/index.ts --format cjs,esm --watch -- --dts-resolve",
+    "build-fast": "tsup src/index.ts",
+    "build": "yarn build-fast",
+    "dev": "tsup src/index.ts --watch",
     "test": "vitest run",
     "prepublishOnly": "yarn build"
   },
