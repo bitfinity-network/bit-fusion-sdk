@@ -246,7 +246,7 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     let create_contract_tx = TransactionBuilder {
         from: &wallet.address().into(),
         to: None,
-        nonce: nonce,
+        nonce,
         value: 0u64.into(),
         gas: 3_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),

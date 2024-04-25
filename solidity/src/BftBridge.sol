@@ -231,7 +231,7 @@ contract BFTBridge {
 
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
-        uint256 initGas = gasleft();
+        uint256 initGasLeft = gasleft();
 
         MintOrderData memory order = _decodeAndValidateOrder(
             encodedOrder[: 269]
@@ -280,7 +280,7 @@ contract BFTBridge {
         }
 
         if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
-            uint256 gasFee = gasleft() - initGas + additionalGasFee;
+            uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
             _chargeFee(order.feePayer, fee);
         }
