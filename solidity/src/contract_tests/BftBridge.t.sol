@@ -289,9 +289,11 @@ contract BftBridgeTest is Test {
     }
 
     function _encodeMintOrder(MintOrder memory order, uint256 privateKey) private pure returns (bytes memory) {
+        // Encoding splitted in two parts to avoid problems with stack overflow.
         bytes memory encodedOrder = abi.encodePacked(order.amount, order.senderID, order.fromTokenID,
             order.recipient, order.toERC20, order.nonce, order.senderChainID, order.recipientChainID,
-            order.name, order.symbol, order.decimals, order.approveSpender, order.approveAmount, order.feePayer);
+            order.name, order.symbol, order.decimals, order.approveSpender, order.approveAmount, address(0));
+        // bytes memory encodedOrder = abi.encodePacked(partlyEncodedOrder, order.feePayer);
         bytes32 hash = keccak256(encodedOrder);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hash);
 

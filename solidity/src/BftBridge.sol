@@ -108,6 +108,9 @@ contract BFTBridge {
         );
     }
 
+    // Additional gas amount for fee charge.
+    uint256 constant additionalGasFee = 1000;
+
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
 
@@ -216,10 +219,22 @@ contract BFTBridge {
         balance = _userNativeDeposit[user];
     }
 
+    // Take the given amount of fee from the user.
+    // Require the user to have enough native token balance.
+    function _chargeFee(address from, uint256 amount) private {
+        uint256 balance = _userNativeDeposit[from];
+        require(balance >= amount, "insufficient balance to pay fee");
+
+        uint256 newBalance = balance - amount;
+        _userNativeDeposit[from] = newBalance;
+    }
+
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
-        MintOrderData memory order = _decodeAndValidateClaim(
-            encodedOrder[: 249]
+        uint256 initGas = gasleft();
+
+        MintOrderData memory order = _decodeAndValidateOrder(
+            encodedOrder[: 269]
         );
 
         _checkMintOrderSignature(encodedOrder);
@@ -264,6 +279,11 @@ contract BFTBridge {
             );
         }
 
+        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
+            uint256 gasFee = gasleft() - initGas + additionalGasFee;
+            uint256 fee = gasFee * tx.gasprice;
+            _chargeFee(order.feePayer, fee);
+        }
 
         // Emit event
         emit MintTokenEvent(
@@ -412,61 +432,43 @@ contract BFTBridge {
     }
 
     // Function to decode and validate the order data
-    function _decodeAndValidateClaim(
+    function _decodeAndValidateOrder(
         bytes calldata encodedOrder
-    ) private view returns (MintOrderData memory) {
+    ) private view returns (MintOrderData memory order) {
         // Decode order data
-        uint256 amount = uint256(bytes32(encodedOrder[: 32]));
-        bytes32 senderID = bytes32(encodedOrder[32 : 64]);
-        bytes32 fromTokenID = bytes32(encodedOrder[64 : 96]);
-        address recipient = address(bytes20(encodedOrder[96 : 116]));
-        address toERC20 = address(bytes20(encodedOrder[116 : 136]));
-        uint32 nonce = uint32(bytes4(encodedOrder[136 : 140]));
-        uint32 senderChainId = uint32(bytes4(encodedOrder[140 : 144]));
-        uint32 recipientChainId = uint32(bytes4(encodedOrder[144 : 148]));
-        bytes32 name = bytes32(encodedOrder[148 : 180]);
-        bytes16 symbol = bytes16(encodedOrder[180 : 196]);
-        uint8 decimals = uint8(encodedOrder[196]);
-        address approveSpender = address(bytes20(encodedOrder[197 : 217]));
-        uint256 approveAmount = uint256(bytes32(encodedOrder[217 : 249]));
-        address feePayer = address(bytes20(encodedOrder[249 : 269]));
+        order.amount = uint256(bytes32(encodedOrder[: 32]));
+        order.senderID = bytes32(encodedOrder[32 : 64]);
+        order.fromTokenID = bytes32(encodedOrder[64 : 96]);
+        order.recipient = address(bytes20(encodedOrder[96 : 116]));
+        order.toERC20 = address(bytes20(encodedOrder[116 : 136]));
+        order.nonce = uint32(bytes4(encodedOrder[136 : 140]));
+        order.senderChainID = uint32(bytes4(encodedOrder[140 : 144]));
+        uint32 recipientChainID = uint32(bytes4(encodedOrder[144 : 148]));
+        order.name = bytes32(encodedOrder[148 : 180]);
+        order.symbol = bytes16(encodedOrder[180 : 196]);
+        order.decimals = uint8(encodedOrder[196]);
+        order.approveSpender = address(bytes20(encodedOrder[197 : 217]));
+        order.approveAmount = uint256(bytes32(encodedOrder[217 : 249]));
+        order.feePayer = address(bytes20(encodedOrder[249 : 269]));
 
         // Assert recipient address is not zero
-        require(recipient != address(0), "Invalid destination address");
+        require(order.recipient != address(0), "Invalid destination address");
 
         // Check if amount is greater than zero
-        require(amount > 0, "Invalid order amount");
+        require(order.amount > 0, "Invalid order amount");
 
         // Check if nonce is not stored in the list
-        require(!_isNonceUsed[senderID][nonce], "Invalid nonce");
+        require(!_isNonceUsed[order.senderID][order.nonce], "Invalid nonce");
 
         // Check if withdrawal is happening on the correct chain
-        require(block.chainid == recipientChainId, "Invalid chain ID");
+        require(block.chainid == recipientChainID, "Invalid chain ID");
 
-        if (_baseTokenRegistry[toERC20] != bytes32(0)) {
+        if (_baseTokenRegistry[order.toERC20] != bytes32(0)) {
             require(
-                _erc20TokenRegistry[fromTokenID] == toERC20,
+                _erc20TokenRegistry[order.fromTokenID] == order.toERC20,
                 "SRC token and DST token must be a valid pair"
             );
         }
-
-        // Return the decoded order data
-        return
-            MintOrderData(
-            amount,
-            senderID,
-            fromTokenID,
-            recipient,
-            toERC20,
-            nonce,
-            name,
-            symbol,
-            decimals,
-            senderChainId,
-            approveSpender,
-            approveAmount,
-            feePayer
-        );
     }
 
     // Function to check encodedOrder signature
@@ -474,10 +476,10 @@ contract BFTBridge {
         bytes calldata encodedOrder
     ) private view {
         // Create a hash of the order data
-        bytes32 hash = keccak256(encodedOrder[: 249]);
+        bytes32 hash = keccak256(encodedOrder[: 269]);
 
         // Recover signer from the signature
-        address signer = ECDSA.recover(hash, encodedOrder[249 :]);
+        address signer = ECDSA.recover(hash, encodedOrder[269 :]);
 
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
