@@ -12,7 +12,10 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::rand;
 use evm_canister_client::{EvmCanisterClient, IcAgentClient};
 use ic_exports::icrc_types::icrc1::account::Subaccount;
+use ic_exports::icrc_types::icrc1::transfer::TransferArg;
+use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_test_utils::Agent;
+use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::bft_bridge_api::{BURN, DEPLOY_WRAPPED_TOKEN, GET_WRAPPED_TOKEN};
 use minter_contract_utils::wrapped_token_api::{ERC_20_APPROVE, ERC_20_BALANCE};
@@ -20,7 +23,7 @@ use minter_did::id256::Id256;
 use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
-use crate::icrc2_client::Icrc2CanisterClient;
+// use crate::icrc2_client::Icrc2CanisterClient;
 
 pub const ICRC1_TRANSFER_FEE: u64 = 10_000;
 
@@ -198,9 +201,9 @@ impl BridgeUser {
         MinterCanisterClient::new(client)
     }
 
-    fn icrc2_client(&self, principal: Principal) -> Icrc2CanisterClient<IcAgentClient> {
+    fn icrc2_client(&self, principal: Principal) -> IcrcCanisterClient<IcAgentClient> {
         let client = IcAgentClient::with_agent(principal, self.agent.clone());
-        Icrc2CanisterClient::new(client)
+        IcrcCanisterClient::new(client)
     }
 
     const CONTRACT_CALL_GAS: u64 = 10_000_000;
@@ -308,8 +311,17 @@ impl BridgeUser {
         );
 
         let icrc2_client = self.icrc2_client(token);
+        let transfer_args = TransferArg {
+            from_subaccount,
+            to: to.get_principal().into(),
+            fee: None,
+            created_at_time: None,
+            memo: None,
+            amount,
+        };
+
         icrc2_client
-            .icrc1_transfer(to.get_principal().into(), from_subaccount, amount)
+            .icrc1_transfer(transfer_args)
             .await?
             .map_err(|e| anyhow::Error::msg(e.to_string()))
     }
@@ -465,8 +477,19 @@ impl BridgeUser {
             "Approving ICRC-2 token burn for {amount} by {} user",
             self.name
         );
+
+        let approve_args = ApproveArgs {
+            from_subaccount: None,
+            spender: self.minter_principal.into(),
+            amount,
+            expected_allowance: None,
+            expires_at: None,
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
         self.icrc2_client(icrc2_token)
-            .icrc2_approve(None, self.minter_principal.into(), amount)
+            .icrc2_approve(approve_args)
             .await?
             .map_err(|e| anyhow::Error::msg(format!("failed to approve ICRC-2 token: {e:?}")))?;
         Ok(())

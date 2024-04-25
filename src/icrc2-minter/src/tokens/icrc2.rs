@@ -1,44 +1,17 @@
 use did::H160;
 use ethers_core::utils;
+use evm_canister_client::IcCanisterClient;
 use ic_canister::virtual_canister_call;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::{Account, Subaccount};
 use ic_exports::icrc_types::icrc2::approve::{ApproveArgs, ApproveError};
 use ic_exports::icrc_types::icrc2::transfer_from::{TransferFromArgs, TransferFromError};
+use icrc_client::IcrcCanisterClient;
 use minter_did::error::{Error, Result};
 use serde::Deserialize;
 
 use super::icrc1::{self, get_token_configuration};
-
-/// Requests an approve on a ICRC-2 token canister.
-pub async fn icrc2_approve(
-    token: Principal,
-    args: ApproveArgs,
-) -> std::result::Result<Nat, ApproveError> {
-    virtual_canister_call!(token, "icrc2_approve", (args,), std::result::Result<Nat, ApproveError>)
-        .await
-        .unwrap_or_else(|e| {
-            Err(ApproveError::GenericError {
-                error_code: (e.0 as u64).into(),
-                message: e.1,
-            })
-        })
-}
-
-/// Requests a previously approved transfer from an account to another a ICRC-2 token canister.
-pub async fn icrc2_transfer_from(
-    token: Principal,
-    args: TransferFromArgs,
-) -> std::result::Result<Nat, TransferFromError> {
-    virtual_canister_call!(token, "icrc2_transfer_from", (args,), std::result::Result<Nat, TransferFromError>)
-            .await.unwrap_or_else(|e| {
-                Err(TransferFromError::GenericError {
-                    error_code: (e.0 as u64).into(),
-                    message: e.1,
-                })
-            })
-}
 
 #[derive(Debug, Deserialize, CandidType, Clone)]
 pub struct Success {
@@ -70,6 +43,8 @@ pub async fn approve_mint(
     let fee = get_token_configuration(token).await?.fee;
     let full_fee = Nat::from(2_u64) * fee.clone();
 
+    let icrc_clent = IcrcCanisterClient::new(IcCanisterClient::new(token));
+
     // Fee deducted twice because there are two transactions: approve and transferFrom.
     if amount < full_fee {
         return Err(Error::InvalidBurnOperation(format!(
@@ -92,7 +67,8 @@ pub async fn approve_mint(
         created_at_time: None,
     };
 
-    let approve_result = icrc2_approve(token, args).await;
+    let approve_result = icrc_clent.icrc2_approve(args).await?;
+
     if repeat_on_bad_fee {
         if let Err(ApproveError::BadFee { .. }) = &approve_result {
             icrc1::refresh_token_configuration(token).await?;
@@ -114,22 +90,14 @@ pub async fn burn(
     amount: Nat,
     repeat_on_bad_fee: bool,
 ) -> Result<Success> {
+    let icrc_clent = IcrcCanisterClient::new(IcCanisterClient::new(token));
+
     let minter_canister_account = Account::from(ic::id());
 
-    // User pays fee, so we don't need to take it into account.
-    let fee = None;
+    let transfer_result = icrc_clent
+        .icrc2_transfer_from(from, minter_canister_account, amount.clone(), None)
+        .await?;
 
-    let args = TransferFromArgs {
-        from,
-        spender_subaccount: None,
-        to: minter_canister_account,
-        amount: amount.clone(),
-        fee,
-        memo: None,
-        created_at_time: None,
-    };
-
-    let transfer_result = icrc2_transfer_from(token, args).await;
     if repeat_on_bad_fee {
         if let Err(TransferFromError::BadFee { .. }) = &transfer_result {
             icrc1::refresh_token_configuration(token).await?;

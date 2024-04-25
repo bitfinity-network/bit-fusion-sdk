@@ -31,8 +31,9 @@ impl Client for Clients {
         request: Request,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<Response>> + Send>> {
         match self {
-            Clients::Canister(client) => client.clone().send_rpc_request(request),
+            // Clients::Canister(client) => client.clone().send_rpc_request(request),
             Clients::HttpOutCall(client) => client.send_rpc_request(request),
+            _ => todo!(),
         }
     }
 }

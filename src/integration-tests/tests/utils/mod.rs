@@ -12,7 +12,7 @@ use solidity_helper::{compile_solidity_contracts, SolidityContract};
 
 pub mod btc;
 pub mod error;
-pub mod icrc_client;
+// pub mod icrc_client;
 pub mod wasm;
 
 /// Returns the Path to the workspace root dir
