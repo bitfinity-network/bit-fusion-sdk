@@ -23,6 +23,12 @@
       "wasm": ".artifact/icrc1-ledger.wasm.gz",
       "type": "custom"
     },
+    "token2": {
+      "build": "",
+      "candid": ".artifact/icrc1.did",
+      "wasm": ".artifact/icrc1-ledger.wasm.gz",
+      "type": "custom"
+    },
     "minter": {
       "build": "",
       "candid": ".artifact/minter.did",
