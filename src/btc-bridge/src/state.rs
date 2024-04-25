@@ -17,12 +17,12 @@ use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 pub struct State {
-    config: BtcBridgeConfig,
-    bft_config: BftBridgeConfig,
-    signer: SignerStorage,
-    orders_store: MintOrdersStore,
-    burn_request_store: BurnRequestStore,
-    evm_params: Option<EvmParams>,
+    pub config: BtcBridgeConfig,
+    pub bft_config: BftBridgeConfig,
+    pub signer: SignerStorage,
+    pub orders_store: MintOrdersStore,
+    pub burn_request_store: BurnRequestStore,
+    pub evm_params: Option<EvmParams>,
 }
 
 #[derive(Debug, CandidType, Deserialize)]
