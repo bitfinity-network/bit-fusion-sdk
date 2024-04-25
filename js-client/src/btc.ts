@@ -33,7 +33,7 @@ export class BtcBridge {
   protected ethWallet: ethers.BaseWallet;
   protected btcAddress?: string;
   protected bftAddress?: string;
-  protected wrappedTokenAddress: string;
+  public wrappedTokenAddress: string;
 
   constructor({
     btc,
@@ -86,6 +86,23 @@ export class BtcBridge {
 
     await this.btc.sendBitcoin(btcAddress, satoshis);
 
+    return await BtcBridgeActor.btc_to_erc20(ethAddress);
+  }
+
+  async getBTCAddress() {
+    const ethAddress = await this.getAddress();
+    console.log('ethAddress', ethAddress);
+    console.log('canister id', BTC_BRIDGE_CANISTER_ID);
+    console.log('BtcBridgeActor', BtcBridgeActor);
+    const btcAddress = await BtcBridgeActor.get_btc_address({
+      owner: [Principal.fromText(BTC_BRIDGE_CANISTER_ID)],
+      subaccount: [ethAddrToSubaccount(ethAddress)]
+    });
+    return btcAddress;
+  }
+
+  async bridgeBtcToEvm() {
+    const ethAddress = await this.getAddress();
     return await BtcBridgeActor.btc_to_erc20(ethAddress);
   }
 
