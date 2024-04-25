@@ -1,14 +1,8 @@
 use core::sync::atomic::Ordering;
 use std::cell::RefCell;
-use std::str::FromStr;
 
-use bitcoin::{Address, Network, PublicKey, Transaction};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    self as IcEcdsa, EcdsaKeyId, EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
-};
 use ic_stable_structures::CellStructure;
 use inscriber::interface::Brc20TransferTransactions;
 use inscriber::ops as Inscriber;
@@ -20,6 +14,7 @@ use crate::constant::NONCE;
 use crate::interface::bridge_api::{
     Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
 };
+use crate::interface::get_deposit_address;
 use crate::interface::store::Brc20TokenInfo;
 use crate::rpc;
 use crate::state::State;
@@ -37,11 +32,11 @@ pub async fn brc20_to_erc20(
         tx_id,
         ticker,
         holder,
-    } = rpc::get_brc20_token_info(state, brc20_ticker, holder_btc_addr)
+    } = rpc::fetch_brc20_token_details(state, brc20_ticker, holder_btc_addr)
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    let reveal_tx = get_reveal_transaction(state, &tx_id)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
@@ -69,31 +64,6 @@ pub async fn brc20_to_erc20(
 
     log::info!("Minting an ERC20 token with symbol: {tick}");
     mint_erc20(state, eth_address, amount, nonce).await
-}
-
-async fn get_reveal_transaction(
-    state: &RefCell<State>,
-    tx_id: &str,
-) -> anyhow::Result<Transaction> {
-    let network = state.borrow().ic_btc_network();
-
-    let reveal_tx = match network {
-        BitcoinNetwork::Regtest => {
-            let bridge_addr = get_deposit_address(state)
-                .await
-                .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))?
-                .to_string();
-
-            rpc::fetch_reveal_transaction_regtest(state, bridge_addr, tx_id)
-                .await
-                .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
-        }
-        _ => rpc::fetch_reveal_transaction(state, tx_id)
-            .await
-            .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?,
-    };
-
-    Ok(reveal_tx)
 }
 
 pub async fn mint_erc20(
@@ -256,14 +226,19 @@ pub async fn erc20_to_brc20(
     brc20_ticker: String,
     dst_addr: &str,
 ) -> Result<Brc20InscribeStatus, BridgeError> {
-    let bridge_addr = get_deposit_address(state)
-        .await
-        .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))?
-        .to_string();
+    let (network, derivation_path) = {
+        (
+            state.borrow().ic_btc_network(),
+            state.borrow().derivation_path(None),
+        )
+    };
 
-    let Brc20TokenInfo { tx_id, .. } = rpc::get_brc20_token_info(state, brc20_ticker, bridge_addr)
-        .await
-        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
+    let bridge_addr = get_deposit_address(network, derivation_path).await;
+
+    let Brc20TokenInfo { tx_id, .. } =
+        rpc::fetch_brc20_token_details(state, brc20_ticker, bridge_addr)
+            .await
+            .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
     let tx_ids = withdraw_brc20(state, request_id, &tx_id, dst_addr)
         .await
@@ -285,7 +260,7 @@ async fn withdraw_brc20(
         )));
     }
 
-    let reveal_tx = get_reveal_transaction(state, reveal_txid)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, reveal_txid)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
@@ -331,53 +306,4 @@ async fn withdraw_brc20(
     }
 
     result
-}
-
-/// Returns the BRC20 deposit address
-pub async fn get_deposit_address(
-    state: &RefCell<State>,
-    // eth_address: H160,
-) -> Result<Address, BridgeError> {
-    let (network, key_id, derivation_path) = {
-        let state = state.borrow();
-        (
-            state.btc_network(),
-            state.ecdsa_key_id(),
-            // state.derivation_path(Some(eth_address)),
-            state.derivation_path(None),
-        )
-    };
-
-    let public_key = ecdsa_public_key(key_id, derivation_path).await?;
-    let public_key = PublicKey::from_str(&public_key)
-        .map_err(|e| BridgeError::PublicKeyFromStr(e.to_string()))?;
-
-    btc_address_from_public_key(network, &public_key)
-}
-
-/// Retrieves the ECDSA public key of this canister at the given derivation path
-/// from IC's ECDSA API.
-async fn ecdsa_public_key(
-    key_id: EcdsaKeyId,
-    derivation_path: Vec<Vec<u8>>,
-) -> Result<String, BridgeError> {
-    let arg = EcdsaPublicKeyArgument {
-        canister_id: None,
-        derivation_path,
-        key_id,
-    };
-
-    let (res,): (EcdsaPublicKeyResponse,) = IcEcdsa::ecdsa_public_key(arg)
-        .await
-        .map_err(|e| BridgeError::EcdsaPublicKey(e.1))?;
-
-    Ok(hex::encode(res.public_key))
-}
-
-fn btc_address_from_public_key(
-    network: Network,
-    public_key: &PublicKey,
-) -> Result<Address, BridgeError> {
-    Address::p2wpkh(public_key, network)
-        .map_err(|e| BridgeError::AddressFromPublicKey(e.to_string()))
 }

@@ -5,7 +5,6 @@ use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
@@ -15,7 +14,7 @@ use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 use crate::interface::bridge_api::BridgeError;
-use crate::interface::store::{Brc20Store, Brc20TokenInfo, BurnRequestStore, MintOrdersStore};
+use crate::interface::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
@@ -33,12 +32,10 @@ pub struct State {
 #[derive(Debug, CandidType, Deserialize)]
 pub struct Brc20BridgeConfig {
     pub network: BitcoinNetwork,
-    pub regtest_rpc: RegtestRpcConfig,
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub erc20_minter_fee: u64,
-    pub brc20_token: Brc20TokenInfo,
     pub ordinals_indexer: String,
     pub general_indexer: String,
     pub logger: LogSettings,
@@ -48,14 +45,12 @@ impl Default for Brc20BridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
-            regtest_rpc: RegtestRpcConfig::default(),
             evm_link: EvmLink::default(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
             erc20_minter_fee: 10,
-            brc20_token: Brc20TokenInfo::default(),
             ordinals_indexer: String::new(),
             general_indexer: String::new(),
             logger: LogSettings::default(),
@@ -202,19 +197,6 @@ impl State {
         }
     }
 
-    #[inline]
-    pub(crate) fn ecdsa_key_id(&self) -> EcdsaKeyId {
-        let name = match &self.config.signing_strategy {
-            SigningStrategy::Local { .. } => "none".to_string(),
-            SigningStrategy::ManagementCanister { key_id } => key_id.to_string(),
-        };
-
-        EcdsaKeyId {
-            curve: EcdsaCurve::Secp256k1,
-            name,
-        }
-    }
-
     pub fn mint_orders(&self) -> &MintOrdersStore {
         &self.mint_orders
     }
@@ -301,30 +283,5 @@ impl State {
 
     pub fn erc20_minter_fee(&self) -> u64 {
         self.config.erc20_minter_fee
-    }
-
-    pub(crate) fn regtest_rpc_config(&self) -> RegtestRpcConfig {
-        self.config.regtest_rpc.clone()
-    }
-
-    pub(crate) fn brc20_token_info(&self) -> Brc20TokenInfo {
-        self.config.brc20_token.clone()
-    }
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct RegtestRpcConfig {
-    pub url: String,
-    pub user: String,
-    pub password: String,
-}
-
-impl Default for RegtestRpcConfig {
-    fn default() -> Self {
-        Self {
-            url: "http://127.0.0.1:9000".to_string(),
-            user: "icp".to_string(),
-            password: "test".to_string(),
-        }
     }
 }

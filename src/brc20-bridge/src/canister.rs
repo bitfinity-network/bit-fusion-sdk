@@ -22,6 +22,7 @@ use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
 };
+use crate::interface;
 use crate::interface::bridge_api::{BridgeError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
@@ -51,10 +52,14 @@ impl Brc20Bridge {
     }
 
     #[update]
-    pub async fn get_deposit_address(&mut self) -> Result<String, BridgeError> {
-        Ok(crate::ops::get_deposit_address(&get_state())
-            .await?
-            .to_string())
+    pub async fn get_deposit_address(&mut self) -> String {
+        let (network, derivation_path) = {
+            (
+                get_state().borrow().ic_btc_network(),
+                get_state().borrow().derivation_path(None),
+            )
+        };
+        interface::get_deposit_address(network, derivation_path).await
     }
 
     /// Returns the balance of the given bitcoin address.

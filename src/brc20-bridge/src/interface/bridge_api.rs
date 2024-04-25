@@ -28,7 +28,7 @@ pub enum BridgeError {
     #[error("{0}")]
     Erc20Mint(#[from] Erc20MintError),
     #[error("{0}")]
-    RegtestRpc(String),
+    FindInscriptionUtxo(String),
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]

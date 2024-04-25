@@ -2,45 +2,66 @@
 
 # Script to deploy and test the Brc20Bridge canister to perform a complete bridging flow (BRC20 <> ERC20).
 #
-# NOTE: Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
+# NOTES: 
+#
+# 1. Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
 # Until then, this script uses dfx version 0.17.
+#
+# 2. We use two indexers in this setup: a general indexer (https://127.0.0.1:8001) to fetch a reveal transaction by its ID,
+# as well as an ordinals indexer (https://127.0.0.1:9001) to fetch BRC20 inscription details. Notice both are using HTTPS, which is
+# required by `dfx`. Therefore we need to set up two things:
+#
+#     a. `mkcert`, which automatically creates and installs a local CA in the system root store, and generates locally-trusted certificates.
+#         After installing `mkcert` and generating the cert and key, you'll see an output like this:
+#             The certificate is at "./localhost+2.pem" and the key at "./localhost+2-key.pem"
+#
+#     b. an SSL proxy (e.g. `local-ssl-proxy`, `caddy`, etc.) which utilises the cert and key generated previously:
+#           local-ssl-proxy --source 8001 --target 8000 -c localhost+2.pem -k localhost+2-key.pem &
+#           local-ssl-proxy --source 9001 --target 9000 -c localhost+2.pem -k localhost+2-key.pem &
+#
+
 set +e
 
-############################### Create a BRC20 inscription with `ord` #################################
-echo "Generating a receiving address"
+######################## Start the Bitcoin Daemon and Ord #####################
 
-dst_addr_res=$(ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
-DST_ADDRESS=$(echo $dst_addr_res | jq .addresses[0])
-DST_ADDRESS=$(echo $DST_ADDRESS | tr -d '"')
+echo "Starting the Bitcoin daemon"
+COMPOSE_FILE="../ckERC20/ord-testnet/bridging-flow/docker-compose.yml"
 
-echo "Receiving address: $DST_ADDRESS"
+docker-compose -f "$COMPOSE_FILE" up -d bitcoind
+sleep 2
 
-BRC20_JSON="brc_20.json"
+wallet_exists=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest listwallets | grep -c "testwallet")
 
-echo "Inscribing $BRC20_JSON"
-inscribe_res=$(ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 \
-  inscribe --fee-rate 10 --destination $DST_ADDRESS --file $BRC20_JSON)
+if [ "$wallet_exists" -eq 0 ]; then
+    echo "Creating 'testwallet'..."
+    docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest createwallet "testwallet"
+fi
 
-echo "Inscription result: $inscribe_res"
+echo "Loading 'testwallet'..."
+load_output=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest loadwallet "testwallet" 2>&1)
 
-BRC20_TICKER="kobp"
-destination=$(echo $inscribe_res | jq .inscriptions[0].destination)
-BRC20_HOLDER=$(echo $destination | tr -d '"')
-reveal=$(echo $inscribe_res | jq .reveal)
-REVEAL_TXID=$(echo $reveal | tr -d '"')
-id=$(echo $inscribe_res | jq .inscriptions[0].id)
-BRC20_ID=$(echo $id | tr -d '"')
+if echo "$load_output" | grep -q "Wallet file verification failed"; then
+    echo "Wallet already exists but could not be loaded due to verification failure."
+elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
+    echo "Wallet loaded successfully."
+else
+    echo "Unexpected wallet load output: $load_output"
+fi
 
-################################################################
+# Generate 101 blocks to ensure enough coins are available for spending
+height=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getblockcount)
+if [ "$height" -lt 101 ]; then
+    echo "Generating 101 blocks..."
+    new_address=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getnewaddress)
+    docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest generatetoaddress 101 "$new_address"
+fi
 
-CHAIN_ID=355113
-
-GENERAL_INDEXER_URL="https://blockstream.info"
-ORDINALS_INDEXER_URL="https://api.hiro.so/ordinals/v1/brc-20/tokens"
-
-RPC_URL=$"http://127.0.0.1:9000"
-RPC_USER=$"icp"
-RPC_PASSWORD=$"test"
+# Start the ord service
+echo "Starting the 'ord' service..."
+docker-compose -f "$COMPOSE_FILE" up -d ord
+if [ $? -ne 0 ]; then
+    echo "Failed to start 'ord' service. Attempting to continue script..."
+fi
 
 ############################### Configure Dfx #################################
 
@@ -56,6 +77,11 @@ ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 
 ######################### Deploy EVM and BRC20 Bridge ######################
+
+CHAIN_ID=355113
+
+GENERAL_INDEXER_URL="https://127.0.0.1:8001"
+ORDINALS_INDEXER_URL="https://127.0.0.1:9001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -82,20 +108,10 @@ echo "Deploying BRC20 bridge"
 dfx deploy brc20-bridge --argument "(record {
     general_indexer = \"${GENERAL_INDEXER_URL}\";
     erc20_minter_fee = 10;
-    brc20_token = record {
-      tx_id = \"{$REVEAL_TXID}\";
-      ticker = \"{$BRC20_TICKER}\";
-      holder = \"{$BRC20_HOLDER}\";
-    };
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
-    regtest_rpc = record {
-      url = \"${RPC_URL}\";
-      user = \"${RPC_USER}\";
-      password = \"${RPC_PASSWORD}\";
-    };
     logger = record {
       enable_console = true;
       in_memory_records = opt 10000;
@@ -147,22 +163,43 @@ echo "All canisters successfully deployed."
 
 ######################## Swap BRC20 for ERC20 ######################
 
-echo "Bridging a BRC20 inscription to an ERC20 token"
+echo "Preparing to bridge a BRC20 inscription to an ERC20 token"
 
-# 1. Get deposit address
+# 1. Get canister's deposit address
 brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
 addr=${brc20_bridge_addr#*\"}
-DEPOSIT_ADDRESS=${addr%\"*}
-echo "BRC20 deposit address: $DEPOSIT_ADDRESS"
+BRIDGE_ADDRESS=${addr%\"*}
+echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
 
-# 2. Send a BRC20 inscription to the deposit address
-ord --datadir target/brc20 wallet --server-url http://127.0.0.1:9001 send --fee-rate 10 $DEPOSIT_ADDRESS $BRC20_ID
+# 2. Top up the canister's balance to enable it send transactions
+CONTAINER_ID=$(docker ps -q --filter "name=bitcoind")
 
-# 3. Swap the BRC20 inscription for an ERC20 token
+if [ -z "$CONTAINER_ID" ]; then
+    echo "bitcoind container not found. Make sure it is running."
+    exit 1
+fi
+
+echo "Topping up canister's wallet"
+docker exec "$CONTAINER_ID" bitcoin-cli -regtest generatetoaddress 101 "$BRIDGE_ADDRESS"
+
+# 3. Check balance
+dfx canister call brc20-bridge get_balance "(\"${BRIDGE_ADDRESS}\")"
+
+# 4. Prepare and make the BRC20 inscription
+USER_ADDRESS=$(docker exec "$CONTAINER_ID" bitcoin-cli -regtest -rpcwallet="testwallet" listreceivedbyaddress 0 true | jq -r '.[0].address')
+echo "Inscription destination and leftovers address: $USER_ADDRESS"
+
+BRC20_TICKER="kobp"
+brc20_inscription="{\"p\":\"brc-20\", \"op\":\"deploy\", \"tick\":\"$BRC20_TICKER\", \"max\":\"1000\", \"lim\":\"10\", \"dec\":\"8\"}"
+
+echo "Creating a BRC20 inscription with content: $brc20_inscription"
+dfx canister call brc20-bridge inscribe "(variant { Brc20 }, \"${brc20_inscription//\"/\\\"}\", \"${USER_ADDRESS}\", \"${USER_ADDRESS}\", null)"
+
+# 5. Swap the BRC20 inscription for an ERC20 token
 for i in 1 2 3; do
   sleep 5
   echo "Trying to bridge from BRC20 to ERC20"
-  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$DEPOSIT_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
   echo "Result: $mint_status"
 
   if [[ $mint_status == *"Minted"* ]]; then
@@ -179,17 +216,12 @@ done
 sleep 5
 
 ######################## Swap ERC20 for BRC20 ######################
-
-recipient_res=$(ord --data-dir target/brc20 wallet --server-url http://127.0.0.1:9001 receive)
-RECIPIENT=$(echo $recipient_res | jq .addresses[0])
-RECIPIENT=$(echo $RECIPIENT | tr -d '"')
-
-echo "BRC20 inscription recipient: $RECIPIENT"
+echo "BRC20 inscription recipient: $USER_ADDRESS"
 
 cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \
   --evm-canister="$EVM" \
   --bft-bridge="$BFT_ETH_ADDRESS" \
   --token-address="$TOKEN_ETH_ADDRESS" \
-  --address="$RECEIVER" \
+  --address="$USER_ADDRESS" \
   --amount=10

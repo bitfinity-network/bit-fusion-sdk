@@ -2,13 +2,12 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::absolute::LockTime;
-use bitcoin::hashes::Hash;
 use bitcoin::transaction::Version;
 use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
-use bitcoincore_rpc::{Auth, Client, RpcApi};
+use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -18,27 +17,13 @@ use ord_rs::{Brc20, OrdParser};
 use serde::Deserialize;
 
 use crate::constant::{BRC20_TICKER_LEN, CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
-use crate::interface::bridge_api::{BridgeError, Erc20MintError};
+use crate::interface::bridge_api::BridgeError;
+use crate::interface::get_deposit_address;
 use crate::interface::store::Brc20TokenInfo;
-use crate::state::{RegtestRpcConfig, State};
+use crate::state::State;
 
 /// Retrieves and validates the details of a BRC20 token given its ticker.
-pub(crate) async fn get_brc20_token_info(
-    state: &RefCell<State>,
-    ticker: String,
-    holder: String,
-) -> Result<Brc20TokenInfo, BridgeError> {
-    let network = state.borrow().ic_btc_network();
-    let brc20_info = match network {
-        BitcoinNetwork::Regtest => state.borrow().brc20_token_info(),
-        _ => crate::rpc::fetch_brc20_token_details(state, ticker, holder)
-            .await
-            .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?,
-    };
-    Ok(brc20_info)
-}
-
-async fn fetch_brc20_token_details(
+pub(crate) async fn fetch_brc20_token_details(
     state: &RefCell<State>,
     tick: String,
     holder: String,
@@ -52,7 +37,7 @@ async fn fetch_brc20_token_details(
     // corresponds to the network.
     is_valid_btc_address(&holder, network)?;
 
-    let url = format!("{indexer_url}/{tick}");
+    let url = format!("{indexer_url}/ordinals/v1/brc-20/tokens/{tick}");
 
     log::info!("Retrieving {tick} token details from: {url}");
 
@@ -124,13 +109,30 @@ pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
-    let (network, indexer_url) = {
+    let (ic_btc_network, btc_network, indexer_url, derivation_path) = {
         let state = state.borrow();
-        (state.btc_network(), state.general_indexer_url())
+        (
+            state.ic_btc_network(),
+            state.btc_network(),
+            state.general_indexer_url(),
+            state.derivation_path(None),
+        )
     };
 
-    let network_str = network_as_str(network);
-    let url = format!("{indexer_url}{network_str}/api/tx/{reveal_tx_id}");
+    let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
+
+    let brc20_utxo = find_inscription_utxo(
+        ic_btc_network,
+        bridge_addr,
+        reveal_tx_id.as_bytes().to_vec(),
+    )
+    .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
+    .await?;
+
+    let txid = hex::encode(brc20_utxo.outpoint.txid);
+
+    let btc_network_str = network_as_str(btc_network);
+    let url = format!("{indexer_url}{btc_network_str}/api/tx/{txid}");
 
     let request_params = CanisterHttpRequestArgument {
         url,
@@ -166,42 +168,6 @@ pub(crate) async fn fetch_reveal_transaction(
     })?;
 
     tx.try_into()
-}
-
-/// Retrieves (and re-constructs) the reveal transaction by its ID.
-///
-/// We use the reveal transaction (as opposed to the commit transaction)
-/// because it contains the actual BRC20 inscription that needs to be parsed.
-pub(crate) async fn fetch_reveal_transaction_regtest(
-    state: &RefCell<State>,
-    bridge_addr: String,
-    reveal_tx_id: &str,
-) -> anyhow::Result<Transaction> {
-    use bitcoin::consensus::encode::deserialize;
-
-    let network = state.borrow().ic_btc_network();
-
-    let RegtestRpcConfig {
-        url,
-        user,
-        password,
-    } = state.borrow().regtest_rpc_config();
-
-    let rpc_client = Client::new(&url, Auth::UserPass(user, password))
-        .map_err(|e| BridgeError::RegtestRpc(format!("Failed to connect to {:?}", e)))?;
-
-    let brc20_utxo = find_inscription_utxo(network, bridge_addr, reveal_tx_id.as_bytes().to_vec())
-        .await
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
-
-    let txid =
-        Txid::from_slice(&brc20_utxo.outpoint.txid).expect("Failed to parse Txid from slice");
-
-    let raw_tx = rpc_client
-        .get_raw_transaction_hex(&txid, None)
-        .map_err(|e| BridgeError::RegtestRpc(e.to_string()))?;
-
-    Ok(deserialize(raw_tx.as_bytes()).map_err(|e| BridgeError::RegtestRpc(e.to_string()))?)
 }
 
 pub(crate) async fn parse_and_validate_inscription(
@@ -260,12 +226,17 @@ fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeErro
     Ok(true)
 }
 
+/// Validates a reveal transaction ID by checking if it matches
+/// the transaction ID of the received UTXO.
+///
+/// TODO: 1. reduce latency by using derivation_path
+///       2. filter out pending UTXOs
 async fn find_inscription_utxo(
     network: BitcoinNetwork,
-    addr: String,
+    deposit_addr: String,
     txid: Vec<u8>,
 ) -> Result<Utxo, BridgeError> {
-    let utxos = bitcoin_api::get_utxos(network, addr)
+    let utxos = bitcoin_api::get_utxos(network, deposit_addr)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
         .utxos;
