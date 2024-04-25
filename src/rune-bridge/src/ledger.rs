@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::mem::size_of;
 
 use bitcoin::hashes::sha256d::Hash;
@@ -27,7 +26,7 @@ impl Default for UtxoLedger {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, CandidType, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize)]
 struct UtxoKey {
     tx_id: [u8; 32],
     vout: u32,
@@ -47,14 +46,6 @@ impl Storable for UtxoKey {
         max_size: 60,
         is_fixed_size: true,
     };
-}
-
-impl Ord for UtxoKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.tx_id
-            .cmp(&other.tx_id)
-            .then(self.vout.cmp(&other.vout))
-    }
 }
 
 impl From<OutPoint> for UtxoKey {
@@ -130,7 +121,7 @@ impl UtxoLedger {
             .map(|(key, details)| StoredUtxo {
                 tx_input_info: TxInputInfo {
                     outpoint: OutPoint {
-                        txid: Txid::from_raw_hash(Hash::from_bytes_ref(&key.tx_id).clone()),
+                        txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
                         vout: key.vout,
                     },
                     tx_out: TxOut {

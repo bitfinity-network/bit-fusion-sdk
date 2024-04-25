@@ -1,6 +1,6 @@
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::sha256d::Hash;
-use bitcoin::{Address, Amount, OutPoint, PublicKey, TxOut, Txid};
+use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -22,7 +22,6 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
-use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
 
 use crate::interface::{
@@ -76,8 +75,8 @@ impl RuneBridge {
     }
 
     #[init]
-    pub async fn init(&mut self, config: RuneBridgeConfig) {
-        get_state().borrow_mut().configure(config).await;
+    pub fn init(&mut self, config: RuneBridgeConfig) {
+        get_state().borrow_mut().configure(config);
 
         {
             let scheduler = get_scheduler();
@@ -174,11 +173,11 @@ impl RuneBridge {
 
         let mut amounts: HashMap<String, u128> = HashMap::new();
         for utxo in &utxos.utxos {
-            let outputs = get_tx_outputs(&state, &utxo)
+            let outputs = get_tx_outputs(&state, utxo)
                 .await
                 .expect("failed to get utxo outputs");
             for rune in outputs.runes {
-                let mut entry = amounts.entry(rune.0.rune.to_string()).or_default();
+                let entry = amounts.entry(rune.0.rune.to_string()).or_default();
                 *entry += rune.1.amount;
             }
         }
@@ -209,11 +208,8 @@ impl RuneBridge {
             .expect("failed to get rune list");
         let rune_id = runes_list
             .into_iter()
-            .find(|(id, spaced_rune)| args.rune_name == spaced_rune.to_string())
-            .expect(&format!(
-                "rune {} is not in the list of runes",
-                args.rune_name
-            ))
+            .find(|(_, spaced_rune)| args.rune_name == spaced_rune.to_string())
+            .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
             .0;
 
         let input_utxos = get_utxos(&state, &from_addr)
@@ -224,12 +220,9 @@ impl RuneBridge {
             .iter()
             .map(|utxo| TxInputInfo {
                 outpoint: OutPoint {
-                    txid: Txid::from_raw_hash(
-                        Hash::from_bytes_ref(
-                            &utxo.outpoint.txid.clone().try_into().expect("invalid txid"),
-                        )
-                        .clone(),
-                    ),
+                    txid: Txid::from_raw_hash(*Hash::from_bytes_ref(
+                        &utxo.outpoint.txid.clone().try_into().expect("invalid txid"),
+                    )),
                     vout: utxo.outpoint.vout,
                 },
                 tx_out: TxOut {

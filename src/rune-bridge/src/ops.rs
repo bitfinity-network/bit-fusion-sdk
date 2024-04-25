@@ -21,7 +21,7 @@ use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
 use ord_rs::OrdTransactionBuilder;
-use ordinals::{Pile, RuneId, SpacedRune};
+use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -40,7 +40,7 @@ pub async fn deposit(
         get_deposit_address(&state, eth_address).expect("Failed to get deposit address");
     let utxo_response: GetUtxosResponse = get_utxos(&state, &deposit_address).await?;
 
-    if utxo_response.utxos.len() == 0 {
+    if utxo_response.utxos.is_empty() {
         log::trace!("No utxos were found for address {deposit_address}");
         return Err(DepositError::NotingToDeposit);
     }
@@ -60,7 +60,7 @@ pub async fn deposit(
     state
         .borrow_mut()
         .mint_orders_mut()
-        .push(sender, nonce, mint_order.clone());
+        .push(sender, nonce, mint_order);
     state.borrow_mut().ledger_mut().deposit(
         &utxo_response.utxos,
         &deposit_address,
@@ -109,7 +109,7 @@ pub async fn build_withdraw_transaction(
     }
 
     let derivation_path = &inputs[0].derivation_path;
-    let public_key = state.borrow().der_public_key(&derivation_path);
+    let public_key = state.borrow().der_public_key(derivation_path);
     let signer = state.borrow().wallet(derivation_path.clone());
 
     let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
@@ -248,7 +248,7 @@ fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtx
 
     get_utxos_response.utxos.retain(|utxo| {
         !existing.iter().any(|v| {
-            &v.tx_input_info.outpoint.txid.as_byte_array()[..] == &utxo.outpoint.txid
+            v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
                 && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
         })
     })
@@ -312,7 +312,7 @@ pub async fn get_rune_list(
     #[derive(Debug, Clone, Deserialize)]
     struct RuneInfo {
         spaced_rune: SpacedRune,
-    };
+    }
 
     #[derive(Debug, Clone, Deserialize)]
     struct RunesResponse {
@@ -435,7 +435,7 @@ async fn create_mint_order(
         let state_ref = state.borrow();
 
         let sender_chain_id = state_ref.btc_chain_id();
-        let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
+        let sender = Id256::from_evm_address(eth_address, sender_chain_id);
         let src_token = Id256::from(&ic::id());
 
         let recipient_chain_id = state_ref.erc20_chain_id();
@@ -533,7 +533,7 @@ fn format_outpoint(outpoint: &Outpoint) -> String {
     // Nevertheless, to get the correct tx_id string we need to reverse the bytes first.
     format!(
         "{}:{}",
-        hex::encode(&outpoint.txid.iter().copied().rev().collect::<Vec<u8>>()),
+        hex::encode(outpoint.txid.iter().copied().rev().collect::<Vec<u8>>()),
         outpoint.vout
     )
 }

@@ -2,12 +2,12 @@ use std::cell::RefCell;
 
 use async_trait::async_trait;
 use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
-use bitcoin::secp256k1::{Message, Secp256k1};
+use bitcoin::secp256k1::Secp256k1;
 use bitcoin::Network;
 use bitcoin::{Address, PublicKey};
 use did::H160;
-use ethers_core::k256::sha2::{Digest, Sha256};
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
+use k256::ecdsa::signature::Verifier;
 use ord_rs::ExternalSigner;
 
 use crate::interface::GetAddressError;
@@ -62,7 +62,7 @@ impl IcSigner {
 #[async_trait]
 impl ExternalSigner for IcSigner {
     async fn ecdsa_public_key(&self) -> String {
-        hex::encode(&self.public_key().inner.serialize())
+        hex::encode(self.public_key().inner.serialize())
     }
 
     async fn sign_with_ecdsa(&self, message: &str) -> String {
@@ -88,15 +88,12 @@ impl ExternalSigner for IcSigner {
         let pubkey_bytes = hex::decode(public_key_hex).expect("failed to hex-decode public key");
         let message_bytes = hex::decode(message).expect("invalid message hex");
 
-        use k256::ecdsa::signature::Verifier;
         let signature = k256::ecdsa::Signature::try_from(signature_bytes.as_slice())
             .expect("failed to deserialize signature");
-        // k256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey_bytes)
-        //     .expect("failed to deserialize sec1 encoding into public key")
-        //     .verify(&message_bytes, &signature)
-        //     .is_ok()
-
-        true
+        k256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey_bytes)
+            .expect("failed to deserialize sec1 encoding into public key")
+            .verify(&message_bytes, &signature)
+            .is_ok()
     }
 }
 
@@ -145,7 +142,7 @@ fn get_derivation_path(eth_address: &H160) -> Result<DerivationPath, GetAddressE
 }
 
 fn ic_dp_to_derivation_path(
-    ic_derivation_path: &Vec<Vec<u8>>,
+    ic_derivation_path: &[Vec<u8>],
 ) -> Result<DerivationPath, GetAddressError> {
     let mut parts = vec![];
     for part in ic_derivation_path.iter() {

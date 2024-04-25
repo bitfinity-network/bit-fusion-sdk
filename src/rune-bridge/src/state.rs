@@ -172,7 +172,6 @@ impl State {
             .as_ref()
             .expect("master key is not initialized")
             .public_key
-            .clone()
     }
 
     pub fn chain_code(&self) -> ChainCode {
@@ -180,7 +179,6 @@ impl State {
             .as_ref()
             .expect("master key is not initialized")
             .chain_code
-            .clone()
     }
 
     pub fn ic_btc_network(&self) -> BitcoinNetwork {
@@ -211,8 +209,8 @@ impl State {
         self.master_key.clone().expect("ecdsa is not initialized")
     }
 
-    pub fn der_public_key(&self, derivation_path: &Vec<Vec<u8>>) -> PublicKey {
-        IcSigner::new(self.master_key(), self.network(), derivation_path.clone()).public_key()
+    pub fn der_public_key(&self, derivation_path: &[Vec<u8>]) -> PublicKey {
+        IcSigner::new(self.master_key(), self.network(), derivation_path.to_vec()).public_key()
     }
 
     pub fn wallet_type(&self, derivation_path: Vec<Vec<u8>>) -> WalletType {
@@ -242,7 +240,7 @@ impl State {
     pub fn indexer_url(&self) -> String {
         self.config
             .indexer_url
-            .strip_suffix("/")
+            .strip_suffix('/')
             .unwrap_or_else(|| &self.config.indexer_url)
             .to_string()
     }
@@ -297,7 +295,7 @@ impl State {
         }
     }
 
-    pub async fn configure(&mut self, config: RuneBridgeConfig) {
+    pub fn configure(&mut self, config: RuneBridgeConfig) {
         if let Err(err) = config.validate() {
             panic!("Invalid configuration: {err}");
         }

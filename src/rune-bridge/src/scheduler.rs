@@ -170,7 +170,7 @@ impl Task for BtcTask {
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
             BtcTask::MintErc20(address) => {
-                let address = address.clone();
+                let _address = address.clone();
                 Box::pin(async move {
                     todo!()
                     //
@@ -180,7 +180,6 @@ impl Task for BtcTask {
                 })
             }
             BtcTask::MintBtc(BurntEventData {
-                operation_id,
                 recipient_id,
                 amount,
                 ..

@@ -51,7 +51,7 @@ minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk"
 minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.14.x" }
 mockall = "0.12"
 once_cell = "1.16"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", rev = "e6d164cc97f36fe9034a723a17e95bc513235f39" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", rev = "79253202f224ca681288db61bbcb8bb7d1939e43" }
 ordinals = "0.0.7"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.11", default-features = false }
