@@ -1,7 +1,6 @@
-import dotenv from 'dotenv';
-import canisters from '../../.dfx/local/canister_ids.json';
+import canistersLocal from '../../.dfx/local/canister_ids.json';
 
-dotenv.config();
+const canisters: Record<string, Record<string, string>> = canistersLocal;
 
 export const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
 
@@ -29,3 +28,10 @@ export const CK_BTC_CANISTER_ID =
 export const CHAIN_ID = process.env.CHAIN_ID || 355113;
 
 export const IS_TEST = process.env.IS_TEST || false;
+
+export const BTC_BRIDGE_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS;
+
+export const BFT_BRIDGE_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS;
+
+export const BITCOIN_TOKEN_WRAPPED_ADDRESS =
+  process.env.BITCOIN_TOKEN_WRAPPED_ADDRESS;
