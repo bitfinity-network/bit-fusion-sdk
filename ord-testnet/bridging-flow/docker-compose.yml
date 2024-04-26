@@ -12,6 +12,8 @@ services:
       - "18444:18444" # Bitcoin P2P port
     networks:
       - bitcoin_network
+    extra_hosts:
+      - host.docker.internal:host-gateway
 
   ord:
     container_name: ord
@@ -43,6 +45,8 @@ services:
       - bitcoind
     networks:
       - bitcoin_network
+    extra_hosts:
+      - host.docker.internal:host-gateway
 
 volumes:
   bitcoin_data:

@@ -36,8 +36,7 @@ pub struct Brc20BridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub erc20_minter_fee: u64,
-    pub ordinals_indexer: String,
-    pub general_indexer: String,
+    pub indexer: String,
     pub logger: LogSettings,
 }
 
@@ -51,24 +50,18 @@ impl Default for Brc20BridgeConfig {
             },
             admin: Principal::management_canister(),
             erc20_minter_fee: 10,
-            ordinals_indexer: String::new(),
-            general_indexer: String::new(),
+            indexer: String::new(),
             logger: LogSettings::default(),
         }
     }
 }
 
 impl Brc20BridgeConfig {
-    fn validate_indexer_urls(&self) -> Result<(), String> {
-        if self.ordinals_indexer.is_empty() && self.general_indexer.is_empty() {
-            return Err("Indexer URLs are empty".to_string());
-        }
-
-        if !self.ordinals_indexer.starts_with("https") && !self.general_indexer.starts_with("https")
-        {
+    fn validate_indexer_url(&self) -> Result<(), String> {
+        if !self.indexer.starts_with("https") {
             return Err(format!(
-                "Indexer URLs must be HTTPS. Given: {} and {}",
-                self.ordinals_indexer, self.general_indexer
+                "Indexer URL must be HTTPS. Given: {}",
+                self.indexer
             ));
         }
 
@@ -117,7 +110,7 @@ impl State {
         #[cfg(target_family = "wasm")]
         ic_crypto_getrandom_for_wasm::register_custom_getrandom();
 
-        if let Err(err) = config.validate_indexer_urls() {
+        if let Err(err) = config.validate_indexer_url() {
             panic!("Invalid configuration: {err}");
         }
 
@@ -143,19 +136,11 @@ impl State {
         self.inscriptions.has_inscription(reveal_txid)
     }
 
-    pub fn general_indexer_url(&self) -> String {
+    pub fn indexer_url(&self) -> String {
         self.config
-            .general_indexer
+            .indexer
             .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.general_indexer)
-            .to_string()
-    }
-
-    pub fn ordinals_indexer_url(&self) -> String {
-        self.config
-            .ordinals_indexer
-            .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.ordinals_indexer)
+            .unwrap_or_else(|| &self.config.indexer)
             .to_string()
     }
 

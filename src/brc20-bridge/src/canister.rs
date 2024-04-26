@@ -94,11 +94,10 @@ impl Brc20Bridge {
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let state = get_state();
         let (network, derivation_path) = {
             (
-                state.borrow().ic_btc_network(),
-                state.borrow().derivation_path(None),
+                get_state().borrow().ic_btc_network(),
+                get_state().borrow().derivation_path(None),
             )
         };
 
@@ -122,11 +121,10 @@ impl Brc20Bridge {
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<Brc20TransferTransactions> {
-        let state = get_state();
         let (network, derivation_path) = {
             (
-                state.borrow().ic_btc_network(),
-                state.borrow().derivation_path(None),
+                get_state().borrow().ic_btc_network(),
+                get_state().borrow().derivation_path(None),
             )
         };
         Inscriber::brc20_transfer(

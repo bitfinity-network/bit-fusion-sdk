@@ -30,7 +30,7 @@ pub(crate) async fn fetch_brc20_token_details(
 ) -> anyhow::Result<Brc20TokenInfo> {
     let (network, indexer_url) = {
         let state = state.borrow();
-        (state.btc_network(), state.ordinals_indexer_url())
+        (state.btc_network(), state.indexer_url())
     };
 
     // check that BTC address is valid and/or
@@ -114,7 +114,7 @@ pub(crate) async fn fetch_reveal_transaction(
         (
             state.ic_btc_network(),
             state.btc_network(),
-            state.general_indexer_url(),
+            state.indexer_url(),
             state.derivation_path(None),
         )
     };
