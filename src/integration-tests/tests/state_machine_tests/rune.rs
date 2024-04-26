@@ -46,11 +46,11 @@ impl RunesSetup {
             log_settings: Default::default(),
             min_confirmations: 1,
             rune_info: RuneInfo {
-                name: "".to_string(),
+                name: "RUNE".to_string(),
                 block: 0,
                 tx: 0,
             },
-            indexer_url: "".to_string(),
+            indexer_url: "https://indexer".to_string(),
             deposit_fee: 0,
         };
         (&context)
