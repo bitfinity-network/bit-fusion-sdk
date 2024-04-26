@@ -19,7 +19,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
-use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use serde::Deserialize;
@@ -81,9 +81,7 @@ impl RuneBridge {
         {
             let scheduler = get_scheduler();
             let mut borrowed_scheduler = scheduler.borrow_mut();
-            borrowed_scheduler.set_failed_task_callback(|task, error| {
-                log::error!("task failed: {task:?}, error: {error:?}")
-            });
+            borrowed_scheduler.on_completion_callback(log_task_execution_error);
             borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
@@ -275,6 +273,24 @@ pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_bytes());
 
     Subaccount(subaccount)
+}
+
+fn log_task_execution_error(task: InnerScheduledTask<BtcTask>) {
+    match task.status() {
+        TaskStatus::Failed {
+            timestamp_secs,
+            error,
+        } => {
+            log::error!(
+                "task #{} execution failed: {error} at {timestamp_secs}",
+                task.id()
+            )
+        }
+        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
+            log::error!("task #{} panicked at {timestamp_secs}", task.id())
+        }
+        _ => (),
+    };
 }
 
 impl Metrics for RuneBridge {

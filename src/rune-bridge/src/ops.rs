@@ -182,7 +182,7 @@ pub async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawErr
 
 async fn send_tx(state: &RefCell<State>, transaction: &Transaction) -> Result<(), WithdrawError> {
     log::trace!(
-        "Sending transaction {} to the bitcoin addapter",
+        "Sending transaction {} to the bitcoin adapter",
         transaction.txid()
     );
 
@@ -452,6 +452,8 @@ async fn create_mint_order(
             name: state_ref.token_name(),
             symbol: state_ref.token_symbol(),
             decimals: state_ref.decimals(),
+            approve_spender: Default::default(),
+            approve_amount: Default::default(),
         };
 
         let signer = state_ref.signer().get().clone();
