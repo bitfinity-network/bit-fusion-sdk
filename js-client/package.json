@@ -47,7 +47,6 @@
     "vitest": "^1.4.0"
   },
   "dependencies": {
-    "runes-js": "^0.1.6",
     "@dfinity/agent": "^1.2.0",
     "@dfinity/candid": "^1.2.0",
     "@dfinity/identity": "^1.2.0",

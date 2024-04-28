@@ -1,18 +1,13 @@
-use bitcoin::{Network, PublicKey};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    EcdsaPublicKeyArgument, EcdsaPublicKeyResponse,
-};
 use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
 
 use rune_bridge::interface::GetAddressError;
-use rune_bridge::key::{get_derivation_path_ic, DERIVATION_PATH_PREFIX};
-use rune_bridge::state::RuneBridgeConfig;
+use rune_bridge::state::{RuneBridgeConfig, RuneInfo};
 
 use crate::context::TestContext;
 use crate::state_machine_tests::StateMachineContext;
@@ -28,13 +23,6 @@ struct RunesSetup {
 fn key_id() -> EcdsaKeyId {
     EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
-        name: KEY_ID.to_string(),
-    }
-}
-
-fn key_id_cdk() -> ic_exports::ic_cdk::api::management_canister::ecdsa::EcdsaKeyId {
-    ic_exports::ic_cdk::api::management_canister::ecdsa::EcdsaKeyId {
-        curve: ic_exports::ic_cdk::api::management_canister::ecdsa::EcdsaCurve::Secp256k1,
         name: KEY_ID.to_string(),
     }
 }
@@ -56,7 +44,14 @@ impl RunesSetup {
             },
             admin: (&context).admin(),
             log_settings: Default::default(),
-            ecdsa_key_name: KEY_ID.to_string(),
+            min_confirmations: 1,
+            rune_info: RuneInfo {
+                name: "RUNE".to_string(),
+                block: 0,
+                tx: 0,
+            },
+            indexer_url: "https://indexer".to_string(),
+            deposit_fee: 0,
         };
         (&context)
             .install_canister(
@@ -78,16 +73,8 @@ impl RunesSetup {
         }
     }
 
-    fn network(&self) -> Network {
-        Network::Bitcoin
-    }
-
     fn rune_client(&self) -> impl CanisterClient {
         (&self.ctx).client(self.rune_bridge, "alice")
-    }
-
-    fn management_client(&self) -> impl CanisterClient {
-        (&self.ctx).client(Principal::management_canister(), "alice")
     }
 
     async fn deposit_address(&self, eth_address: &H160) -> String {

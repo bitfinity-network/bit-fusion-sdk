@@ -3,6 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::CellStructure;
@@ -21,7 +22,7 @@ use crate::state::State;
 
 type SignedMintOrderData = Vec<u8>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmEvents(BridgeSide),
@@ -195,6 +196,8 @@ impl BridgeTask {
             name: to_array(&burn_event.name)?,
             symbol: to_array(&burn_event.symbol)?,
             decimals: burn_event.decimals,
+            approve_spender: H160::zero(),
+            approve_amount: U256::zero(),
         };
 
         let signer = state.borrow().signer.get().clone();

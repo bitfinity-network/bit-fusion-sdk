@@ -85,3 +85,27 @@ pub static ERC_20_BALANCE: Lazy<Function> = Lazy::new(|| Function {
     constant: None,
     state_mutability: StateMutability::NonPayable,
 });
+
+#[allow(deprecated)] // need to initialize `constant` field
+pub static ERC_20_ALLOWANCE: Lazy<Function> = Lazy::new(|| Function {
+    name: "allowance".into(),
+    inputs: vec![
+        Param {
+            name: "_owner".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+        Param {
+            name: "_spender".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+    ],
+    outputs: vec![Param {
+        name: "remaining".into(),
+        kind: ParamType::Uint(256),
+        internal_type: None,
+    }],
+    constant: None,
+    state_mutability: StateMutability::View,
+});
