@@ -1,0 +1,90 @@
+type BftBridgeConfig = record {
+  decimals : nat8;
+  token_symbol : vec nat8;
+  token_address : text;
+  bridge_address : text;
+  erc20_chain_id : nat32;
+  token_name : vec nat8;
+};
+type BitcoinNetwork = variant { mainnet; regtest; testnet };
+type CreateEdictTxArgs = record {
+  destination : text;
+  rune_name : text;
+  change_address : opt text;
+  from_address : text;
+  amount : nat;
+};
+type DepositError = variant {
+  Evm : text;
+  Sign : text;
+  NoRunesToDeposit;
+  NotingToDeposit;
+  NotInitialized;
+  NotEnoughBtc : record { minimum : nat64; received : nat64 };
+  Unavailable : text;
+  Pending : record { current_confirmations : nat32; min_confirmations : nat32 };
+};
+type Erc20MintStatus = variant {
+  Minted : record { tx_id : text; amount : nat };
+  Scheduled : record {
+    required_confirmations : nat32;
+    pending_utxos : opt vec record {};
+    current_confirmations : nat32;
+  };
+  Signed : vec nat8;
+};
+type EvmLink = variant { Ic : principal; Http : text };
+type GetAddressError = variant { Derivation };
+type Interval = variant {
+  PerHour;
+  PerWeek;
+  PerDay;
+  Period : record { seconds : nat64 };
+  PerMinute;
+};
+type LogSettings = record {
+  log_filter : opt text;
+  in_memory_records : opt nat64;
+  enable_console : bool;
+};
+type MetricsData = record {
+  stable_memory_size : nat64;
+  cycles : nat64;
+  heap_memory_size : nat64;
+};
+type MetricsMap = record {
+  map : vec record { nat64; MetricsData };
+  interval : Interval;
+  history_length_nanos : nat64;
+};
+type MetricsStorage = record { metrics : MetricsMap };
+type Result = variant { Ok : Erc20MintStatus; Err : DepositError };
+type Result_1 = variant { Ok : text; Err : GetAddressError };
+type RuneBridgeConfig = record {
+  admin : principal;
+  signing_strategy : SigningStrategy;
+  indexer_url : text;
+  evm_link : EvmLink;
+  rune_info : RuneInfo;
+  network : BitcoinNetwork;
+  min_confirmations : nat32;
+  log_settings : LogSettings;
+  deposit_fee : nat64;
+};
+type RuneInfo = record { tx : nat32; name : text; block : nat64 };
+type SigningKeyId = variant { Dfx; Production; Test; PocketIc; Custom : text };
+type SigningStrategy = variant {
+  Local : record { private_key : vec nat8 };
+  ManagementCanister : record { key_id : SigningKeyId };
+};
+service : (RuneBridgeConfig) -> {
+  admin_configure_bft_bridge : (BftBridgeConfig) -> ();
+  admin_configure_ecdsa : () -> ();
+  create_edict_tx : (CreateEdictTxArgs) -> (vec nat8);
+  deposit : (text) -> (Result);
+  get_curr_metrics : () -> (MetricsData) query;
+  get_deposit_address : (text) -> (Result_1) query;
+  get_evm_address : () -> (opt text);
+  get_metrics : () -> (MetricsStorage) query;
+  get_rune_balances : (text) -> (vec record { text; nat });
+}
