@@ -55,9 +55,15 @@ export const getProvider = () => {
 
 export const generateWallet = () => {
   const wallet = ethers.Wallet.fromPhrase(LOCAL_TEST_SEED_PHRASE);
-  // const wallet = new ethers.Wallet(
-  //   '0xe96e898e18631ef63c31ae9349a332cced5075e04fd5bcf4e212b6ecea699ee3'
-  // );
+
+  const provider = getProvider();
+
+  return wallet.connect(provider);
+};
+
+export const randomWallet = () => {
+  const wallet = ethers.Wallet.createRandom();
+
   const provider = getProvider();
 
   return wallet.connect(provider);
@@ -90,8 +96,36 @@ export const execBitcoinCmd = (cmd: string) => {
 };
 
 export const execOrdCmd = (cmd: string) => {
-  return execCmd(`${process.env.ORD_CMD} ${cmd}`)
-}
+  return execCmd(`${process.env.ORD_CMD} ${cmd}`);
+};
+
+export const execOrdSend = async (address: string, runeName: string) => {
+  try {
+    const response = await execOrdCmd(
+      `wallet --server-url http://0.0.0.0:8000 send --fee-rate 10 ${address} 10:${runeName}`
+    );
+
+    const result = JSON.parse(response);
+
+    return result.txid;
+  } catch (_) {
+    return null;
+  }
+};
+
+export const execOrdReceive = async () => {
+  try {
+    const response = await execOrdCmd(
+      `wallet --server-url http://0.0.0.0:8000 receive`
+    );
+
+    const result = JSON.parse(response);
+
+    return result.addresses[0];
+  } catch (_) {
+    return null;
+  }
+};
 
 export async function mintNativeToken(toAddress: string, amount: string) {
   const response = await fetch(process.env.ETH_RPC_URL!, {
