@@ -20,46 +20,46 @@
 
 set +e
 
-######################## Start the Bitcoin Daemon and Ord #####################
+# ######################## Start the Bitcoin Daemon and Ord #####################
 
-echo "Starting the Bitcoin daemon"
-COMPOSE_FILE="../ckERC20/ord-testnet/bridging-flow/docker-compose.yml"
+# echo "Starting the Bitcoin daemon"
+# COMPOSE_FILE="../ckERC20/ord-testnet/bridging-flow/docker-compose.yml"
 
-docker-compose -f "$COMPOSE_FILE" up -d bitcoind
-sleep 2
+# docker-compose -f "$COMPOSE_FILE" up -d bitcoind
+# sleep 2
 
-wallet_exists=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest listwallets | grep -c "testwallet")
+# wallet_exists=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest listwallets | grep -c "testwallet")
 
-if [ "$wallet_exists" -eq 0 ]; then
-    echo "Creating 'testwallet'..."
-    docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest createwallet "testwallet"
-fi
+# if [ "$wallet_exists" -eq 0 ]; then
+#     echo "Creating 'testwallet'..."
+#     docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest createwallet "testwallet"
+# fi
 
-echo "Loading 'testwallet'..."
-load_output=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest loadwallet "testwallet" 2>&1)
+# echo "Loading 'testwallet'..."
+# load_output=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest loadwallet "testwallet" 2>&1)
 
-if echo "$load_output" | grep -q "Wallet file verification failed"; then
-    echo "Wallet already exists but could not be loaded due to verification failure."
-elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
-    echo "Wallet loaded successfully."
-else
-    echo "Unexpected wallet load output: $load_output"
-fi
+# if echo "$load_output" | grep -q "Wallet file verification failed"; then
+#     echo "Wallet already exists but could not be loaded due to verification failure."
+# elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
+#     echo "Wallet loaded successfully."
+# else
+#     echo "Unexpected wallet load output: $load_output"
+# fi
 
-# Generate 101 blocks to ensure enough coins are available for spending
-height=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getblockcount)
-if [ "$height" -lt 101 ]; then
-    echo "Generating 101 blocks..."
-    new_address=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getnewaddress)
-    docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest generatetoaddress 101 "$new_address"
-fi
+# # Generate 101 blocks to ensure enough coins are available for spending
+# height=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getblockcount)
+# if [ "$height" -lt 101 ]; then
+#     echo "Generating 101 blocks..."
+#     new_address=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getnewaddress)
+#     docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest generatetoaddress 101 "$new_address"
+# fi
 
-# Start the ord service
-echo "Starting the 'ord' service..."
-docker-compose -f "$COMPOSE_FILE" up -d ord
-if [ $? -ne 0 ]; then
-    echo "Failed to start 'ord' service. Attempting to continue script..."
-fi
+# # Start the ord service
+# echo "Starting the 'ord' service..."
+# docker-compose -f "$COMPOSE_FILE" up -d ord
+# if [ $? -ne 0 ]; then
+#     echo "Failed to start 'ord' service. Attempting to continue script..."
+# fi
 
 ############################### Configure Dfx #################################
 

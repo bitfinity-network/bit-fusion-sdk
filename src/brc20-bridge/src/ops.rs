@@ -28,6 +28,7 @@ pub async fn brc20_to_erc20(
     brc20_ticker: String,
     holder_btc_addr: String,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
+    log::info!("Fetching {brc20_ticker} token details");
     let Brc20TokenInfo {
         tx_id,
         ticker,
@@ -36,6 +37,7 @@ pub async fn brc20_to_erc20(
         .await
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
+    log::info!("Fetching BRC20 reveal transaction by its ID: {tx_id}");
     let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
