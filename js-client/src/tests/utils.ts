@@ -128,7 +128,7 @@ export const execOrdReceive = async () => {
 };
 
 export async function mintNativeToken(toAddress: string, amount: string) {
-  const response = await fetch(process.env.ETH_RPC_URL!, {
+  const response = await fetch(process.env.RPC_URL!, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

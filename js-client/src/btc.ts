@@ -12,8 +12,7 @@ import { wait } from './tests/utils';
 type EthAddr = `0x${string}`;
 
 export class BtcBridge {
-  protected BTC_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS as EthAddr;
-  protected BFT_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS as EthAddr;
+  protected BFT_ETH_ADDRESS = process.env.BFT_ETH_ADDRESS as EthAddr;
   protected TOKEN_WRAPPED_ADDRESS = process.env
     .BITCOIN_TOKEN_WRAPPED_ADDRESS as EthAddr;
 

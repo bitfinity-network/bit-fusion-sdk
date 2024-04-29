@@ -7,7 +7,7 @@ import { exec } from 'child_process';
 import bitcore from 'bitcore-lib';
 
 import { BtcBridge } from '../btc';
-import { wait } from './utils';
+import { mintNativeToken, wait } from './utils';
 
 export const execCmd = (cmd: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -38,31 +38,10 @@ export const evmc = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.ETH_RPC_URL!]
+      http: [process.env.RPC_URL!]
     }
   }
 });
-
-export async function mintNativeToken(toAddress: string, amount: string) {
-  const response = await fetch(process.env.ETH_RPC_URL!, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: '67',
-      method: 'ic_mintNativeToken',
-      params: [toAddress, amount]
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  return response.json();
-}
 
 describe.sequential(
   'btc',

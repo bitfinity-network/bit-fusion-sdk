@@ -10,7 +10,7 @@ import { encodeBtcAddress } from './utils';
 type EthAddr = `0x${string}`;
 
 export class RuneBridge {
-  protected BFT_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS as EthAddr;
+  protected BFT_ETH_ADDRESS = process.env.BFT_ETH_ADDRESS as EthAddr;
 
   constructor(protected provider: ethers.Signer) {}
 
@@ -31,7 +31,7 @@ export class RuneBridge {
 
   private getBftBridgeContract() {
     return new ethers.Contract(
-      process.env.BFT_BRIDGE_ETH_ADDRESS!,
+      process.env.BFT_ETH_ADDRESS!,
       BftBridgeABI,
       this.provider
     );
@@ -72,11 +72,11 @@ export class RuneBridge {
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await RuneActor.deposit(ethAddress);
 
-      await wait(5000);
-
       if ('Ok' in result) {
         return result.Ok;
       }
+
+      await wait(5000);
     }
   }
 
