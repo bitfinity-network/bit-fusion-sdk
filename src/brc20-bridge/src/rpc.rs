@@ -10,13 +10,18 @@ use bitcoin::{
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
-    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
+    http_request, CanisterHttpRequestArgument, HttpMethod, HttpResponse,
 };
+use ic_exports::ic_kit::ic;
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-use crate::constant::{BRC20_TICKER_LEN, CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
+use crate::constant::{
+    BRC20_TICKER_LEN, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
+    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
+};
 use crate::interface::bridge_api::BridgeError;
 use crate::interface::get_deposit_address;
 use crate::interface::store::Brc20TokenInfo;
@@ -37,43 +42,17 @@ pub(crate) async fn fetch_brc20_token_details(
     // corresponds to the network.
     is_valid_btc_address(&holder, network)?;
 
-    let url = format!("{indexer_url}/ordinals/v1/brc-20/tokens/{tick}");
-
-    log::info!("Retrieving {tick} token details from: {url}");
-
-    let request_params = CanisterHttpRequestArgument {
-        url,
-        max_response_bytes: Some(MAX_HTTP_RESPONSE_BYTES),
-        method: HttpMethod::GET,
-        headers: vec![HttpHeader {
-            name: "Accept".to_string(),
-            value: "application/json".to_string(),
-        }],
-        body: None,
-        transform: None,
-    };
-
-    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+    let token_details = match get_brc20_token_by_ticker(state, &indexer_url, &tick)
         .await
-        .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
-        .0;
-
-    if result.status.to_string() != "200" {
-        log::error!("Failed to fetch data: HTTP status {}", result.status);
-        return Err(BridgeError::FetchBrc20TokenDetails("Failed to fetch data".to_string()).into());
-    }
-
-    log::info!(
-        "Response from indexer: Status: {} Body: {}",
-        result.status,
-        String::from_utf8_lossy(&result.body)
-    );
-
-    let token_details: Brc20TokenResponse =
-        serde_json::from_slice(&result.body).map_err(|err| {
-            log::error!("Failed to retrieve {tick} token details from the indexer: {err:?}");
-            BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
-        })?;
+        .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
+    {
+        Some(token_res) => token_res,
+        None => {
+            return Err(
+                BridgeError::FetchBrc20TokenDetails("No BRC20 token found".to_owned()).into(),
+            )
+        }
+    };
 
     let TokenInfo {
         tx_id,
@@ -109,11 +88,10 @@ pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
-    let (ic_btc_network, btc_network, indexer_url, derivation_path) = {
+    let (ic_btc_network, indexer_url, derivation_path) = {
         let state = state.borrow();
         (
             state.ic_btc_network(),
-            state.btc_network(),
             state.indexer_url(),
             state.derivation_path(None),
         )
@@ -131,43 +109,17 @@ pub(crate) async fn fetch_reveal_transaction(
 
     let txid = hex::encode(brc20_utxo.outpoint.txid);
 
-    let btc_network_str = network_as_str(btc_network);
-    let url = format!("{indexer_url}{btc_network_str}/api/tx/{txid}");
-
-    let request_params = CanisterHttpRequestArgument {
-        url,
-        max_response_bytes: Some(MAX_HTTP_RESPONSE_BYTES),
-        method: HttpMethod::GET,
-        headers: vec![HttpHeader {
-            name: "Accept".to_string(),
-            value: "application/json".to_string(),
-        }],
-        body: None,
-        transform: None,
+    let transaction = match get_brc20_transaction_by_id(state, &indexer_url, &txid)
+        .await
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
+    {
+        Some(token_res) => token_res,
+        None => {
+            return Err(BridgeError::GetTransactionById("No BRC20 token found".to_owned()).into())
+        }
     };
 
-    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
-        .await
-        .map_err(|err| BridgeError::GetTransactionById(format!("{err:?}")))?
-        .0;
-
-    if result.status.to_string() != "200" {
-        log::error!("Failed to fetch data: HTTP status {}", result.status);
-        return Err(BridgeError::FetchBrc20TokenDetails("Failed to fetch data".to_string()).into());
-    }
-
-    log::info!(
-        "Response from indexer: Status: {} Body: {}",
-        result.status,
-        String::from_utf8_lossy(&result.body)
-    );
-
-    let tx: TxInfo = serde_json::from_slice(&result.body).map_err(|err| {
-        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
-        BridgeError::GetTransactionById(format!("{err:?}"))
-    })?;
-
-    tx.try_into()
+    Ok(transaction)
 }
 
 pub(crate) async fn parse_and_validate_inscription(
@@ -200,6 +152,133 @@ pub(crate) fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
         Brc20::Deploy(deploy_func) => (deploy_func.max, &deploy_func.tick),
         Brc20::Mint(mint_func) => (mint_func.amt, &mint_func.tick),
         Brc20::Transfer(transfer_func) => (transfer_func.amt, &transfer_func.tick),
+    }
+}
+
+async fn get_brc20_token_by_ticker(
+    state: &RefCell<State>,
+    base_indexer_url: &str,
+    ticker: &str,
+) -> Result<Option<Brc20TokenResponse>, String> {
+    let network = { state.borrow().btc_network() };
+
+    match network {
+        Network::Regtest => {
+            http_get_req_mock::<Brc20TokenResponse>(&format!(
+                "{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}"
+            ))
+            .await
+        }
+        _ => {
+            http_get_req::<Brc20TokenResponse>(&format!(
+                "{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}"
+            ))
+            .await
+        }
+    }
+}
+
+async fn get_brc20_transaction_by_id(
+    state: &RefCell<State>,
+    base_indexer_url: &str,
+    txid: &str,
+) -> Result<Option<Transaction>, String> {
+    let network = { state.borrow().btc_network() };
+    let btc_network_str = network_as_str(network);
+
+    match network {
+        Network::Regtest => {
+            http_get_req_mock::<Transaction>(&format!(
+                "{base_indexer_url}{btc_network_str}/api/tx/{txid}"
+            ))
+            .await
+        }
+        _ => {
+            http_get_req::<Transaction>(&format!(
+                "{base_indexer_url}{btc_network_str}/api/tx/{txid}"
+            ))
+            .await
+        }
+    }
+}
+
+fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 {
+    let headers_size = req.headers.iter().fold(0u128, |len, header| {
+        len + header.value.len() as u128 + header.name.len() as u128
+    });
+
+    let mut request_size = req.url.len() as u128 + headers_size;
+
+    if let Some(transform) = &req.transform {
+        request_size += transform.context.len() as u128;
+    }
+
+    if let Some(body) = &req.body {
+        request_size += body.len() as u128;
+    }
+
+    let http_outcall_cost: u128 = HTTP_OUTCALL_PER_CALL_COST
+        + HTTP_OUTCALL_REQ_PER_BYTE_COST * request_size
+        + HTTP_OUTCALL_RES_PER_BYTE_COST
+            * req
+                .max_response_bytes
+                .unwrap_or(HTTP_OUTCALL_RES_DEFAULT_SIZE) as u128;
+
+    http_outcall_cost
+}
+
+async fn http_get_req<T>(url: &str) -> Result<Option<T>, String>
+where
+    T: DeserializeOwned,
+{
+    let req = CanisterHttpRequestArgument {
+        url: url.to_string(),
+        max_response_bytes: None,
+        method: HttpMethod::GET,
+        headers: Vec::new(),
+        body: None,
+        transform: None,
+    };
+
+    let cycles = get_estimated_http_outcall_cycles(&req);
+
+    let (resp,) = http_request(req, cycles)
+        .await
+        .map_err(|(_rejection_code, cause)| cause)?;
+
+    if resp.status == 200u16 {
+        let data = serde_json::from_slice(&resp.body).map_err(|x| x.to_string())?;
+
+        Ok(Some(data))
+    } else if resp.status == 404u16 {
+        Ok(None)
+    } else {
+        Err("Invalid http status code".to_string())
+    }
+}
+
+async fn http_get_req_mock<T>(url: &str) -> Result<Option<T>, String>
+where
+    T: DeserializeOwned,
+{
+    let canister_id = ic::id();
+    let (maybe_resp,): (Option<HttpResponse>,) =
+        ic::call(canister_id, "get_http_mock", (url.to_string(),))
+            .await
+            .map_err(|(_rejection_code, cause)| cause)?;
+
+    let Some(resp) = maybe_resp else {
+        panic!("HTTP mock is not found")
+    };
+
+    if resp.status == 200u16 {
+        let data = serde_json::from_slice(&resp.body).map_err(|x| x.to_string())?;
+
+        Ok(Some(data))
+    } else if resp.status == 404u16 {
+        Ok(None)
+    } else {
+        Err("Invalid http status code".to_string())
     }
 }
 

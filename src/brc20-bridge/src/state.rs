@@ -1,10 +1,12 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use bitcoin::Network;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::api::management_canister::http_request::HttpResponse;
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
@@ -37,6 +39,7 @@ pub struct Brc20BridgeConfig {
     pub admin: Principal,
     pub erc20_minter_fee: u64,
     pub indexer: String,
+    pub http_mocks: HashMap<String, HttpResponse>,
     pub logger: LogSettings,
 }
 
@@ -51,6 +54,7 @@ impl Default for Brc20BridgeConfig {
             admin: Principal::management_canister(),
             erc20_minter_fee: 10,
             indexer: String::new(),
+            http_mocks: HashMap::new(),
             logger: LogSettings::default(),
         }
     }
@@ -204,6 +208,14 @@ impl State {
 
     pub fn inscriptions_mut(&mut self) -> &mut Brc20Store {
         &mut self.inscriptions
+    }
+
+    pub fn http_mocks(&self) -> HashMap<String, HttpResponse> {
+        self.config.http_mocks.clone()
+    }
+
+    pub fn http_mocks_mut(&mut self) -> &mut HashMap<String, HttpResponse> {
+        &mut self.config.http_mocks
     }
 
     pub fn get_evm_info(&self) -> EvmInfo {

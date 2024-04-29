@@ -5,6 +5,7 @@ use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner as _;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_exports::ic_cdk::api::management_canister::http_request::HttpResponse;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure as _, StableUnboundedMap, VirtualMemory};
@@ -179,6 +180,16 @@ impl Brc20Bridge {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         crate::build_data::canister_build_data()
+    }
+
+    #[update]
+    pub fn set_http_mock(&mut self, url: String, resp: HttpResponse) {
+        get_state().borrow_mut().http_mocks_mut().insert(url, resp);
+    }
+
+    #[update]
+    pub fn get_http_mock(&self, url: String) -> Option<HttpResponse> {
+        get_state().borrow().http_mocks().get(&url).cloned()
     }
 
     pub fn idl() -> Idl {

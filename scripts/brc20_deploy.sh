@@ -78,8 +78,8 @@ ADMIN_WALLET=$(dfx identity get-wallet)
 
 CHAIN_ID=355113
 
-# INDEXER_URL="https://127.0.0.1:8001"
-INDEXER_URL="https://host.docker.internal:8001"
+INDEXER_URL="https://127.0.0.1:8001"
+# INDEXER_URL="https://host.docker.internal:8001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -115,6 +115,7 @@ dfx deploy brc20-bridge --argument "(record {
       in_memory_records = opt 10000;
       log_filter = opt \"info\";
     };
+    http_mocks = vec { };
 })"
 
 ######################## Deploy BFT and Token Contracts ######################
@@ -179,47 +180,47 @@ fi
 
 echo "bitcoind container ID: $CONTAINER_ID"
 
-echo "Topping up canister's wallet"
-docker exec "$CONTAINER_ID" bitcoin-cli -regtest generatetoaddress 1 "$BRIDGE_ADDRESS"
+# echo "Topping up canister's wallet"
+# docker exec "$CONTAINER_ID" bitcoin-cli -regtest generatetoaddress 1 "$BRIDGE_ADDRESS"
 
-# 3. Check balance
-dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+# # 3. Check balance
+# dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
-# 4. Prepare and make the BRC20 inscription
-BRC20_TICKER="kobp"
-brc20_inscription="{\"p\":\"brc-20\", \"op\":\"deploy\", \"tick\":\"$BRC20_TICKER\", \"max\":\"1000\", \"lim\":\"10\", \"dec\":\"8\"}"
+# # 4. Prepare and make the BRC20 inscription
+# BRC20_TICKER="kobp"
+# brc20_inscription="{\"p\":\"brc-20\", \"op\":\"deploy\", \"tick\":\"$BRC20_TICKER\", \"max\":\"1000\", \"lim\":\"10\", \"dec\":\"8\"}"
 
-echo "Creating a BRC20 inscription with content: $brc20_inscription"
-dfx canister call brc20-bridge inscribe "(variant { Brc20 }, \"${brc20_inscription//\"/\\\"}\", \"${BRIDGE_ADDRESS}\", \"${BRIDGE_ADDRESS}\", null)"
+# echo "Creating a BRC20 inscription with content: $brc20_inscription"
+# dfx canister call brc20-bridge inscribe "(variant { Brc20 }, \"${brc20_inscription//\"/\\\"}\", \"${BRIDGE_ADDRESS}\", \"${BRIDGE_ADDRESS}\", null)"
 
-# 5. Swap the BRC20 inscription for an ERC20 token
-for i in 1 2 3; do
-  sleep 5
-  echo "Trying to bridge from BRC20 to ERC20"
-  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
-  echo "Result: $mint_status"
+# # 5. Swap the BRC20 inscription for an ERC20 token
+# for i in 1 2 3; do
+#   sleep 5
+#   echo "Trying to bridge from BRC20 to ERC20"
+#   mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+#   echo "Result: $mint_status"
 
-  if [[ $mint_status == *"Minted"* ]]; then
-    echo "Minting of ERC20 token successful."
-    break
-  fi
+#   if [[ $mint_status == *"Minted"* ]]; then
+#     echo "Minting of ERC20 token successful."
+#     break
+#   fi
 
-  if [[ $i -eq 3 ]]; then
-    echo "Failed to mint after 3 retries"
-    exit 1
-  fi
-done
+#   if [[ $i -eq 3 ]]; then
+#     echo "Failed to mint after 3 retries"
+#     exit 1
+#   fi
+# done
 
-sleep 5
+# sleep 5
 
-######################## Swap ERC20 for BRC20 ######################
-USER_ADDRESS=$(docker exec -it "$CONTAINER_ID" bitcoin-cli -regtest -rpcwallet="testwallet" listreceivedbyaddress 0 true | jq -r '.[0].address')
-echo "Inscription destination and leftovers address: $USER_ADDRESS"
+# ######################## Swap ERC20 for BRC20 ######################
+# USER_ADDRESS=$(docker exec -it "$CONTAINER_ID" bitcoin-cli -regtest -rpcwallet="testwallet" listreceivedbyaddress 0 true | jq -r '.[0].address')
+# echo "Inscription destination and leftovers address: $USER_ADDRESS"
 
-cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
-  --wallet="$ETH_WALLET" \
-  --evm-canister="$EVM" \
-  --bft-bridge="$BFT_ETH_ADDRESS" \
-  --token-address="$TOKEN_ETH_ADDRESS" \
-  --address="$USER_ADDRESS" \
-  --amount=10
+# cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+#   --wallet="$ETH_WALLET" \
+#   --evm-canister="$EVM" \
+#   --bft-bridge="$BFT_ETH_ADDRESS" \
+#   --token-address="$TOKEN_ETH_ADDRESS" \
+#   --address="$USER_ADDRESS" \
+#   --amount=10
