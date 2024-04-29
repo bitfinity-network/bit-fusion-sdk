@@ -200,7 +200,7 @@ pub struct BurnEventData {
     pub operation_id: u32,
     pub name: Vec<u8>,
     pub symbol: Vec<u8>,
-    pub token_uri: String,
+    pub nft_id: String,
 }
 
 /// Builds `BurntEventData` from tokens.
@@ -213,7 +213,7 @@ struct BurnEventDataBuilder {
     pub operation_id: Option<u32>,
     pub name: Option<Vec<u8>>,
     pub symbol: Option<Vec<u8>>,
-    pub token_uri: Option<String>,
+    pub nft_id: Option<String>,
 }
 
 impl BurnEventDataBuilder {
@@ -233,7 +233,7 @@ impl BurnEventDataBuilder {
             operation_id: self.operation_id.ok_or_else(not_found("operationID"))?,
             name: self.name.ok_or_else(not_found("name"))?,
             symbol: self.symbol.ok_or_else(not_found("symbol"))?,
-            token_uri: self.token_uri.ok_or_else(not_found("tokenURI"))?,
+            nft_id: self.nft_id.ok_or_else(not_found("nftID"))?,
         })
     }
 
@@ -246,7 +246,7 @@ impl BurnEventDataBuilder {
             "operationID" => self.operation_id = value.into_uint().map(|v| v.as_u32()),
             "name" => self.name = value.into_fixed_bytes(),
             "symbol" => self.symbol = value.into_fixed_bytes(),
-            "tokenURI" => self.token_uri = value.into_string(),
+            "nftID" => self.nft_id = value.into_string(),
             _ => {}
         };
         self
@@ -417,8 +417,7 @@ mod tests {
     use ethers_core::abi::{Bytes, RawLog, Token};
     use ethers_core::utils::hex::traits::FromHex;
 
-    use super::{BurnEventData, MintedEventData};
-    use super::{BurnEventDataBuilder, MintedEventDataBuilder};
+    use super::{BurnEventData, BurnEventDataBuilder, MintedEventData, MintedEventDataBuilder};
 
     #[test]
     fn minted_event_data_builder_test() {
@@ -452,6 +451,7 @@ mod tests {
         let from_erc721 = H160::from_slice(&[3; 20]);
         let recipient_id = vec![2; 32];
         let to_token = vec![3; 32];
+        let nft_id = "66bf2c7be3b0de6916ce8d29465ca7d7c6e27bd57238c25721c101fac34f39cfi0";
         let operation_id = 24.into();
         let name = vec![4; 32];
         let symbol = vec![5; 32];
@@ -463,11 +463,19 @@ mod tests {
             .with_field_from_token("toToken", Token::FixedBytes(to_token.clone()))
             .with_field_from_token("operationID", Token::Uint(operation_id))
             .with_field_from_token("name", Token::FixedBytes(name.clone()))
+            .with_field_from_token(
+                "nftID",
+                Token::String(
+                    "66bf2c7be3b0de6916ce8d29465ca7d7c6e27bd57238c25721c101fac34f39cfi0"
+                        .to_string(),
+                ),
+            )
             .with_field_from_token("symbol", Token::FixedBytes(symbol.clone()))
             .build()
             .unwrap();
 
         assert_eq!(event.sender, sender);
+        assert_eq!(event.nft_id, nft_id);
         assert_eq!(event.from_erc721, from_erc721);
         assert_eq!(event.recipient_id, recipient_id);
         assert_eq!(event.to_token, to_token);

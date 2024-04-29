@@ -195,7 +195,7 @@ impl BridgeTask {
             name: to_array(&burn_event.name)?,
             symbol: to_array(&burn_event.symbol)?,
             approve_spender: H160::zero(),
-            token_uri: burn_event.token_uri,
+            token_uri: burn_event.nft_id,
         };
 
         let signer = state.borrow().signer.get().clone();

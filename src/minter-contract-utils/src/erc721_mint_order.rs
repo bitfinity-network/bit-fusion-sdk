@@ -8,9 +8,45 @@ use ethers_core::utils::keccak256;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storable};
 use minter_did::id256::Id256;
+use serde::de::Visitor;
+use serde::Deserialize;
 
 #[derive(Debug, CandidType, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SignedMintOrder(pub Vec<u8>);
+
+/// Visitor for `SignedMintOrder` objects deserialization.
+struct SignedMintOrderVisitor;
+
+impl<'v> Visitor<'v> for SignedMintOrderVisitor {
+    type Value = SignedMintOrder;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            formatter,
+            "blob of size {}",
+            MintOrder::SIGNED_ENCODED_DATA_SIZE
+        )
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(SignedMintOrder(
+            v.try_into()
+                .map_err(|_| E::invalid_length(v.len(), &Self))?,
+        ))
+    }
+}
+
+impl<'de> Deserialize<'de> for SignedMintOrder {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(SignedMintOrderVisitor)
+    }
+}
 
 /// Data which should be signed and provided to the `BftBridge.mint()` call
 /// to perform mint.
