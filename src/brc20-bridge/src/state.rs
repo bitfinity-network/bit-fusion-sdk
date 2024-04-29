@@ -210,14 +210,6 @@ impl State {
         &mut self.inscriptions
     }
 
-    pub fn http_mocks(&self) -> HashMap<String, HttpResponse> {
-        self.config.http_mocks.clone()
-    }
-
-    pub fn http_mocks_mut(&mut self) -> &mut HashMap<String, HttpResponse> {
-        &mut self.config.http_mocks
-    }
-
     pub fn get_evm_info(&self) -> EvmInfo {
         EvmInfo {
             link: self.config.evm_link.clone(),
