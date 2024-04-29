@@ -115,7 +115,6 @@ dfx deploy brc20-bridge --argument "(record {
       in_memory_records = opt 10000;
       log_filter = opt \"info\";
     };
-    http_mocks = vec { };
 })"
 
 ######################## Deploy BFT and Token Contracts ######################
