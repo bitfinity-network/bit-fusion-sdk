@@ -21,7 +21,7 @@ type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 pub struct State {
     config: BtcNftBridgeConfig,
-    bft_config: BftBridgeConfig,
+    bft_config: NftBridgeConfig,
     signer: SignerStorage,
     mint_orders: MintOrdersStore,
     burn_requests: BurnRequestStore,
@@ -68,7 +68,7 @@ impl BtcNftBridgeConfig {
 }
 
 #[derive(Default, Debug, CandidType, Deserialize)]
-pub struct BftBridgeConfig {
+pub struct NftBridgeConfig {
     pub erc721_chain_id: u32,
     pub bridge_address: H160,
     pub token_address: H160,
@@ -125,7 +125,7 @@ impl State {
         self.config = config;
     }
 
-    pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
+    pub fn configure_bft(&mut self, bft_config: NftBridgeConfig) {
         self.bft_config = bft_config;
     }
 

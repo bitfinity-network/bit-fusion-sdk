@@ -63,3 +63,5 @@ rust-toolchain.toml
 # solidity-coverage files
 */coverage
 */coverage.json
+
+dfx_log.txt

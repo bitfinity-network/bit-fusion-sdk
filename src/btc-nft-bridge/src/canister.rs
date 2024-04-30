@@ -26,7 +26,7 @@ use crate::interface::bridge_api::{BridgeError, NftMintStatus};
 use crate::interface::store::StorableNftId;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::NftTask;
-use crate::state::{BftBridgeConfig, BtcNftBridgeConfig, State};
+use crate::state::{BtcNftBridgeConfig, NftBridgeConfig, State};
 
 #[derive(Canister, Clone, Debug)]
 pub struct NftBridge {
@@ -139,7 +139,7 @@ impl NftBridge {
     }
 
     #[update]
-    pub fn admin_configure_bft_bridge(&self, config: BftBridgeConfig) {
+    pub fn admin_configure_nft_bridge(&self, config: NftBridgeConfig) {
         get_state()
             .borrow()
             .check_admin(ic_exports::ic_kit::ic::caller());
