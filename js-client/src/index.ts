@@ -1,4 +1,4 @@
 import { BtcBridge } from './btc';
 import { IcrcBridge } from './icrc';
-
-export { BtcBridge, IcrcBridge };
+import { BTC_TOKEN_WRAPPED_ADDRESS } from './constants';
+export { BtcBridge, IcrcBridge, BTC_TOKEN_WRAPPED_ADDRESS };
