@@ -1,34 +1,37 @@
-# This script tests deployment and bridging flow of the BTC Runes. The script uses `bitcoin-core.daemon` and
-# `bitcoin-core.cli` applications for bitcoin operations. Depending on your installation you may need to change these
-# to `bitcoind` and `bitcoind.cli`.
+# This script tests deployment and bridging flow of the BTC Runes.
 #
-# Before the script is run, a few services are needed to be started:
+# To set up bitcoind and ord services before this script is run:
 #
-# 1. Bitcoin daemon with transaction index.
+# > cd btc-deploy
+# > docker compose down -v
+# > docker compose up
 #
-# bitcoin-core.daemon -conf=${PWD}/src/create_bft_bridge_tool/bitcoin.conf -datadir=${PWD}/target/bc -txindex -fallbackfee=0.000001
+# Then etch the test rune:
 #
-# 2. Ord indexer with support for runes.
-
-# ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --index-runes --data-dir target/bc server --http-port 8000
+# > ./scripts/rune/etch.sh
 #
-# 3. Https proxy to let dfx connect to the indexer. You can use the proxy you like. For example, `local-ssl-proxy`:
+# To make dfx trust local https certificate use mkcert:
 #
-# local-ssl-proxy --source 8001 --target 8000 -c localhost+1.pem -k localhost+1-key.pem
+# > export CAROOT=$PWD/btc-deploy/mkcert
+# > mkcert install
 #
-# Not though that for the https certificats to be accepted by dfx, a local CA authority must be installed in the system
-# and the certificates (`.pem` files above) must be created by that authority. You can use `mkcert` tool for that.
-#
-# 4. Create the test rune with
-#
-# ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 batch --fee-rate 10 --batch ./scripts/rune/batch.yaml
-#
-# After this command is run it will wait for 10 blocks to be mined in BTC network. After that the rune is created. You
-# need to modify `RUNE_BLOCK` and `RUNE_TX_ID` variables in the script below to match your values.
 
 set -e
 
 CHAIN_ID=355113
+
+ORD_DATA=$PWD/target/ord
+RUNE_NAME="SUPERMAXRUNENAME"
+RUNE_ID=$(ord -r --data-dir $ORD_DATA --index-runes runes | jq -r .runes.SUPERMAXRUNENAME.id)
+rune_id_arr=(${RUNE_ID//:/ })
+RUNE_BLOCK=${rune_id_arr[0]}
+RUNE_TX_ID=${rune_id_arr[1]}
+
+echo "Found rune id: ${RUNE_BLOCK}:${RUNE_TX_ID}"
+
+INDEXER_URL="https://127.0.0.1:8001"
+
+######### Start dfx #############
 
 dfx stop
 rm -f dfx_stderr.log
@@ -40,11 +43,6 @@ dfx identity use btc-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 
-RUNE_NAME="SUPERMAXRUNENAME"
-RUNE_BLOCK="113"
-RUNE_TX_ID="1"
-
-INDEXER_URL="https://127.0.0.1:8001"
 
 ########## Deploy EVM and Rune bridge ##########
 
@@ -133,18 +131,34 @@ dfx canister call rune-bridge admin_configure_bft_bridge "(record {
 
 ########### Deposit runes ##########
 
+if ! command -v bitcoin-cli &> /dev/null
+then
+  if command -v bitcoin-core.cli &> /dev/null
+  then
+    bc="bitcoin-core.cli -conf=$PWD/btc-deploy/bitcoin.conf -rpcwallet=admin"
+    echo "Using bitcoin-core.cli as bitcoin-cli"
+  else
+    echo "bitcoin-cli could not be found"
+    exit 1
+  fi
+else
+  bc="bitcoin-cli -conf=$PWD/btc-deploy/bitcoin.conf -rpcwallet=admin"
+fi
+
+export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
+export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
+
+ordw="ord -r --data-dir $ORD_DATA --index-runes wallet --server-url http://localhost:8000"
+
 deposit_addr_resp=$(dfx canister call rune-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
 res=${deposit_addr_resp#*\"}
 DEPOSIT_ADDRESS=${res%\"*}
 echo "Deposit address: $DEPOSIT_ADDRESS"
 
-ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= \
-  --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 send --fee-rate 10 \
-  $DEPOSIT_ADDRESS 10:$RUNE_NAME
+$ordw send --fee-rate 10 $DEPOSIT_ADDRESS 10:$RUNE_NAME
+$ordw send --fee-rate 10 $DEPOSIT_ADDRESS "0.0049 btc"
 
-bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" sendtoaddress $DEPOSIT_ADDRESS 0.0049
-bitcoin-core.cli -conf="${PWD}/src/create_bft_bridge_tool/bitcoin.conf" generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
-
+$bc generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
 
 for i in 1 2 3
 do
@@ -164,9 +178,12 @@ done
 
 sleep 5
 
-receiver_resp=$(ord -r --bitcoin-rpc-username ic-btc-integration --bitcoin-rpc-password QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E= --index-runes --data-dir target/bc wallet --server-url http://0.0.0.0:8000 receive)
+receiver_resp=$($ordw receive)
 RECEIVER=$(echo $receiver_resp | jq .addresses[0])
 RECEIVER=$(echo $RECEIVER | tr -d '"')
+
+echo "Ord balance before burn:"
+$ordw balance
 
 echo "Runes withdrawal receiver: $RECEIVER"
 
@@ -177,3 +194,11 @@ cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
   --token-address="$TOKEN_ETH_ADDRESS" \
   --address="$RECEIVER" \
   --amount=10
+
+echo "Wait for 15 seconds for the transaction to be broadcast"
+sleep 15
+$bc generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
+
+sleep 5
+echo "Ord balance after burn:"
+$ordw balance
