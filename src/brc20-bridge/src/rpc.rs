@@ -10,7 +10,7 @@ use bitcoin::{
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
-    http_request, CanisterHttpRequestArgument, HttpMethod,
+    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
@@ -18,8 +18,8 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
 use crate::constant::{
-    BRC20_TICKER_LEN, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
-    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
+    BRC20_TICKER_LEN, HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST,
+    HTTP_OUTCALL_REQ_PER_BYTE_COST, HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
 };
 use crate::interface::bridge_api::BridgeError;
 use crate::interface::get_deposit_address;
@@ -207,20 +207,29 @@ async fn http_get_req<T>(url: &str) -> Result<Option<T>, String>
 where
     T: DeserializeOwned,
 {
-    let req = CanisterHttpRequestArgument {
+    let request_params = CanisterHttpRequestArgument {
         url: url.to_string(),
-        max_response_bytes: None,
+        max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
         method: HttpMethod::GET,
-        headers: Vec::new(),
+        headers: vec![HttpHeader {
+            name: "Accept".to_string(),
+            value: "application/json".to_string(),
+        }],
         body: None,
         transform: None,
     };
 
-    let cycles = get_estimated_http_outcall_cycles(&req);
+    let cycles = get_estimated_http_outcall_cycles(&request_params);
 
-    let (resp,) = http_request(req, cycles)
+    let (resp,) = http_request(request_params, cycles)
         .await
         .map_err(|(_rejection_code, cause)| cause)?;
+
+    log::info!(
+        "Indexer responded with: status: {} body: {}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
 
     if resp.status == 200u16 {
         let data = serde_json::from_slice(&resp.body).map_err(|x| x.to_string())?;
