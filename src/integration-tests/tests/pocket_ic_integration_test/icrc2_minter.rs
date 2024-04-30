@@ -24,6 +24,26 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 use crate::utils::error::TestError;
 
 #[tokio::test]
+async fn test_tokens() {
+    let ctx = PocketIcTestContext::new(&[CanisterType::Token1]).await;
+    let client = ctx.icrc_token_1_client(ADMIN);
+
+    // get the name of the token
+    let name = client.icrc1_name().await.unwrap();
+    println!("name: {:?}", name);
+    let symbol = client.icrc1_symbol().await.unwrap();
+    println!("symbol: {:?}", symbol);
+    let decimals = client.icrc1_decimals().await.unwrap();
+    println!("decimals: {:?}", decimals);
+    let md = client.icrc1_metadata().await.unwrap();
+    println!("metadata: {:?}", md);
+    let total_supply = client.icrc1_total_supply().await.unwrap();
+    println!("total_supply: {:?}", total_supply);
+    let balance = client.icrc1_balance_of(ctx.admin().into()).await.unwrap();
+    println!("balance: {:?}", balance);
+}
+
+#[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 

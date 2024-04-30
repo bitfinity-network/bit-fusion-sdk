@@ -1,7 +1,6 @@
 use did::H160;
 use ethers_core::utils;
 use evm_canister_client::IcCanisterClient;
-use ic_canister::virtual_canister_call;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
 use ic_exports::icrc_types::icrc1::account::{Account, Subaccount};
@@ -94,9 +93,17 @@ pub async fn burn(
 
     let minter_canister_account = Account::from(ic::id());
 
-    let transfer_result = icrc_clent
-        .icrc2_transfer_from(from, minter_canister_account, amount.clone(), None)
-        .await?;
+    let args = TransferFromArgs {
+        from,
+        spender_subaccount: None,
+        to: minter_canister_account,
+        amount: amount.clone(),
+        fee: None,
+        memo: None,
+        created_at_time: None,
+    };
+
+    let transfer_result = icrc_clent.icrc2_transfer_from(args).await?;
 
     if repeat_on_bad_fee {
         if let Err(TransferFromError::BadFee { .. }) = &transfer_result {
