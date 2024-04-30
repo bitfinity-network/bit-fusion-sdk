@@ -12,4 +12,4 @@ if [ -z "$2" ] ; then
     exit 1
 fi
 
-docker exec -it bitcoind bitcoin-cli -rpcuser=user -rpcpassword=pass -regtest generatetoaddress $1 $2
+docker exec bitcoind bitcoin-cli -regtest generatetoaddress $1 $2
