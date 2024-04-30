@@ -14,10 +14,6 @@ import BFTBridgeABI from './abi/BFTBridge';
 import { wait } from './tests/utils';
 import * as ethers from 'ethers';
 
-const p = new ethers.JsonRpcProvider();
-const s = await p.getSigner();
-s.getAddress();
-
 type EthAddr = `0x${string}`;
 
 interface BtcBridgeOptions {
@@ -91,9 +87,6 @@ export class BtcBridge {
 
   async getBTCAddress() {
     const ethAddress = await this.getAddress();
-    console.log('ethAddress', ethAddress);
-    console.log('canister id', BTC_BRIDGE_CANISTER_ID);
-    console.log('BtcBridgeActor', BtcBridgeActor);
     const btcAddress = await BtcBridgeActor.get_btc_address({
       owner: [Principal.fromText(BTC_BRIDGE_CANISTER_ID)],
       subaccount: [ethAddrToSubaccount(ethAddress)]
