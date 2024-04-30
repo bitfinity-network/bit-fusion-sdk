@@ -6,7 +6,7 @@ import {
   BFT_BRIDGE_ETH_ADDRESS,
   BTC_BRIDGE_CANISTER_ID,
   BTC_BRIDGE_ETH_ADDRESS,
-  BITCOIN_TOKEN_WRAPPED_ADDRESS
+  BTC_TOKEN_WRAPPED_ADDRESS
 } from './constants';
 import { encodeBtcAddress, ethAddrToSubaccount } from './utils';
 import WrappedTokenABI from './abi/WrappedToken';
@@ -43,7 +43,7 @@ export class BtcBridge {
     this.btcAddress = btcAddress || BTC_BRIDGE_ETH_ADDRESS!;
     this.bftAddress = bftAddress || BFT_BRIDGE_ETH_ADDRESS!;
     this.wrappedTokenAddress =
-      wrappedTokenAddress || BITCOIN_TOKEN_WRAPPED_ADDRESS!;
+      wrappedTokenAddress || BTC_TOKEN_WRAPPED_ADDRESS!;
   }
 
   async getAddress() {
