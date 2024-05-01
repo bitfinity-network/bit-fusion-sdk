@@ -1,24 +1,21 @@
 use std::time::Duration;
 
 use did::{H160, U256, U64};
-use erc20_minter::state::Settings;
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use evm_canister_client::EvmCanisterClient;
-use ic_log::LogSettings;
-use icrc2_minter::SigningStrategy;
-use minter_contract_utils::bft_bridge_api::{self, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::bft_bridge_api::{BURN, NATIVE_TOKEN_BALANCE};
+use minter_contract_utils::bft_bridge_api::{
+    self, BURN, NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT,
+};
 use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
 };
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use super::PocketIcTestContext;
-use crate::context::{evm_canister_init_data, CanisterType, TestContext};
+use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::{self, CHAIN_ID};
 
@@ -35,93 +32,36 @@ use crate::utils::{self, CHAIN_ID};
 // Make sure SignedMintOrder removed from erc20-minter after some time.
 #[tokio::test]
 async fn test_external_bridging() {
-    let ctx = PocketIcTestContext::new(&CanisterType::EVM_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::EVM_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     // Deploy external EVM canister.
-    let (external_evm, external_evm_client) = {
-        let external_evm = ctx
-            .deploy_canister(
-                CanisterType::Evm,
-                (evm_canister_init_data(
-                    ctx.canisters.signature_verification(),
-                    ctx.admin(),
-                    None,
-                ),),
-            )
-            .await;
-
-        (
-            external_evm,
-            EvmCanisterClient::new(ctx.client(external_evm, ctx.admin_name())),
-        )
-    };
+    let external_evm = ctx.canisters().external_evm();
+    let external_evm_client = EvmCanisterClient::new(ctx.client(external_evm, ctx.admin_name()));
 
     println!("Deployed external EVM canister: {}", external_evm);
     println!("Deployed EVM canister: {}", ctx.canisters().evm());
 
-    // whitelist external EVM canister.
-    {
-        let signature =
-            signature_verification_canister_client::SignatureVerificationCanisterClient::new(
-                ctx.client(ctx.canisters.signature_verification(), ctx.admin_name()),
-            );
+    let mut rng = rand::thread_rng();
 
-        signature
-            .add_principal_to_access_list(external_evm)
-            .await
-            .unwrap()
-            .unwrap();
-    }
-
-    let bob_wallet = {
-        let wallet = {
-            let mut rng = rand::thread_rng();
-            Wallet::new(&mut rng)
-        };
-
-        external_evm_client
-            .mint_native_tokens(wallet.address().into(), 10_u64.pow(18).into())
-            .await
-            .unwrap()
-            .unwrap();
-        ctx.advance_time(Duration::from_secs(4)).await;
-
-        wallet
-    };
+    let bob_wallet = Wallet::new(&mut rng);
     let bob_address: H160 = bob_wallet.address().into();
 
+    // Mint native tokens for bob in both evms
+    external_evm_client
+        .mint_native_tokens(bob_address.clone(), u64::MAX.into())
+        .await
+        .unwrap()
+        .unwrap();
     ctx.evm_client(ADMIN)
         .mint_native_tokens(bob_address.clone(), u64::MAX.into())
         .await
         .unwrap()
         .unwrap();
-
-    // Initialize erc20-minter with EvmInfos for both EVM canisters.
-    let erc20_minter_canister = ctx
-        .deploy_canister(
-            CanisterType::EvmMinter,
-            (Settings {
-                base_evm_link: EvmLink::Ic(external_evm),
-                wrapped_evm_link: EvmLink::Ic(ctx.canisters().evm()),
-                base_bridge_contract: H160::default(),
-                wrapped_bridge_contract: H160::default(),
-                signing_strategy: SigningStrategy::Local {
-                    private_key: [135; 32],
-                },
-                log_settings: Some(LogSettings {
-                    enable_console: true,
-                    in_memory_records: None,
-                    log_filter: Some("trace".to_string()),
-                }),
-            },),
-        )
-        .await;
-
-    println!("Deployed EVM minter canister: {}", erc20_minter_canister);
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     // get evm minter canister address
-    let erc20_minter_client = ctx.client(erc20_minter_canister, ADMIN);
+    let erc20_minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
     let erc20_minter_address = erc20_minter_client
         .update::<_, Option<H160>>("get_evm_address", ())
         .await
@@ -379,9 +319,6 @@ async fn test_external_bridging() {
         .unwrap()
         .as_u32();
 
-    // Query SignedMintOrder from the erc20-minter.
-    let client = ctx.client(erc20_minter_canister, ADMIN);
-
     let bob_address_id = Id256::from_evm_address(&bob_address, CHAIN_ID as _);
 
     // Advance time to perform two tasks in erc20-minter:
@@ -424,9 +361,10 @@ async fn test_external_bridging() {
 
     // Wait for mint order removal
     ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     // Check mint order removed
-    let signed_order = client
+    let signed_order = erc20_minter_client
         .update::<_, Option<SignedMintOrder>>(
             "get_mint_order",
             (bob_address_id, token_id, burn_operation_id),

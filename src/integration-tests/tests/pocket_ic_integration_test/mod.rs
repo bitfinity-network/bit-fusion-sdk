@@ -222,7 +222,7 @@ impl fmt::Debug for PocketIcTestContext {
 /// - opetaion points for john,
 /// - bridge contract
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     let bft_bridge = ctx
