@@ -22,10 +22,10 @@ set +e
 
 ############################### Configure Dfx #################################
 
-echo "Starting dfx in a clean state"
-dfx stop
-rm -f dfx_log.txt
-dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
+# echo "Starting dfx in a clean state"
+# dfx stop
+# rm -f dfx_log.txt
+# dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -35,7 +35,7 @@ dfx identity use brc20-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 CHAIN_ID=355113
-INDEXER_URL="https://127.0.0.1:8001"
+INDEXER_URL="https://127.0.0.1:9001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -226,24 +226,24 @@ sleep 5
 
 ####################### Swap ERC20 for BRC20 ######################
 
-USER_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
-echo "Inscription destination and leftovers address: $USER_ADDRESS"
+# USER_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+# echo "Inscription destination and leftovers address: $USER_ADDRESS"
 
-echo "Ord wallet balance before swap:"
-$ord_wallet balance
+# echo "Ord wallet balance before swap:"
+# $ord_wallet balance
 
-cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
-  --wallet="$ETH_WALLET" \
-  --evm-canister="$EVM" \
-  --bft-bridge="$BFT_ETH_ADDRESS" \
-  --token-address="$TOKEN_ETH_ADDRESS" \
-  --address="$USER_ADDRESS" \
-  --amount=10
+# cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+#   --wallet="$ETH_WALLET" \
+#   --evm-canister="$EVM" \
+#   --bft-bridge="$BFT_ETH_ADDRESS" \
+#   --token-address="$TOKEN_ETH_ADDRESS" \
+#   --address="$USER_ADDRESS" \
+#   --amount=10
 
-echo "Wait for 15 seconds for the transaction to be broadcast"
-sleep 15
-$bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
+# echo "Wait for 15 seconds for the transaction to be broadcast"
+# sleep 15
+# $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 
-sleep 5
-echo "Ord wallet balance after swap:"
-$ord_wallet balance
+# sleep 5
+# echo "Ord wallet balance after swap:"
+# $ord_wallet balance

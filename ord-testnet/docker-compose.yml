@@ -18,8 +18,6 @@ services:
     ports:
       - "18443:18443"
       - "18444:18444"
-      # - "8333:8333"
-      # - "8332:8332"
       - "28332:28332"
       - "28333:28333"
     volumes:
@@ -38,19 +36,12 @@ services:
       - db
   ordhook:
     container_name: ordhook
+    platform: linux/amd64
     build:
-      context: https://github.com/hirosystems/ordhook.git
-      dockerfile: dockerfiles/components/ordhook.dockerfile
+      dockerfile: ordhook.dockerfile
     ports:
-      - "20456:20456"
-    command:
-      [
-        "service",
-        "start",
-        "--post-to=http://ordinals-api:3099/payload",
-        "--auth-token=1",
-        "--config-path=/Ordhook.toml",
-      ]
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - ./Ordhook.toml:/Ordhook.toml
     depends_on:
