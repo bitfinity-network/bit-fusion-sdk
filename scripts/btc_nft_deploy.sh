@@ -1,67 +1,6 @@
 #!/bin/bash
 
-# Script to deploy and test the BtcNftBridge canister to perform a complete bridging flow (BTCNFT <> ERC721).
-#
-# NOTES: 
-#
-# 1. Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
-# Until then, this script uses dfx version 0.17.
-#
-# 2. We use https://127.0.0.1:8001 as the indexer to fetch a reveal transaction by its ID, and to fetch NFT inscription details.
-# Notice it's using HTTPS, which is required by `dfx`. Therefore we need to set up two things:
-#
-#     a. `mkcert`, which automatically creates and installs a local CA in the system root store, and generates locally-trusted certificates.
-#         After installing `mkcert` and generating the cert and key, you'll see an output like this:
-#             The certificate is at "./localhost+2.pem" and the key at "./localhost+2-key.pem"
-#
-#     b. an SSL proxy (e.g. `local-ssl-proxy`, `caddy`, etc.) which utilises the cert and key generated previously:
-#           local-ssl-proxy --source 8001 --target 8000 -c localhost+2.pem -k localhost+2-key.pem &
-#
-
 set +e
-
-# ######################## Start the Bitcoin Daemon and Ord #####################
-
-# echo "Starting the Bitcoin daemon"
-# COMPOSE_FILE="../ckERC20/ord-testnet/bridging-flow/docker-compose.yml"
-
-# docker-compose -f "$COMPOSE_FILE" up -d bitcoind
-# sleep 2
-
-# wallet_exists=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest listwallets | grep -c "testwallet")
-
-# if [ "$wallet_exists" -eq 0 ]; then
-#     echo "Creating 'testwallet'..."
-#     docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest createwallet "testwallet"
-# fi
-
-# echo "Loading 'testwallet'..."
-# load_output=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest loadwallet "testwallet" 2>&1)
-
-# if echo "$load_output" | grep -q "Wallet file verification failed"; then
-#     echo "Wallet already exists but could not be loaded due to verification failure."
-# elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
-#     echo "Wallet loaded successfully."
-# else
-#     echo "Unexpected wallet load output: $load_output"
-# fi
-
-# # Generate 101 blocks to ensure enough coins are available for spending
-# height=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getblockcount)
-# if [ "$height" -lt 101 ]; then
-#     echo "Generating 101 blocks..."
-#     new_address=$(docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest getnewaddress)
-#     docker-compose -f "$COMPOSE_FILE" exec -T bitcoind bitcoin-cli -regtest generatetoaddress 101 "$new_address"
-# fi
-
-# # Start the ord service
-# echo "Starting the 'ord' service..."
-# docker-compose -f "$COMPOSE_FILE" up -d ord
-# if [ $? -ne 0 ]; then
-#     echo "Failed to start 'ord' service. Attempting to continue script..."
-# fi
-
-############################### Configure Dfx #################################
 
 echo "Starting dfx in a clean state"
 dfx stop
@@ -71,15 +10,14 @@ dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.
 dfx identity new --force btc-admin
 dfx identity use btc-admin
 
+######################### Deploy EVM and NFT Bridge ######################
+
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 
-######################### Deploy EVM and NFT Bridge ######################
-
 CHAIN_ID=355113
 
-INDEXER_URL="https://127.0.0.1:8001"
-# INDEXER_URL="https://host.docker.internal:8001"
+INDEXER_URL="https://127.0.0.1:9001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -94,7 +32,7 @@ dfx deploy evm_testnet --argument "(record {
     log_settings = opt record {
       enable_console = true;
       in_memory_records = opt 10000;
-      log_filter = opt \"info,brc20_bridge::scheduler=warn\";
+      log_filter = opt \"info,nft_bridge::scheduler=warn\";
     };
     owner = principal \"${ADMIN_PRINCIPAL}\";
     genesis_accounts = vec { };
@@ -102,7 +40,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-echo "Deploying BTC NFt bridge"
+echo "Deploying BTC NFT bridge"
 dfx deploy btc-nft-bridge --argument "(record {
     indexer = \"${INDEXER_URL}\";
     admin = principal \"${ADMIN_PRINCIPAL}\";
@@ -156,68 +94,110 @@ dfx canister call btc-nft-bridge admin_configure_nft_bridge "(record {
 
 echo "All canisters successfully deployed."
 
-######################## Swap NFT for ERC721 ######################
+######################## Prepare Inscription Addresses ######################
+
+bitcoin_cli="docker exec bitcoind bitcoin-cli -regtest"
+ord_wallet="docker exec ord ./ord --regtest --bitcoin-rpc-url bitcoind:18443 wallet --server-url http://localhost:8000"
+
+wallet_exists=$($bitcoin_cli listwallets | grep -c "admin")
+
+if [ "$wallet_exists" -eq 0 ]; then
+    echo "Creating 'admin' wallet"
+    $bitcoin_cli createwallet "admin"
+fi
+
+echo "Loading 'admin' wallet"
+load_output=$($bitcoin_cli loadwallet "admin" 2>&1)
+
+if echo "$load_output" | grep -q "Wallet file verification failed"; then
+    echo "Wallet already exists but could not be loaded due to verification failure."
+elif echo "$load_output" | grep -q "Wallet loaded successfully"; then
+    echo "Wallet loaded successfully."
+else
+    echo "Unexpected wallet load output: $load_output"
+fi
+
+ADMIN_ADDRESS=$($bitcoin_cli -rpcwallet=admin getnewaddress)
+echo "Admin address: $ADMIN_ADDRESS"
+
+# Generate 101 blocks to ensure enough coins are available for spending
+height=$($bitcoin_cli getblockcount)
+if [ "$height" -lt 101 ]; then
+    echo "Generating 101 blocks..."
+    $bitcoin_cli generatetoaddress 101 "$ADMIN_ADDRESS"
+fi
+
+sleep 5
+
+ORD_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+echo "Ord wallet address: $ORD_ADDRESS"
+
+$bitcoin_cli -rpcwallet=admin sendtoaddress "$ORD_ADDRESS" 10
+$bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
+
+##################### Create a BRC20 Inscription ###################
+
+echo "Creating a NFT inscription"
+sleep 5
+inscription_res=$($ord_wallet inscribe --fee-rate 10 --file /nft_json_inscriptions/demo.json)
+
+sleep 1
+$bitcoin_cli -rpcwallet=admin generatetoaddress 10 "$ADMIN_ADDRESS"
+
+sleep 5
+$bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
+
+sleep 3
+NFT_ID=$(echo "$inscription_res" | jq -r '.inscriptions[0].id')
+echo "NFT inscription ID: $NFT_ID"
+
+sleep 3
+$ord_wallet balance
+
+####################### Swap NFT for ERC721 ######################
 
 echo "Preparing to bridge a NFT inscription to an ERC721 token"
 
-# 1. Get canister's deposit address
 nft_bridge_addr=$(dfx canister call btc-nft-bridge get_deposit_address)
-echo "NFT bridge BTC address (raw output): $nft_bridge_addr"
-
 BRIDGE_ADDRESS=$(echo "$nft_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
-echo "NFT bridge canister BTC address: $BRIDGE_ADDRESS"
+echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
 
-# 2. Top up the canister's balance to enable it send transactions
-CONTAINER_ID=$(docker ps -q --filter "name=bitcoind")
+echo "Topping up canister's wallet"
+docker exec bitcoind bitcoin-cli -regtest generatetoaddress 10 "$BRIDGE_ADDRESS"
 
-if [ -z "$CONTAINER_ID" ]; then
-    echo "bitcoind container not found. Make sure it is running."
+sleep 10
+echo "Canister's balance after topup"
+dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+
+echo "Ord wallet balance before deposit of BRC20"
+$ord_wallet balance
+
+# Deposit NFT on the bridge
+$ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $BRC20_ID
+$bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
+
+sleep 10
+echo "Ord wallet balance after deposit"
+$ord_wallet balance
+
+echo "Canister's balance after NFT deposit"
+dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+
+for i in 1 2 3; do
+  sleep 5
+  echo "Trying to bridge from BTC-NFT to ERC721"
+  mint_status=$(dfx canister call brc20-bridge nft_to_erc721 "(\"$NFT_ID\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  echo "Result: $mint_status"
+
+  if [[ $mint_status == *"Minted"* ]]; then
+    echo "Minting of ERC721 token successful."
+    break
+  fi
+
+  if [[ $i -eq 3 ]]; then
+    echo "Failed to mint after 3 retries"
     exit 1
-fi
+  fi
+done
 
-echo "bitcoind container ID: $CONTAINER_ID"
-
-# echo "Topping up canister's wallet"
-# docker exec "$CONTAINER_ID" bitcoin-cli -regtest generatetoaddress 1 "$BRIDGE_ADDRESS"
-
-# # 3. Check balance
-# dfx canister call btc-nft-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
-
-# # 4. Prepare and make the NFT inscription
-# NFT_TICKER="kobp"
-# brc20_inscription="{\"p\":\"brc-20\", \"op\":\"deploy\", \"tick\":\"$NFT_TICKER\", \"max\":\"1000\", \"lim\":\"10\", \"dec\":\"8\"}"
-
-# echo "Creating a NFT inscription with content: $brc20_inscription"
-# dfx canister call btc-nft-bridge inscribe "(variant { Brc20 }, \"${brc20_inscription//\"/\\\"}\", \"${BRIDGE_ADDRESS}\", \"${BRIDGE_ADDRESS}\", null)"
-
-# # 5. Swap the NFT inscription for an ERC20 token
-# for i in 1 2 3; do
-#   sleep 5
-#   echo "Trying to bridge from NFT to ERC20"
-#   mint_status=$(dfx canister call btc-nft-bridge brc20_to_erc20 "(\"$NFT_TICKER\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
-#   echo "Result: $mint_status"
-
-#   if [[ $mint_status == *"Minted"* ]]; then
-#     echo "Minting of ERC20 token successful."
-#     break
-#   fi
-
-#   if [[ $i -eq 3 ]]; then
-#     echo "Failed to mint after 3 retries"
-#     exit 1
-#   fi
-# done
-
-# sleep 5
-
-# ######################## Swap ERC20 for NFT ######################
-# USER_ADDRESS=$(docker exec -it "$CONTAINER_ID" bitcoin-cli -regtest -rpcwallet="testwallet" listreceivedbyaddress 0 true | jq -r '.[0].address')
-# echo "Inscription destination and leftovers address: $USER_ADDRESS"
-
-# cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
-#   --wallet="$ETH_WALLET" \
-#   --evm-canister="$EVM" \
-#   --bft-bridge="$ERC721_ETH_ADDRESS" \
-#   --token-address="$TOKEN_ETH_ADDRESS" \
-#   --address="$USER_ADDRESS" \
-#   --amount=10
+sleep 5
