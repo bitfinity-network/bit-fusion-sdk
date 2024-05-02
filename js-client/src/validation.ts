@@ -1,10 +1,12 @@
 import { isAddress } from 'web3-validator';
 import { Principal } from '@dfinity/principal';
 import { Buffer } from 'buffer';
-import ethers from 'ethers';
+import * as ethers from 'ethers';
 
 export type Id256 = Buffer;
 export type SignedMintOrder = ethers.BytesLike; //Uint8Array | number[];
+
+export type EthAddress = `0x${string}`;
 
 export class Id256Factory {
   chainIdFromId256(buffer: Id256): number {

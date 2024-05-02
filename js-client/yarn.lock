@@ -1667,6 +1667,13 @@
     rpc-websockets "^7.5.1"
     superstruct "^0.14.2"
 
+"@types/bitcore-lib@^0.15.6":
+  version "0.15.6"
+  resolved "https://registry.yarnpkg.com/@types/bitcore-lib/-/bitcore-lib-0.15.6.tgz#6cbb5889e7fdb49e26d2a7e4e522275b1d03d449"
+  integrity sha512-CtKDBgSBubPXZ0wFeCiUCSdzH+cuy6nFya3FboOqf44evi+OmkQPqEg3ASMpmPDYE8vkcxV302Iu8lZqCjYieg==
+  dependencies:
+    "@types/node" "*"
+
 "@types/connect@^3.4.33":
   version "3.4.38"
   resolved "https://registry.yarnpkg.com/@types/connect/-/connect-3.4.38.tgz#5ba7f3bc4fbbdeaff8dded952e5ff2cc53f8d858"
@@ -2197,7 +2204,7 @@ bip39@^3.1.0:
   dependencies:
     "@noble/hashes" "^1.2.0"
 
-bitcore-lib@^10.0.23:
+bitcore-lib@^10.0.23, bitcore-lib@^10.0.28:
   version "10.0.28"
   resolved "https://registry.yarnpkg.com/bitcore-lib/-/bitcore-lib-10.0.28.tgz#f46810324df1021f194dcdc1411c2d1a83b9be10"
   integrity sha512-uOWHpWbUxEj411p+tp6DCb9NfZdsCAHl6Z/rs96mquQMsef29fOqWUyk4Bl7yLf+KwzU5ZKy0HIPnjGFlmpXpg==

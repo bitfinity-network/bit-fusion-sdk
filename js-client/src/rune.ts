@@ -1,25 +1,34 @@
-import { RuneActor } from './ic';
 import { Actor } from '@dfinity/agent';
 import * as ethers from 'ethers';
-import { Id256Factory } from './validation';
+
+import { RuneActor } from './ic';
+import { EthAddress, Id256Factory } from './validation';
 import WrappedTokenABI from './abi/WrappedToken';
 import BftBridgeABI from './abi/BFTBridge';
 import { wait } from './tests/utils';
 import { encodeBtcAddress } from './utils';
+import { BFT_BRIDGE_ETH_ADDRESS } from './constants';
 
-type EthAddr = `0x${string}`;
+interface RuneBridgeOptions {
+  bftAddress?: EthAddress;
+  provider: ethers.Signer;
+}
 
 export class RuneBridge {
-  protected BFT_ETH_ADDRESS = process.env.BFT_ETH_ADDRESS as EthAddr;
+  protected bftAddress: EthAddress;
+  protected provider: ethers.Signer;
 
-  constructor(protected provider: ethers.Signer) {}
+  constructor({ provider, bftAddress }: RuneBridgeOptions) {
+    this.bftAddress = bftAddress || (BFT_BRIDGE_ETH_ADDRESS! as EthAddress);
+    this.provider = provider;
+  }
 
   /**
    *
    * dfx canister call rune-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")"
    *
    */
-  async getDepositAddress(ethAddress: EthAddr) {
+  async getDepositAddress(ethAddress: EthAddress) {
     const result = await RuneActor.get_deposit_address(ethAddress);
 
     if (!('Ok' in result)) {
@@ -30,11 +39,7 @@ export class RuneBridge {
   }
 
   private getBftBridgeContract() {
-    return new ethers.Contract(
-      process.env.BFT_ETH_ADDRESS!,
-      BftBridgeABI,
-      this.provider
-    );
+    return new ethers.Contract(this.bftAddress, BftBridgeABI, this.provider);
   }
 
   private async getWrappedTokenContract() {
@@ -62,13 +67,13 @@ export class RuneBridge {
     );
   }
 
-  async getWrappedTokenBalance(address: EthAddr) {
+  async getWrappedTokenBalance(address: EthAddress) {
     const wrappedTokenContract = await this.getWrappedTokenContract();
 
     return await wrappedTokenContract.balanceOf(address);
   }
 
-  async bridgeBtc(ethAddress: EthAddr) {
+  async bridgeBtc(ethAddress: EthAddress) {
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await RuneActor.deposit(ethAddress);
 
@@ -94,7 +99,7 @@ export class RuneBridge {
   async bridgeEVMc(address: string, satoshis: number) {
     const wrappedTokenContract = await this.getWrappedTokenContract();
 
-    await wrappedTokenContract.approve(this.BFT_ETH_ADDRESS, satoshis);
+    await wrappedTokenContract.approve(this.bftAddress, satoshis);
 
     await wait(15000);
 
