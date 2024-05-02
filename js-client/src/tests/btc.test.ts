@@ -12,19 +12,22 @@ describe.sequential(
   () => {
     const wallet = generateWallet();
 
-    const btcBridge = new BtcBridge({  provider: wallet });
+    const btcBridge = new BtcBridge({ provider: wallet });
 
     test('get balance', async () => {
       await mintNativeToken(wallet.address, '10000000000000000');
 
-      const wrappedBalance = await btcBridge.getWrappedTokenBalance(wallet.address as EthAddress);
+      const wrappedBalance = await btcBridge.getWrappedTokenBalance(
+        wallet.address as EthAddress
+      );
 
       expect(wrappedBalance).toStrictEqual(0n);
     });
 
     test('bridge to evm', async () => {
-
-      const btcAddress = await btcBridge.getBTCAddress(wallet.address as EthAddress);
+      const btcAddress = await btcBridge.getBTCAddress(
+        wallet.address as EthAddress
+      );
 
       await execBitcoinCmd(
         `sendtoaddress "${btcAddress}" ${bitcore.Unit.fromSatoshis(1000000000).toBTC()}`
@@ -38,7 +41,9 @@ describe.sequential(
 
       await wait(5000);
 
-      const wrappedBalance = await btcBridge.getWrappedTokenBalance(wallet.address as EthAddress);
+      const wrappedBalance = await btcBridge.getWrappedTokenBalance(
+        wallet.address as EthAddress
+      );
 
       expect(wrappedBalance).toStrictEqual(999998990n);
     });
@@ -54,7 +59,9 @@ describe.sequential(
 
       await wait(5000);
 
-      const wrappedBalance = await btcBridge.getWrappedTokenBalance(wallet.address as EthAddress);
+      const wrappedBalance = await btcBridge.getWrappedTokenBalance(
+        wallet.address as EthAddress
+      );
       expect(wrappedBalance).toStrictEqual(899998990n);
     });
   },
