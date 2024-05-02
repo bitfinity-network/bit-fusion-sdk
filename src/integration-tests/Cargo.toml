@@ -11,22 +11,28 @@ bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "reqwest",
+    "pocket-ic-tests-client",
+] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
 ic-canister = { workspace = true }
-ic-canister-client = { workspace = true, features = ["ic-agent-client", "pocket-ic-client"] }
+ic-canister-client = { workspace = true, features = ["pocket-ic-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-helpers = { workspace = true }
+icrc-client = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
 icrc2-minter = { path = "../icrc2-minter" }
 jsonrpc-core = { workspace = true }
 minter-client = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils", features = ["test-contracts"] }
+minter-contract-utils = { path = "../minter-contract-utils", features = [
+    "test-contracts",
+] }
 minter-did = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

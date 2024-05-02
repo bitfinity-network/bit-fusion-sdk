@@ -18,8 +18,10 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc1_ledger::{
     ArchiveOptions, FeatureFlags, InitArgs, LedgerArgument,
 };
+use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
+use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
@@ -33,14 +35,7 @@ use tokio::time::Instant;
 use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
-use crate::utils::icrc_client::IcrcClient;
-use crate::utils::wasm::{
-    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
-    get_ck_btc_minter_canister_bytecode, get_erc20_minter_canister_bytecode,
-    get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_kyt_canister_bytecode, get_minter_canister_bytecode, get_rune_bridge_canister_bytecode,
-    get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
-};
+use crate::utils::wasm::*;
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
@@ -72,13 +67,13 @@ pub trait TestContext {
     }
 
     /// Returns client for the ICRC token 1 canister.
-    fn icrc_token_1_client(&self, caller: &str) -> IcrcClient<Self::Client> {
-        IcrcClient::new(self.client(self.canisters().token_1(), caller))
+    fn icrc_token_1_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
+        IcrcCanisterClient::new(self.client(self.canisters().token_1(), caller))
     }
 
     /// Returns client for the ICRC token 2 canister.
-    fn icrc_token_2_client(&self, caller: &str) -> IcrcClient<Self::Client> {
-        IcrcClient::new(self.client(self.canisters().token_2(), caller))
+    fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
+        IcrcCanisterClient::new(self.client(self.canisters().token_2(), caller))
     }
 
     /// Sends tx with notification to EVMc.
@@ -178,7 +173,7 @@ pub trait TestContext {
             .wait_transaction_receipt(&hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
-                "transction not processed".into(),
+                "transaction not processed".into(),
             )))?;
 
         if receipt.status != Some(U64::one()) {
@@ -408,7 +403,19 @@ pub trait TestContext {
     async fn approve_icrc2_burn(&self, caller: &str, amount: u128) -> Result<()> {
         let client = self.icrc_token_1_client(caller);
         let minter_canister = self.canisters().minter().into();
-        client.icrc2_approve(minter_canister, amount.into()).await?;
+
+        let approve_args = ApproveArgs {
+            from_subaccount: None,
+            spender: minter_canister,
+            amount: amount.into(),
+            expected_allowance: None,
+            expires_at: None,
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        };
+
+        client.icrc2_approve(approve_args).await?.unwrap();
         Ok(())
     }
 
