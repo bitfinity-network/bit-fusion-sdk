@@ -87,5 +87,10 @@
       "wasm": ".artifact/ic-ckbtc-minter.wasm.gz",
       "type": "custom"
     }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943"
+    }
   }
 }

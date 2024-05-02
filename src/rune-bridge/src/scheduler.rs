@@ -1,8 +1,8 @@
-use bitcoin::Address;
 use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 
+use bitcoin::Address;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -20,12 +20,12 @@ use serde::{Deserialize, Serialize};
 use crate::canister::get_state;
 
 pub type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableUnboundedMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 
-pub type PersistentScheduler = Scheduler<BtcTask, TasksStorage>;
+pub type PersistentScheduler = Scheduler<RuneBridgeTask, TasksStorage>;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum BtcTask {
+pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
@@ -33,7 +33,7 @@ pub enum BtcTask {
     MintErc20(H160),
 }
 
-impl BtcTask {
+impl RuneBridgeTask {
     pub fn into_scheduled(self, options: TaskOptions) -> ScheduledTask<Self> {
         ScheduledTask::with_options(self, options)
     }
@@ -110,7 +110,7 @@ impl BtcTask {
         Ok(())
     }
 
-    fn task_by_log(log: Log) -> Option<ScheduledTask<BtcTask>> {
+    fn task_by_log(log: Log) -> Option<ScheduledTask<RuneBridgeTask>> {
         log::trace!("creating task from the log: {log:?}");
 
         const TASK_RETRY_DELAY_SECS: u32 = 5;
@@ -124,12 +124,12 @@ impl BtcTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = BtcTask::MintBtc(burnt);
+                let mint_order_task = RuneBridgeTask::MintBtc(burnt);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
                 log::debug!("Adding RemoveMintOrder task");
-                let remove_mint_order_task = BtcTask::RemoveMintOrder(minted);
+                let remove_mint_order_task = RuneBridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
@@ -157,19 +157,19 @@ impl BtcTask {
     }
 }
 
-impl Task for BtcTask {
+impl Task for RuneBridgeTask {
     fn execute(
         &self,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         match self {
-            BtcTask::InitEvmState => Box::pin(Self::init_evm_state()),
-            BtcTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
-            BtcTask::RemoveMintOrder(data) => {
+            RuneBridgeTask::InitEvmState => Box::pin(Self::init_evm_state()),
+            RuneBridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
+            RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            BtcTask::MintErc20(address) => {
+            RuneBridgeTask::MintErc20(address) => {
                 let _address = address.clone();
                 Box::pin(async move {
                     todo!()
@@ -179,7 +179,7 @@ impl Task for BtcTask {
                     // Ok(())
                 })
             }
-            BtcTask::MintBtc(BurntEventData {
+            RuneBridgeTask::MintBtc(BurntEventData {
                 recipient_id,
                 amount,
                 ..

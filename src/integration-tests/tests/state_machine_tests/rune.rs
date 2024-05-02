@@ -5,7 +5,6 @@ use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
-
 use rune_bridge::interface::GetAddressError;
 use rune_bridge::state::{RuneBridgeConfig, RuneInfo};
 

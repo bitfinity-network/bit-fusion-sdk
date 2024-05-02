@@ -1,11 +1,11 @@
-use bitcoin::consensus::Encodable;
-use bitcoin::hashes::sha256d::Hash;
-use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
+use bitcoin::consensus::Encodable;
+use bitcoin::hashes::sha256d::Hash;
+use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -29,7 +29,7 @@ use crate::interface::{
 };
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::ops::{get_fee_rate, get_rune_list, get_tx_outputs, get_utxos};
-use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
+use crate::scheduler::{PersistentScheduler, RuneBridgeTask, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
 use crate::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
@@ -103,14 +103,14 @@ impl RuneBridge {
         crate::ops::deposit(get_state(), &eth_address).await
     }
 
-    fn init_evm_info_task() -> ScheduledTask<BtcTask> {
+    fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
         let init_options = TaskOptions::default()
             .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
             .with_backoff_policy(BackoffPolicy::Exponential {
                 secs: EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
                 multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
             });
-        BtcTask::InitEvmState.into_scheduled(init_options)
+        RuneBridgeTask::InitEvmState.into_scheduled(init_options)
     }
 
     /// Returns EVM address of the canister.
@@ -128,6 +128,7 @@ impl RuneBridge {
 
     #[update]
     pub async fn admin_configure_ecdsa(&self) {
+        get_state().borrow().check_admin(ic::caller());
         let key_id = get_state().borrow().ecdsa_key_id();
 
         let master_key = ecdsa_public_key(EcdsaPublicKeyArgument {
@@ -137,6 +138,7 @@ impl RuneBridge {
         })
         .await
         .expect("failed to get master key");
+
         get_state().borrow_mut().configure_ecdsa(master_key.0);
     }
 
@@ -147,7 +149,7 @@ impl RuneBridge {
     }
 
     #[cfg(target_family = "wasm")]
-    fn collect_evm_events_task() -> ScheduledTask<BtcTask> {
+    fn collect_evm_events_task() -> ScheduledTask<RuneBridgeTask> {
         const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
 
         let options = TaskOptions::default()
@@ -156,7 +158,7 @@ impl RuneBridge {
                 secs: EVM_EVENTS_COLLECTING_DELAY,
             });
 
-        BtcTask::CollectEvmEvents.into_scheduled(options)
+        RuneBridgeTask::CollectEvmEvents.into_scheduled(options)
     }
 
     #[update]
@@ -275,7 +277,7 @@ pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     Subaccount(subaccount)
 }
 
-fn log_task_execution_error(task: InnerScheduledTask<BtcTask>) {
+fn log_task_execution_error(task: InnerScheduledTask<RuneBridgeTask>) {
     match task.status() {
         TaskStatus::Failed {
             timestamp_secs,

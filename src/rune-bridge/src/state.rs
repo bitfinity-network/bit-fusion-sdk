@@ -10,11 +10,10 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
-use ord_rs::{Wallet, WalletType};
-use ordinals::RuneId;
-
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
+use ord_rs::{Wallet, WalletType};
+use ordinals::RuneId;
 
 use crate::burn_request_store::BurnRequestStore;
 use crate::key::IcSigner;
@@ -327,6 +326,7 @@ impl State {
     pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
         self.bft_config = bft_config;
     }
+
     pub fn mint_orders(&self) -> &MintOrdersStore {
         &self.orders_store
     }

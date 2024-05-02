@@ -4,8 +4,10 @@ use std::rc::Rc;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::virtual_canister_call;
-use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_canister::{
+    generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
+    PreUpdate,
+};
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;

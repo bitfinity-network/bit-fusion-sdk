@@ -1,7 +1,7 @@
-use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
-use crate::key::{get_deposit_address, get_derivation_path_ic};
-use crate::ledger::StoredUtxo;
-use crate::state::State;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, FeeRate, Transaction, Txid};
@@ -9,7 +9,7 @@ use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     bitcoin_get_current_fee_percentiles, bitcoin_get_utxos, bitcoin_send_transaction,
-    GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse, Outpoint,
+    BitcoinNetwork, GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse, Outpoint,
     SendTransactionRequest, Utxo,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -23,10 +23,13 @@ use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
+use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
+use crate::key::{get_deposit_address, get_derivation_path_ic};
+use crate::ledger::StoredUtxo;
+use crate::state::State;
+
+const DEFAULT_REGTEST_FEE: u64 = 10_000;
 const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
 static NONCE: AtomicU32 = AtomicU32::new(0);
 
@@ -44,6 +47,12 @@ pub async fn deposit(
         log::trace!("No utxos were found for address {deposit_address}");
         return Err(DepositError::NotingToDeposit);
     }
+
+    log::trace!(
+        "Found {} utxos at the address {}",
+        utxo_response.utxos.len(),
+        deposit_address
+    );
 
     validate_utxo_confirmations(&state, &utxo_response)?;
     validate_utxo_btc_amount(&state, &utxo_response)?;
@@ -152,9 +161,8 @@ fn get_change_address(state: &RefCell<State>) -> Result<Address, WithdrawError> 
 }
 
 pub async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawError> {
-    let args = GetCurrentFeePercentilesRequest {
-        network: state.borrow().ic_btc_network(),
-    };
+    let network = state.borrow().ic_btc_network();
+    let args = GetCurrentFeePercentilesRequest { network };
     let response = bitcoin_get_current_fee_percentiles(args)
         .await
         .map_err(|err| {
@@ -163,14 +171,19 @@ pub async fn get_fee_rate(state: &RefCell<State>) -> Result<FeeRate, WithdrawErr
         })?
         .0;
 
-    if response.is_empty() {
-        log::error!("Empty response for fee rate request");
-        return Err(WithdrawError::FeeRateRequest);
-    }
+    let middle_percentile = if response.is_empty() {
+        match network {
+            BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
+            _ => {
+                log::error!("Empty response for fee rate request");
+                return Err(WithdrawError::FeeRateRequest);
+            }
+        }
+    } else {
+        response[response.len() / 2]
+    };
 
     log::trace!("Received fee rate percentiles: {response:?}");
-
-    let middle_percentile = &response[response.len() / 2];
 
     log::info!("Using fee rate {}", middle_percentile / 1000);
 
@@ -272,6 +285,11 @@ fn validate_utxo_confirmations(
             current_confirmations: utxo_min_confirmations,
         })
     } else {
+        log::trace!(
+            "Current utxo confirmations {} satisfies minimum {}. Proceeding.",
+            utxo_min_confirmations,
+            min_confirmations
+        );
         Ok(())
     }
 }
@@ -289,6 +307,12 @@ fn validate_utxo_btc_amount(
             minimum: min_amount,
         });
     }
+
+    log::trace!(
+        "Input utxo BTC amount is {}, which satisfies minimum of {}",
+        received_amount,
+        min_amount
+    );
 
     Ok(())
 }

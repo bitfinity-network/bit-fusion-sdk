@@ -38,7 +38,7 @@ use crate::utils::wasm::{
     get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
     get_ck_btc_minter_canister_bytecode, get_erc20_minter_canister_bytecode,
     get_evm_testnet_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_kyt_canister_bytecode, get_minter_canister_bytecode,
+    get_kyt_canister_bytecode, get_minter_canister_bytecode, get_rune_bridge_canister_bytecode,
     get_signature_verification_canister_bytecode, get_spender_canister_bytecode,
 };
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
@@ -587,6 +587,7 @@ pub trait TestContext {
             CanisterType::BtcBridge => {
                 todo!()
             }
+            CanisterType::RuneBridge => {}
         }
     }
 
@@ -870,6 +871,13 @@ impl TestCanisters {
             .expect("bridge canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn rune_bridge(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::RuneBridge)
+            .expect("rune bridge canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -896,6 +904,7 @@ pub enum CanisterType {
     Kyt,
     Icrc1Ledger,
     BtcBridge,
+    RuneBridge,
 }
 
 impl CanisterType {
@@ -918,6 +927,12 @@ impl CanisterType {
         CanisterType::Icrc1Ledger,
     ];
 
+    pub const RUNE_CANISTER_SET: [CanisterType; 3] = [
+        CanisterType::Evm,
+        CanisterType::Signature,
+        CanisterType::RuneBridge,
+    ];
+
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
@@ -932,6 +947,7 @@ impl CanisterType {
             CanisterType::Kyt => get_kyt_canister_bytecode().await,
             CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
+            CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
         }
     }
 }

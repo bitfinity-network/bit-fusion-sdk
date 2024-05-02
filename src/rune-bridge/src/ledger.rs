@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::mem::size_of;
 
 use bitcoin::hashes::sha256d::Hash;
-use bitcoin::secp256k1::ThirtyTwoByteHash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use candid::{CandidType, Decode, Encode};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
@@ -51,7 +50,7 @@ impl Storable for UtxoKey {
 impl From<OutPoint> for UtxoKey {
     fn from(value: OutPoint) -> Self {
         Self {
-            tx_id: value.txid.to_raw_hash().into_32(),
+            tx_id: *<Hash as AsRef<[u8; 32]>>::as_ref(&value.txid.to_raw_hash()),
             vout: value.vout,
         }
     }
@@ -112,6 +111,13 @@ impl UtxoLedger {
                     derivation_path: derivation_path.clone(),
                 },
             );
+
+            log::debug!(
+                "Added utxo {}:{} with value {} to the ledger",
+                hex::encode(&utxo.outpoint.txid),
+                utxo.outpoint.vout,
+                utxo.value
+            );
         }
     }
 
@@ -137,11 +143,13 @@ impl UtxoLedger {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::key::get_derivation_path_ic;
+    use std::str::FromStr;
+
     use bitcoin::{Network, PublicKey};
     use did::H160;
-    use std::str::FromStr;
+
+    use super::*;
+    use crate::key::get_derivation_path_ic;
 
     #[test]
     fn key_serialization() {

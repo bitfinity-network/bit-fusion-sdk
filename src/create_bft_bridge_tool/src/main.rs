@@ -12,11 +12,10 @@ use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use minter_did::id256::Id256;
-use tokio::time::Instant;
-
 use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
+use minter_did::id256::Id256;
+use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
 // identity.

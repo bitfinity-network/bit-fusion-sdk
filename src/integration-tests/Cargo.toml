@@ -18,12 +18,13 @@ evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
 ic-canister = { workspace = true }
-ic-canister-client = { workspace = true, features = ["pocket-ic-client"] }
+ic-canister-client = { workspace = true, features = ["ic-agent-client", "pocket-ic-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-helpers = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
 icrc2-minter = { path = "../icrc2-minter" }
+jsonrpc-core = { workspace = true }
 minter-client = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils", features = ["test-contracts"] }
 minter-did = { workspace = true }
@@ -49,8 +50,11 @@ ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "rel
 [dev-dependencies]
 anyhow = { workspace = true }
 btc-bridge = { path = "../btc-bridge" }
+ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
+ic-agent = { workspace = true }
+ic-utils = { workspace = true }
 rlp = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
@@ -74,3 +78,4 @@ state_machine_tests = [
     "ic-management-canister-types",
     "ic-state-machine-tests",
 ]
+dfx_tests = []
