@@ -11,10 +11,10 @@ use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::rand;
 use evm_canister_client::{EvmCanisterClient, IcAgentClient};
-use ic_exports::icrc_types::icrc1::account::Subaccount;
-use ic_exports::icrc_types::icrc1::transfer::TransferArg;
-use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_test_utils::Agent;
+use icrc_client::account::Subaccount;
+use icrc_client::approve::ApproveArgs;
+use icrc_client::transfer::TransferArg;
 use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::bft_bridge_api::{BURN, DEPLOY_WRAPPED_TOKEN, GET_WRAPPED_TOKEN};
@@ -22,8 +22,6 @@ use minter_contract_utils::wrapped_token_api::{ERC_20_APPROVE, ERC_20_BALANCE};
 use minter_did::id256::Id256;
 use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
-
-// use crate::icrc2_client::Icrc2CanisterClient;
 
 pub const ICRC1_TRANSFER_FEE: u64 = 10_000;
 

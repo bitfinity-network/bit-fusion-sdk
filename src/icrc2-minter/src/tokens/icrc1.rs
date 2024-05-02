@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
 use evm_canister_client::IcCanisterClient;
-use ic_exports::icrc_types::icrc1::account::Account;
+use icrc_client::account::Account;
 use icrc_client::IcrcCanisterClient;
 use minter_did::error::Result;
 use serde::{Deserialize, Serialize};
