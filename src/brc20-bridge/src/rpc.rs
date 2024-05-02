@@ -11,7 +11,6 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 };
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::constant::{
@@ -42,24 +41,14 @@ impl Rpc {
         // corresponds to the network.
         Self::is_valid_btc_address(&holder, network)?;
 
-        let token_details = match Self::get_brc20_token_by_ticker(&indexer_url, &tick)
-            .await
-            .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
-        {
-            Some(token_res) => token_res,
-            None => {
-                return Err(
-                    BridgeError::FetchBrc20TokenDetails("No BRC20 token found".to_owned()).into(),
-                )
-            }
-        };
-
         let TokenInfo {
             tx_id,
             address,
             ticker,
             ..
-        } = token_details.token;
+        } = Self::get_brc20_token_by_ticker(&indexer_url, &tick)
+            .await?
+            .token;
 
         if address != holder && tick != ticker {
             log::error!(
@@ -103,7 +92,8 @@ impl Rpc {
         .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
         .await?;
 
-        let txid = Txid::from_slice(&brc20_utxo.outpoint.txid).expect("failed");
+        let txid =
+            Txid::from_slice(&brc20_utxo.outpoint.txid).expect("failed to convert Txid from slice");
 
         Ok(Self::get_brc20_transaction_by_id(state, &txid)
             .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?)
@@ -143,11 +133,38 @@ impl Rpc {
     async fn get_brc20_token_by_ticker(
         base_indexer_url: &str,
         ticker: &str,
-    ) -> Result<Option<Brc20TokenResponse>, String> {
-        Self::http_get_req::<Brc20TokenResponse>(&format!(
-            "{base_indexer_url}/ordinals/v1/brc-20/tokens/:{ticker}"
-        ))
-        .await
+    ) -> Result<Brc20TokenResponse, BridgeError> {
+        let url = format!("{base_indexer_url}/ordinals/v1/brc-20/tokens/:{ticker}");
+
+        let request_params = CanisterHttpRequestArgument {
+            url,
+            max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
+            method: HttpMethod::GET,
+            headers: vec![HttpHeader {
+                name: "Accept".to_string(),
+                value: "application/json".to_string(),
+            }],
+            body: None,
+            transform: None,
+        };
+
+        let cycles = Self::get_estimated_http_outcall_cycles(&request_params);
+
+        let resp = http_request(request_params, cycles)
+            .await
+            .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
+            .0;
+
+        log::info!(
+            "Indexer responded with: status: {} body: {}",
+            resp.status,
+            String::from_utf8_lossy(&resp.body)
+        );
+
+        serde_json::from_slice(&resp.body).map_err(|err| {
+            log::error!("Failed to retrieve BRC20 token from the indexer: {err:?}");
+            BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
+        })
     }
 
     fn get_brc20_transaction_by_id(
@@ -183,45 +200,6 @@ impl Rpc {
                     .unwrap_or(HTTP_OUTCALL_RES_DEFAULT_SIZE) as u128;
 
         http_outcall_cost
-    }
-
-    async fn http_get_req<T>(url: &str) -> Result<Option<T>, String>
-    where
-        T: DeserializeOwned,
-    {
-        let request_params = CanisterHttpRequestArgument {
-            url: url.to_string(),
-            max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
-            method: HttpMethod::GET,
-            headers: vec![HttpHeader {
-                name: "Accept".to_string(),
-                value: "application/json".to_string(),
-            }],
-            body: None,
-            transform: None,
-        };
-
-        let cycles = Self::get_estimated_http_outcall_cycles(&request_params);
-
-        let (resp,) = http_request(request_params, cycles)
-            .await
-            .map_err(|(_rejection_code, cause)| cause)?;
-
-        log::info!(
-            "Indexer responded with: status: {} body: {}",
-            resp.status,
-            String::from_utf8_lossy(&resp.body)
-        );
-
-        if resp.status == 200u16 {
-            let data = serde_json::from_slice(&resp.body).map_err(|x| x.to_string())?;
-
-            Ok(Some(data))
-        } else if resp.status == 404u16 {
-            Ok(None)
-        } else {
-            Err("Invalid http status code".to_string())
-        }
     }
 
     fn network_as_str(network: Network) -> &'static str {
@@ -262,12 +240,11 @@ impl Rpc {
             .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
             .utxos;
 
-        let brc20_utxo = utxos
+        match utxos
             .iter()
             .find(|utxo| utxo.outpoint.txid == txid)
-            .cloned();
-
-        match brc20_utxo {
+            .cloned()
+        {
             Some(utxo) => Ok(utxo),
             None => Err(BridgeError::GetTransactionById(
                 "No matching UTXO found".to_string(),
