@@ -7,8 +7,8 @@ use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use evm_canister_client::EvmCanisterClient;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
-use minter_contract_utils::bft_bridge_api;
-use minter_contract_utils::bft_bridge_api::BURN;
+use minter_contract_utils::bft_bridge_api::{self, NATIVE_TOKEN_DEPOSIT};
+use minter_contract_utils::bft_bridge_api::{BURN, NATIVE_TOKEN_BALANCE};
 use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
 };
@@ -90,6 +90,12 @@ async fn test_external_bridging() {
         wallet
     };
     let bob_address: H160 = bob_wallet.address().into();
+
+    ctx.evm_client(ADMIN)
+        .mint_native_tokens(bob_address.clone(), u64::MAX.into())
+        .await
+        .unwrap()
+        .unwrap();
 
     // Initialize erc20-minter with EvmInfos for both EVM canisters.
     let erc20_minter_canister = ctx
@@ -245,6 +251,32 @@ async fn test_external_bridging() {
     // Approve ERC-20 transfer on behalf of some user in external EVM.
     let alice_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
     let alice_address: H160 = alice_wallet.address().into();
+
+    let input = NATIVE_TOKEN_DEPOSIT
+        .encode_input(&[Token::Address(bob_address.0)])
+        .unwrap();
+
+    // spender should deposit native tokens to bft bridge, to pay fee.
+    let expected_init_native_balance = 10_u64.pow(15);
+    let receipt = ctx
+        .call_contract(
+            &bob_wallet,
+            &evmc_bridge_address,
+            input,
+            expected_init_native_balance.into(),
+        )
+        .await
+        .unwrap()
+        .1;
+    let init_native_balance = NATIVE_TOKEN_DEPOSIT
+        .decode_output(receipt.output.as_ref().unwrap())
+        .unwrap()
+        .first()
+        .cloned()
+        .unwrap()
+        .into_uint()
+        .unwrap();
+    assert_eq!(init_native_balance, expected_init_native_balance.into());
 
     let nonce = external_evm_client
         .account_basic(bob_address.clone())
@@ -402,5 +434,33 @@ async fn test_external_bridging() {
         .await
         .unwrap();
 
-    assert!(signed_order.is_none())
+    assert!(signed_order.is_none());
+
+    // Check fee charged
+    let input = NATIVE_TOKEN_BALANCE
+        .encode_input(&[Token::Address(bob_address.0)])
+        .unwrap();
+    let response = ctx
+        .evm_client(ADMIN)
+        .eth_call(
+            Some(bob_address),
+            Some(evmc_bridge_address),
+            None,
+            3_000_000,
+            None,
+            Some(input.into()),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let native_balance_after_mint = NATIVE_TOKEN_DEPOSIT
+        .decode_output(&hex::decode(response.trim_start_matches("0x")).unwrap())
+        .unwrap()
+        .first()
+        .cloned()
+        .unwrap()
+        .into_uint()
+        .unwrap();
+    assert!(native_balance_after_mint > U256::zero().0);
+    assert!(native_balance_after_mint < init_native_balance);
 }
