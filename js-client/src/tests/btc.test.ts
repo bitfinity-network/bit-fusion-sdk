@@ -4,13 +4,13 @@ import { describe, expect, test } from 'vitest';
 import bitcore from 'bitcore-lib';
 
 import { BtcBridge } from '../btc';
-import { generateWallet, wait, mintNativeToken, execBitcoinCmd } from './utils';
+import { randomWallet, wait, mintNativeToken, execBitcoinCmd } from './utils';
 import { EthAddress } from '../validation';
 
 describe.sequential(
   'btc',
   () => {
-    const wallet = generateWallet();
+    const wallet = randomWallet();
 
     const btcBridge = new BtcBridge({ provider: wallet });
 
