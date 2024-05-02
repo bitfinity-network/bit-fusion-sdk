@@ -130,12 +130,12 @@ export class IcrcBridge {
     );
 
     if (wrappedTokenAddress && new Address(wrappedTokenAddress).isZero()) {
-      const response = await this.bftBridge.deployERC20(
+      const tx = await this.bftBridge.deployERC20(
         name,
         symbol,
         this.baseTokenId256
       );
-      wrappedTokenAddress = await response.wait(2);
+      wrappedTokenAddress = await tx.wait(2);
     }
 
     return wrappedTokenAddress;
@@ -161,6 +161,7 @@ export class IcrcBridge {
           console.log('res - icrc2', res);
         }
       };
+
       if (IS_TEST) {
         console.log('test is running', IS_TEST);
 
