@@ -51,15 +51,6 @@ export class BtcBridge {
   }
 
   async bridgeBtc(address: EthAddress) {
-    // const ethAddress = await this.getAddress();
-
-    // const btcAddress = await BtcBridgeActor.get_btc_address({
-    //   owner: [Principal.fromText(BTC_BRIDGE_CANISTER_ID)],
-    //   subaccount: [ethAddrToSubaccount(address)]
-    // });
-
-    // await this.btc.sendBitcoin(btcAddress, satoshis);
-
     return await BtcBridgeActor.btc_to_erc20(address);
   }
 
@@ -70,10 +61,6 @@ export class BtcBridge {
     });
 
     return btcAddress;
-  }
-
-  async bridgeBtcToEvm(address: EthAddress) {
-    return await BtcBridgeActor.btc_to_erc20(address);
   }
 
   async bridgeEVMc(address: string, satoshis: number) {
