@@ -1,4 +1,4 @@
-FROM hirosystems/ordhook:latest
+FROM hirosystems/ordhook:2.1
 
 COPY ordhook.sh .
 COPY mkcert .

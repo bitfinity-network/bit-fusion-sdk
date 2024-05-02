@@ -3,8 +3,8 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use bitcoin::{OutPoint, Txid};
-use candid::types::{Compound, Type, TypeInner};
-use candid::{field, CandidType, Decode, Deserialize, Encode};
+use candid::types::{Type, TypeInner};
+use candid::{CandidType, Decode, Deserialize, Encode};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, VirtualMemory};
 use minter_contract_utils::erc721_mint_order::SignedMintOrder;
@@ -102,23 +102,14 @@ pub struct StorableNftId(pub NftId);
 
 impl CandidType for StorableNftId {
     fn _ty() -> Type {
-        Type(Rc::new(TypeInner::Record(vec![
-            field! {txid: StorableTxId::ty()},
-            field! {index: u32::ty()},
-        ])))
+        Type(Rc::new(TypeInner::Text))
     }
 
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
         S: candid::types::Serializer,
     {
-        let mut compound = serializer.serialize_struct().unwrap();
-        let storable_txid = StorableTxId(self.0.txid.clone());
-
-        compound.serialize_element(&storable_txid)?;
-        compound.serialize_element(&self.0.index)?;
-
-        Ok(())
+        serializer.serialize_text(&self.0.to_string())
     }
 }
 

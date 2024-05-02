@@ -2,11 +2,13 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::absolute::LockTime;
+use bitcoin::hashes::Hash as _;
 use bitcoin::transaction::Version;
 use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
+use bitcoincore_rpc::RpcApi as _;
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -17,7 +19,10 @@ use ord_rs::inscription::nft::id::NftId;
 use ord_rs::{Nft, OrdParser};
 use serde::Deserialize;
 
-use crate::constant::{CYCLES_PER_HTTP_REQUEST, MAX_HTTP_RESPONSE_BYTES};
+use crate::constant::{
+    CYCLES_PER_HTTP_REQUEST, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
+    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST, MAX_HTTP_RESPONSE_BYTES,
+};
 use crate::interface::bridge_api::BridgeError;
 use crate::interface::get_deposit_address;
 use crate::interface::store::NftInfo;
@@ -56,7 +61,8 @@ pub async fn fetch_nft_token_details(
         transform: None,
     };
 
-    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+    let cycles = get_estimated_http_outcall_cycles(&request_params);
+    let result = http_request(request_params, cycles)
         .await
         .map_err(|err| BridgeError::FetchNftTokenDetails(format!("{err:?}")))?
         .0;
@@ -102,14 +108,9 @@ pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
-    let (ic_btc_network, btc_network, indexer_url, derivation_path) = {
+    let (ic_btc_network, derivation_path) = {
         let state = state.borrow();
-        (
-            state.ic_btc_network(),
-            state.btc_network(),
-            state.indexer_url(),
-            state.derivation_path(None),
-        )
+        (state.ic_btc_network(), state.derivation_path(None))
     };
 
     let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
@@ -122,45 +123,11 @@ pub(crate) async fn fetch_reveal_transaction(
     .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
     .await?;
 
-    let txid = hex::encode(nft_utxo.outpoint.txid);
+    let txid =
+        Txid::from_slice(&nft_utxo.outpoint.txid).expect("failed to convert Txid from slice");
 
-    let btc_network_str = network_as_str(btc_network);
-    let url = format!("{indexer_url}{btc_network_str}/api/tx/{txid}");
-
-    let request_params = CanisterHttpRequestArgument {
-        url,
-        max_response_bytes: Some(MAX_HTTP_RESPONSE_BYTES),
-        method: HttpMethod::GET,
-        headers: vec![HttpHeader {
-            name: "Accept".to_string(),
-            value: "application/json".to_string(),
-        }],
-        body: None,
-        transform: None,
-    };
-
-    let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
-        .await
-        .map_err(|err| BridgeError::GetTransactionById(format!("{err:?}")))?
-        .0;
-
-    if result.status.to_string() != "200" {
-        log::error!("Failed to fetch data: HTTP status {}", result.status);
-        return Err(BridgeError::FetchNftTokenDetails("Failed to fetch data".to_string()).into());
-    }
-
-    log::info!(
-        "Response from indexer: Status: {} Body: {}",
-        result.status,
-        String::from_utf8_lossy(&result.body)
-    );
-
-    let tx: TxInfo = serde_json::from_slice(&result.body).map_err(|err| {
-        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
-        BridgeError::GetTransactionById(format!("{err:?}"))
-    })?;
-
-    tx.try_into()
+    Ok(get_nft_transaction_by_id(state, &txid)
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?)
 }
 
 pub(crate) async fn parse_and_validate_inscription(
@@ -184,6 +151,13 @@ fn network_as_str(network: Network) -> &'static str {
         Network::Signet => "/signet",
         _ => "",
     }
+}
+
+fn get_nft_transaction_by_id(state: &RefCell<State>, txid: &Txid) -> anyhow::Result<Transaction> {
+    Ok(state
+        .borrow()
+        .bitcoin_rpc_client()?
+        .get_raw_transaction(txid, None)?)
 }
 
 fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeError> {
@@ -304,6 +278,31 @@ impl TryFrom<TxInfo> for Transaction {
             output: tx_out,
         })
     }
+}
+
+fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 {
+    let headers_size = req.headers.iter().fold(0u128, |len, header| {
+        len + header.value.len() as u128 + header.name.len() as u128
+    });
+
+    let mut request_size = req.url.len() as u128 + headers_size;
+
+    if let Some(transform) = &req.transform {
+        request_size += transform.context.len() as u128;
+    }
+
+    if let Some(body) = &req.body {
+        request_size += body.len() as u128;
+    }
+
+    let http_outcall_cost: u128 = HTTP_OUTCALL_PER_CALL_COST
+        + HTTP_OUTCALL_REQ_PER_BYTE_COST * request_size
+        + HTTP_OUTCALL_RES_PER_BYTE_COST
+            * req
+                .max_response_bytes
+                .unwrap_or(HTTP_OUTCALL_RES_DEFAULT_SIZE) as u128;
+
+    http_outcall_cost
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

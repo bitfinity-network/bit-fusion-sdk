@@ -47,6 +47,13 @@ dfx deploy btc-nft-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
+    rpc_config = record {
+      bitcoin_rpc_url = opt \"http://127.0.0.1:18443\";
+      bitcoin_rpc_username = opt \"user\";
+      bitcoin_rpc_password = opt \"pass\";
+      bitcoin_data_dir = null;
+      cookie_file = null;
+    };
     logger = record {
       enable_console = true;
       in_memory_records = opt 10000;
@@ -130,12 +137,20 @@ fi
 sleep 5
 
 ORD_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+if [ -z "$ORD_ADDRESS" ]; then
+    $ord_wallet create
+    ORD_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+    if [ -z "$ORD_ADDRESS" ]; then
+        echo "Failed to get Ord wallet address"
+        exit 1
+    fi
+fi
 echo "Ord wallet address: $ORD_ADDRESS"
 
 $bitcoin_cli -rpcwallet=admin sendtoaddress "$ORD_ADDRESS" 10
 $bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
 
-##################### Create a BRC20 Inscription ###################
+##################### Create a NFT Inscription ###################
 
 echo "Creating a NFT inscription"
 sleep 5
@@ -149,6 +164,10 @@ $bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
 
 sleep 3
 NFT_ID=$(echo "$inscription_res" | jq -r '.inscriptions[0].id')
+if [ -z "$NFT_ID" ]; then
+    echo "Failed to create NFT inscription"
+    exit 1
+fi
 echo "NFT inscription ID: $NFT_ID"
 
 sleep 3
@@ -160,20 +179,20 @@ echo "Preparing to bridge a NFT inscription to an ERC721 token"
 
 nft_bridge_addr=$(dfx canister call btc-nft-bridge get_deposit_address)
 BRIDGE_ADDRESS=$(echo "$nft_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
-echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
+echo "NFT bridge canister BTC address: $BRIDGE_ADDRESS"
 
 echo "Topping up canister's wallet"
 docker exec bitcoind bitcoin-cli -regtest generatetoaddress 10 "$BRIDGE_ADDRESS"
 
 sleep 10
 echo "Canister's balance after topup"
-dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+dfx canister call btc-nft-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
-echo "Ord wallet balance before deposit of BRC20"
+echo "Ord wallet balance before deposit of NFT"
 $ord_wallet balance
 
 # Deposit NFT on the bridge
-$ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $BRC20_ID
+$ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $NFT_ID
 $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 
 sleep 10
@@ -181,12 +200,12 @@ echo "Ord wallet balance after deposit"
 $ord_wallet balance
 
 echo "Canister's balance after NFT deposit"
-dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+dfx canister call btc-nft-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
 for i in 1 2 3; do
   sleep 5
   echo "Trying to bridge from BTC-NFT to ERC721"
-  mint_status=$(dfx canister call brc20-bridge nft_to_erc721 "(\"$NFT_ID\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  mint_status=$(dfx canister call btc-nft-bridge nft_to_erc721 "(\"$NFT_ID\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
   echo "Result: $mint_status"
 
   if [[ $mint_status == *"Minted"* ]]; then

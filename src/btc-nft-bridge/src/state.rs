@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
 
 use bitcoin::Network;
+use bitcoincore_rpc::{Auth, Client};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
@@ -36,6 +38,7 @@ pub struct BtcNftBridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub indexer: String,
+    pub rpc_config: RpcConfig,
     pub logger: LogSettings,
 }
 
@@ -43,6 +46,7 @@ impl Default for BtcNftBridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
+            rpc_config: RpcConfig::default(),
             evm_link: EvmLink::default(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [0; 32],
@@ -74,6 +78,27 @@ pub struct NftBridgeConfig {
     pub token_address: H160,
     pub token_name: [u8; 32],
     pub token_symbol: [u8; 16],
+}
+
+#[derive(Debug, CandidType, Clone, Deserialize, PartialEq)]
+pub struct RpcConfig {
+    pub bitcoin_rpc_url: Option<String>,
+    pub bitcoin_rpc_username: Option<String>,
+    pub bitcoin_rpc_password: Option<String>,
+    pub bitcoin_data_dir: Option<PathBuf>,
+    pub cookie_file: Option<PathBuf>,
+}
+
+impl Default for RpcConfig {
+    fn default() -> Self {
+        Self {
+            bitcoin_rpc_url: Some("http://127.0.0.1:18443".to_string()),
+            bitcoin_rpc_username: Some("user".to_string()),
+            bitcoin_rpc_password: Some("pass".to_string()),
+            bitcoin_data_dir: None,
+            cookie_file: None,
+        }
+    }
 }
 
 impl Default for State {
@@ -153,12 +178,89 @@ impl State {
         }
     }
 
+    fn bitcoin_rpc_url(&self) -> String {
+        self.rpc_config().bitcoin_rpc_url.unwrap_or_default()
+    }
+
+    fn bitcoin_credentials(&self) -> anyhow::Result<Auth> {
+        if let Some((user, pass)) = &self
+            .rpc_config()
+            .bitcoin_rpc_username
+            .as_ref()
+            .zip(self.rpc_config().bitcoin_rpc_password.as_ref())
+        {
+            Ok(Auth::UserPass((*user).clone(), (*pass).clone()))
+        } else {
+            Ok(Auth::CookieFile(self.cookie_file()?))
+        }
+    }
+
+    fn cookie_file(&self) -> anyhow::Result<PathBuf> {
+        if let Some(cookie_file) = &self.rpc_config().cookie_file {
+            return Ok(cookie_file.clone());
+        }
+
+        let path = if let Some(bitcoin_data_dir) = &self.rpc_config().bitcoin_data_dir {
+            bitcoin_data_dir.clone()
+        } else if cfg!(target_os = "linux") {
+            dirs::home_dir()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("failed to get cookie file path: could not get home dir")
+                })?
+                .join(".bitcoin")
+        } else {
+            dirs::data_dir()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("failed to get cookie file path: could not get data dir")
+                })?
+                .join("Bitcoin")
+        };
+
+        Ok(self.join_btc_network_with_data_dir(path).join(".cookie"))
+    }
+
+    fn join_btc_network_with_data_dir(&self, data_dir: impl AsRef<Path>) -> PathBuf {
+        match self.btc_network() {
+            Network::Testnet => data_dir.as_ref().join("testnet3"),
+            Network::Signet => data_dir.as_ref().join("signet"),
+            Network::Regtest => data_dir.as_ref().join("regtest"),
+            _ => data_dir.as_ref().to_owned(),
+        }
+    }
+
     pub fn btc_network(&self) -> Network {
         match self.config.network {
             BitcoinNetwork::Mainnet => Network::Bitcoin,
             BitcoinNetwork::Testnet => Network::Testnet,
             BitcoinNetwork::Regtest => Network::Regtest,
         }
+    }
+
+    pub(crate) fn rpc_config(&self) -> RpcConfig {
+        self.config.rpc_config.clone()
+    }
+
+    pub(crate) fn bitcoin_rpc_client(&self) -> anyhow::Result<Client> {
+        let rpc_url = self.bitcoin_rpc_url();
+        let bitcoin_credentials = self.bitcoin_credentials()?;
+
+        log::info!("Connecting to Bitcoin Core at {}", self.bitcoin_rpc_url());
+
+        if let Auth::CookieFile(cookie_file) = &bitcoin_credentials {
+            log::info!(
+                "Using credentials from cookie file at `{}`",
+                cookie_file.display()
+            );
+
+            anyhow::ensure!(
+                cookie_file.is_file(),
+                "cookie file `{}` does not exist",
+                cookie_file.display()
+            );
+        }
+
+        Ok(Client::new(&rpc_url, bitcoin_credentials)
+            .unwrap_or_else(|_| panic!("failed to connect to Bitcoin Core RPC at `{rpc_url}`")))
     }
 
     pub fn ic_btc_network(&self) -> BitcoinNetwork {

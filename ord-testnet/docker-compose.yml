@@ -70,6 +70,7 @@ services:
       - "8001:8001"
     volumes:
       - ./brc20_json_inscriptions:/brc20_json_inscriptions
+      - ./nft_json_inscriptions:/nft_json_inscriptions
     depends_on:
       - bitcoind
 
