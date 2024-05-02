@@ -467,6 +467,64 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::View,
 });
 
+#[allow(deprecated)] // need to initialize `constant` field
+pub static NATIVE_TOKEN_BALANCE: Lazy<Function> = Lazy::new(|| Function {
+    name: "nativeTokenBalance".into(),
+    inputs: vec![Param {
+        name: "user".into(),
+        kind: ParamType::Address,
+        internal_type: None,
+    }],
+    outputs: vec![Param {
+        name: "balance".into(),
+        kind: ParamType::Uint(256),
+        internal_type: None,
+    }],
+    constant: None,
+    state_mutability: StateMutability::View,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
+pub static NATIVE_TOKEN_DEPOSIT: Lazy<Function> = Lazy::new(|| Function {
+    name: "nativeTokenDeposit".into(),
+    inputs: vec![Param {
+        name: "to".into(),
+        kind: ParamType::Address,
+        internal_type: None,
+    }],
+    outputs: vec![Param {
+        name: "balance".into(),
+        kind: ParamType::Uint(256),
+        internal_type: None,
+    }],
+    constant: None,
+    state_mutability: StateMutability::Payable,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
+pub static NATIVE_TOKEN_WITHDRAW: Lazy<Function> = Lazy::new(|| Function {
+    name: "nativeTokenWithdraw".into(),
+    inputs: vec![
+        Param {
+            name: "to".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+        Param {
+            name: "amount".into(),
+            kind: ParamType::Uint(256),
+            internal_type: None,
+        },
+    ],
+    outputs: vec![Param {
+        name: "balance".into(),
+        kind: ParamType::Uint(256),
+        internal_type: None,
+    }],
+    constant: None,
+    state_mutability: StateMutability::NonPayable,
+});
+
 pub fn mint_transaction(
     sender: H160,
     bridge: H160,

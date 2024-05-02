@@ -179,7 +179,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
-            fee_payer: Default::default(),
+            fee_payer: H160::zero(),
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
