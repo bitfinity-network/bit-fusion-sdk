@@ -70,8 +70,6 @@ impl BridgeTask {
         ScheduledTask::with_options(self, options)
     }
 
-    pub fn icrc_client(&self) {}
-
     pub async fn init_evm_info(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
         log::trace!("evm info initialization started");
 
@@ -181,7 +179,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
-            fee_payer: Default::default(), //TODO:: set fee payer
+            fee_payer: Default::default(),
         };
 
         let signer = state.borrow().signer.get_transaction_signer();

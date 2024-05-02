@@ -35,7 +35,6 @@ use tokio::time::Instant;
 use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
-
 use crate::utils::wasm::*;
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
