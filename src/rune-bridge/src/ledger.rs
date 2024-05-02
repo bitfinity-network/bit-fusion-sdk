@@ -10,9 +10,10 @@ use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, V
 use ord_rs::wallet::TxInputInfo;
 use serde::Deserialize;
 
-use crate::key::IcSigner;
+use crate::key::IcBtcSigner;
 use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER};
 
+/// Data structure to keep track of utxos owned by the canister.
 pub struct UtxoLedger {
     utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
 }
@@ -74,7 +75,7 @@ struct UtxoDetails {
 
 impl UtxoDetails {
     const MAX_SCRIPT_SIZE: u32 = 128;
-    const DERIVATION_PATH_SIZE: u32 = IcSigner::DERIVATION_PATH_SIZE;
+    const DERIVATION_PATH_SIZE: u32 = IcBtcSigner::DERIVATION_PATH_SIZE;
 }
 
 impl Storable for UtxoDetails {
@@ -100,6 +101,7 @@ pub struct StoredUtxo {
 }
 
 impl UtxoLedger {
+    /// Adds the utxo to the store.
     pub fn deposit(&mut self, utxos: &[Utxo], address: &Address, derivation_path: Vec<Vec<u8>>) {
         let script = address.script_pubkey();
         for utxo in utxos {
@@ -121,6 +123,7 @@ impl UtxoLedger {
         }
     }
 
+    /// Lists all utxos in the store.
     pub fn load_all(&self) -> Vec<StoredUtxo> {
         self.utxo_storage
             .iter()

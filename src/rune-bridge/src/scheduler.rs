@@ -3,7 +3,6 @@ use std::pin::Pin;
 use std::str::FromStr;
 
 use bitcoin::Address;
-use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -30,7 +29,6 @@ pub enum RuneBridgeTask {
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
-    MintErc20(H160),
 }
 
 impl RuneBridgeTask {
@@ -168,16 +166,6 @@ impl Task for RuneBridgeTask {
             RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
-            }
-            RuneBridgeTask::MintErc20(address) => {
-                let _address = address.clone();
-                Box::pin(async move {
-                    todo!()
-                    //
-                    // log::info!("ERC20 mint result from scheduler: {result:?}");
-                    //
-                    // Ok(())
-                })
             }
             RuneBridgeTask::MintBtc(BurntEventData {
                 recipient_id,

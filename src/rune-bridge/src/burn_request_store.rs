@@ -8,6 +8,7 @@ use crate::memory::{BURN_REQUEST_MEMORY_ID, MEMORY_MANAGER};
 
 pub type BurnRequestId = u32;
 
+/// Stores burn requests from the EVM until they are confirmed by the BTC network.
 pub struct BurnRequestStore {
     inner: StableBTreeMap<BurnRequestId, BurnRequestInfo, VirtualMemory<DefaultMemoryImpl>>,
 }
@@ -40,6 +41,7 @@ impl Default for BurnRequestStore {
 }
 
 impl BurnRequestStore {
+    /// Adds a new burn request.
     pub fn insert(&mut self, request_id: BurnRequestId, address: String, amount: u64) {
         self.inner.insert(
             request_id,
@@ -51,10 +53,12 @@ impl BurnRequestStore {
         );
     }
 
+    /// Remove the burn request from the store.
     pub fn remove(&mut self, request_id: BurnRequestId) {
         self.inner.remove(&request_id);
     }
 
+    ///
     pub fn set_transferred(&mut self, request_id: BurnRequestId) {
         if let Some(v) = self.inner.remove(&request_id) {
             self.inner.insert(

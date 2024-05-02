@@ -14,13 +14,13 @@ use crate::state::{MasterKey, State};
 
 pub const DERIVATION_PATH_PREFIX: u8 = 7;
 
-pub struct IcSigner {
+pub struct IcBtcSigner {
     master_key: MasterKey,
     network: Network,
     derivation_path: Vec<Vec<u8>>,
 }
 
-impl IcSigner {
+impl IcBtcSigner {
     pub const DERIVATION_PATH_SIZE: u32 = 21 / 3 * 4;
 
     pub fn new(master_key: MasterKey, network: Network, derivation_path: Vec<Vec<u8>>) -> Self {
@@ -59,7 +59,7 @@ impl IcSigner {
 }
 
 #[async_trait]
-impl ExternalSigner for IcSigner {
+impl ExternalSigner for IcBtcSigner {
     async fn ecdsa_public_key(&self) -> String {
         hex::encode(self.public_key().inner.serialize())
     }

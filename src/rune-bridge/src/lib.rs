@@ -1,4 +1,3 @@
-pub mod burn_request_store;
 pub mod canister;
 pub mod interface;
 pub mod key;
