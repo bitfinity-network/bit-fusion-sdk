@@ -237,6 +237,7 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         minted_event: MintedEventData,
     ) -> Result<(), SchedulerError> {
+        log::trace!("mint order removing");
         let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
                 "failed to decode sender id256 from minted event".into(),

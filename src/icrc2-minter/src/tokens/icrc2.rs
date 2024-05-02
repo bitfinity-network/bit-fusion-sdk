@@ -42,7 +42,7 @@ pub async fn approve_mint(
     let fee = get_token_configuration(token).await?.fee;
     let full_fee = Nat::from(2_u64) * fee.clone();
 
-    let icrc_clent = IcrcCanisterClient::new(IcCanisterClient::new(token));
+    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     // Fee deducted twice because there are two transactions: approve and transferFrom.
     if amount < full_fee {
@@ -66,7 +66,7 @@ pub async fn approve_mint(
         created_at_time: None,
     };
 
-    let approve_result = icrc_clent.icrc2_approve(args).await?;
+    let approve_result = icrc_client.icrc2_approve(args).await?;
 
     if repeat_on_bad_fee {
         if let Err(ApproveError::BadFee { .. }) = &approve_result {
@@ -89,7 +89,7 @@ pub async fn burn(
     amount: Nat,
     repeat_on_bad_fee: bool,
 ) -> Result<Success> {
-    let icrc_clent = IcrcCanisterClient::new(IcCanisterClient::new(token));
+    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     let minter_canister_account = Account::from(ic::id());
 
@@ -103,7 +103,7 @@ pub async fn burn(
         created_at_time: None,
     };
 
-    let transfer_result = icrc_clent.icrc2_transfer_from(args).await?;
+    let transfer_result = icrc_client.icrc2_transfer_from(args).await?;
 
     if repeat_on_bad_fee {
         if let Err(TransferFromError::BadFee { .. }) = &transfer_result {
