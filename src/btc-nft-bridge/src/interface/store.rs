@@ -11,6 +11,7 @@ use minter_contract_utils::erc721_mint_order::SignedMintOrder;
 use minter_contract_utils::erc721_mint_orders::MintOrders;
 use minter_did::id256::Id256;
 use ord_rs::inscription::nft::id::NftId;
+use serde::Serialize;
 
 use super::bridge_api::BridgeError;
 use crate::memory::{
@@ -96,7 +97,7 @@ impl From<&NftInfo> for OutPoint {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
 pub struct StorableNftId(pub NftId);
 
 impl CandidType for StorableNftId {

@@ -1,5 +1,5 @@
 use candid::CandidType;
-use did::H256;
+use did::{H160, H256};
 use inscriber::interface::{Multisig, Protocol};
 use minter_contract_utils::erc721_mint_order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,17 @@ pub struct InscribeNftArgs {
     pub leftovers_address: String,
     pub dst_address: String,
     pub multisig_config: Option<Multisig>,
+}
+
+/// Arguments to `NftTask::MintNft`
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MintNftArgs {
+    /// User's ETH address
+    pub eth_address: H160,
+    /// User's BTC address
+    pub btc_address: String,
+    /// NFT id
+    pub nft_id: StorableNftId,
 }
 
 /// Status of an NFT to a BTC NFT swap

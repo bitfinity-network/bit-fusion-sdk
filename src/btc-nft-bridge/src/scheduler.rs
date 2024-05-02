@@ -16,13 +16,14 @@ use ord_rs::inscription::nft::id::NftId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
+use crate::interface::bridge_api::MintNftArgs;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NftTask {
     InitEvmState,
     CollectEvmEvents,
     RemoveMintOrder(MintedEventData),
-    //MintNft(MintNftfArgs),
+    MintNft(MintNftArgs),
     InscribeNft(BurnEventData),
 }
 
@@ -162,18 +163,17 @@ impl Task for NftTask {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            /*
             Self::MintNft(args) => {
-                let (eth_address, brc20_token, btc_address) = (
+                let (eth_address, nft_id, btc_address) = (
                     args.eth_address.clone(),
-                    args.brc20_token.clone(),
+                    args.nft_id.clone(),
                     args.btc_address.clone(),
                 );
                 Box::pin(async move {
-                    let result = crate::ops::brc20_to_erc20(
+                    let result = crate::ops::nft_to_erc721(
                         &get_state(),
                         eth_address,
-                        brc20_token,
+                        nft_id.into(),
                         btc_address,
                     )
                     .await;
@@ -183,7 +183,6 @@ impl Task for NftTask {
                     Ok(())
                 })
             }
-             */
             Self::InscribeNft(BurnEventData {
                 operation_id,
                 recipient_id,
