@@ -7,8 +7,9 @@ use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use evm_canister_client::EvmCanisterClient;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
-use minter_contract_utils::bft_bridge_api::{self, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::bft_bridge_api::{BURN, NATIVE_TOKEN_BALANCE};
+use minter_contract_utils::bft_bridge_api::{
+    self, BURN, NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT,
+};
 use minter_contract_utils::build_data::test_contracts::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, TEST_WTM_HEX_CODE,
 };

@@ -2,8 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
-use ic_canister::virtual_canister_call;
-use ic_exports::icrc_types::icrc1::account::Account;
+use evm_canister_client::IcCanisterClient;
+use icrc_client::account::Account;
+use icrc_client::IcrcCanisterClient;
 use minter_did::error::Result;
 use serde::{Deserialize, Serialize};
 
@@ -71,16 +72,22 @@ pub struct TokenConfiguration {
 
 /// Requests fee and minting account configuration from an ICRC-1 canister.
 async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguration> {
+    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
+
     // ICRC-1 standard metadata doesn't include a minting account, so we have to do two requests
     // to get both fields, which is fine though since this is done once.
-    let fee = get_icrc1_fee(token).await?;
-    let minting_account = get_icrc1_minting_account(token).await?.unwrap_or(Account {
-        owner: Principal::management_canister(),
-        subaccount: None,
-    });
-    let name = get_icrc1_name(token).await?;
-    let symbol = get_icrc1_symbol(token).await?;
-    let decimals = get_icrc1_decimals(token).await?;
+    let fee = icrc_client.icrc1_fee().await?;
+    let minting_account = icrc_client
+        .icrc1_minting_account()
+        .await?
+        .unwrap_or(Account {
+            owner: Principal::management_canister(),
+            subaccount: None,
+        });
+
+    let name = icrc_client.icrc1_name().await?;
+    let symbol = icrc_client.icrc1_symbol().await?;
+    let decimals = icrc_client.icrc1_decimals().await?;
 
     let info = TokenInfo {
         name,
@@ -98,40 +105,17 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
 
 /// Requests fee and minting account configuration from an ICRC-1 canister.
 async fn query_icrc1_token_info(token: Principal) -> Result<TokenInfo> {
-    let name = get_icrc1_name(token).await?;
-    let symbol = get_icrc1_symbol(token).await?;
-    let decimals = get_icrc1_decimals(token).await?;
+    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
+
+    let name = icrc_client.icrc1_name().await?;
+    let symbol = icrc_client.icrc1_symbol().await?;
+    let decimals = icrc_client.icrc1_decimals().await?;
 
     Ok(TokenInfo {
         name,
         symbol,
         decimals,
     })
-}
-
-/// Requests fee configuration from an ICRC-1 canister.
-async fn get_icrc1_fee(token: Principal) -> Result<Nat> {
-    Ok(virtual_canister_call!(token, "icrc1_fee", (), Nat).await?)
-}
-
-/// Requests ICRC-1 token name.
-async fn get_icrc1_name(token: Principal) -> Result<String> {
-    Ok(virtual_canister_call!(token, "icrc1_name", (), String).await?)
-}
-
-/// Requests ICRC-1 token symbol.
-async fn get_icrc1_symbol(token: Principal) -> Result<String> {
-    Ok(virtual_canister_call!(token, "icrc1_symbol", (), String).await?)
-}
-
-/// Requests ICRC-1 token decimals number.
-async fn get_icrc1_decimals(token: Principal) -> Result<u8> {
-    Ok(virtual_canister_call!(token, "icrc1_decimals", (), u8).await?)
-}
-
-/// Requests minting account configuration from an ICRC-1 canister.
-async fn get_icrc1_minting_account(token: Principal) -> Result<Option<Account>> {
-    Ok(virtual_canister_call!(token, "icrc1_minting_account", (), Option<Account>).await?)
 }
 
 /// Cache the token configuration value in the cache
