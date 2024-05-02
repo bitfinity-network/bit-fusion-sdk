@@ -11,8 +11,10 @@ export-api = []
 [dependencies]
 anyhow = { workspace = true }
 bitcoin = { workspace = true }
+bitcoincore-rpc = "0.18"
 candid = { workspace = true }
 did = { workspace = true }
+dirs = "5.0"
 ethers-core = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 futures = { workspace = true }

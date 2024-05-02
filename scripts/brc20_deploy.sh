@@ -1,31 +1,15 @@
 #!/bin/bash
 
 # Script to deploy and test the Brc20Bridge canister to perform a complete bridging flow (BRC20 <> ERC20).
-#
-# NOTES: 
-#
-# 1. Version 0.18 of dfx has a bug not allowing BTC operations to work properly. Future versions may fix the issue.
-# Until then, this script uses dfx version 0.17.
-#
-# 2. We use https://127.0.0.1:8001 as the indexer to fetch a reveal transaction by its ID, and to fetch BRC20 inscription details.
-# Notice it's using HTTPS, which is required by `dfx`. Therefore we need to set up two things:
-#
-#     a. `mkcert`, which automatically creates and installs a local CA in the system root store, and generates locally-trusted certificates.
-#         After installing `mkcert` and generating the cert and key, you'll see an output like this:
-#             The certificate is at "./localhost+2.pem" and the key at "./localhost+2-key.pem"
-#
-#     b. an SSL proxy (e.g. `local-ssl-proxy`, `caddy`, etc.) which utilises the cert and key generated previously:
-#           local-ssl-proxy --source 8001 --target 8000 -c localhost+2.pem -k localhost+2-key.pem &
-#
 
 set +e
 
 ############################### Configure Dfx #################################
 
-# echo "Starting dfx in a clean state"
-# dfx stop
-# rm -f dfx_log.txt
-# dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
+echo "Starting dfx in a clean state"
+dfx stop
+rm -f dfx_log.txt
+dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -66,6 +50,13 @@ dfx deploy brc20-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
+    rpc_config = record {
+      bitcoin_rpc_url = opt \"http://127.0.0.1:18443\";
+      bitcoin_rpc_username = opt \"user\";
+      bitcoin_rpc_password = opt \"pass\";
+      bitcoin_data_dir = null;
+      cookie_file = null;
+    };
     logger = record {
       enable_console = true;
       in_memory_records = opt 10000;
@@ -226,24 +217,24 @@ sleep 5
 
 ####################### Swap ERC20 for BRC20 ######################
 
-# USER_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
-# echo "Inscription destination and leftovers address: $USER_ADDRESS"
+USER_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+echo "Inscription destination and leftovers address: $USER_ADDRESS"
 
-# echo "Ord wallet balance before swap:"
-# $ord_wallet balance
+echo "Ord wallet balance before swap:"
+$ord_wallet balance
 
-# cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
-#   --wallet="$ETH_WALLET" \
-#   --evm-canister="$EVM" \
-#   --bft-bridge="$BFT_ETH_ADDRESS" \
-#   --token-address="$TOKEN_ETH_ADDRESS" \
-#   --address="$USER_ADDRESS" \
-#   --amount=10
+cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+  --wallet="$ETH_WALLET" \
+  --evm-canister="$EVM" \
+  --bft-bridge="$BFT_ETH_ADDRESS" \
+  --token-address="$TOKEN_ETH_ADDRESS" \
+  --address="$USER_ADDRESS" \
+  --amount=10
 
-# echo "Wait for 15 seconds for the transaction to be broadcast"
-# sleep 15
-# $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
+echo "Wait for 15 seconds for the transaction to be broadcast"
+sleep 15
+$bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 
-# sleep 5
-# echo "Ord wallet balance after swap:"
-# $ord_wallet balance
+sleep 5
+echo "Ord wallet balance after swap:"
+$ord_wallet balance
