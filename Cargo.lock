@@ -52,9 +52,9 @@ checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
 name = "alloy-primitives"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50c715249705afa1e32be79dabfd35e2ef0f1cc02ad2cf48c9d1e20026ee637b"
+checksum = "525448f6afc1b70dd0f9d0a8145631bf2f5e434678ab23ab18409ca264cae6b3"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -578,9 +578,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
-version = "0.22.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
@@ -1629,7 +1629,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1927,7 +1927,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "async-trait",
  "candid",
@@ -1978,7 +1978,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "anyhow",
  "candid",
@@ -2043,7 +2043,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "candid",
  "did",
@@ -5460,7 +5460,7 @@ dependencies = [
 [[package]]
 name = "icrc-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6114,7 +6114,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "candid",
  "did",
@@ -6152,7 +6152,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "candid",
  "did",
@@ -6671,7 +6671,7 @@ version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "serde",
 ]
 
@@ -6692,9 +6692,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pest"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "311fb059dee1a7b802f036316d790138c613a4e8b180c822e3925a662e9f0c95"
+checksum = "560131c633294438da9f7c4b08189194b20946c8274c6b9e38881a7874dc8ee8"
 dependencies = [
  "memchr",
  "thiserror",
@@ -6703,9 +6703,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73541b156d32197eecda1a4014d7f868fd2bcb3c550d5386087cfba442bf69c"
+checksum = "26293c9193fbca7b1a3bf9b79dc1e388e927e6cacaa78b4a3ab705a1d3d41459"
 dependencies = [
  "pest",
  "pest_generator",
@@ -6713,9 +6713,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c35eeed0a3fab112f75165fdc026b3913f4183133f19b49be773ac9ea966e8bd"
+checksum = "3ec22af7d3fb470a85dd2ca96b7c577a1eb4ef6f1683a9fe9a8c16e136c04687"
 dependencies = [
  "pest",
  "pest_meta",
@@ -6726,9 +6726,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2adbf29bb9776f28caece835398781ab24435585fe0d4dc1374a61db5accedca"
+checksum = "d7a240022f37c361ec1878d646fc5b7d7c4d28d5946e1a80ad5a7a4f4ca0bdcd"
 dependencies = [
  "once_cell",
  "pest",
@@ -7370,7 +7370,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
  "async-compression",
- "base64 0.22.0",
+ "base64 0.22.1",
  "bytes",
  "futures-channel",
  "futures-core",
@@ -7664,7 +7664,7 @@ version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29993a25686778eb88d4189742cd713c9bce943bc54251a33509dc63cbacf73d"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "rustls-pki-types",
 ]
 
@@ -7863,9 +7863,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9f6e76df036c77cd94996771fb40db98187f096dd0b9af39c6c6e452ba966a"
+checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
 dependencies = [
  "serde_derive",
 ]
@@ -7902,9 +7902,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11bd257a6541e141e42ca6d24ae26f7714887b47e89aa739099104c7e4d3b7fc"
+checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7995,7 +7995,7 @@ version = "3.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ad483d2ab0149d5a5ebcd9972a3852711e0153d863bf5a5d0391d28883c4a20"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -8122,7 +8122,7 @@ dependencies = [
 [[package]]
 name = "signature-verification-canister-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#14208e18863263d7c0f0e32e09352a448ba798cb"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-791-create-canister-client-implementation-for-icrc-1-2-methods-and-use-it-for-btc-and-icrc-2-bridges#45929336976241462c946a8188abc26d3271ff50"
 dependencies = [
  "candid",
  "did",
