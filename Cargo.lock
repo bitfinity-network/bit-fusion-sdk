@@ -832,8 +832,8 @@ dependencies = [
  "ic-crypto-getrandom-for-wasm 0.15.0",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.14.0",
- "ic-stable-structures 0.14.0",
+ "ic-metrics 0.15.0",
+ "ic-stable-structures 0.15.0",
  "ic-storage",
  "ic-task-scheduler",
  "inscriber",
@@ -976,9 +976,9 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.7"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "818394610ed32d9e4c81025f97c8580698b69542527efde18514cf9ad1f8f5f0"
+checksum = "dd5902d37352dffd8bd9177a2daa6444ce3cd0279c91763fb0171c053aa04335"
 dependencies = [
  "anyhow",
  "binread",
@@ -1679,7 +1679,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1977,7 +1977,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "async-trait",
  "candid",
@@ -2028,7 +2028,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "anyhow",
  "candid",
@@ -2093,7 +2093,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "candid",
  "did",
@@ -3393,14 +3393,6 @@ dependencies = [
 name = "ic-crypto-getrandom-for-wasm"
 version = "0.9.0"
 source = "git+https://github.com/dfinity/ic.git?tag=release-2024-02-21_23-01#2e921c9adfc71f3edc96a9eb5d85fc742e7d8a9f"
-dependencies = [
- "getrandom 0.2.14",
-]
-
-[[package]]
-name = "ic-crypto-getrandom-for-wasm"
-version = "0.15.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.15.x#424db870d5c29c465e660f510cc3439d22ccea30"
 dependencies = [
  "getrandom 0.2.14",
 ]
@@ -5518,7 +5510,7 @@ dependencies = [
 [[package]]
 name = "icrc-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -5704,8 +5696,8 @@ dependencies = [
  "ic-canister",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.14.0",
- "ic-stable-structures 0.14.0",
+ "ic-metrics 0.15.0",
+ "ic-stable-structures 0.15.0",
  "ic-storage",
  "jsonrpc-core",
  "k256",
@@ -6207,7 +6199,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "candid",
  "did",
@@ -6245,7 +6237,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "candid",
  "did",
@@ -8234,7 +8226,7 @@ dependencies = [
 [[package]]
 name = "signature-verification-canister-client"
 version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#743c81253b5671231caed253e060af3baa332fa4"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.17.x#d45561baa1f2c30415e262507f400d09372daf85"
 dependencies = [
  "candid",
  "did",
