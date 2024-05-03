@@ -6,7 +6,7 @@ use std::str::FromStr;
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
-use candid::{CandidType, Principal};
+use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
@@ -22,7 +22,6 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
-use serde::Deserialize;
 
 use crate::interface::{
     CreateEdictTxArgs, DepositError, Erc20MintStatus, GetAddressError, WithdrawError,
