@@ -2,12 +2,11 @@ use std::borrow::Cow;
 
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storable};
+use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use minter_did::id256::Id256;
 
-use crate::erc721_mint_order::SignedMintOrder;
-
 pub struct MintOrders<M: Memory> {
-    mint_orders_map: StableMultimap<MintOrderKey, u32, SignedMintOrder, M>,
+    mint_orders_map: StableMultimap<MintOrderKey, u32, ERC721SignedMintOrder, M>,
 }
 
 impl<M: Memory> MintOrders<M> {
@@ -24,8 +23,8 @@ impl<M: Memory> MintOrders<M> {
         sender: Id256,
         src_token: Id256,
         operation_id: u32,
-        order: &SignedMintOrder,
-    ) -> Option<SignedMintOrder> {
+        order: &ERC721SignedMintOrder,
+    ) -> Option<ERC721SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
         self.mint_orders_map.insert(&key, &operation_id, order)
     }
@@ -36,13 +35,13 @@ impl<M: Memory> MintOrders<M> {
         sender: Id256,
         src_token: Id256,
         operation_id: u32,
-    ) -> Option<SignedMintOrder> {
+    ) -> Option<ERC721SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
         self.mint_orders_map.get(&key, &operation_id)
     }
 
     /// Returns all the signed mint orders for the given sender and token.
-    pub fn get_all(&self, sender: Id256, src_token: Id256) -> Vec<(u32, SignedMintOrder)> {
+    pub fn get_all(&self, sender: Id256, src_token: Id256) -> Vec<(u32, ERC721SignedMintOrder)> {
         let key = MintOrderKey { sender, src_token };
         self.mint_orders_map.range(&key).collect()
     }
@@ -57,7 +56,7 @@ impl<M: Memory> MintOrders<M> {
         sender: Id256,
         src_token: Id256,
         operation_id: u32,
-    ) -> Option<SignedMintOrder> {
+    ) -> Option<ERC721SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
         self.mint_orders_map.remove(&key, &operation_id)
     }
@@ -106,10 +105,10 @@ mod tests {
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::stable_structures::DefaultMemoryImpl;
     use ic_stable_structures::{default_ic_memory_manager, MemoryId, Storable, VirtualMemory};
+    use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
     use minter_did::id256::Id256;
 
     use super::{MintOrderKey, MintOrders};
-    use crate::erc721_mint_order::{MintOrder, SignedMintOrder};
 
     #[test]
     fn mint_order_key_encoding() {
@@ -136,7 +135,7 @@ mod tests {
         let src_token = Id256::from(&Principal::anonymous());
         let operation_id = 0;
 
-        let order = SignedMintOrder(vec![0; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
+        let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
         assert!(orders
             .insert(sender, src_token, operation_id, &order)
@@ -155,7 +154,7 @@ mod tests {
         let src_token = Id256::from(&Principal::anonymous());
         let operation_id = 0;
 
-        let order = SignedMintOrder(vec![0; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
+        let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
         assert!(orders
             .insert(sender, src_token, operation_id, &order)
@@ -172,7 +171,7 @@ mod tests {
         let other_sender = Id256::from(&Principal::anonymous());
         let src_token = Id256::from(&Principal::anonymous());
         let other_src_token = Id256::from(&Principal::management_canister());
-        let order = SignedMintOrder(vec![0; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
+        let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
         assert!(orders.insert(sender, src_token, 0, &order).is_none());
         assert!(orders.insert(sender, src_token, 1, &order).is_none());
