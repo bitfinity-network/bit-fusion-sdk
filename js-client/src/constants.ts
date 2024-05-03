@@ -31,6 +31,6 @@ export const IS_TEST = process.env.IS_TEST || false;
 
 export const BTC_BRIDGE_ETH_ADDRESS = process.env.BTC_BRIDGE_ETH_ADDRESS;
 
-export const BFT_BRIDGE_ETH_ADDRESS = process.env.BFT_BRIDGE_ETH_ADDRESS;
+export const BFT_ETH_ADDRESS = process.env.BFT_ETH_ADDRESS;
 
 export const BTC_TOKEN_WRAPPED_ADDRESS = process.env.BTC_TOKEN_WRAPPED_ADDRESS;

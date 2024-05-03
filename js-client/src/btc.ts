@@ -3,7 +3,7 @@ import * as ethers from 'ethers';
 
 import { BtcBridgeActor } from './ic';
 import {
-  BFT_BRIDGE_ETH_ADDRESS,
+  BFT_ETH_ADDRESS,
   BTC_BRIDGE_CANISTER_ID,
   BTC_TOKEN_WRAPPED_ADDRESS
 } from './constants';
@@ -27,7 +27,7 @@ export class BtcBridge {
 
   constructor({ provider, bftAddress, wrappedTokenAddress }: BtcBridgeOptions) {
     this.provider = provider;
-    this.bftAddress = bftAddress || (BFT_BRIDGE_ETH_ADDRESS! as EthAddress);
+    this.bftAddress = bftAddress || (BFT_ETH_ADDRESS! as EthAddress);
     this.wrappedTokenAddress =
       wrappedTokenAddress || BTC_TOKEN_WRAPPED_ADDRESS!;
   }

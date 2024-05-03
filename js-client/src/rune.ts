@@ -7,7 +7,7 @@ import WrappedTokenABI from './abi/WrappedToken';
 import BftBridgeABI from './abi/BFTBridge';
 import { wait } from './tests/utils';
 import { encodeBtcAddress } from './utils';
-import { BFT_BRIDGE_ETH_ADDRESS } from './constants';
+import { BFT_ETH_ADDRESS } from './constants';
 
 interface RuneBridgeOptions {
   bftAddress?: EthAddress;
@@ -19,7 +19,7 @@ export class RuneBridge {
   protected provider: ethers.Signer;
 
   constructor({ provider, bftAddress }: RuneBridgeOptions) {
-    this.bftAddress = bftAddress || (BFT_BRIDGE_ETH_ADDRESS! as EthAddress);
+    this.bftAddress = bftAddress || (BFT_ETH_ADDRESS! as EthAddress);
     this.provider = provider;
   }
 

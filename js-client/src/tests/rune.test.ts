@@ -20,7 +20,7 @@ describe.sequential(
 
     await mintNativeToken(wallet.address, '10000000000000000');
 
-    const runeBridge = new RuneBridge(wallet);
+    const runeBridge = new RuneBridge({ provider: wallet });
 
     test('bridge to evm', async () => {
       const toAddress = wallet.address as `0x${string}`;
@@ -43,7 +43,8 @@ describe.sequential(
 
       await runeBridge.bridgeBtc(toAddress);
 
-      const wrappedBalance2 = await runeBridge.getWrappedTokenBalance(toAddress);
+      const wrappedBalance2 =
+        await runeBridge.getWrappedTokenBalance(toAddress);
 
       expect(wrappedBalance2).toStrictEqual(1000n);
     });
@@ -68,11 +69,7 @@ describe.sequential(
 
       await wait(5000);
 
-      console.log(
-        await runeBridge.getRunesBalance(
-          toAddress
-        )
-      );
+      console.log(await runeBridge.getRunesBalance(toAddress));
     });
   },
   180000
