@@ -198,6 +198,7 @@ impl BridgeTask {
             decimals: burn_event.decimals,
             approve_spender: H160::zero(),
             approve_amount: U256::zero(),
+            fee_payer: burn_event.sender,
         };
 
         let signer = state.borrow().signer.get().clone();

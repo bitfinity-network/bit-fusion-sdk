@@ -14,8 +14,14 @@ WASM_DIR=".artifact"
 IC_COMMIT_HASH="85bd56a70e55b2cea75cae6405ae11243e5fdad8" # 2024-02-21
 EVM_FEATURES="export-api"
 
-cargo install icx-proxy@0.10.1 -f
-cargo install ic-wasm
+
+if
+    ! command -v icx-proxy &
+    >/dev/null
+then
+    cargo install icx-proxy --version 0.10.1
+    cargo install ic-wasm
+fi
 
 # Function to print help instructions
 print_help() {
@@ -118,7 +124,7 @@ build_requested_canisters() {
         get_ckbtc_binaries
 
         # Build all canisters
-        
+
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 

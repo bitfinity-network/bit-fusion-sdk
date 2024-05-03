@@ -211,6 +211,7 @@ mod tests {
             decimals: 18,
             approve_spender: Default::default(),
             approve_amount: Default::default(),
+            fee_payer: H160::from_slice(&[25; 20]),
         };
 
         let encoded = order.encode_and_sign(&signer).await.unwrap();

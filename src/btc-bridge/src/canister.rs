@@ -4,11 +4,12 @@ use std::rc::Rc;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::virtual_canister_call;
-use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_canister::{
+    generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
+    PreUpdate,
+};
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_kit::ic;
-use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
@@ -158,9 +159,9 @@ impl BtcBridge {
     #[update]
     pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
         let ck_btc_minter = get_state().borrow().ck_btc_minter();
-        return virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)
+        virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)
             .await
-            .unwrap();
+            .unwrap()
     }
 
     #[update]
