@@ -1,4 +1,5 @@
 use candid::{Nat, Principal};
+use ic_exports::icrc_types::icrc1::transfer::TransferArg;
 
 use super::PocketIcTestContext;
 use crate::context::TestContext;
@@ -11,7 +12,16 @@ async fn test_transfer_tokens() {
     let amount = Nat::from(100_u64);
     let to = Principal::anonymous().into();
 
-    client.icrc1_transfer(to, amount.clone()).await.unwrap();
+    let tranfer_arg = TransferArg {
+        from_subaccount: None,
+        to,
+        fee: None,
+        created_at_time: None,
+        memo: None,
+        amount: amount.clone(),
+    };
+
+    client.icrc1_transfer(tranfer_arg).await.unwrap().unwrap();
     let balance = client.icrc1_balance_of(to).await.unwrap();
 
     assert_eq!(balance, amount);

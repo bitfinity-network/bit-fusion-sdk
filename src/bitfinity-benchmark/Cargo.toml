@@ -26,3 +26,4 @@ minter-did = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+icrc-client = { workspace = true }

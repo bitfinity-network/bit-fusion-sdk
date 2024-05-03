@@ -195,6 +195,7 @@ async fn prepare_mint_order(
             decimals: state_ref.decimals(),
             approve_spender: Default::default(),
             approve_amount: Default::default(),
+            fee_payer: H160::zero(),
         };
 
         let signer = state_ref.signer().get().clone();
