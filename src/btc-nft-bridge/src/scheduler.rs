@@ -16,6 +16,7 @@ use ord_rs::inscription::nft::id::NftId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
+use crate::interface;
 use crate::interface::bridge_api::MintNftArgs;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -187,6 +188,7 @@ impl Task for NftTask {
                 operation_id,
                 recipient_id,
                 nft_id,
+                sender,
                 ..
             }) => {
                 log::info!("ERC20 burn event received");
@@ -204,13 +206,25 @@ impl Task for NftTask {
                     )));
                 };
 
+                let (network, derivation_path) = {
+                    (
+                        get_state().borrow().ic_btc_network(),
+                        get_state().borrow().derivation_path(Some(sender.clone())),
+                    )
+                };
+
                 Box::pin(async move {
-                    let result =
-                        crate::ops::erc721_to_nft(&get_state(), operation_id, nft_id, &address)
-                            .await
-                            .map_err(|err| {
-                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
-                            })?;
+                    let fee_address =
+                        interface::get_deposit_address(network, derivation_path).await;
+                    let result = crate::ops::erc721_to_nft(
+                        &get_state(),
+                        operation_id,
+                        nft_id,
+                        &address,
+                        fee_address,
+                    )
+                    .await
+                    .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
                     log::info!("Transferred NFT UTXO: {}", result.tx_id);
 

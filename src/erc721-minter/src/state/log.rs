@@ -54,20 +54,4 @@ impl LoggerConfigService {
         let logger_config = init_log(&log_settings).expect("failed to init logger");
         self.config.replace(logger_config);
     }
-
-    /// Changes the logger filter at runtime
-    pub fn set_logger_filter(&mut self, filter: &str) {
-        self.update_log_settings(filter);
-        if let Some(config) = &self.config {
-            config.update_filters(filter);
-        }
-    }
-
-    fn update_log_settings(&mut self, filter: &str) {
-        let mut log_settings = self.settings.get().clone();
-        log_settings.0.log_filter = Some(filter.to_string());
-        self.settings
-            .set(log_settings)
-            .expect("failed to update logger settings");
-    }
 }

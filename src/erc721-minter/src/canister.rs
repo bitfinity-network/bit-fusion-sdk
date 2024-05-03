@@ -12,8 +12,8 @@ use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::erc721_mint_order::SignedMintOrder;
 use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use minter_did::id256::Id256;
 
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
@@ -120,7 +120,7 @@ impl EvmMinter {
         &self,
         sender: Id256,
         src_token: Id256,
-    ) -> Vec<(u32, SignedMintOrder)> {
+    ) -> Vec<(u32, ERC721SignedMintOrder)> {
         get_state().borrow().mint_orders.get_all(sender, src_token)
     }
 
@@ -131,7 +131,7 @@ impl EvmMinter {
         sender: Id256,
         src_token: Id256,
         operation_id: u32,
-    ) -> Option<SignedMintOrder> {
+    ) -> Option<ERC721SignedMintOrder> {
         get_state()
             .borrow()
             .mint_orders

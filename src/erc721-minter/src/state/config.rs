@@ -57,11 +57,6 @@ impl Config {
         self.data.get().evm_info_by_side(side).clone()
     }
 
-    /// Sets owner principal.
-    pub fn set_admin(&mut self, admin: Principal) {
-        self.update_data(|data| data.admin = admin);
-    }
-
     /// Sets evm bridge contract address for the given bridge side.
     pub fn set_erc721_bridge_address(&mut self, side: BridgeSide, address: H160) {
         self.update_data(|data| data.evm_info_by_side_mut(side).bridge_contract = address);

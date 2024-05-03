@@ -179,6 +179,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
+            fee_payer: H160::zero(),
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
@@ -234,6 +235,7 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         minted_event: MintedEventData,
     ) -> Result<(), SchedulerError> {
+        log::trace!("mint order removing");
         let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
                 "failed to decode sender id256 from minted event".into(),

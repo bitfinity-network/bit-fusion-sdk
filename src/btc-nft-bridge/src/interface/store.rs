@@ -7,8 +7,8 @@ use candid::types::{Type, TypeInner};
 use candid::{CandidType, Decode, Deserialize, Encode};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, VirtualMemory};
-use minter_contract_utils::erc721_mint_order::SignedMintOrder;
 use minter_contract_utils::erc721_mint_orders::MintOrders;
+use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use minter_did::id256::Id256;
 use ord_rs::inscription::nft::id::NftId;
 use serde::Serialize;
@@ -74,7 +74,7 @@ impl NftInfo {
         let output = output.split(":");
         let vout = output
             .clone()
-            .last()
+            .nth(1)
             .unwrap()
             .parse::<u32>()
             .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?;
@@ -164,7 +164,7 @@ impl Default for MintOrdersStore {
 }
 
 impl MintOrdersStore {
-    pub fn push(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
+    pub fn push(&mut self, sender: Id256, nonce: u32, mint_order: ERC721SignedMintOrder) {
         self.0.insert(sender, SRC_TOKEN, nonce, &mint_order);
     }
 
@@ -188,17 +188,6 @@ impl Default for BurnRequestStore {
 }
 
 impl BurnRequestStore {
-    pub fn insert(&mut self, request_id: BurnRequestId, address: String, reveal_txid: String) {
-        self.inner.insert(
-            request_id,
-            BurnRequestInfo {
-                address,
-                reveal_txid,
-                is_transferred: false,
-            },
-        );
-    }
-
     pub fn remove(&mut self, request_id: BurnRequestId) {
         self.inner.remove(&request_id);
     }

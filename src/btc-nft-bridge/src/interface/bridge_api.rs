@@ -1,7 +1,7 @@
 use candid::CandidType;
 use did::{H160, H256};
 use inscriber::interface::{Multisig, Protocol};
-use minter_contract_utils::erc721_mint_order::SignedMintOrder;
+use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -17,6 +17,8 @@ pub enum BridgeError {
     FetchNftTokenDetails(String),
     #[error("{0}")]
     GetTransactionById(String),
+    #[error("{0}")]
+    GetUtxos(String),
     #[error("{0}")]
     PublicKeyFromStr(String),
     #[error("{0}")]
@@ -76,7 +78,7 @@ pub enum NftMintStatus {
     /// This happens when the transaction is processed, the BRC20 inscription is parsed and validated,
     /// and the mint order is created; however, there is a problem sending the mint order to the EVM.
     /// The signed mint order can be sent manually to the BftBridge to mint wrapped tokens.
-    Signed(Box<SignedMintOrder>),
+    Signed(Box<ERC721SignedMintOrder>),
     /// Mint order for wrapped tokens is successfully sent to the `BftBridge`.
     Minted {
         /// Id of the minted NFT

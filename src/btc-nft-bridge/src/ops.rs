@@ -1,14 +1,21 @@
 use core::sync::atomic::Ordering;
 use std::cell::RefCell;
+use std::str::FromStr;
 
-use bitcoin::Txid;
+use bitcoin::hashes::Hash;
+use bitcoin::{Address, Amount, FeeRate, Network, OutPoint, TxOut, Txid};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
 use ic_stable_structures::CellStructure;
+use inscriber::interface::bitcoin_api;
 use inscriber::ops as Inscriber;
-use minter_contract_utils::erc721_mint_order::{MintOrder, SignedMintOrder};
+use inscriber::wallet::fees::estimate_transaction_fees;
+use inscriber::wallet::CanisterWallet;
+use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
 use minter_did::id256::Id256;
 use ord_rs::inscription::nft::id::NftId;
+use ord_rs::wallet::ScriptType;
 
 use crate::constant::NONCE;
 use crate::interface::bridge_api::{BridgeError, NftInscribeStatus, NftMintError, NftMintStatus};
@@ -87,7 +94,7 @@ async fn prepare_mint_order(
     eth_address: H160,
     nonce: u32,
     token_uri: String,
-) -> Result<SignedMintOrder, NftMintError> {
+) -> Result<ERC721SignedMintOrder, NftMintError> {
     log::info!("preparing mint order");
 
     let (signer, mint_order) = {
@@ -99,7 +106,7 @@ async fn prepare_mint_order(
 
         let recipient_chain_id = state_ref.erc721_chain_id();
 
-        let mint_order = MintOrder {
+        let mint_order = ERC721MintOrder {
             sender,
             src_token,
             recipient: eth_address,
@@ -128,7 +135,7 @@ async fn prepare_mint_order(
 
 fn store_mint_order(
     state: &RefCell<State>,
-    signed_mint_order: SignedMintOrder,
+    signed_mint_order: ERC721SignedMintOrder,
     eth_address: &H160,
     nonce: u32,
 ) {
@@ -144,7 +151,7 @@ fn store_mint_order(
 
 async fn send_mint_order(
     state: &RefCell<State>,
-    mint_order: SignedMintOrder,
+    mint_order: ERC721SignedMintOrder,
 ) -> Result<H256, NftMintError> {
     log::info!("Sending mint transaction");
 
@@ -212,6 +219,7 @@ pub async fn erc721_to_nft(
     request_id: u32,
     nft_id: NftId,
     dst_addr: &str,
+    fee_canister_address: String,
 ) -> Result<NftInscribeStatus, BridgeError> {
     let (network, derivation_path) = {
         (
@@ -226,7 +234,7 @@ pub async fn erc721_to_nft(
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let tx_id = withdraw_nft(state, request_id, nft_info, dst_addr)
+    let tx_id = withdraw_nft(state, request_id, nft_info, dst_addr, fee_canister_address)
         .await
         .map_err(|e| BridgeError::Erc721Burn(e.to_string()))?;
 
@@ -240,6 +248,7 @@ async fn withdraw_nft(
     request_id: u32,
     nft: NftInfo,
     dst_addr: &str,
+    fee_canister_address: String,
 ) -> Result<Txid, BridgeError> {
     if !state.borrow().has_nft(&nft.tx_id) {
         return Err(BridgeError::Erc721Burn(format!(
@@ -263,11 +272,47 @@ async fn withdraw_nft(
         request_id
     );
 
+    let btc_network = CanisterWallet::map_network(network);
+
+    let dst_addr = Address::from_str(dst_addr)
+        .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?
+        .require_network(btc_network)
+        .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?;
+
+    let leftovers_addr = Address::from_str(&fee_canister_address)
+        .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?
+        .require_network(btc_network)
+        .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?;
+
+    // get utxos for fees
+    let wallet = CanisterWallet::new(derivation_path.clone(), network);
+    let fee_rate = wallet.get_fee_rate().await;
+    let utxos = bitcoin_api::get_utxos(network, fee_canister_address)
+        .await
+        .map_err(|e| BridgeError::GetUtxos(e.to_string()))?;
+
+    let outputs = vec![
+        TxOut {
+            value: Amount::ONE_SAT,
+            script_pubkey: dst_addr.script_pubkey(),
+        },
+        TxOut {
+            value: Amount::ONE_SAT,
+            script_pubkey: leftovers_addr.script_pubkey(),
+        },
+    ];
+    let fee_utxos = match find_fee_utxos(utxos, &fee_rate, &outputs) {
+        None => return Err(BridgeError::Erc721Burn("Insufficient funds".to_string())),
+        Some(utxos) => utxos,
+    };
+    let mut outpoints = vec![(&nft).into()];
+    outpoints.extend(fee_utxos);
+
     // transfer the UTXO to the destination address
     let result = Inscriber::transfer_utxo(
-        (&nft).into(),
-        dst_addr.to_string(),
-        dst_addr.to_string(),
+        &outpoints,
+        leftovers_addr,
+        dst_addr,
         None,
         derivation_path,
         network,
@@ -289,4 +334,45 @@ async fn withdraw_nft(
     }
 
     result
+}
+
+fn find_fee_utxos(
+    res: GetUtxosResponse,
+    fee_rate: &FeeRate,
+    outputs: &[TxOut],
+) -> Option<Vec<OutPoint>> {
+    let mut tx_inputs = 2;
+    loop {
+        let fee = estimate_transaction_fees(
+            ScriptType::P2WSH,
+            tx_inputs,
+            fee_rate,
+            &None,
+            outputs.to_vec(),
+        );
+        // sort utxos by value
+        let mut utxos = res.utxos.clone();
+        utxos.sort_by_key(|u| u.value);
+        // find `tx_inputs - 1` outpoints to satisfy fee
+        let mut outpoints = vec![];
+        let mut total_value = 0;
+        for _ in 0..(tx_inputs - 1) {
+            let next = match utxos.pop() {
+                Some(u) => u,
+                None => return None,
+            };
+            total_value += next.value;
+            outpoints.push(OutPoint {
+                txid: Txid::from_slice(&next.outpoint.txid).expect("bad txid"),
+                vout: next.outpoint.vout,
+            });
+        }
+        // check if value is satisfied
+        if total_value >= fee.to_sat() {
+            return Some(outpoints);
+        } else {
+            // try with more inputs
+            tx_inputs += 1;
+        }
+    }
 }

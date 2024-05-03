@@ -88,9 +88,9 @@ pub async fn brc20_transfer(
 }
 
 pub async fn transfer_utxo(
-    outpoint: OutPoint,
-    leftovers_address: String,
-    dst_address: String,
+    outpoints: &[OutPoint],
+    leftovers_address: Address,
+    dst_address: Address,
     multisig_config: Option<Multisig>,
     derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,

@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
 use bitcoin::Network;
@@ -15,7 +14,6 @@ use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
-use crate::interface::bridge_api::BridgeError;
 use crate::interface::store::{BurnRequestStore, MintOrdersStore, NftStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
@@ -37,7 +35,7 @@ pub struct BtcNftBridgeConfig {
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
-    pub indexer: String,
+    pub ord_url: String,
     pub rpc_config: RpcConfig,
     pub logger: LogSettings,
 }
@@ -52,7 +50,7 @@ impl Default for BtcNftBridgeConfig {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
-            indexer: String::new(),
+            ord_url: String::new(),
             logger: LogSettings::default(),
         }
     }
@@ -60,10 +58,10 @@ impl Default for BtcNftBridgeConfig {
 
 impl BtcNftBridgeConfig {
     fn validate_indexer_url(&self) -> Result<(), String> {
-        if !self.indexer.starts_with("https") {
+        if !self.ord_url.starts_with("https") {
             return Err(format!(
                 "Indexer URL must be HTTPS. Given: {}",
-                self.indexer
+                self.ord_url
             ));
         }
 
@@ -158,11 +156,11 @@ impl State {
         self.inscriptions.has_inscription(reveal_txid)
     }
 
-    pub fn indexer_url(&self) -> String {
+    pub fn ord_url(&self) -> String {
         self.config
-            .indexer
+            .ord_url
             .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.indexer)
+            .unwrap_or_else(|| &self.config.ord_url)
             .to_string()
     }
 
@@ -281,24 +279,12 @@ impl State {
         }
     }
 
-    pub fn mint_orders(&self) -> &MintOrdersStore {
-        &self.mint_orders
-    }
-
     pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
         &mut self.mint_orders
     }
 
-    pub fn burn_requests(&self) -> &BurnRequestStore {
-        &self.burn_requests
-    }
-
     pub fn burn_requests_mut(&mut self) -> &mut BurnRequestStore {
         &mut self.burn_requests
-    }
-
-    pub fn inscriptions(&self) -> &NftStore {
-        &self.inscriptions
     }
 
     pub fn inscriptions_mut(&mut self) -> &mut NftStore {
@@ -317,34 +303,12 @@ impl State {
         &self.evm_params
     }
 
-    pub fn token_address(&self) -> &H160 {
-        &self.bft_config.token_address
-    }
-
     pub fn token_name(&self) -> [u8; 32] {
         self.bft_config.token_name
     }
 
     pub fn token_symbol(&self) -> [u8; 16] {
         self.bft_config.token_symbol
-    }
-
-    pub(crate) fn set_token_symbol(&mut self, nft_tick: &str) -> Result<(), BridgeError> {
-        let bytes = nft_tick.as_bytes();
-
-        match bytes.len().cmp(&16usize) {
-            Ordering::Equal => {
-                self.bft_config.token_symbol.copy_from_slice(bytes);
-                Ok(())
-            }
-            Ordering::Less => {
-                self.bft_config.token_symbol[..bytes.len()].copy_from_slice(bytes);
-                Ok(())
-            }
-            Ordering::Greater => Err(BridgeError::SetTokenSymbol(
-                "Input string is longer than 16 bytes and needs truncation.".to_string(),
-            )),
-        }
     }
 
     pub fn update_evm_params(&mut self, f: impl FnOnce(&mut Option<EvmParams>)) {

@@ -772,6 +772,7 @@ dependencies = [
  "hex",
  "ic-exports",
  "ic-test-utils",
+ "icrc-client",
  "log",
  "minter-client",
  "minter-contract-utils",
@@ -865,6 +866,7 @@ dependencies = [
  "futures",
  "ic-canister",
  "ic-canister-client",
+ "ic-ckbtc-minter",
  "ic-exports",
  "ic-log",
  "ic-metrics 0.15.0",
@@ -5555,6 +5557,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "icrc-client"
+version = "0.17.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-628-prototype-a-bridge-from-ordinals-to-nft#843d2a69a25a3956b2f909db5f8a029164b22202"
+dependencies = [
+ "candid",
+ "ic-canister-client",
+ "ic-exports",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "icrc-ledger-client"
 version = "0.1.2"
 source = "git+https://github.com/dfinity/ic.git?tag=release-2024-02-21_23-01#2e921c9adfc71f3edc96a9eb5d85fc742e7d8a9f"
@@ -5629,6 +5643,7 @@ dependencies = [
  "ic-stable-structures 0.15.0",
  "ic-storage",
  "ic-task-scheduler",
+ "icrc-client",
  "log",
  "minter-contract-utils",
  "minter-did",
@@ -5789,6 +5804,7 @@ dependencies = [
  "ic-stable-structures 0.15.0",
  "ic-state-machine-tests",
  "ic-test-utils",
+ "icrc-client",
  "icrc2-minter",
  "minter-client",
  "minter-contract-utils",

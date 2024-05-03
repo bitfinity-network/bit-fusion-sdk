@@ -1,6 +1,4 @@
 use bitcoin::absolute::LockTime;
-use bitcoin::hash_types::Txid;
-use bitcoin::hashes::Hash as _;
 use bitcoin::transaction::Version;
 use bitcoin::{
     Address, Amount, FeeRate, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
@@ -21,47 +19,28 @@ pub fn inscription_tranfer_fees(fee_rate: &FeeRate, recipient_address: &Address)
         };
         2
     ];
-    let tx_in = vec![
-        TxIn {
-            previous_output: OutPoint {
-                txid: Txid::all_zeros(),
-                vout: 0,
-            },
-            script_sig: ScriptBuf::new(),
-            sequence: Sequence::from_consensus(0xffffffff),
-            witness: Witness::new(),
-        };
-        2
-    ];
-    let tx_size = Transaction {
-        version: Version::TWO,
-        lock_time: LockTime::ZERO,
-        input: tx_in,
-        output: tx_out,
-    }
-    .vsize();
-    estimate_transaction_fees(ScriptType::P2WSH, tx_size, fee_rate, 2, None)
+    estimate_transaction_fees(ScriptType::P2WSH, 2, fee_rate, &None, tx_out)
 }
 
-fn estimate_transaction_fees(
+pub fn estimate_transaction_fees(
     script_type: ScriptType,
-    unsigned_tx_size: usize,
-    fee_rate: &FeeRate,
     number_of_inputs: usize,
-    multisig_config: Option<&MultisigConfig>,
+    current_fee_rate: &FeeRate,
+    multisig_config: &Option<MultisigConfig>,
+    outputs: Vec<TxOut>,
 ) -> Amount {
-    let estimated_sig_size = estimate_signature_size(script_type, multisig_config);
-    let total_estimated_tx_size = unsigned_tx_size + (number_of_inputs * estimated_sig_size);
+    let vbytes = estimate_vbytes(number_of_inputs, script_type, multisig_config, outputs);
 
-    fee_rate.fee_vb(total_estimated_tx_size as u64).unwrap()
+    current_fee_rate.fee_vb(vbytes as u64).unwrap()
 }
 
-/// Estimates the total size of signatures for a given script type and multisig configuration.
-fn estimate_signature_size(
+fn estimate_vbytes(
+    inputs: usize,
     script_type: ScriptType,
-    multisig_config: Option<&MultisigConfig>,
+    multisig_config: &Option<MultisigConfig>,
+    outputs: Vec<TxOut>,
 ) -> usize {
-    match script_type {
+    let sighash_size = match script_type {
         // For P2WSH, calculate based on the multisig configuration if provided.
         ScriptType::P2WSH => match multisig_config {
             Some(config) => ECDSA_SIGHASH_SIZE * config.required,
@@ -69,5 +48,20 @@ fn estimate_signature_size(
         },
         // For P2TR, use the fixed Schnorr signature size.
         ScriptType::P2TR => SCHNORR_SIGHASH_SIZE,
+    };
+
+    Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: (0..inputs)
+            .map(|_| TxIn {
+                previous_output: OutPoint::null(),
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+                witness: Witness::from_slice(&[&vec![0; sighash_size]]),
+            })
+            .collect(),
+        output: outputs,
     }
+    .vsize()
 }

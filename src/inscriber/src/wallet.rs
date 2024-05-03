@@ -1,4 +1,4 @@
-mod fees;
+pub mod fees;
 mod signer;
 mod utxo_store;
 
@@ -467,7 +467,7 @@ impl CanisterWallet {
         Address::p2wpkh(pk, network).expect("Can't convert public key to segwit bitcoin address")
     }
 
-    async fn get_fee_rate(&self) -> FeeRate {
+    pub async fn get_fee_rate(&self) -> FeeRate {
         // Get fee percentiles from previous transactions to estimate our own fee.
         let fee_percentiles = bitcoin_api::get_current_fee_percentiles(self.bitcoin_network).await;
 

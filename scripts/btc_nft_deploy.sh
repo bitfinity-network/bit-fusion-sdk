@@ -17,7 +17,7 @@ ADMIN_WALLET=$(dfx identity get-wallet)
 
 CHAIN_ID=355113
 
-INDEXER_URL="https://127.0.0.1:9001"
+ORD_URL="https://127.0.0.1:8001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -42,7 +42,7 @@ dfx deploy evm_testnet --argument "(record {
 
 echo "Deploying BTC NFT bridge"
 dfx deploy btc-nft-bridge --argument "(record {
-    indexer = \"${INDEXER_URL}\";
+    ord_url = \"${ORD_URL}\";
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };

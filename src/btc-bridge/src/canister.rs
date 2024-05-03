@@ -4,7 +4,11 @@ use std::rc::Rc;
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_canister::{generate_idl, init, post_upgrade, update, Canister, Idl, PreUpdate};
+use ic_canister::{
+    generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
+    PreUpdate,
+};
+use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
@@ -132,6 +136,13 @@ impl BtcBridge {
         BtcTask::InitEvmState.into_scheduled(init_options)
     }
 
+    /// Returns bridge contract address for EVM.
+    /// If contract isn't initialized yet - returns None.
+    #[query]
+    pub fn get_bft_bridge_contract(&mut self) -> Option<H160> {
+        Some(get_state().borrow().bft_config.bridge_address.clone())
+    }
+
     /// Returns EVM address of the canister.
     #[update]
     pub async fn get_evm_address(&self) -> Option<H160> {
@@ -143,6 +154,14 @@ impl BtcBridge {
                 None
             }
         }
+    }
+
+    #[update]
+    pub async fn get_btc_address(&self, args: GetBtcAddressArgs) -> String {
+        let ck_btc_minter = get_state().borrow().ck_btc_minter();
+        virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)
+            .await
+            .unwrap()
     }
 
     #[update]

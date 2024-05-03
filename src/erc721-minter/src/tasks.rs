@@ -12,23 +12,23 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::erc721_bridge_api::{self, BridgeEvent, BurnEventData, MintedEventData};
-use minter_contract_utils::erc721_mint_order::MintOrder;
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
+use minter_did::erc721_mint_order::ERC721MintOrder;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
 use crate::state::State;
 
-type SignedMintOrderData = Vec<u8>;
+type SignedERC721MintOrderData = Vec<u8>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmEvents(BridgeSide),
-    PrepareMintOrder(BurnEventData, BridgeSide),
-    RemoveMintOrder(MintedEventData),
-    SendMintTransaction(SignedMintOrderData, BridgeSide),
+    PrepareERC721MintOrder(BurnEventData, BridgeSide),
+    RemoveERC721MintOrder(MintedEventData),
+    SendMintTransaction(SignedERC721MintOrderData, BridgeSide),
 }
 
 impl Task for BridgeTask {
@@ -44,13 +44,13 @@ impl Task for BridgeTask {
             BridgeTask::CollectEvmEvents(side) => {
                 Box::pin(Self::collect_evm_events(state, scheduler, *side))
             }
-            BridgeTask::PrepareMintOrder(data, side) => Box::pin(Self::prepare_mint_order(
+            BridgeTask::PrepareERC721MintOrder(data, side) => Box::pin(Self::prepare_mint_order(
                 state,
                 scheduler,
                 data.clone(),
                 *side,
             )),
-            BridgeTask::RemoveMintOrder(data) => {
+            BridgeTask::RemoveERC721MintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(state, data) })
             }
@@ -184,7 +184,7 @@ impl BridgeTask {
 
         let nonce = burn_event.operation_id;
 
-        let mint_order = MintOrder {
+        let mint_order = ERC721MintOrder {
             sender,
             src_token,
             recipient,
@@ -233,13 +233,13 @@ impl BridgeTask {
 
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
-                log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = BridgeTask::PrepareMintOrder(burnt, sender_side);
+                log::debug!("Adding PrepareERC721MintOrder task");
+                let mint_order_task = BridgeTask::PrepareERC721MintOrder(burnt, sender_side);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
-                log::debug!("Adding RemoveMintOrder task");
-                let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
+                log::debug!("Adding RemoveERC721MintOrder task");
+                let remove_mint_order_task = BridgeTask::RemoveERC721MintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),

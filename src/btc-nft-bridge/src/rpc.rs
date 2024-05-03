@@ -20,8 +20,8 @@ use ord_rs::{Nft, OrdParser};
 use serde::Deserialize;
 
 use crate::constant::{
-    CYCLES_PER_HTTP_REQUEST, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
-    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST, MAX_HTTP_RESPONSE_BYTES,
+    HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST, HTTP_OUTCALL_RES_DEFAULT_SIZE,
+    HTTP_OUTCALL_RES_PER_BYTE_COST, MAX_HTTP_RESPONSE_BYTES,
 };
 use crate::interface::bridge_api::BridgeError;
 use crate::interface::get_deposit_address;
@@ -34,18 +34,17 @@ pub async fn fetch_nft_token_details(
     id: NftId,
     holder: String,
 ) -> anyhow::Result<NftInfo> {
-    let (network, indexer_url) = {
+    let (network, ord_url) = {
         let state = state.borrow();
-        (state.btc_network(), state.indexer_url())
+        (state.btc_network(), state.ord_url())
     };
 
     // check that BTC address is valid and/or
     // corresponds to the network.
     is_valid_btc_address(&holder, network)?;
 
-    // <https://docs.hiro.so/ordinals/list-of-inscriptions>
-    // e.g. id=66bf2c7be3b0de6916ce8d29465ca7d7c6e27bd57238c25721c101fac34f39cfi0
-    let url = format!("{indexer_url}/ordinals/v1/inscriptions?address={holder}&id={id}");
+    // <https://docs.ordinals.com/guides/explorer.html#json-api>
+    let url = format!("{ord_url}/inscription/{id}");
 
     log::info!("Retrieving inscriptions for {holder} from: {url}");
 
@@ -78,25 +77,21 @@ pub async fn fetch_nft_token_details(
         String::from_utf8_lossy(&result.body)
     );
 
-    let inscriptions: ListInscriptionsResponse =
-        serde_json::from_slice(&result.body).map_err(|err| {
-            log::error!("Failed to retrieve inscriptions details from the indexer: {err:?}");
-            BridgeError::FetchNftTokenDetails(format!("{err:?}"))
-        })?;
+    let inscription: InscriptionResponse = serde_json::from_slice(&result.body).map_err(|err| {
+        log::error!("Failed to retrieve inscriptions details from the indexer: {err:?}");
+        BridgeError::FetchNftTokenDetails(format!("{err:?}"))
+    })?;
 
-    let inscription = inscriptions
-        .results
-        .into_iter()
-        .find(|res| res.id == id.to_string())
-        .ok_or_else(|| {
-            BridgeError::FetchNftTokenDetails("No matching inscription found".to_string())
-        })?;
+    let nft_id = NftId::from_str(&inscription.id).map_err(|err| {
+        log::error!("Failed to parse NFT ID: {err:?}");
+        BridgeError::FetchNftTokenDetails(format!("{err:?}"))
+    })?;
 
     Ok(NftInfo::new(
         inscription.id,
-        id.into(),
+        nft_id.into(),
         inscription.address,
-        inscription.output,
+        inscription.satpoint,
     )?)
 }
 
@@ -212,16 +207,10 @@ fn validate_utxos(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct ListInscriptionsResponse {
-    results: Vec<InscriptionResponse>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct InscriptionResponse {
     id: String,
-    tx_id: String,
-    output: String,
     address: String,
+    satpoint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
