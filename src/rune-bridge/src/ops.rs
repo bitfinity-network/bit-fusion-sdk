@@ -114,6 +114,7 @@ pub async fn build_withdraw_transaction(
         .iter()
         .all(|input| input.derivation_path == inputs[0].derivation_path)
     {
+        // https://infinityswap.atlassian.net/browse/EPROD-848
         todo!();
     }
 
