@@ -35,12 +35,6 @@ pub struct BtcBridge {
 
 impl PreUpdate for BtcBridge {}
 
-#[derive(Debug, CandidType, Deserialize)]
-pub struct InitArgs {
-    ck_btc_minter: Principal,
-    ck_btc_ledger: Principal,
-}
-
 impl BtcBridge {
     fn set_timers(&mut self) {
         #[cfg(target_family = "wasm")]

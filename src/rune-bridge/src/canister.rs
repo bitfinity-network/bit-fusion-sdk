@@ -44,12 +44,6 @@ pub struct RuneBridge {
 
 impl PreUpdate for RuneBridge {}
 
-#[derive(Debug, CandidType, Deserialize)]
-pub struct InitArgs {
-    ck_btc_minter: Principal,
-    ck_btc_ledger: Principal,
-}
-
 impl RuneBridge {
     fn set_timers(&mut self) {
         #[cfg(target_family = "wasm")]
