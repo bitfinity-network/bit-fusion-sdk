@@ -6,6 +6,7 @@ use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, V
 use minter_contract_utils::mint_orders::MintOrders;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
+use serde::Serialize;
 
 use crate::memory::{
     BRC20_STORE_MEMORY_ID, BURN_REQUEST_MEMORY_ID, MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID,
@@ -16,7 +17,7 @@ const SRC_TOKEN: Id256 = Id256([0; 32]);
 pub type RevealTxId = String;
 
 pub struct Brc20Store {
-    inner: StableBTreeMap<RevealTxId, Brc20TokenInfo, VirtualMemory<DefaultMemoryImpl>>,
+    inner: StableBTreeMap<RevealTxId, Brc20Token, VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for Brc20Store {
@@ -28,11 +29,11 @@ impl Default for Brc20Store {
 }
 
 impl Brc20Store {
-    pub fn get_token_info(&self, txid: &str) -> Option<Brc20TokenInfo> {
+    pub fn get_token_info(&self, txid: &str) -> Option<Brc20Token> {
         self.inner.get(&txid.to_string())
     }
 
-    pub fn insert(&mut self, token_info: Brc20TokenInfo) {
+    pub fn insert(&mut self, token_info: Brc20Token) {
         self.inner
             .insert(token_info.tx_id.clone(), token_info.clone());
     }
@@ -49,14 +50,14 @@ impl Brc20Store {
     }
 }
 
-#[derive(Debug, CandidType, Deserialize, Clone, Eq, PartialEq)]
-pub struct Brc20TokenInfo {
+#[derive(Debug, CandidType, Deserialize, Serialize, Clone, Eq, PartialEq)]
+pub struct Brc20Token {
     pub tx_id: RevealTxId,
     pub ticker: String,
     pub holder: String,
 }
 
-impl Storable for Brc20TokenInfo {
+impl Storable for Brc20Token {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(&(self,)).expect("serialization failed"))
     }

@@ -19,7 +19,7 @@ dfx identity use brc20-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 CHAIN_ID=355113
-INDEXER_URL="https://127.0.0.1:9001"
+INDEXER_URL="https://127.0.0.1:5001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -50,13 +50,6 @@ dfx deploy brc20-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
-    rpc_config = record {
-      bitcoin_rpc_url = opt \"http://127.0.0.1:18443\";
-      bitcoin_rpc_username = opt \"user\";
-      bitcoin_rpc_password = opt \"pass\";
-      bitcoin_data_dir = null;
-      cookie_file = null;
-    };
     logger = record {
       enable_console = true;
       in_memory_records = opt 10000;
@@ -141,6 +134,15 @@ fi
 sleep 5
 
 ORD_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+if [ -z "$ORD_ADDRESS" ]; then
+    $ord_wallet create
+    ORD_ADDRESS=$($ord_wallet receive | jq -r .addresses[0])
+    if [ -z "$ORD_ADDRESS" ]; then
+        echo "Failed to get Ord wallet address"
+        exit 1
+    fi
+fi
+
 echo "Ord wallet address: $ORD_ADDRESS"
 
 $bitcoin_cli -rpcwallet=admin sendtoaddress "$ORD_ADDRESS" 10
@@ -159,6 +161,9 @@ sleep 5
 $bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
 
 sleep 3
+HOLDER=$(echo "$inscription_res" | jq -r '.inscriptions[0].destination')
+echo "Owner of inscription: $HOLDER"
+
 BRC20_ID=$(echo "$inscription_res" | jq -r '.inscriptions[0].id')
 echo "BRC20 inscription ID: $BRC20_ID"
 
@@ -184,7 +189,13 @@ echo "Ord wallet balance before deposit of BRC20"
 $ord_wallet balance
 
 # Deposit BRC20 on the bridge
-$ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $BRC20_ID
+echo "Sending BRC20 inscription to canister"
+send_res=$($ord_wallet send --fee-rate 10 "$BRIDGE_ADDRESS" "$BRC20_ID")
+echo "Inscription transfer response: $send_res"
+
+TXID=$(echo "$send_res" | jq -r '.txid')
+echo "New txid: $TXID"
+
 $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 
 sleep 10
@@ -194,12 +205,15 @@ $ord_wallet balance
 echo "Canister's balance after BRC20 deposit"
 dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
-BRC20_TICKER="kobp"
+TICKER="kobp"
+
+BRC20="record { tx_id = \"$TXID\"; ticker = \"$TICKER\"; holder = \"$HOLDER\" }"
+sleep 10
 
 for i in 1 2 3; do
   sleep 5
   echo "Trying to bridge from BRC20 to ERC20"
-  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "(\"$BRC20_TICKER\", \"$BRIDGE_ADDRESS\", \"$ETH_WALLET_ADDRESS\")")
+  mint_status=$(dfx canister call brc20-bridge brc20_to_erc20 "($BRC20, \"$ETH_WALLET_ADDRESS\")")
   echo "Result: $mint_status"
 
   if [[ $mint_status == *"Minted"* ]]; then
@@ -238,3 +252,5 @@ $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 sleep 5
 echo "Ord wallet balance after swap:"
 $ord_wallet balance
+
+echo "Testing complete!"

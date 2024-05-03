@@ -14,9 +14,8 @@ use crate::constant::NONCE;
 use crate::interface::bridge_api::{
     Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
 };
-use crate::interface::get_deposit_address;
-use crate::interface::store::Brc20TokenInfo;
-use crate::rpc::Rpc;
+use crate::interface::store::Brc20Token;
+use crate::rpc;
 use crate::state::State;
 
 /// Swap a BRC20 for an ERC20.
@@ -25,38 +24,30 @@ use crate::state::State;
 pub async fn brc20_to_erc20(
     state: &RefCell<State>,
     eth_address: H160,
-    brc20_ticker: String,
-    holder_btc_addr: String,
+    brc20: Brc20Token,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    log::info!("Fetching {brc20_ticker} token details");
-
-    let Brc20TokenInfo {
+    let Brc20Token {
         tx_id,
         ticker,
         holder,
-    } = Rpc::fetch_brc20_token_details(state, brc20_ticker, holder_btc_addr)
-        .await
-        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
+    } = brc20;
 
     log::info!("Fetching BRC20 reveal transaction by its ID: {tx_id}");
-    let reveal_tx = Rpc::fetch_reveal_transaction(state, &tx_id)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
     log::info!("Parsing BRC20 inscription from transaction");
-    let brc20 = Rpc::parse_and_validate_inscription(reveal_tx)
+    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    state
-        .borrow_mut()
-        .inscriptions_mut()
-        .insert(Brc20TokenInfo {
-            tx_id,
-            ticker,
-            holder,
-        });
+    state.borrow_mut().inscriptions_mut().insert(Brc20Token {
+        tx_id,
+        ticker,
+        holder,
+    });
 
-    let (amount, tick) = Rpc::get_brc20_data(&brc20);
+    let (amount, tick) = rpc::get_brc20_data(&brc20);
     // Set the token symbol using the tick (symbol) from the BRC20
     state
         .borrow_mut()
@@ -222,28 +213,14 @@ async fn send_mint_order(
 
 /// Swap an ERC20 for a BRC20.
 ///
-/// This burns an ERC20 and inscribes an equivalent BRC20.
+/// This burns an ERC20 and transfers the BRC20.
 pub async fn erc20_to_brc20(
     state: &RefCell<State>,
     request_id: u32,
-    brc20_ticker: String,
+    reveal_txid: String,
     dst_addr: &str,
 ) -> Result<Brc20InscribeStatus, BridgeError> {
-    let (network, derivation_path) = {
-        (
-            state.borrow().ic_btc_network(),
-            state.borrow().derivation_path(None),
-        )
-    };
-
-    let bridge_addr = get_deposit_address(network, derivation_path).await;
-
-    let Brc20TokenInfo { tx_id, .. } =
-        Rpc::fetch_brc20_token_details(state, brc20_ticker, bridge_addr)
-            .await
-            .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
-
-    let tx_ids = withdraw_brc20(state, request_id, &tx_id, dst_addr)
+    let tx_ids = withdraw_brc20(state, request_id, &reveal_txid, dst_addr)
         .await
         .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
 
@@ -263,11 +240,11 @@ async fn withdraw_brc20(
         )));
     }
 
-    let reveal_tx = Rpc::fetch_reveal_transaction(state, reveal_txid)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, reveal_txid)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
-    let brc20 = Rpc::parse_and_validate_inscription(reveal_tx)
+    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
         .encode()
         .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;

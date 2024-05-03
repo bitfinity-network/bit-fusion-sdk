@@ -162,19 +162,11 @@ impl Task for Brc20Task {
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
             Self::MintErc20(args) => {
-                let (eth_address, brc20_token, btc_address) = (
-                    args.eth_address.clone(),
-                    args.brc20_token.clone(),
-                    args.btc_address.clone(),
-                );
+                let (eth_address, brc20_token) =
+                    (args.eth_address.clone(), args.brc20_token.clone());
                 Box::pin(async move {
-                    let result = crate::ops::brc20_to_erc20(
-                        &get_state(),
-                        eth_address,
-                        brc20_token,
-                        btc_address,
-                    )
-                    .await;
+                    let result =
+                        crate::ops::brc20_to_erc20(&get_state(), eth_address, brc20_token).await;
 
                     log::info!("ERC20 mint result from scheduler: {result:?}");
 

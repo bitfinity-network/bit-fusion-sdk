@@ -24,6 +24,7 @@ use crate::constant::{
 };
 use crate::interface;
 use crate::interface::bridge_api::{BridgeError, Erc20MintStatus};
+use crate::interface::store::Brc20Token;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
 use crate::state::{BftBridgeConfig, Brc20BridgeConfig, State};
@@ -141,11 +142,10 @@ impl Brc20Bridge {
     #[update]
     pub async fn brc20_to_erc20(
         &mut self,
-        brc20_ticker: String,
-        holder_btc_addr: String,
+        brc20: Brc20Token,
         dst_eth_addr: H160,
     ) -> Result<Erc20MintStatus, BridgeError> {
-        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20_ticker, holder_btc_addr)
+        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20)
             .await
             .map_err(BridgeError::Erc20Mint)
     }

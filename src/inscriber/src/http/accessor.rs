@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use jsonrpc_core::{Error, MethodCall, Params as RequestParams};
 use serde::de::DeserializeOwned;
 

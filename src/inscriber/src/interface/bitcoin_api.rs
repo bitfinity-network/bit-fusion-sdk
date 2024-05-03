@@ -4,6 +4,8 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     UtxoFilter,
 };
 
+use crate::constant::UTXO_MIN_CONFIRMATION;
+
 /// Returns the balance of the given bitcoin address.
 ///
 /// NOTE: Relies on the `bitcoin_get_balance` endpoint.
@@ -28,7 +30,8 @@ pub async fn get_utxos(
     address: String,
 ) -> Result<GetUtxosResponse, String> {
     let mut all_utxos = Vec::<Utxo>::new();
-    let mut page_filter: Option<UtxoFilter> = None;
+    let mut page_filter: Option<UtxoFilter> =
+        Some(UtxoFilter::MinConfirmations(UTXO_MIN_CONFIRMATION));
     let mut tip_block_hash = Vec::<u8>::new();
     let mut tip_height = 0u32;
 

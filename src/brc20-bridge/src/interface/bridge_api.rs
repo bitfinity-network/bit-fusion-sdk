@@ -5,6 +5,8 @@ use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::store::Brc20Token;
+
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
     #[error("{0}")]
@@ -40,6 +42,14 @@ pub struct InscribeBrc20Args {
     pub multisig_config: Option<Multisig>,
 }
 
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub enum DepositError {
+    Pending {
+        min_confirmations: u32,
+        current_confirmations: u32,
+    },
+}
+
 /// Arguments to `Brc20Task::MintErc20`
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MintErc20Args {
@@ -47,8 +57,8 @@ pub struct MintErc20Args {
     pub eth_address: H160,
     /// User's BTC address
     pub btc_address: String,
-    /// BRC20 token name (ticker)
-    pub brc20_token: String,
+    /// BRC20 token info
+    pub brc20_token: Brc20Token,
 }
 
 /// Status of an ERC20 to a BRC20 swap
