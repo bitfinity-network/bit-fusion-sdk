@@ -25,6 +25,8 @@ describe.sequential(
     test('bridge to evm', async () => {
       const toAddress = wallet.address as `0x${string}`;
 
+      console.log(toAddress);
+
       const address = await runeBridge.getDepositAddress(toAddress);
 
       const wrappedBalance = await runeBridge.getWrappedTokenBalance(toAddress);
@@ -43,6 +45,8 @@ describe.sequential(
 
       await runeBridge.bridgeBtc(toAddress);
 
+      await wait(15000);
+
       const wrappedBalance2 =
         await runeBridge.getWrappedTokenBalance(toAddress);
 
@@ -60,16 +64,6 @@ describe.sequential(
         wallet.address as `0x${string}`
       );
       expect(wrappedBalance).toStrictEqual(900n);
-
-      await wait(5000);
-
-      await execBitcoinCmd(
-        `generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts`
-      );
-
-      await wait(5000);
-
-      console.log(await runeBridge.getRunesBalance(toAddress));
     });
   },
   180000

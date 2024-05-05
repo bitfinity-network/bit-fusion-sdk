@@ -81,7 +81,7 @@ export class RuneBridge {
         return result.Ok;
       }
 
-      await wait(5000);
+      await wait(7000);
     }
   }
 
