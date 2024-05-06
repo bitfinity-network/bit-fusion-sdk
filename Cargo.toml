@@ -29,6 +29,7 @@ ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfini
 ethereum-types = "0.14"
 ethers-core = "2.0"
 evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.17.x" }
+icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.17.x" }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 ic-btc-interface = "0.2"
@@ -51,7 +52,7 @@ minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", p
 mockall = "0.12"
 once_cell = "1.16"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
-reqwest = { version = "0.11", default-features = false }
+reqwest = { version = "0.12", default-features = false }
 rlp = "0.5"
 serde = "1.0"
 serde_json = "1.0"
