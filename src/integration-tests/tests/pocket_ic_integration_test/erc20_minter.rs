@@ -191,7 +191,7 @@ async fn test_external_bridging() {
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
     let alice_address: H160 = alice_wallet.address().into();
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
-    let amount = 1000_u64;
+    let amount = 1000_u128;
 
     // spender should deposit native tokens to bft bridge, to pay fee.
     let expected_init_native_balance = 10_u64.pow(15);
@@ -221,7 +221,7 @@ async fn test_external_bridging() {
             &ctx.base_token_address,
             alice_id,
             &ctx.base_bft_bridge,
-            amount as _,
+            amount,
         )
         .await
         .unwrap()
@@ -237,32 +237,12 @@ async fn test_external_bridging() {
     ctx.context.advance_time(Duration::from_secs(2)).await;
     ctx.context.advance_time(Duration::from_secs(2)).await;
 
-    // Chech the balance of the wrapped token.
-    let data = utils::function_selector(
-        "balanceOf",
-        &[Param {
-            name: "account".to_string(),
-            kind: ParamType::Address,
-            internal_type: None,
-        }],
-    )
-    .encode_input(&[Token::Address(alice_address.clone().into())])
-    .unwrap();
-
-    let balance = wrapped_evm_client
-        .eth_call(
-            Some(alice_address),
-            Some(ctx.wrapped_token_address.clone()),
-            None,
-            3_000_000,
-            None,
-            Some(data.into()),
-        )
+    let balance = ctx
+        .context
+        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet)
         .await
-        .unwrap()
         .unwrap();
-
-    assert_eq!(amount, U256::from_hex_str(&balance).unwrap().0.as_u64());
+    assert_eq!(amount, balance);
 
     // Wait for mint order removal
     ctx.context.advance_time(Duration::from_secs(2)).await;
