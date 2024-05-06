@@ -64,6 +64,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let _operation_id = ctx
         .burn_erc_20_tokens(
+            &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
             (&john()).into(),

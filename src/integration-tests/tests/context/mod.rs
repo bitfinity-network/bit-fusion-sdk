@@ -21,6 +21,7 @@ use ic_exports::icrc_types::icrc1_ledger::{
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use minter_client::MinterCanisterClient;
+use minter_contract_utils::bft_bridge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
 use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::evm_link::EvmLink;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
@@ -242,6 +243,7 @@ pub trait TestContext {
 
     async fn burn_erc_20_tokens_raw(
         &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         recipient: Vec<u8>,
@@ -253,7 +255,9 @@ pub trait TestContext {
             .encode_input(&[Token::Address(bridge.0), Token::Uint(amount)])
             .unwrap();
 
-        let results = self.call_contract(wallet, from_token, input, 0).await?;
+        let results = self
+            .call_contract_on_evm(evm_client, wallet, from_token, input, 0)
+            .await?;
         let output = results.1.output.unwrap();
         assert_eq!(
             wrapped_token_api::ERC_20_APPROVE
@@ -271,7 +275,9 @@ pub trait TestContext {
             ])
             .unwrap();
 
-        let (tx_hash, receipt) = self.call_contract(wallet, bridge, input, 0).await?;
+        let (tx_hash, receipt) = self
+            .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
+            .await?;
         let decoded_output = bft_bridge_api::BURN
             .decode_output(receipt.output.as_ref().unwrap())
             .unwrap();
@@ -288,14 +294,85 @@ pub trait TestContext {
 
     async fn burn_erc_20_tokens(
         &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         recipient: Id256,
         bridge: &H160,
         amount: u128,
     ) -> Result<(u32, H256)> {
-        self.burn_erc_20_tokens_raw(wallet, from_token, recipient.0.to_vec(), bridge, amount)
+        self.burn_erc_20_tokens_raw(
+            evm_client,
+            wallet,
+            from_token,
+            recipient.0.to_vec(),
+            bridge,
+            amount,
+        )
+        .await
+    }
+
+    /// Current native token balance on user's deposit inside the BftBridge.
+    async fn native_token_deposit_balance(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        bft_bridge: H160,
+        user: H160,
+    ) -> U256 {
+        let input = NATIVE_TOKEN_BALANCE
+            .encode_input(&[Token::Address(user.0)])
+            .unwrap();
+        let response = evm_client
+            .eth_call(
+                Some(user),
+                Some(bft_bridge),
+                None,
+                3_000_000,
+                None,
+                Some(input.into()),
+            )
             .await
+            .unwrap()
+            .unwrap();
+
+        NATIVE_TOKEN_BALANCE
+            .decode_output(&hex::decode(response.trim_start_matches("0x")).unwrap())
+            .unwrap()
+            .first()
+            .cloned()
+            .unwrap()
+            .into_uint()
+            .unwrap()
+            .into()
+    }
+
+    /// Deposit native tokens to BftBridge to pay mint fee.
+    async fn native_token_deposit(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        bft_bridge: H160,
+        user_wallet: &Wallet<'static, SigningKey>,
+        amount: u128,
+    ) -> Result<U256> {
+        let input = NATIVE_TOKEN_DEPOSIT
+            .encode_input(&[Token::Address(user_wallet.address())])
+            .unwrap();
+
+        let receipt = self
+            .call_contract_on_evm(evm_client, user_wallet, &bft_bridge, input, amount)
+            .await?
+            .1;
+
+        let new_balance = NATIVE_TOKEN_DEPOSIT
+            .decode_output(receipt.output.as_ref().unwrap())
+            .unwrap()
+            .first()
+            .cloned()
+            .unwrap()
+            .into_uint()
+            .unwrap();
+
+        Ok(new_balance.into())
     }
 
     /// Returns a signed transaction from the given `wallet`.
@@ -332,6 +409,19 @@ pub trait TestContext {
         amount: u128,
     ) -> Result<(H256, TransactionReceipt)> {
         let evm_client = self.evm_client(self.admin_name());
+        self.call_contract_on_evm(&evm_client, wallet, contract, input, amount)
+            .await
+    }
+
+    /// Calls contract in the evm_client.
+    async fn call_contract_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+        contract: &H160,
+        input: Vec<u8>,
+        amount: u128,
+    ) -> Result<(H256, TransactionReceipt)> {
         let from: H160 = wallet.address().into();
         let nonce = evm_client.account_basic(from.clone()).await?.nonce;
 
@@ -339,7 +429,7 @@ pub trait TestContext {
 
         let hash = evm_client.send_raw_transaction(call_tx).await??;
         let receipt = self
-            .wait_transaction_receipt(&hash)
+            .wait_transaction_receipt_on_evm(evm_client, &hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
                 "transaction not processed".into(),
@@ -434,10 +524,24 @@ pub trait TestContext {
         token: &H160,
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<u128> {
+        let evm_client = self.evm_client(self.admin_name());
+        self.check_erc20_balance_on_evm(&evm_client, token, wallet)
+            .await
+    }
+
+    /// Returns ERC-20 balance on the given evm.
+    async fn check_erc20_balance_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        token: &H160,
+        wallet: &Wallet<'_, SigningKey>,
+    ) -> Result<u128> {
         let input = wrapped_token_api::ERC_20_BALANCE
             .encode_input(&[Token::Address(wallet.address())])
             .unwrap();
-        let results = self.call_contract(wallet, token, input, 0).await?;
+        let results = self
+            .call_contract_on_evm(evm_client, wallet, token, input, 0)
+            .await?;
         let output = results.1.output.unwrap();
 
         Ok(wrapped_token_api::ERC_20_BALANCE
