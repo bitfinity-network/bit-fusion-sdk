@@ -1,11 +1,7 @@
 use std::cell::RefCell;
-use std::str::FromStr;
 
-use bitcoin::absolute::LockTime;
-use bitcoin::transaction::Version;
-use bitcoin::{
-    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
-};
+use bitcoin::{Network, Transaction, Txid};
+use clap::ValueEnum;
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, Utxo,
@@ -16,7 +12,8 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 use inscriber::constant::UTXO_MIN_CONFIRMATION;
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
-use serde::Deserialize;
+use ordinals::SpacedRune;
+use serde::{Deserialize, Serialize};
 
 use crate::constant::{
     BRC20_TICKER_LEN, HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST,
@@ -118,17 +115,18 @@ async fn get_brc20_transaction_by_id(
         .0;
 
     log::info!(
-        "Indexer responded with: status: {} body: {}",
+        "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
         response.status,
+        response.headers,
         String::from_utf8_lossy(&response.body)
     );
 
-    let tx: TxInfo = serde_json::from_slice(&response.body).map_err(|err| {
+    let tx_html: TransactionHtml = serde_json::from_slice(&response.body).map_err(|err| {
         log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
         BridgeError::GetTransactionById(format!("{err:?}"))
     })?;
 
-    tx.try_into()
+    Ok(tx_html.transaction)
 }
 
 fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 {
@@ -230,86 +228,66 @@ fn reverse_txid_byte_order(utxo: &Utxo) -> Vec<u8> {
         .collect::<Vec<u8>>()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct TxInfo {
-    pub version: i32,
-    pub locktime: u32,
-    pub vin: Vec<Vin>,
-    pub vout: Vec<Vout>,
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct TransactionHtml {
+    chain: Chain,
+    etching: Option<SpacedRune>,
+    inscription_count: u32,
+    transaction: Transaction,
+    txid: Txid,
 }
 
-impl TryFrom<TxInfo> for Transaction {
-    type Error = anyhow::Error;
+// To avoid pulling the entire `ord` crate into our dependencies, the following code is
+// copied from https://github.com/ordinals/ord/blob/master/src/chain.rs
 
-    fn try_from(info: TxInfo) -> Result<Self, Self::Error> {
-        let version = Version(info.version);
-        let lock_time = LockTime::from_consensus(info.locktime);
+#[derive(Default, ValueEnum, Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum Chain {
+    #[default]
+    #[value(alias("main"))]
+    Mainnet,
+    #[value(alias("test"))]
+    Testnet,
+    Signet,
+    Regtest,
+}
 
-        let mut tx_in = Vec::with_capacity(info.vin.len());
-        for input in info.vin {
-            let txid = Txid::from_str(&input.txid)?;
-            let vout = input.vout;
-            let script_sig = ScriptBuf::from_hex(&input.prevout.scriptpubkey)?;
-
-            let mut witness = Witness::new();
-            for item in input.witness {
-                witness.push(ScriptBuf::from_hex(&item)?);
-            }
-
-            let tx_input = TxIn {
-                previous_output: OutPoint { txid, vout },
-                script_sig,
-                sequence: Sequence(input.sequence),
-                witness,
-            };
-
-            tx_in.push(tx_input);
+impl From<Chain> for Network {
+    fn from(chain: Chain) -> Network {
+        match chain {
+            Chain::Mainnet => Network::Bitcoin,
+            Chain::Testnet => Network::Testnet,
+            Chain::Signet => Network::Signet,
+            Chain::Regtest => Network::Regtest,
         }
-
-        let mut tx_out = Vec::with_capacity(info.vout.len());
-        for output in info.vout {
-            let script_pubkey = ScriptBuf::from_hex(&output.scriptpubkey)?;
-            let value = Amount::from_sat(output.value);
-
-            tx_out.push(TxOut {
-                script_pubkey,
-                value,
-            });
-        }
-
-        Ok(Transaction {
-            version,
-            lock_time,
-            input: tx_in,
-            output: tx_out,
-        })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Vin {
-    pub txid: String,
-    pub vout: u32,
-    pub sequence: u32,
-    pub is_coinbase: bool,
-    pub prevout: Prevout,
-    pub witness: Vec<String>,
+impl std::fmt::Display for Chain {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Mainnet => "mainnet",
+                Self::Regtest => "regtest",
+                Self::Signet => "signet",
+                Self::Testnet => "testnet",
+            }
+        )
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Prevout {
-    pub scriptpubkey: String,
-    pub scriptpubkey_asm: String,
-    pub scriptpubkey_type: String,
-    pub scriptpubkey_address: Option<String>,
-    pub value: u64,
-}
+impl std::str::FromStr for Chain {
+    type Err = anyhow::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Vout {
-    pub scriptpubkey: String,
-    pub scriptpubkey_asm: String,
-    pub scriptpubkey_type: String,
-    pub scriptpubkey_address: Option<String>,
-    pub value: u64,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mainnet" => Ok(Self::Mainnet),
+            "regtest" => Ok(Self::Regtest),
+            "signet" => Ok(Self::Signet),
+            "testnet" => Ok(Self::Testnet),
+            _ => anyhow::bail!("invalid chain `{s}`"),
+        }
+    }
 }

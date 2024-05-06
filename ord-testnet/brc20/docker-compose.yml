@@ -23,20 +23,20 @@ services:
       - ../brc20_json_inscriptions:/brc20_json_inscriptions
     depends_on:
       - bitcoind
-  esplora:
-    container_name: esplora
-    build:
-      dockerfile: esplora.dockerfile
-    platform: linux/amd64
-    ports:
-      - "5000:5000"
-    volumes:
-      - esplora-data:/app/esplora
-    depends_on:
-      - bitcoind
-    environment:
-      - NO_REGTEST_MINING=1
+  # esplora:
+  #   container_name: esplora
+  #   build:
+  #     dockerfile: esplora.dockerfile
+  #   platform: linux/amd64
+  #   ports:
+  #     - "5001:5001"
+  #   volumes:
+  #     - esplora-data:/app/esplora
+  #   depends_on:
+  #     - bitcoind
+  #   environment:
+  #     - NO_REGTEST_MINING=1
 
 volumes:
   bitcoin-data:
-  esplora-data:
+  # esplora-data:

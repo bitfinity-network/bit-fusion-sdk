@@ -19,7 +19,7 @@ dfx identity use brc20-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 CHAIN_ID=355113
-INDEXER_URL="https://127.0.0.1:5001"
+INDEXER_URL="https://127.0.0.1:8001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
