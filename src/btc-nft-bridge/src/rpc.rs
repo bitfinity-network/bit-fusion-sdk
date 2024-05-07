@@ -8,22 +8,24 @@ use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
-use bitcoincore_rpc::RpcApi as _;
 use futures::TryFutureExt;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Utxo};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{
+    BitcoinNetwork, GetUtxosResponse, Utxo,
+};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
+use inscriber::constant::UTXO_MIN_CONFIRMATION;
 use inscriber::interface::bitcoin_api;
 use ord_rs::inscription::nft::id::NftId;
 use ord_rs::{Nft, OrdParser};
 use serde::Deserialize;
 
 use crate::constant::{
-    HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST, HTTP_OUTCALL_RES_DEFAULT_SIZE,
-    HTTP_OUTCALL_RES_PER_BYTE_COST, MAX_HTTP_RESPONSE_BYTES,
+    HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
+    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST, MAX_HTTP_RESPONSE_BYTES,
 };
-use crate::interface::bridge_api::BridgeError;
+use crate::interface::bridge_api::{BridgeError, DepositError};
 use crate::interface::get_deposit_address;
 use crate::interface::store::NftInfo;
 use crate::state::State;
@@ -88,7 +90,6 @@ pub async fn fetch_nft_token_details(
     })?;
 
     Ok(NftInfo::new(
-        inscription.id,
         nft_id.into(),
         inscription.address,
         inscription.satpoint,
@@ -113,7 +114,7 @@ pub(crate) async fn fetch_reveal_transaction(
     let nft_utxo = find_inscription_utxo(
         ic_btc_network,
         bridge_addr,
-        reveal_tx_id.as_bytes().to_vec(),
+        hex::decode(reveal_tx_id).expect("failed to decode reveal_tx_id"),
     )
     .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
     .await?;
@@ -121,7 +122,8 @@ pub(crate) async fn fetch_reveal_transaction(
     let txid =
         Txid::from_slice(&nft_utxo.outpoint.txid).expect("failed to convert Txid from slice");
 
-    Ok(get_nft_transaction_by_id(state, &txid)
+    Ok(get_nft_transaction_by_id(&state.borrow().ord_url(), &txid)
+        .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?)
 }
 
@@ -148,11 +150,41 @@ fn network_as_str(network: Network) -> &'static str {
     }
 }
 
-fn get_nft_transaction_by_id(state: &RefCell<State>, txid: &Txid) -> anyhow::Result<Transaction> {
-    Ok(state
-        .borrow()
-        .bitcoin_rpc_client()?
-        .get_raw_transaction(txid, None)?)
+async fn get_nft_transaction_by_id(ord_url: &str, txid: &Txid) -> anyhow::Result<Transaction> {
+    let url = format!("{ord_url}/tx/{txid}");
+
+    let request_params = CanisterHttpRequestArgument {
+        url,
+        max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
+        method: HttpMethod::GET,
+        headers: vec![HttpHeader {
+            name: "Accept".to_string(),
+            value: "application/json".to_string(),
+        }],
+        body: None,
+        transform: None,
+    };
+
+    let cycles = get_estimated_http_outcall_cycles(&request_params);
+
+    let response = http_request(request_params, cycles)
+        .await
+        .map_err(|err| BridgeError::FetchNftTokenDetails(format!("{err:?}")))?
+        .0;
+
+    log::info!(
+        "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
+        response.status,
+        response.headers,
+        String::from_utf8_lossy(&response.body)
+    );
+
+    let tx_html: TransactionHtml = serde_json::from_slice(&response.body).map_err(|err| {
+        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
+        BridgeError::GetTransactionById(format!("{err:?}"))
+    })?;
+
+    Ok(tx_html.transaction)
 }
 
 fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeError> {
@@ -171,39 +203,61 @@ fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeErro
 
 /// Validates a reveal transaction ID by checking if it matches
 /// the transaction ID of the received UTXO.
-///
-/// TODO: 1. reduce latency by using derivation_path
-///       2. filter out pending UTXOs
 async fn find_inscription_utxo(
     network: BitcoinNetwork,
     deposit_addr: String,
     txid: Vec<u8>,
 ) -> Result<Utxo, BridgeError> {
-    let utxos = bitcoin_api::get_utxos(network, deposit_addr)
+    let utxos_response = bitcoin_api::get_utxos(network, deposit_addr.clone())
         .await
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?
-        .utxos;
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
+
+    let utxos = validate_utxos(utxos_response)
+        .map_err(|err| BridgeError::FindInscriptionUtxo(format!("{err:?}")))?;
 
     let nft_utxo = utxos
         .iter()
-        .find(|utxo| utxo.outpoint.txid == txid)
+        .find(|utxo| reverse_txid_byte_order(utxo) == txid)
         .cloned();
 
     match nft_utxo {
         Some(utxo) => Ok(utxo),
         None => Err(BridgeError::GetTransactionById(
-            "No matching UTXO found".to_string(),
+            format!("No matching UTXO found: {}", hex::encode(txid),).to_string(),
         )),
     }
 }
 
-#[allow(unused)]
-fn validate_utxos(
-    _network: BitcoinNetwork,
-    _addr: &str,
-    _utxos: &[Utxo],
-) -> Result<Vec<Utxo>, String> {
-    todo!()
+fn validate_utxos(utxo_response: GetUtxosResponse) -> Result<Vec<Utxo>, DepositError> {
+    let min_confirmations = UTXO_MIN_CONFIRMATION;
+    let current_confirmations = utxo_response
+        .utxos
+        .iter()
+        .map(|utxo| utxo_response.tip_height - utxo.height + 1)
+        .min()
+        .unwrap_or_default();
+
+    if min_confirmations > current_confirmations {
+        Err(DepositError::Pending {
+            min_confirmations,
+            current_confirmations,
+        })
+    } else {
+        Ok(utxo_response.utxos)
+    }
+}
+
+/// Reverses the byte order of the transaction ID.
+///
+/// The IC management canister returns bytes of txid in reversed order,
+/// so we need to undo the operation first before before consuming the output.
+fn reverse_txid_byte_order(utxo: &Utxo) -> Vec<u8> {
+    utxo.outpoint
+        .txid
+        .iter()
+        .copied()
+        .rev()
+        .collect::<Vec<u8>>()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -320,4 +374,11 @@ struct Vout {
     scriptpubkey_type: String,
     scriptpubkey_address: Option<String>,
     value: u64,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct TransactionHtml {
+    inscription_count: u32,
+    transaction: Transaction,
+    txid: Txid,
 }

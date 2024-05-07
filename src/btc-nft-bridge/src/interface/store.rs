@@ -65,13 +65,16 @@ pub struct NftInfo {
 }
 
 impl NftInfo {
-    pub fn new(
-        tx_id: RevealTxId,
-        id: StorableNftId,
-        holder: String,
-        output: String,
-    ) -> Result<Self, BridgeError> {
+    pub fn new(id: StorableNftId, holder: String, output: String) -> Result<Self, BridgeError> {
         let output = output.split(":");
+        let tx_id = output
+            .clone()
+            .nth(0)
+            .ok_or_else(|| BridgeError::MalformedAddress("Missing txid".to_string()))?
+            .to_string();
+        if tx_id.len() != 64 {
+            return Err(BridgeError::MalformedAddress("Invalid txid".to_string()));
+        }
         let vout = output
             .clone()
             .nth(1)

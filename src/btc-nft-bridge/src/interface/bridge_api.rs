@@ -35,6 +35,14 @@ pub enum BridgeError {
     Erc721Burn(String),
 }
 
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub enum DepositError {
+    Pending {
+        min_confirmations: u32,
+        current_confirmations: u32,
+    },
+}
+
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct InscribeNftArgs {
     pub inscription_type: Protocol,

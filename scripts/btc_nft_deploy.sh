@@ -192,7 +192,9 @@ echo "Ord wallet balance before deposit of NFT"
 $ord_wallet balance
 
 # Deposit NFT on the bridge
+echo "Depositing NFT on the bridge"
 $ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $NFT_ID
+echo "Generate to address $ORD_ADDRESS"
 $bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
 
 sleep 10
@@ -201,6 +203,7 @@ $ord_wallet balance
 
 echo "Canister's balance after NFT deposit"
 dfx canister call btc-nft-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
+echo "BRIDGE_ADDRESS: $BRIDGE_ADDRESS"
 
 for i in 1 2 3; do
   sleep 5

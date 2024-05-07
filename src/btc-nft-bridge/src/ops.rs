@@ -3,10 +3,10 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, FeeRate, Network, OutPoint, TxOut, Txid};
+use bitcoin::{Address, Amount, FeeRate, OutPoint, TxOut, Txid};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, GetUtxosResponse};
+use ic_exports::ic_cdk::api::management_canister::bitcoin::GetUtxosResponse;
 use ic_stable_structures::CellStructure;
 use inscriber::interface::bitcoin_api;
 use inscriber::ops as Inscriber;
@@ -41,20 +41,13 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
-    rpc::parse_and_validate_inscription(reveal_tx)
-        .await
-        .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
+    // TODO: parse and validate it is a nft
+    // requires EPROD-853 <https://infinityswap.atlassian.net/browse/EPROD-853>
+    // rpc::parse_and_validate_inscription(reveal_tx)
+    //     .await
+    //     .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
     state.borrow_mut().inscriptions_mut().insert(nft);
-
-    /*
-    let (amount, tick) = rpc::get_brc20_data(&nft);
-    // Set the token symbol using the tick (symbol) from the BRC20
-    state
-        .borrow_mut()
-        .set_token_symbol(tick)
-        .map_err(|e| NftMintError::Brc20Bridge(e.to_string()))?;
-     */
 
     let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
 
