@@ -26,11 +26,21 @@ pub async fn brc20_to_erc20(
     eth_address: H160,
     brc20: Brc20Token,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
+    // NOTE:
+    // We can fetch BRC20 token details via an indexer that supports the standard,
+    // or we can parse an `ord_rs::Brc20` from the witness section of a `bitcoin::Transaction`.
+    // Either way, the goal is to validate the token details against the received UTXO(s),
+    // before storing the information in state and proceeding with the ERC20 mint.
     let Brc20Token {
         tx_id,
         ticker,
         holder,
     } = brc20;
+
+    // log::info!("Fetching BRC20 token details");
+    // let fetched_token = rpc::fetch_brc20_token_details(state, ticker.clone(), holder.clone())
+    //     .await
+    //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
     log::info!("Fetching BRC20 reveal transaction by its ID: {tx_id}");
     let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)

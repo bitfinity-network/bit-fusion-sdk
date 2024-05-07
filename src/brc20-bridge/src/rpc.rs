@@ -1,6 +1,7 @@
 use std::cell::RefCell;
+use std::str::FromStr;
 
-use bitcoin::{Network, Transaction, Txid};
+use bitcoin::{Address, Network, Transaction, Txid};
 use clap::ValueEnum;
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
@@ -21,7 +22,58 @@ use crate::constant::{
 };
 use crate::interface::bridge_api::{BridgeError, DepositError};
 use crate::interface::get_deposit_address;
+use crate::interface::store::Brc20Token;
 use crate::state::State;
+
+/// Retrieves and validates the details of a BRC20 token given its ticker.
+pub async fn fetch_brc20_token_details(
+    state: &RefCell<State>,
+    tick: String,
+    holder: String,
+) -> anyhow::Result<Brc20Token> {
+    let (network, indexer_url) = {
+        let state = state.borrow();
+        (state.btc_network(), state.indexer_url())
+    };
+
+    // check that BTC address is valid and/or
+    // corresponds to the network.
+    is_valid_btc_address(&holder, network)?;
+
+    let TokenInfo {
+        tx_id,
+        address,
+        ticker,
+        ..
+    } = match get_brc20_token_by_ticker(&indexer_url, &tick)
+        .await
+        .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
+    {
+        Some(token) => token,
+        None => {
+            return Err(
+                BridgeError::FetchBrc20TokenDetails("No BRC20 token found".to_string()).into(),
+            )
+        }
+    };
+
+    if address != holder && ticker != tick {
+        log::error!(
+            "Token details mismatch. Given: {:?}. Expected: {:?}",
+            (tick, holder),
+            (ticker, address)
+        );
+        return Err(
+            BridgeError::FetchBrc20TokenDetails("Incorrect token details".to_string()).into(),
+        );
+    }
+
+    Ok(Brc20Token {
+        ticker,
+        holder: address,
+        tx_id,
+    })
+}
 
 /// Retrieves (and re-constructs) the reveal transaction by its ID.
 ///
@@ -87,12 +139,51 @@ pub(crate) fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
     }
 }
 
+async fn get_brc20_token_by_ticker(
+    base_indexer_url: &str,
+    ticker: &str,
+) -> anyhow::Result<Option<TokenInfo>> {
+    let url = format!("{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}");
+
+    let request_params = CanisterHttpRequestArgument {
+        url,
+        max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
+        method: HttpMethod::GET,
+        headers: vec![HttpHeader {
+            name: "Accept".to_string(),
+            value: "application/json".to_string(),
+        }],
+        body: None,
+        transform: None,
+    };
+
+    let cycles = get_estimated_http_outcall_cycles(&request_params);
+
+    let response = http_request(request_params, cycles)
+        .await
+        .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
+        .0;
+
+    log::info!(
+        "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
+        response.status,
+        response.headers,
+        String::from_utf8_lossy(&response.body)
+    );
+
+    let brc20_resp: Brc20TokenResponse = serde_json::from_slice(&response.body).map_err(|err| {
+        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
+        BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
+    })?;
+
+    Ok(brc20_resp.token)
+}
+
 async fn get_brc20_transaction_by_id(
     base_indexer_url: &str,
     txid: &str,
     _network_str: &str,
 ) -> anyhow::Result<Transaction> {
-    // let url = format!("{base_indexer_url}{network_str}/api/tx/{txid}");
     let url = format!("{base_indexer_url}/tx/{txid}");
 
     let request_params = CanisterHttpRequestArgument {
@@ -161,6 +252,20 @@ fn network_as_str(network: Network) -> &'static str {
         Network::Signet => "/signet",
         _ => "",
     }
+}
+
+fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeError> {
+    let network_str = network_as_str(network);
+
+    if !Address::from_str(addr)
+        .expect("Failed to convert to bitcoin address")
+        .is_valid_for_network(network)
+    {
+        log::error!("The given bitcoin address {addr} is not valid for {network_str}");
+        return Err(BridgeError::MalformedAddress(addr.to_string()));
+    }
+
+    Ok(true)
 }
 
 /// Validates a reveal transaction ID by checking if it matches
@@ -290,4 +395,34 @@ impl std::str::FromStr for Chain {
             _ => anyhow::bail!("invalid chain `{s}`"),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct Brc20TokenResponse {
+    token: Option<TokenInfo>,
+    supply: Option<TokenSupply>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct TokenInfo {
+    id: String,
+    number: u32,
+    block_height: u32,
+    tx_id: String,
+    address: String,
+    ticker: String,
+    max_supply: String,
+    mint_limit: String,
+    decimals: u8,
+    deploy_timestamp: u64,
+    minted_supply: String,
+    tx_count: u32,
+    self_mint: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct TokenSupply {
+    max_supply: String,
+    minted_supply: String,
+    holders: u32,
 }
