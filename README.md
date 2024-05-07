@@ -6,7 +6,8 @@
 
 ## Legal notice
 
-Astari encourages integrators to evaluate their own regulatory obligations when integrating this widget into their products, including, but not limited to, those related to economic or trade sanctions compliance.
+**Finity Technologies encourages developers to evaluate their own regulatory obligations when using this code, including, but not limited to, those related to compliance.
+**
 
 THE CODE (THE “CODE”) PROVIDED BY FINITY TECHNOLOGIES LTD (THE “COMPANY”) IS PROVIDED ON AN AS IS BASIS. THE COMPANY DOES NOT GIVE ANY WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE AND/OR NONINFRINGEMENT. IN NO EVENT SHALL THE COMPANY BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE CODE, AND/OR THE USE OF OR OTHER DEALINGS IN THE CODE.
 
