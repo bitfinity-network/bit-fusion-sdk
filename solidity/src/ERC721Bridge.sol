@@ -3,6 +3,7 @@ pragma solidity ^0.8.7;
 
 import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC721/IERC721.sol";
+import "openzeppelin-contracts/utils/Strings.sol";
 import "src/WrappedERC721.sol";
 
 contract ERC721Bridge {
@@ -177,7 +178,7 @@ contract ERC721Bridge {
         _checkMintOrderSignature(encodedOrder);
 
         // Cases:
-        // 1. `_erc721TokenRegistry` contains the `order.fromTokenID`. So, we are in WrappedToken side.
+        // 1. `_erc721TokenRegistry` contains the `order.fromTokenID`. So, we are in WrappedERC721 side.
         // 2. `_erc721TokenRegistry` does not contain the `order.fromTokenID`. So:
         //   a. We are in BaseToken side.
         //   b. We are minting NativeToken.
@@ -302,10 +303,10 @@ contract ERC721Bridge {
     function getTokenMetadata(
         address token
     ) internal view returns (TokenMetadata memory meta) {
-        try WrappedToken(token).name() returns (string memory _name) {
+        try WrappedERC721(token).name() returns (string memory _name) {
             meta.name = truncateUTF8(_name);
         } catch {}
-        try WrappedToken(token).symbol() returns (string memory _symbol) {
+        try WrappedERC721(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(truncateUTF8(_symbol));
         } catch {}
     }
@@ -341,7 +342,7 @@ contract ERC721Bridge {
         );
 
         // Create the new token
-        WrappedToken wrappedERC721 = new WrappedToken(
+        WrappedERC721 wrappedERC721 = new WrappedERC721(
             name,
             symbol,
             address(this)
