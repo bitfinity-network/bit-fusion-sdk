@@ -64,6 +64,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let _operation_id = ctx
         .burn_erc_20_tokens(
+            &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
             (&john()).into(),
@@ -204,7 +205,7 @@ async fn spender_canister_access_control() {
 
 #[tokio::test]
 async fn set_owner_access() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
     let mut admin_client = ctx.minter_client(ADMIN);
     admin_client.set_owner(alice()).await.unwrap().unwrap();
 
@@ -225,7 +226,7 @@ async fn set_owner_access() {
 
 #[tokio::test]
 async fn invalid_bridge_contract() {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let minter_client = ctx.minter_client(ADMIN);
     let res = minter_client
         .register_evmc_bft_bridge(H160::from_slice(&[20; 20]))
@@ -238,7 +239,7 @@ async fn invalid_bridge_contract() {
 
 #[tokio::test]
 async fn invalid_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let admin = ADMIN;
     let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
     let minter_canister_address = ctx.get_minter_canister_evm_address(admin).await.unwrap();
@@ -268,7 +269,7 @@ async fn invalid_bridge() {
 
 #[tokio::test]
 async fn double_register_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     let _ = ctx
@@ -293,7 +294,7 @@ async fn double_register_bridge() {
 
 #[tokio::test]
 async fn canister_log_config_should_still_be_storable_after_upgrade() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
 
     let minter_client = ctx.minter_client(ADMIN);
 
@@ -319,7 +320,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
 #[tokio::test]
 async fn test_canister_build_data() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Minter]).await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
     let minter_client = ctx.minter_client(ALICE);
     let build_data = minter_client.get_canister_build_data().await.unwrap();
     assert!(build_data.pkg_name.contains("icrc2-minter"));

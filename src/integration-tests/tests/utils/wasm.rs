@@ -34,7 +34,7 @@ pub async fn get_spender_canister_bytecode() -> Vec<u8> {
 }
 
 /// Returns the bytecode of the minter evm
-pub async fn get_erc20_minter_canister_bytecode() -> Vec<u8> {
+pub async fn get_ck_erc20_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, "erc20-minter.wasm.gz").await
 }
@@ -46,7 +46,7 @@ pub async fn get_evm_testnet_canister_bytecode() -> Vec<u8> {
 }
 
 /// Returns the bytecode of the minter canister
-pub async fn get_minter_canister_bytecode() -> Vec<u8> {
+pub async fn get_icrc2_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, "icrc2-minter.wasm.gz").await
 }

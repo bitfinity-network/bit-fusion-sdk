@@ -14,7 +14,6 @@ WASM_DIR=".artifact"
 IC_COMMIT_HASH="85bd56a70e55b2cea75cae6405ae11243e5fdad8" # 2024-02-21
 EVM_FEATURES="export-api"
 
-
 if
     ! command -v icx-proxy &
     >/dev/null

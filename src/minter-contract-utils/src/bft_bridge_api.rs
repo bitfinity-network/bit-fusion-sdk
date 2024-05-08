@@ -57,6 +57,18 @@ pub static BURN: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::NonPayable,
 });
 
+pub fn decode_burn_operation_id(raw_data: &[u8]) -> anyhow::Result<u32> {
+    let id = BURN
+        .decode_output(raw_data)?
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow::Error::msg("no tokens in burn operation output"))?
+        .into_uint()
+        .ok_or_else(|| anyhow::Error::msg("wrong token in burn operation output"))?
+        .as_u32();
+    Ok(id)
+}
+
 #[allow(deprecated)] // need to initialize `constant` field
 pub static GET_PENDING_BURN_INFO: Lazy<Function> = Lazy::new(|| Function {
     name: "getPendingBurnInfo".into(),
@@ -499,30 +511,6 @@ pub static NATIVE_TOKEN_DEPOSIT: Lazy<Function> = Lazy::new(|| Function {
     }],
     constant: None,
     state_mutability: StateMutability::Payable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static NATIVE_TOKEN_WITHDRAW: Lazy<Function> = Lazy::new(|| Function {
-    name: "nativeTokenWithdraw".into(),
-    inputs: vec![
-        Param {
-            name: "to".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "amount".into(),
-            kind: ParamType::Uint(256),
-            internal_type: None,
-        },
-    ],
-    outputs: vec![Param {
-        name: "balance".into(),
-        kind: ParamType::Uint(256),
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
 });
 
 pub fn mint_transaction(

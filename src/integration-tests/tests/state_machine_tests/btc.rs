@@ -1085,6 +1085,7 @@ impl CkBtcSetup {
 
         (&self.context)
             .burn_erc_20_tokens_raw(
+                &(&self.context).evm_client("admin"),
                 wallet,
                 from_token,
                 recipient,
