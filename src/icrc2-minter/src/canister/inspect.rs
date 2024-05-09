@@ -29,19 +29,19 @@ async fn inspect_method(method: &str) -> Result<()> {
         }
         "ic_logs" => MinterCanister::ic_logs_inspect_message_check(ic::caller(), &state),
         "set_evm_principal" => {
-            let (evm,) = api::call::arg_data::<(Principal,)>();
+            let (evm,) = api::call::arg_data::<(Principal,)>(Default::default());
             MinterCanister::set_evm_principal_inspect_message_check(ic::caller(), evm, &state)
         }
         "set_owner" => {
-            let (owner,) = api::call::arg_data::<(Principal,)>();
+            let (owner,) = api::call::arg_data::<(Principal,)>(Default::default());
             MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)
         }
         "burn_icrc2" => {
-            let (reason,) = api::call::arg_data::<(Icrc2Burn,)>();
+            let (reason,) = api::call::arg_data::<(Icrc2Burn,)>(Default::default());
             MinterCanister::burn_icrc2_inspect_message_check(&reason)
         }
         "register_evmc_bft_bridge" => {
-            let (bft_bridge_address,) = api::call::arg_data::<(H160,)>();
+            let (bft_bridge_address,) = api::call::arg_data::<(H160,)>(Default::default());
             MinterCanister::register_evmc_bft_bridge_inspect_message_check(
                 ic::caller(),
                 bft_bridge_address,

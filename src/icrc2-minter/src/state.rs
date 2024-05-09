@@ -78,7 +78,6 @@ pub struct Settings {
     pub owner: Principal,
     pub evm_principal: Principal,
     pub signing_strategy: SigningStrategy,
-    pub spender_principal: Principal,
 }
 
 impl Default for Settings {
@@ -87,9 +86,8 @@ impl Default for Settings {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
+                private_key: [218u8; 32],
             },
-            spender_principal: Principal::anonymous(),
         }
     }
 }

@@ -27,12 +27,6 @@ pub async fn get_signature_verification_canister_bytecode() -> Vec<u8> {
     get_or_load_wasm(&CANISTER_BYTECODE, "signature_verification.wasm.gz").await
 }
 
-/// Returns the bytecode of the spender canister
-pub async fn get_spender_canister_bytecode() -> Vec<u8> {
-    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "spender.wasm.gz").await
-}
-
 /// Returns the bytecode of the minter evm
 pub async fn get_ck_erc20_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();

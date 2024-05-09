@@ -1,15 +1,12 @@
 use std::time::Duration;
 
-use candid::{Nat, Principal};
 use did::keccak::keccak_hash;
 use did::{H160, U256};
 use eth_signer::Signer;
 use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
-use ic_exports::icrc_types::icrc2::transfer_from::TransferFromError;
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use icrc2_minter::tokens::icrc1::IcrcTransferDst;
 use minter_contract_utils::build_data::test_contracts::WRAPPED_TOKEN_SMART_CONTRACT_CODE;
 use minter_contract_utils::wrapped_token_api::{self, ERC_20_ALLOWANCE};
 use minter_did::error::Error as McError;
@@ -91,7 +88,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
     assert_eq!(wrapped_balance, 0);
-    assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 4);
+    assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 3);
 }
 
 #[tokio::test]
@@ -181,26 +178,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .unwrap();
 
     assert_eq!(allowance, approve_amount.0);
-}
-
-#[tokio::test]
-async fn spender_canister_access_control() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Spender]).await;
-    let spender_client = ctx.client(ctx.canisters().spender(), JOHN);
-
-    let dst_info = IcrcTransferDst {
-        token: Principal::anonymous(),
-        recipient: Principal::anonymous(),
-    };
-
-    let amount = Nat::default();
-    spender_client
-        .update::<_, TransferFromError>(
-            "finish_icrc2_mint",
-            (&dst_info, &[0u8; 32], &amount, &amount),
-        )
-        .await
-        .unwrap_err();
 }
 
 #[tokio::test]

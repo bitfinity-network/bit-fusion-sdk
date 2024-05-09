@@ -663,23 +663,13 @@ pub trait TestContext {
             CanisterType::Icrc2Minter => {
                 println!("Installing default Minter canister...");
                 let evm_canister = self.canisters().get_or_anonymous(CanisterType::Evm);
-                let spender_canister = self.canisters().get_or_anonymous(CanisterType::Spender);
-                let init_data =
-                    minter_canister_init_data(self.admin(), evm_canister, spender_canister);
+                let init_data = minter_canister_init_data(self.admin(), evm_canister);
                 self.install_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
                     .await
                     .unwrap();
 
                 // Wait for initialization of the Minter canister parameters.
                 self.advance_time(Duration::from_secs(2)).await;
-            }
-            CanisterType::Spender => {
-                println!("Installing default Spender canister...");
-                let minter_canister = self.canisters().get_or_anonymous(CanisterType::Icrc2Minter);
-                let init_data = minter_canister;
-                self.install_canister(self.canisters().spender(), wasm, (init_data,))
-                    .await
-                    .unwrap();
             }
             CanisterType::Icrc1Ledger => {
                 println!("Installing default ICRC1 ledger canister...");
@@ -787,11 +777,7 @@ pub trait TestContext {
 
     async fn reinstall_minter_canister(&self) -> Result<()> {
         eprintln!("reinstalling Minter canister");
-        let init_data = minter_canister_init_data(
-            self.admin(),
-            self.canisters().evm(),
-            self.canisters().spender(),
-        );
+        let init_data = minter_canister_init_data(self.admin(), self.canisters().evm());
 
         let wasm = get_icrc2_minter_canister_bytecode().await;
         self.reinstall_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
@@ -839,17 +825,12 @@ pub fn icrc_canister_default_init_args(
     }
 }
 
-pub fn minter_canister_init_data(
-    owner: Principal,
-    evm_principal: Principal,
-    spender_principal: Principal,
-) -> InitData {
+pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> InitData {
     let mut rng = rand::thread_rng();
     let wallet = Wallet::new(&mut rng);
     InitData {
         owner,
         evm_principal,
-        spender_principal,
         signing_strategy: SigningStrategy::Local {
             private_key: wallet.signer().to_bytes().into(),
         },
@@ -974,13 +955,6 @@ impl TestCanisters {
             .expect("signature canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn spender(&self) -> Principal {
-        *self
-            .0
-            .get(&CanisterType::Spender)
-            .expect("spender canister should be initialized (see `TestContext::new()`)")
-    }
-
     pub fn icrc2_minter(&self) -> Principal {
         *self
             .0
@@ -1054,7 +1028,6 @@ pub enum CanisterType {
     Token1,
     Token2,
     Icrc2Minter,
-    Spender,
     CkErc20Minter,
     Btc,
     CkBtcMinter,
@@ -1067,13 +1040,12 @@ impl CanisterType {
     /// EVM and SignatureVerification.
     pub const EVM_TEST_SET: [CanisterType; 2] = [CanisterType::Evm, CanisterType::Signature];
 
-    /// EVM, SignatureVerification, Minter, Spender and Token1.
-    pub const ICRC2_MINTER_TEST_SET: [CanisterType; 5] = [
+    /// EVM, SignatureVerification, Minter and Token1.
+    pub const ICRC2_MINTER_TEST_SET: [CanisterType; 4] = [
         CanisterType::Evm,
         CanisterType::Signature,
         CanisterType::Token1,
         CanisterType::Icrc2Minter,
-        CanisterType::Spender,
     ];
 
     /// EVM, SignatureVerification, Minter, Spender and Token1.
@@ -1099,7 +1071,6 @@ impl CanisterType {
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Icrc2Minter => get_icrc2_minter_canister_bytecode().await,
-            CanisterType::Spender => get_spender_canister_bytecode().await,
             CanisterType::CkErc20Minter => get_ck_erc20_minter_canister_bytecode().await,
             CanisterType::Btc => get_btc_canister_bytecode().await,
             CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
