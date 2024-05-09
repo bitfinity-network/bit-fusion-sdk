@@ -251,7 +251,7 @@ fn validate_utxos(utxo_response: GetUtxosResponse) -> Result<Vec<Utxo>, DepositE
 ///
 /// The IC management canister returns bytes of txid in reversed order,
 /// so we need to undo the operation first before before consuming the output.
-fn reverse_txid_byte_order(utxo: &Utxo) -> Vec<u8> {
+pub fn reverse_txid_byte_order(utxo: &Utxo) -> Vec<u8> {
     utxo.outpoint
         .txid
         .iter()

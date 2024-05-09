@@ -1,6 +1,6 @@
 use std::str::FromStr as _;
 
-use bitcoin::{Address, OutPoint, Txid};
+use bitcoin::{Address, Txid};
 use ethers_core::types::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::MultisigConfig;
@@ -85,17 +85,6 @@ pub async fn brc20_transfer(
         transfer_tx: transfer_tx.to_string(),
         leftover_amount,
     })
-}
-
-pub async fn transfer_utxo(
-    outpoints: &[OutPoint],
-    leftovers_address: Address,
-    dst_address: Address,
-    multisig_config: Option<Multisig>,
-    derivation_path: Vec<Vec<u8>>,
-    network: BitcoinNetwork,
-) -> InscribeResult<Txid> {
-    todo!();
 }
 
 /// Gets the Bitcoin address for the given derivation path.

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use solidity_helper::SolidityContract;
 
 fn main() {
+    /*
     use solidity_helper::compile_solidity_contracts;
     let contracts =
         compile_solidity_contracts(None, None).expect("Should compile solidity smart contracts");
@@ -46,6 +47,7 @@ fn main() {
         "WatermelonToken",
         "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
     );
+    */
 }
 
 /// Loads the contract with the specified name

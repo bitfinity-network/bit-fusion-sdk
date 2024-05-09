@@ -3,10 +3,14 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, FeeRate, OutPoint, TxOut, Txid};
+use bitcoin::{
+    Address, Amount, FeeRate, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Txid, Witness,
+};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::GetUtxosResponse;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::{
+    BitcoinNetwork, GetUtxosResponse, Outpoint, Utxo,
+};
 use ic_stable_structures::CellStructure;
 use inscriber::interface::bitcoin_api;
 use inscriber::ops as Inscriber;
@@ -21,7 +25,7 @@ use crate::constant::NONCE;
 use crate::interface::bridge_api::{BridgeError, NftInscribeStatus, NftMintError, NftMintStatus};
 use crate::interface::get_deposit_address;
 use crate::interface::store::NftInfo;
-use crate::rpc;
+use crate::rpc::{self, reverse_txid_byte_order};
 use crate::state::State;
 
 /// Swap a BTC-NFT for an ERC721.
@@ -37,7 +41,7 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let reveal_tx = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
@@ -250,7 +254,7 @@ async fn withdraw_nft(
         )));
     }
 
-    rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
@@ -294,19 +298,18 @@ async fn withdraw_nft(
             script_pubkey: leftovers_addr.script_pubkey(),
         },
     ];
-    let fee_utxos = match find_fee_utxos(utxos, &fee_rate, &outputs) {
+    let (fee_utxos, fee_amount) = match find_fee_utxos(utxos, &fee_rate, &outputs) {
         None => return Err(BridgeError::Erc721Burn("Insufficient funds".to_string())),
         Some(utxos) => utxos,
     };
-    let mut outpoints = vec![(&nft).into()];
-    outpoints.extend(fee_utxos);
 
     // transfer the UTXO to the destination address
-    let result = Inscriber::transfer_utxo(
-        &outpoints,
+    let result = transfer_utxo(
+        (&nft).into(),
+        &fee_utxos,
+        fee_amount,
         leftovers_addr,
         dst_addr,
-        None,
         derivation_path,
         network,
     )
@@ -333,7 +336,7 @@ fn find_fee_utxos(
     res: GetUtxosResponse,
     fee_rate: &FeeRate,
     outputs: &[TxOut],
-) -> Option<Vec<OutPoint>> {
+) -> Option<(Vec<Utxo>, Amount)> {
     let mut tx_inputs = 2;
     loop {
         let fee = estimate_transaction_fees(
@@ -355,17 +358,52 @@ fn find_fee_utxos(
                 None => return None,
             };
             total_value += next.value;
-            outpoints.push(OutPoint {
-                txid: Txid::from_slice(&next.outpoint.txid).expect("bad txid"),
-                vout: next.outpoint.vout,
-            });
+            outpoints.push(next);
         }
         // check if value is satisfied
         if total_value >= fee.to_sat() {
-            return Some(outpoints);
+            return Some((outpoints, fee));
         } else {
             // try with more inputs
             tx_inputs += 1;
         }
     }
+}
+
+async fn transfer_utxo(
+    utxo: Outpoint,
+    fee_utxos: &[Utxo],
+    fee_amount: Amount,
+    leftovers_address: Address,
+    dst_address: Address,
+    derivation_path: Vec<Vec<u8>>,
+    network: BitcoinNetwork,
+) -> Result<Txid, BridgeError> {
+    let leftovers_amount =
+        Amount::from_sat(fee_utxos.iter().map(|utxo| utxo.value).sum::<u64>()) - fee_amount;
+    let tx_input = fee_utxos
+        .into_iter()
+        .map(|utxo| {
+            let txid = reverse_txid_byte_order(utxo);
+            let mut outpoint = utxo.outpoint;
+            outpoint.txid = txid;
+            outpoint
+        })
+        .chain([utxo])
+        .rev()
+        .map(|utxo| TxIn {
+            previous_output: OutPoint {
+                txid: Txid::from_slice(&utxo.txid).expect("bad txid"),
+                vout: utxo.vout,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::from_consensus(0xffffffff),
+            witness: Witness::new(),
+        })
+        .collect::<Vec<TxIn>>();
+
+    let mut tx_output = vec![TxOut {}];
+
+    //let fee_utxo_amount =
+    todo!();
 }
