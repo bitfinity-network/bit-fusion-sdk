@@ -2,9 +2,14 @@ use core::sync::atomic::Ordering;
 use std::cell::RefCell;
 use std::str::FromStr;
 
+use bitcoin::absolute::LockTime;
 use bitcoin::hashes::Hash;
+use bitcoin::secp256k1::ecdsa::Signature;
+use bitcoin::sighash::SighashCache;
+use bitcoin::transaction::Version;
 use bitcoin::{
-    Address, Amount, FeeRate, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Txid, Witness,
+    Address, Amount, FeeRate, OutPoint, PublicKey, ScriptBuf, Sequence, Transaction, TxIn, TxOut,
+    Txid, Witness,
 };
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -15,11 +20,12 @@ use ic_stable_structures::CellStructure;
 use inscriber::interface::bitcoin_api;
 use inscriber::ops as Inscriber;
 use inscriber::wallet::fees::estimate_transaction_fees;
-use inscriber::wallet::CanisterWallet;
+use inscriber::wallet::{CanisterWallet, EcdsaSigner};
 use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
 use minter_did::id256::Id256;
 use ord_rs::inscription::nft::id::NftId;
 use ord_rs::wallet::ScriptType;
+use ord_rs::ExternalSigner;
 
 use crate::constant::NONCE;
 use crate::interface::bridge_api::{BridgeError, NftInscribeStatus, NftMintError, NftMintStatus};
@@ -254,7 +260,7 @@ async fn withdraw_nft(
         )));
     }
 
-    let reveal_tx = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let (reveal_tx, utxo) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
@@ -298,6 +304,7 @@ async fn withdraw_nft(
             script_pubkey: leftovers_addr.script_pubkey(),
         },
     ];
+
     let (fee_utxos, fee_amount) = match find_fee_utxos(utxos, &fee_rate, &outputs) {
         None => return Err(BridgeError::Erc721Burn("Insufficient funds".to_string())),
         Some(utxos) => utxos,
@@ -305,7 +312,7 @@ async fn withdraw_nft(
 
     // transfer the UTXO to the destination address
     let result = transfer_utxo(
-        (&nft).into(),
+        &utxo,
         &fee_utxos,
         fee_amount,
         leftovers_addr,
@@ -371,7 +378,7 @@ fn find_fee_utxos(
 }
 
 async fn transfer_utxo(
-    utxo: Outpoint,
+    utxo: &Utxo,
     fee_utxos: &[Utxo],
     fee_amount: Amount,
     leftovers_address: Address,
@@ -381,20 +388,19 @@ async fn transfer_utxo(
 ) -> Result<Txid, BridgeError> {
     let leftovers_amount =
         Amount::from_sat(fee_utxos.iter().map(|utxo| utxo.value).sum::<u64>()) - fee_amount;
-    let tx_input = fee_utxos
+    let input = [utxo]
         .into_iter()
+        .chain(fee_utxos)
         .map(|utxo| {
             let txid = reverse_txid_byte_order(utxo);
-            let mut outpoint = utxo.outpoint;
+            let mut outpoint = utxo.outpoint.clone();
             outpoint.txid = txid;
             outpoint
         })
-        .chain([utxo])
-        .rev()
-        .map(|utxo| TxIn {
+        .map(|outpoint| TxIn {
             previous_output: OutPoint {
-                txid: Txid::from_slice(&utxo.txid).expect("bad txid"),
-                vout: utxo.vout,
+                txid: Txid::from_slice(&outpoint.txid).expect("bad txid"),
+                vout: outpoint.vout,
             },
             script_sig: ScriptBuf::new(),
             sequence: Sequence::from_consensus(0xffffffff),
@@ -402,8 +408,88 @@ async fn transfer_utxo(
         })
         .collect::<Vec<TxIn>>();
 
-    let mut tx_output = vec![TxOut {}];
+    let mut output = vec![TxOut {
+        value: Amount::from_sat(utxo.value),
+        script_pubkey: dst_address.script_pubkey(),
+    }];
+    if leftovers_amount > Amount::ZERO {
+        output.push(TxOut {
+            value: leftovers_amount,
+            script_pubkey: leftovers_address.script_pubkey(),
+        });
+    }
+
+    let unsigned_tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input,
+        output,
+    };
+
+    let tx = sign_transaction(
+        &unsigned_tx,
+        &[utxo.clone()],
+        leftovers_address,
+        leftovers_address,
+        derivation_path,
+    )
+    .await?;
 
     //let fee_utxo_amount =
     todo!();
+}
+
+async fn sign_transaction(
+    unsigned_tx: &Transaction,
+    utxos: &[Utxo],
+    holder_btc_addr: Address,
+    holder_btc_pubkey: PublicKey,
+    derivation_path: Vec<Vec<u8>>,
+) -> Result<Transaction, BridgeError> {
+    let mut hash = SighashCache::new(unsigned_tx.clone());
+    let signer = EcdsaSigner { derivation_path };
+    for (index, input) in utxos.iter().enumerate() {
+        let sighash = hash
+            .p2wpkh_signature_hash(
+                index,
+                &holder_btc_addr.script_pubkey(),
+                Amount::from_sat(input.value),
+                bitcoin::EcdsaSighashType::All,
+            )
+            .map_err(|e| InscribeError::SignatureError(e.to_string()))?;
+
+        log::debug!("Signing transaction and verifying signature");
+        let signature = {
+            let msg_hex = hex::encode(sighash);
+            // sign
+
+            let sig_hex = signer.sign_with_ecdsa(&msg_hex).await;
+            let signature = Signature::from_compact(
+                &hex::decode(&sig_hex).map_err(|e| InscribeError::SignatureError(e.to_string()))?,
+            )
+            .map_err(|e| InscribeError::SignatureError(e.to_string()))?;
+
+            // verify
+            if signer
+                .verify_ecdsa(&sig_hex, &msg_hex, &holder_btc_pubkey.to_string())
+                .await
+            {
+                return Err(InscribeError::SignatureError(
+                    "signature verification failed".to_string(),
+                ));
+            }
+            signature
+        };
+
+        log::debug!("signature: {}", signature.serialize_der());
+
+        // append witness
+        let signature = bitcoin::ecdsa::Signature::sighash_all(signature).into();
+        let witness = Witness::p2wpkh(&signature, &spender.pubkey.inner);
+        *hash
+            .witness_mut(index)
+            .ok_or(InscribeError::NoSuchUtxo(index.to_string()))? = witness;
+    }
+
+    Ok(hash.into_transaction())
 }

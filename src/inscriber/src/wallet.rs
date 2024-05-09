@@ -32,7 +32,7 @@ use crate::wallet::utxo_store::UtxoStore;
 
 #[derive(Clone)]
 pub struct EcdsaSigner {
-    derivation_path: Vec<Vec<u8>>,
+    pub derivation_path: Vec<Vec<u8>>,
 }
 
 #[async_trait::async_trait]
