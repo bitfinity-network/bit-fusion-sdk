@@ -110,7 +110,9 @@ pub(crate) async fn fetch_reveal_transaction(
     )
 }
 
-pub(crate) fn parse_and_validate_inscription(reveal_tx: Transaction) -> Result<Brc20, BridgeError> {
+pub(crate) fn parse_and_validate_inscriptions(
+    reveal_tx: Transaction,
+) -> Result<Brc20, BridgeError> {
     let inscriptions = OrdParser::parse_all(&reveal_tx)
         .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?
         .into_iter()

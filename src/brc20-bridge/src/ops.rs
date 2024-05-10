@@ -48,7 +48,7 @@ pub async fn brc20_to_erc20(
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
     log::info!("Parsing BRC20 inscription from transaction");
-    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
+    let brc20 = rpc::parse_and_validate_inscriptions(reveal_tx)
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
     state.borrow_mut().inscriptions_mut().insert(Brc20Token {
@@ -255,7 +255,7 @@ async fn withdraw_brc20(
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
-    let brc20 = rpc::parse_and_validate_inscription(reveal_tx)
+    let brc20 = rpc::parse_and_validate_inscriptions(reveal_tx)
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
         .encode()
         .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
