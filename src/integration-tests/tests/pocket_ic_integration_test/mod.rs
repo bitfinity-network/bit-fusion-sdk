@@ -66,30 +66,6 @@ impl PocketIcTestContext {
             _ => panic!("unexpected caller"),
         }
     }
-
-    pub async fn deploy_canister(
-        &self,
-        canister_type: CanisterType,
-        args: impl ArgumentEncoder + Send,
-    ) -> Principal {
-        let canister = self
-            .create_canister()
-            .await
-            .expect("canister should be created");
-
-        let wasm = canister_type.default_canister_wasm().await;
-
-        self.client
-            .install_canister(
-                canister,
-                wasm,
-                candid::encode_args::<_>(args).unwrap(),
-                Some(self.admin()),
-            )
-            .await;
-
-        canister
-    }
 }
 
 #[async_trait::async_trait]
@@ -222,7 +198,7 @@ impl fmt::Debug for PocketIcTestContext {
 /// - opetaion points for john,
 /// - bridge contract
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
-    let ctx = PocketIcTestContext::new(&CanisterType::MINTER_TEST_SET).await;
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     let bft_bridge = ctx

@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use candid::{CandidType, Principal};
+use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
@@ -16,7 +16,6 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use serde::Deserialize;
 
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
@@ -34,12 +33,6 @@ pub struct BtcBridge {
 }
 
 impl PreUpdate for BtcBridge {}
-
-#[derive(Debug, CandidType, Deserialize)]
-pub struct InitArgs {
-    ck_btc_minter: Principal,
-    ck_btc_ledger: Principal,
-}
 
 impl BtcBridge {
     fn set_timers(&mut self) {

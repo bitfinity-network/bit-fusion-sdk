@@ -14,7 +14,6 @@ WASM_DIR=".artifact"
 IC_COMMIT_HASH="85bd56a70e55b2cea75cae6405ae11243e5fdad8" # 2024-02-21
 EVM_FEATURES="export-api"
 
-
 if
     ! command -v icx-proxy &
     >/dev/null
@@ -142,11 +141,11 @@ build_requested_canisters() {
         cp "$project_dir/src/integration-tests/signature_verification.did" "$WASM_DIR/signature_verification.did"
         cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
 
-        build_canister "spender_canister" "export-api" "spender.wasm" "spender"
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
         build_canister "brc20-bridge" "export-api" "brc20-bridge.wasm" "brc20-bridge"
+        build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
         # Build tools
         build_create_bft_bridge_tool
@@ -162,7 +161,7 @@ build_requested_canisters() {
             signature_verification | spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
-            brc20-bridge| ircr2-minter | erc20-minter | btc-bridge)
+            btc-bridge | brc20-bridge | rune-bridge | ircr2-minter | erc20-minter)
                 build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)

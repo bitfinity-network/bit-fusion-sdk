@@ -64,6 +64,17 @@
         }
       ]
     },
+    "rune-bridge": {
+      "build": "",
+      "candid": ".artifact/rune-bridge.did",
+      "wasm": ".artifact/rune-bridge.wasm.gz",
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    },
     "ic-ckbtc-kyt": {
       "build": "",
       "candid": ".artifact/ic-ckbtc-kyt.did",
@@ -95,6 +106,11 @@
           "log_level": "info"
         }
       }
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943"
     }
   }
 }
