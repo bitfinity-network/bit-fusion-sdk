@@ -19,6 +19,7 @@ if
     >/dev/null
 then
     cargo install icx-proxy --version 0.10.1
+    cargo install ic-wasm
 fi
 
 # Function to print help instructions
@@ -132,11 +133,11 @@ build_requested_canisters() {
         cp "$project_dir/src/integration-tests/signature_verification.did" "$WASM_DIR/signature_verification.did"
         cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
 
-        build_canister "spender_canister" "export-api" "spender.wasm" "spender"
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
         build_canister "btc-nft-bridge" "export-api" "btc-nft-bridge.wasm" "btc-nft-bridge"
+        build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
         # Build tools
         build_create_bft_bridge_tool
@@ -151,6 +152,9 @@ build_requested_canisters() {
                 ;;
             signature_verification | spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
+                ;;
+            btc-bridge | rune-bridge | ircr2-minter | erc20-minter)
+                build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."

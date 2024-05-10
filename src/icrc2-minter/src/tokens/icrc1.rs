@@ -127,15 +127,8 @@ fn cache_ic_token_configuration(config: TokenConfiguration) {
     });
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize, CandidType)]
-pub struct IcrcTransferDst {
-    pub token: Principal,
-    pub recipient: Principal,
-}
-
 #[cfg(test)]
 mod test {
-
     use candid::Nat;
     use ic_exports::icrc_types::icrc1::account::Account;
 

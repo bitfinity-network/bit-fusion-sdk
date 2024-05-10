@@ -194,21 +194,7 @@ contract BFTBridge {
         balance = _userNativeDeposit[to];
         balance += msg.value;
         _userNativeDeposit[to] = balance;
-    }
-    
-    // Withdraw the `amount` of native token from user's address.
-    // Returns user's balance after the operation.
-    function nativeTokenWithdraw(address payable to, uint256 amount) external returns (uint256 balance) {
-        balance = _userNativeDeposit[msg.sender];
-        require(balance >= amount, "Not enough balance on deposit");
-        if (to == payable(0)) {
-            to = payable(msg.sender);
-        }
-
-        to.transfer(amount);
-
-        balance -= amount;
-        _userNativeDeposit[msg.sender] = balance;
+        payable(minterCanisterAddress).transfer(msg.value);
     }
     
     // Returns user's native token deposit balance. 

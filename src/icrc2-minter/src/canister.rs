@@ -123,7 +123,6 @@ impl MinterCanister {
             owner: init_data.owner,
             evm_principal: init_data.evm_principal,
             signing_strategy: init_data.signing_strategy,
-            spender_principal: init_data.spender_principal,
         };
 
         state.reset(settings);
@@ -382,18 +381,21 @@ impl MinterCanister {
             .with_max_retries_policy(u32::MAX);
 
         get_scheduler().borrow_mut().append_task(
-            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
-                sender: caller,
-                amount: reason.amount,
-                operation_id,
-                name,
-                symbol,
-                decimals: token_info.decimals,
-                src_token: reason.icrc2_token_principal,
-                recipient_address: reason.recipient_address,
-                approve_spender,
-                approve_amount,
-            })
+            BridgeTask::PrepareMintOrder(
+                BurntIcrc2Data {
+                    sender: caller,
+                    amount: reason.amount,
+                    operation_id,
+                    name,
+                    symbol,
+                    decimals: token_info.decimals,
+                    src_token: reason.icrc2_token_principal,
+                    recipient_address: reason.recipient_address,
+                    approve_spender,
+                    approve_amount,
+                },
+                true,
+            )
             .into_scheduled(options),
         );
 
@@ -561,7 +563,6 @@ mod test {
         let init_data = InitData {
             owner: owner(),
             evm_principal: Principal::anonymous(),
-            spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -582,7 +583,6 @@ mod test {
         let init_data = InitData {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -699,7 +699,6 @@ mod test {
         let init_data = InitData {
             owner: Principal::anonymous(),
             evm_principal: Principal::anonymous(),
-            spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -765,7 +764,6 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            spender_principal: Principal::anonymous(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -783,7 +781,6 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            spender_principal: Principal::management_canister(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -810,7 +807,6 @@ mod test {
         let init_data = InitData {
             owner: Principal::management_canister(),
             evm_principal: Principal::management_canister(),
-            spender_principal: Principal::management_canister(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },

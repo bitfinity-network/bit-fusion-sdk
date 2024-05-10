@@ -25,7 +25,6 @@ impl Config {
             evm_principal: settings.evm_principal,
             evm_params: None,
             bft_bridge_contract: None,
-            spender_principal: settings.spender_principal,
         };
 
         self.update_data(|data| *data = new_data);
@@ -104,11 +103,6 @@ impl Config {
             result
         })
     }
-
-    /// Returns principal of spender canister.
-    pub fn get_spender_principal(&self) -> Principal {
-        self.with_data(|data| data.get().spender_principal)
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, CandidType, PartialEq, Eq, serde::Serialize)]
@@ -117,7 +111,6 @@ pub struct ConfigData {
     pub evm_principal: Principal,
     pub evm_params: Option<EvmParams>,
     pub bft_bridge_contract: Option<H160>,
-    pub spender_principal: Principal,
 }
 
 impl Default for ConfigData {
@@ -127,7 +120,6 @@ impl Default for ConfigData {
             evm_principal: Principal::anonymous(),
             evm_params: None,
             bft_bridge_contract: None,
-            spender_principal: Principal::anonymous(),
         }
     }
 }
@@ -187,7 +179,6 @@ mod tests {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
-            spender_principal: Principal::anonymous(),
         };
 
         config.reset(settings.clone());
