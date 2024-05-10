@@ -1,16 +1,4 @@
 services:
-  db:
-    container_name: db
-    image: postgres
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
   bitcoind:
     container_name: bitcoind
     image: lncm/bitcoind:v26.0
@@ -23,43 +11,6 @@ services:
     volumes:
       - bitcoin-data:/data/.bitcoin
       - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf
-  ordinals-api:
-    container_name: ordinals-api
-    build:
-      context: .
-      dockerfile: ordinals-api.dockerfile
-    volumes:
-      - ./ordinals-api.env:/app/ordinals-api/.env
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
-  ordhook:
-    container_name: ordhook
-    platform: linux/amd64
-    build:
-      dockerfile: ordhook.dockerfile
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - ./Ordhook.toml:/Ordhook.toml
-    depends_on:
-      - bitcoind
-      - ordinals-api
-  ordinals-explorer:
-    container_name: ordinals-explorer
-    build:
-      context: .
-      dockerfile: ordinals-explorer.dockerfile
-    env_file:
-      - ./ordinals-explorer.env
-    ports:
-      - "1337:3001"
-    volumes:
-      - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
-    depends_on:
-      - ordinals-api
   ord:
     container_name: ord
     build:
