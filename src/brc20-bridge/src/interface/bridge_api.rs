@@ -21,8 +21,8 @@ pub enum BridgeError {
     PublicKeyFromStr(String),
     #[error("{0}")]
     AddressFromPublicKey(String),
-    #[error("{0}")]
-    EcdsaPublicKey(String),
+    #[error("")]
+    BadRequest,
     #[error("{0}")]
     SetTokenSymbol(String),
     #[error("{0}")]

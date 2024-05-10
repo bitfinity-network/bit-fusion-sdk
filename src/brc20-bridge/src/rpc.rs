@@ -14,6 +14,7 @@ use inscriber::constant::UTXO_MIN_CONFIRMATION;
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
 use ordinals::SpacedRune;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::constant::{
@@ -83,31 +84,26 @@ pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
     reveal_tx_id: &str,
 ) -> anyhow::Result<Transaction> {
-    let (ic_btc_network, derivation_path, indexer_url, btc_network) = {
+    let (ic_btc_network, derivation_path, indexer_url) = {
         let state = state.borrow();
         (
             state.ic_btc_network(),
             state.derivation_path(None),
             state.indexer_url(),
-            network_as_str(state.btc_network()),
         )
     };
 
     let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
-
     let tx_id = hex::decode(reveal_tx_id).expect("failed to decode txid to bytes");
 
     let brc20_utxo = find_inscription_utxo(ic_btc_network, bridge_addr, tx_id)
         .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
         .await?;
-
     let tx_id = hex::encode(reverse_txid_byte_order(&brc20_utxo));
 
-    Ok(
-        get_brc20_transaction_by_id(&indexer_url, &tx_id, btc_network)
-            .map_err(|e| BridgeError::GetTransactionById(e.to_string()))
-            .await?,
-    )
+    Ok(get_brc20_transaction_by_id(&indexer_url, &tx_id)
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))
+        .await?)
 }
 
 pub(crate) fn parse_and_validate_inscriptions(
@@ -142,51 +138,44 @@ async fn get_brc20_token_by_ticker(
     base_indexer_url: &str,
     ticker: &str,
 ) -> anyhow::Result<Option<TokenInfo>> {
-    // let url = format!("{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}");
-    let url = format!("{base_indexer_url}/brc-20/tokens/{ticker}");
-    let request_params = CanisterHttpRequestArgument {
-        url,
-        max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
-        method: HttpMethod::GET,
-        headers: vec![HttpHeader {
-            name: "Accept".to_string(),
-            value: "application/json".to_string(),
-        }],
-        body: None,
-        transform: None,
-    };
-
-    let cycles = get_estimated_http_outcall_cycles(&request_params);
-
-    let response = http_request(request_params, cycles)
-        .await
-        .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
-        .0;
-
-    log::info!(
-        "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
-        response.status,
-        response.headers,
-        String::from_utf8_lossy(&response.body)
-    );
-
-    let brc20_resp: Brc20TokenResponse = serde_json::from_slice(&response.body).map_err(|err| {
-        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
+    let payload = http_get_req::<Brc20TokenResponse>(&format!(
+        "{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}"
+    ))
+    .await
+    .map_err(|err| {
+        log::error!("Failed to retrieve BRC20 token details from the indexer: {err:?}");
         BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
     })?;
 
-    Ok(brc20_resp.token)
+    match payload {
+        Some(data) => Ok(data.token),
+        None => Err(BridgeError::FetchBrc20TokenDetails("Nothing found".to_string()).into()),
+    }
 }
 
 async fn get_brc20_transaction_by_id(
     base_indexer_url: &str,
     txid: &str,
-    _network_str: &str,
 ) -> anyhow::Result<Transaction> {
-    let url = format!("{base_indexer_url}/tx/{txid}");
+    let payload = http_get_req::<TransactionHtml>(&format!("{base_indexer_url}/tx/{txid}"))
+        .await
+        .map_err(|err| {
+            log::error!("Failed to retrieve transaction from the indexer: {err:?}");
+            BridgeError::GetTransactionById(format!("{err:?}"))
+        })?;
 
+    match payload {
+        Some(data) => Ok(data.transaction),
+        None => Err(BridgeError::GetTransactionById("Nothing found".to_string()).into()),
+    }
+}
+
+async fn http_get_req<T>(url: &str) -> Result<Option<T>, String>
+where
+    T: DeserializeOwned,
+{
     let request_params = CanisterHttpRequestArgument {
-        url,
+        url: url.to_owned(),
         max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),
         method: HttpMethod::GET,
         headers: vec![HttpHeader {
@@ -199,10 +188,9 @@ async fn get_brc20_transaction_by_id(
 
     let cycles = get_estimated_http_outcall_cycles(&request_params);
 
-    let response = http_request(request_params, cycles)
+    let (response,) = http_request(request_params, cycles)
         .await
-        .map_err(|err| BridgeError::FetchBrc20TokenDetails(format!("{err:?}")))?
-        .0;
+        .map_err(|(_rejection_code, cause)| cause)?;
 
     log::info!(
         "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
@@ -211,12 +199,15 @@ async fn get_brc20_transaction_by_id(
         String::from_utf8_lossy(&response.body)
     );
 
-    let tx_html: TransactionHtml = serde_json::from_slice(&response.body).map_err(|err| {
-        log::error!("Failed to retrieve the reveal transaction from the indexer: {err:?}");
-        BridgeError::GetTransactionById(format!("{err:?}"))
-    })?;
-
-    Ok(tx_html.transaction)
+    if response.status == 200u16 {
+        let payload = serde_json::from_slice::<T>(&response.body).map_err(|x| x.to_string())?;
+        Ok(Some(payload))
+    } else if response.status == 404u16 {
+        log::info!("No resource found at {url}");
+        Ok(None)
+    } else {
+        Err(BridgeError::BadRequest.to_string())
+    }
 }
 
 fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 {
