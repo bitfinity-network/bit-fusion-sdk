@@ -1629,7 +1629,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1927,7 +1927,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "async-trait",
  "candid",
@@ -1978,7 +1978,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "anyhow",
  "candid",
@@ -2043,7 +2043,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "candid",
  "did",
@@ -5567,7 +5567,7 @@ dependencies = [
 [[package]]
 name = "icrc-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6221,7 +6221,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "candid",
  "did",
@@ -6259,7 +6259,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "candid",
  "did",
@@ -8283,7 +8283,7 @@ dependencies = [
 [[package]]
 name = "signature-verification-canister-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=icrc2_minter_without_spender#d9739f6faa741f121880b55f6cd40e5f0fd4b85f"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.18.x#c0ef5c887082f0237e18f7e1848683b221592268"
 dependencies = [
  "candid",
  "did",
