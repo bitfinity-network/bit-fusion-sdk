@@ -29,7 +29,7 @@ pub async fn brc20_to_erc20(
     // NOTE:
     // We can fetch BRC20 token details via an indexer that supports the standard,
     // or we can parse an `ord_rs::Brc20` from the witness section of a `bitcoin::Transaction`.
-    // Either way, the goal is to validate the token details against the received UTXO(s),
+    // Either way, the goal is to parse and validate the token details against the received UTXO(s),
     // before storing the information in state and proceeding with the ERC20 mint.
     let Brc20Token {
         tx_id,

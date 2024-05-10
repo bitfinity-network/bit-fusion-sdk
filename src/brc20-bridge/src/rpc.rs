@@ -17,8 +17,8 @@ use ordinals::SpacedRune;
 use serde::{Deserialize, Serialize};
 
 use crate::constant::{
-    BRC20_TICKER_LEN, HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST,
-    HTTP_OUTCALL_REQ_PER_BYTE_COST, HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
+    HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
+    HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
 };
 use crate::interface::bridge_api::{BridgeError, DepositError};
 use crate::interface::get_deposit_address;
@@ -111,23 +111,20 @@ pub(crate) async fn fetch_reveal_transaction(
 }
 
 pub(crate) fn parse_and_validate_inscription(reveal_tx: Transaction) -> Result<Brc20, BridgeError> {
-    let inscription = OrdParser::parse::<Brc20>(&reveal_tx)
-        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
+    let inscriptions = OrdParser::parse_all(&reveal_tx)
+        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?
+        .into_iter()
+        .map(|parsed| match parsed {
+            OrdParser::Brc20(payload) => Ok(payload),
+            _ => Err(BridgeError::InscriptionParsing(
+                "Not a valid BRC20".to_string(),
+            )),
+        })
+        .collect::<Result<Vec<Brc20>, BridgeError>>();
 
-    match inscription {
-        Some(brc20) => {
-            let ticker = get_brc20_data(&brc20).1;
-            if ticker.len() != BRC20_TICKER_LEN {
-                return Err(BridgeError::InscriptionParsing(
-                    "BRC20 ticker (symbol) should be only 4 letters".to_string(),
-                ));
-            }
-            log::info!("BRC20 inscription validated");
-            Ok(brc20)
-        }
-        None => Err(BridgeError::InscriptionParsing(
-            "No BRC20 inscription associated with this transaction".to_string(),
-        )),
+    match inscriptions {
+        Ok(_brc20s) => todo!(),
+        Err(err) => Err(err),
     }
 }
 
@@ -143,8 +140,8 @@ async fn get_brc20_token_by_ticker(
     base_indexer_url: &str,
     ticker: &str,
 ) -> anyhow::Result<Option<TokenInfo>> {
-    let url = format!("{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}");
-
+    // let url = format!("{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}");
+    let url = format!("{base_indexer_url}/brc-20/tokens/{ticker}");
     let request_params = CanisterHttpRequestArgument {
         url,
         max_response_bytes: Some(HTTP_OUTCALL_MAX_RESPONSE_BYTES),

@@ -32,7 +32,7 @@ jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git", branch = "fix-ord-parser" }
 ordinals = "0.0.8"
 serde = { workspace = true }
 serde_bytes = "0.11"
