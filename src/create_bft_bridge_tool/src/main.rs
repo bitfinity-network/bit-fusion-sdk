@@ -343,7 +343,7 @@ async fn deploy_erc721_bridge(args: DeployErc721Args) {
         to: None,
         nonce: 0u64.into(),
         value: 0u64.into(),
-        gas: 3_000_000u64.into(),
+        gas: 30_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         input,
         signature: SigningMethod::SigningKey(wallet.signer()),
