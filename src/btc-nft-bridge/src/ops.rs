@@ -14,11 +14,10 @@ use bitcoin::{
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetUtxosResponse, Outpoint, Utxo,
+    BitcoinNetwork, GetUtxosResponse, Utxo,
 };
 use ic_stable_structures::CellStructure;
-use inscriber::interface::bitcoin_api;
-use inscriber::ops as Inscriber;
+use inscriber::interface::{bitcoin_api, ecdsa_api};
 use inscriber::wallet::fees::estimate_transaction_fees;
 use inscriber::wallet::{CanisterWallet, EcdsaSigner};
 use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
@@ -260,7 +259,7 @@ async fn withdraw_nft(
         )));
     }
 
-    let (reveal_tx, utxo) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let (_, utxo) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
@@ -419,6 +418,14 @@ async fn transfer_utxo(
         });
     }
 
+    let pubkey = ecdsa_api::ecdsa_public_key(derivation_path.clone())
+        .await
+        .map_err(|e| BridgeError::EcdsaPublicKey(e.to_string()))?
+        .public_key_hex;
+
+    let pubkey =
+        PublicKey::from_str(&pubkey).map_err(|e| BridgeError::PublicKeyFromStr(e.to_string()))?;
+
     let unsigned_tx = Transaction {
         version: Version::TWO,
         lock_time: LockTime::ZERO,
@@ -426,17 +433,18 @@ async fn transfer_utxo(
         output,
     };
 
-    let tx = sign_transaction(
+    let signed_tx = sign_transaction(
         &unsigned_tx,
         &[utxo.clone()],
         leftovers_address,
-        leftovers_address,
+        pubkey,
         derivation_path,
     )
     .await?;
 
-    //let fee_utxo_amount =
-    todo!();
+    bitcoin_api::send_transaction(network, bitcoin::consensus::serialize(&signed_tx)).await;
+
+    Ok(signed_tx.txid())
 }
 
 async fn sign_transaction(
@@ -456,7 +464,7 @@ async fn sign_transaction(
                 Amount::from_sat(input.value),
                 bitcoin::EcdsaSighashType::All,
             )
-            .map_err(|e| InscribeError::SignatureError(e.to_string()))?;
+            .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
 
         log::debug!("Signing transaction and verifying signature");
         let signature = {
@@ -465,16 +473,16 @@ async fn sign_transaction(
 
             let sig_hex = signer.sign_with_ecdsa(&msg_hex).await;
             let signature = Signature::from_compact(
-                &hex::decode(&sig_hex).map_err(|e| InscribeError::SignatureError(e.to_string()))?,
+                &hex::decode(&sig_hex).map_err(|e| BridgeError::SignatureError(e.to_string()))?,
             )
-            .map_err(|e| InscribeError::SignatureError(e.to_string()))?;
+            .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
 
             // verify
             if signer
                 .verify_ecdsa(&sig_hex, &msg_hex, &holder_btc_pubkey.to_string())
                 .await
             {
-                return Err(InscribeError::SignatureError(
+                return Err(BridgeError::SignatureError(
                     "signature verification failed".to_string(),
                 ));
             }
@@ -485,10 +493,10 @@ async fn sign_transaction(
 
         // append witness
         let signature = bitcoin::ecdsa::Signature::sighash_all(signature).into();
-        let witness = Witness::p2wpkh(&signature, &spender.pubkey.inner);
+        let witness = Witness::p2wpkh(&signature, &holder_btc_pubkey.inner);
         *hash
             .witness_mut(index)
-            .ok_or(InscribeError::NoSuchUtxo(index.to_string()))? = witness;
+            .ok_or(BridgeError::NoSuchUtxo(index.to_string()))? = witness;
     }
 
     Ok(hash.into_transaction())

@@ -9,29 +9,33 @@ use super::store::StorableNftId;
 
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
-    #[error("{0}")]
+    #[error("inscription parsing error: {0}")]
     InscriptionParsing(String),
-    #[error("{0}")]
+    #[error("malformed address: {0}")]
     MalformedAddress(String),
-    #[error("{0}")]
+    #[error("fetch nft token details error: {0}")]
     FetchNftTokenDetails(String),
-    #[error("{0}")]
+    #[error("get transaction error: {0}")]
     GetTransactionById(String),
-    #[error("{0}")]
+    #[error("get utxos error: {0}")]
     GetUtxos(String),
-    #[error("{0}")]
+    #[error("no such utxo error: {0}")]
+    NoSuchUtxo(String),
+    #[error("public key from string error: {0}")]
     PublicKeyFromStr(String),
-    #[error("{0}")]
+    #[error("address from public key error: {0}")]
     AddressFromPublicKey(String),
-    #[error("{0}")]
+    #[error("ecdsa public key error: {0}")]
     EcdsaPublicKey(String),
-    #[error("{0}")]
+    #[error("signature error: {0}")]
+    SignatureError(String),
+    #[error("set token symbol error: {0}")]
     SetTokenSymbol(String),
-    #[error("{0}")]
+    #[error("find inscription utxo error: {0}")]
     FindInscriptionUtxo(String),
-    #[error("{0}")]
+    #[error("erc721 mint error: {0}")]
     Erc721Mint(#[from] NftMintError),
-    #[error("{0}")]
+    #[error("erc721 burn error: {0}")]
     Erc721Burn(String),
 }
 

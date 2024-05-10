@@ -7,9 +7,7 @@ use serde::Serialize;
 
 /// Retrieves the public key of this canister at the given derivation path
 /// from IC's ECDSA API.
-pub(crate) async fn ecdsa_public_key(
-    derivation_path: Vec<Vec<u8>>,
-) -> Result<PublicKeyReply, String> {
+pub async fn ecdsa_public_key(derivation_path: Vec<Vec<u8>>) -> Result<PublicKeyReply, String> {
     let request = EcdsaPublicKeyArgument {
         canister_id: None,
         derivation_path,
@@ -26,7 +24,7 @@ pub(crate) async fn ecdsa_public_key(
 }
 
 /// Signs a message with an ECDSA key and returns the signature.
-pub(crate) async fn sign_with_ecdsa(
+pub async fn sign_with_ecdsa(
     derivation_path: Vec<Vec<u8>>,
     message: &str,
 ) -> Result<SignatureReply, String> {
@@ -46,7 +44,7 @@ pub(crate) async fn sign_with_ecdsa(
 }
 
 /// Verifies an ECDSA signature against a message and a public key.
-pub(crate) async fn verify_ecdsa(
+pub async fn verify_ecdsa(
     signature_hex: &str,
     message: &str,
     public_key_hex: &str,
@@ -95,16 +93,16 @@ impl EcdsaKeyIds {
 }
 
 #[derive(CandidType, Serialize, Debug)]
-pub(crate) struct PublicKeyReply {
+pub struct PublicKeyReply {
     pub public_key_hex: String,
 }
 
 #[derive(CandidType, Serialize, Debug)]
-pub(crate) struct SignatureReply {
+pub struct SignatureReply {
     pub signature_hex: String,
 }
 
 #[derive(CandidType, Serialize, Debug)]
-pub(crate) struct SignatureVerificationReply {
+pub struct SignatureVerificationReply {
     pub is_signature_valid: bool,
 }

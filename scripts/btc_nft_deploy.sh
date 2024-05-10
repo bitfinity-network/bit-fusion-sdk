@@ -47,13 +47,6 @@ dfx deploy btc-nft-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
     network = variant { regtest };
-    rpc_config = record {
-      bitcoin_rpc_url = opt \"http://127.0.0.1:18443\";
-      bitcoin_rpc_username = opt \"user\";
-      bitcoin_rpc_password = opt \"pass\";
-      bitcoin_data_dir = null;
-      cookie_file = null;
-    };
     logger = record {
       enable_console = true;
       in_memory_records = opt 10000;
