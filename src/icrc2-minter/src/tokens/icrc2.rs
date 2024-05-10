@@ -1,10 +1,8 @@
-use did::H160;
-use ethers_core::utils;
 use evm_canister_client::IcCanisterClient;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
-use icrc_client::account::{Account, Subaccount};
-use icrc_client::approve::{ApproveArgs, ApproveError};
+use icrc_client::account::Account;
+use icrc_client::transfer::{TransferArg, TransferError};
 use icrc_client::transfer_from::{TransferFromArgs, TransferFromError};
 use icrc_client::IcrcCanisterClient;
 use minter_did::error::{Error, Result};
@@ -33,50 +31,46 @@ pub struct Success {
 ///
 /// - If token canister is not available, returns `Error::InternalError`.
 #[async_recursion::async_recursion]
-pub async fn approve_mint(
+pub async fn mint(
     token: Principal,
-    spender: Account,
+    recipient: Principal,
     amount: Nat,
     repeat_on_bad_fee: bool,
 ) -> Result<Success> {
     let fee = get_token_configuration(token).await?.fee;
-    let full_fee = Nat::from(2_u64) * fee.clone();
 
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
-    // Fee deducted twice because there are two transactions: approve and transferFrom.
-    if amount < full_fee {
+    if amount < fee {
         return Err(Error::InvalidBurnOperation(format!(
-            "{} tokens is not enough to pay double fee {}",
-            amount, full_fee
+            "{} tokens is not enough to pay transfer fee {}",
+            amount, fee
         )));
     }
 
     // Fee deduction for approve operation.
     let effective_amount = amount.clone() - fee.clone();
 
-    let args = ApproveArgs {
-        from_subaccount: None,
-        spender,
-        amount: effective_amount.clone(),
-        expected_allowance: Some(0_u64.into()),
-        expires_at: Some(u64::MAX),
-        fee: Some(fee),
+    let args = TransferArg {
+        to: recipient.into(),
         memo: None,
-        created_at_time: None,
+        amount: effective_amount.clone(),
+        fee: Some(fee),
+        from_subaccount: None,
+        created_at_time: None, // Todo: set the time to prevent double spend
     };
 
-    let approve_result = icrc_client.icrc2_approve(args).await?;
+    let transfer_result = icrc_client.icrc1_transfer(args).await?;
 
     if repeat_on_bad_fee {
-        if let Err(ApproveError::BadFee { .. }) = &approve_result {
+        if let Err(TransferError::BadFee { .. }) = &transfer_result {
             icrc1::refresh_token_configuration(token).await?;
-            return approve_mint(token, spender, amount, false).await;
+            return mint(token, recipient, amount, false).await;
         }
     }
 
     Ok(Success {
-        tx_id: approve_result.map_err(Error::Icrc2ApproveError)?,
+        tx_id: transfer_result.map_err(Error::Icrc2TransferError)?,
         amount: effective_amount,
     })
 }
@@ -116,22 +110,4 @@ pub async fn burn(
         tx_id: transfer_result.map_err(Error::Icrc2TransferFromError)?,
         amount,
     })
-}
-
-/// Generates a subaccount for which transferFrom will be called.
-pub fn approve_subaccount(
-    user: H160,
-    operation_id: u32,
-    chain_id: u32,
-    to_token: Principal,
-    recipient: Principal,
-) -> Subaccount {
-    let mut bytes = Vec::with_capacity(128);
-    bytes.extend_from_slice(user.0.as_bytes());
-    bytes.extend_from_slice(&operation_id.to_be_bytes());
-    bytes.extend_from_slice(&chain_id.to_be_bytes());
-    bytes.extend_from_slice(to_token.as_slice());
-    bytes.extend_from_slice(recipient.as_slice());
-
-    utils::keccak256(bytes)
 }
