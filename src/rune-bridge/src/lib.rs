@@ -5,6 +5,7 @@ pub mod ledger;
 pub mod memory;
 pub mod ops;
 pub mod orders_store;
+pub mod rune_info;
 pub mod scheduler;
 pub mod state;
 

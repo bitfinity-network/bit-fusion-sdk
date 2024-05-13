@@ -29,7 +29,7 @@ ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 k256 = { workspace = true }
 log = { workspace = true }
-minter-did = { workspace = true }
+minter-did = { workspace = true, features = ["runes"] }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }

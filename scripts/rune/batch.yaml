@@ -69,7 +69,7 @@ inscriptions:
   #  # inscription metaprotocol (optional)
   #  metaprotocol: DOPEPROTOCOL-42069
   #
-  - file: ../ckERC20/cat.jpg
+  - file: ./scripts/rune/cat.jpg
     destination: bcrt1pjarq93se7upem8yt246njzmfg37yfjmx7f6wwvfmuuvsw2lwkn4qjw6w09
     metadata:
       author: Satoshi Nakamoto

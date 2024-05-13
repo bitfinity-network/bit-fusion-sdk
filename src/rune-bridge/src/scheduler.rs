@@ -170,6 +170,7 @@ impl Task for RuneBridgeTask {
             RuneBridgeTask::MintBtc(BurntEventData {
                 recipient_id,
                 amount,
+                to_token,
                 ..
             }) => {
                 log::info!("ERC20 burn event received");
@@ -190,13 +191,27 @@ impl Task for RuneBridgeTask {
                     )));
                 };
 
+                let Some(token_id) = Id256::from_slice(&to_token) else {
+                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
+                        format!("Failed to decode token id from the value {to_token:?}"),
+                    )));
+                };
+
+                let Ok(rune_id) = token_id.try_into() else {
+                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
+                        format!("Failed to decode rune id from the token id {to_token:?}"),
+                    )));
+                };
+
                 Box::pin(async move {
-                    let tx_id =
-                        crate::ops::withdraw(&get_state(), amount, address.assume_checked())
-                            .await
-                            .map_err(|err| {
-                                SchedulerError::TaskExecutionFailed(format!("{err:?}"))
-                            })?;
+                    let tx_id = crate::ops::withdraw(
+                        &get_state(),
+                        amount,
+                        rune_id,
+                        address.assume_checked(),
+                    )
+                    .await
+                    .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
                     log::info!("Created withdrawal transaction: {tx_id}",);
 
