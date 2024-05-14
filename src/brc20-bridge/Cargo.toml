@@ -20,6 +20,7 @@ eth-signer = { workspace = true, features = ["ic_sign"] }
 futures = { workspace = true }
 hex = "0.4"
 ic-canister = { workspace = true }
+ic-cdk = "=0.13.2"
 ic-crypto-getrandom-for-wasm = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-crypto-getrandom-for-wasm", tag = "v0.15.x" }
 ic-exports = { workspace = true }
 ic-log = { workspace = true }

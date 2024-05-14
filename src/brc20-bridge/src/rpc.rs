@@ -1,9 +1,6 @@
 use std::cell::RefCell;
-use std::str::FromStr;
 
-use bitcoin::{Address, Network, Transaction, Txid};
-use clap::ValueEnum;
-use futures::TryFutureExt;
+use bitcoin::Transaction;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, Utxo,
 };
@@ -13,44 +10,31 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 use inscriber::constant::UTXO_MIN_CONFIRMATION;
 use inscriber::interface::bitcoin_api;
 use ord_rs::{Brc20, OrdParser};
-use ordinals::SpacedRune;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 
 use crate::constant::{
     HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
     HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
 };
 use crate::interface::bridge_api::{BridgeError, DepositError};
-use crate::interface::get_deposit_address;
-use crate::interface::store::Brc20Token;
+use crate::interface::store::{Brc20Id, Brc20Token, StorableBrc20};
+use crate::interface::{get_deposit_address, Brc20TokenResponse, TokenInfo, TransactionHtml};
 use crate::state::State;
 
+/// WIP: https://infinityswap.atlassian.net/browse/EPROD-858
+///
 /// Retrieves and validates the details of a BRC20 token given its ticker.
 pub async fn fetch_brc20_token_details(
     state: &RefCell<State>,
     tick: String,
-    holder: String,
-) -> anyhow::Result<Brc20Token> {
-    let (network, indexer_url) = {
-        let state = state.borrow();
-        (state.btc_network(), state.indexer_url())
-    };
+) -> anyhow::Result<TokenInfo> {
+    let indexer_url = { state.borrow().indexer_url() };
 
-    // check that BTC address is valid and/or
-    // corresponds to the network.
-    is_valid_btc_address(&holder, network)?;
-
-    let TokenInfo {
-        tx_id,
-        address,
-        ticker,
-        ..
-    } = match get_brc20_token_by_ticker(&indexer_url, &tick)
+    let token_info = match get_brc20_token_by_ticker(&indexer_url, &tick)
         .await
         .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
     {
-        Some(token) => token,
+        Some(payload) => payload,
         None => {
             return Err(
                 BridgeError::FetchBrc20TokenDetails("No BRC20 token found".to_string()).into(),
@@ -58,22 +42,16 @@ pub async fn fetch_brc20_token_details(
         }
     };
 
-    if address != holder && ticker != tick {
-        log::error!(
-            "Token details mismatch. Given: {:?}. Expected: {:?}",
-            (tick, holder),
-            (ticker, address)
-        );
+    // TODO: Add more robust validation checks
+    let ticker = token_info.clone().ticker;
+    if ticker != tick {
+        log::error!("Token tick mismatch. Given: {tick}. Expected: {ticker}");
         return Err(
             BridgeError::FetchBrc20TokenDetails("Incorrect token details".to_string()).into(),
         );
     }
 
-    Ok(Brc20Token {
-        ticker,
-        holder: address,
-        tx_id,
-    })
+    Ok(token_info)
 }
 
 /// Retrieves (and re-constructs) the reveal transaction by its ID.
@@ -82,7 +60,7 @@ pub async fn fetch_brc20_token_details(
 /// because it contains the actual BRC20 inscription that needs to be parsed.
 pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
-    reveal_tx_id: &str,
+    tx_id: &str,
 ) -> anyhow::Result<Transaction> {
     let (ic_btc_network, derivation_path, indexer_url) = {
         let state = state.borrow();
@@ -94,36 +72,55 @@ pub(crate) async fn fetch_reveal_transaction(
     };
 
     let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
-    let tx_id = hex::decode(reveal_tx_id).expect("failed to decode txid to bytes");
 
-    let brc20_utxo = find_inscription_utxo(ic_btc_network, bridge_addr, tx_id)
-        .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
-        .await?;
-    let tx_id = hex::encode(reverse_txid_byte_order(&brc20_utxo));
+    let transaction = http_get_req::<TransactionHtml>(&format!("{indexer_url}/tx/{tx_id}"))
+        .await
+        .map_err(|err| {
+            log::error!("Failed to retrieve transaction from the indexer: {err:?}");
+            BridgeError::GetTransactionById(format!("{err:?}"))
+        })?
+        .ok_or_else(|| BridgeError::GetTransactionById("Transaction not found.".to_string()))?;
 
-    Ok(get_brc20_transaction_by_id(&indexer_url, &tx_id)
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))
-        .await?)
+    let txid_bytes = hex::decode(tx_id).map_err(|err| {
+        log::error!("Failed to decode transaction ID {tx_id}: {err:?}");
+        BridgeError::GetTransactionById("Invalid transaction ID format.".to_string())
+    })?;
+
+    // Validate UTXOs associated with the transaction ID
+    let matching_utxos = find_inscription_utxos(ic_btc_network, bridge_addr, txid_bytes).await?;
+
+    if matching_utxos.is_empty() {
+        log::warn!("Given transaction ID does not match any of the UTXOs txid.");
+        return Err(BridgeError::GetTransactionById(
+            "Transaction ID mismatch between the retrieved transaction and UTXOs.".to_string(),
+        )
+        .into());
+    }
+
+    Ok(transaction.transaction)
 }
 
 pub(crate) fn parse_and_validate_inscriptions(
     reveal_tx: Transaction,
-) -> Result<Brc20, BridgeError> {
-    let inscriptions = OrdParser::parse_all(&reveal_tx)
-        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?
-        .into_iter()
-        .map(|parsed| match parsed {
-            OrdParser::Brc20(payload) => Ok(payload),
-            _ => Err(BridgeError::InscriptionParsing(
-                "Not a valid BRC20".to_string(),
-            )),
-        })
-        .collect::<Result<Vec<Brc20>, BridgeError>>();
+) -> Result<Vec<StorableBrc20>, BridgeError> {
+    let parsed_data = OrdParser::parse_all(&reveal_tx)
+        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
 
-    match inscriptions {
-        Ok(_brc20s) => todo!(),
-        Err(err) => Err(err),
-    }
+    parsed_data.iter().try_fold(
+        Vec::new(),
+        |mut acc, (token_id, inscription)| match inscription {
+            OrdParser::Brc20(brc20) => {
+                acc.push(StorableBrc20 {
+                    token_id: Brc20Id(*token_id),
+                    token: Brc20Token(brc20.clone()),
+                });
+                Ok(acc)
+            }
+            _ => Err(BridgeError::InscriptionParsing(
+                "Non-BRC20 inscription found".to_string(),
+            )),
+        },
+    )
 }
 
 pub(crate) fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
@@ -150,23 +147,6 @@ async fn get_brc20_token_by_ticker(
     match payload {
         Some(data) => Ok(data.token),
         None => Err(BridgeError::FetchBrc20TokenDetails("Nothing found".to_string()).into()),
-    }
-}
-
-async fn get_brc20_transaction_by_id(
-    base_indexer_url: &str,
-    txid: &str,
-) -> anyhow::Result<Transaction> {
-    let payload = http_get_req::<TransactionHtml>(&format!("{base_indexer_url}/tx/{txid}"))
-        .await
-        .map_err(|err| {
-            log::error!("Failed to retrieve transaction from the indexer: {err:?}");
-            BridgeError::GetTransactionById(format!("{err:?}"))
-        })?;
-
-    match payload {
-        Some(data) => Ok(data.transaction),
-        None => Err(BridgeError::GetTransactionById("Nothing found".to_string()).into()),
     }
 }
 
@@ -235,59 +215,35 @@ fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 
     http_outcall_cost
 }
 
-fn network_as_str(network: Network) -> &'static str {
-    match network {
-        Network::Testnet => "/testnet",
-        Network::Regtest => "/regtest",
-        Network::Signet => "/signet",
-        _ => "",
-    }
-}
-
-fn is_valid_btc_address(addr: &str, network: Network) -> Result<bool, BridgeError> {
-    let network_str = network_as_str(network);
-
-    if !Address::from_str(addr)
-        .expect("Failed to convert to bitcoin address")
-        .is_valid_for_network(network)
-    {
-        log::error!("The given bitcoin address {addr} is not valid for {network_str}");
-        return Err(BridgeError::MalformedAddress(addr.to_string()));
-    }
-
-    Ok(true)
-}
-
 /// Validates a reveal transaction ID by checking if it matches
-/// the transaction ID of the received UTXO.
+/// the transaction IDs of the received UTXOs and returns all matching UTXOs.
 ///
-/// TODO: 1. reduce latency by using derivation_path
-///       2. filter out pending UTXOs
-async fn find_inscription_utxo(
+/// TODO: reduce latency by using derivation_path
+async fn find_inscription_utxos(
     network: BitcoinNetwork,
     address: String,
     txid: Vec<u8>,
-) -> Result<Utxo, BridgeError> {
+) -> Result<Vec<Utxo>, BridgeError> {
     let utxo_response = bitcoin_api::get_utxos(network, address)
         .await
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
+        .map_err(|e| BridgeError::FindInscriptionUtxos(e.to_string()))?;
 
     let validated_utxos = validate_utxos(utxo_response)
-        .map_err(|err| BridgeError::FindInscriptionUtxo(format!("{err:?}")))?;
+        .map_err(|err| BridgeError::FindInscriptionUtxos(format!("{err:?}")))?;
 
-    match validated_utxos
-        .iter()
-        .find(|&utxo| reverse_txid_byte_order(utxo) == txid)
-        .cloned()
-    {
-        Some(utxo) => Ok(utxo),
-        None => {
-            let tx_id = hex::encode(txid);
-            log::info!("No matching UTXO found for transaction ID {tx_id}");
-            Err(BridgeError::FindInscriptionUtxo(
-                "No matching UTXO found".to_string(),
-            ))
-        }
+    let matching_utxos = validated_utxos
+        .into_iter()
+        .filter(|utxo| reverse_txid_byte_order(&utxo.outpoint.txid) == txid)
+        .collect::<Vec<Utxo>>();
+
+    if matching_utxos.is_empty() {
+        let tx_id = hex::encode(txid);
+        log::info!("No matching UTXOs found for transaction ID {tx_id}");
+        Err(BridgeError::FindInscriptionUtxos(
+            "No UTXOs found".to_string(),
+        ))
+    } else {
+        Ok(matching_utxos)
     }
 }
 
@@ -314,105 +270,6 @@ fn validate_utxos(utxo_response: GetUtxosResponse) -> Result<Vec<Utxo>, DepositE
 ///
 /// The IC management canister returns bytes of txid in reversed order,
 /// so we need to undo the operation first before before consuming the output.
-fn reverse_txid_byte_order(utxo: &Utxo) -> Vec<u8> {
-    utxo.outpoint
-        .txid
-        .iter()
-        .copied()
-        .rev()
-        .collect::<Vec<u8>>()
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct TransactionHtml {
-    chain: Chain,
-    etching: Option<SpacedRune>,
-    inscription_count: u32,
-    transaction: Transaction,
-    txid: Txid,
-}
-
-// To avoid pulling the entire `ord` crate into our dependencies, the following code is
-// copied from https://github.com/ordinals/ord/blob/master/src/chain.rs
-
-#[derive(Default, ValueEnum, Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-enum Chain {
-    #[default]
-    #[value(alias("main"))]
-    Mainnet,
-    #[value(alias("test"))]
-    Testnet,
-    Signet,
-    Regtest,
-}
-
-impl From<Chain> for Network {
-    fn from(chain: Chain) -> Network {
-        match chain {
-            Chain::Mainnet => Network::Bitcoin,
-            Chain::Testnet => Network::Testnet,
-            Chain::Signet => Network::Signet,
-            Chain::Regtest => Network::Regtest,
-        }
-    }
-}
-
-impl std::fmt::Display for Chain {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Mainnet => "mainnet",
-                Self::Regtest => "regtest",
-                Self::Signet => "signet",
-                Self::Testnet => "testnet",
-            }
-        )
-    }
-}
-
-impl std::str::FromStr for Chain {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "mainnet" => Ok(Self::Mainnet),
-            "regtest" => Ok(Self::Regtest),
-            "signet" => Ok(Self::Signet),
-            "testnet" => Ok(Self::Testnet),
-            _ => anyhow::bail!("invalid chain `{s}`"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct Brc20TokenResponse {
-    token: Option<TokenInfo>,
-    supply: Option<TokenSupply>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct TokenInfo {
-    id: String,
-    number: u32,
-    block_height: u32,
-    tx_id: String,
-    address: String,
-    ticker: String,
-    max_supply: String,
-    mint_limit: String,
-    decimals: u8,
-    deploy_timestamp: u64,
-    minted_supply: String,
-    tx_count: u32,
-    self_mint: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-struct TokenSupply {
-    max_supply: String,
-    minted_supply: String,
-    holders: u32,
+fn reverse_txid_byte_order(tx_id: &[u8]) -> Vec<u8> {
+    tx_id.iter().copied().rev().collect::<Vec<u8>>()
 }

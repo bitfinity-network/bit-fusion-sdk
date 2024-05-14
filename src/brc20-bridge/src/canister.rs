@@ -23,8 +23,7 @@ use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
 };
 use crate::interface;
-use crate::interface::bridge_api::{BridgeError, Erc20MintStatus};
-use crate::interface::store::Brc20Token;
+use crate::interface::bridge_api::{BridgeError, DepositBrc20Args, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
 use crate::state::{BftBridgeConfig, Brc20BridgeConfig, State};
@@ -50,6 +49,17 @@ impl Brc20Bridge {
         }
 
         self.set_timers();
+    }
+
+    #[update]
+    pub async fn brc20_to_erc20(
+        &mut self,
+        brc20: DepositBrc20Args,
+        dst_eth_addr: H160,
+    ) -> Result<Erc20MintStatus, BridgeError> {
+        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20)
+            .await
+            .map_err(BridgeError::Erc20Mint)
     }
 
     #[update]
@@ -137,17 +147,6 @@ impl Brc20Bridge {
             network,
         )
         .await
-    }
-
-    #[update]
-    pub async fn brc20_to_erc20(
-        &mut self,
-        brc20: Brc20Token,
-        dst_eth_addr: H160,
-    ) -> Result<Erc20MintStatus, BridgeError> {
-        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20)
-            .await
-            .map_err(BridgeError::Erc20Mint)
     }
 
     /// Returns EVM address of the canister.

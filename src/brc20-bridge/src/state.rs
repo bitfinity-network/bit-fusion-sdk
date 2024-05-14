@@ -132,8 +132,8 @@ impl State {
         self.bft_config = bft_config;
     }
 
-    pub fn has_brc20(&self, reveal_txid: &str) -> bool {
-        self.inscriptions.has_inscription(reveal_txid)
+    pub fn has_brc20(&self, iid: &str) -> bool {
+        self.inscriptions.has_inscription(iid)
     }
 
     pub fn indexer_url(&self) -> String {

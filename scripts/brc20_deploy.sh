@@ -161,9 +161,6 @@ sleep 5
 $bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
 
 sleep 3
-HOLDER=$(echo "$inscription_res" | jq -r '.inscriptions[0].destination')
-echo "Owner of inscription: $HOLDER"
-
 BRC20_ID=$(echo "$inscription_res" | jq -r '.inscriptions[0].id')
 echo "BRC20 inscription ID: $BRC20_ID"
 
@@ -207,7 +204,7 @@ dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
 TICKER="kobp"
 
-BRC20="record { tx_id = \"$TXID\"; ticker = \"$TICKER\"; holder = \"$HOLDER\" }"
+BRC20="record { tx_id = \"$TXID\"; ticker = \"$TICKER\"; }"
 sleep 10
 
 for i in 1 2 3; do

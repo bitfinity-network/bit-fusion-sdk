@@ -8,37 +8,29 @@ use inscriber::interface::Brc20TransferTransactions;
 use inscriber::ops as Inscriber;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use ord_rs::Inscription as _;
+use ord_rs::{Inscription as _, InscriptionId};
 
 use crate::constant::NONCE;
 use crate::interface::bridge_api::{
-    Brc20InscribeStatus, BridgeError, Erc20MintError, Erc20MintStatus,
+    Brc20InscribeStatus, BridgeError, DepositBrc20Args, Erc20MintError, Erc20MintStatus,
 };
-use crate::interface::store::Brc20Token;
 use crate::rpc;
 use crate::state::State;
 
-/// Swap a BRC20 for an ERC20.
+/// Swaps a BRC20 for an ERC20.
 ///
 /// This burns a BRC20 and mints an equivalent ERC20.
 pub async fn brc20_to_erc20(
     state: &RefCell<State>,
     eth_address: H160,
-    brc20: Brc20Token,
+    brc20: DepositBrc20Args,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    // NOTE:
-    // We can fetch BRC20 token details via an indexer that supports the standard,
-    // or we can parse an `ord_rs::Brc20` from the witness section of a `bitcoin::Transaction`.
-    // Either way, the goal is to parse and validate the token details against the received UTXO(s),
-    // before storing the information in state and proceeding with the ERC20 mint.
-    let Brc20Token {
-        tx_id,
-        ticker,
-        holder,
-    } = brc20;
+    let DepositBrc20Args { tx_id, ticker: _ } = brc20;
 
+    // TODO: https://infinityswap.atlassian.net/browse/EPROD-858
+    //
     // log::info!("Fetching BRC20 token details");
-    // let fetched_token = rpc::fetch_brc20_token_details(state, ticker.clone(), holder.clone())
+    // let fetched_token = rpc::fetch_brc20_token_details(state, ticker.clone())
     //     .await
     //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
@@ -47,17 +39,19 @@ pub async fn brc20_to_erc20(
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
-    log::info!("Parsing BRC20 inscription from transaction");
-    let brc20 = rpc::parse_and_validate_inscriptions(reveal_tx)
+    log::info!("Parsing BRC20 inscriptions from transaction");
+    let storable_brc20s = rpc::parse_and_validate_inscriptions(reveal_tx)
         .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
 
-    state.borrow_mut().inscriptions_mut().insert(Brc20Token {
-        tx_id,
-        ticker,
-        holder,
-    });
+    state
+        .borrow_mut()
+        .inscriptions_mut()
+        .write_all(&storable_brc20s);
 
-    let (amount, tick) = rpc::get_brc20_data(&brc20);
+    // TODO: Get BRC20 data for all inscriptions
+    //
+    let (amount, tick) = rpc::get_brc20_data(storable_brc20s[0].actual_brc20()); // for now!
+
     // Set the token symbol using the tick (symbol) from the BRC20
     state
         .borrow_mut()
@@ -151,7 +145,7 @@ fn store_mint_order(
     nonce: u32,
 ) {
     let mut state = state.borrow_mut();
-    let sender_chain_id = state.btc_chain_id();
+    let sender_chain_id = state.erc20_chain_id();
     let sender = Id256::from_evm_address(eth_address, sender_chain_id);
     state
         .mint_orders_mut()
@@ -228,10 +222,10 @@ async fn send_mint_order(
 pub async fn erc20_to_brc20(
     state: &RefCell<State>,
     request_id: u32,
-    reveal_txid: String,
+    brc20_iid: String,
     dst_addr: &str,
 ) -> Result<Brc20InscribeStatus, BridgeError> {
-    let tx_ids = withdraw_brc20(state, request_id, &reveal_txid, dst_addr)
+    let tx_ids = withdraw_brc20(state, request_id, &brc20_iid, dst_addr)
         .await
         .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
 
@@ -241,24 +235,24 @@ pub async fn erc20_to_brc20(
 async fn withdraw_brc20(
     state: &RefCell<State>,
     request_id: u32,
-    reveal_txid: &str,
+    brc20_iid: &str,
     dst_addr: &str,
 ) -> Result<Brc20TransferTransactions, BridgeError> {
-    if !state.borrow().has_brc20(reveal_txid) {
+    if !state.borrow().has_brc20(brc20_iid) {
         return Err(BridgeError::Brc20Withdraw(format!(
-            "Specified tx ID ({}) not associated with any BRC20 inscription",
-            reveal_txid
+            "Specified BRC20 inscription ID ({}) not found",
+            brc20_iid
         )));
     }
 
-    let reveal_tx = rpc::fetch_reveal_transaction(state, reveal_txid)
-        .await
-        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
+    let inscriptions = state.borrow().inscriptions().read_all();
 
-    let brc20 = rpc::parse_and_validate_inscriptions(reveal_tx)
-        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?
+    // TODO: handle withdrawal of all BRC20s in store
+    //
+    let brc20 = inscriptions[0]
+        .actual_brc20()
         .encode()
-        .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
+        .map_err(|err| BridgeError::Brc20Withdraw(err.to_string()))?; // for now!
 
     let (network, derivation_path) = {
         let state = state.borrow();
@@ -284,9 +278,11 @@ async fn withdraw_brc20(
 
     let mut state = state.borrow_mut();
     if result.is_ok() {
+        let brc20_iid = InscriptionId::parse_from_str(brc20_iid)
+            .expect("Failed to parse InscriptionId from string");
         state
             .inscriptions_mut()
-            .remove(reveal_txid.to_string())
+            .remove(brc20_iid)
             .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
 
         state.burn_requests_mut().set_transferred(request_id);

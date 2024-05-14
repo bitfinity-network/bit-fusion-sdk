@@ -5,23 +5,17 @@ use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::store::Brc20Token;
-
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
     #[error("{0}")]
     InscriptionParsing(String),
     #[error("{0}")]
-    MalformedAddress(String),
+    GetInscriptions(String),
     #[error("{0}")]
     FetchBrc20TokenDetails(String),
     #[error("{0}")]
     GetTransactionById(String),
-    #[error("{0}")]
-    PublicKeyFromStr(String),
-    #[error("{0}")]
-    AddressFromPublicKey(String),
-    #[error("")]
+    #[error("invalid https request params")]
     BadRequest,
     #[error("{0}")]
     SetTokenSymbol(String),
@@ -30,7 +24,7 @@ pub enum BridgeError {
     #[error("{0}")]
     Erc20Mint(#[from] Erc20MintError),
     #[error("{0}")]
-    FindInscriptionUtxo(String),
+    FindInscriptionUtxos(String),
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
@@ -55,10 +49,14 @@ pub enum DepositError {
 pub struct MintErc20Args {
     /// User's ETH address
     pub eth_address: H160,
-    /// User's BTC address
-    pub btc_address: String,
     /// BRC20 token info
-    pub brc20_token: Brc20Token,
+    pub brc20_token: DepositBrc20Args,
+}
+
+#[derive(Debug, CandidType, Deserialize, Serialize, Clone, Eq, PartialEq)]
+pub struct DepositBrc20Args {
+    pub tx_id: String,
+    pub ticker: String,
 }
 
 /// Status of an ERC20 to a BRC20 swap
