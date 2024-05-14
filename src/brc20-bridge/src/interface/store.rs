@@ -123,42 +123,6 @@ impl StorableBrc20 {
     }
 }
 
-// pub type RevealTxId = String;
-
-// pub struct Brc20Store {
-//     inner: StableBTreeMap<RevealTxId, Brc20Token, VirtualMemory<DefaultMemoryImpl>>,
-// }
-
-// impl Default for Brc20Store {
-//     fn default() -> Self {
-//         Self {
-//             inner: StableBTreeMap::new(MEMORY_MANAGER.with(|mm| mm.get(BRC20_STORE_MEMORY_ID))),
-//         }
-//     }
-// }
-
-// impl Brc20Store {
-//     pub fn get_token_info(&self, txid: &str) -> Option<Brc20Token> {
-//         self.inner.get(&txid.to_string())
-//     }
-
-//     pub fn insert(&mut self, token_info: Brc20Token) {
-//         self.inner
-//             .insert(token_info.tx_id.clone(), token_info.clone());
-//     }
-
-//     pub fn remove(&mut self, txid: String) -> Result<(), String> {
-//         match self.inner.remove(&txid) {
-//             Some(_v) => Ok(()),
-//             None => Err("Token not found in store".to_string()),
-//         }
-//     }
-
-//     pub(crate) fn has_inscription(&self, txid: &str) -> bool {
-//         self.get_token_info(txid).is_some()
-//     }
-// }
-
 impl Default for Brc20Store {
     fn default() -> Self {
         Self {
@@ -205,25 +169,6 @@ impl Brc20Store {
         self.inner.get(&Brc20Id(iid))
     }
 }
-
-// #[derive(Debug, CandidType, Deserialize, Serialize, Clone, Eq, PartialEq)]
-// pub struct Brc20Token {
-//     pub tx_id: RevealTxId,
-//     pub ticker: String,
-//     pub holder: String,
-// }
-
-// impl Storable for Brc20Token {
-//     fn to_bytes(&self) -> Cow<[u8]> {
-//         Cow::Owned(Encode!(&(self,)).expect("serialization failed"))
-//     }
-
-//     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-//         Decode!(&bytes, (Self,)).expect("deserialization failed").0
-//     }
-
-//     const BOUND: Bound = Bound::Unbounded;
-// }
 
 pub struct MintOrdersStore(MintOrders<VirtualMemory<DefaultMemoryImpl>>);
 
