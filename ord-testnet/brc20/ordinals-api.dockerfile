@@ -3,8 +3,9 @@ FROM node:18-alpine
 WORKDIR /app
 RUN apk add --no-cache --virtual .build-deps git
 
-# RUN git clone https://github.com/hirosystems/ordinals-api
 RUN git clone -b patch-genesis-block https://github.com/kobby-pentangeli/ordinals-api
+# RUN git clone -b fix/ordhook-ingestion https://github.com/hirosystems/ordinals-api
+# RUN git clone https://github.com/hirosystems/ordinals-api
 WORKDIR /app/ordinals-api
 RUN git fetch --all --tags
 

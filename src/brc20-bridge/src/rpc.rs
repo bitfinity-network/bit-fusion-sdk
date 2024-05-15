@@ -26,11 +26,11 @@ use crate::state::State;
 /// Retrieves and validates the details of a BRC20 token given its ticker.
 pub async fn fetch_brc20_token_details(
     state: &RefCell<State>,
-    tick: String,
+    tick: &str,
 ) -> anyhow::Result<TokenInfo> {
-    let indexer_url = { state.borrow().indexer_url() };
+    let indexer_url = { state.borrow().brc20_indexer_url() };
 
-    let token_info = match get_brc20_token_by_ticker(&indexer_url, &tick)
+    let token_info = match get_brc20_token_by_ticker(&indexer_url, tick)
         .await
         .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
     {
@@ -67,7 +67,7 @@ pub(crate) async fn fetch_reveal_transaction(
         (
             state.ic_btc_network(),
             state.derivation_path(None),
-            state.indexer_url(),
+            state.general_indexer_url(),
         )
     };
 

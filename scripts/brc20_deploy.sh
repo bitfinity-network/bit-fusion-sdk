@@ -19,7 +19,8 @@ dfx identity use brc20-admin
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
 CHAIN_ID=355113
-INDEXER_URL="https://127.0.0.1:8001"
+GENERAL_INDEXER_URL="https://127.0.0.1:8001"
+BRC20_INDEXER_URL="https://127.0.0.1:9001"
 
 echo "Deploying EVMc testnet"
 dfx canister create evm_testnet
@@ -44,7 +45,8 @@ dfx deploy evm_testnet --argument "(record {
 
 echo "Deploying BRC20 bridge"
 dfx deploy brc20-bridge --argument "(record {
-    indexer = \"${INDEXER_URL}\";
+    general_indexer = \"${GENERAL_INDEXER_URL}\";
+    brc20_indexer = \"${BRC20_INDEXER_URL}\";
     erc20_minter_fee = 10;
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };

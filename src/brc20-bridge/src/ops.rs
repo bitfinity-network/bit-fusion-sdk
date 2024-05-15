@@ -29,10 +29,10 @@ pub async fn brc20_to_erc20(
 
     // TODO: https://infinityswap.atlassian.net/browse/EPROD-858
     //
-    // log::info!("Fetching BRC20 token details");
-    // let fetched_token = rpc::fetch_brc20_token_details(state, ticker.clone())
-    //     .await
-    //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+    log::info!("Fetching BRC20 token details");
+    let _fetched_token = rpc::fetch_brc20_token_details(state, &brc20.ticker)
+        .await
+        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
     log::info!("Fetching BRC20 reveal transaction by its ID: {tx_id}");
     let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)

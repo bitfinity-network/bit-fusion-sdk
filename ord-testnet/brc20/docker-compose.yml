@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
   bitcoind:
-    image: lncm/bitcoind:v26.0
+    image: lncm/bitcoind:v27.0
     container_name: bitcoind
     command: ["-txindex", "-regtest"]
     ports:
@@ -38,12 +38,19 @@ services:
       - db
   ordhook:
     container_name: ordhook
-    platform: linux/amd64
     build:
-      dockerfile: ordhook.dockerfile
+      context: https://github.com/hirosystems/ordhook.git
+      dockerfile: dockerfiles/components/ordhook.dockerfile
     ports:
       - "20456:20456"
-      - "9001:9001"
+    command:
+      [
+        "service",
+        "start",
+        "--post-to=http://ordinals-api:3000/api/events",
+        "--auth-token=1",
+        "--config-path=/Ordhook.toml",
+      ]
     volumes:
       - ./Ordhook.toml:/Ordhook.toml
     depends_on:
@@ -57,7 +64,8 @@ services:
     env_file:
       - ./ordinals-explorer.env
     ports:
-      - "1337:3000"
+      - "1337:3001"
+      - "9001:9001"
     volumes:
       - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
     depends_on:

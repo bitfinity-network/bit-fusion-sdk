@@ -36,7 +36,8 @@ pub struct Brc20BridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub erc20_minter_fee: u64,
-    pub indexer: String,
+    pub general_indexer: String,
+    pub brc20_indexer: String,
     pub logger: LogSettings,
 }
 
@@ -50,18 +51,30 @@ impl Default for Brc20BridgeConfig {
             },
             admin: Principal::management_canister(),
             erc20_minter_fee: 10,
-            indexer: String::new(),
+            general_indexer: String::new(),
+            brc20_indexer: String::new(),
             logger: LogSettings::default(),
         }
     }
 }
 
 impl Brc20BridgeConfig {
-    fn validate_indexer_url(&self) -> Result<(), String> {
-        if !self.indexer.starts_with("https") {
+    fn validate_general_indexer_url(&self) -> Result<(), String> {
+        if !self.general_indexer.starts_with("https") {
             return Err(format!(
-                "Indexer URL must be HTTPS. Given: {}",
-                self.indexer
+                "General indexer URL must be HTTPS. Given: {}",
+                self.general_indexer
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_brc20_indexer_url(&self) -> Result<(), String> {
+        if !self.brc20_indexer.starts_with("https") {
+            return Err(format!(
+                "BRC20 indexer URL must be HTTPS. Given: {}",
+                self.brc20_indexer
             ));
         }
 
@@ -110,7 +123,11 @@ impl State {
         #[cfg(target_family = "wasm")]
         ic_crypto_getrandom_for_wasm::register_custom_getrandom();
 
-        if let Err(err) = config.validate_indexer_url() {
+        if let Err(err) = config.validate_general_indexer_url() {
+            panic!("Invalid configuration: {err}");
+        }
+
+        if let Err(err) = config.validate_brc20_indexer_url() {
             panic!("Invalid configuration: {err}");
         }
 
@@ -136,11 +153,19 @@ impl State {
         self.inscriptions.has_inscription(iid)
     }
 
-    pub fn indexer_url(&self) -> String {
+    pub fn general_indexer_url(&self) -> String {
         self.config
-            .indexer
+            .general_indexer
             .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.indexer)
+            .unwrap_or_else(|| &self.config.general_indexer)
+            .to_string()
+    }
+
+    pub fn brc20_indexer_url(&self) -> String {
+        self.config
+            .brc20_indexer
+            .strip_suffix('/')
+            .unwrap_or_else(|| &self.config.brc20_indexer)
             .to_string()
     }
 

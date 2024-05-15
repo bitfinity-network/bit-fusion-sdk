@@ -871,7 +871,7 @@ dependencies = [
  "log",
  "minter-contract-utils",
  "minter-did",
- "ord-rs 0.1.0 (git+https://github.com/bitfinity-network/ord-rs.git?branch=fix-ord-parser)",
+ "ord-rs 0.1.0 (git+https://github.com/bitfinity-network/ord-rs.git)",
  "ordinals 0.0.8",
  "serde",
  "serde_bytes",
@@ -6798,23 +6798,6 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git?branch=fix-ord-parser#7e7b4ca0222d2a770be6c69ef1b865a2ff6ad24b"
-dependencies = [
- "async-trait",
- "bitcoin 0.31.2",
- "ciborium",
- "hex",
- "log",
- "rand",
- "serde",
- "serde_json",
- "serde_with 3.8.1",
- "thiserror",
-]
-
-[[package]]
-name = "ord-rs"
-version = "0.1.0"
 source = "git+https://github.com/bitfinity-network/ord-rs?rev=927a5040d69493c785095c81888eba3264495196#927a5040d69493c785095c81888eba3264495196"
 dependencies = [
  "async-trait",
@@ -6834,13 +6817,12 @@ dependencies = [
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git#d9f198565b13419ab9f10fdba3024bfc3f217d20"
+source = "git+https://github.com/bitfinity-network/ord-rs.git#f9bf15241e4588200e4ec97cf0fc0ef1a3933a41"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",
  "ciborium",
  "hex",
- "http 1.1.0",
  "log",
  "rand",
  "serde",
@@ -8127,9 +8109,9 @@ dependencies = [
 
 [[package]]
 name = "schnellru"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b0cf7da6fc4477944d5529807234f66802fcb618fc62b9c05bedca7f9be6c43"
+checksum = "c9a8ef13a93c54d20580de1e5c413e624e53121d42fc7e2c11d10ef7f8b02367"
 dependencies = [
  "ahash",
  "cfg-if 1.0.0",
