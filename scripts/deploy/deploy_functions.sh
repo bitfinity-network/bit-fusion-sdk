@@ -1,5 +1,15 @@
 #!/bin/bash
 
+link_to_variant() {
+  LINK=$1
+  if [[ $URL == "http"* ]]; then
+    IC_TYPE="variant { Http = \"${LINK}\" };"
+  else
+    IC_TYPE="variant { Ic = principal \"${LINK}\" };"
+  fi
+  echo "$IC_TYPE"
+}
+
 create_canister() {
     # Create canisters
     NETWORK=$1
