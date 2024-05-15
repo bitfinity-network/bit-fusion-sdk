@@ -14,13 +14,15 @@ function usage() {
   echo "  -i, --ic-network <network>                      Internet Computer network (local, ic)"
   echo "  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)"
   echo "  --indexer-url <url>                             Indexer URL"
-  echo "  --base-evm-link <canister-id>                   Base EVM link canister ID"
-  echo "  --wrapped-evm-link <canister-id>                Wrapped EVM link canister ID"
+  echo "  --base-evm <canister-id>                        Base EVM link canister ID"
+  echo "  --wrapped-evm <canister-id>                     Wrapped EVM link canister ID"
   echo "  --erc20-base-bridge-contract <canister-id>      ERC20 Base bridge contract canister ID"
   echo "  --erc20-wrapped-bridge-contract <canister-id>   ERC20 Wrapped bridge contract canister ID"
+  echo "  --ckbtc-minter <canister-id>                    CK-BTC minter canister ID"
+  echo "  --ckbtc-ledger <canister-id>                    CK-BTC ledger canister ID"
 }
 
-ARGS=$(getopt -o e:b:i:m:h --long evm-rpc-url,bitcoin-network,ic-network,install-mode,base-evm-link,wrapped-evm-link,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,rune-name,rune-block,rune-tx-id,indexer-url,help -- "$@")
+ARGS=$(getopt -o e:b:i:m:h --long evm-rpc-url,bitcoin-network,ic-network,install-mode,ckbtc-ledger,ckbtc-minter,base-evm,wrapped-evm,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,rune-name,rune-block,rune-tx-id,indexer-url,help -- "$@")
 while true; do
   case "$1" in
     -e|--evm-rpc-url)
@@ -48,12 +50,12 @@ while true; do
       shift 2
       ;;
 
-    --base-evm-link)
+    --base-evm)
       BASE_EVM_LINK=$(link_to_variant "$2")
       shift 2
       ;;
 
-    --wrapped-evm-link)
+    --wrapped-evm)
       WRAPPED_EVM_LINK=$(link_to_variant "$2")
       shift 2
       ;;
@@ -65,6 +67,16 @@ while true; do
 
     --erc20-wrapped-bridge-contract)
       WRAPPED_BRIDGE_CONTRACT="$2"
+      shift 2
+      ;;
+
+    --ckbtc-minter)
+      CKBTC_MINTER="$2"
+      shift 2
+      ;;
+    
+    --ckbtc-ledger)
+      CKBTC_LEDGER="$2"
       shift 2
       ;;
 
@@ -98,38 +110,8 @@ fi
 # get positional arguments; skip $0, if empty 'all'
 CANISTERS_TO_DEPLOY="${@:1}"
 if [ -z "$CANISTERS_TO_DEPLOY" ]; then
-  CANISTERS_TO_DEPLOY="icrc2-minter erc20-minter rune-bridge"
+  CANISTERS_TO_DEPLOY="icrc2-minter erc20-minter rune-bridge btc-bridge"
 fi
-
-start_dfx() {
-    echo "Attempting to create Alice's Identity"
-    set +e
-
-    if [ "$INSTALL_MODE" = "create" ]; then
-        echo "Stopping DFX"
-        dfx stop
-        echo "Starting DFX"
-        dfx start --clean --background --artificial-delay 0
-    else
-        return
-    fi
-
-    # Create identity
-    dfx identity new --storage-mode=plaintext alice
-    dfx identity use alice
-    echo "Alice's Identity Created"
-}
-
-start_icx() {
-    killall icx-proxy
-    sleep 2
-    # Start ICX Proxy
-    dfx_local_port=$(dfx info replica-port)
-    icx-proxy --fetch-root-key --address 127.0.0.1:8545 --dns-alias 127.0.0.1:$evm_id --replica http://localhost:$dfx_local_port &
-    sleep 2
-
-    curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc": "2.0", "method": "eth_chainId", "params": [], "id":1}' 'http://127.0.0.1:8545'
-}
 
 assert_isset_param () {
   PARAM=$1
@@ -143,13 +125,9 @@ assert_isset_param () {
 
 start_dfx
 
-LOG_SETTINGS="opt record { enable_console=true; in_memory_records=opt 10000; log_filter=opt \"error,did=debug,evm_core=debug,evm=debug\"; }"
+LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=debug\"; }"
 OWNER=$(dfx identity get-principal)
-SIGNING_STRATEGY="variant { 
-  Local = record {
-    private_key = blob \"\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\67\\01\";
-  }
-}"
+SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant = { Dfx }; } }"
 
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
   INSTALL_MODE="install"
@@ -179,6 +157,13 @@ for canister in $CANISTERS_TO_DEPLOY; do
       assert_isset_param "$BASE_EVM_LINK" "BASE_EVM_LINK"
       assert_isset_param "$INDEXER_URL" "INDEXER_URL"
       deploy_rune_bridge $IC_NETWORK $INSTALL_MODE $BITCOIN_NETWORK $BASE_EVM_LINK $OWNER $INDEXER_URL $SIGNING_STRATEGY $LOG_SETTINGS
+      ;;
+
+    "btc-bridge")
+      assert_isset_param "$BASE_EVM_LINK" "BASE_EVM_LINK"
+      assert_isset_param "$CKBTC_MINTER" "CKBTC_MINTER"
+      assert_isset_param "$CKBTC_LEDGER" "CKBTC_LEDGER"
+      deploy_btc_bridge "$IC_NETWORK" "$INSTALL_MODE" "$BITCOIN_NETWORK" "$OWNER" "$EVM_PRINCIPAL" "$CKBTC_MINTER" "$CKBTC_LEDGER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
       ;;
 
     *)
