@@ -8,19 +8,19 @@ BITCOIN_NETWORK="regtest"
 function usage() {
   echo "Usage: $0 [options]"
   echo "Options:"
-  echo "  -e, --evm-rpc-url <url>                   EVM RPC URL"
-  echo "  -b, --bitcoin-network <network>           Bitcoin network (regtest, testnet, mainnet)"
-  echo "  -i, --ic-network <network>                Internet Computer network (local, ic)"
-  echo "  -m, --install-mode <mode>                 Install mode (create, init, reinstall, upgrade)"
-  echo "  --indexer-url <url>                       Indexer URL"
-  echo "  --base-evm-link <canister-id>             Base EVM link canister ID"
-  echo "  --wrapped-evm-link <canister-id>          Wrapped EVM link canister ID"
-  echo "  --base-bridge-contract <canister-id>      Base bridge contract canister ID"
-  echo "  --wrapped-bridge-contract <canister-id>   Wrapped bridge contract canister ID"
-  echo "  -h, --help                                Display this help message"
+  echo "  -h, --help                                      Display this help message"
+  echo "  -e, --evm-rpc-url <url>                         EVM RPC URL"
+  echo "  -b, --bitcoin-network <network>                 Bitcoin network (regtest, testnet, mainnet)"
+  echo "  -i, --ic-network <network>                      Internet Computer network (local, ic)"
+  echo "  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)"
+  echo "  --indexer-url <url>                             Indexer URL"
+  echo "  --base-evm-link <canister-id>                   Base EVM link canister ID"
+  echo "  --wrapped-evm-link <canister-id>                Wrapped EVM link canister ID"
+  echo "  --erc20-base-bridge-contract <canister-id>      ERC20 Base bridge contract canister ID"
+  echo "  --erc20-wrapped-bridge-contract <canister-id>   ERC20 Wrapped bridge contract canister ID"
 }
 
-ARGS=$(getopt -o e:b:i:m:h --long evm-rpc-url,bitcoin-network,ic-network,install-mode,base-evm-link,wrapped-evm-link,base-bridge-contract,wrapped-bridge-contract,rune-name,rune-block,rune-tx-id,indexer-url,help -- "$@")
+ARGS=$(getopt -o e:b:i:m:h --long evm-rpc-url,bitcoin-network,ic-network,install-mode,base-evm-link,wrapped-evm-link,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,rune-name,rune-block,rune-tx-id,indexer-url,help -- "$@")
 while true; do
   case "$1" in
     -e|--evm-rpc-url)
@@ -49,21 +49,21 @@ while true; do
       ;;
 
     --base-evm-link)
-      BASE_EVM_LINK="$2"
+      BASE_EVM_LINK=$(link_to_variant "$2")
       shift 2
       ;;
 
     --wrapped-evm-link)
-      WRAPPED_EVM_LINK="$2"
+      WRAPPED_EVM_LINK=$(link_to_variant "$2")
       shift 2
       ;;
 
-    --base-bridge-contract)
+    --erc20-base-bridge-contract)
       BASE_BRIDGE_CONTRACT="$2"
       shift 2
       ;;
 
-    --wrapped-bridge-contract)
+    --erc20-wrapped-bridge-contract)
       WRAPPED_BRIDGE_CONTRACT="$2"
       shift 2
       ;;
@@ -131,6 +131,16 @@ start_icx() {
     curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc": "2.0", "method": "eth_chainId", "params": [], "id":1}' 'http://127.0.0.1:8545'
 }
 
+assert_isset_param () {
+  PARAM=$1
+  NAME=$2
+  if [ -z "$PARAM" ]; then
+    echo "$NAME is required"
+    usage
+    exit 1
+  fi
+}
+
 start_dfx
 
 LOG_SETTINGS="opt record { enable_console=true; in_memory_records=opt 10000; log_filter=opt \"error,did=debug,evm_core=debug,evm=debug\"; }"
@@ -153,14 +163,21 @@ fi
 for canister in $CANISTERS_TO_DEPLOY; do
   case $canister in
     "icrc2-minter")
+      assert_isset_param "$EVM_RPC_URL" "EVM_RPC_URL"
       deploy_icrc2_minter $IC_NETWORK $INSTALL_MODE $EVM_RPC_URL $OWNER $SIGNING_STRATEGY $LOG_SETTINGS
       ;;
 
     "erc20-minter")
+      assert_isset_param "$BASE_EVM_LINK" "BASE_EVM_LINK"
+      assert_isset_param "$WRAPPED_EVM_LINK" "WRAPPED_EVM_LINK"
+      assert_isset_param "$BASE_BRIDGE_CONTRACT" "BASE_BRIDGE_CONTRACT"
+      assert_isset_param "$WRAPPED_BRIDGE_CONTRACT" "WRAPPED_BRIDGE_CONTRACT"
       deploy_erc20_minter $IC_NETWORK $INSTALL_MODE $BASE_EVM_LINK $WRAPPED_EVM_LINK $BASE_BRIDGE_CONTRACT $WRAPPED_BRIDGE_CONTRACT $SIGNING_STRATEGY $LOG_SETTINGS
       ;;
     
     "rune-bridge")
+      assert_isset_param "$BASE_EVM_LINK" "BASE_EVM_LINK"
+      assert_isset_param "$INDEXER_URL" "INDEXER_URL"
       deploy_rune_bridge $IC_NETWORK $INSTALL_MODE $BITCOIN_NETWORK $BASE_EVM_LINK $OWNER $INDEXER_URL $SIGNING_STRATEGY $LOG_SETTINGS
       ;;
 
