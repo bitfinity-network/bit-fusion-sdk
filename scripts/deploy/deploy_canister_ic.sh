@@ -101,12 +101,6 @@ if [ -z "$INSTALL_MODE" ]; then
   exit 1
 fi
 
-if [ -z "$EVM_RPC_URL" ]; then
-  echo "EVM_RPC_URL is required"
-  usage
-  exit 1
-fi
-
 # get positional arguments; skip $0, if empty 'all'
 CANISTERS_TO_DEPLOY="${@:1}"
 if [ -z "$CANISTERS_TO_DEPLOY" ]; then
