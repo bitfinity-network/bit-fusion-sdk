@@ -2,8 +2,8 @@
 
 source "$(dirname "$0")/deploy_functions.sh"
 
-IC_NETWORK="local"
-BITCOIN_NETWORK="regtest"
+IC_NETWORK="ic"
+BITCOIN_NETWORK="mainnet"
 
 function usage() {
   echo "Usage: $0 [options]"

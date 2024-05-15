@@ -73,11 +73,16 @@ start_dfx() {
     echo "Attempting to create Alice's Identity"
     set +e
 
+    ENABLE_BITCOIN=""
+    if [[ "$CANISTERS_TO_DEPLOY" == *"btc-bridge"* ]] || [[ "$CANISTERS_TO_DEPLOY" == *"rune-bridge"* ]]; then
+      ENABLE_BITCOIN="--enable-bitcoin"
+    fi
+
     if [ "$INSTALL_MODE" = "create" ]; then
         echo "Stopping DFX"
         dfx stop
         echo "Starting DFX"
-        dfx start --clean --background --enable-bitcoin --artificial-delay 0 2> dfx_stderr.log
+        dfx start --clean --background $ENABLE_BITCOIN --artificial-delay 0 2> dfx_stderr.log
     else
         return
     fi
