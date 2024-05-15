@@ -35,6 +35,8 @@ deploy_icrc2_minter() {
     owner = principal \"$ADMIN_PRINCIPAL\";
   })"
 
+  echo "deploying icrc2-minter with args: $args"
+
   dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK --arguments="$args" icrc2-minter
 }
 
@@ -59,6 +61,8 @@ deploy_erc20_minter() {
     log_settings = $LOG_SETTINGS;
   })"
 
+  echo "deploying erc20-minter with args: $args"
+
   dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK --arguments="$args" erc20-minter
 }
 
@@ -69,11 +73,8 @@ deploy_rune_bridge() {
   EVM_LINK="$4"
   ADMIN_PRINCIPAL="$5"
   INDEXER_URL="$6"
-  RUNE_NAME="$7"
-  RUNE_BLOCK="$8"
-  RUNE_TX_ID="$9"
-  SIGNING_STRATEGY="${10}"
-  LOG_SETTINGS="${11}"
+  SIGNING_STRATEGY="$7"
+  LOG_SETTINGS="$8"
 
   create_canister $NETWORK rune-bridge
 
@@ -84,13 +85,10 @@ deploy_rune_bridge() {
     admin = principal \"$ADMIN_PRINCIPAL\";
     log_settings = $LOG_SETTINGS;
     min_confirmations = 1;
-    rune_info = record {
-      name = \"$RUNE_NAME\";
-      block = $RUNE_BLOCK;
-      tx = $RUNE_TX_ID;
-    };
     indexer_url = \"$INDEXER_URL\";
   })"
+
+  echo "deploying rune-bridge with args: $args"
   
   dfx canister install --mode=$INSTALL_MODE --yes --network=$NETWORK --arguments="$args" rune-bridge
 }

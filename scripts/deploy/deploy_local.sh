@@ -13,9 +13,6 @@ function usage() {
   echo "  -i, --ic-network <network>                Internet Computer network (local, ic)"
   echo "  -m, --install-mode <mode>                 Install mode (create, init, reinstall, upgrade)"
   echo "  --indexer-url <url>                       Indexer URL"
-  echo "  --rune-name <name>                        Rune name"
-  echo "  --rune-block <block>                      Rune block"
-  echo "  --rune-tx-id <tx-id>                      Rune transaction ID"
   echo "  --base-evm-link <canister-id>             Base EVM link canister ID"
   echo "  --wrapped-evm-link <canister-id>          Wrapped EVM link canister ID"
   echo "  --base-bridge-contract <canister-id>      Base bridge contract canister ID"
@@ -43,21 +40,6 @@ while true; do
 
     -m|--install-mode)
       INSTALL_MODE="$2"
-      shift 2
-      ;;
-
-    --rune-name)
-      RUNE_NAME="$2"
-      shift 2
-      ;;
-
-    --rune-block)
-      RUNE_BLOCK="$2"
-      shift 2
-      ;;
-    
-    --rune-tx-id)
-      RUNE_TX_ID="$2"
       shift 2
       ;;
 
@@ -119,9 +101,6 @@ if [ -z "$CANISTERS_TO_DEPLOY" ]; then
   CANISTERS_TO_DEPLOY="icrc2-minter erc20-minter rune-bridge"
 fi
 
-echo "Deploying canisters: $CANISTERS_TO_DEPLOY"
-exit 0
-
 start_dfx() {
     echo "Attempting to create Alice's Identity"
     set +e
@@ -173,6 +152,17 @@ fi
 
 for canister in $CANISTERS_TO_DEPLOY; do
   case $canister in
+    "icrc2-minter")
+      deploy_icrc2_minter $IC_NETWORK $INSTALL_MODE $EVM_RPC_URL $OWNER $SIGNING_STRATEGY $LOG_SETTINGS
+      ;;
+
+    "erc20-minter")
+      deploy_erc20_minter $IC_NETWORK $INSTALL_MODE $BASE_EVM_LINK $WRAPPED_EVM_LINK $BASE_BRIDGE_CONTRACT $WRAPPED_BRIDGE_CONTRACT $SIGNING_STRATEGY $LOG_SETTINGS
+      ;;
+    
+    "rune-bridge")
+      deploy_rune_bridge $IC_NETWORK $INSTALL_MODE $BITCOIN_NETWORK $BASE_EVM_LINK $OWNER $INDEXER_URL $SIGNING_STRATEGY $LOG_SETTINGS
+      ;;
 
     *)
       echo "Unknown canister: $canister"
