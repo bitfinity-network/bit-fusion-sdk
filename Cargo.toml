@@ -31,8 +31,8 @@ evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-ev
 icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.18.x" }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-ic-agent = "0.33"
-ic-utils = "0.33"
+ic-agent = "0.34"
+ic-utils = "0.34"
 ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.16.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.16.x" }
