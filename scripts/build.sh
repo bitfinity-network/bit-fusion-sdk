@@ -136,6 +136,7 @@ build_requested_canisters() {
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
+        build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
         # Build tools
         build_create_bft_bridge_tool
@@ -150,6 +151,9 @@ build_requested_canisters() {
                 ;;
             signature_verification | spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
+                ;;
+            btc-bridge | rune-bridge | ircr2-minter | erc20-minter)
+                build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."
