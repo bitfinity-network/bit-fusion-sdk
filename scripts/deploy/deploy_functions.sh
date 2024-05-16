@@ -2,6 +2,16 @@
 
 CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
 
+assert_isset_param () {
+  PARAM=$1
+  NAME=$2
+  if [ -z "$PARAM" ]; then
+    echo "$NAME is required"
+    usage
+    exit 1
+  fi
+}
+
 link_to_variant() {
   LINK=$1
   if [[ $URL == "http"* ]]; then
@@ -151,3 +161,146 @@ deploy_erc721_bridge() {
 
   echo "$BRIDGE_ADDRESS"
 }
+
+# test canisters
+
+
+deploy_evm_testnet() {
+  set -e
+  CHAIN_ID=355113
+  ADMIN_PRINCIPAL=$(dfx identity get-principal)
+  dfx canister create evm_testnet
+  EVM=$(dfx canister id evm_testnet)
+  dfx deploy signature_verification --argument "(vec { principal \"${EVM}\" })"
+  SIGNATURE_VERIFICATION=$(dfx canister id signature_verification)
+
+  dfx deploy evm_testnet --argument "(record {
+      min_gas_price = 10;
+      signature_verification_principal = principal \"${SIGNATURE_VERIFICATION}\";
+      log_settings = opt record {
+          enable_console = true;
+          in_memory_records = opt 10000;
+          log_filter = opt \"warn\";
+      };
+      owner = principal \"${ADMIN_PRINCIPAL}\";
+      genesis_accounts = vec { };
+      chain_id = $CHAIN_ID;
+      coinbase = \"0x0000000000000000000000000000000000000000\";
+  })"
+
+  set +e
+
+  echo "$EVM"
+}
+
+deploy_ckbtc_ledger() {
+  set -e
+  dfx canister create ic-ckbtc-ledger
+  dfx canister create ic-ckbtc-minter
+  CKBTC_MINTER=$(dfx canister id ic-ckbtc-minter)
+  CKBTC_LEDGER=$(dfx canister id ic-ckbtc-ledger)
+  ADMIN_WALLET=$(dfx identity get-wallet)
+
+  dfx deploy token --argument "(variant {Init = record {
+    minting_account = record { owner = principal \"$CKBTC_MINTER\" };
+    transfer_fee = 10;
+    token_symbol = \"ckTESTBTC\";
+    token_name = \"Chain key testnet Bitcoin\";
+    metadata = vec {};
+    initial_balances = vec {};
+    max_memo_length = opt 100;
+    archive_options = record {
+        num_blocks_to_archive = 1000;
+        trigger_threshold = 2000;
+        max_message_size_bytes = null;
+        cycles_for_archive_creation = opt 1_000_000_000_000;
+        node_max_memory_size_bytes = opt 3_221_225_472;
+        controller_id = principal \"$ADMIN_WALLET\"
+    }
+  }})"
+
+  set +e
+
+  echo "$CKBTC_LEDGER"
+}
+
+deploy_ckbtc_kyt() {
+  set -e
+  CKBTC_MINTER="$(dfx canister id ic-ckbtc-minter)"
+  ADMIN_PRINCIPAL=$(dfx identity get-principal)
+  dfx canister create ic-ckbtc-kyt
+  CKBTC_KYT=$(dfx canister id ic-ckbtc-ledger)
+  dfx deploy ic-ckbtc-kyt --argument "(variant {InitArg = record {
+    api_key = \"abcdef\";
+    maintainers = vec { principal \"$ADMIN_PRINCIPAL\"; };
+    mode = variant { AcceptAll };
+    minter_id = principal \"$CKBTC_MINTER\";
+  } })"
+
+  dfx canister call ic-ckbtc-kyt set_api_key "(record { api_key = \"abc\"; })"
+
+  set +e
+
+  echo "$CKBTC_KYT"
+}
+
+deploy_ckbtc_minter() {
+  set -e
+  CKBTC_LEDGER="$(dfx canister id ic-ckbtc-ledger)"
+  CKBTC_MINTER="$(dfx canister id ic-ckbtc-minter)"
+  dfx deploy ic-ckbtc-minter --argument "(variant {Init = record {
+    btc_network = variant { Regtest };
+    ledger_id = principal \"$CKBTC_LEDGER\";
+    ecdsa_key_name = \"dfx_test_key\";
+    retrieve_btc_min_amount = 5_000;
+    max_time_in_queue_nanos = 420_000_000_000;
+    min_confirmations = opt 1;
+    kyt_fee = opt 1000;
+    kyt_principal = opt principal \"$CKBTC_KYT\";
+    mode = variant { GeneralAvailability };
+  }})"
+
+  set +e
+
+  echo "$CKBTC_MINTER"
+}
+
+
+start_dfx() {
+  echo "Attempting to create Alice's Identity"
+  set +e
+
+  ENABLE_BITCOIN="${1:-0}"
+  if [ "$ENABLE_BITCOIN" -gt 0 ]; then
+    ENABLE_BITCOIN="--enable-bitcoin"
+  else
+    ENABLE_BITCOIN=""
+  fi
+
+  if [ "$INSTALL_MODE" = "create" ]; then
+    echo "Stopping DFX"
+    dfx stop
+    echo "Starting DFX"
+    dfx start --clean --background $ENABLE_BITCOIN --artificial-delay 0 2> dfx_stderr.log
+  else
+    return
+  fi
+
+  # Create identity
+  dfx identity new --storage-mode=plaintext alice
+  dfx identity use alice
+  echo "Alice's Identity Created"
+}
+
+start_icx() {
+  evm_id="$1"
+  killall icx-proxy
+  sleep 2
+  # Start ICX Proxy
+  dfx_local_port=$(dfx info replica-port)
+  icx-proxy --fetch-root-key --address 127.0.0.1:8545 --dns-alias 127.0.0.1:$evm_id --replica http://localhost:$dfx_local_port &
+  sleep 2
+
+  curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc": "2.0", "method": "eth_chainId", "params": [], "id":1}' 'http://127.0.0.1:8545'
+}
+
