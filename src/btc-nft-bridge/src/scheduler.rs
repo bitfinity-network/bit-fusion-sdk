@@ -194,7 +194,7 @@ impl Task for NftTask {
                 log::info!("ERC20 burn event received");
                 let operation_id = *operation_id;
 
-                let Ok(nft_id) = InscriptionId::from_str(&nft_id) else {
+                let Ok(nft_id) = InscriptionId::from_str(nft_id) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
                         format!("Failed to decode NFT ID: {nft_id}"),
                     )));

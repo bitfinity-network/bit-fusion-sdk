@@ -122,8 +122,9 @@ pub(crate) async fn fetch_reveal_transaction(
     let txid =
         Txid::from_slice(&nft_utxo.outpoint.txid).expect("failed to convert Txid from slice");
 
+    let ord_url = state.borrow().ord_url();
     Ok((
-        get_nft_transaction_by_id(&state.borrow().ord_url(), &txid)
+        get_nft_transaction_by_id(&ord_url, &txid)
             .await
             .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?,
         nft_utxo,

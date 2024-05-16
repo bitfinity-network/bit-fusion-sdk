@@ -490,7 +490,7 @@ async fn sign_transaction(
         log::debug!("signature: {}", signature.serialize_der());
 
         // append witness
-        let signature = bitcoin::ecdsa::Signature::sighash_all(signature).into();
+        let signature = bitcoin::ecdsa::Signature::sighash_all(signature);
         let witness = Witness::p2wpkh(&signature, &holder_btc_pubkey.inner);
         *hash
             .witness_mut(index)

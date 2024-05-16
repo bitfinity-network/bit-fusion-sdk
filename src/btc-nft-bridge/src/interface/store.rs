@@ -70,7 +70,7 @@ impl NftInfo {
         holder: String,
         output: String,
     ) -> Result<Self, BridgeError> {
-        let output = output.split(":");
+        let output = output.split(':');
         let tx_id = output
             .clone()
             .nth(0)
