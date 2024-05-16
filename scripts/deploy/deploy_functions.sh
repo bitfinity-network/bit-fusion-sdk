@@ -39,8 +39,6 @@ deploy_icrc2_minter() {
 
   echo "deploying icrc2-minter with args: $args"
 
-  pwd
-
   dfx canister install --mode=$INSTALL_MODE --wasm=./.artifact/icrc2-minter.wasm.gz --yes --network=$NETWORK --argument="$args" icrc2-minter
 }
 
