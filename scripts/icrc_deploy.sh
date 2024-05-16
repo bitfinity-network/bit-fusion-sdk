@@ -61,10 +61,8 @@ dfx deploy token2 --argument "(variant {Init = record {
 
 dfx canister create evm_testnet
 dfx canister create icrc2-minter
-dfx canister create spender
 EVM=$(dfx canister id evm_testnet)
 ICRC2_MINTER=$(dfx canister id icrc2-minter)
-SPENDER=$(dfx canister id spender)
 
 dfx deploy signature_verification --argument "(vec { principal \"${EVM}\" })"
 SIGNATURE_VERIFICATION=$(dfx canister id signature_verification)
@@ -96,10 +94,8 @@ dfx deploy icrc2-minter  --argument "(record {
         log_filter = opt \"trace\";
     };
     owner = principal \"$ADMIN_PRINCIPAL\";
-    spender_principal = principal \"$SPENDER\";
 })"
 
-dfx deploy spender --argument "(principal \"$ICRC2_MINTER\")"
 
 start_icx
 

@@ -17,7 +17,7 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 };
 use inscriber::constant::UTXO_MIN_CONFIRMATION;
 use inscriber::interface::bitcoin_api;
-use ord_rs::inscription::nft::id::NftId;
+use ord_rs::inscription::iid::InscriptionId;
 use ord_rs::{Nft, OrdParser};
 use serde::Deserialize;
 
@@ -33,7 +33,7 @@ use crate::state::State;
 /// Retrieves and validates the details of a NFT token given its ticker.
 pub async fn fetch_nft_token_details(
     state: &RefCell<State>,
-    id: NftId,
+    id: InscriptionId,
     holder: String,
 ) -> anyhow::Result<NftInfo> {
     let (network, ord_url) = {
@@ -84,7 +84,7 @@ pub async fn fetch_nft_token_details(
         BridgeError::FetchNftTokenDetails(format!("{err:?}"))
     })?;
 
-    let nft_id = NftId::from_str(&inscription.id).map_err(|err| {
+    let nft_id = InscriptionId::from_str(&inscription.id).map_err(|err| {
         log::error!("Failed to parse NFT ID: {err:?}");
         BridgeError::FetchNftTokenDetails(format!("{err:?}"))
     })?;
@@ -132,16 +132,19 @@ pub(crate) async fn fetch_reveal_transaction(
 
 pub(crate) async fn parse_and_validate_inscription(
     reveal_tx: Transaction,
+    index: usize,
 ) -> Result<Nft, BridgeError> {
     log::info!("Parsing NFT inscription from transaction");
 
-    let inscription = OrdParser::parse::<Nft>(&reveal_tx)
-        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?
-        .ok_or_else(|| {
-            BridgeError::InscriptionParsing("Failed to parse inscription".to_string())
-        })?;
+    let (_, parser) = OrdParser::parse_one(&reveal_tx, index)
+        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
 
-    Ok(inscription)
+    match parser {
+        OrdParser::Ordinal(nft) => Ok(nft),
+        _ => Err(BridgeError::InscriptionParsing(
+            "Invalid inscription".to_string(),
+        )),
+    }
 }
 
 fn network_as_str(network: Network) -> &'static str {

@@ -5,7 +5,7 @@ use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::store::StorableNftId;
+use super::store::StorableInscriptionId;
 
 #[derive(Error, CandidType, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub enum BridgeError {
@@ -64,7 +64,7 @@ pub struct MintNftArgs {
     /// User's BTC address
     pub btc_address: String,
     /// NFT id
-    pub nft_id: StorableNftId,
+    pub nft_id: StorableInscriptionId,
 }
 
 /// Status of an NFT to a BTC NFT swap
@@ -94,7 +94,7 @@ pub enum NftMintStatus {
     /// Mint order for wrapped tokens is successfully sent to the `BftBridge`.
     Minted {
         /// Id of the minted NFT
-        id: StorableNftId,
+        id: StorableInscriptionId,
         /// EVM transaction ID.
         tx_id: H256,
     },

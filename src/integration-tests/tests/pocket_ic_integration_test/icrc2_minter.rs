@@ -92,6 +92,115 @@ async fn test_icrc2_tokens_roundtrip() {
 }
 
 #[tokio::test]
+async fn test_icrc2_token_canister_stopped() {
+    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    let amount = 3_000_000u64;
+
+    eprintln!("burning icrc tokens and creating mint order");
+    let _operation_id = ctx
+        .burn_icrc2(JOHN, &john_wallet, amount as _, 42, None)
+        .await
+        .unwrap();
+
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+
+    let base_token_client = ctx.icrc_token_1_client(JOHN);
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
+        .await
+        .unwrap();
+
+    eprintln!("checking wrapped token balance");
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .await
+        .unwrap();
+    assert_eq!(
+        base_balance,
+        ICRC1_INITIAL_BALANCE - amount - ICRC1_TRANSFER_FEE * 2
+    );
+    assert_eq!(wrapped_balance as u64, amount);
+
+    ctx.client
+        .stop_canister(ctx.canisters().token_1(), Some(ctx.admin()))
+        .await
+        .unwrap();
+
+    let john_principal_id256 = Id256::from(&john());
+    let _operation_id = ctx
+        .burn_erc_20_tokens(
+            &ctx.evm_client(ADMIN),
+            &john_wallet,
+            &wrapped_token,
+            john_principal_id256,
+            &bft_bridge,
+            wrapped_balance,
+        )
+        .await
+        .unwrap()
+        .0;
+
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+
+    let refund_mint_order = ctx
+        .minter_client(ADMIN)
+        .list_mint_orders(john_principal_id256, base_token_id)
+        .await
+        .unwrap()[0]
+        .1;
+
+    ctx.mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
+        .await
+        .unwrap();
+
+    ctx.client
+        .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
+        .await
+        .unwrap();
+
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+
+    // Check if the amount is refunded as wrapped token.
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
+        .await
+        .unwrap();
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .await
+        .unwrap();
+    assert_eq!(
+        base_balance,
+        ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 2 - amount
+    );
+    assert_eq!(wrapped_balance as u64, amount);
+}
+
+#[tokio::test]
 async fn test_icrc2_tokens_approve_after_mint() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 

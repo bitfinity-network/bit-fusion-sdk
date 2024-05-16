@@ -22,7 +22,7 @@ use inscriber::wallet::fees::estimate_transaction_fees;
 use inscriber::wallet::{CanisterWallet, EcdsaSigner};
 use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
 use minter_did::id256::Id256;
-use ord_rs::inscription::nft::id::NftId;
+use ord_rs::inscription::iid::InscriptionId;
 use ord_rs::wallet::ScriptType;
 use ord_rs::ExternalSigner;
 
@@ -39,22 +39,20 @@ use crate::state::State;
 pub async fn nft_to_erc721(
     state: &RefCell<State>,
     eth_address: H160,
-    nft_id: NftId,
+    nft_id: InscriptionId,
     holder_btc_addr: String,
 ) -> Result<NftMintStatus, NftMintError> {
     let nft = rpc::fetch_nft_token_details(state, nft_id, holder_btc_addr)
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let (reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
-    // TODO: parse and validate it is a nft
-    // requires EPROD-853 <https://infinityswap.atlassian.net/browse/EPROD-853>
-    // rpc::parse_and_validate_inscription(reveal_tx)
-    //     .await
-    //     .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
+    rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
+        .await
+        .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
     state.borrow_mut().inscriptions_mut().insert(nft);
 
@@ -67,7 +65,7 @@ pub async fn nft_to_erc721(
 pub async fn mint_erc721(
     state: &RefCell<State>,
     eth_address: H160,
-    nft_id: NftId,
+    nft_id: InscriptionId,
     nonce: u32,
 ) -> Result<NftMintStatus, NftMintError> {
     let mint_order = prepare_mint_order(
@@ -219,7 +217,7 @@ async fn send_mint_order(
 pub async fn erc721_to_nft(
     state: &RefCell<State>,
     request_id: u32,
-    nft_id: NftId,
+    nft_id: InscriptionId,
     dst_addr: &str,
     fee_canister_address: String,
 ) -> Result<NftInscribeStatus, BridgeError> {

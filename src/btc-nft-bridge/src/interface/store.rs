@@ -10,7 +10,7 @@ use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, V
 use minter_contract_utils::erc721_mint_orders::MintOrders;
 use minter_did::erc721_mint_order::ERC721SignedMintOrder;
 use minter_did::id256::Id256;
-use ord_rs::inscription::nft::id::NftId;
+use ord_rs::inscription::iid::InscriptionId;
 use serde::Serialize;
 
 use super::bridge_api::BridgeError;
@@ -60,12 +60,16 @@ impl NftStore {
 pub struct NftInfo {
     pub tx_id: RevealTxId,
     vout: u32,
-    pub id: StorableNftId,
+    pub id: StorableInscriptionId,
     pub holder: String,
 }
 
 impl NftInfo {
-    pub fn new(id: StorableNftId, holder: String, output: String) -> Result<Self, BridgeError> {
+    pub fn new(
+        id: StorableInscriptionId,
+        holder: String,
+        output: String,
+    ) -> Result<Self, BridgeError> {
         let output = output.split(":");
         let tx_id = output
             .clone()
@@ -101,9 +105,9 @@ impl From<&NftInfo> for OutPoint {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
-pub struct StorableNftId(pub NftId);
+pub struct StorableInscriptionId(pub InscriptionId);
 
-impl CandidType for StorableNftId {
+impl CandidType for StorableInscriptionId {
     fn _ty() -> Type {
         Type(Rc::new(TypeInner::Text))
     }
@@ -116,14 +120,14 @@ impl CandidType for StorableNftId {
     }
 }
 
-impl From<NftId> for StorableNftId {
-    fn from(nft_id: NftId) -> Self {
+impl From<InscriptionId> for StorableInscriptionId {
+    fn from(nft_id: InscriptionId) -> Self {
         Self(nft_id)
     }
 }
 
-impl From<StorableNftId> for NftId {
-    fn from(storable_nft_id: StorableNftId) -> Self {
+impl From<StorableInscriptionId> for InscriptionId {
+    fn from(storable_nft_id: StorableInscriptionId) -> Self {
         storable_nft_id.0
     }
 }
@@ -240,14 +244,14 @@ mod test {
             Txid::from_str("2ca04a8c189d1eabdad4dafb654cd2ead33a17be983cf77103e585158c957262")
                 .unwrap();
 
-        let nft_id = NftId {
+        let nft_id = InscriptionId {
             txid: txid.clone(),
             index: 1,
         };
 
-        let storable_nft_id = StorableNftId(nft_id);
+        let storable_nft_id = StorableInscriptionId(nft_id);
         let bytes = Encode!(&(storable_nft_id.clone(),)).expect("serialization failed");
-        let decoded = Decode!(&bytes, (StorableNftId,))
+        let decoded = Decode!(&bytes, (StorableInscriptionId,))
             .expect("deserialization failed")
             .0;
 

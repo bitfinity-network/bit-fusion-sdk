@@ -57,7 +57,7 @@ impl Task for BridgeTask {
                 Box::pin(Self::send_mint_transaction(state, order_data.clone()))
             }
             BridgeTask::MintIcrc2Tokens(burn_data) => {
-                Box::pin(Self::mint_icrc2(burn_data.clone(), scheduler))
+                Box::pin(Self::mint_icrc2(burn_data.clone(), state, scheduler))
             }
         }
     }
@@ -317,6 +317,7 @@ impl BridgeTask {
 
     async fn mint_icrc2(
         burnt_event: BurntEventData,
+        state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
         log::trace!("Minting Icrc2 tokens");
@@ -369,7 +370,7 @@ impl BridgeTask {
                         amount: burnt_event.amount,
                         src_token: to_token,
                         recipient_address: burnt_event.sender,
-                        operation_id: burnt_event.operation_id,
+                        operation_id: state.borrow_mut().next_nonce(),
                         name,
                         symbol,
                         decimals: burnt_event.decimals,
@@ -381,10 +382,12 @@ impl BridgeTask {
                     let options = TaskOptions::default()
                         .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
                         .with_backoff_policy(BackoffPolicy::Exponential {
-                            secs: 60,
-                            multiplier: 2,
+                            secs: 1,
+                            multiplier: 4,
                         });
-                    scheduler.append_task(task.into_scheduled(options));
+
+                    let task_id = scheduler.append_task(task.into_scheduled(options));
+                    log::trace!("Appending refund mint order task#{task_id}.");
                 }
             }
         }

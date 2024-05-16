@@ -363,7 +363,9 @@ impl CanisterWallet {
                     .map_err(|e| InscribeError::BadInscription(e.to_string()))?;
 
                 let inscription = match op {
-                    Brc20::Deploy(data) => Brc20::deploy(data.tick, data.max, data.lim, data.dec),
+                    Brc20::Deploy(data) => {
+                        Brc20::deploy(data.tick, data.max, data.lim, data.dec, data.self_mint)
+                    }
                     Brc20::Mint(data) => Brc20::mint(data.tick, data.amt),
                     Brc20::Transfer(data) => Brc20::transfer(data.tick, data.amt),
                 };

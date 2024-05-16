@@ -23,7 +23,7 @@ use crate::constant::{
 };
 use crate::interface;
 use crate::interface::bridge_api::{BridgeError, NftMintStatus};
-use crate::interface::store::StorableNftId;
+use crate::interface::store::StorableInscriptionId;
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::NftTask;
 use crate::state::{BtcNftBridgeConfig, NftBridgeConfig, State};
@@ -116,7 +116,7 @@ impl NftBridge {
     #[update]
     pub async fn nft_to_erc721(
         &mut self,
-        nft_id: StorableNftId,
+        nft_id: StorableInscriptionId,
         holder_btc_addr: String,
         dst_eth_addr: H160,
     ) -> Result<NftMintStatus, BridgeError> {

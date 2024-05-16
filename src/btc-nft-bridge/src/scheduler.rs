@@ -12,7 +12,7 @@ use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::erc721_bridge_api::{BridgeEvent, BurnEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
-use ord_rs::inscription::nft::id::NftId;
+use ord_rs::inscription::iid::InscriptionId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
@@ -194,7 +194,7 @@ impl Task for NftTask {
                 log::info!("ERC20 burn event received");
                 let operation_id = *operation_id;
 
-                let Ok(nft_id) = NftId::from_str(&nft_id) else {
+                let Ok(nft_id) = InscriptionId::from_str(&nft_id) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
                         format!("Failed to decode NFT ID: {nft_id}"),
                     )));

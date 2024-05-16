@@ -1,5 +1,9 @@
 # ChainFusion SDK
 
+# Warning 
+
+This code is still in the early alpha stages of development and is not intended for production use. Use at your own risk. 
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
