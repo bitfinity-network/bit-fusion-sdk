@@ -117,8 +117,6 @@ assert_isset_param () {
   fi
 }
 
-start_dfx
-
 LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=debug\"; }"
 OWNER=$(dfx identity get-principal)
 SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant = { Dfx }; } }"
@@ -166,5 +164,3 @@ for canister in $CANISTERS_TO_DEPLOY; do
       ;;
   esac
 done
-
-start_icx
