@@ -329,8 +329,10 @@ impl RunesContext {
 
     async fn withdraw(&self, amount: u128) {
         let withdrawal_address = self.get_withdrawal_address().await;
+        let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
+                &client,
                 &self.eth_wallet,
                 &self.token_contract,
                 withdrawal_address.as_bytes().to_vec(),
