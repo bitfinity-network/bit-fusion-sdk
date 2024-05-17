@@ -3,12 +3,27 @@
 set +e
 
 echo "Starting dfx in a clean state"
+killall icx-proxy
 dfx stop
 rm -f dfx_log.txt
 dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force btc-admin
 dfx identity use btc-admin
+
+start_icx() {
+  evm_id="$1"
+  killall icx-proxy
+  sleep 2
+  # Start ICX Proxy
+  dfx_local_port=$(dfx info replica-port)
+  icx-proxy --fetch-root-key --address 127.0.0.1:8545 --dns-alias 127.0.0.1:$evm_id --replica http://localhost:$dfx_local_port &
+  sleep 2
+
+  curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc": "2.0", "method": "eth_chainId", "params": [], "id":1}' 'http://127.0.0.1:8545'
+
+  echo "ICX Proxy started http://localhost:$dfx_local_port canister ID $evm_id"
+}
 
 ######################### Deploy EVM and NFT Bridge ######################
 
@@ -40,6 +55,8 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
+start_icx $EVM
+
 echo "Deploying BTC NFT bridge"
 dfx deploy btc-nft-bridge --argument "(record {
     ord_url = \"${ORD_URL}\";
@@ -66,36 +83,36 @@ res=$(dfx canister call btc-nft-bridge get_evm_address)
 res=${res#*\"}
 NFT_BRIDGE_ETH_ADDRESS=${res%\"*}
 
-echo "NFT bridge eth address: ${NFT_BRIDGE_ETH_ADDRESS}"
+echo "ERC721 BRIDGE ETH address: ${NFT_BRIDGE_ETH_ADDRESS}"
 
 echo "Minting ETH tokens for NFT bridge canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${NFT_BRIDGE_ETH_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
 echo cargo run -q -p create_bft_bridge_tool -- deploy-erc721-bridge --minter-address="$NFT_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET"
-ERC721_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-erc721-bridge --minter-address="$NFT_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
-echo "NFT ETH address: $ERC721_ETH_ADDRESS"
+ERC721_BRIDGE_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-erc721-bridge --minter-address="$NFT_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
+echo "ERC721 BRIDGE ETH address: $ERC721_BRIDGE_ETH_ADDRESS"
 
-if [ -z "$ERC721_ETH_ADDRESS" ]; then
+if [ -z "$ERC721_BRIDGE_ETH_ADDRESS" ]; then
     echo "Failed to deploy ERC721 bridge contract"
     exit 1
 fi
 
 TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-nft \
-  --erc721-bridge-address="$ERC721_ETH_ADDRESS" \
+  --erc721-bridge-address="$ERC721_BRIDGE_ETH_ADDRESS" \
   --token-name=KOBP \
   --token-id="$NFT_BRIDGE" \
   --evm-canister="$EVM" \
   --wallet="$ETH_WALLET")
 
-echo "Wrapped token ETH address: $TOKEN_ETH_ADDRESS"
+echo "NFT ETH address: $TOKEN_ETH_ADDRESS"
 
 echo "Configuring NFT bridge canister"
 dfx canister call btc-nft-bridge admin_configure_nft_bridge "(record {
-  erc721_chain_id = 355113;
-  bridge_address = \"$ERC721_ETH_ADDRESS\";
+  erc721_chain_id = $CHAIN_ID;
+  bridge_address = \"$ERC721_BRIDGE_ETH_ADDRESS\";
   token_address = \"$TOKEN_ETH_ADDRESS\";
-  token_name = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
-  token_symbol = vec { 42; 54; 43; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
+  token_name = vec { 75; 79; 66; 80; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
+  token_symbol = vec { 75; 79; 66; 80; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; };
 })"
 
 echo "All canisters successfully deployed."

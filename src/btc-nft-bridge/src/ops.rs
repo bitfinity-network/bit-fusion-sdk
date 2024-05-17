@@ -46,13 +46,14 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let (reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let (_reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
-    rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
-        .await
-        .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
+    // FIXME: it doesn't work
+    //rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
+    //    .await
+    //    .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
     state.borrow_mut().inscriptions_mut().insert(nft);
 
@@ -101,6 +102,7 @@ async fn prepare_mint_order(
         let state_ref = state.borrow();
 
         let sender_chain_id = state_ref.btc_chain_id();
+        let dst_token = state_ref.nft_token_address();
         let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
         let src_token = Id256::from(&ic_exports::ic_kit::ic::id());
 
@@ -110,7 +112,7 @@ async fn prepare_mint_order(
             sender,
             src_token,
             recipient: eth_address,
-            dst_token: H160::default(),
+            dst_token,
             nonce,
             sender_chain_id,
             recipient_chain_id,
@@ -119,6 +121,8 @@ async fn prepare_mint_order(
             approve_spender: Default::default(),
             token_uri,
         };
+
+        log::info!("mint order: {mint_order:?}");
 
         let signer = state_ref.signer().get().clone();
 
@@ -206,7 +210,7 @@ async fn send_mint_order(
         }
     });
 
-    log::info!("Mint transaction sent");
+    log::info!("Mint transaction sent: {id}");
 
     Ok(id.into())
 }

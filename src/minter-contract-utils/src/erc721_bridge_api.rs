@@ -293,6 +293,11 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
             indexed: false,
         },
         EventParam {
+            name: "tokenId".into(),
+            kind: ParamType::Uint(32),
+            indexed: false,
+        },
+        EventParam {
             name: "nonce".into(),
             kind: ParamType::Uint(32),
             indexed: false,

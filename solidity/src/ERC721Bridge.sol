@@ -136,6 +136,7 @@ contract ERC721Bridge {
         bytes32 senderID,
         address toERC721,
         address recipient,
+        uint256 tokenId,
         uint32 nonce
     );
 
@@ -171,9 +172,7 @@ contract ERC721Bridge {
 
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
-        MintOrderData memory order = _decodeAndValidateClaim(
-            encodedOrder[:249]
-        );
+        MintOrderData memory order = _decodeAndValidateClaim(encodedOrder);
 
         _checkMintOrderSignature(encodedOrder);
 
@@ -221,6 +220,7 @@ contract ERC721Bridge {
             order.senderID,
             toToken,
             order.recipient,
+            tokenId,
             order.nonce
         );
     }

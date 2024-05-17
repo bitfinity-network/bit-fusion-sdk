@@ -165,6 +165,10 @@ impl State {
         self.bridge_config.erc721_chain_id
     }
 
+    pub fn nft_token_address(&self) -> H160 {
+        self.bridge_config.token_address.clone()
+    }
+
     pub fn btc_chain_id(&self) -> u32 {
         match self.config.network {
             BitcoinNetwork::Mainnet => MAINNET_CHAIN_ID,
