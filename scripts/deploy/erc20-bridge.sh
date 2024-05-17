@@ -87,11 +87,11 @@ fi
 
 LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=debug\"; }"
 OWNER=$(dfx identity get-principal)
-SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
+SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Production }; } }"
 
 if [ "$IC_NETWORK" = "local" ]; then
   start_dfx
-  SIGNING_STRATEGY="variant { Local = record { private_key = blob \"\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\01\\23\\45\\67\\89\\01\\23\\45\\67\\01\\67\\01\"; } }"
+  SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
   EVM_PRINCIPAL=$(deploy_evm_testnet)
   ICRC2_MINTER_ID=$(dfx canister id icrc2-minter)
   if [ -z "$ICRC2_MINTER_ID" ]; then

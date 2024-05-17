@@ -53,11 +53,12 @@ fi
 
 LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=debug\"; }"
 OWNER=$(dfx identity get-principal)
-SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
+SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Production }; } }"
 
 if [ "$IC_NETWORK" = "local" ]; then
   start_dfx
   EVM_PRINCIPAL=$(deploy_evm_testnet)
+  SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
 fi
 
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
