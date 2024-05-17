@@ -51,7 +51,7 @@ fn get_rune_info(name: &str) -> RuneInfo {
     let id_str = json["runes"][name]["id"].as_str().expect("invalid rune id");
     let id_parts = id_str.split(':').collect::<Vec<_>>();
     RuneInfo {
-        name: RuneName::from_str(name).expect("invalid rune name".into()),
+        name: RuneName::from_str(name).unwrap_or_else(|_| panic!("invalid rune name: {name}")),
         decimals: 8,
         block: u64::from_str(id_parts[0]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
         tx: u32::from_str(id_parts[1]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),

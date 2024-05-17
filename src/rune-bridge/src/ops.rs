@@ -106,7 +106,7 @@ async fn fill_rune_infos(
 ) -> Option<Vec<(RuneInfo, u128)>> {
     match fill_rune_infos_from_state(state, rune_amounts) {
         Some(v) => Some(v),
-        None => fill_run_infos_from_indexer(state, rune_amounts).await,
+        None => fill_rune_infos_from_indexer(state, rune_amounts).await,
     }
 }
 
@@ -118,13 +118,13 @@ fn fill_rune_infos_from_state(
     let runes = state.runes();
     let mut infos = vec![];
     for (rune_name, amount) in rune_amounts {
-        infos.push((*runes.get(&rune_name)?, *amount));
+        infos.push((*runes.get(rune_name)?, *amount));
     }
 
     Some(infos)
 }
 
-async fn fill_run_infos_from_indexer(
+async fn fill_rune_infos_from_indexer(
     state: &RefCell<State>,
     rune_amounts: &HashMap<RuneName, u128>,
 ) -> Option<Vec<(RuneInfo, u128)>> {
@@ -145,7 +145,7 @@ async fn fill_run_infos_from_indexer(
         .collect();
     let mut infos = vec![];
     for (rune_name, amount) in rune_amounts {
-        match runes.get(&rune_name) {
+        match runes.get(rune_name) {
             Some(v) => infos.push((*v, *amount)),
             None => {
                 log::error!("Ord indexer didn't return a rune information for rune {rune_name} that was present in an UTXO");
