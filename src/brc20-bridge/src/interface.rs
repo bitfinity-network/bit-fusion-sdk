@@ -2,7 +2,6 @@ use bitcoin::{Network, Transaction, Txid};
 use clap::ValueEnum;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use inscriber::wallet::CanisterWallet;
-use ordinals::SpacedRune;
 use serde::{Deserialize, Serialize};
 
 pub mod bridge_api;
@@ -25,7 +24,6 @@ pub(crate) async fn get_deposit_address(
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionHtml {
     pub chain: Chain,
-    pub etching: Option<SpacedRune>,
     pub inscription_count: u32,
     pub transaction: Transaction,
     pub txid: Txid,

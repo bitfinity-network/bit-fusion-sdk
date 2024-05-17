@@ -872,7 +872,6 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "ord-rs 0.1.0 (git+https://github.com/bitfinity-network/ord-rs.git)",
- "ordinals 0.0.8",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -6806,7 +6805,7 @@ dependencies = [
  "hex",
  "http 1.1.0",
  "log",
- "ordinals 0.0.7",
+ "ordinals",
  "rand",
  "serde",
  "serde_json",
@@ -6836,19 +6835,6 @@ name = "ordinals"
 version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f3b2919fe8ffd6aa09ac72138fd031527f9d57ddb0a01baf8725f13d798598"
-dependencies = [
- "bitcoin 0.30.2",
- "derive_more 0.99.17",
- "serde",
- "serde_with 3.8.1",
- "thiserror",
-]
-
-[[package]]
-name = "ordinals"
-version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f69dc8f090e996b63e1f96972f0d619f497c9545464c7bddf65e42d38576b3f3"
 dependencies = [
  "bitcoin 0.30.2",
  "derive_more 0.99.17",
@@ -7878,7 +7864,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "ord-rs 0.1.0 (git+https://github.com/bitfinity-network/ord-rs?rev=927a5040d69493c785095c81888eba3264495196)",
- "ordinals 0.0.7",
+ "ordinals",
  "serde",
  "serde_json",
 ]

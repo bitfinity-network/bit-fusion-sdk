@@ -34,7 +34,6 @@ log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
 ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
-ordinals = "0.0.8"
 serde = { workspace = true }
 serde_bytes = "0.11"
 serde_json = { workspace = true }

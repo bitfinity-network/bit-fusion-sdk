@@ -25,23 +25,32 @@ pub async fn brc20_to_erc20(
     eth_address: H160,
     brc20: DepositBrc20Args,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
+    let indexer_url = { state.borrow().general_indexer_url() };
     let DepositBrc20Args { tx_id, ticker: _ } = brc20;
 
     // TODO: https://infinityswap.atlassian.net/browse/EPROD-858
     //
-    log::info!("Fetching BRC20 token details");
-    let _fetched_token = rpc::fetch_brc20_token_details(state, &brc20.ticker)
+    // log::info!("Fetching BRC20 token details");
+    // let _fetched_token = rpc::fetch_brc20_token_details(state, &brc20.ticker)
+    //     .await
+    //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+
+    log::info!("Fetching BRC20 transfer transaction by its ID: {tx_id}");
+    let transaction = rpc::fetch_transfer_transaction(state, &tx_id)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
-    log::info!("Fetching BRC20 reveal transaction by its ID: {tx_id}");
-    let reveal_tx = rpc::fetch_reveal_transaction(state, &tx_id)
+    log::info!("Parsing BRC20 inscriptions from from the given transaction");
+    let storable_brc20s = rpc::parse_and_validate_inscriptions(&indexer_url, transaction)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
-    log::info!("Parsing BRC20 inscriptions from transaction");
-    let storable_brc20s = rpc::parse_and_validate_inscriptions(reveal_tx)
-        .map_err(|e| Erc20MintError::InvalidBrc20(e.to_string()))?;
+    if storable_brc20s.is_empty() {
+        return Err(Erc20MintError::Brc20Bridge(
+            "No BRC20 inscriptions found".to_string(),
+        ));
+    }
+    log::debug!("Parsed BRC20 inscriptions: {:?}", storable_brc20s);
 
     state
         .borrow_mut()

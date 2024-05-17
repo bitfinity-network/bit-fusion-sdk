@@ -6,10 +6,10 @@ set +e
 
 ############################### Configure Dfx #################################
 
-echo "Starting dfx in a clean state"
-dfx stop
-rm -f dfx_log.txt
-dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
+# echo "Starting dfx in a clean state"
+# dfx stop
+# rm -f dfx_log.txt
+# dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -130,7 +130,7 @@ echo "Admin address: $ADMIN_ADDRESS"
 height=$($bitcoin_cli getblockcount)
 if [ "$height" -lt 101 ]; then
     echo "Generating 101 blocks..."
-    $bitcoin_cli generatetoaddress 101 "$ADMIN_ADDRESS"
+    $bitcoin_cli generatetoaddress 101 $ADMIN_ADDRESS
 fi
 
 sleep 5
@@ -147,8 +147,8 @@ fi
 
 echo "Ord wallet address: $ORD_ADDRESS"
 
-$bitcoin_cli -rpcwallet=admin sendtoaddress "$ORD_ADDRESS" 10
-$bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
+$bitcoin_cli -rpcwallet=admin sendtoaddress $ORD_ADDRESS 10
+$bitcoin_cli -rpcwallet=admin generatetoaddress 1 $ADMIN_ADDRESS
 
 ##################### Create a BRC20 Inscription ###################
 
@@ -157,10 +157,10 @@ sleep 5
 inscription_res=$($ord_wallet inscribe --fee-rate 10 --file /brc20_json_inscriptions/brc20_deploy.json)
 
 sleep 1
-$bitcoin_cli -rpcwallet=admin generatetoaddress 10 "$ADMIN_ADDRESS"
+$bitcoin_cli -rpcwallet=admin generatetoaddress 10 $ADMIN_ADDRESS
 
 sleep 5
-$bitcoin_cli -rpcwallet=admin generatetoaddress 1 "$ADMIN_ADDRESS"
+$bitcoin_cli -rpcwallet=admin generatetoaddress 1 $ADMIN_ADDRESS
 
 sleep 3
 BRC20_ID=$(echo "$inscription_res" | jq -r '.inscriptions[0].id')
@@ -177,11 +177,7 @@ brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address)
 BRIDGE_ADDRESS=$(echo "$brc20_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
 echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
 
-echo "Topping up canister's wallet"
-docker exec bitcoind bitcoin-cli -regtest generatetoaddress 10 "$BRIDGE_ADDRESS"
-
-sleep 10
-echo "Canister's balance after topup"
+echo "Canister's balance before BRC20 deposit"
 dfx canister call brc20-bridge get_balance "(\"$BRIDGE_ADDRESS\")"
 
 echo "Ord wallet balance before deposit of BRC20"
@@ -189,13 +185,16 @@ $ord_wallet balance
 
 # Deposit BRC20 on the bridge
 echo "Sending BRC20 inscription to canister"
-send_res=$($ord_wallet send --fee-rate 10 "$BRIDGE_ADDRESS" "$BRC20_ID")
+send_res=$($ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS $BRC20_ID)
+$bitcoin_cli generatetoaddress 1 $ORD_ADDRESS
+sleep 5
+$ord_wallet send --fee-rate 10 $BRIDGE_ADDRESS "0.0049 btc"
+$bitcoin_cli generatetoaddress 1 $ORD_ADDRESS
+sleep 5
 echo "Inscription transfer response: $send_res"
 
 TXID=$(echo "$send_res" | jq -r '.txid')
-echo "New txid: $TXID"
-
-$bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
+echo "Inscription transfer txid: $TXID"
 
 sleep 10
 echo "Ord wallet balance after deposit"
@@ -246,7 +245,7 @@ cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
 
 echo "Wait for 15 seconds for the transaction to be broadcast"
 sleep 15
-$bitcoin_cli generatetoaddress 1 "$ORD_ADDRESS"
+$bitcoin_cli generatetoaddress 1 $ORD_ADDRESS
 
 sleep 5
 echo "Ord wallet balance after swap:"

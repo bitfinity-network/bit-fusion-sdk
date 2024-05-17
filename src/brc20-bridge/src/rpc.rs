@@ -54,13 +54,10 @@ pub async fn fetch_brc20_token_details(
     Ok(token_info)
 }
 
-/// Retrieves (and re-constructs) the reveal transaction by its ID.
-///
-/// We use the reveal transaction (as opposed to the commit transaction)
-/// because it contains the actual BRC20 inscription that needs to be parsed.
-pub(crate) async fn fetch_reveal_transaction(
+/// Retrieves (and re-constructs) the BRC20 transfer transaction by its ID.
+pub(crate) async fn fetch_transfer_transaction(
     state: &RefCell<State>,
-    tx_id: &str,
+    txid: &str,
 ) -> anyhow::Result<Transaction> {
     let (ic_btc_network, derivation_path, indexer_url) = {
         let state = state.borrow();
@@ -70,21 +67,13 @@ pub(crate) async fn fetch_reveal_transaction(
             state.general_indexer_url(),
         )
     };
+    let transaction = get_transaction_by_id(&indexer_url, txid).await?;
 
-    let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
-
-    let transaction = http_get_req::<TransactionHtml>(&format!("{indexer_url}/tx/{tx_id}"))
-        .await
-        .map_err(|err| {
-            log::error!("Failed to retrieve transaction from the indexer: {err:?}");
-            BridgeError::GetTransactionById(format!("{err:?}"))
-        })?
-        .ok_or_else(|| BridgeError::GetTransactionById("Transaction not found.".to_string()))?;
-
-    let txid_bytes = hex::decode(tx_id).map_err(|err| {
-        log::error!("Failed to decode transaction ID {tx_id}: {err:?}");
+    let txid_bytes = hex::decode(txid).map_err(|err| {
+        log::error!("Failed to decode transaction ID {txid}: {err:?}");
         BridgeError::GetTransactionById("Invalid transaction ID format.".to_string())
     })?;
+    let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
 
     // Validate UTXOs associated with the transaction ID
     let matching_utxos = find_inscription_utxos(ic_btc_network, bridge_addr, txid_bytes).await?;
@@ -97,12 +86,29 @@ pub(crate) async fn fetch_reveal_transaction(
         .into());
     }
 
-    Ok(transaction.transaction)
+    Ok(transaction)
 }
 
-pub(crate) fn parse_and_validate_inscriptions(
-    reveal_tx: Transaction,
+/// Parses valid BRC20 inscriptions from the given transaction.
+///
+/// NOTE:
+/// The actual inscription is contained in the reveal transaction, not the eventual transfer.
+/// Therefore, we need the ID of the previous output to get the actual BRC20 inscription.
+pub(crate) async fn parse_and_validate_inscriptions(
+    indexer_url: &str,
+    tx: Transaction,
 ) -> Result<Vec<StorableBrc20>, BridgeError> {
+    let reveal_txid = tx
+        .input
+        .first()
+        .map(|input| hex::encode(input.previous_output.txid))
+        .ok_or_else(|| BridgeError::GetTransactionById("No inputs in transaction".to_string()))?;
+
+    let reveal_tx = get_transaction_by_id(indexer_url, &reveal_txid)
+        .await
+        .map_err(|err| BridgeError::GetTransactionById(err.to_string()))?;
+
+    // parse from the actual inscription's reveal transaction
     let parsed_data = OrdParser::parse_all(&reveal_tx)
         .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
 
@@ -213,6 +219,19 @@ fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 
                 .unwrap_or(HTTP_OUTCALL_RES_DEFAULT_SIZE) as u128;
 
     http_outcall_cost
+}
+
+async fn get_transaction_by_id(indexer_url: &str, tx_id: &str) -> anyhow::Result<Transaction> {
+    let transaction = http_get_req::<TransactionHtml>(&format!("{indexer_url}/tx/{tx_id}"))
+        .await
+        .map_err(|err| {
+            log::error!("Failed to retrieve transaction from the indexer: {err:?}");
+            BridgeError::GetTransactionById(format!("{err:?}"))
+        })?
+        .ok_or_else(|| BridgeError::GetTransactionById("Transaction not found.".to_string()))?
+        .transaction;
+
+    Ok(transaction)
 }
 
 /// Validates a reveal transaction ID by checking if it matches
