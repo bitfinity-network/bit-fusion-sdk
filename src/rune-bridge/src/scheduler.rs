@@ -191,7 +191,7 @@ impl Task for RuneBridgeTask {
                     )));
                 };
 
-                let Some(token_id) = Id256::from_slice(&to_token) else {
+                let Some(token_id) = Id256::from_slice(to_token) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
                         format!("Failed to decode token id from the value {to_token:?}"),
                     )));

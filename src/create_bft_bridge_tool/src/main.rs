@@ -283,7 +283,7 @@ async fn create_token(args: CreateTokenArgs) {
     );
 
     let token_id = decode_token_id(&args.token_id)
-        .expect(&format!("Invalid token id format: {}", args.token_id));
+        .unwrap_or_else(|| panic!("Invalid token id format: {}", args.token_id));
 
     let client = EvmCanisterClient::new(
         IcAgentClient::with_identity(
@@ -515,10 +515,10 @@ fn decode_token_id(id_string: &str) -> Option<Id256> {
     if split.len() == 2 {
         let block_id = split[0]
             .parse::<u64>()
-            .expect(&format!("invalid rune id: {id_string})"));
+            .unwrap_or_else(|_| panic!("invalid rune id: {id_string})"));
         let tx_index = split[1]
             .parse::<u32>()
-            .expect(&format!("invalid rune id: {id_string})"));
+            .unwrap_or_else(|_| panic!("invalid rune id: {id_string})"));
         return Some(Id256::from_btc_tx_index(block_id, tx_index));
     }
 

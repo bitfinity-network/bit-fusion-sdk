@@ -52,9 +52,11 @@ impl RuneInfo {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RuneName(Rune);
 
-impl RuneName {
-    pub fn from_str(name: &str) -> Result<Self, <Rune as FromStr>::Err> {
-        Ok(Self(Rune::from_str(name)?))
+impl FromStr for RuneName {
+    type Err = <Rune as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(Rune::from_str(s)?))
     }
 }
 
