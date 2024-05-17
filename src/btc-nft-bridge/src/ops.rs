@@ -46,14 +46,14 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let (_reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let (reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
     // FIXME: it doesn't work
-    //rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
-    //    .await
-    //    .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
+    rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
+        .await
+        .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
     state.borrow_mut().inscriptions_mut().insert(nft);
 
