@@ -9,6 +9,6 @@ dfx start --background --clean --enable-bitcoin 2> dfx_tests.log
 
 sleep 10
 
-cargo test -p integration-tests --features dfx_tests
+cargo test -p integration-tests --features dfx_tests $1
 
 dfx stop

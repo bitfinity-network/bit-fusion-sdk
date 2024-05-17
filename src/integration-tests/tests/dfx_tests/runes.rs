@@ -155,10 +155,6 @@ impl RunesContext {
         self.inner.canisters().rune_bridge()
     }
 
-    fn eth_wallet_address(&self) -> H160 {
-        self.eth_wallet.address().into()
-    }
-
     async fn get_deposit_address(&self, eth_address: &H160) -> String {
         self.inner
             .client(self.bridge(), ADMIN)
@@ -168,7 +164,7 @@ impl RunesContext {
             .expect("get_deposit_address error")
     }
 
-    async fn send_ord(&self, btc_address: &str, amount: u128) {
+    async fn send_runes(&self, btc_address: &str, amount: u128) {
         let output = self
             .run_ord(&[
                 "send",
@@ -366,6 +362,11 @@ impl RunesContext {
         self.inner.advance_time(Duration::from_secs(15)).await;
         self.mint_blocks(1).await;
         self.inner.advance_time(Duration::from_secs(5)).await;
+
+        // Ord indexer doesn't catch the new balance for some reason after the first block, so
+        // we mint one more time to make sure indexer is up to date.
+        self.mint_blocks(1).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
     }
 
     async fn get_withdrawal_address(&self) -> String {
@@ -404,33 +405,37 @@ impl RunesContext {
                     json["runes"][RUNE_NAME]
                 )
             })
-            * 100.0) as u128
+            * 100.0)
+            .round() as u128
+    }
+
+    async fn deposit_runes_to(&self, rune_amount: u128, wallet: &Wallet<'_, SigningKey>) {
+        let balance_before = self.wrapped_balance(wallet).await;
+
+        let wallet_address = wallet.address();
+        let address = self.get_deposit_address(&wallet_address.into()).await;
+
+        self.send_runes(&address, rune_amount).await;
+        self.send_btc(&address, 490000).await;
+
+        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        self.deposit(&wallet_address.into())
+            .await
+            .expect("failed to deposit runes");
+
+        let balance_after = self.wrapped_balance(wallet).await;
+        assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
     }
 }
 
 #[tokio::test]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::new().await;
-
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
-
     let ord_balance = ctx.ord_rune_balance().await;
-
-    let wallet_address = ctx.eth_wallet_address();
-    let address = ctx.get_deposit_address(&wallet_address).await;
-
-    ctx.send_ord(&address, 100).await;
-    ctx.send_btc(&address, 490000).await;
-
-    ctx.inner.advance_time(Duration::from_secs(5)).await;
-
-    ctx.deposit(&wallet_address)
-        .await
-        .expect("failed to deposit runes");
-
-    let balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
-    assert_eq!(balance, 100);
+    ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
 
     ctx.withdraw(30).await;
 
@@ -440,6 +445,36 @@ async fn runes_bridging_flow() {
     let updated_ord_balance = ctx.ord_rune_balance().await;
 
     assert_eq!(updated_ord_balance, ord_balance - 70);
+
+    ctx.stop().await
+}
+
+#[tokio::test]
+async fn inputs_from_different_users() {
+    let ctx = RunesContext::new().await;
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let rune_balance = ctx.ord_rune_balance().await;
+    ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
+
+    let another_wallet = ctx
+        .inner
+        .new_wallet(u128::MAX)
+        .await
+        .expect("failed to create an ETH wallet");
+    ctx.deposit_runes_to(77, &another_wallet).await;
+
+    ctx.withdraw(50).await;
+
+    let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_balance, 50);
+
+    let updated_rune_balance = ctx.ord_rune_balance().await;
+
+    assert_eq!(updated_rune_balance, rune_balance - 50 - 77);
+
+    assert_eq!(ctx.wrapped_balance(&another_wallet).await, 77);
+    assert_eq!(ctx.wrapped_balance(&ctx.eth_wallet).await, 50);
 
     ctx.stop().await
 }

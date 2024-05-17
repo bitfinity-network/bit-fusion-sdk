@@ -12,7 +12,8 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
-use ord_rs::{Wallet, WalletType};
+use ord_rs::wallet::LocalSigner;
+use ord_rs::Wallet;
 use std::collections::HashMap;
 
 use crate::key::IcBtcSigner;
@@ -184,32 +185,16 @@ impl State {
         self.master_key.clone().expect("ecdsa is not initialized")
     }
 
-    /// Derived public key with the given derivation path.
-    pub fn der_public_key(&self, derivation_path: &[Vec<u8>]) -> PublicKey {
-        IcBtcSigner::new(self.master_key(), self.network(), derivation_path.to_vec()).public_key()
-    }
-
-    /// Returns `WalletType` structure to be used to sign transactions with the given
-    /// derivation path.
-    pub fn wallet_type(&self, derivation_path: Vec<Vec<u8>>) -> WalletType {
-        match &self.config.signing_strategy {
-            SigningStrategy::Local { private_key } => WalletType::Local {
-                private_key: PrivateKey::from_slice(private_key, self.network())
-                    .expect("Invalid PK"),
-            },
-            SigningStrategy::ManagementCanister { .. } => WalletType::External {
-                signer: Box::new(IcBtcSigner::new(
-                    self.master_key(),
-                    self.network(),
-                    derivation_path,
-                )),
-            },
-        }
-    }
-
     /// Wallet to be used to sign transactions with the given derivation path.
-    pub fn wallet(&self, derivation_path: Vec<Vec<u8>>) -> Wallet {
-        Wallet::new_with_signer(self.wallet_type(derivation_path))
+    pub fn wallet(&self) -> Wallet {
+        match &self.config.signing_strategy {
+            SigningStrategy::Local { private_key } => Wallet::new_with_signer(LocalSigner::new(
+                PrivateKey::from_slice(private_key, self.network()).expect("invalid private key"),
+            )),
+            SigningStrategy::ManagementCanister { .. } => {
+                Wallet::new_with_signer(IcBtcSigner::new(self.master_key(), self.network()))
+            }
+        }
     }
 
     /// BTC fee in SATs for a deposit request.

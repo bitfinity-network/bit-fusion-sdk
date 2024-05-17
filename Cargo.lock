@@ -6723,7 +6723,6 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 [[package]]
 name = "ord-rs"
 version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs?rev=927a5040d69493c785095c81888eba3264495196#927a5040d69493c785095c81888eba3264495196"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",
