@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
+use bitcoin::bip32::DerivationPath;
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
@@ -222,6 +223,7 @@ impl RuneBridge {
                     value: Amount::from_sat(utxo.value),
                     script_pubkey: from_addr.script_pubkey(),
                 },
+                derivation_path: DerivationPath::default(),
             })
             .collect();
 
@@ -240,7 +242,7 @@ impl RuneBridge {
         let builder = OrdTransactionBuilder::new(
             state.borrow().public_key(),
             ScriptType::P2WSH,
-            state.borrow().wallet(vec![]),
+            state.borrow().wallet(),
         );
         let unsigned_tx = builder
             .create_edict_transaction(&args)

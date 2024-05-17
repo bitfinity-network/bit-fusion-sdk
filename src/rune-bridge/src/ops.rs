@@ -19,14 +19,13 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 use ic_stable_structures::CellStructure;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
+use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
 
 use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
 use crate::key::{get_deposit_address, get_derivation_path_ic};
-use crate::ledger::StoredUtxo;
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::state::State;
 
@@ -177,32 +176,22 @@ pub async fn build_withdraw_transaction(
     amount: u128,
     address: Address,
     rune: RuneId,
-    inputs: Vec<StoredUtxo>,
+    inputs: Vec<TxInputInfo>,
 ) -> Result<Transaction, WithdrawError> {
     if inputs.is_empty() {
         return Err(WithdrawError::NoInputs);
     }
 
-    if !inputs
-        .iter()
-        .all(|input| input.derivation_path == inputs[0].derivation_path)
-    {
-        // https://infinityswap.atlassian.net/browse/EPROD-848
-        todo!();
-    }
+    let public_key = state.borrow().public_key();
+    let wallet = state.borrow().wallet();
 
-    let derivation_path = &inputs[0].derivation_path;
-    let public_key = state.borrow().der_public_key(derivation_path);
-    let signer = state.borrow().wallet(derivation_path.clone());
-
-    let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
+    let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
     let change_address = get_change_address(state)?;
     let rune_change_address = change_address.clone();
 
     let fee_rate = get_fee_rate(state).await?;
 
-    let inputs = inputs.into_iter().map(|v| v.tx_input_info).collect();
     let args = CreateEdictTxArgs {
         rune,
         inputs,
@@ -335,8 +324,8 @@ fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtx
 
     get_utxos_response.utxos.retain(|utxo| {
         !existing.iter().any(|v| {
-            v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-                && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
+            v.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
+                && v.outpoint.vout == utxo.outpoint.vout
         })
     })
 }
