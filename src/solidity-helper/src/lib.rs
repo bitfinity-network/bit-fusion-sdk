@@ -180,6 +180,6 @@ mod tests {
         let contract = contracts.get("TestContractWithPrecompiles").unwrap();
         assert!(!contract.bytecode.is_empty());
         assert!(!contract.deployed_bytecode.is_empty());
-        assert!(contract.method_identifiers.get("do_ripemd160()").is_some());
+        assert!(contract.method_identifiers.contains_key("do_ripemd160()"));
     }
 }
