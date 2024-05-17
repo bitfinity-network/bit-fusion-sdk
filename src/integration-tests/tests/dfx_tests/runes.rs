@@ -12,9 +12,9 @@ use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
 use minter_contract_utils::evm_link::EvmLink;
-use minter_did::id256::Id256;
 use rune_bridge::interface::{DepositError, Erc20MintStatus, GetAddressError};
-use rune_bridge::state::{RuneBridgeConfig, RuneInfo};
+use rune_bridge::rune_info::{RuneInfo, RuneName};
+use rune_bridge::state::RuneBridgeConfig;
 use serde_json::Value;
 use tokio::process::Command;
 use tokio::time::Instant;
@@ -51,7 +51,8 @@ fn get_rune_info(name: &str) -> RuneInfo {
     let id_str = json["runes"][name]["id"].as_str().expect("invalid rune id");
     let id_parts = id_str.split(':').collect::<Vec<_>>();
     RuneInfo {
-        name: name.to_string(),
+        name: RuneName::from_str(name).unwrap_or_else(|_| panic!("invalid rune name: {name}")),
+        decimals: 8,
         block: u64::from_str(id_parts[0]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
         tx: u32::from_str(id_parts[1]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
     }
@@ -75,7 +76,6 @@ impl RunesContext {
                 log_filter: Some("trace".to_string()),
             },
             min_confirmations: 1,
-            rune_info: get_rune_info(RUNE_NAME),
             indexer_url: "https://localhost:8001".to_string(),
             deposit_fee: 500_000,
         };
@@ -112,9 +112,10 @@ impl RunesContext {
             .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap())
             .await
             .unwrap();
-        let token_id = Id256::from(&bridge);
+
+        let rune_info = get_rune_info(RUNE_NAME);
         let token = context
-            .create_wrapped_token(&wallet, &bft_bridge, token_id)
+            .create_wrapped_token(&wallet, &bft_bridge, rune_info.id().into())
             .await
             .unwrap();
 
@@ -154,10 +155,6 @@ impl RunesContext {
         self.inner.canisters().rune_bridge()
     }
 
-    fn eth_wallet_address(&self) -> H160 {
-        self.eth_wallet.address().into()
-    }
-
     async fn get_deposit_address(&self, eth_address: &H160) -> String {
         self.inner
             .client(self.bridge(), ADMIN)
@@ -167,7 +164,7 @@ impl RunesContext {
             .expect("get_deposit_address error")
     }
 
-    async fn send_ord(&self, btc_address: &str, amount: u128) {
+    async fn send_runes(&self, btc_address: &str, amount: u128) {
         let output = self
             .run_ord(&[
                 "send",
@@ -201,6 +198,13 @@ impl RunesContext {
 
     async fn run_ord(&self, args: &[&str]) -> String {
         let output = Command::new("ord")
+            .envs([
+                ("ORD_BITCOIN_RPC_USERNAME", "ic-btc-integration"),
+                (
+                    "ORD_BITCOIN_RPC_PASSWORD",
+                    "QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E=",
+                ),
+            ])
             .args([
                 "-r",
                 "--data-dir",
@@ -218,7 +222,12 @@ impl RunesContext {
             Ok(res) if res.status.success() => res.stdout,
             Err(err) if err.kind() == ErrorKind::NotFound => panic!("`ord` cli tool not found"),
             Err(err) => panic!("'ord' execution failed: {err:?}"),
-            Ok(res) => panic!("'ord' exited with status code {}", res.status),
+            Ok(res) => panic!(
+                "'ord' exited with status code {}: {} {}",
+                res.status,
+                String::from_utf8_lossy(&res.stdout),
+                String::from_utf8_lossy(&res.stderr),
+            ),
         };
 
         String::from_utf8(result).expect("Ord returned not valid utf8 string")
@@ -264,18 +273,27 @@ impl RunesContext {
             match self
                 .inner
                 .client(self.bridge(), ADMIN)
-                .update::<_, Result<Erc20MintStatus, DepositError>>("deposit", (eth_address,))
+                .update::<_, Result<Vec<Erc20MintStatus>, DepositError>>("deposit", (eth_address,))
                 .await
                 .expect("canister call failed")
             {
-                Err(DepositError::NotingToDeposit) => retry_count += 1,
-                Ok(ref res @ Erc20MintStatus::Minted { ref tx_id, .. }) => {
-                    self.inner.advance_time(Duration::from_secs(2)).await;
-                    self.wait_for_tx_success(tx_id).await;
-
-                    return Ok(res.clone());
+                Err(DepositError::NotingToDeposit) | Err(DepositError::NotEnoughBtc { .. }) => {
+                    retry_count += 1
                 }
-                result => return result,
+                Ok(statuses) => match &statuses[0] {
+                    res @ Erc20MintStatus::Minted { ref tx_id, .. } => {
+                        self.inner.advance_time(Duration::from_secs(2)).await;
+                        self.wait_for_tx_success(tx_id).await;
+
+                        return Ok(res.clone());
+                    }
+                    status => return Ok(status.clone()),
+                },
+                result => {
+                    return Err(DepositError::Unavailable(format!(
+                        "Unexpected deposit result: {result:?}"
+                    )))
+                }
             }
         }
 
@@ -329,8 +347,10 @@ impl RunesContext {
 
     async fn withdraw(&self, amount: u128) {
         let withdrawal_address = self.get_withdrawal_address().await;
+        let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
+                &client,
                 &self.eth_wallet,
                 &self.token_contract,
                 withdrawal_address.as_bytes().to_vec(),
@@ -341,6 +361,11 @@ impl RunesContext {
             .expect("failed to burn wrapped token");
 
         self.inner.advance_time(Duration::from_secs(15)).await;
+        self.mint_blocks(1).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        // Ord indexer doesn't catch the new balance for some reason after the first block, so
+        // we mint one more time to make sure indexer is up to date.
         self.mint_blocks(1).await;
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
@@ -381,33 +406,37 @@ impl RunesContext {
                     json["runes"][RUNE_NAME]
                 )
             })
-            * 100.0) as u128
+            * 100.0)
+            .round() as u128
+    }
+
+    async fn deposit_runes_to(&self, rune_amount: u128, wallet: &Wallet<'_, SigningKey>) {
+        let balance_before = self.wrapped_balance(wallet).await;
+
+        let wallet_address = wallet.address();
+        let address = self.get_deposit_address(&wallet_address.into()).await;
+
+        self.send_runes(&address, rune_amount).await;
+        self.send_btc(&address, 490000).await;
+
+        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        self.deposit(&wallet_address.into())
+            .await
+            .expect("failed to deposit runes");
+
+        let balance_after = self.wrapped_balance(wallet).await;
+        assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
     }
 }
 
 #[tokio::test]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::new().await;
-
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
-
     let ord_balance = ctx.ord_rune_balance().await;
-
-    let wallet_address = ctx.eth_wallet_address();
-    let address = ctx.get_deposit_address(&wallet_address).await;
-
-    ctx.send_ord(&address, 100).await;
-    ctx.send_btc(&address, 490000).await;
-
-    ctx.inner.advance_time(Duration::from_secs(5)).await;
-
-    ctx.deposit(&wallet_address)
-        .await
-        .expect("failed to deposit runes");
-
-    let balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
-    assert_eq!(balance, 100);
+    ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
 
     ctx.withdraw(30).await;
 
@@ -417,6 +446,36 @@ async fn runes_bridging_flow() {
     let updated_ord_balance = ctx.ord_rune_balance().await;
 
     assert_eq!(updated_ord_balance, ord_balance - 70);
+
+    ctx.stop().await
+}
+
+#[tokio::test]
+async fn inputs_from_different_users() {
+    let ctx = RunesContext::new().await;
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let rune_balance = ctx.ord_rune_balance().await;
+    ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
+
+    let another_wallet = ctx
+        .inner
+        .new_wallet(u128::MAX)
+        .await
+        .expect("failed to create an ETH wallet");
+    ctx.deposit_runes_to(77, &another_wallet).await;
+
+    ctx.withdraw(50).await;
+
+    let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_balance, 50);
+
+    let updated_rune_balance = ctx.ord_rune_balance().await;
+
+    assert_eq!(updated_rune_balance, rune_balance - 50 - 77);
+
+    assert_eq!(ctx.wrapped_balance(&another_wallet).await, 77);
+    assert_eq!(ctx.wrapped_balance(&ctx.eth_wallet).await, 50);
 
     ctx.stop().await
 }

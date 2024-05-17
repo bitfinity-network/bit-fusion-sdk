@@ -33,8 +33,8 @@ evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-ev
 icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.18.x" }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-ic-agent = "0.33"
-ic-utils = "0.33"
+ic-agent = "0.34"
+ic-utils = "0.34"
 ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.16.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.16.x" }
@@ -55,7 +55,7 @@ minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk"
 minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.18.x" }
 mockall = "0.12"
 once_cell = "1.16"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", rev = "927a5040d69493c785095c81888eba3264495196" }
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.1.2" }
 ordinals = "0.0.7"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.12", default-features = false }
