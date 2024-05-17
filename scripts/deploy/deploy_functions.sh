@@ -287,7 +287,7 @@ start_dfx() {
   fi
 
   # Create identity
-  dfx identity new --storage-mode=plaintext alice
+  dfx identity new --force --storage-mode=plaintext alice
   dfx identity use alice
   echo "Alice's Identity Created"
 }
