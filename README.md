@@ -1,8 +1,12 @@
 # ChainFusion SDK
 
-# Warning 
+## Warning
 
-This code is still in the early alpha stages of development and is not intended for production use. Use at your own risk. 
+This code is still in the early stages of development and is not intended for production use. Use at your own risk.
+
+## Deploy
+
+See [Deploy readme](./docs/deploy.md)
 
 ## License
 
