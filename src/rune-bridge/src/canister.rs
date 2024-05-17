@@ -92,7 +92,7 @@ impl RuneBridge {
     }
 
     #[update]
-    pub async fn deposit(&self, eth_address: H160) -> Result<Erc20MintStatus, DepositError> {
+    pub async fn deposit(&self, eth_address: H160) -> Result<Vec<Erc20MintStatus>, DepositError> {
         crate::ops::deposit(get_state(), &eth_address).await
     }
 
@@ -201,7 +201,7 @@ impl RuneBridge {
             .expect("failed to get rune list");
         let rune_id = runes_list
             .into_iter()
-            .find(|(_, spaced_rune)| args.rune_name == spaced_rune.to_string())
+            .find(|(_, spaced_rune, _)| args.rune_name == spaced_rune.to_string())
             .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
             .0;
 

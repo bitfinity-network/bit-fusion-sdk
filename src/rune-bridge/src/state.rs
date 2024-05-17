@@ -13,12 +13,13 @@ use ic_stable_structures::{StableCell, VirtualMemory};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use ord_rs::{Wallet, WalletType};
-use ordinals::RuneId;
+use std::collections::HashMap;
 
 use crate::key::IcBtcSigner;
 use crate::ledger::UtxoLedger;
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::orders_store::MintOrdersStore;
+use crate::rune_info::{RuneInfo, RuneName};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
@@ -33,6 +34,7 @@ pub struct State {
     evm_params: Option<EvmParams>,
     master_key: Option<MasterKey>,
     ledger: UtxoLedger,
+    runes: HashMap<RuneName, RuneInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +66,7 @@ impl Default for State {
             evm_params: None,
             master_key: None,
             ledger: Default::default(),
+            runes: Default::default(),
         }
     }
 }
@@ -76,25 +79,8 @@ pub struct RuneBridgeConfig {
     pub admin: Principal,
     pub log_settings: LogSettings,
     pub min_confirmations: u32,
-    pub rune_info: RuneInfo,
     pub indexer_url: String,
     pub deposit_fee: u64,
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct RuneInfo {
-    pub name: String,
-    pub block: u64,
-    pub tx: u32,
-}
-
-impl RuneInfo {
-    pub fn id(&self) -> RuneId {
-        RuneId {
-            block: self.block,
-            tx: self.tx,
-        }
-    }
 }
 
 impl Default for RuneBridgeConfig {
@@ -108,11 +94,6 @@ impl Default for RuneBridgeConfig {
             admin: Principal::management_canister(),
             log_settings: LogSettings::default(),
             min_confirmations: 12,
-            rune_info: RuneInfo {
-                name: "".to_string(),
-                block: 0,
-                tx: 0,
-            },
             indexer_url: String::new(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
         }
@@ -121,10 +102,6 @@ impl Default for RuneBridgeConfig {
 
 impl RuneBridgeConfig {
     fn validate(&self) -> Result<(), String> {
-        if self.rune_info.name.is_empty() {
-            return Err("Rune name is empty".to_string());
-        }
-
         if self.indexer_url.is_empty() {
             return Err("Indexer url is empty".to_string());
         }
@@ -144,10 +121,6 @@ impl RuneBridgeConfig {
 pub struct BftBridgeConfig {
     pub erc20_chain_id: u32,
     pub bridge_address: H160,
-    pub token_address: H160,
-    pub token_name: [u8; 32],
-    pub token_symbol: [u8; 16],
-    pub decimals: u8,
 }
 
 impl State {
@@ -162,6 +135,14 @@ impl State {
             curve: EcdsaCurve::Secp256k1,
             name: key_name,
         }
+    }
+
+    pub fn runes(&self) -> &HashMap<RuneName, RuneInfo> {
+        &self.runes
+    }
+
+    pub fn update_rune_list(&mut self, runes: HashMap<RuneName, RuneInfo>) {
+        self.runes = runes;
     }
 
     /// Returns master public key of the canister.
@@ -197,16 +178,6 @@ impl State {
     /// Minimum number of confirmations the canister requires to consider a transaction to be confirmed.
     pub fn min_confirmations(&self) -> u32 {
         self.config.min_confirmations
-    }
-
-    /// Name of the rune the canister works with.
-    pub fn rune_name(&self) -> String {
-        self.config.rune_info.name.clone()
-    }
-
-    /// Id of the rune the canister works with.
-    pub fn rune_id(&self) -> RuneId {
-        self.config.rune_info.id()
     }
 
     fn master_key(&self) -> MasterKey {
@@ -363,21 +334,6 @@ impl State {
     /// Mutable reference to the signed mint orders store.
     pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
         &mut self.orders_store
-    }
-
-    /// Name of the wrapped token.
-    pub fn token_name(&self) -> [u8; 32] {
-        self.bft_config.token_name
-    }
-
-    /// Symbol of the wrapped token.
-    pub fn token_symbol(&self) -> [u8; 16] {
-        self.bft_config.token_symbol
-    }
-
-    /// Decimals of the wrapped token.
-    pub fn decimals(&self) -> u8 {
-        self.bft_config.decimals
     }
 }
 

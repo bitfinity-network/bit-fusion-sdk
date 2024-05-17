@@ -19,6 +19,6 @@ ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 minter-contract-utils = { path = "../minter-contract-utils", features = [
     "test-contracts",
 ] }
-minter-did = { workspace = true }
+minter-did = { workspace = true, features = ["runes"] }
 rand = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }

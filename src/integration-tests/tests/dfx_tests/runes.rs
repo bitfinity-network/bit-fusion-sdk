@@ -12,9 +12,9 @@ use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
 use minter_contract_utils::evm_link::EvmLink;
-use minter_did::id256::Id256;
 use rune_bridge::interface::{DepositError, Erc20MintStatus, GetAddressError};
-use rune_bridge::state::{RuneBridgeConfig, RuneInfo};
+use rune_bridge::rune_info::{RuneInfo, RuneName};
+use rune_bridge::state::RuneBridgeConfig;
 use serde_json::Value;
 use tokio::process::Command;
 use tokio::time::Instant;
@@ -51,7 +51,8 @@ fn get_rune_info(name: &str) -> RuneInfo {
     let id_str = json["runes"][name]["id"].as_str().expect("invalid rune id");
     let id_parts = id_str.split(':').collect::<Vec<_>>();
     RuneInfo {
-        name: name.to_string(),
+        name: RuneName::from_str(name).unwrap_or_else(|_| panic!("invalid rune name: {name}")),
+        decimals: 8,
         block: u64::from_str(id_parts[0]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
         tx: u32::from_str(id_parts[1]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
     }
@@ -75,7 +76,6 @@ impl RunesContext {
                 log_filter: Some("trace".to_string()),
             },
             min_confirmations: 1,
-            rune_info: get_rune_info(RUNE_NAME),
             indexer_url: "https://localhost:8001".to_string(),
             deposit_fee: 500_000,
         };
@@ -112,9 +112,10 @@ impl RunesContext {
             .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap())
             .await
             .unwrap();
-        let token_id = Id256::from(&bridge);
+
+        let rune_info = get_rune_info(RUNE_NAME);
         let token = context
-            .create_wrapped_token(&wallet, &bft_bridge, token_id)
+            .create_wrapped_token(&wallet, &bft_bridge, rune_info.id().into())
             .await
             .unwrap();
 
@@ -201,6 +202,13 @@ impl RunesContext {
 
     async fn run_ord(&self, args: &[&str]) -> String {
         let output = Command::new("ord")
+            .envs([
+                ("ORD_BITCOIN_RPC_USERNAME", "ic-btc-integration"),
+                (
+                    "ORD_BITCOIN_RPC_PASSWORD",
+                    "QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E=",
+                ),
+            ])
             .args([
                 "-r",
                 "--data-dir",
@@ -218,7 +226,12 @@ impl RunesContext {
             Ok(res) if res.status.success() => res.stdout,
             Err(err) if err.kind() == ErrorKind::NotFound => panic!("`ord` cli tool not found"),
             Err(err) => panic!("'ord' execution failed: {err:?}"),
-            Ok(res) => panic!("'ord' exited with status code {}", res.status),
+            Ok(res) => panic!(
+                "'ord' exited with status code {}: {} {}",
+                res.status,
+                String::from_utf8_lossy(&res.stdout),
+                String::from_utf8_lossy(&res.stderr),
+            ),
         };
 
         String::from_utf8(result).expect("Ord returned not valid utf8 string")
@@ -264,18 +277,27 @@ impl RunesContext {
             match self
                 .inner
                 .client(self.bridge(), ADMIN)
-                .update::<_, Result<Erc20MintStatus, DepositError>>("deposit", (eth_address,))
+                .update::<_, Result<Vec<Erc20MintStatus>, DepositError>>("deposit", (eth_address,))
                 .await
                 .expect("canister call failed")
             {
-                Err(DepositError::NotingToDeposit) => retry_count += 1,
-                Ok(ref res @ Erc20MintStatus::Minted { ref tx_id, .. }) => {
-                    self.inner.advance_time(Duration::from_secs(2)).await;
-                    self.wait_for_tx_success(tx_id).await;
-
-                    return Ok(res.clone());
+                Err(DepositError::NotingToDeposit) | Err(DepositError::NotEnoughBtc { .. }) => {
+                    retry_count += 1
                 }
-                result => return result,
+                Ok(statuses) => match &statuses[0] {
+                    res @ Erc20MintStatus::Minted { ref tx_id, .. } => {
+                        self.inner.advance_time(Duration::from_secs(2)).await;
+                        self.wait_for_tx_success(tx_id).await;
+
+                        return Ok(res.clone());
+                    }
+                    status => return Ok(status.clone()),
+                },
+                result => {
+                    return Err(DepositError::Unavailable(format!(
+                        "Unexpected deposit result: {result:?}"
+                    )))
+                }
             }
         }
 
