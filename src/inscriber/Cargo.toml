@@ -9,6 +9,7 @@ bitcoin = { version = "0.31", features = ["serde"] }
 bs58 = "0.5"
 candid = { workspace = true }
 ethers-core = { workspace = true }
+eth-signer = { workspace = true }
 did = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
@@ -20,7 +21,7 @@ ic-storage = { workspace = true }
 jsonrpc-core = { workspace = true }
 k256 = { version = "0.13", features = ["ecdsa"] }
 log = { workspace = true }
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs.git" }
+ord-rs = { workspace = true }
 ripemd = "0.1"
 serde = { workspace = true }
 serde_bytes = "0.11"

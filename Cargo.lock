@@ -871,7 +871,7 @@ dependencies = [
  "log",
  "minter-contract-utils",
  "minter-did",
- "ord-rs 0.1.0",
+ "ord-rs",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -5858,6 +5858,7 @@ dependencies = [
  "bs58 0.5.1",
  "candid",
  "did",
+ "eth-signer",
  "ethers-core",
  "hex",
  "ic-canister",
@@ -5869,7 +5870,7 @@ dependencies = [
  "jsonrpc-core",
  "k256",
  "log",
- "ord-rs 0.1.0",
+ "ord-rs",
  "ripemd",
  "serde",
  "serde_bytes",
@@ -6795,23 +6796,6 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
-
-[[package]]
-name = "ord-rs"
-version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git#f9bf15241e4588200e4ec97cf0fc0ef1a3933a41"
-dependencies = [
- "async-trait",
- "bitcoin 0.31.2",
- "ciborium",
- "hex",
- "log",
- "rand",
- "serde",
- "serde_json",
- "serde_with 3.8.1",
- "thiserror",
-]
 
 [[package]]
 name = "ord-rs"
@@ -7864,7 +7848,7 @@ dependencies = [
  "log",
  "minter-contract-utils",
  "minter-did",
- "ord-rs 0.1.2",
+ "ord-rs",
  "ordinals",
  "serde",
  "serde_json",

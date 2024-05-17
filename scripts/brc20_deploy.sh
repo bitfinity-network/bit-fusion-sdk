@@ -6,10 +6,10 @@ set +e
 
 ############################### Configure Dfx #################################
 
-# echo "Starting dfx in a clean state"
-# dfx stop
-# rm -f dfx_log.txt
-# dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
+echo "Starting dfx in a clean state"
+dfx stop
+rm -f dfx_log.txt
+dfx start --clean --background --enable-bitcoin  --host 127.0.0.1:4943 >dfx_log.txt 2>&1
 
 dfx identity new --force brc20-admin
 dfx identity use brc20-admin
@@ -173,7 +173,7 @@ $ord_wallet balance
 
 echo "Preparing to bridge a BRC20 inscription to an ERC20 token"
 
-brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address)
+brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address"(\"$ETH_WALLET_ADDRESS\")")
 BRIDGE_ADDRESS=$(echo "$brc20_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
 echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
 

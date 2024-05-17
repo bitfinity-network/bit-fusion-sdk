@@ -8,6 +8,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
+use inscriber::interface::ecdsa_api::{EcdsaSigner, MasterKey};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
@@ -25,6 +26,7 @@ pub struct State {
     signer: SignerStorage,
     mint_orders: MintOrdersStore,
     burn_requests: BurnRequestStore,
+    master_key: Option<MasterKey>,
     inscriptions: Brc20Store,
     evm_params: Option<EvmParams>,
 }
@@ -112,6 +114,7 @@ impl Default for State {
             signer,
             mint_orders: Default::default(),
             burn_requests: Default::default(),
+            master_key: None,
             inscriptions: Brc20Store::default(),
             evm_params: None,
         }
@@ -197,14 +200,12 @@ impl State {
         &self.signer
     }
 
-    #[inline]
-    pub(crate) fn derivation_path(&self, address: Option<H160>) -> Vec<Vec<u8>> {
-        let caller_principal = ic_exports::ic_cdk::caller().as_slice().to_vec();
-
-        match address {
-            Some(address) => vec![address.0.as_bytes().to_vec()],
-            None => vec![caller_principal],
-        }
+    pub fn ecdsa_signer(&self) -> EcdsaSigner {
+        EcdsaSigner::new(
+            self.config.signing_strategy.clone(),
+            self.master_key.clone(),
+            self.btc_network(),
+        )
     }
 
     pub fn mint_orders(&self) -> &MintOrdersStore {

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use bitcoin::Transaction;
+use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, Utxo,
 };
@@ -59,13 +60,9 @@ pub(crate) async fn fetch_transfer_transaction(
     state: &RefCell<State>,
     txid: &str,
 ) -> anyhow::Result<Transaction> {
-    let (ic_btc_network, derivation_path, indexer_url) = {
+    let (ic_btc_network, indexer_url) = {
         let state = state.borrow();
-        (
-            state.ic_btc_network(),
-            state.derivation_path(None),
-            state.general_indexer_url(),
-        )
+        (state.ic_btc_network(), state.general_indexer_url())
     };
     let transaction = get_transaction_by_id(&indexer_url, txid).await?;
 
@@ -73,7 +70,7 @@ pub(crate) async fn fetch_transfer_transaction(
         log::error!("Failed to decode transaction ID {txid}: {err:?}");
         BridgeError::GetTransactionById("Invalid transaction ID format.".to_string())
     })?;
-    let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
+    let bridge_addr = get_deposit_address(state, &H160::default(), ic_btc_network).await;
 
     // Validate UTXOs associated with the transaction ID
     let matching_utxos = find_inscription_utxos(ic_btc_network, bridge_addr, txid_bytes).await?;

@@ -263,9 +263,9 @@ async fn withdraw_brc20(
         .encode()
         .map_err(|err| BridgeError::Brc20Withdraw(err.to_string()))?; // for now!
 
-    let (network, derivation_path) = {
+    let (network, ecdsa_signer) = {
         let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
+        (state.ic_btc_network(), state.ecdsa_signer())
     };
 
     log::info!(
@@ -279,7 +279,7 @@ async fn withdraw_brc20(
         dst_addr.to_string(),
         dst_addr.to_string(),
         None,
-        derivation_path,
+        ecdsa_signer,
         network,
     )
     .await
