@@ -51,7 +51,7 @@ if [ "$IC_NETWORK" != "local" ]; then
   assert_isset_param "$EVM_PRINCIPAL" "EVM_PRINCIPAL"
 fi
 
-LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=debug\"; }"
+LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=info\"; }"
 OWNER=$(dfx identity get-principal)
 SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Production }; } }"
 
