@@ -62,7 +62,12 @@ struct CreateTokenArgs {
     #[arg(long)]
     token_name: String,
 
-    /// Principal of the token bridge canister.
+    /// ID of the source token.
+    ///
+    /// ID can be in one of the following forms:
+    /// * raw hex value of `Id256`
+    /// * principal of the token in case the token is hosted by IC
+    /// * `BLOCK_ID:TX_INDEX` for runes
     #[arg(long)]
     token_id: String,
 
@@ -277,9 +282,8 @@ async fn create_token(args: CreateTokenArgs) {
             .expect("failed to parse bft bridge address"),
     );
 
-    let token_principal =
-        Principal::from_str(&args.token_id).expect("Failed to parse token id from principal");
-    let token_id = Id256::from(&token_principal);
+    let token_id = decode_token_id(&args.token_id)
+        .unwrap_or_else(|| panic!("Invalid token id format: {}", args.token_id));
 
     let client = EvmCanisterClient::new(
         IcAgentClient::with_identity(
@@ -498,4 +502,29 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .expect("Failed to send raw transaction")
         .expect("Failed to execute burn transaction");
     wait_for_tx_success(&client, hash).await;
+}
+
+fn decode_token_id(id_string: &str) -> Option<Id256> {
+    if let Ok(hex) = hex::decode(id_string) {
+        if hex.len() == 32 {
+            return Id256::from_slice(&hex);
+        }
+    }
+
+    let split: Vec<_> = id_string.split(':').collect();
+    if split.len() == 2 {
+        let block_id = split[0]
+            .parse::<u64>()
+            .unwrap_or_else(|_| panic!("invalid rune id: {id_string})"));
+        let tx_index = split[1]
+            .parse::<u32>()
+            .unwrap_or_else(|_| panic!("invalid rune id: {id_string})"));
+        return Some(Id256::from_btc_tx_index(block_id, tx_index));
+    }
+
+    if let Ok(id) = Principal::from_str(id_string) {
+        return Some(Id256::from(&id));
+    }
+
+    None
 }

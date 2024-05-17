@@ -2,12 +2,12 @@ use std::cell::RefCell;
 
 use async_trait::async_trait;
 use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
-use bitcoin::secp256k1::Secp256k1;
+use bitcoin::secp256k1::ecdsa::Signature;
+use bitcoin::secp256k1::{Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
-use k256::ecdsa::signature::Verifier;
-use ord_rs::ExternalSigner;
+use ord_rs::BtcTxSigner;
 
 use crate::interface::GetAddressError;
 use crate::state::{MasterKey, State};
@@ -17,25 +17,22 @@ pub const DERIVATION_PATH_PREFIX: u8 = 7;
 pub struct IcBtcSigner {
     master_key: MasterKey,
     network: Network,
-    derivation_path: Vec<Vec<u8>>,
 }
 
 impl IcBtcSigner {
     pub const DERIVATION_PATH_SIZE: u32 = 21 / 3 * 4;
 
-    pub fn new(master_key: MasterKey, network: Network, derivation_path: Vec<Vec<u8>>) -> Self {
+    pub fn new(master_key: MasterKey, network: Network) -> Self {
         Self {
             master_key,
             network,
-            derivation_path,
         }
     }
+}
 
-    fn derivation_path(&self) -> Result<DerivationPath, GetAddressError> {
-        ic_dp_to_derivation_path(&self.derivation_path)
-    }
-
-    pub fn public_key(&self) -> PublicKey {
+#[async_trait]
+impl BtcTxSigner for IcBtcSigner {
+    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> PublicKey {
         let x_public_key = Xpub {
             network: self.network,
             depth: 0,
@@ -45,32 +42,21 @@ impl IcBtcSigner {
             chain_code: self.master_key.chain_code,
         };
         let public_key = x_public_key
-            .derive_pub(
-                &Secp256k1::new(),
-                &self
-                    .derivation_path()
-                    .expect("Failed to get derivation path"),
-            )
+            .derive_pub(&Secp256k1::new(), derivation_path)
             .expect("Failed to derive public key")
             .public_key;
 
         PublicKey::from(public_key)
     }
-}
 
-#[async_trait]
-impl ExternalSigner for IcBtcSigner {
-    async fn ecdsa_public_key(&self) -> String {
-        hex::encode(self.public_key().inner.serialize())
-    }
-
-    async fn sign_with_ecdsa(&self, message: &str) -> String {
-        let bytes = hex::decode(message).expect("invalid message hex");
-        assert_eq!(bytes.len(), 32);
-
+    async fn sign_with_ecdsa(
+        &self,
+        message: Message,
+        derivation_path: &DerivationPath,
+    ) -> Result<Signature, Error> {
         let request = SignWithEcdsaArgument {
-            message_hash: bytes,
-            derivation_path: self.derivation_path.clone(),
+            message_hash: message.as_ref().to_vec(),
+            derivation_path: derivation_path_to_ic(derivation_path.clone()),
             key_id: self.master_key.key_id.clone(),
         };
 
@@ -79,26 +65,15 @@ impl ExternalSigner for IcBtcSigner {
             .expect("sign_with_ecdsa failed")
             .0;
 
-        hex::encode(response.signature)
+        Signature::from_compact(&response.signature)
     }
 
-    async fn verify_ecdsa(&self, signature_hex: &str, message: &str, public_key_hex: &str) -> bool {
-        let signature_bytes = hex::decode(signature_hex).expect("failed to hex-decode signature");
-        let pubkey_bytes = hex::decode(public_key_hex).expect("failed to hex-decode public key");
-        let message_bytes = hex::decode(message).expect("invalid message hex");
-
-        let signature = k256::ecdsa::Signature::try_from(signature_bytes.as_slice())
-            .expect("failed to deserialize signature");
-        let check_result = k256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey_bytes)
-            .expect("failed to deserialize sec1 encoding into public key")
-            .verify(&message_bytes, &signature)
-            .is_ok();
-
-        // todo: For some reason this check is always false, even though the signature is correct.
-        //       Need more testing here. Leave it as is right now.
-        log::debug!("Check result: {check_result}");
-
-        true
+    async fn sign_with_schnorr(
+        &self,
+        _message: Message,
+        _derivation_path: &DerivationPath,
+    ) -> Result<bitcoin::secp256k1::schnorr::Signature, Error> {
+        Err(Error::IncorrectSignature)
     }
 }
 
@@ -146,7 +121,7 @@ fn get_derivation_path(eth_address: &H160) -> Result<DerivationPath, GetAddressE
     ic_dp_to_derivation_path(&get_derivation_path_ic(eth_address))
 }
 
-fn ic_dp_to_derivation_path(
+pub fn ic_dp_to_derivation_path(
     ic_derivation_path: &[Vec<u8>],
 ) -> Result<DerivationPath, GetAddressError> {
     let mut parts = vec![];
@@ -157,4 +132,11 @@ fn ic_dp_to_derivation_path(
     }
 
     Ok(DerivationPath::from(parts))
+}
+
+fn derivation_path_to_ic(derivation_path: DerivationPath) -> Vec<Vec<u8>> {
+    let vec: Vec<_> = derivation_path.into();
+    vec.into_iter()
+        .map(|child| u32::from(child).to_be_bytes().to_vec())
+        .collect()
 }
