@@ -46,9 +46,13 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let (reveal_tx, _) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let reveal_tx = rpc::fetch_reveal_transaction(state, &nft.id.0.txid)
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
+
+    log::info!("Reveal transaction: {}", reveal_tx.txid());
+    log::info!("ALL TX {:?}", reveal_tx);
+    log::info!("INPUTS {:?}", reveal_tx.input[0].witness.tapscript());
 
     // FIXME: it doesn't work
     rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
@@ -254,14 +258,15 @@ async fn withdraw_nft(
     dst_addr: &str,
     fee_canister_address: String,
 ) -> Result<Txid, BridgeError> {
-    if !state.borrow().has_nft(&nft.tx_id) {
+    let tx_id = nft.id.0.txid.to_string();
+    if !state.borrow().has_nft(&tx_id) {
         return Err(BridgeError::Erc721Burn(format!(
             "Specified tx ID ({}) not associated with any BTC inscription",
-            nft.tx_id
+            tx_id
         )));
     }
 
-    let (_, utxo) = rpc::fetch_reveal_transaction(state, &nft.tx_id)
+    let utxo = rpc::fetch_nft_utxo(state, &tx_id)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
@@ -328,7 +333,7 @@ async fn withdraw_nft(
     if result.is_ok() {
         state
             .inscriptions_mut()
-            .remove(nft.tx_id.to_string())
+            .remove(nft.id.0.txid.to_string())
             .map_err(|e| BridgeError::Erc721Burn(e.to_string()))?;
 
         state.burn_requests_mut().set_transferred(request_id);

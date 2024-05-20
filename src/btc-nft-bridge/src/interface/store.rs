@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use bitcoin::{OutPoint, Txid};
 use candid::types::{Type, TypeInner};
@@ -41,7 +40,7 @@ impl NftStore {
 
     pub fn insert(&mut self, token_info: NftInfo) {
         self.inner
-            .insert(token_info.tx_id.clone(), token_info.clone());
+            .insert(token_info.id.0.txid.to_string(), token_info.clone());
     }
 
     pub fn remove(&mut self, txid: String) -> Result<(), String> {
@@ -58,7 +57,6 @@ impl NftStore {
 
 #[derive(Debug, CandidType, Deserialize, Clone, Eq, PartialEq)]
 pub struct NftInfo {
-    pub tx_id: RevealTxId,
     vout: u32,
     pub id: StorableInscriptionId,
     pub holder: String,
@@ -71,14 +69,6 @@ impl NftInfo {
         output: String,
     ) -> Result<Self, BridgeError> {
         let output = output.split(':');
-        let tx_id = output
-            .clone()
-            .nth(0)
-            .ok_or_else(|| BridgeError::MalformedAddress("Missing txid".to_string()))?
-            .to_string();
-        if tx_id.len() != 64 {
-            return Err(BridgeError::MalformedAddress("Invalid txid".to_string()));
-        }
         let vout = output
             .clone()
             .nth(1)
@@ -86,19 +76,14 @@ impl NftInfo {
             .parse::<u32>()
             .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?;
 
-        Ok(Self {
-            tx_id,
-            id,
-            holder,
-            vout,
-        })
+        Ok(Self { id, holder, vout })
     }
 }
 
 impl From<&NftInfo> for OutPoint {
     fn from(value: &NftInfo) -> Self {
         OutPoint {
-            txid: Txid::from_str(&value.tx_id).unwrap(),
+            txid: value.id.0.txid.clone(),
             vout: value.vout,
         }
     }

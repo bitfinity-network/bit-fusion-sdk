@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin::absolute::LockTime;
-use bitcoin::hashes::Hash as _;
 use bitcoin::transaction::Version;
 use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
@@ -102,8 +101,22 @@ pub async fn fetch_nft_token_details(
 /// because it contains the actual NFT inscription that needs to be parsed.
 pub(crate) async fn fetch_reveal_transaction(
     state: &RefCell<State>,
+    reveal_tx_id: &Txid,
+) -> anyhow::Result<Transaction> {
+    let ord_url: String = state.borrow().ord_url();
+    Ok(get_nft_transaction_by_id(&ord_url, &reveal_tx_id)
+        .await
+        .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?)
+}
+
+/// Retrieves (and re-constructs) the reveal transaction by its ID.
+///
+/// We use the reveal transaction (as opposed to the commit transaction)
+/// because it contains the actual NFT inscription that needs to be parsed.
+pub(crate) async fn fetch_nft_utxo(
+    state: &RefCell<State>,
     reveal_tx_id: &str,
-) -> anyhow::Result<(Transaction, Utxo)> {
+) -> anyhow::Result<Utxo> {
     let (ic_btc_network, derivation_path) = {
         let state = state.borrow();
         (state.ic_btc_network(), state.derivation_path(None))
@@ -118,17 +131,7 @@ pub(crate) async fn fetch_reveal_transaction(
     )
     .map_err(|e| BridgeError::FindInscriptionUtxo(e.to_string()))
     .await?;
-
-    let txid =
-        Txid::from_slice(&nft_utxo.outpoint.txid).expect("failed to convert Txid from slice");
-
-    let ord_url = state.borrow().ord_url();
-    Ok((
-        get_nft_transaction_by_id(&ord_url, &txid)
-            .await
-            .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?,
-        nft_utxo,
-    ))
+    Ok(nft_utxo)
 }
 
 pub(crate) async fn parse_and_validate_inscription(
