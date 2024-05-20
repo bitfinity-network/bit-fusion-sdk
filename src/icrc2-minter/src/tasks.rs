@@ -30,6 +30,7 @@ type ShouldSendMintTx = bool;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BridgeTask {
     InitEvmInfo,
+    RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
     PrepareMintOrder(BurntIcrc2Data, ShouldSendMintTx),
     RemoveMintOrder(MintedEventData),
@@ -45,6 +46,7 @@ impl Task for BridgeTask {
         let state = crate::canister::get_state();
         match self {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
+            BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
             BridgeTask::PrepareMintOrder(data, should_send_mint_tx) => Box::pin(
                 Self::prepare_mint_order(state, scheduler, data.clone(), *should_send_mint_tx),
@@ -88,6 +90,16 @@ impl BridgeTask {
 
         log::trace!("evm parameters initialized");
 
+        Ok(())
+    }
+
+    pub async fn refresh_bft_bridge(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+        let mut status = state.borrow().config.get_bft_bridge_contract_status();
+        status.refresh().await.into_scheduler_result()?;
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_contract_status(status);
         Ok(())
     }
 

@@ -21,6 +21,7 @@ ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
     "http-outcall",
 ] }
+eth-signer = { workspace = true }
 anyhow = { workspace = true }
 
 [build-dependencies]

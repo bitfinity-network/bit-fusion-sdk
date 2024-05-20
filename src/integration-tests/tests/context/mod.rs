@@ -206,17 +206,18 @@ pub trait TestContext {
             .await??;
         self.advance_time(Duration::from_secs(2)).await;
 
-        let minter_client = self.minter_client(caller);
-
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
         let input = bft_bridge_api::CONSTRUCTOR
             .encode_input(contract, &[Token::Address(minter_canister_address.into())])
             .unwrap();
 
         let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
-        minter_client
-            .register_evmc_bft_bridge(bridge_address.clone())
+        let raw_client = self.client(self.canisters().icrc2_minter(), self.admin_name());
+        let hash = raw_client
+            .update::<_, McResult<H256>>("init_bft_bridge_contract", ())
             .await??;
+
+        self.wait_transaction_receipt(&hash).await?;
 
         Ok(bridge_address)
     }
