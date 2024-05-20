@@ -13,7 +13,7 @@
 
 ## Requirements
 
-- Use `dfx` version <= `0.17.x` (for now). [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if you don't have it already.
+- [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if you don't have it already.
 - [Install the Rust toolchain](https://www.rust-lang.org/tools/install) if it's not already installed.
 - [Download and install Docker, with Compose](https://www.docker.com/products/docker-desktop/) if you don't already have it.
 - Install [foundry](https://book.getfoundry.sh/getting-started/installation).

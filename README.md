@@ -1,4 +1,4 @@
-# ChainFusion SDK
+# BitFusion SDK
 
 ## Warning
 
