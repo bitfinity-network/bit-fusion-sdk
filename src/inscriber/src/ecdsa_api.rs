@@ -1,88 +1,57 @@
+use async_trait::async_trait;
 use bitcoin::bip32::{ChainCode, ChildNumber, DerivationPath, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error, Message, Secp256k1};
 use bitcoin::sighash::SighashCache;
-use bitcoin::{Address, Network, PrivateKey, PublicKey, ScriptBuf, Transaction, Witness};
+use bitcoin::{Address, Network, PublicKey, ScriptBuf, Transaction, Witness};
 use did::H160;
-use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     sign_with_ecdsa, EcdsaKeyId, SignWithEcdsaArgument,
 };
-use ord_rs::wallet::LocalSigner;
-use ord_rs::{BtcTxSigner, Utxo as OrdUtxo, Wallet};
+use ord_rs::{BtcTxSigner, Utxo as OrdUtxo};
 
-use super::{GetAddressError, InscribeResult};
-use crate::interface::InscribeError;
+use crate::interface::{GetAddressError, InscribeError, InscribeResult};
 
 pub const DERIVATION_PATH_PREFIX: u8 = 7;
 
-#[derive(Clone)]
-pub struct EcdsaSigner {
-    signing_strategy: SigningStrategy,
-    master_key: Option<MasterKey>,
-    network: Network,
+#[derive(Debug, Clone)]
+pub struct IcBtcSigner {
+    pub master_key: MasterKey,
+    pub network: Network,
 }
 
 #[derive(Debug, Clone)]
 pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
+    pub script: ScriptBuf,
     pub key_id: EcdsaKeyId,
 }
 
-pub struct Spender {
-    pub pubkey: PublicKey,
-    pub script: ScriptBuf,
-}
-
-impl EcdsaSigner {
+impl IcBtcSigner {
     pub const DERIVATION_PATH_SIZE: u32 = 21 / 3 * 4;
 
-    pub fn new(
-        signing_strategy: SigningStrategy,
-        master_key: Option<MasterKey>,
-        network: Network,
-    ) -> Self {
+    pub fn new(master_key: MasterKey, network: Network) -> Self {
         Self {
-            signing_strategy,
             master_key,
             network,
         }
     }
 
-    pub fn wallet(&self) -> Wallet {
-        match self.signing_strategy {
-            SigningStrategy::Local { private_key } => Wallet::new_with_signer(LocalSigner::new(
-                PrivateKey::from_slice(&private_key, self.network).expect("invalid private key"),
-            )),
-            SigningStrategy::ManagementCanister { .. } => Wallet::new_with_signer(Self::new(
-                self.signing_strategy.clone(),
-                self.master_key.clone(),
-                self.network,
-            )),
-        }
-    }
-
-    pub fn master_key(&self) -> MasterKey {
-        self.master_key.clone().expect("ecdsa is not initialized")
-    }
-
-    pub fn signing_strategy(&self) -> SigningStrategy {
-        self.signing_strategy.clone()
-    }
-
     pub fn public_key(&self) -> PublicKey {
-        self.master_key
-            .as_ref()
-            .expect("master key is not initialized")
-            .public_key
+        self.master_key.public_key
     }
 
     pub fn chain_code(&self) -> ChainCode {
-        self.master_key
-            .as_ref()
-            .expect("master key is not initialized")
-            .chain_code
+        self.master_key.chain_code
+    }
+
+    pub fn network(&self) -> Network {
+        self.network
+    }
+
+    pub fn master_key(&self) -> MasterKey {
+        self.master_key.clone()
     }
 
     /// Verifies an ECDSA signature against a message and a public key.
@@ -103,14 +72,13 @@ impl EcdsaSigner {
         &self,
         unsigned_tx: Transaction,
         utxos: &[OrdUtxo],
-        spender: Spender,
     ) -> InscribeResult<Transaction> {
         let mut hash = SighashCache::new(unsigned_tx.clone());
         for (index, input) in utxos.iter().enumerate() {
             let sighash = hash
                 .p2wpkh_signature_hash(
                     index,
-                    &spender.script,
+                    &self.master_key.script,
                     input.amount,
                     bitcoin::EcdsaSighashType::All,
                 )
@@ -129,7 +97,7 @@ impl EcdsaSigner {
                     .map_err(|e| InscribeError::SignatureError(e.to_string()))?;
 
                 // verify
-                self.verify_ecdsa(&signature, &msg, &spender.pubkey)
+                self.verify_ecdsa(&signature, &msg, &self.master_key.public_key)
                     .map_err(InscribeError::SignatureError)?;
 
                 signature
@@ -139,7 +107,7 @@ impl EcdsaSigner {
 
             // append witness
             let signature = bitcoin::ecdsa::Signature::sighash_all(signature);
-            let witness = Witness::p2wpkh(&signature, &spender.pubkey.inner);
+            let witness = Witness::p2wpkh(&signature, &self.master_key.public_key.inner);
             *hash
                 .witness_mut(index)
                 .ok_or(InscribeError::NoSuchUtxo(index.to_string()))? = witness;
@@ -149,16 +117,16 @@ impl EcdsaSigner {
     }
 }
 
-#[async_trait::async_trait]
-impl BtcTxSigner for EcdsaSigner {
+#[async_trait]
+impl BtcTxSigner for IcBtcSigner {
     async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> PublicKey {
         let x_public_key = Xpub {
             network: self.network,
             depth: 0,
             parent_fingerprint: Default::default(),
             child_number: ChildNumber::from_normal_idx(0).expect("Failed to create child number"),
-            public_key: self.public_key().inner,
-            chain_code: self.chain_code(),
+            public_key: self.master_key.public_key.inner,
+            chain_code: self.master_key.chain_code,
         };
         let public_key = x_public_key
             .derive_pub(&Secp256k1::new(), derivation_path)
@@ -176,7 +144,7 @@ impl BtcTxSigner for EcdsaSigner {
         let request = SignWithEcdsaArgument {
             message_hash: message.as_ref().to_vec(),
             derivation_path: btc_dp_to_ic_dp(derivation_path.clone()),
-            key_id: self.master_key().key_id.clone(),
+            key_id: self.master_key.key_id.clone(),
         };
 
         let response = sign_with_ecdsa(request)
@@ -196,11 +164,12 @@ impl BtcTxSigner for EcdsaSigner {
     }
 }
 
+/// Retrieves the Bitcoin address for the given derivation path.
 pub fn get_bitcoin_address(
-    eth_address: &H160,
-    network: Network,
     public_key: PublicKey,
+    network: Network,
     chain_code: ChainCode,
+    eth_address: &H160,
 ) -> Result<Address, GetAddressError> {
     let x_public_key = Xpub {
         network,

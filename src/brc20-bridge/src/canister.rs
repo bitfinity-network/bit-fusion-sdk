@@ -11,17 +11,17 @@ use ic_stable_structures::{CellStructure as _, StableUnboundedMap, VirtualMemory
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
+use inscriber::ecdsa_api::{get_ic_derivation_path, IcBtcSigner};
 use inscriber::interface::{
-    InscribeResult, InscribeTransactions, InscriptionFees, Multisig, Protocol,
+    GetAddressError, InscribeResult, InscribeTransactions, InscriptionFees, Multisig, Protocol,
 };
-use inscriber::ops as Inscriber;
+use inscriber::{bitcoin_api, ops as Inscriber};
 
 use crate::build_data::BuildData;
 use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
 };
-use crate::interface;
 use crate::interface::bridge_api::{BridgeError, DepositBrc20Args, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
@@ -61,17 +61,15 @@ impl Brc20Bridge {
             .map_err(BridgeError::Erc20Mint)
     }
 
-    #[update]
-    pub async fn get_deposit_address(&mut self, eth_address: H160) -> String {
-        let network = { get_state().borrow().ic_btc_network() };
-        interface::get_deposit_address(&get_state(), &eth_address, network).await
+    #[query]
+    pub async fn get_deposit_address(&self, eth_address: H160) -> Result<String, GetAddressError> {
+        crate::interface::get_deposit_address(&get_state(), &eth_address)
+            .map(|addr| addr.to_string())
     }
 
     /// Returns the balance of the given bitcoin address.
     #[update]
     pub async fn get_balance(&mut self, address: String) -> u64 {
-        use inscriber::interface::bitcoin_api;
-
         let network = get_state().borrow().ic_btc_network();
         bitcoin_api::get_balance(network, address).await
     }
@@ -83,17 +81,19 @@ impl Brc20Bridge {
         inscription: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscriptionFees> {
-        let (network, ecdsa_signer) = {
-            (
-                get_state().borrow().ic_btc_network(),
-                get_state().borrow().ecdsa_signer(),
-            )
+        let (ic_btc_network, ecdsa_signer) = {
+            let state = get_state();
+            let signer =
+                IcBtcSigner::new(state.borrow().master_key(), state.borrow().btc_network());
+            let network = state.borrow().ic_btc_network();
+            (network, signer)
         };
         Inscriber::get_inscription_fees(
             inscription_type,
             inscription,
             multisig_config,
-            network,
+            ic_btc_network,
+            get_ic_derivation_path(&H160::default()),
             ecdsa_signer,
         )
         .await
@@ -104,17 +104,19 @@ impl Brc20Bridge {
     #[update]
     pub async fn inscribe(
         &mut self,
+        eth_address: H160,
         inscription_type: Protocol,
         inscription: String,
         leftovers_address: String,
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let (network, ecdsa_signer) = {
-            (
-                get_state().borrow().ic_btc_network(),
-                get_state().borrow().ecdsa_signer(),
-            )
+        let (ic_btc_network, ecdsa_signer) = {
+            let state = get_state();
+            let signer =
+                IcBtcSigner::new(state.borrow().master_key(), state.borrow().btc_network());
+            let network = state.borrow().ic_btc_network();
+            (network, signer)
         };
 
         Inscriber::inscribe(
@@ -124,7 +126,8 @@ impl Brc20Bridge {
             dst_address,
             multisig_config,
             ecdsa_signer,
-            network,
+            get_ic_derivation_path(&eth_address),
+            ic_btc_network,
         )
         .await
     }

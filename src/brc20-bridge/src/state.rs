@@ -1,16 +1,20 @@
 use std::cmp::Ordering;
 
-use bitcoin::Network;
+use bitcoin::bip32::ChainCode;
+use bitcoin::{Network, PrivateKey, PublicKey};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
+use ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
-use inscriber::interface::ecdsa_api::{EcdsaSigner, MasterKey};
+use inscriber::ecdsa_api::{IcBtcSigner, MasterKey};
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
+use ord_rs::wallet::LocalSigner;
+use ord_rs::Wallet;
 use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
@@ -19,6 +23,8 @@ use crate::interface::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
+
+const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
 
 pub struct State {
     config: Brc20BridgeConfig,
@@ -37,7 +43,7 @@ pub struct Brc20BridgeConfig {
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
-    pub erc20_minter_fee: u64,
+    pub deposit_fee: u64,
     pub general_indexer: String,
     pub brc20_indexer: String,
     pub logger: LogSettings,
@@ -52,7 +58,7 @@ impl Default for Brc20BridgeConfig {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
-            erc20_minter_fee: 10,
+            deposit_fee: DEFAULT_DEPOSIT_FEE,
             general_indexer: String::new(),
             brc20_indexer: String::new(),
             logger: LogSettings::default(),
@@ -148,6 +154,48 @@ impl State {
         self.config = config;
     }
 
+    pub fn ecdsa_key_id(&self) -> EcdsaKeyId {
+        let key_name = match &self.config.signing_strategy {
+            SigningStrategy::Local { .. } => "none".to_string(),
+            SigningStrategy::ManagementCanister { key_id } => key_id.to_string(),
+        };
+
+        EcdsaKeyId {
+            curve: EcdsaCurve::Secp256k1,
+            name: key_name,
+        }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        self.master_key
+            .as_ref()
+            .expect("master key is not initialized")
+            .public_key
+    }
+
+    pub fn chain_code(&self) -> ChainCode {
+        self.master_key
+            .as_ref()
+            .expect("master key is not initialized")
+            .chain_code
+    }
+
+    pub fn wallet(&self) -> Wallet {
+        match &self.config.signing_strategy {
+            SigningStrategy::Local { private_key } => Wallet::new_with_signer(LocalSigner::new(
+                PrivateKey::from_slice(private_key, self.btc_network())
+                    .expect("invalid private key"),
+            )),
+            SigningStrategy::ManagementCanister { .. } => {
+                Wallet::new_with_signer(IcBtcSigner::new(self.master_key(), self.btc_network()))
+            }
+        }
+    }
+
+    pub(crate) fn master_key(&self) -> MasterKey {
+        self.master_key.clone().expect("ecdsa is not initialized")
+    }
+
     pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
         self.bft_config = bft_config;
     }
@@ -198,14 +246,6 @@ impl State {
 
     pub fn signer(&self) -> &SignerStorage {
         &self.signer
-    }
-
-    pub fn ecdsa_signer(&self) -> EcdsaSigner {
-        EcdsaSigner::new(
-            self.config.signing_strategy.clone(),
-            self.master_key.clone(),
-            self.btc_network(),
-        )
     }
 
     pub fn mint_orders(&self) -> &MintOrdersStore {
@@ -292,7 +332,7 @@ impl State {
         }
     }
 
-    pub fn erc20_minter_fee(&self) -> u64 {
-        self.config.erc20_minter_fee
+    pub fn deposit_fee(&self) -> u64 {
+        self.config.deposit_fee
     }
 }

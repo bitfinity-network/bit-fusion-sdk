@@ -5,7 +5,7 @@ use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::MultisigConfig;
 
-use crate::interface::ecdsa_api::EcdsaSigner;
+use crate::ecdsa_api::IcBtcSigner;
 use crate::interface::{
     Brc20TransferTransactions, InscribeError, InscribeResult, InscribeTransactions,
     InscriptionFees, Multisig, Protocol,
@@ -14,16 +14,18 @@ use crate::wallet::CanisterWallet;
 
 /// Inscribes a message onto the Bitcoin blockchain using the given inscription
 /// type.
+#[allow(clippy::too_many_arguments)]
 pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
     leftovers_address: String,
     dst_address: String,
     multisig_config: Option<Multisig>,
-    signer: EcdsaSigner,
+    signer: IcBtcSigner,
+    derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,
 ) -> InscribeResult<InscribeTransactions> {
-    let wallet = CanisterWallet::new(network, signer);
+    let wallet = CanisterWallet::new(network, derivation_path, signer);
 
     let leftovers_address = get_address(leftovers_address, network)?;
     let dst_address = get_address(dst_address, network)?;
@@ -50,13 +52,14 @@ pub async fn brc20_transfer(
     leftovers_address: String,
     dst_address: String,
     multisig_config: Option<Multisig>,
-    signer: EcdsaSigner,
+    signer: IcBtcSigner,
+    derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,
 ) -> InscribeResult<Brc20TransferTransactions> {
     let leftovers_address = get_address(leftovers_address, network)?;
     let transfer_dst_address = get_address(dst_address, network)?;
 
-    let wallet = CanisterWallet::new(network, signer.clone());
+    let wallet = CanisterWallet::new(network, derivation_path.clone(), signer.clone());
     let inscription_dst_address = wallet.get_bitcoin_address(&H160::default()).await;
     let inscription_leftovers_address = inscription_dst_address.clone();
 
@@ -67,6 +70,7 @@ pub async fn brc20_transfer(
         inscription_leftovers_address.to_string(),
         multisig_config,
         signer,
+        derivation_path,
         network,
     )
     .await?;
@@ -89,31 +93,20 @@ pub async fn brc20_transfer(
     })
 }
 
-/// Gets the Bitcoin address for the given derivation path.
-pub async fn get_bitcoin_address(
-    eth_address: H160,
-    network: BitcoinNetwork,
-    signer: EcdsaSigner,
-) -> String {
-    CanisterWallet::new(network, signer)
-        .get_bitcoin_address(&eth_address)
-        .await
-        .to_string()
-}
-
 pub async fn get_inscription_fees(
     inscription_type: Protocol,
     inscription: String,
     multisig_config: Option<Multisig>,
     network: BitcoinNetwork,
-    signer: EcdsaSigner,
+    derivation_path: Vec<Vec<u8>>,
+    signer: IcBtcSigner,
 ) -> InscribeResult<InscriptionFees> {
     let multisig_config = multisig_config.map(|m| MultisigConfig {
         required: m.required,
         total: m.total,
     });
 
-    CanisterWallet::new(network, signer)
+    CanisterWallet::new(network, derivation_path, signer)
         .get_inscription_fees(inscription_type, inscription, multisig_config)
         .await
 }

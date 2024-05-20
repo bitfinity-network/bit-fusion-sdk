@@ -10,6 +10,7 @@ export-api = []
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 bitcoin = { workspace = true }
 candid = { workspace = true }
 clap = { version = "4.4.2", features = ["derive"] }

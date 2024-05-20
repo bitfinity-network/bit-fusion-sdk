@@ -8,8 +8,9 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
+use inscriber::bitcoin_api;
 use inscriber::constant::UTXO_MIN_CONFIRMATION;
-use inscriber::interface::bitcoin_api;
+use inscriber::ecdsa_api::get_bitcoin_address;
 use ord_rs::{Brc20, OrdParser};
 use serde::de::DeserializeOwned;
 
@@ -19,7 +20,7 @@ use crate::constant::{
 };
 use crate::interface::bridge_api::{BridgeError, DepositError};
 use crate::interface::store::{Brc20Id, Brc20Token, StorableBrc20};
-use crate::interface::{get_deposit_address, Brc20TokenResponse, TokenInfo, TransactionHtml};
+use crate::interface::{Brc20TokenResponse, TokenInfo, TransactionHtml};
 use crate::state::State;
 
 /// WIP: https://infinityswap.atlassian.net/browse/EPROD-858
@@ -58,11 +59,16 @@ pub async fn fetch_brc20_token_details(
 /// Retrieves (and re-constructs) the BRC20 transfer transaction by its ID.
 pub(crate) async fn fetch_transfer_transaction(
     state: &RefCell<State>,
+    eth_address: &H160,
     txid: &str,
 ) -> anyhow::Result<Transaction> {
-    let (ic_btc_network, indexer_url) = {
+    let (btc_network, ic_btc_network, indexer_url) = {
         let state = state.borrow();
-        (state.ic_btc_network(), state.general_indexer_url())
+        (
+            state.btc_network(),
+            state.ic_btc_network(),
+            state.general_indexer_url(),
+        )
     };
     let transaction = get_transaction_by_id(&indexer_url, txid).await?;
 
@@ -70,7 +76,10 @@ pub(crate) async fn fetch_transfer_transaction(
         log::error!("Failed to decode transaction ID {txid}: {err:?}");
         BridgeError::GetTransactionById("Invalid transaction ID format.".to_string())
     })?;
-    let bridge_addr = get_deposit_address(state, &H160::default(), ic_btc_network).await;
+    let (public_key, chain_code) = (state.borrow().public_key(), state.borrow().chain_code());
+    let bridge_addr = get_bitcoin_address(public_key, btc_network, chain_code, eth_address)
+        .expect("Failed to get deposit address")
+        .to_string();
 
     // Validate UTXOs associated with the transaction ID
     let matching_utxos = find_inscription_utxos(ic_btc_network, bridge_addr, txid_bytes).await?;

@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_stable_structures::CellStructure;
+use inscriber::ecdsa_api::{get_ic_derivation_path, IcBtcSigner};
 use inscriber::interface::Brc20TransferTransactions;
 use inscriber::ops as Inscriber;
 use minter_did::id256::Id256;
@@ -36,7 +37,7 @@ pub async fn brc20_to_erc20(
     //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
     log::info!("Fetching BRC20 transfer transaction by its ID: {tx_id}");
-    let transaction = rpc::fetch_transfer_transaction(state, &tx_id)
+    let transaction = rpc::fetch_transfer_transaction(state, &eth_address, &tx_id)
         .await
         .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
 
@@ -79,7 +80,7 @@ pub async fn mint_erc20(
     amount: u64,
     nonce: u32,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    let fee = state.borrow().erc20_minter_fee();
+    let fee = state.borrow().deposit_fee();
     let amount_minus_fee = amount
         .checked_sub(fee)
         .ok_or(Erc20MintError::ValueTooSmall(amount.to_string()))?;
@@ -265,7 +266,8 @@ async fn withdraw_brc20(
 
     let (network, ecdsa_signer) = {
         let state = state.borrow();
-        (state.ic_btc_network(), state.ecdsa_signer())
+        let signer = IcBtcSigner::new(state.master_key(), state.btc_network());
+        (state.ic_btc_network(), signer)
     };
 
     log::info!(
@@ -280,6 +282,7 @@ async fn withdraw_brc20(
         dst_addr.to_string(),
         None,
         ecdsa_signer,
+        get_ic_derivation_path(&H160::default()),
         network,
     )
     .await

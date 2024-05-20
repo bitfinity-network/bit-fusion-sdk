@@ -1,6 +1,3 @@
-pub mod bitcoin_api;
-pub mod ecdsa_api;
-
 use candid::CandidType;
 use ord_rs::{Inscription, OrdError};
 use serde::{Deserialize, Serialize};
