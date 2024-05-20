@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -15,18 +16,17 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
-use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use ord_rs::wallet::{CreateEdictTxArgs, ScriptType};
+use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::{RuneId, SpacedRune};
 use serde::Deserialize;
 
 use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
 use crate::key::{get_deposit_address, get_derivation_path_ic};
-use crate::ledger::StoredUtxo;
+use crate::rune_info::{RuneInfo, RuneName};
 use crate::state::State;
 
 const DEFAULT_REGTEST_FEE: u64 = 10_000;
@@ -36,7 +36,7 @@ static NONCE: AtomicU32 = AtomicU32::new(0);
 pub async fn deposit(
     state: Rc<RefCell<State>>,
     eth_address: &H160,
-) -> Result<Erc20MintStatus, DepositError> {
+) -> Result<Vec<Erc20MintStatus>, DepositError> {
     log::trace!("Requested deposit for eth address: {eth_address}");
 
     let deposit_address =
@@ -57,44 +57,115 @@ pub async fn deposit(
     validate_utxo_confirmations(&state, &utxo_response)?;
     validate_utxo_btc_amount(&state, &utxo_response)?;
 
-    let rune_amount: u128 = get_rune_amount(&state, &utxo_response.utxos).await?;
-    if rune_amount == 0 {
+    let rune_amounts = get_rune_amounts(&state, &utxo_response.utxos).await?;
+    if rune_amounts.is_empty() {
         return Err(DepositError::NoRunesToDeposit);
     }
 
+    let Some(rune_info_amounts) = fill_rune_infos(&state, &rune_amounts).await else {
+        return Err(DepositError::Unavailable(
+            "Ord indexer is in invalid state".to_string(),
+        ));
+    };
+
     let sender = Id256::from_evm_address(eth_address, state.borrow().erc20_chain_id());
-    let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
-    let mint_order = create_mint_order(&state, eth_address, rune_amount, nonce).await?;
 
-    state
-        .borrow_mut()
-        .mint_orders_mut()
-        .push(sender, nonce, mint_order);
-    state.borrow_mut().ledger_mut().deposit(
-        &utxo_response.utxos,
-        &deposit_address,
-        get_derivation_path_ic(eth_address),
-    );
+    let mut results = vec![];
+    for (rune_info, amount) in rune_info_amounts {
+        let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+        let mint_order = create_mint_order(&state, eth_address, amount, rune_info, nonce).await?;
 
-    Ok(match send_mint_order(&state, mint_order).await {
-        Ok(tx_id) => Erc20MintStatus::Minted {
-            amount: rune_amount,
-            tx_id,
-        },
-        Err(err) => {
-            log::warn!("Failed to send mint order: {err:?}");
-            Erc20MintStatus::Signed(Box::new(mint_order))
+        state
+            .borrow_mut()
+            .mint_orders_mut()
+            .push(sender, nonce, mint_order);
+        state.borrow_mut().ledger_mut().deposit(
+            &utxo_response.utxos,
+            &deposit_address,
+            get_derivation_path_ic(eth_address),
+        );
+
+        let result = match send_mint_order(&state, mint_order).await {
+            Ok(tx_id) => Erc20MintStatus::Minted { amount, tx_id },
+            Err(err) => {
+                log::warn!("Failed to send mint order: {err:?}");
+                Erc20MintStatus::Signed(Box::new(mint_order))
+            }
+        };
+
+        results.push(result);
+    }
+
+    Ok(results)
+}
+
+async fn fill_rune_infos(
+    state: &RefCell<State>,
+    rune_amounts: &HashMap<RuneName, u128>,
+) -> Option<Vec<(RuneInfo, u128)>> {
+    match fill_rune_infos_from_state(state, rune_amounts) {
+        Some(v) => Some(v),
+        None => fill_rune_infos_from_indexer(state, rune_amounts).await,
+    }
+}
+
+fn fill_rune_infos_from_state(
+    state: &RefCell<State>,
+    rune_amounts: &HashMap<RuneName, u128>,
+) -> Option<Vec<(RuneInfo, u128)>> {
+    let state = state.borrow();
+    let runes = state.runes();
+    let mut infos = vec![];
+    for (rune_name, amount) in rune_amounts {
+        infos.push((*runes.get(rune_name)?, *amount));
+    }
+
+    Some(infos)
+}
+
+async fn fill_rune_infos_from_indexer(
+    state: &RefCell<State>,
+    rune_amounts: &HashMap<RuneName, u128>,
+) -> Option<Vec<(RuneInfo, u128)>> {
+    let rune_list = get_rune_list(state).await.ok()?;
+    let runes: HashMap<RuneName, RuneInfo> = rune_list
+        .iter()
+        .map(|(rune_id, spaced_rune, decimals)| {
+            (
+                spaced_rune.rune.into(),
+                RuneInfo {
+                    name: spaced_rune.rune.into(),
+                    decimals: *decimals,
+                    block: rune_id.block,
+                    tx: rune_id.tx,
+                },
+            )
+        })
+        .collect();
+    let mut infos = vec![];
+    for (rune_name, amount) in rune_amounts {
+        match runes.get(rune_name) {
+            Some(v) => infos.push((*v, *amount)),
+            None => {
+                log::error!("Ord indexer didn't return a rune information for rune {rune_name} that was present in an UTXO");
+                return None;
+            }
         }
-    })
+    }
+
+    state.borrow_mut().update_rune_list(runes);
+
+    Some(infos)
 }
 
 pub async fn withdraw(
     state: &RefCell<State>,
     amount: u128,
+    rune_id: RuneId,
     address: Address,
 ) -> Result<Txid, WithdrawError> {
     let current_utxos = state.borrow().ledger().load_all();
-    let tx = build_withdraw_transaction(state, amount, address, current_utxos).await?;
+    let tx = build_withdraw_transaction(state, amount, address, rune_id, current_utxos).await?;
     send_tx(state, &tx).await?;
 
     Ok(tx.txid())
@@ -104,34 +175,25 @@ pub async fn build_withdraw_transaction(
     state: &RefCell<State>,
     amount: u128,
     address: Address,
-    inputs: Vec<StoredUtxo>,
+    rune: RuneId,
+    inputs: Vec<TxInputInfo>,
 ) -> Result<Transaction, WithdrawError> {
     if inputs.is_empty() {
         return Err(WithdrawError::NoInputs);
     }
 
-    if !inputs
-        .iter()
-        .all(|input| input.derivation_path == inputs[0].derivation_path)
-    {
-        // https://infinityswap.atlassian.net/browse/EPROD-848
-        todo!();
-    }
+    let public_key = state.borrow().public_key();
+    let wallet = state.borrow().wallet();
 
-    let derivation_path = &inputs[0].derivation_path;
-    let public_key = state.borrow().der_public_key(derivation_path);
-    let signer = state.borrow().wallet(derivation_path.clone());
-
-    let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, signer);
+    let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
     let change_address = get_change_address(state)?;
     let rune_change_address = change_address.clone();
 
     let fee_rate = get_fee_rate(state).await?;
 
-    let inputs = inputs.into_iter().map(|v| v.tx_input_info).collect();
     let args = CreateEdictTxArgs {
-        rune: state.borrow().rune_id(),
+        rune,
         inputs,
         destination: address,
         change_address,
@@ -262,8 +324,8 @@ fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtx
 
     get_utxos_response.utxos.retain(|utxo| {
         !existing.iter().any(|v| {
-            v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-                && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
+            v.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
+                && v.outpoint.vout == utxo.outpoint.vout
         })
     })
 }
@@ -318,25 +380,31 @@ fn validate_utxo_btc_amount(
     Ok(())
 }
 
-async fn get_rune_amount(state: &RefCell<State>, utxos: &[Utxo]) -> Result<u128, DepositError> {
+async fn get_rune_amounts(
+    state: &RefCell<State>,
+    utxos: &[Utxo],
+) -> Result<HashMap<RuneName, u128>, DepositError> {
     log::trace!("Requesting rune balance for given inputs");
 
-    let mut amount = 0;
+    let mut amounts = HashMap::new();
     for utxo in utxos {
-        amount += get_tx_rune_amount(state, utxo).await?;
+        for (rune_name, amount) in get_tx_rune_amounts(state, utxo).await? {
+            *amounts.entry(rune_name).or_default() += amount;
+        }
     }
 
-    log::trace!("Total rune balance for input utxos: {amount}");
+    log::trace!("Total rune balances for input utxos: {amounts:?}");
 
-    Ok(amount)
+    Ok(amounts)
 }
 
 pub async fn get_rune_list(
     state: &RefCell<State>,
-) -> Result<Vec<(RuneId, SpacedRune)>, DepositError> {
+) -> Result<Vec<(RuneId, SpacedRune, u8)>, DepositError> {
     #[derive(Debug, Clone, Deserialize)]
     struct RuneInfo {
         spaced_rune: SpacedRune,
+        divisibility: u8,
     }
 
     #[derive(Debug, Clone, Deserialize)]
@@ -346,6 +414,9 @@ pub async fn get_rune_list(
 
     const MAX_RESPONSE_BYTES: u64 = 10_000;
 
+    // todo: AFAIK this endpoint will return first 50 entries. Need to figure out how to use
+    // pagination with this api.
+    // https://infinityswap.atlassian.net/browse/EPROD-854
     let indexer_url = state.borrow().indexer_url();
     let url = format!("{indexer_url}/runes");
 
@@ -383,7 +454,7 @@ pub async fn get_rune_list(
     Ok(response
         .entries
         .into_iter()
-        .map(|(rune_id, info)| (rune_id, info.spaced_rune))
+        .map(|(rune_id, info)| (rune_id, info.spaced_rune, info.divisibility))
         .collect())
 }
 
@@ -429,29 +500,31 @@ pub async fn get_tx_outputs(
     })
 }
 
-async fn get_tx_rune_amount(state: &RefCell<State>, utxo: &Utxo) -> Result<u128, DepositError> {
+async fn get_tx_rune_amounts(
+    state: &RefCell<State>,
+    utxo: &Utxo,
+) -> Result<HashMap<RuneName, u128>, DepositError> {
     let response = get_tx_outputs(state, utxo).await?;
-    let mut amount = 0;
-    let self_rune_name = state.borrow().rune_name();
-    for (rune_id, pile) in response.runes {
-        if rune_id.rune.to_string() == self_rune_name {
-            amount += pile.amount;
-        }
-    }
+    let amounts = response
+        .runes
+        .iter()
+        .map(|(spaced_rune, pile)| (spaced_rune.rune.into(), pile.amount))
+        .collect();
 
     log::trace!(
-        "Rune balance for utxo {}:{}: {amount}",
+        "Received rune balances for utxo {}: {:?}",
         hex::encode(&utxo.outpoint.txid),
-        utxo.outpoint.vout
+        amounts
     );
 
-    Ok(amount)
+    Ok(amounts)
 }
 
 async fn create_mint_order(
     state: &RefCell<State>,
     eth_address: &H160,
     amount: u128,
+    rune_info: RuneInfo,
     nonce: u32,
 ) -> Result<SignedMintOrder, DepositError> {
     log::trace!("preparing mint order");
@@ -461,7 +534,7 @@ async fn create_mint_order(
 
         let sender_chain_id = state_ref.btc_chain_id();
         let sender = Id256::from_evm_address(eth_address, sender_chain_id);
-        let src_token = Id256::from(&ic::id());
+        let src_token = Id256::from(rune_info.id());
 
         let recipient_chain_id = state_ref.erc20_chain_id();
 
@@ -474,9 +547,9 @@ async fn create_mint_order(
             nonce,
             sender_chain_id,
             recipient_chain_id,
-            name: state_ref.token_name(),
-            symbol: state_ref.token_symbol(),
-            decimals: state_ref.decimals(),
+            name: rune_info.name_array(),
+            symbol: rune_info.symbol_array(),
+            decimals: rune_info.decimals(),
             approve_spender: Default::default(),
             approve_amount: Default::default(),
             fee_payer: H160::default(),

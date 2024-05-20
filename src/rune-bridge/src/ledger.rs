@@ -10,7 +10,7 @@ use ic_stable_structures::{BTreeMapStructure, Bound, StableBTreeMap, Storable, V
 use ord_rs::wallet::TxInputInfo;
 use serde::Deserialize;
 
-use crate::key::IcBtcSigner;
+use crate::key::{ic_dp_to_derivation_path, IcBtcSigner};
 use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER};
 
 /// Data structure to keep track of utxos owned by the canister.
@@ -94,12 +94,6 @@ impl Storable for UtxoDetails {
     };
 }
 
-#[derive(Debug, Clone)]
-pub struct StoredUtxo {
-    pub tx_input_info: TxInputInfo,
-    pub derivation_path: Vec<Vec<u8>>,
-}
-
 impl UtxoLedger {
     /// Adds the utxo to the store.
     pub fn deposit(&mut self, utxos: &[Utxo], address: &Address, derivation_path: Vec<Vec<u8>>) {
@@ -124,21 +118,20 @@ impl UtxoLedger {
     }
 
     /// Lists all utxos in the store.
-    pub fn load_all(&self) -> Vec<StoredUtxo> {
+    pub fn load_all(&self) -> Vec<TxInputInfo> {
         self.utxo_storage
             .iter()
-            .map(|(key, details)| StoredUtxo {
-                tx_input_info: TxInputInfo {
-                    outpoint: OutPoint {
-                        txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
-                        vout: key.vout,
-                    },
-                    tx_out: TxOut {
-                        value: Amount::from_sat(details.value),
-                        script_pubkey: details.script_buf.into(),
-                    },
+            .map(|(key, details)| TxInputInfo {
+                outpoint: OutPoint {
+                    txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
+                    vout: key.vout,
                 },
-                derivation_path: details.derivation_path,
+                tx_out: TxOut {
+                    value: Amount::from_sat(details.value),
+                    script_pubkey: details.script_buf.into(),
+                },
+                derivation_path: ic_dp_to_derivation_path(&details.derivation_path)
+                    .expect("invalid derivation path"),
             })
             .collect()
     }
