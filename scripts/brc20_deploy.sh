@@ -59,6 +59,8 @@ dfx deploy brc20-bridge --argument "(record {
     };
 })"
 
+dfx canister call brc20-bridge admin_configure_ecdsa
+
 ######################## Deploy BFT and Token Contracts ######################
 
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
