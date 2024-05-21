@@ -9,7 +9,7 @@ use ethers_core::types::{BlockNumber, U256 as EthU256};
 use serde::{Deserialize, Serialize};
 
 use crate::bft_bridge_api;
-use crate::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
 
 /// Determined side of the bridge.

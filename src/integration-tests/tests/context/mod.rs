@@ -24,7 +24,7 @@ use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::bft_bridge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::evm_link::EvmLink;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;

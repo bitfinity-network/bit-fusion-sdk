@@ -14,6 +14,14 @@ fn get_contract_code(env_name: &str) -> Vec<u8> {
 pub static BFT_BRIDGE_SMART_CONTRACT_DEPLOYED_CODE: Lazy<Vec<u8>> =
     Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_BFT_BRIDGE_DEPLOYED_HEX_CODE));
 
+/// Bridge contract bytecode
+const BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE: &str =
+    env!("BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE");
+
+/// BftBridge smart contract bytecode
+pub static BFT_BRIDGE_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
+    Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE));
+
 #[cfg(feature = "test-contracts")]
 pub mod test_contracts {
     use once_cell::sync::Lazy;
@@ -23,10 +31,6 @@ pub mod test_contracts {
     /// Wrapped token contract bytecode
     const BUILD_SMART_CONTRACT_WRAPPED_TOKEN_HEX_CODE: &str =
         env!("BUILD_SMART_CONTRACT_WRAPPED_TOKEN_HEX_CODE");
-
-    /// Bridge contract bytecode
-    const BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE: &str =
-        env!("BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE");
 
     /// Uniswap factory bytecode
     const BUILD_SMART_CONTRACT_UNISWAP_FACTORY_HEX_CODE: &str =
@@ -41,10 +45,6 @@ pub mod test_contracts {
     /// WrappedToken smart contract bytecode
     pub static WRAPPED_TOKEN_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
         Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_WRAPPED_TOKEN_HEX_CODE));
-
-    /// BftBridge smart contract bytecode
-    pub static BFT_BRIDGE_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
-        Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE));
 
     /// Uniswap factory contract bytecode
     pub static UNISWAP_FACTORY_HEX_CODE: Lazy<Vec<u8>> =
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn should_get_bft_bridge_token_smart_contract_code() {
-        let code = &*test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+        let code = &*BFT_BRIDGE_SMART_CONTRACT_CODE;
         assert!(!code.is_empty())
     }
 
