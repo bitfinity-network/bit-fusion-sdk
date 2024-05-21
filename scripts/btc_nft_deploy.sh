@@ -71,6 +71,8 @@ dfx deploy btc-nft-bridge --argument "(record {
     };
 })"
 
+dfx canister call btc-nft-bridge admin_configure_ecdsa
+
 ######################## Deploy BFT and Token Contracts ######################
 
 ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")

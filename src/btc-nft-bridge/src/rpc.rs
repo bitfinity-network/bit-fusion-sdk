@@ -105,7 +105,7 @@ pub(crate) async fn fetch_reveal_transaction(
     reveal_tx_id: &Txid,
 ) -> anyhow::Result<Transaction> {
     let ord_url: String = state.borrow().ord_url();
-    Ok(get_nft_transaction_by_id(&ord_url, &reveal_tx_id)
+    Ok(get_nft_transaction_by_id(&ord_url, reveal_tx_id)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?)
 }

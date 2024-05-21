@@ -83,7 +83,7 @@ impl NftInfo {
 impl From<&NftInfo> for OutPoint {
     fn from(value: &NftInfo) -> Self {
         OutPoint {
-            txid: value.id.0.txid.clone(),
+            txid: value.id.0.txid,
             vout: value.vout,
         }
     }

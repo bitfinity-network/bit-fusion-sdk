@@ -227,7 +227,7 @@ pub async fn erc721_to_nft(
 ) -> Result<NftInscribeStatus, BridgeError> {
     let network = state.borrow().ic_btc_network();
 
-    let bridge_addr = get_deposit_address(state, &eth_address, network).await;
+    let bridge_addr = get_deposit_address(state, eth_address, network).await;
 
     let nft_info = rpc::fetch_nft_token_details(state, nft_id, bridge_addr)
         .await
@@ -239,7 +239,7 @@ pub async fn erc721_to_nft(
         nft_info,
         dst_addr,
         fee_canister_address,
-        &eth_address,
+        eth_address,
     )
     .await
     .map_err(|e| BridgeError::Erc721Burn(e.to_string()))?;

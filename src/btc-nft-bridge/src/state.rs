@@ -1,10 +1,14 @@
 use std::path::PathBuf;
 
-use bitcoin::Network;
+use bitcoin::bip32::ChainCode;
+use bitcoin::{Network, PublicKey};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{
+    EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
+};
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
@@ -194,6 +198,32 @@ impl State {
 
     pub fn signer(&self) -> &SignerStorage {
         &self.signer
+    }
+
+    /// Updates the ecdsa signing configuration with the given master key information.
+    ///
+    /// This configuration is used to derive public keys for different user addresses, so this
+    /// configuration must be set before any of the transactions can be processed.
+    pub fn configure_ecdsa(&mut self, master_key: EcdsaPublicKeyResponse) {
+        let chain_code: &[u8] = &master_key.chain_code;
+        self.master_key = Some(MasterKey {
+            public_key: PublicKey::from_slice(&master_key.public_key)
+                .expect("invalid public key slice"),
+            chain_code: ChainCode::try_from(chain_code).expect("invalid chain code slice"),
+            key_id: self.ecdsa_key_id(),
+        });
+    }
+
+    pub fn ecdsa_key_id(&self) -> EcdsaKeyId {
+        let key_name = match &self.config.signing_strategy {
+            SigningStrategy::Local { .. } => "none".to_string(),
+            SigningStrategy::ManagementCanister { key_id } => key_id.to_string(),
+        };
+
+        EcdsaKeyId {
+            curve: EcdsaCurve::Secp256k1,
+            name: key_name,
+        }
     }
 
     pub fn ecdsa_signer(&self) -> EcdsaSigner {
