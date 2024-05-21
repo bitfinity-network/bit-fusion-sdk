@@ -93,6 +93,8 @@ build_canister() {
     local output_wasm="$3"
     local did_file_name="${4:-$canister_name}"
 
+    mkdir -p "$WASM_DIR"
+
     # Generate the did file
     cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
 
@@ -152,7 +154,7 @@ build_requested_canisters() {
             signature_verification | spender | minter)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
-            btc-bridge | rune-bridge | ircr2-minter | erc20-minter)
+            btc-bridge | rune-bridge | icrc2-minter | erc20-minter)
                 build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
