@@ -293,6 +293,7 @@ impl CanisterWallet {
         leftovers_address: Address,
         leftover_amount: u64,
     ) -> InscribeResult<(Txid, u64)> {
+        let own_address = self.get_bitcoin_address(&H160::default()).await;
         let fee_rate = self.get_fee_rate().await;
         let fee_utxo = Utxo {
             outpoint: Outpoint {
@@ -355,7 +356,7 @@ impl CanisterWallet {
 
         let signed_tx = self
             .signer
-            .sign_transaction_ecdsa(unsigned_tx, &utxos_to_sign)
+            .sign_transaction_ecdsa(unsigned_tx, &utxos_to_sign, own_address)
             .await?;
 
         // send transaction

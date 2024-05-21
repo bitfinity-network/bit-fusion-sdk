@@ -5,6 +5,7 @@ use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner as _;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_cdk::api::management_canister::ecdsa::{ecdsa_public_key, EcdsaPublicKeyArgument};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure as _, StableUnboundedMap, VirtualMemory};
@@ -143,6 +144,24 @@ impl Brc20Bridge {
                 None
             }
         }
+    }
+
+    #[update]
+    pub async fn admin_configure_ecdsa(&self) {
+        get_state()
+            .borrow()
+            .check_admin(ic_exports::ic_kit::ic::caller());
+        let key_id = get_state().borrow().ecdsa_key_id();
+
+        let master_key = ecdsa_public_key(EcdsaPublicKeyArgument {
+            canister_id: None,
+            derivation_path: vec![],
+            key_id,
+        })
+        .await
+        .expect("failed to get master key");
+
+        get_state().borrow_mut().configure_ecdsa(master_key.0);
     }
 
     #[update]

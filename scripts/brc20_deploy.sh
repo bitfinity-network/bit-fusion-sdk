@@ -47,7 +47,7 @@ echo "Deploying BRC20 bridge"
 dfx deploy brc20-bridge --argument "(record {
     general_indexer = \"${GENERAL_INDEXER_URL}\";
     brc20_indexer = \"${BRC20_INDEXER_URL}\";
-    erc20_minter_fee = 10;
+    deposit_fee = 100_000;
     admin = principal \"${ADMIN_PRINCIPAL}\";
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     evm_link = variant { Ic = principal \"${EVM}\" };
@@ -173,8 +173,12 @@ $ord_wallet balance
 
 echo "Preparing to bridge a BRC20 inscription to an ERC20 token"
 
-brc20_bridge_addr=$(dfx canister call brc20-bridge get_deposit_address"(\"$ETH_WALLET_ADDRESS\")")
-BRIDGE_ADDRESS=$(echo "$brc20_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
+deposit_addr_resp=$(dfx canister call brc20-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
+res=${deposit_addr_resp#*\"}
+BRIDGE_ADDRESS=${res%\"*}
+
+sleep 5
+
 echo "BRC20 bridge canister BTC address: $BRIDGE_ADDRESS"
 
 echo "Canister's balance before BRC20 deposit"

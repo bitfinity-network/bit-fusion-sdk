@@ -3,7 +3,7 @@ use bitcoin::bip32::{ChainCode, ChildNumber, DerivationPath, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error, Message, Secp256k1};
 use bitcoin::sighash::SighashCache;
-use bitcoin::{Address, Network, PublicKey, ScriptBuf, Transaction, Witness};
+use bitcoin::{Address, Network, PublicKey, Transaction, Witness};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     sign_with_ecdsa, EcdsaKeyId, SignWithEcdsaArgument,
@@ -24,7 +24,6 @@ pub struct IcBtcSigner {
 pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
-    pub script: ScriptBuf,
     pub key_id: EcdsaKeyId,
 }
 
@@ -72,13 +71,14 @@ impl IcBtcSigner {
         &self,
         unsigned_tx: Transaction,
         utxos: &[OrdUtxo],
+        own_address: Address,
     ) -> InscribeResult<Transaction> {
         let mut hash = SighashCache::new(unsigned_tx.clone());
         for (index, input) in utxos.iter().enumerate() {
             let sighash = hash
                 .p2wpkh_signature_hash(
                     index,
-                    &self.master_key.script,
+                    &own_address.script_pubkey(),
                     input.amount,
                     bitcoin::EcdsaSighashType::All,
                 )

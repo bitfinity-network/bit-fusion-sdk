@@ -1,20 +1,18 @@
 use std::cmp::Ordering;
 
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PrivateKey, PublicKey};
+use bitcoin::{Network, PublicKey};
 use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
-use ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
+use ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
-use inscriber::ecdsa_api::{IcBtcSigner, MasterKey};
+use inscriber::ecdsa_api::MasterKey;
 use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
-use ord_rs::wallet::LocalSigner;
-use ord_rs::Wallet;
 use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
@@ -166,6 +164,20 @@ impl State {
         }
     }
 
+    /// Updates the ecdsa signing configuration with the given master key information.
+    ///
+    /// This configuration is used to derive public keys for different user addresses, so this
+    /// configuration must be set before any of the transactions can be processed.
+    pub fn configure_ecdsa(&mut self, master_key: EcdsaPublicKeyResponse) {
+        let chain_code: &[u8] = &master_key.chain_code;
+        self.master_key = Some(MasterKey {
+            public_key: PublicKey::from_slice(&master_key.public_key)
+                .expect("invalid public key slice"),
+            chain_code: ChainCode::try_from(chain_code).expect("invalid chain code slice"),
+            key_id: self.ecdsa_key_id(),
+        });
+    }
+
     pub fn public_key(&self) -> PublicKey {
         self.master_key
             .as_ref()
@@ -178,18 +190,6 @@ impl State {
             .as_ref()
             .expect("master key is not initialized")
             .chain_code
-    }
-
-    pub fn wallet(&self) -> Wallet {
-        match &self.config.signing_strategy {
-            SigningStrategy::Local { private_key } => Wallet::new_with_signer(LocalSigner::new(
-                PrivateKey::from_slice(private_key, self.btc_network())
-                    .expect("invalid private key"),
-            )),
-            SigningStrategy::ManagementCanister { .. } => {
-                Wallet::new_with_signer(IcBtcSigner::new(self.master_key(), self.btc_network()))
-            }
-        }
     }
 
     pub(crate) fn master_key(&self) -> MasterKey {
