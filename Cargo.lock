@@ -5899,6 +5899,7 @@ dependencies = [
  "bs58 0.5.1",
  "candid",
  "did",
+ "eth-signer",
  "ethers-core",
  "hex",
  "ic-canister",
@@ -6173,7 +6174,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.52.5",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -6454,6 +6455,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.16.0",
+ "ordinals",
  "serde",
  "thiserror",
 ]
@@ -6850,8 +6852,8 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ord-rs"
-version = "0.1.0"
-source = "git+https://github.com/bitfinity-network/ord-rs.git#f9bf15241e4588200e4ec97cf0fc0ef1a3933a41"
+version = "0.1.2"
+source = "git+https://github.com/bitfinity-network/ord-rs.git#135980f8a8178ffa4913dbaefca5302a8bed0682"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",

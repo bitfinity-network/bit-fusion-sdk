@@ -7,6 +7,7 @@ use bitcoin::{
     Address, Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
     Witness,
 };
+use did::H160;
 use futures::TryFutureExt;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, Utxo,
@@ -116,13 +117,11 @@ pub(crate) async fn fetch_reveal_transaction(
 pub(crate) async fn fetch_nft_utxo(
     state: &RefCell<State>,
     reveal_tx_id: &str,
+    eth_address: &H160,
 ) -> anyhow::Result<Utxo> {
-    let (ic_btc_network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
+    let ic_btc_network = state.borrow().ic_btc_network();
 
-    let bridge_addr = get_deposit_address(ic_btc_network, derivation_path).await;
+    let bridge_addr = get_deposit_address(state, eth_address, ic_btc_network).await;
 
     let nft_utxo = find_inscription_utxo(
         ic_btc_network,

@@ -52,14 +52,9 @@ impl NftBridge {
     }
 
     #[update]
-    pub async fn get_deposit_address(&mut self) -> String {
-        let (network, derivation_path) = {
-            (
-                get_state().borrow().ic_btc_network(),
-                get_state().borrow().derivation_path(None),
-            )
-        };
-        interface::get_deposit_address(network, derivation_path).await
+    pub async fn get_deposit_address(&mut self, eth_address: H160) -> String {
+        let network = { get_state().borrow().ic_btc_network() };
+        interface::get_deposit_address(&get_state(), &eth_address, network).await
     }
 
     /// Returns the balance of the given bitcoin address.
@@ -78,9 +73,20 @@ impl NftBridge {
         inscription: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscriptionFees> {
-        let network = get_state().borrow().ic_btc_network();
-        Inscriber::get_inscription_fees(inscription_type, inscription, multisig_config, network)
-            .await
+        let (network, ecdsa_signer) = {
+            (
+                get_state().borrow().ic_btc_network(),
+                get_state().borrow().ecdsa_signer(),
+            )
+        };
+        Inscriber::get_inscription_fees(
+            inscription_type,
+            inscription,
+            multisig_config,
+            network,
+            ecdsa_signer,
+        )
+        .await
     }
 
     /// Inscribes and sends the inscribed sat from this canister to the given address.
@@ -94,10 +100,10 @@ impl NftBridge {
         dst_address: String,
         multisig_config: Option<Multisig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let (network, derivation_path) = {
+        let (network, ecdsa_signer) = {
             (
                 get_state().borrow().ic_btc_network(),
-                get_state().borrow().derivation_path(None),
+                get_state().borrow().ecdsa_signer(),
             )
         };
 
@@ -107,7 +113,7 @@ impl NftBridge {
             leftovers_address,
             dst_address,
             multisig_config,
-            derivation_path,
+            ecdsa_signer,
             network,
         )
         .await

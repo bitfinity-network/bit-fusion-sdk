@@ -206,22 +206,20 @@ impl Task for NftTask {
                     )));
                 };
 
-                let (network, derivation_path) = {
-                    (
-                        get_state().borrow().ic_btc_network(),
-                        get_state().borrow().derivation_path(Some(sender.clone())),
-                    )
-                };
+                let network = get_state().borrow().ic_btc_network();
+                let state = get_state();
+                let sender = sender.clone();
 
                 Box::pin(async move {
                     let fee_address =
-                        interface::get_deposit_address(network, derivation_path).await;
+                        interface::get_deposit_address(&state, &sender, network).await;
                     let result = crate::ops::erc721_to_nft(
                         &get_state(),
                         operation_id,
                         nft_id,
                         &address,
                         fee_address,
+                        &sender,
                     )
                     .await
                     .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;

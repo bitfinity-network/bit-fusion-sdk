@@ -1,5 +1,5 @@
 pub mod fees;
-mod signer;
+
 mod utxo_store;
 
 use std::str::FromStr;
@@ -12,93 +12,36 @@ use bitcoin::{
     Address, Amount, FeeRate, Network, OutPoint, PublicKey, ScriptBuf, Sequence, Transaction, TxIn,
     TxOut, Txid, Witness,
 };
+use did::H160;
+use eth_signer::sign_strategy::SigningStrategy;
 use hex::ToHex;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{BitcoinNetwork, Outpoint, Utxo};
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
 use ord_rs::constants::POSTAGE;
 use ord_rs::wallet::ScriptType;
 use ord_rs::{
-    Brc20, CreateCommitTransaction, CreateCommitTransactionArgs, ExternalSigner, Inscription,
-    MultisigConfig, Nft, OrdError, OrdResult, OrdTransactionBuilder, RevealTransactionArgs,
-    SignCommitTransactionArgs, Utxo as OrdUtxo, Wallet, WalletType,
+    Brc20, CreateCommitTransaction, CreateCommitTransactionArgs, Inscription, MultisigConfig, Nft,
+    OrdResult, OrdTransactionBuilder, RevealTransactionArgs, SignCommitTransactionArgs,
+    Utxo as OrdUtxo, Wallet,
 };
 use serde::de::DeserializeOwned;
 
-use self::signer::{Signer, Spender};
+use crate::interface::ecdsa_api::{self, EcdsaSigner, Spender};
 use crate::interface::{
-    bitcoin_api, ecdsa_api, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
+    bitcoin_api, InscribeError, InscribeResult, InscribeTransactions, InscriptionFees,
     InscriptionWrapper, Nft as CandidNft, Protocol,
 };
 use crate::wallet::utxo_store::UtxoStore;
 
-#[derive(Clone)]
-pub struct EcdsaSigner {
-    pub derivation_path: Vec<Vec<u8>>,
-}
-
-#[async_trait::async_trait]
-impl ExternalSigner for EcdsaSigner {
-    async fn ecdsa_public_key(&self) -> String {
-        match ecdsa_api::ecdsa_public_key(self.derivation_path.clone()).await {
-            Ok(res) => res.public_key_hex,
-            Err(e) => panic!("{e}"),
-        }
-    }
-
-    async fn sign_with_ecdsa(&self, message: &str) -> String {
-        match ecdsa_api::sign_with_ecdsa(self.derivation_path.clone(), message).await {
-            Ok(res) => res.signature_hex,
-            Err(e) => panic!("{e}"),
-        }
-    }
-
-    async fn verify_ecdsa(&self, signature_hex: &str, message: &str, public_key_hex: &str) -> bool {
-        match ecdsa_api::verify_ecdsa(signature_hex, message, public_key_hex).await {
-            Ok(res) => res.is_signature_valid,
-            Err(e) => panic!("{e}"),
-        }
-    }
-}
-
 pub struct CanisterWallet {
-    bitcoin_network: BitcoinNetwork,
-    derivation_path: Vec<Vec<u8>>,
-    network: Network,
+    network: BitcoinNetwork,
+    signer: EcdsaSigner,
 }
 
 impl CanisterWallet {
-    pub fn new(derivation_path: Vec<Vec<u8>>, network: BitcoinNetwork) -> Self {
-        Self {
-            bitcoin_network: network,
-            derivation_path,
-            network: Self::map_network(network),
-        }
+    pub fn new(network: BitcoinNetwork, signer: EcdsaSigner) -> Self {
+        Self { network, signer }
     }
-
-    #[inline]
-    fn with_ecdsa_signer(signer: EcdsaSigner) -> Wallet {
-        Wallet::new_with_signer(WalletType::External {
-            signer: Box::new(signer),
-        })
-    }
-
-    #[inline]
-    fn ecdsa_signer(&self) -> EcdsaSigner {
-        EcdsaSigner {
-            derivation_path: self.derivation_path.clone(),
-        }
-    }
-
-    /// Returns bech32 bitcoin `Address` of this canister.
-    pub async fn get_bitcoin_address(&self) -> Address {
-        let public_key = match ecdsa_api::ecdsa_public_key(self.derivation_path.clone()).await {
-            Ok(res) => res.public_key_hex,
-            Err(e) => panic!("{e}"),
-        };
-
-        let pk = PublicKey::from_str(&public_key).expect("Can't deserialize public key");
-        Self::btc_address_from_public_key(self.bitcoin_network, &pk)
-    }
-
     /// Returns the estimated inscription fees for the given inscription.
     pub async fn get_inscription_fees(
         &self,
@@ -108,7 +51,6 @@ impl CanisterWallet {
     ) -> InscribeResult<InscriptionFees> {
         use crate::constant::{DUMMY_BITCOIN_ADDRESS, DUMMY_BITCOIN_PUBKEY};
 
-        let ecdsa_signer = self.ecdsa_signer();
         let own_utxos = vec![OrdUtxo {
             id: Txid::all_zeros(),
             index: 0,
@@ -120,7 +62,7 @@ impl CanisterWallet {
             .assume_checked();
 
         // initialize a wallet (transaction signer) and a transaction builder
-        let wallet = Self::with_ecdsa_signer(ecdsa_signer);
+        let wallet = self.get_signer_wallet();
         // Hardcoded for debugging
         let script_type = ScriptType::P2WSH;
         let mut builder = OrdTransactionBuilder::new(dummy_pubkey, script_type, wallet);
@@ -166,15 +108,12 @@ impl CanisterWallet {
         leftovers_address: Address,
         multisig_config: Option<MultisigConfig>,
     ) -> InscribeResult<InscribeTransactions> {
-        let ecdsa_signer = self.ecdsa_signer();
-
-        let own_pk = PublicKey::from_str(&ecdsa_signer.ecdsa_public_key().await)
-            .map_err(OrdError::PubkeyConversion)?;
-
-        let own_address = Self::btc_address_from_public_key(self.bitcoin_network, &own_pk);
+        let ic_btc_network = self.ic_btc_network();
+        let own_pk = self.signer.public_key();
+        let own_address = self.get_bitcoin_address(&H160::default()).await;
 
         log::info!("Fetching UTXOs...");
-        let own_utxos = bitcoin_api::get_utxos(self.bitcoin_network, own_address.to_string())
+        let own_utxos = bitcoin_api::get_utxos(ic_btc_network, own_address.to_string())
             .await
             .map_err(InscribeError::FailedToCollectUtxos)?
             .utxos;
@@ -193,7 +132,7 @@ impl CanisterWallet {
         let own_utxos = utxo_store.process_utxos(fees, own_utxos)?;
 
         // initialize a wallet (transaction signer) and a transaction builder
-        let wallet = Self::with_ecdsa_signer(ecdsa_signer);
+        let wallet = self.get_signer_wallet();
         // Hardcoded for debugging
         // TODO: dynamically determine the `ScriptType`
         let script_type = ScriptType::P2WSH;
@@ -241,11 +180,11 @@ impl CanisterWallet {
         .await?;
 
         log::info!("Sending the commit transaction...");
-        bitcoin_api::send_transaction(self.bitcoin_network, serialize(&commit_tx)).await;
+        bitcoin_api::send_transaction(self.ic_btc_network(), serialize(&commit_tx)).await;
         log::info!("Done");
 
         log::info!("Sending the reveal transaction...");
-        bitcoin_api::send_transaction(self.bitcoin_network, serialize(&reveal_tx)).await;
+        bitcoin_api::send_transaction(self.ic_btc_network(), serialize(&reveal_tx)).await;
         log::info!("Done");
 
         // Clear the locked UTXO set
@@ -267,7 +206,7 @@ impl CanisterWallet {
         leftovers_address: Address,
         leftover_amount: u64,
     ) -> InscribeResult<(Txid, u64)> {
-        let own_address = self.get_bitcoin_address().await;
+        let own_address = self.get_bitcoin_address(&H160::default()).await;
 
         let fee_rate = self.get_fee_rate().await;
         let fee_utxo = Utxo {
@@ -321,14 +260,7 @@ impl CanisterWallet {
             output,
         };
 
-        // sign transaction
-        let ecdsa_signer = EcdsaSigner {
-            derivation_path: self.derivation_path.clone(),
-        };
-
-        let own_pk = PublicKey::from_str(&ecdsa_signer.ecdsa_public_key().await)
-            .map_err(OrdError::PubkeyConversion)?;
-        let signer = Signer::new(ecdsa_signer);
+        let own_pk = self.signer.public_key();
 
         let utxos_to_sign = [inscription_utxo, fee_utxo]
             .map(|utxo| OrdUtxo {
@@ -342,12 +274,13 @@ impl CanisterWallet {
             pubkey: own_pk,
             script: own_address.script_pubkey(),
         };
-        let signed_tx = signer
+        let signed_tx = self
+            .signer
             .sign_transaction_ecdsa(unsigned_tx, &utxos_to_sign, spender)
             .await?;
 
         // send transaction
-        bitcoin_api::send_transaction(self.bitcoin_network, serialize(&signed_tx)).await;
+        bitcoin_api::send_transaction(self.ic_btc_network(), serialize(&signed_tx)).await;
 
         Ok((signed_tx.txid(), leftover_amount.to_sat()))
     }
@@ -423,7 +356,7 @@ impl CanisterWallet {
         };
 
         let commit_tx_result = builder.build_commit_transaction(
-            self.network,
+            self.btc_network(),
             recipient_address.clone(),
             commit_tx_args,
         )?;
@@ -461,17 +394,9 @@ impl CanisterWallet {
         builder.build_reveal_transaction(reveal_tx_args).await
     }
 
-    // Returns bech32 bitcoin `Address` of this canister from given `PublicKey`.
-    fn btc_address_from_public_key(network: BitcoinNetwork, pk: &PublicKey) -> Address {
-        let network = Self::map_network(network);
-
-        // Compute the bitcoin segwit(bech32) address.
-        Address::p2wpkh(pk, network).expect("Can't convert public key to segwit bitcoin address")
-    }
-
     pub async fn get_fee_rate(&self) -> FeeRate {
         // Get fee percentiles from previous transactions to estimate our own fee.
-        let fee_percentiles = bitcoin_api::get_current_fee_percentiles(self.bitcoin_network).await;
+        let fee_percentiles = bitcoin_api::get_current_fee_percentiles(self.network).await;
 
         let fee_per_byte = if fee_percentiles.is_empty() {
             // There are no fee percentiles. This case can only happen on a regtest
@@ -484,6 +409,44 @@ impl CanisterWallet {
         };
 
         FeeRate::from_sat_per_vb(fee_per_byte).expect("Overflow!")
+    }
+
+    pub fn get_signer_wallet(&self) -> Wallet {
+        self.signer.wallet()
+    }
+
+    pub fn btc_network(&self) -> Network {
+        match self.network {
+            BitcoinNetwork::Mainnet => Network::Bitcoin,
+            BitcoinNetwork::Testnet => Network::Testnet,
+            BitcoinNetwork::Regtest => Network::Regtest,
+        }
+    }
+
+    pub fn ic_btc_network(&self) -> BitcoinNetwork {
+        self.network
+    }
+
+    pub async fn get_bitcoin_address(&self, eth_address: &H160) -> Address {
+        ecdsa_api::get_bitcoin_address(
+            eth_address,
+            self.btc_network(),
+            self.signer.public_key(),
+            self.signer.chain_code(),
+        )
+        .expect("Failed to retrieve BTC address")
+    }
+
+    pub fn ecdsa_key_id(&self, signer: SigningStrategy) -> EcdsaKeyId {
+        let key_name = match signer {
+            SigningStrategy::Local { .. } => "none".to_string(),
+            SigningStrategy::ManagementCanister { key_id } => key_id.to_string(),
+        };
+
+        EcdsaKeyId {
+            curve: EcdsaCurve::Secp256k1,
+            name: key_name,
+        }
     }
 
     #[inline]

@@ -124,6 +124,14 @@ pub enum InscribeError {
     RequestError(String),
     #[error("address mismatch expected: {expected} actual: {actual}")]
     AddressMismatch { expected: String, actual: String },
+    #[error("{0}")]
+    DerivationPath(#[from] GetAddressError),
+}
+
+#[derive(Debug, Clone, Copy, CandidType, Deserialize, PartialEq, Eq, Error)]
+pub enum GetAddressError {
+    #[error("")]
+    Derivation,
 }
 
 impl From<ord_rs::Brc20> for InscriptionWrapper {

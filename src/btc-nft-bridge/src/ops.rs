@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use bitcoin::absolute::LockTime;
 use bitcoin::hashes::Hash;
-use bitcoin::secp256k1::ecdsa::Signature;
+use bitcoin::secp256k1::Message;
 use bitcoin::sighash::SighashCache;
 use bitcoin::transaction::Version;
 use bitcoin::{
@@ -17,14 +17,14 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetUtxosResponse, Utxo,
 };
 use ic_stable_structures::CellStructure;
+use inscriber::interface::ecdsa_api::EcdsaSigner;
 use inscriber::interface::{bitcoin_api, ecdsa_api};
 use inscriber::wallet::fees::estimate_transaction_fees;
-use inscriber::wallet::{CanisterWallet, EcdsaSigner};
+use inscriber::wallet::CanisterWallet;
 use minter_did::erc721_mint_order::{ERC721MintOrder, ERC721SignedMintOrder};
 use minter_did::id256::Id256;
 use ord_rs::inscription::iid::InscriptionId;
 use ord_rs::wallet::ScriptType;
-use ord_rs::ExternalSigner;
 
 use crate::constant::NONCE;
 use crate::interface::bridge_api::{BridgeError, NftInscribeStatus, NftMintError, NftMintStatus};
@@ -50,11 +50,6 @@ pub async fn nft_to_erc721(
         .await
         .map_err(|e| NftMintError::NftBridge(e.to_string()))?;
 
-    log::info!("Reveal transaction: {}", reveal_tx.txid());
-    log::info!("ALL TX {:?}", reveal_tx);
-    log::info!("INPUTS {:?}", reveal_tx.input[0].witness.tapscript());
-
-    // FIXME: it doesn't work
     rpc::parse_and_validate_inscription(reveal_tx, nft_id.index as usize)
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
@@ -228,23 +223,26 @@ pub async fn erc721_to_nft(
     nft_id: InscriptionId,
     dst_addr: &str,
     fee_canister_address: String,
+    eth_address: &H160,
 ) -> Result<NftInscribeStatus, BridgeError> {
-    let (network, derivation_path) = {
-        (
-            state.borrow().ic_btc_network(),
-            state.borrow().derivation_path(None),
-        )
-    };
+    let network = state.borrow().ic_btc_network();
 
-    let bridge_addr = get_deposit_address(network, derivation_path).await;
+    let bridge_addr = get_deposit_address(state, &eth_address, network).await;
 
     let nft_info = rpc::fetch_nft_token_details(state, nft_id, bridge_addr)
         .await
         .map_err(|e| NftMintError::InvalidNft(e.to_string()))?;
 
-    let tx_id = withdraw_nft(state, request_id, nft_info, dst_addr, fee_canister_address)
-        .await
-        .map_err(|e| BridgeError::Erc721Burn(e.to_string()))?;
+    let tx_id = withdraw_nft(
+        state,
+        request_id,
+        nft_info,
+        dst_addr,
+        fee_canister_address,
+        &eth_address,
+    )
+    .await
+    .map_err(|e| BridgeError::Erc721Burn(e.to_string()))?;
 
     Ok(NftInscribeStatus {
         tx_id: tx_id.to_string(),
@@ -257,6 +255,7 @@ async fn withdraw_nft(
     nft: NftInfo,
     dst_addr: &str,
     fee_canister_address: String,
+    eth_address: &H160,
 ) -> Result<Txid, BridgeError> {
     let tx_id = nft.id.0.txid.to_string();
     if !state.borrow().has_nft(&tx_id) {
@@ -266,14 +265,11 @@ async fn withdraw_nft(
         )));
     }
 
-    let utxo = rpc::fetch_nft_utxo(state, &tx_id)
+    let utxo = rpc::fetch_nft_utxo(state, &tx_id, eth_address)
         .await
         .map_err(|e| BridgeError::GetTransactionById(e.to_string()))?;
 
-    let (network, derivation_path) = {
-        let state = state.borrow();
-        (state.ic_btc_network(), state.derivation_path(None))
-    };
+    let network = state.borrow().ic_btc_network();
 
     log::info!(
         "Transferring requested NFT to {} with request id {}",
@@ -294,7 +290,8 @@ async fn withdraw_nft(
         .map_err(|e| BridgeError::MalformedAddress(e.to_string()))?;
 
     // get utxos for fees
-    let wallet = CanisterWallet::new(derivation_path.clone(), network);
+    let signer = state.borrow().ecdsa_signer();
+    let wallet = CanisterWallet::new(network, signer);
     let fee_rate = wallet.get_fee_rate().await;
     let utxos = bitcoin_api::get_utxos(network, fee_canister_address)
         .await
@@ -317,14 +314,15 @@ async fn withdraw_nft(
     };
 
     // transfer the UTXO to the destination address
+    let signer = state.borrow().ecdsa_signer();
     let result = transfer_utxo(
         &utxo,
         &fee_utxos,
         fee_amount,
         leftovers_addr,
         dst_addr,
-        derivation_path,
         network,
+        signer,
     )
     .await
     .map_err(|e| BridgeError::Erc721Burn(e.to_string()));
@@ -389,8 +387,8 @@ async fn transfer_utxo(
     fee_amount: Amount,
     leftovers_address: Address,
     dst_address: Address,
-    derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,
+    signer: EcdsaSigner,
 ) -> Result<Txid, BridgeError> {
     let leftovers_amount =
         Amount::from_sat(fee_utxos.iter().map(|utxo| utxo.value).sum::<u64>()) - fee_amount;
@@ -425,13 +423,7 @@ async fn transfer_utxo(
         });
     }
 
-    let pubkey = ecdsa_api::ecdsa_public_key(derivation_path.clone())
-        .await
-        .map_err(|e| BridgeError::EcdsaPublicKey(e.to_string()))?
-        .public_key_hex;
-
-    let pubkey =
-        PublicKey::from_str(&pubkey).map_err(|e| BridgeError::PublicKeyFromStr(e.to_string()))?;
+    let pubkey = signer.public_key();
 
     let unsigned_tx = Transaction {
         version: Version::TWO,
@@ -445,7 +437,7 @@ async fn transfer_utxo(
         &[utxo.clone()],
         leftovers_address,
         pubkey,
-        derivation_path,
+        signer,
     )
     .await?;
 
@@ -459,10 +451,9 @@ async fn sign_transaction(
     utxos: &[Utxo],
     holder_btc_addr: Address,
     holder_btc_pubkey: PublicKey,
-    derivation_path: Vec<Vec<u8>>,
+    signer: EcdsaSigner,
 ) -> Result<Transaction, BridgeError> {
     let mut hash = SighashCache::new(unsigned_tx.clone());
-    let signer = EcdsaSigner { derivation_path };
     for (index, input) in utxos.iter().enumerate() {
         let sighash = hash
             .p2wpkh_signature_hash(
@@ -475,24 +466,20 @@ async fn sign_transaction(
 
         log::debug!("Signing transaction and verifying signature");
         let signature = {
-            let msg_hex = hex::encode(sighash);
             // sign
+            let msg = Message::from(sighash);
+            let dp = ecdsa_api::get_btc_derivation_path(&H160::default())
+                .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
 
-            let sig_hex = signer.sign_with_ecdsa(&msg_hex).await;
-            let signature = Signature::from_compact(
-                &hex::decode(&sig_hex).map_err(|e| BridgeError::SignatureError(e.to_string()))?,
-            )
-            .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
-
-            // verify
-            if signer
-                .verify_ecdsa(&sig_hex, &msg_hex, &holder_btc_pubkey.to_string())
+            use ord_rs::BtcTxSigner;
+            let signature = signer
+                .sign_with_ecdsa(msg, &dp)
                 .await
-            {
-                return Err(BridgeError::SignatureError(
-                    "signature verification failed".to_string(),
-                ));
-            }
+                .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
+            signer
+                .verify_ecdsa(&signature, &msg, &holder_btc_pubkey)
+                .map_err(|e| BridgeError::SignatureError(e.to_string()))?;
+
             signature
         };
 

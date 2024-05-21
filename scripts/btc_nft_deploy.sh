@@ -193,7 +193,7 @@ $ord_wallet balance
 
 echo "Preparing to bridge a NFT inscription to an ERC721 token"
 
-nft_bridge_addr=$(dfx canister call btc-nft-bridge get_deposit_address)
+nft_bridge_addr=$(dfx canister call btc-nft-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
 BRIDGE_ADDRESS=$(echo "$nft_bridge_addr" | sed -e 's/.*"\(.*\)".*/\1/')
 echo "NFT bridge canister BTC address: $BRIDGE_ADDRESS"
 
