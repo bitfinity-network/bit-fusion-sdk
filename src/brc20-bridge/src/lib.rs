@@ -9,6 +9,8 @@ pub mod scheduler;
 pub mod state;
 
 use ic_metrics::Metrics;
+pub use inscriber::interface::GetAddressError;
+pub use ord_rs::InscriptionId;
 
 pub use crate::canister::Brc20Bridge;
 

@@ -5940,7 +5940,6 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "once_cell",
- "ord-rs",
  "rand",
  "rlp",
  "rune-bridge",
