@@ -5,11 +5,6 @@ use tokio::io::AsyncReadExt;
 
 use crate::utils::get_workspace_root_dir;
 
-pub async fn get_icrc1_token_canister_bytecode() -> Vec<u8> {
-    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "icrc1-ledger.wasm.gz").await
-}
-
 async fn get_or_load_wasm(cell: &OnceCell<Vec<u8>>, file_name: &str) -> Vec<u8> {
     match cell.get() {
         Some(code) => code.clone(),
@@ -19,6 +14,11 @@ async fn get_or_load_wasm(cell: &OnceCell<Vec<u8>>, file_name: &str) -> Vec<u8> 
             code
         }
     }
+}
+
+pub async fn get_icrc1_token_canister_bytecode() -> Vec<u8> {
+    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
+    get_or_load_wasm(&CANISTER_BYTECODE, "icrc1-ledger.wasm.gz").await
 }
 
 /// Returns the bytecode of the signature_verification canister
@@ -68,6 +68,11 @@ pub async fn get_btc_bridge_canister_bytecode() -> Vec<u8> {
 pub async fn get_rune_bridge_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, "rune-bridge.wasm.gz").await
+}
+
+pub async fn get_brc20_bridge_canister_bytecode() -> Vec<u8> {
+    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
+    get_or_load_wasm(&CANISTER_BYTECODE, "brc20-bridge.wasm.gz").await
 }
 
 async fn load_wasm_bytecode_or_panic(wasm_name: &str) -> Vec<u8> {

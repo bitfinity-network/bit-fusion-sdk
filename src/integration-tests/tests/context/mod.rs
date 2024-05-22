@@ -724,6 +724,7 @@ pub trait TestContext {
                 todo!()
             }
             CanisterType::RuneBridge => {}
+            CanisterType::Brc20Bridge => {}
         }
     }
 
@@ -1012,6 +1013,13 @@ impl TestCanisters {
             .expect("rune bridge canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn brc20_bridge(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::Brc20Bridge)
+            .expect("brc20 bridge canister should be initialized first (see `TestContext::new()`")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -1043,6 +1051,7 @@ pub enum CanisterType {
     Icrc1Ledger,
     BtcBridge,
     RuneBridge,
+    Brc20Bridge,
 }
 
 impl CanisterType {
@@ -1078,6 +1087,12 @@ impl CanisterType {
         CanisterType::RuneBridge,
     ];
 
+    pub const BRC20_CANISTER_SET: [CanisterType; 3] = [
+        CanisterType::Evm,
+        CanisterType::Signature,
+        CanisterType::Brc20Bridge,
+    ];
+
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
@@ -1093,6 +1108,7 @@ impl CanisterType {
             CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
+            CanisterType::Brc20Bridge => get_brc20_bridge_canister_bytecode().await,
         }
     }
 }

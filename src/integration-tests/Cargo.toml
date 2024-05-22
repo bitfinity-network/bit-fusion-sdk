@@ -21,7 +21,10 @@ evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
 ic-canister = { workspace = true }
-ic-canister-client = { workspace = true, features = ["pocket-ic-client", "ic-agent-client"] }
+ic-canister-client = { workspace = true, features = [
+    "pocket-ic-client",
+    "ic-agent-client",
+] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-helpers = { workspace = true }
 icrc-client = { workspace = true }
@@ -35,6 +38,7 @@ minter-contract-utils = { path = "../minter-contract-utils", features = [
 ] }
 minter-did = { workspace = true }
 once_cell = { workspace = true }
+ord-rs = { workspace = true }
 rand = { workspace = true }
 rlp = { workspace = true }
 serde = { workspace = true }
@@ -55,8 +59,12 @@ ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "rel
 
 [dev-dependencies]
 anyhow = { workspace = true }
+brc20-bridge = { path = "../brc20-bridge" }
 btc-bridge = { path = "../btc-bridge" }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "reqwest",
+    "pocket-ic-tests-client",
+] }
 futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 ic-agent = { workspace = true }
