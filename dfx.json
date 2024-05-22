@@ -75,6 +75,12 @@
         }
       ]
     },
+    "ic-ckbtc-ledger": {
+      "build": "",
+      "candid": ".artifact/icrc1-ledger.did",
+      "wasm": ".artifact/icrc1-ledger.wasm.gz",
+      "type": "custom"
+    },
     "ic-ckbtc-kyt": {
       "build": "",
       "candid": ".artifact/ic-ckbtc-kyt.did",

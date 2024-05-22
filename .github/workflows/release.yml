@@ -1,0 +1,90 @@
+name: "Release minter canisters"
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: 'Release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+            fetch-depth: 0
+
+      - name: "Extract Version"
+        id: version
+        run: |
+          NEW_V=""
+          beginswith() { case $1 in "$2"*) true;; *) false;; esac; }
+
+          TOML="${{ steps.toml.outputs.path }}"
+          
+          V_TOML=$(awk -F= '{gsub(/[ \t]+/, "", $1); gsub(/[ \t"]+/, "", $2); if($1 == "version"){print $2}}' $TOML)
+          V_GIT=$(git describe --tag)
+
+          # Assuming that we tag each version in git
+          # If toml version was not changed manually 
+          # expecting git tag like "v1.1.1-ab8d" and toml version like "1.1.1"
+
+          echo "Tag for this commit: $V_GIT"
+          echo "Cargo.toml version: $V_TOML"
+
+          if beginswith $V_GIT "v$V_TOML" ; then
+            echo "Toml version $V_TOML matches $V_GIT"
+            if [ "$V_GIT" != "v$V_TOML" ]; then
+              echo "RELEASE_TAG=$V_GIT" >> $GITHUB_ENV
+            fi
+          else
+            echo "Toml version was changed manually"
+            echo "RELEASE_TAG=v$V_TOML" >> $GITHUB_ENV
+          fi
+          echo "RELEASE_VERSION: $RELEASE_TAG"
+
+      # Check if the tag already exists
+      - name: Validate tag
+        run: |
+          # Check is the tag that will be created already exists
+          echo $RELEASE_TAG
+          if git show-ref --tags | grep -q "$RELEASE_TAG"; then
+            echo "Tag $RELEASE_TAG already exists. Exiting."
+            exit 1
+          fi
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: false
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
+
+      - name: Build
+        run: |
+          ./scripts/build.sh icrc2-minter erc20-minter
+          ls -la .artifact
+
+      # Create a new GitHub release with the tag version
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GH_PKG_TOKEN }}
+          files: |
+            .artifact/erc20-minter.did
+            .artifact/erc20-minter.wasm
+            .artifact/erc20-minter.wasm.gz
+            .artifact/icrc2-minter.did
+            .artifact/icrc2-minter.wasm
+            .artifact/icrc2-minter.wasm.gz
