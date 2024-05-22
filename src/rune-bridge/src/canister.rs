@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::time::Duration;
 
 use bitcoin::bip32::DerivationPath;
 use bitcoin::consensus::Encodable;
@@ -54,6 +55,8 @@ impl RuneBridge {
             self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24 * 7); // 7 days
+
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 get_scheduler()
                     .borrow_mut()
@@ -64,6 +67,12 @@ impl RuneBridge {
                 if let Err(err) = task_execution_result {
                     log::error!("task execution failed: {err}",);
                 }
+            });
+
+            ic_exports::ic_cdk_timers::set_timer_interval(USED_UTXOS_REMOVE_INTERVAL, || async {
+                crate::task::RemoveUsedUtxosTask::from(get_state())
+                    .run()
+                    .await;
             });
         }
     }

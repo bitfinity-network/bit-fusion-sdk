@@ -164,9 +164,14 @@ pub async fn withdraw(
     rune_id: RuneId,
     address: Address,
 ) -> Result<Txid, WithdrawError> {
-    let current_utxos = state.borrow().ledger().load_all();
+    let (utxo_keys, current_utxos) = state.borrow().ledger().load_all();
     let tx = build_withdraw_transaction(state, amount, address, rune_id, current_utxos).await?;
     send_tx(state, &tx).await?;
+
+    // mark all utxos as used
+    utxo_keys.into_iter().for_each(|key| {
+        state.borrow_mut().ledger_mut().mark_as_used(key);
+    });
 
     Ok(tx.txid())
 }
@@ -320,7 +325,8 @@ pub async fn get_utxos(
 }
 
 fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtxosResponse) {
-    let existing = state.borrow().ledger().load_all();
+    let (_, existing) = state.borrow().ledger().load_all();
+    // TODO: maybe remove here used utxos from the ledger
 
     get_utxos_response.utxos.retain(|utxo| {
         !existing.iter().any(|v| {
