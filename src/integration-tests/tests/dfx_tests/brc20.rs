@@ -12,10 +12,11 @@
 use std::io::ErrorKind;
 use std::time::Duration;
 
+use brc20_bridge::interface::bridge_api::{BridgeError, DepositBrc20Args, Erc20MintStatus};
 use brc20_bridge::state::{BftBridgeConfig, Brc20BridgeConfig};
 use brc20_bridge::{GetAddressError, InscriptionId};
 use candid::Principal;
-use did::H160;
+use did::{TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::Wallet;
 use ethers_core::k256::ecdsa::SigningKey;
@@ -26,6 +27,7 @@ use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 use serde_json::Value;
 use tokio::process::Command;
+use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::{DfxTestContext, ADMIN};
@@ -202,6 +204,16 @@ impl Brc20TestContext {
             .to_string()
     }
 
+    async fn create_brc20_inscription(&self, filename: &str) {
+        let output = self
+            .ord_wallet_run(&["inscribe", "--fee-rate", "10", "--file", filename])
+            .await;
+
+        eprintln!("{output}");
+
+        self.create_blocks(1).await;
+    }
+
     async fn send_inscription(&self, dst_addr: &str, inscription_id: &str) {
         let output = self
             .ord_wallet_run(&["send", "--fee-rate", "10", dst_addr, inscription_id])
@@ -257,6 +269,47 @@ impl Brc20TestContext {
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
 
+    async fn wrapped_token_balance(&self, wallet: &Wallet<'_, SigningKey>) -> u128 {
+        self.inner
+            .check_erc20_balance(&self.token_contract, wallet)
+            .await
+            .expect("Failed to get wrapped token balance")
+    }
+
+    async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
+        const MAX_TX_TIMEOUT_SEC: u64 = 6;
+
+        let start = Instant::now();
+        let timeout = Duration::from_secs(MAX_TX_TIMEOUT_SEC);
+        let client = self.inner.evm_client(ADMIN);
+        while start.elapsed() < timeout {
+            let receipt = client
+                .eth_get_transaction_receipt(tx_hash.clone())
+                .await
+                .expect("Failed to request transaction receipt")
+                .expect("Request for receipt failed");
+
+            if let Some(receipt) = receipt {
+                if receipt.status != Some(1u64.into()) {
+                    eprintln!("Transaction: {tx_hash}");
+                    eprintln!("Receipt: {receipt:?}");
+                    if let Some(output) = receipt.output {
+                        let output = String::from_utf8_lossy(&output);
+                        eprintln!("Output: {output}");
+                    }
+
+                    panic!("Transaction failed");
+                } else {
+                    return receipt;
+                }
+            } else {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        }
+
+        panic!("Transaction {tx_hash} timed out");
+    }
+
     fn get_inscription_id(index: usize) -> InscriptionId {
         let output = std::process::Command::new("ord")
             .args(["-r", "--data-dir", ORD_DATA_DIR, "wallet", "inscriptions"])
@@ -276,5 +329,67 @@ impl Brc20TestContext {
             .expect("invalid inscription id");
 
         InscriptionId::parse_from_str(iid).expect("Failed to parse InscriptionId from string")
+    }
+
+    async fn deposit_brc20(
+        &self,
+        brc20: DepositBrc20Args,
+        eth_address: &H160,
+    ) -> Result<Erc20MintStatus, BridgeError> {
+        const MAX_RETRIES: u32 = 3;
+        let mut retry_count = 0;
+        while retry_count < MAX_RETRIES {
+            match self
+                .inner
+                .client(self.brc20_bridge(), ADMIN)
+                .update::<_, Result<Vec<Erc20MintStatus>, BridgeError>>(
+                    "brc20_to_erc20",
+                    (brc20.clone(), eth_address),
+                )
+                .await
+                .expect("canister call failed")
+            {
+                Err(BridgeError::NothingToDeposit) => retry_count += 1,
+                Ok(statuses) => match &statuses[0] {
+                    res @ Erc20MintStatus::Minted { ref tx_id, .. } => {
+                        self.inner.advance_time(Duration::from_secs(2)).await;
+                        self.wait_for_tx_success(tx_id).await;
+
+                        return Ok(res.clone());
+                    }
+                    status => return Ok(status.clone()),
+                },
+                _result => {
+                    todo!()
+                }
+            }
+        }
+
+        Err(BridgeError::NothingToDeposit)
+    }
+
+    async fn withdraw_brc20(&self, amount: u128) {
+        let withdrawal_address = self.get_withdrawal_address().await;
+        let client = self.inner.evm_client(ADMIN);
+        self.inner
+            .burn_erc_20_tokens_raw(
+                &client,
+                &self.eth_wallet,
+                &self.token_contract,
+                withdrawal_address.as_bytes().to_vec(),
+                &self.bft_bridge_contract,
+                amount,
+            )
+            .await
+            .expect("failed to burn wrapped token");
+
+        self.inner.advance_time(Duration::from_secs(15)).await;
+        self.create_blocks(1).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        // Ord indexer doesn't catch the new balance for some reason after the first block, so
+        // we mint one more time to make sure indexer is up to date.
+        self.create_blocks(1).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
     }
 }

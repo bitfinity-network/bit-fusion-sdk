@@ -25,6 +25,8 @@ pub enum BridgeError {
     Erc20Mint(#[from] Erc20MintError),
     #[error("{0}")]
     FindInscriptionUtxos(String),
+    #[error("")]
+    NothingToDeposit,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
@@ -80,7 +82,7 @@ pub enum Brc20InscribeError {
 }
 
 /// Status of a BRC20 to ERC20 swap
-#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub enum Erc20MintStatus {
     /// This happens when the transaction is processed, the BRC20 inscription is parsed and validated,
     /// and the mint order is created; however, there is a problem sending the mint order to the EVM.
