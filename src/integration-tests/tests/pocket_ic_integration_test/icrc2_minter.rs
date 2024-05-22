@@ -16,7 +16,6 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::error::TestError;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -37,6 +36,8 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
 
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
 
@@ -311,26 +312,17 @@ async fn set_owner_access() {
 #[tokio::test]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let _ = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap();
-    let err = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap_err();
+    let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    assert!(matches!(
-        err,
-        TestError::CanisterClient(CanisterClientError::PocketIcTestError(
-            CallError::UserError(UserError {
-                code: ErrorCode::CanisterCalledTrap,
-                description: _,
-            })
-        ))
-    ));
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+
+    let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("creation of BftBridge contract already finised"));
 }
 
 #[tokio::test]

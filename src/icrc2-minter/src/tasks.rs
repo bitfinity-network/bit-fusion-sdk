@@ -94,12 +94,17 @@ impl BridgeTask {
     }
 
     pub async fn refresh_bft_bridge(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+        log::trace!("refreshing bft bridge status");
         let mut status = state.borrow().config.get_bft_bridge_contract_status();
         status.refresh().await.into_scheduler_result()?;
+
+        log::trace!("bft bridge status refreshed: {status:?}");
+
         state
             .borrow_mut()
             .config
             .set_bft_bridge_contract_status(status);
+
         Ok(())
     }
 
@@ -293,10 +298,16 @@ impl BridgeTask {
             ));
         };
 
+        let client = state.borrow().config.get_evm_client();
+        let nonce = client
+            .get_transaction_count(sender.0, BlockNumber::Latest)
+            .await
+            .into_scheduler_result()?;
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,
-            evm_params.nonce.into(),
+            nonce.into(),
             evm_params.gas_price.into(),
             order_data,
             evm_params.chain_id as _,

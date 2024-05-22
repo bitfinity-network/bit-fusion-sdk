@@ -201,10 +201,7 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let bft_bridge = ctx
-        .initialize_bft_bridge(ADMIN, &john_wallet)
-        .await
-        .unwrap();
+    let bft_bridge = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
     (ctx, john_wallet, bft_bridge)
 }

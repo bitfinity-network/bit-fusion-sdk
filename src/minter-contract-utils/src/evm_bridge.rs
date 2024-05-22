@@ -114,6 +114,8 @@ pub enum BftBridgeContractStatus {
 }
 
 impl BftBridgeContractStatus {
+    /// Starts Contract initialization if currenst status is None.
+    /// Else, returns an error.
     pub async fn initialize(
         &mut self,
         link: EvmLink,
@@ -123,7 +125,12 @@ impl BftBridgeContractStatus {
     ) -> anyhow::Result<H256> {
         match self {
             BftBridgeContractStatus::None => {}
-            _ => return Err(anyhow!("creation of BftBridge contract already started")),
+            BftBridgeContractStatus::Creating(_, _) => {
+                return Err(anyhow!("creation of BftBridge contract already started"))
+            }
+            BftBridgeContractStatus::Created(_) => {
+                return Err(anyhow!("creation of BftBridge contract already finised"))
+            }
         };
 
         let client = link.get_client();
@@ -148,12 +155,16 @@ impl BftBridgeContractStatus {
         transaction.hash = transaction.hash();
 
         let client = link.get_client();
-        client
-            .send_raw_transaction(transaction)
-            .await
-            .map(Into::into)
+        let hash = client.send_raw_transaction(transaction).await?;
+
+        *self = BftBridgeContractStatus::Creating(link, hash.into());
+        Ok(hash.into())
     }
 
+    /// Refreshes the status of the BftBridge contract.
+    /// If current status is `Creating`, tries to get the creation tx result.
+    /// If current status is `None`, returns an error.
+    /// If current status is `Created`, returns Ok.
     pub async fn refresh(&mut self) -> Result<(), anyhow::Error> {
         match self.clone() {
             BftBridgeContractStatus::None => {
@@ -176,9 +187,28 @@ impl BftBridgeContractStatus {
             .ok_or_else(|| anyhow!("BftBridge contract not present in receipt"))?;
         Ok(contract.into())
     }
-}
 
-pub trait BftBridgeStatusStorage {
-    fn get(&self) -> BftBridgeContractStatus;
-    fn set(&mut self, new_status: BftBridgeContractStatus);
+    /// Returns `true` if the bft bridge contract status is [`Created`].
+    ///
+    /// [`Created`]: BftBridgeContractStatus::Created
+    #[must_use]
+    pub fn is_created(&self) -> bool {
+        matches!(self, Self::Created(..))
+    }
+
+    /// Returns `true` if the bft bridge contract status is [`None`].
+    ///
+    /// [`None`]: BftBridgeContractStatus::None
+    #[must_use]
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns `true` if the bft bridge contract status is [`Creating`].
+    ///
+    /// [`Creating`]: BftBridgeContractStatus::Creating
+    #[must_use]
+    pub fn is_creating(&self) -> bool {
+        matches!(self, Self::Creating(..))
+    }
 }

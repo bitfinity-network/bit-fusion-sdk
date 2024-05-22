@@ -274,11 +274,21 @@ impl MinterCanister {
             .await
             .map_err(|e| Error::Internal(format!("failed to get EVM address: {e}")))?;
 
-        let mut status = state.borrow_mut().config.get_bft_bridge_contract_status();
+        let mut status = state.borrow().config.get_bft_bridge_contract_status();
+
+        log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
+
         let hash = status
             .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
+
+        log::trace!("BftBridge contract initialization started with status: {status:?}");
+
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_contract_status(status);
 
         let options = TaskOptions::default()
             .with_max_retries_policy(u32::MAX)
