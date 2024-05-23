@@ -68,10 +68,10 @@ impl RuneBridge {
                 }
             });
 
-            ic_exports::ic_cdk_timers::set_timer_interval(USED_UTXOS_REMOVE_INTERVAL, || async {
-                crate::task::RemoveUsedUtxosTask::from(get_state())
-                    .run()
-                    .await;
+            ic_exports::ic_cdk_timers::set_timer_interval(USED_UTXOS_REMOVE_INTERVAL, || {
+                ic_exports::ic_cdk::spawn(
+                    crate::task::RemoveUsedUtxosTask::from(get_state()).run(),
+                );
             });
         }
     }
