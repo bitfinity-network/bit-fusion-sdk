@@ -6,7 +6,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
 use rune_bridge::interface::GetAddressError;
-use rune_bridge::state::{RuneBridgeConfig, RuneInfo};
+use rune_bridge::state::RuneBridgeConfig;
 
 use crate::context::TestContext;
 use crate::state_machine_tests::StateMachineContext;
@@ -44,11 +44,6 @@ impl RunesSetup {
             admin: (&context).admin(),
             log_settings: Default::default(),
             min_confirmations: 1,
-            rune_info: RuneInfo {
-                name: "RUNE".to_string(),
-                block: 0,
-                tx: 0,
-            },
             indexer_url: "https://indexer".to_string(),
             deposit_fee: 0,
         };

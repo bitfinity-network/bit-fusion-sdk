@@ -77,11 +77,6 @@ dfx deploy rune-bridge --argument "(record {
        log_filter = opt \"trace,rune_bridge::scheduler=warn\";
     };
     min_confirmations = 1;
-    rune_info = record {
-      name = \"$RUNE_NAME\";
-      block = $RUNE_BLOCK;
-      tx = $RUNE_TX_ID;
-    };
     indexer_url = \"$INDEXER_URL\";
     deposit_fee = 100_000;
 })"
@@ -113,7 +108,7 @@ echo "BFT ETH address: $BFT_ETH_ADDRESS"
 TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
   --bft-bridge-address="$BFT_ETH_ADDRESS" \
   --token-name=RUNE \
-  --token-id="$RUNE_BRIDGE" \
+  --token-id="$RUNE_ID" \
   --evm-canister="$EVM" \
   --wallet="$ETH_WALLET")
 
@@ -153,11 +148,16 @@ ordw="ord -r --data-dir $ORD_DATA --index-runes wallet --server-url http://local
 deposit_addr_resp=$(dfx canister call rune-bridge get_deposit_address "(\"$ETH_WALLET_ADDRESS\")")
 res=${deposit_addr_resp#*\"}
 DEPOSIT_ADDRESS=${res%\"*}
+
+sleep 5
+
 echo "Deposit address: $DEPOSIT_ADDRESS"
 
 $ordw send --fee-rate 10 $DEPOSIT_ADDRESS 10:$RUNE_NAME
-$ordw send --fee-rate 10 $DEPOSIT_ADDRESS "0.0049 btc"
+$bc generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
+sleep 5
 
+$ordw send --fee-rate 10 $DEPOSIT_ADDRESS "0.0049 btc"
 $bc generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
 
 for i in 1 2 3

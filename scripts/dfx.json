@@ -41,6 +41,12 @@
         }
       ]
     },
+    "rune-bridge": {
+      "build": "",
+      "candid": ".artifact/rune-bridge.did",
+      "wasm": ".artifact/rune-bridge.wasm.gz",
+      "type": "custom"
+    },
     "spender": {
       "build": "",
       "candid": ".artifact/spender.did",

@@ -26,6 +26,7 @@ serde = { workspace = true }
 
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 candid = { workspace = true }

@@ -1,11 +1,22 @@
 use std::collections::HashMap;
+use std::io::ErrorKind;
 
-use solidity_helper::SolidityContract;
+use solidity_helper::error::SolidityHelperError;
+use solidity_helper::{compile_solidity_contracts, SolidityContract};
 
-fn main() {
-    use solidity_helper::compile_solidity_contracts;
-    let contracts =
-        compile_solidity_contracts(None, None).expect("Should compile solidity smart contracts");
+fn main() -> anyhow::Result<()> {
+    let contracts = match compile_solidity_contracts(None, None) {
+        Ok(c) => c,
+        Err(SolidityHelperError::IoError(err)) if err.kind() == ErrorKind::NotFound => {
+            return Err(anyhow::anyhow!(
+                "`forge` executable not found. Try installing forge with foundry: https://book.getfoundry.sh/getting-started/installation or check if it is present in the PATH"
+            ))
+        }
+        Err(err) => {
+            return Err(anyhow::anyhow!("Failed to compile solidity contracts: {err:?}"))
+        }
+    };
+
     set_contract_code(
         &contracts,
         "WrappedToken",
@@ -46,6 +57,8 @@ fn main() {
         "WatermelonToken",
         "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
     );
+
+    Ok(())
 }
 
 /// Loads the contract with the specified name
