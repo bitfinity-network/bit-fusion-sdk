@@ -12,13 +12,13 @@
 use std::io::ErrorKind;
 use std::time::Duration;
 
-use brc20_bridge::interface::bridge_api::{BridgeError, DepositBrc20Args, Erc20MintStatus};
+use brc20_bridge::interface::bridge_api::{DepositBrc20Args, DepositError, Erc20MintStatus};
 use brc20_bridge::state::{BftBridgeConfig, Brc20BridgeConfig};
 use brc20_bridge::{GetAddressError, InscriptionId};
 use candid::Principal;
 use did::{TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
-use eth_signer::Wallet;
+use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
@@ -34,6 +34,9 @@ use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::wasm::get_brc20_bridge_canister_bytecode;
 
 const ORD_DATA_DIR: &str = "target/ord";
+const BRC20_DATA: &str = "ord-testnet/brc20_json_inscriptions/brc20_deploy.json";
+const BRC20_TICKER: &str = "demo";
+const POSTAGE: u128 = 10000;
 
 struct Brc20TestContext {
     inner: DfxTestContext,
@@ -97,7 +100,7 @@ impl Brc20TestContext {
             .await
             .unwrap();
 
-        let inscription_id = Self::get_inscription_id(0).get_raw();
+        let inscription_id = Self::get_inscription_details(0).0.get_raw();
         let iid_256 =
             Id256::from_slice(&inscription_id).expect("Failed to convert inscription_id to Id256");
         let token = context
@@ -204,14 +207,25 @@ impl Brc20TestContext {
             .to_string()
     }
 
-    async fn create_brc20_inscription(&self, filename: &str) {
+    // returns the inscription ID and the reveal transaction ID.
+    async fn create_brc20_inscription(&self, filename: &str) -> (String, String) {
         let output = self
             .ord_wallet_run(&["inscribe", "--fee-rate", "10", "--file", filename])
             .await;
 
         eprintln!("{output}");
+        let json =
+            serde_json::from_str::<Value>(&output).expect("failed to parse ord wallet response");
 
         self.create_blocks(1).await;
+
+        let iid = json["inscriptions"][0]["id"]
+            .as_str()
+            .expect("invalid inscription ID");
+        let reveal_txid = json["reveal"]
+            .as_str()
+            .expect("invalid reveal transaction ID");
+        (iid.to_owned(), reveal_txid.to_owned())
     }
 
     async fn send_inscription(&self, dst_addr: &str, inscription_id: &str) {
@@ -276,6 +290,18 @@ impl Brc20TestContext {
             .expect("Failed to get wrapped token balance")
     }
 
+    async fn ordinal_balance(&self) -> u128 {
+        let json = serde_json::from_str::<Value>(&self.ord_wallet_run(&["balance"]).await)
+            .expect("failed to parse ordinal balance response");
+
+        (json["ordinal"].as_u64().unwrap_or_else(|| {
+            panic!(
+                "invalid ordinal balance value: {}. Full json: {json}",
+                json["ordinal"]
+            )
+        })) as u128
+    }
+
     async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
         const MAX_TX_TIMEOUT_SEC: u64 = 6;
 
@@ -310,7 +336,8 @@ impl Brc20TestContext {
         panic!("Transaction {tx_hash} timed out");
     }
 
-    fn get_inscription_id(index: usize) -> InscriptionId {
+    // returns the inscription ID and the actual inscription amount (a.k.a, postage).
+    fn get_inscription_details(index: usize) -> (InscriptionId, u64) {
         let output = std::process::Command::new("ord")
             .args(["-r", "--data-dir", ORD_DATA_DIR, "wallet", "inscriptions"])
             .output()
@@ -324,32 +351,39 @@ impl Brc20TestContext {
 
         let json = serde_json::from_slice::<Value>(&output.stdout)
             .expect("failed to parse list of ord inscriptions");
+
         let iid = json[index]["inscription"]
             .as_str()
             .expect("invalid inscription id");
+        let iid =
+            InscriptionId::parse_from_str(iid).expect("Failed to parse InscriptionId from string");
 
-        InscriptionId::parse_from_str(iid).expect("Failed to parse InscriptionId from string")
+        let postage = json[index]["postage"]
+            .as_u64()
+            .expect("invalid postage amount");
+
+        (iid, postage)
     }
 
     async fn deposit_brc20(
         &self,
         brc20: DepositBrc20Args,
         eth_address: &H160,
-    ) -> Result<Erc20MintStatus, BridgeError> {
+    ) -> Result<Erc20MintStatus, DepositError> {
         const MAX_RETRIES: u32 = 3;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
             match self
                 .inner
                 .client(self.brc20_bridge(), ADMIN)
-                .update::<_, Result<Vec<Erc20MintStatus>, BridgeError>>(
+                .update::<_, Result<Vec<Erc20MintStatus>, DepositError>>(
                     "brc20_to_erc20",
                     (brc20.clone(), eth_address),
                 )
                 .await
                 .expect("canister call failed")
             {
-                Err(BridgeError::NothingToDeposit) => retry_count += 1,
+                Err(DepositError::NothingToDeposit) => retry_count += 1,
                 Ok(statuses) => match &statuses[0] {
                     res @ Erc20MintStatus::Minted { ref tx_id, .. } => {
                         self.inner.advance_time(Duration::from_secs(2)).await;
@@ -359,13 +393,15 @@ impl Brc20TestContext {
                     }
                     status => return Ok(status.clone()),
                 },
-                _result => {
-                    todo!()
+                result => {
+                    return Err(DepositError::Unavailable(format!(
+                        "Unexpected deposit result: {result:?}"
+                    )))
                 }
             }
         }
 
-        Err(BridgeError::NothingToDeposit)
+        Err(DepositError::NothingToDeposit)
     }
 
     async fn withdraw_brc20(&self, amount: u128) {
@@ -392,4 +428,101 @@ impl Brc20TestContext {
         self.create_blocks(1).await;
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
+
+    async fn brc20_to_erc20(&self, iid: &str, tx_id: &str, wallet: &Wallet<'_, SigningKey>) {
+        let balance_before = self.wrapped_token_balance(wallet).await;
+
+        let wallet_address = wallet.address();
+        let address = self.get_deposit_address(&wallet_address.into()).await;
+
+        let inscription_index = InscriptionId::parse_from_str(iid)
+            .ok()
+            .expect("invalid inscription ID")
+            .index as usize;
+
+        let deposit_args = DepositBrc20Args {
+            tx_id: tx_id.to_owned(),
+            ticker: BRC20_TICKER.to_string(),
+        };
+
+        self.send_inscription(&address, &iid).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
+        let postage = Self::get_inscription_details(inscription_index).1 as u128;
+
+        self.send_btc(&address, 490000).await;
+        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        self.deposit_brc20(deposit_args, &wallet_address.into())
+            .await
+            .expect("failed to deposit BRC20 inscription");
+
+        let balance_after = self.wrapped_token_balance(wallet).await;
+        assert_eq!(balance_after - balance_before, postage, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {postage}");
+    }
+}
+
+#[tokio::test]
+async fn brc20_bridging_flow_for_one_user() {
+    let ctx = Brc20TestContext::new().await;
+    // Mint one block in case there are some pending transactions
+    ctx.create_blocks(1).await;
+
+    let (iid, tx_id) = ctx.create_brc20_inscription(BRC20_DATA).await;
+    let ordinal_bal_before_deposit = ctx.ordinal_balance().await;
+    // each postage = 10000 sats
+    assert_eq!(ordinal_bal_before_deposit, POSTAGE);
+
+    ctx.brc20_to_erc20(&iid, &tx_id, &ctx.eth_wallet).await;
+    let updated_wrapped_balance = ctx.wrapped_token_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_wrapped_balance, POSTAGE);
+
+    let ordinal_bal_after_deposit = ctx.ordinal_balance().await;
+    assert_eq!(ordinal_bal_after_deposit, 0);
+
+    // each postage = 10000 sats
+    ctx.withdraw_brc20(POSTAGE).await;
+
+    let updated_wrapped_balance = ctx.wrapped_token_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_wrapped_balance, 0);
+
+    ctx.stop_canister_instances().await
+}
+
+#[tokio::test]
+async fn brc20_bridging_flow_for_multiple_users() {
+    let ctx = Brc20TestContext::new().await;
+    // Create one block in case there are pending transactions
+    ctx.create_blocks(1).await;
+
+    let (iid, tx_id) = ctx.create_brc20_inscription(BRC20_DATA).await;
+    let ordinal_bal_before_deposit = ctx.ordinal_balance().await;
+    // each postage = 10000 sats
+    assert_eq!(ordinal_bal_before_deposit, 10000);
+
+    ctx.brc20_to_erc20(&iid, &tx_id, &ctx.eth_wallet).await;
+
+    let ordinal_bal_after_deposit = ctx.ordinal_balance().await;
+    assert_eq!(ordinal_bal_after_deposit, 0);
+
+    let (iid, tx_id) = ctx.create_brc20_inscription(BRC20_DATA).await;
+    let another_wallet = ctx
+        .inner
+        .new_wallet(u128::MAX)
+        .await
+        .expect("failed to create an ETH wallet");
+    ctx.brc20_to_erc20(&iid, &tx_id, &another_wallet).await;
+
+    let updated_wrapped_balance = ctx.wrapped_token_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_wrapped_balance, 10000);
+    let updated_wrapped_balance = ctx.wrapped_token_balance(&another_wallet).await;
+    assert_eq!(updated_wrapped_balance, 10000);
+
+    ctx.withdraw_brc20(10000).await;
+
+    let updated_wrapped_balance = ctx.wrapped_token_balance(&ctx.eth_wallet).await;
+    assert_eq!(updated_wrapped_balance, 0);
+
+    assert_eq!(ctx.wrapped_token_balance(&another_wallet).await, 10000);
+
+    ctx.stop_canister_instances().await
 }
