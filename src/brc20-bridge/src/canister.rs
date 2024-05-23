@@ -23,7 +23,7 @@ use crate::constant::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
 };
-use crate::interface::bridge_api::{BridgeError, DepositBrc20Args, Erc20MintStatus};
+use crate::interface::bridge_api::{DepositBrc20Args, DepositError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::scheduler::Brc20Task;
 use crate::state::{BftBridgeConfig, Brc20BridgeConfig, State};
@@ -56,10 +56,8 @@ impl Brc20Bridge {
         &mut self,
         brc20: DepositBrc20Args,
         dst_eth_addr: H160,
-    ) -> Result<Erc20MintStatus, BridgeError> {
-        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20)
-            .await
-            .map_err(BridgeError::Erc20Mint)
+    ) -> Result<Erc20MintStatus, DepositError> {
+        crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20).await
     }
 
     #[query]

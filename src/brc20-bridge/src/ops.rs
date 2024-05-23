@@ -13,7 +13,7 @@ use ord_rs::{Inscription as _, InscriptionId};
 
 use crate::constant::NONCE;
 use crate::interface::bridge_api::{
-    Brc20InscribeStatus, BridgeError, DepositBrc20Args, Erc20MintError, Erc20MintStatus,
+    Brc20InscribeStatus, DepositBrc20Args, DepositError, Erc20MintStatus, WithdrawError,
 };
 use crate::rpc;
 use crate::state::State;
@@ -25,7 +25,7 @@ pub async fn brc20_to_erc20(
     state: &RefCell<State>,
     eth_address: H160,
     brc20: DepositBrc20Args,
-) -> Result<Erc20MintStatus, Erc20MintError> {
+) -> Result<Erc20MintStatus, DepositError> {
     let indexer_url = { state.borrow().general_indexer_url() };
     let DepositBrc20Args { tx_id, ticker: _ } = brc20;
 
@@ -33,23 +33,16 @@ pub async fn brc20_to_erc20(
     //
     // log::info!("Fetching BRC20 token details");
     // let _fetched_token = rpc::fetch_brc20_token_details(state, &brc20.ticker)
-    //     .await
-    //     .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+    //     .await?;
 
     log::info!("Fetching BRC20 transfer transaction by its ID: {tx_id}");
-    let transaction = rpc::fetch_transfer_transaction(state, &eth_address, &tx_id)
-        .await
-        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+    let transaction = rpc::fetch_transfer_transaction(state, &eth_address, &tx_id).await?;
 
     log::info!("Parsing BRC20 inscriptions from from the given transaction");
-    let storable_brc20s = rpc::parse_and_validate_inscriptions(&indexer_url, transaction)
-        .await
-        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+    let storable_brc20s = rpc::parse_and_validate_inscriptions(&indexer_url, transaction).await?;
 
     if storable_brc20s.is_empty() {
-        return Err(Erc20MintError::Brc20Bridge(
-            "No BRC20 inscriptions found".to_string(),
-        ));
+        return Err(DepositError::NothingToDeposit);
     }
     log::debug!("Parsed BRC20 inscriptions: {:?}", storable_brc20s);
 
@@ -63,10 +56,7 @@ pub async fn brc20_to_erc20(
     let (amount, tick) = rpc::get_brc20_data(storable_brc20s[0].actual_brc20()); // for now!
 
     // Set the token symbol using the tick (symbol) from the BRC20
-    state
-        .borrow_mut()
-        .set_token_symbol(tick)
-        .map_err(|e| Erc20MintError::Brc20Bridge(e.to_string()))?;
+    state.borrow_mut().set_token_symbol(tick)?;
 
     let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
 
@@ -79,11 +69,11 @@ pub async fn mint_erc20(
     eth_address: H160,
     amount: u64,
     nonce: u32,
-) -> Result<Erc20MintStatus, Erc20MintError> {
+) -> Result<Erc20MintStatus, DepositError> {
     let fee = state.borrow().deposit_fee();
     let amount_minus_fee = amount
         .checked_sub(fee)
-        .ok_or(Erc20MintError::ValueTooSmall(amount.to_string()))?;
+        .ok_or(DepositError::ValueTooSmall(amount.to_string()))?;
 
     let mint_order =
         prepare_mint_order(state, eth_address.clone(), amount_minus_fee, nonce).await?;
@@ -106,7 +96,7 @@ async fn prepare_mint_order(
     eth_address: H160,
     amount: u64,
     nonce: u32,
-) -> Result<SignedMintOrder, Erc20MintError> {
+) -> Result<SignedMintOrder, DepositError> {
     log::info!("preparing mint order");
 
     let (signer, mint_order) = {
@@ -143,7 +133,7 @@ async fn prepare_mint_order(
     let signed_mint_order = mint_order
         .encode_and_sign(&signer)
         .await
-        .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
+        .map_err(|err| DepositError::MintOrderSign(format!("{err:?}")))?;
 
     Ok(signed_mint_order)
 }
@@ -167,14 +157,14 @@ fn store_mint_order(
 async fn send_mint_order(
     state: &RefCell<State>,
     mint_order: SignedMintOrder,
-) -> Result<H256, Erc20MintError> {
+) -> Result<H256, DepositError> {
     log::info!("Sending mint transaction");
 
     let signer = state.borrow().signer().get().clone();
     let sender = signer
         .get_address()
         .await
-        .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
+        .map_err(|err| DepositError::MintOrderSign(format!("{err:?}")))?;
 
     let (evm_info, evm_params) = {
         let state = state.borrow();
@@ -183,7 +173,7 @@ async fn send_mint_order(
         let evm_params = state
             .get_evm_params()
             .clone()
-            .ok_or(Erc20MintError::NotInitialized(
+            .ok_or(DepositError::NotInitialized(
                 "Bridge must be initialized first".to_string(),
             ))?;
 
@@ -202,7 +192,7 @@ async fn send_mint_order(
     let signature = signer
         .sign_transaction(&(&tx).into())
         .await
-        .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
+        .map_err(|err| DepositError::MintOrderSign(format!("{err:?}")))?;
 
     tx.r = signature.r.0;
     tx.s = signature.s.0;
@@ -213,7 +203,7 @@ async fn send_mint_order(
     let id = client
         .send_raw_transaction(tx)
         .await
-        .map_err(|err| Erc20MintError::Evm(format!("{err:?}")))?;
+        .map_err(|err| DepositError::Evm(format!("{err:?}")))?;
 
     state.borrow_mut().update_evm_params(|p| {
         if let Some(params) = p.as_mut() {
@@ -234,11 +224,8 @@ pub async fn erc20_to_brc20(
     request_id: u32,
     brc20_iid: String,
     dst_addr: &str,
-) -> Result<Brc20InscribeStatus, BridgeError> {
-    let tx_ids = withdraw_brc20(state, request_id, &brc20_iid, dst_addr)
-        .await
-        .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
-
+) -> Result<Brc20InscribeStatus, WithdrawError> {
+    let tx_ids = withdraw_brc20(state, request_id, &brc20_iid, dst_addr).await?;
     Ok(Brc20InscribeStatus { tx_ids })
 }
 
@@ -247,9 +234,9 @@ async fn withdraw_brc20(
     request_id: u32,
     brc20_iid: &str,
     dst_addr: &str,
-) -> Result<Brc20TransferTransactions, BridgeError> {
+) -> Result<Brc20TransferTransactions, WithdrawError> {
     if !state.borrow().has_brc20(brc20_iid) {
-        return Err(BridgeError::Brc20Withdraw(format!(
+        return Err(WithdrawError::NoSuchInscription(format!(
             "Specified BRC20 inscription ID ({}) not found",
             brc20_iid
         )));
@@ -262,7 +249,7 @@ async fn withdraw_brc20(
     let brc20 = inscriptions[0]
         .actual_brc20()
         .encode()
-        .map_err(|err| BridgeError::Brc20Withdraw(err.to_string()))?; // for now!
+        .map_err(|err| WithdrawError::InvalidInscription(err.to_string()))?; // for now!
 
     let (network, ecdsa_signer) = {
         let state = state.borrow();
@@ -286,16 +273,17 @@ async fn withdraw_brc20(
         network,
     )
     .await
-    .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()));
+    .map_err(|e| WithdrawError::InscriptionTransfer(e.to_string()));
 
     let mut state = state.borrow_mut();
     if result.is_ok() {
         let brc20_iid = InscriptionId::parse_from_str(brc20_iid)
             .expect("Failed to parse InscriptionId from string");
+
         state
             .inscriptions_mut()
             .remove(brc20_iid)
-            .map_err(|e| BridgeError::Brc20Withdraw(e.to_string()))?;
+            .map_err(WithdrawError::NoSuchInscription)?;
 
         state.burn_requests_mut().set_transferred(request_id);
         state.burn_requests_mut().remove(request_id);

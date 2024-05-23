@@ -18,7 +18,7 @@ use crate::constant::{
     HTTP_OUTCALL_MAX_RESPONSE_BYTES, HTTP_OUTCALL_PER_CALL_COST, HTTP_OUTCALL_REQ_PER_BYTE_COST,
     HTTP_OUTCALL_RES_DEFAULT_SIZE, HTTP_OUTCALL_RES_PER_BYTE_COST,
 };
-use crate::interface::bridge_api::{BridgeError, DepositError};
+use crate::interface::bridge_api::DepositError;
 use crate::interface::store::{Brc20Id, Brc20Token, StorableBrc20};
 use crate::interface::{Brc20TokenResponse, TokenInfo, TransactionHtml};
 use crate::state::State;
@@ -29,18 +29,15 @@ use crate::state::State;
 pub async fn fetch_brc20_token_details(
     state: &RefCell<State>,
     tick: &str,
-) -> anyhow::Result<TokenInfo> {
+) -> Result<TokenInfo, DepositError> {
     let indexer_url = { state.borrow().brc20_indexer_url() };
 
-    let token_info = match get_brc20_token_by_ticker(&indexer_url, tick)
-        .await
-        .map_err(|e| BridgeError::FetchBrc20TokenDetails(e.to_string()))?
-    {
+    let token_info = match get_brc20_token_by_ticker(&indexer_url, tick).await? {
         Some(payload) => payload,
         None => {
-            return Err(
-                BridgeError::FetchBrc20TokenDetails("No BRC20 token found".to_string()).into(),
-            )
+            return Err(DepositError::FetchBrc20Token(
+                "No BRC20 token found".to_string(),
+            ))
         }
     };
 
@@ -48,9 +45,9 @@ pub async fn fetch_brc20_token_details(
     let ticker = token_info.clone().ticker;
     if ticker != tick {
         log::error!("Token tick mismatch. Given: {tick}. Expected: {ticker}");
-        return Err(
-            BridgeError::FetchBrc20TokenDetails("Incorrect token details".to_string()).into(),
-        );
+        return Err(DepositError::FetchBrc20Token(
+            "Incorrect token details".to_string(),
+        ));
     }
 
     Ok(token_info)
@@ -61,7 +58,7 @@ pub(crate) async fn fetch_transfer_transaction(
     state: &RefCell<State>,
     eth_address: &H160,
     txid: &str,
-) -> anyhow::Result<Transaction> {
+) -> Result<Transaction, DepositError> {
     let (btc_network, ic_btc_network, indexer_url) = {
         let state = state.borrow();
         (
@@ -74,7 +71,7 @@ pub(crate) async fn fetch_transfer_transaction(
 
     let txid_bytes = hex::decode(txid).map_err(|err| {
         log::error!("Failed to decode transaction ID {txid}: {err:?}");
-        BridgeError::GetTransactionById("Invalid transaction ID format.".to_string())
+        DepositError::GetTransactionById("Invalid transaction ID format.".to_string())
     })?;
     let (public_key, chain_code) = (state.borrow().public_key(), state.borrow().chain_code());
     let bridge_addr = get_bitcoin_address(public_key, btc_network, chain_code, eth_address)
@@ -86,10 +83,9 @@ pub(crate) async fn fetch_transfer_transaction(
 
     if matching_utxos.is_empty() {
         log::warn!("Given transaction ID does not match any of the UTXOs txid.");
-        return Err(BridgeError::GetTransactionById(
+        return Err(DepositError::GetTransactionById(
             "Transaction ID mismatch between the retrieved transaction and UTXOs.".to_string(),
-        )
-        .into());
+        ));
     }
 
     Ok(transaction)
@@ -103,20 +99,18 @@ pub(crate) async fn fetch_transfer_transaction(
 pub(crate) async fn parse_and_validate_inscriptions(
     indexer_url: &str,
     tx: Transaction,
-) -> Result<Vec<StorableBrc20>, BridgeError> {
+) -> Result<Vec<StorableBrc20>, DepositError> {
     let reveal_txid = tx
         .input
         .first()
         .map(|input| hex::encode(input.previous_output.txid))
-        .ok_or_else(|| BridgeError::GetTransactionById("No inputs in transaction".to_string()))?;
+        .ok_or_else(|| DepositError::GetTransactionById("No inputs in transaction".to_string()))?;
 
-    let reveal_tx = get_transaction_by_id(indexer_url, &reveal_txid)
-        .await
-        .map_err(|err| BridgeError::GetTransactionById(err.to_string()))?;
+    let reveal_tx = get_transaction_by_id(indexer_url, &reveal_txid).await?;
 
     // parse from the actual inscription's reveal transaction
     let parsed_data = OrdParser::parse_all(&reveal_tx)
-        .map_err(|e| BridgeError::InscriptionParsing(e.to_string()))?;
+        .map_err(|e| DepositError::InscriptionParser(e.to_string()))?;
 
     parsed_data.iter().try_fold(
         Vec::new(),
@@ -128,7 +122,7 @@ pub(crate) async fn parse_and_validate_inscriptions(
                 });
                 Ok(acc)
             }
-            _ => Err(BridgeError::InscriptionParsing(
+            _ => Err(DepositError::InscriptionParser(
                 "Non-BRC20 inscription found".to_string(),
             )),
         },
@@ -146,23 +140,19 @@ pub(crate) fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
 async fn get_brc20_token_by_ticker(
     base_indexer_url: &str,
     ticker: &str,
-) -> anyhow::Result<Option<TokenInfo>> {
+) -> Result<Option<TokenInfo>, DepositError> {
     let payload = http_get_req::<Brc20TokenResponse>(&format!(
         "{base_indexer_url}/ordinals/v1/brc-20/tokens/{ticker}"
     ))
-    .await
-    .map_err(|err| {
-        log::error!("Failed to retrieve BRC20 token details from the indexer: {err:?}");
-        BridgeError::FetchBrc20TokenDetails(format!("{err:?}"))
-    })?;
+    .await?;
 
     match payload {
         Some(data) => Ok(data.token),
-        None => Err(BridgeError::FetchBrc20TokenDetails("Nothing found".to_string()).into()),
+        None => Err(DepositError::FetchBrc20Token("Nothing found".to_string())),
     }
 }
 
-async fn http_get_req<T>(url: &str) -> Result<Option<T>, String>
+async fn http_get_req<T>(url: &str) -> Result<Option<T>, DepositError>
 where
     T: DeserializeOwned,
 {
@@ -180,9 +170,10 @@ where
 
     let cycles = get_estimated_http_outcall_cycles(&request_params);
 
-    let (response,) = http_request(request_params, cycles)
+    let response = http_request(request_params, cycles)
         .await
-        .map_err(|(_rejection_code, cause)| cause)?;
+        .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?
+        .0;
 
     log::info!(
         "Indexer responded with: STATUS: {} HEADERS: {:?} BODY: {}",
@@ -192,13 +183,15 @@ where
     );
 
     if response.status == 200u16 {
-        let payload = serde_json::from_slice::<T>(&response.body).map_err(|x| x.to_string())?;
+        let payload = serde_json::from_slice::<T>(&response.body).map_err(|err| {
+            DepositError::Unavailable(format!("Unexpected response from indexer: {err:?}"))
+        })?;
         Ok(Some(payload))
     } else if response.status == 404u16 {
         log::info!("No resource found at {url}");
         Ok(None)
     } else {
-        Err(BridgeError::BadRequest.to_string())
+        Err(DepositError::BadHttpRequest)
     }
 }
 
@@ -227,14 +220,17 @@ fn get_estimated_http_outcall_cycles(req: &CanisterHttpRequestArgument) -> u128 
     http_outcall_cost
 }
 
-async fn get_transaction_by_id(indexer_url: &str, tx_id: &str) -> anyhow::Result<Transaction> {
+async fn get_transaction_by_id(
+    indexer_url: &str,
+    tx_id: &str,
+) -> Result<Transaction, DepositError> {
     let transaction = http_get_req::<TransactionHtml>(&format!("{indexer_url}/tx/{tx_id}"))
         .await
         .map_err(|err| {
             log::error!("Failed to retrieve transaction from the indexer: {err:?}");
-            BridgeError::GetTransactionById(format!("{err:?}"))
+            DepositError::GetTransactionById(format!("{err:?}"))
         })?
-        .ok_or_else(|| BridgeError::GetTransactionById("Transaction not found.".to_string()))?
+        .ok_or_else(|| DepositError::GetTransactionById("Transaction not found.".to_string()))?
         .transaction;
 
     Ok(transaction)
@@ -248,13 +244,13 @@ async fn find_inscription_utxos(
     network: BitcoinNetwork,
     address: String,
     txid: Vec<u8>,
-) -> Result<Vec<Utxo>, BridgeError> {
+) -> Result<Vec<Utxo>, DepositError> {
     let utxo_response = bitcoin_api::get_utxos(network, address)
         .await
-        .map_err(|e| BridgeError::FindInscriptionUtxos(e.to_string()))?;
+        .map_err(|e| DepositError::FetchUtxos(e.to_string()))?;
 
     let validated_utxos = validate_utxos(utxo_response)
-        .map_err(|err| BridgeError::FindInscriptionUtxos(format!("{err:?}")))?;
+        .map_err(|err| DepositError::FetchUtxos(format!("{err:?}")))?;
 
     let matching_utxos = validated_utxos
         .into_iter()
@@ -264,9 +260,7 @@ async fn find_inscription_utxos(
     if matching_utxos.is_empty() {
         let tx_id = hex::encode(txid);
         log::info!("No matching UTXOs found for transaction ID {tx_id}");
-        Err(BridgeError::FindInscriptionUtxos(
-            "No UTXOs found".to_string(),
-        ))
+        Err(DepositError::FetchUtxos("No UTXOs found".to_string()))
     } else {
         Ok(matching_utxos)
     }

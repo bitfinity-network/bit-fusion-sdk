@@ -16,7 +16,7 @@ use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
 use crate::constant::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
-use crate::interface::bridge_api::BridgeError;
+use crate::interface::bridge_api::DepositError;
 use crate::interface::store::{Brc20Store, BurnRequestStore, MintOrdersStore};
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
@@ -296,7 +296,7 @@ impl State {
         self.bft_config.token_symbol
     }
 
-    pub(crate) fn set_token_symbol(&mut self, brc20_tick: &str) -> Result<(), BridgeError> {
+    pub(crate) fn set_token_symbol(&mut self, brc20_tick: &str) -> Result<(), DepositError> {
         let bytes = brc20_tick.as_bytes();
 
         match bytes.len().cmp(&16usize) {
@@ -308,7 +308,7 @@ impl State {
                 self.bft_config.token_symbol[..bytes.len()].copy_from_slice(bytes);
                 Ok(())
             }
-            Ordering::Greater => Err(BridgeError::SetTokenSymbol(
+            Ordering::Greater => Err(DepositError::SetTokenSymbol(
                 "Input string is longer than 16 bytes and needs truncation.".to_string(),
             )),
         }
