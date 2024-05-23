@@ -56,7 +56,7 @@ impl Brc20Bridge {
         &mut self,
         brc20: DepositBrc20Args,
         dst_eth_addr: H160,
-    ) -> Result<Erc20MintStatus, DepositError> {
+    ) -> Result<Vec<Erc20MintStatus>, DepositError> {
         crate::ops::brc20_to_erc20(&get_state(), dst_eth_addr, brc20).await
     }
 

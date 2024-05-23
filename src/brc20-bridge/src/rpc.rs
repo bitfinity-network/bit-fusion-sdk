@@ -97,16 +97,18 @@ pub(crate) async fn fetch_transfer_transaction(
 /// The actual inscription is contained in the reveal transaction, not the eventual transfer.
 /// Therefore, we need the ID of the previous output to get the actual BRC20 inscription.
 pub(crate) async fn parse_and_validate_inscriptions(
-    indexer_url: &str,
+    state: &RefCell<State>,
     tx: Transaction,
 ) -> Result<Vec<StorableBrc20>, DepositError> {
+    let indexer_url = { state.borrow().general_indexer_url() };
+
     let reveal_txid = tx
         .input
         .first()
         .map(|input| hex::encode(input.previous_output.txid))
         .ok_or_else(|| DepositError::GetTransactionById("No inputs in transaction".to_string()))?;
 
-    let reveal_tx = get_transaction_by_id(indexer_url, &reveal_txid).await?;
+    let reveal_tx = get_transaction_by_id(&indexer_url, &reveal_txid).await?;
 
     // parse from the actual inscription's reveal transaction
     let parsed_data = OrdParser::parse_all(&reveal_tx)
@@ -129,11 +131,22 @@ pub(crate) async fn parse_and_validate_inscriptions(
     )
 }
 
-pub(crate) fn get_brc20_data(inscription: &Brc20) -> (u64, &str) {
+/// Returns the amount and ticker of the BRC20.
+///
+/// NOTE:
+/// If it's a `deploy` op, we first check whether there's a `lim`. If set,
+/// we return that value as the amount, else we return the `max` supply.
+pub(crate) fn get_brc20_data(inscription: Brc20) -> (u64, String) {
     match inscription {
-        Brc20::Deploy(deploy_func) => (deploy_func.max, &deploy_func.tick),
-        Brc20::Mint(mint_func) => (mint_func.amt, &mint_func.tick),
-        Brc20::Transfer(transfer_func) => (transfer_func.amt, &transfer_func.tick),
+        Brc20::Deploy(deploy_func) => {
+            if let Some(limit) = deploy_func.lim {
+                (limit, deploy_func.tick)
+            } else {
+                (deploy_func.max, deploy_func.tick)
+            }
+        }
+        Brc20::Mint(mint_func) => (mint_func.amt, mint_func.tick),
+        Brc20::Transfer(transfer_func) => (transfer_func.amt, transfer_func.tick),
     }
 }
 

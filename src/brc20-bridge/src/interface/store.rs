@@ -118,8 +118,8 @@ impl StorableBrc20 {
         self.token_id.0
     }
 
-    pub fn actual_brc20(&self) -> &Brc20 {
-        &self.token.0
+    pub fn actual_brc20(self) -> Brc20 {
+        self.token.0
     }
 }
 
@@ -142,6 +142,14 @@ impl Brc20Store {
                 brc20.token_id
             );
         });
+    }
+
+    pub fn fetch_by_id(&self, iid: &str) -> Brc20 {
+        let iid = InscriptionId::parse_from_str(iid).expect("Failed to InscriptionId from string");
+        self.get_token_info(iid)
+            .expect("No BRC20 token found for the specified ID")
+            .0
+            .clone()
     }
 
     /// Retrieves all BRC20 inscriptions in the store.
