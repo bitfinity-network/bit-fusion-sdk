@@ -60,8 +60,8 @@ jobs:
         ./scripts/build.sh
       test-script: |
         export WASMS_DIR="`pwd`/.artifact"
-        ./scripts/tests_i686.sh
-        ./scripts/tests.sh
+        ./scripts/tests/tests_i686.sh
+        ./scripts/tests/tests.sh
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
     secrets:
