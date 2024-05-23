@@ -59,6 +59,7 @@ impl fmt::Display for EvmLink {
 }
 
 impl EvmLink {
+    /// Returns the JSON-RPC client.
     pub fn get_json_rpc_client(&self) -> EthJsonRpcClient<impl Client> {
         match self {
             EvmLink::Http(url) => EthJsonRpcClient::new(Clients::http_outcall(url.clone())),
@@ -66,6 +67,7 @@ impl EvmLink {
         }
     }
 
+    /// Returns the underlying client.
     pub fn get_client(&self) -> impl Client {
         match self {
             EvmLink::Http(url) => Clients::http_outcall(url.clone()),
