@@ -22,9 +22,11 @@ use crate::state::State;
 
 type SignedMintOrderData = Vec<u8>;
 
+/// Task for the ERC-20 bridge
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
+    RefreshBftBridgeCreationStatus(BridgeSide),
     CollectEvmEvents(BridgeSide),
     PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
@@ -41,6 +43,9 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
+            BridgeTask::RefreshBftBridgeCreationStatus(side) => {
+                Box::pin(Self::refresh_bft_bridge(state, *side))
+            }
             BridgeTask::CollectEvmEvents(side) => {
                 Box::pin(Self::collect_evm_events(state, scheduler, *side))
             }
@@ -86,6 +91,24 @@ impl BridgeTask {
             .update_evm_params(|old| *old = evm_params, side);
 
         log::trace!("evm state initialized for side {:?}", side);
+
+        Ok(())
+    }
+
+    pub async fn refresh_bft_bridge(
+        state: Rc<RefCell<State>>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        log::trace!("refreshing bft bridge status");
+        let mut status = state.borrow().config.get_bft_bridge_status(side);
+        status.refresh().await.into_scheduler_result()?;
+
+        log::trace!("{side} bft bridge status refreshed: {status:?}");
+
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_status(side, status);
 
         Ok(())
     }
@@ -307,10 +330,16 @@ impl BridgeTask {
             return SchedulerError::TaskExecutionFailed("bft bridge is not created".into());
         })?;
 
+        let client = evm_info.link.get_client();
+        let nonce = client
+            .get_transaction_count(sender.0, BlockNumber::Latest)
+            .await
+            .into_scheduler_result()?;
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bft_bridge.into(),
-            evm_params.nonce.into(),
+            nonce.into(),
             evm_params.gas_price.into(),
             order_data,
             evm_params.chain_id as _,
@@ -325,7 +354,6 @@ impl BridgeTask {
         tx.v = signature.v.0;
         tx.hash = tx.hash();
 
-        let client = evm_info.link.get_client();
         client
             .send_raw_transaction(tx)
             .await

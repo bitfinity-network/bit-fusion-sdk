@@ -158,7 +158,7 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.advance_time(Duration::from_secs(2)).await;
 
     let refund_mint_order = ctx
-        .minter_client(ADMIN)
+        .icrc_minter_client(ADMIN)
         .list_mint_orders(john_principal_id256, base_token_id)
         .await
         .unwrap()[0]
@@ -291,7 +291,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
 #[tokio::test]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
-    let mut admin_client = ctx.minter_client(ADMIN);
+    let mut admin_client = ctx.icrc_minter_client(ADMIN);
     admin_client.set_owner(alice()).await.unwrap().unwrap();
 
     // Now Alice is owner, so admin can't update owner anymore.
@@ -305,7 +305,7 @@ async fn set_owner_access() {
     ));
 
     // Now Alice is owner, so she can update owner.
-    let mut alice_client = ctx.minter_client(ALICE);
+    let mut alice_client = ctx.icrc_minter_client(ALICE);
     alice_client.set_owner(alice()).await.unwrap().unwrap();
 }
 
@@ -329,7 +329,7 @@ async fn double_register_bridge() {
 async fn canister_log_config_should_still_be_storable_after_upgrade() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
 
-    let minter_client = ctx.minter_client(ADMIN);
+    let minter_client = ctx.icrc_minter_client(ADMIN);
 
     assert!(minter_client
         .set_logger_filter("info".to_string())
@@ -354,7 +354,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 #[tokio::test]
 async fn test_canister_build_data() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
-    let minter_client = ctx.minter_client(ALICE);
+    let minter_client = ctx.icrc_minter_client(ALICE);
     let build_data = minter_client.get_canister_build_data().await.unwrap();
     assert!(build_data.pkg_name.contains("icrc2-minter"));
 }

@@ -64,7 +64,7 @@ pub trait TestContext {
     }
 
     /// Returns client for the evm canister.
-    fn minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
+    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
         MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
     }
 
@@ -487,7 +487,7 @@ pub trait TestContext {
             approve_minted_tokens,
         };
 
-        Ok(self.minter_client(caller).burn_icrc2(reason).await??)
+        Ok(self.icrc_minter_client(caller).burn_icrc2(reason).await??)
     }
 
     /// Approves burning of ICRC-2 token.
