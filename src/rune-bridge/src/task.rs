@@ -118,7 +118,7 @@ impl RemoveUsedUtxosTask {
                 filter: Some(filter),
             })
             .await
-            .map(|value| value.0)?;
+            .map(|(value,)| value)?;
 
             utxos.extend(response.utxos);
             match response.next_page {

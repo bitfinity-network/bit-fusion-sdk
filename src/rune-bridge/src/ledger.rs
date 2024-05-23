@@ -114,7 +114,7 @@ pub struct UsedUtxoDetails {
 }
 
 impl UsedUtxoDetails {
-    const MAX_BITCOIN_ADDRESS_SIZE: u32 = 42;
+    const MAX_BITCOIN_ADDRESS_SIZE: u32 = 96;
 
     /// Returns the owner address of the utxo.
     pub fn owner_address(&self, network: Network) -> Result<Address, Box<dyn std::error::Error>> {

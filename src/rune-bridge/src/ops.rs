@@ -340,6 +340,7 @@ fn filter_out_spent_utxos(
     get_utxos_response: &mut GetUtxosResponse,
 ) -> Vec<UtxoKey> {
     let used_utxos = state.borrow().ledger().load_used_utxos();
+    println!("Used utxos: {:?}", used_utxos);
     let spent_utxos = used_utxos
         .into_iter()
         .filter(|(used_utxo_key, _)| {
@@ -350,6 +351,7 @@ fn filter_out_spent_utxos(
         })
         .map(|(used_utxo_key, _)| used_utxo_key)
         .collect::<Vec<_>>();
+    println!("Spent utxos: {:?}", spent_utxos);
 
     get_utxos_response
         .utxos
@@ -669,7 +671,12 @@ fn format_outpoint(outpoint: &Outpoint) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use ic_exports::ic_kit::MockContext;
+
     use super::*;
+    use crate::canister::get_state;
 
     #[test]
     fn ic_outpoint_formatting() {
@@ -683,5 +690,95 @@ mod tests {
 
         let expected = "1a4a16488b256849fe07d0995c067b3c97b575bc67d3b9f3119e3207b9b83f62:2";
         assert_eq!(&format_outpoint(&outpoint)[..], expected);
+    }
+
+    #[test]
+    fn test_should_remove_spent_utxo() {
+        MockContext::new().inject();
+
+        // utxos used; the last two are spent
+        let spent_utxos: Vec<Utxo> = vec![
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xde; 32],
+                    vout: 0,
+                },
+                value: 0,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xde; 32],
+                    vout: 1,
+                },
+                value: 0,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xca; 32],
+                    vout: 0,
+                },
+                value: 0,
+                height: 0,
+            },
+        ];
+
+        // In response we put one utxo that is not spent, but is deposited and one not tracked.
+        let response_utxos = vec![
+            spent_utxos[0].clone(),
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xbb; 32],
+                    vout: 0,
+                },
+                value: 0,
+                height: 0,
+            },
+        ];
+        let mut response = GetUtxosResponse {
+            utxos: response_utxos.clone(),
+            tip_block_hash: vec![],
+            tip_height: 0,
+            next_page: None,
+        };
+        // put used utxo in the ledger
+        let address = Address::from_str("bc1quyjp8qxkdc22cej962xaydd5arm7trwtcnkzks")
+            .unwrap()
+            .assume_checked();
+        let state = get_state();
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(&spent_utxos, &address, vec![]);
+        // mark utxos as used
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .mark_as_used(UtxoKey::from(&spent_utxos[0].outpoint), address.clone());
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .mark_as_used(UtxoKey::from(&spent_utxos[1].outpoint), address.clone());
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .mark_as_used(UtxoKey::from(&spent_utxos[2].outpoint), address);
+
+        // filter
+        let spent_utxos = filter_out_spent_utxos(&state, &mut response);
+
+        // check response
+        assert_eq!(response.utxos.len(), 2);
+        assert_eq!(response.utxos[0].outpoint.txid, vec![0xde; 32]);
+        assert_eq!(response.utxos[0].outpoint.vout, 0);
+        assert_eq!(response.utxos[1].outpoint.txid, vec![0xbb; 32]);
+        assert_eq!(response.utxos[1].outpoint.vout, 0);
+        // check spent utxos
+        assert_eq!(spent_utxos.len(), 2);
+        assert_eq!(spent_utxos[0].tx_id.to_vec(), vec![0xca; 32]);
+        assert_eq!(spent_utxos[0].vout, 0);
+        assert_eq!(spent_utxos[1].tx_id.to_vec(), vec![0xde; 32]);
+        assert_eq!(spent_utxos[1].vout, 1);
     }
 }
