@@ -5,7 +5,6 @@ use solidity_helper::error::SolidityHelperError;
 use solidity_helper::{compile_solidity_contracts, SolidityContract};
 
 fn main() -> anyhow::Result<()> {
-    /*
     let contracts = match compile_solidity_contracts(None, None) {
         Ok(c) => c,
         Err(SolidityHelperError::IoError(err)) if err.kind() == ErrorKind::NotFound => {
@@ -47,7 +46,7 @@ fn main() -> anyhow::Result<()> {
         &contracts,
         "WatermelonToken",
         "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
-    ); */
+    );
 
     Ok(())
 }

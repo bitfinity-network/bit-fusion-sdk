@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::time::Duration;
 
 use bitcoin::bip32::DerivationPath;
 use bitcoin::consensus::Encodable;

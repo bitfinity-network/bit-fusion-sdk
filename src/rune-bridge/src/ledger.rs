@@ -1,8 +1,10 @@
 use std::borrow::Cow;
+use std::fmt;
 use std::mem::size_of;
+use std::str::FromStr;
 
 use bitcoin::hashes::sha256d::Hash;
-use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
+use bitcoin::{Address, Amount, Network, OutPoint, TxOut, Txid};
 use candid::{CandidType, Decode, Encode};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
@@ -33,8 +35,14 @@ impl Default for UtxoLedger {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize)]
 pub struct UtxoKey {
-    tx_id: [u8; 32],
-    vout: u32,
+    pub tx_id: [u8; 32],
+    pub vout: u32,
+}
+
+impl fmt::Display for UtxoKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", hex::encode(self.tx_id), self.vout)
+    }
 }
 
 impl Storable for UtxoKey {
@@ -102,6 +110,18 @@ impl Storable for UtxoDetails {
 #[derive(Debug, Clone, Eq, PartialEq, CandidType, Deserialize)]
 pub struct UsedUtxoDetails {
     pub used_at: u64,
+    owner_address: String,
+}
+
+impl UsedUtxoDetails {
+    const MAX_BITCOIN_ADDRESS_SIZE: u32 = 42;
+
+    /// Returns the owner address of the utxo.
+    pub fn owner_address(&self, network: Network) -> Result<Address, Box<dyn std::error::Error>> {
+        Address::from_str(self.owner_address.as_str())?
+            .require_network(network)
+            .map_err(|e| e.into())
+    }
 }
 
 impl Storable for UsedUtxoDetails {
@@ -115,7 +135,7 @@ impl Storable for UsedUtxoDetails {
     }
 
     const BOUND: Bound = Bound::Bounded {
-        max_size: size_of::<u64>() as u32,
+        max_size: size_of::<u64>() as u32 + Self::MAX_BITCOIN_ADDRESS_SIZE,
         is_fixed_size: false,
     };
 }
@@ -168,30 +188,32 @@ impl UtxoLedger {
     }
 
     /// Marks the utxo as used.
-    pub fn mark_as_used(&mut self, key: UtxoKey) {
+    pub fn mark_as_used(&mut self, key: UtxoKey, address: Address) {
         self.used_utxos_registry.insert(
             key,
             UsedUtxoDetails {
                 used_at: ic::time(),
+                owner_address: address.to_string(),
             },
         );
     }
 
     /// Lists all used utxos in the store.
-    pub fn load_used_utxos(&self) -> Vec<(UtxoKey, UsedUtxoDetails, UtxoDetails)> {
-        self.used_utxos_registry
-            .iter()
-            .filter_map(|(key, used_details)| {
-                self.utxo_storage
-                    .get(&key)
-                    .map(|details| (key, used_details.clone(), details.clone()))
-            })
-            .collect()
+    pub fn load_used_utxos(&self) -> Vec<(UtxoKey, UsedUtxoDetails)> {
+        self.used_utxos_registry.iter().collect()
     }
 
-    /// Removes the utxo from the store.
-    pub fn remove_utxo(&mut self, key: &UtxoKey) {
+    /// Removes the spent utxo from the store.
+    ///
+    /// It gets removed from both the utxo storage and the used utxos registry.
+    pub fn remove_spent_utxo(&mut self, key: &UtxoKey) {
         self.utxo_storage.remove(key);
+        self.used_utxos_registry.remove(key);
+    }
+
+    /// Removes the unspent utxo from the store.
+    /// It gets removed only from the `used_utxos_registry`
+    pub fn remove_unspent_utxo(&mut self, key: &UtxoKey) {
         self.used_utxos_registry.remove(key);
     }
 }

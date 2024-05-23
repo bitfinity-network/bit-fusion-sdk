@@ -4,7 +4,6 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use bitcoin::consensus::Encodable;
-use bitcoin::hashes::Hash;
 use bitcoin::{Address, FeeRate, Transaction, Txid};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -26,6 +25,7 @@ use serde::Deserialize;
 
 use crate::interface::{DepositError, Erc20MintStatus, OutputResponse, WithdrawError};
 use crate::key::{get_deposit_address, get_derivation_path_ic};
+use crate::ledger::UtxoKey;
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::state::State;
 
@@ -165,12 +165,16 @@ pub async fn withdraw(
     address: Address,
 ) -> Result<Txid, WithdrawError> {
     let (utxo_keys, current_utxos) = state.borrow().ledger().load_all();
-    let tx = build_withdraw_transaction(state, amount, address, rune_id, current_utxos).await?;
+    let tx =
+        build_withdraw_transaction(state, amount, address.clone(), rune_id, current_utxos).await?;
     send_tx(state, &tx).await?;
 
     // mark all utxos as used
     utxo_keys.into_iter().for_each(|key| {
-        state.borrow_mut().ledger_mut().mark_as_used(key);
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .mark_as_used(key, address.clone());
     });
 
     Ok(tx.txid())
@@ -319,21 +323,39 @@ pub async fn get_utxos(
     log::trace!("Got UTXO list result for address {address}:");
     log::trace!("{response:?}");
 
-    filter_out_used_utxos(state, &mut response);
+    // filter out spent utxos and spent utxos from the ledger
+    filter_out_spent_utxos(state, &mut response)
+        .into_iter()
+        .for_each(|utxo_key| {
+            state.borrow_mut().ledger_mut().remove_spent_utxo(&utxo_key);
+        });
 
     Ok(response)
 }
 
-fn filter_out_used_utxos(state: &RefCell<State>, get_utxos_response: &mut GetUtxosResponse) {
-    let (_, existing) = state.borrow().ledger().load_all();
-    // TODO: maybe remove here used utxos from the ledger
-
-    get_utxos_response.utxos.retain(|utxo| {
-        !existing.iter().any(|v| {
-            v.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-                && v.outpoint.vout == utxo.outpoint.vout
+/// Filters out utxos that are already spent in the ledger.
+/// Returns the filtered utxox.
+fn filter_out_spent_utxos(
+    state: &RefCell<State>,
+    get_utxos_response: &mut GetUtxosResponse,
+) -> Vec<UtxoKey> {
+    let used_utxos = state.borrow().ledger().load_used_utxos();
+    let spent_utxos = used_utxos
+        .into_iter()
+        .filter(|(used_utxo_key, _)| {
+            !get_utxos_response.utxos.iter().any(|owner_utxo| {
+                owner_utxo.outpoint.txid == used_utxo_key.tx_id
+                    && owner_utxo.outpoint.vout == used_utxo_key.vout
+            })
         })
-    })
+        .map(|(used_utxo_key, _)| used_utxo_key)
+        .collect::<Vec<_>>();
+
+    get_utxos_response
+        .utxos
+        .retain(|utxo| !spent_utxos.contains(&UtxoKey::from(&utxo.outpoint)));
+
+    spent_utxos
 }
 
 fn validate_utxo_confirmations(
