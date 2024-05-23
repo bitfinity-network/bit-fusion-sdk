@@ -4,8 +4,8 @@ use std::cell::RefCell;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_stable_structures::CellStructure;
-use inscriber::ecdsa_api::{get_ic_derivation_path, IcBtcSigner};
-use inscriber::interface::Brc20TransferTransactions;
+use inscriber::ecdsa_api::IcBtcSigner;
+use inscriber::interface::{InscribeTransactions, Protocol};
 use inscriber::ops as Inscriber;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
@@ -241,7 +241,7 @@ async fn withdraw_brc20(
     request_id: u32,
     brc20_iid: &str,
     dst_addr: &str,
-) -> Result<Brc20TransferTransactions, WithdrawError> {
+) -> Result<InscribeTransactions, WithdrawError> {
     if !state.borrow().has_brc20(brc20_iid) {
         return Err(WithdrawError::NoSuchInscription(format!(
             "Specified BRC20 inscription ID ({}) not found",
@@ -268,13 +268,14 @@ async fn withdraw_brc20(
         request_id
     );
 
-    let result = Inscriber::brc20_transfer(
+    let result = Inscriber::inscribe(
+        Protocol::Brc20,
         inscription,
+        &H160::default(),
         dst_addr.to_string(),
         dst_addr.to_string(),
         None,
         ecdsa_signer,
-        get_ic_derivation_path(&H160::default()),
         network,
     )
     .await

@@ -1,6 +1,6 @@
 use candid::CandidType;
 use did::{H160, H256};
-use inscriber::interface::Brc20TransferTransactions;
+use inscriber::interface::InscribeTransactions;
 use minter_did::order::SignedMintOrder;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,7 @@ pub struct DepositBrc20Args {
 /// Status of an ERC20 to a BRC20 swap
 #[derive(CandidType, Clone, Debug, Deserialize)]
 pub struct Brc20InscribeStatus {
-    pub tx_ids: Brc20TransferTransactions,
+    pub tx_ids: InscribeTransactions,
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]

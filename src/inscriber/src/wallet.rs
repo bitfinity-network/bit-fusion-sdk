@@ -189,6 +189,7 @@ impl CanisterWallet {
         &self,
         inscription_type: Protocol,
         inscription: String,
+        eth_address: &H160,
         dst_address: Address,
         leftovers_address: Address,
         multisig_config: Option<MultisigConfig>,
@@ -197,7 +198,7 @@ impl CanisterWallet {
         let derivation_path =
             ic_dp_to_btc_dp(&self.derivation_path).expect("Failed to convert IC dp to BTC dp");
         let own_pk = self.ecdsa_public_key(&derivation_path).await;
-        let own_address = self.get_bitcoin_address(&H160::default()).await;
+        let own_address = self.get_bitcoin_address(eth_address).await;
 
         log::info!("Fetching UTXOs...");
         let own_utxos = bitcoin_api::get_utxos(ic_btc_network, own_address.to_string())

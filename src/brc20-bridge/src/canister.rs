@@ -73,9 +73,10 @@ impl Brc20Bridge {
         bitcoin_api::get_balance(network, address).await
     }
 
-    #[update]
+    #[query]
     pub async fn get_inscription_fees(
         &self,
+        eth_address: H160,
         inscription_type: Protocol,
         inscription: String,
         multisig_config: Option<Multisig>,
@@ -92,7 +93,7 @@ impl Brc20Bridge {
             inscription,
             multisig_config,
             ic_btc_network,
-            get_ic_derivation_path(&H160::default()),
+            get_ic_derivation_path(&eth_address),
             ecdsa_signer,
         )
         .await
@@ -121,11 +122,11 @@ impl Brc20Bridge {
         Inscriber::inscribe(
             inscription_type,
             inscription,
+            &eth_address,
             leftovers_address,
             dst_address,
             multisig_config,
             ecdsa_signer,
-            get_ic_derivation_path(&eth_address),
             ic_btc_network,
         )
         .await

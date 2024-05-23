@@ -12,3 +12,6 @@ pub(crate) const HTTP_OUTCALL_REQ_PER_BYTE_COST: u128 = 13_600;
 pub(crate) const HTTP_OUTCALL_RES_PER_BYTE_COST: u128 = 27_200;
 pub(crate) const HTTP_OUTCALL_RES_DEFAULT_SIZE: u64 = 2097152;
 pub(crate) const HTTP_OUTCALL_MAX_RESPONSE_BYTES: u64 = 10_000;
+
+/// Length of BRC20 ticker must be 4 or 5.
+pub(crate) const BRC20_TICKER_LEN: usize = 5;

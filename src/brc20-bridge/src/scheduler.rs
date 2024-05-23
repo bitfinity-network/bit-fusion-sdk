@@ -14,6 +14,7 @@ use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
+use crate::constant::BRC20_TICKER_LEN;
 use crate::interface::bridge_api::MintErc20Args;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -181,7 +182,12 @@ impl Task for Brc20Task {
             }) => {
                 log::info!("ERC20 burn event received");
                 let operation_id = *operation_id;
-                let brc20_ticker = hex::encode(name);
+
+                let mut ticker = hex::encode(name);
+                if ticker.len() > BRC20_TICKER_LEN {
+                    log::warn!("Length of {ticker} exceeds maximum allowed ({BRC20_TICKER_LEN}); truncating it...");
+                    ticker = ticker.chars().take(BRC20_TICKER_LEN).collect::<String>();
+                }
 
                 let Ok(address) = String::from_utf8(recipient_id.clone()) else {
                     return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
@@ -193,13 +199,13 @@ impl Task for Brc20Task {
                     let result = crate::ops::erc20_to_brc20(
                         &get_state(),
                         operation_id,
-                        brc20_ticker,
+                        ticker.clone(),
                         &address,
                     )
                     .await
                     .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
-                    log::info!("Created a BRC20 inscription with IDs: {:?}", result.tx_ids);
+                    log::info!("Created a BRC20 inscription with ticker {ticker} and transaction IDs: {:?}", result.tx_ids);
 
                     Ok(())
                 })

@@ -5,7 +5,7 @@ use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ord_rs::MultisigConfig;
 
-use crate::ecdsa_api::IcBtcSigner;
+use crate::ecdsa_api::{get_ic_derivation_path, IcBtcSigner};
 use crate::interface::{
     Brc20TransferTransactions, InscribeError, InscribeResult, InscribeTransactions,
     InscriptionFees, Multisig, Protocol,
@@ -18,13 +18,14 @@ use crate::wallet::CanisterWallet;
 pub async fn inscribe(
     inscription_type: Protocol,
     inscription: String,
+    eth_address: &H160,
     leftovers_address: String,
     dst_address: String,
     multisig_config: Option<Multisig>,
     signer: IcBtcSigner,
-    derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,
 ) -> InscribeResult<InscribeTransactions> {
+    let derivation_path = get_ic_derivation_path(eth_address);
     let wallet = CanisterWallet::new(network, derivation_path, signer);
 
     let leftovers_address = get_address(leftovers_address, network)?;
@@ -39,6 +40,7 @@ pub async fn inscribe(
         .inscribe(
             inscription_type,
             inscription,
+            eth_address,
             dst_address,
             leftovers_address,
             multisig_config,
@@ -49,28 +51,29 @@ pub async fn inscribe(
 /// Inscribes and sends the inscribed sat from this canister to the given address.
 pub async fn brc20_transfer(
     inscription: String,
+    eth_address: &H160,
     leftovers_address: String,
     dst_address: String,
     multisig_config: Option<Multisig>,
     signer: IcBtcSigner,
-    derivation_path: Vec<Vec<u8>>,
     network: BitcoinNetwork,
 ) -> InscribeResult<Brc20TransferTransactions> {
     let leftovers_address = get_address(leftovers_address, network)?;
     let transfer_dst_address = get_address(dst_address, network)?;
+    let derivation_path = get_ic_derivation_path(eth_address);
 
-    let wallet = CanisterWallet::new(network, derivation_path.clone(), signer.clone());
+    let wallet = CanisterWallet::new(network, derivation_path, signer.clone());
     let inscription_dst_address = wallet.get_bitcoin_address(&H160::default()).await;
     let inscription_leftovers_address = inscription_dst_address.clone();
 
     let inscribe_txs = inscribe(
         Protocol::Brc20,
         inscription,
+        eth_address,
         inscription_dst_address.to_string(),
         inscription_leftovers_address.to_string(),
         multisig_config,
         signer,
-        derivation_path,
         network,
     )
     .await?;
