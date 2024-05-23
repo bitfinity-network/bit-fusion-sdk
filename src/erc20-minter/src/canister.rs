@@ -151,24 +151,6 @@ impl EvmMinter {
         }
     }
 
-    /// Sets the BFT bridge contract address.
-    ///
-    /// The caller must be the owner.
-    #[update]
-    pub async fn admin_set_bft_bridge_address(
-        &mut self,
-        bridge_side: BridgeSide,
-        address: H160,
-    ) -> Option<()> {
-        let state = get_state();
-        state.borrow().config.check_admin(ic::caller())?;
-        state
-            .borrow_mut()
-            .config
-            .set_bft_bridge_address(bridge_side, address);
-        Some(())
-    }
-
     pub fn idl() -> Idl {
         generate_idl!()
     }

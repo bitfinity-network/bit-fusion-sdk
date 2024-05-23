@@ -103,13 +103,19 @@ impl BridgeTask {
             return Self::init_evm_state(state, side).await;
         };
 
+        let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
+        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
+            log::warn!("failed to collect evm events: bft bridge is not created");
+            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
+        })?;
+
         let client = evm_info.link.get_client();
 
         let logs = BridgeEvent::collect_logs(
             &client,
             params.next_block.into(),
             BlockNumber::Safe,
-            evm_info.bridge_contract.0,
+            bft_bridge.0,
         )
         .await
         .into_scheduler_result()?;
@@ -295,9 +301,15 @@ impl BridgeTask {
             .get_evm_params(side)
             .into_scheduler_result()?;
 
+        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
+        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
+            log::warn!("failed to send mint transaction: bft bridge is not created");
+            return SchedulerError::TaskExecutionFailed("bft bridge is not created".into());
+        })?;
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
-            evm_info.bridge_contract.0,
+            bft_bridge.into(),
             evm_params.nonce.into(),
             evm_params.gas_price.into(),
             order_data,

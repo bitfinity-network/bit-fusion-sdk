@@ -705,8 +705,6 @@ pub trait TestContext {
                 let init_data = erc20_minter::state::Settings {
                     base_evm_link: EvmLink::Ic(external_evm_canister),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
-                    base_bridge_contract: H160::default(),
-                    wrapped_bridge_contract: H160::default(),
                     signing_strategy: SigningStrategy::Local {
                         private_key: rand::random(),
                     },
