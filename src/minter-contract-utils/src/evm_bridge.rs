@@ -1,10 +1,11 @@
 use core::fmt;
+use std::collections::HashMap;
 
 use candid::CandidType;
 use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber, Log, U256 as EthU256};
-use jsonrpc_core::{serde_json, Call, Id, MethodCall, Output, Params, Request, Response};
+use jsonrpc_core::{serde_json, Call, Id, MethodCall, Output, Params, Request, Response, Version};
 use serde::{Deserialize, Serialize};
 
 use crate::bft_bridge_api::{BURNT_EVENT, MINTED_EVENT};
@@ -139,19 +140,19 @@ impl EvmData {
 
         let calls = vec![
             Call::MethodCall(MethodCall {
-                jsonrpc: Some(jsonrpc_core::Version::V2),
+                jsonrpc: Some(Version::V2),
                 method: "eth_getTransactionCount".into(),
                 params: make_params_array!(address.0, BlockNumber::Latest),
-                id: jsonrpc_core::Id::Str("nonce".into()),
+                id: Id::Str("nonce".into()),
             }),
             Call::MethodCall(MethodCall {
-                jsonrpc: Some(jsonrpc_core::Version::V2),
+                jsonrpc: Some(Version::V2),
                 method: "eth_gasPrice".into(),
                 params: Params::Array(vec![]),
-                id: jsonrpc_core::Id::Str("gasPrice".into()),
+                id: Id::Str("gasPrice".into()),
             }),
             Call::MethodCall(MethodCall {
-                jsonrpc: Some(jsonrpc_core::Version::V2),
+                jsonrpc: Some(Version::V2),
                 method: "eth_getLogs".into(),
                 params: Params::Array(vec![serde_json::to_value(EthGetLogsParams {
                     address: Some(vec![bridge_contract.into()]),
@@ -162,7 +163,7 @@ impl EvmData {
                         MINTED_EVENT.signature(),
                     ]]),
                 })?]),
-                id: jsonrpc_core::Id::Str("events".into()),
+                id: Id::Str("events".into()),
             }),
         ];
 
@@ -171,7 +172,7 @@ impl EvmData {
             return Err(anyhow::anyhow!("Unexpected response format"));
         };
 
-        let mut response_map = std::collections::HashMap::new();
+        let mut response_map = HashMap::new();
         for response in responses {
             if let Output::Success(success) = response {
                 response_map.insert(success.id, success.result);
