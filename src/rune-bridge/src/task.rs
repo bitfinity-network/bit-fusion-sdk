@@ -12,7 +12,7 @@ use ic_exports::ic_kit::RejectionCode;
 use crate::ledger::UtxoKey;
 use crate::state::State;
 
-const EXPIRED_UTXO_TTL: Duration = Duration::from_secs(60 * 60 * 24 * 3); // 3 days
+const AVG_BLOCK_TIME: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
 /// Task to remove used UTXOs from the ledger.
 /// It also remark as available to be spent those utxos which haven't been spent for some reason.
@@ -30,6 +30,9 @@ impl RemoveUsedUtxosTask {
     /// Run the task.
     pub async fn run(self) {
         let time_now = Duration::from_nanos(ic_exports::ic_cdk::api::time());
+        let min_confirmations = self.state.borrow().min_confirmations();
+        let minimum_confirmation_time = min_confirmations * AVG_BLOCK_TIME;
+
         let utxos_to_check = self
             .state
             .borrow()
@@ -37,7 +40,7 @@ impl RemoveUsedUtxosTask {
             .load_used_utxos()
             .into_iter()
             .filter(|(_, details)| {
-                Duration::from_nanos(details.used_at) + EXPIRED_UTXO_TTL <= time_now
+                Duration::from_nanos(details.used_at) + minimum_confirmation_time <= time_now
             })
             .collect::<Vec<_>>();
 
@@ -63,13 +66,14 @@ impl RemoveUsedUtxosTask {
         // iter owners
         let btc_network = self.state.borrow().ic_btc_network();
         for (owner, utxos) in utxos_by_owner {
-            let owner_utxos = match Self::get_owner_utxos(&owner, btc_network).await {
-                Ok(utxos) => utxos,
-                Err((code, msg)) => {
-                    log::error!("failed to get owner {owner} utxos: {msg} ({code:?})");
-                    continue;
-                }
-            };
+            let owner_utxos =
+                match Self::get_owner_utxos(&owner, btc_network, min_confirmations).await {
+                    Ok(utxos) => utxos,
+                    Err((code, msg)) => {
+                        log::error!("failed to get owner {owner} utxos: {msg} ({code:?})");
+                        continue;
+                    }
+                };
             // get spent utxos
             utxos
                 .into_iter()
@@ -107,9 +111,10 @@ impl RemoveUsedUtxosTask {
     async fn get_owner_utxos(
         owner: &Address,
         btc_network: BitcoinNetwork,
+        min_confirmations: u32,
     ) -> Result<Vec<Utxo>, (RejectionCode, String)> {
         log::debug!("getting utxos for owner {owner}");
-        let mut filter = UtxoFilter::MinConfirmations(6);
+        let mut filter = UtxoFilter::MinConfirmations(min_confirmations);
         let mut utxos = vec![];
         loop {
             let response = bitcoin::bitcoin_get_utxos(GetUtxosRequest {

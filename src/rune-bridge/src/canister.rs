@@ -54,7 +54,7 @@ impl RuneBridge {
             self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
-            const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24 * 7); // 7 days
+            const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24); // once a day
 
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 get_scheduler()

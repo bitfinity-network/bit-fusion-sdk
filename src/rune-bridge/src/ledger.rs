@@ -163,10 +163,11 @@ impl UtxoLedger {
         }
     }
 
-    /// Lists all utxos in the store.
-    pub fn load_all(&self) -> (Vec<UtxoKey>, Vec<TxInputInfo>) {
+    /// Lists all unspent utxos in the store.
+    pub fn load_unspent_utxos(&self) -> (Vec<UtxoKey>, Vec<TxInputInfo>) {
         self.utxo_storage
             .iter()
+            .filter(|(key, _)| !self.used_utxos_registry.contains_key(key))
             .map(|(key, details)| {
                 (
                     key,

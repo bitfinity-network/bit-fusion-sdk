@@ -164,7 +164,7 @@ pub async fn withdraw(
     rune_id: RuneId,
     address: Address,
 ) -> Result<Txid, WithdrawError> {
-    let (utxo_keys, current_utxos) = state.borrow().ledger().load_all();
+    let (utxo_keys, current_utxos) = state.borrow().ledger().load_unspent_utxos();
     let tx =
         build_withdraw_transaction(state, amount, address.clone(), rune_id, current_utxos).await?;
     send_tx(state, &tx).await?;
