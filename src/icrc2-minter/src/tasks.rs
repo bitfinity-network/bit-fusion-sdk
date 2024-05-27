@@ -30,6 +30,7 @@ type ShouldSendMintTx = bool;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BridgeTask {
     InitEvmInfo,
+    RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
     PrepareMintOrder(BurntIcrc2Data, ShouldSendMintTx),
     RemoveMintOrder(MintedEventData),
@@ -45,6 +46,7 @@ impl Task for BridgeTask {
         let state = crate::canister::get_state();
         match self {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
+            BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
             BridgeTask::PrepareMintOrder(data, should_send_mint_tx) => Box::pin(
                 Self::prepare_mint_order(state, scheduler, data.clone(), *should_send_mint_tx),
@@ -87,6 +89,21 @@ impl BridgeTask {
             .update_evm_params(|p| *p = evm_params);
 
         log::trace!("evm parameters initialized");
+
+        Ok(())
+    }
+
+    pub async fn refresh_bft_bridge(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+        log::trace!("refreshing bft bridge status");
+        let mut status = state.borrow().config.get_bft_bridge_contract_status();
+        status.refresh().await.into_scheduler_result()?;
+
+        log::trace!("bft bridge status refreshed: {status:?}");
+
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_contract_status(status);
 
         Ok(())
     }
@@ -281,10 +298,16 @@ impl BridgeTask {
             ));
         };
 
+        let client = state.borrow().config.get_evm_client();
+        let nonce = client
+            .get_transaction_count(sender.0, BlockNumber::Latest)
+            .await
+            .into_scheduler_result()?;
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,
-            evm_params.nonce.into(),
+            nonce.into(),
             evm_params.gas_price.into(),
             order_data,
             evm_params.chain_id as _,

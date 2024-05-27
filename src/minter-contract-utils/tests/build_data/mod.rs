@@ -1,4 +1,4 @@
-use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use solidity_helper::compile_solidity_contracts;
 
 #[test]

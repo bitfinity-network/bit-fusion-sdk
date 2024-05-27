@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::build::BuildData;
-use did::{H160, U256};
+use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
@@ -19,6 +19,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
+use minter_contract_utils::evm_link::EvmLink;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
@@ -30,7 +31,7 @@ use crate::constant::{PENDING_TASKS_MEMORY_ID, TASK_RETRY_DELAY_SECS};
 use crate::memory::MEMORY_MANAGER;
 use crate::state::{Settings, State};
 use crate::tasks::{BridgeTask, BurntIcrc2Data};
-use crate::tokens::{bft_bridge, icrc1, icrc2};
+use crate::tokens::{icrc1, icrc2};
 
 mod inspect;
 
@@ -255,48 +256,58 @@ impl MinterCanister {
         Ok(())
     }
 
+    /// Starts the BFT bridge contract deployment.
+    #[update]
+    pub async fn init_bft_bridge_contract(&mut self) -> Result<H256> {
+        let state = get_state();
+        let signer = state.borrow().signer.get_transaction_signer();
+
+        let evm_principal = state.borrow().config.get_evm_principal();
+        let evm_link = EvmLink::Ic(evm_principal);
+        let evm_params = state
+            .borrow()
+            .config
+            .get_evm_params()
+            .ok_or_else(|| Error::Internal("EVM params not initialized".into()))?;
+        let minter_address = signer
+            .get_address()
+            .await
+            .map_err(|e| Error::Internal(format!("failed to get EVM address: {e}")))?;
+
+        let mut status = state.borrow().config.get_bft_bridge_contract_status();
+
+        log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
+
+        let hash = status
+            .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
+            .await
+            .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
+
+        log::trace!("BftBridge contract initialization started with status: {status:?}");
+
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_contract_status(status);
+
+        let options = TaskOptions::default()
+            .with_max_retries_policy(u32::MAX)
+            .with_fixed_backoff_policy(4);
+        get_scheduler()
+            .borrow_mut()
+            .append_task(ScheduledTask::with_options(
+                BridgeTask::RefreshBftBridgeCreationStatus,
+                options,
+            ));
+
+        Ok(hash)
+    }
+
     /// Returns bridge contract address for EVM.
     /// If contract isn't initialized yet - returns None.
     #[query]
     pub fn get_bft_bridge_contract(&mut self) -> Option<H160> {
         get_state().borrow().config.get_bft_bridge_contract()
-    }
-
-    /// register_evmc_bft_bridge inspect_message check
-    pub fn register_evmc_bft_bridge_inspect_message_check(
-        principal: Principal,
-        bft_bridge_address: H160,
-        state: &State,
-    ) -> Result<()> {
-        inspect_check_is_owner(principal, state)?;
-        if bft_bridge_address == H160::default() {
-            return Err(Error::Internal(
-                "BFTBridge contract address shouldn' be zero".into(),
-            ));
-        }
-
-        if let Some(address) = state.config.get_bft_bridge_contract() {
-            return Err(Error::BftBridgeAlreadyRegistered(address));
-        }
-
-        Ok(())
-    }
-
-    /// Registers BftBridge contract for EVM canister.
-    /// This method is available for canister owner only.
-    #[update]
-    pub async fn register_evmc_bft_bridge(&self, bft_bridge_address: H160) -> Result<()> {
-        let state = get_state();
-
-        Self::register_evmc_bft_bridge_inspect_message_check(
-            ic::caller(),
-            bft_bridge_address.clone(),
-            &state.borrow(),
-        )?;
-
-        self.register_evm_bridge(bft_bridge_address).await?;
-
-        Ok(())
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
@@ -410,19 +421,6 @@ impl MinterCanister {
             .get_address()
             .await
             .map_err(|e| Error::Internal(format!("failed to get minter canister address: {e}")))
-    }
-
-    async fn register_evm_bridge(&self, bft_bridge: H160) -> Result<()> {
-        let state = get_state();
-        let client = state.borrow().config.get_evm_client();
-        bft_bridge::check_bft_bridge_contract(&client, bft_bridge.clone(), get_state()).await?;
-
-        get_state()
-            .borrow_mut()
-            .config
-            .set_bft_bridge_contract(bft_bridge);
-
-        Ok(())
     }
 
     /// Returns the build data of the canister
@@ -668,21 +666,6 @@ mod test {
             .unwrap_err();
 
         assert_eq!(err, Error::AnonymousPrincipal);
-    }
-
-    #[tokio::test]
-    async fn set_evm_bft_bridge_should_fail_for_non_owner() {
-        let canister = init_canister().await;
-
-        let err = canister_call!(
-            canister.register_evmc_bft_bridge(H160::from_slice(&[2u8; 20])),
-            Result<()>
-        )
-        .await
-        .unwrap()
-        .unwrap_err();
-
-        assert_eq!(err, Error::NotAuthorized);
     }
 
     // This test work fine if executed alone but could fail if executed with all other tests

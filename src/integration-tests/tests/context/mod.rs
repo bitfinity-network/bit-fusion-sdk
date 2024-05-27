@@ -24,7 +24,7 @@ use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
 use minter_contract_utils::bft_bridge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::evm_link::EvmLink;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;
@@ -145,7 +145,7 @@ pub trait TestContext {
     }
 
     /// Returns minter canister EVM address.
-    async fn get_minter_canister_evm_address(&self, caller: &str) -> Result<H160> {
+    async fn get_icrc_minter_canister_evm_address(&self, caller: &str) -> Result<H160> {
         let client = self.client(self.canisters().icrc2_minter(), caller);
         Ok(client
             .update::<_, McResult<H160>>("get_minter_canister_evm_address", ())
@@ -193,12 +193,8 @@ pub trait TestContext {
     }
 
     /// Crates BFTBridge contract in EVMc and registered it in minter canister
-    async fn initialize_bft_bridge(
-        &self,
-        caller: &str,
-        wallet: &Wallet<'_, SigningKey>,
-    ) -> Result<H160> {
-        let minter_canister_address = self.get_minter_canister_evm_address(caller).await?;
+    async fn initialize_bft_bridge(&self, caller: &str) -> Result<H160> {
+        let minter_canister_address = self.get_icrc_minter_canister_evm_address(caller).await?;
 
         let client = self.evm_client(self.admin_name());
         client
@@ -206,18 +202,22 @@ pub trait TestContext {
             .await??;
         self.advance_time(Duration::from_secs(2)).await;
 
-        let minter_client = self.minter_client(caller);
-
-        let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
-        let input = bft_bridge_api::CONSTRUCTOR
-            .encode_input(contract, &[Token::Address(minter_canister_address.into())])
-            .unwrap();
-
-        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
-        minter_client
-            .register_evmc_bft_bridge(bridge_address.clone())
+        let raw_client = self.client(self.canisters().icrc2_minter(), self.admin_name());
+        let hash = raw_client
+            .update::<_, McResult<H256>>("init_bft_bridge_contract", ())
             .await??;
 
+        let receipt = self.wait_transaction_receipt(&hash).await?.ok_or_else(|| {
+            TestError::Evm(EvmError::Internal(
+                "bft bridge creation transaction not processed".into(),
+            ))
+        })?;
+
+        let bridge_address = receipt.contract_address.ok_or_else(|| {
+            TestError::Evm(EvmError::Internal(
+                "bft bridge creation transaction succeeded, but it doesn't contain the contract address".into(),
+            ))
+        })?;
         Ok(bridge_address)
     }
 

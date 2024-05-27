@@ -1,14 +1,17 @@
 use core::fmt;
 use std::collections::HashMap;
 
+use anyhow::anyhow;
 use candid::CandidType;
-use did::{H160, U256};
+use did::{H160, H256, U256};
+use eth_signer::sign_strategy::TransactionSigner;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber, Log, U256 as EthU256};
 use jsonrpc_core::{serde_json, Call, Id, MethodCall, Output, Params, Request, Response, Version};
 use serde::{Deserialize, Serialize};
 
-use crate::bft_bridge_api::{BURNT_EVENT, MINTED_EVENT};
+use crate::bft_bridge_api::{self, BURNT_EVENT, MINTED_EVENT};
+use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
 
 macro_rules! make_params_array {
@@ -106,6 +109,114 @@ impl EvmParams {
             nonce,
             gas_price,
         })
+    }
+}
+
+/// Status of BftBridge contract initialization
+#[derive(Debug, Clone, Default, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub enum BftBridgeContractStatus {
+    #[default]
+    None,
+    Creating(EvmLink, H256),
+    Created(H160),
+}
+
+impl BftBridgeContractStatus {
+    /// Starts Contract initialization if currenst status is None.
+    /// Else, returns an error.
+    pub async fn initialize(
+        &mut self,
+        link: EvmLink,
+        chain_id: u32,
+        signer: impl TransactionSigner,
+        minter_address: H160,
+    ) -> anyhow::Result<H256> {
+        match self {
+            BftBridgeContractStatus::None => {}
+            BftBridgeContractStatus::Creating(_, _) => {
+                return Err(anyhow!("creation of BftBridge contract already started"))
+            }
+            BftBridgeContractStatus::Created(_) => {
+                return Err(anyhow!("creation of BftBridge contract already finised"))
+            }
+        };
+
+        let client = link.get_json_rpc_client();
+        let sender = signer.get_address().await?.0;
+        let nonce = client
+            .get_transaction_count(sender, BlockNumber::Latest)
+            .await?;
+        let gas_price = client.gas_price().await?;
+        let mut transaction = bft_bridge_api::deploy_transaction(
+            sender,
+            nonce.into(),
+            gas_price,
+            chain_id,
+            BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
+            minter_address.into(),
+        );
+        let signature = signer.sign_transaction(&(&transaction).into()).await?;
+
+        transaction.r = signature.r.0;
+        transaction.s = signature.s.0;
+        transaction.v = signature.v.0;
+        transaction.hash = transaction.hash();
+
+        let hash = client.send_raw_transaction(transaction).await?;
+
+        *self = BftBridgeContractStatus::Creating(link, hash.into());
+        Ok(hash.into())
+    }
+
+    /// Refreshes the status of the BftBridge contract.
+    /// If current status is `Creating`, tries to get the creation tx result.
+    /// If current status is `None`, returns an error.
+    /// If current status is `Created`, returns Ok.
+    pub async fn refresh(&mut self) -> Result<(), anyhow::Error> {
+        match self.clone() {
+            BftBridgeContractStatus::None => {
+                Err(anyhow!("creation of BftBridge contract not started"))
+            }
+            BftBridgeContractStatus::Creating(link, tx) => {
+                let address = Self::check_creation_tx(link, tx).await?;
+                *self = BftBridgeContractStatus::Created(address);
+                Ok(())
+            }
+            BftBridgeContractStatus::Created(_) => Ok(()),
+        }
+    }
+
+    async fn check_creation_tx(link: EvmLink, tx: H256) -> Result<H160, anyhow::Error> {
+        let client = link.get_json_rpc_client();
+        let receipt = client.get_receipt_by_hash(tx.0).await?;
+        let contract = receipt
+            .contract_address
+            .ok_or_else(|| anyhow!("BftBridge contract not present in receipt"))?;
+        Ok(contract.into())
+    }
+
+    /// Returns `true` if the bft bridge contract status is [`Created`].
+    ///
+    /// [`Created`]: BftBridgeContractStatus::Created
+    #[must_use]
+    pub fn is_created(&self) -> bool {
+        matches!(self, Self::Created(..))
+    }
+
+    /// Returns `true` if the bft bridge contract status is [`None`].
+    ///
+    /// [`None`]: BftBridgeContractStatus::None
+    #[must_use]
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns `true` if the bft bridge contract status is [`Creating`].
+    ///
+    /// [`Creating`]: BftBridgeContractStatus::Creating
+    #[must_use]
+    pub fn is_creating(&self) -> bool {
+        matches!(self, Self::Creating(..))
     }
 }
 
