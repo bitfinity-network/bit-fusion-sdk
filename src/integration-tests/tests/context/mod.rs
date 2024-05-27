@@ -214,10 +214,13 @@ pub trait TestContext {
         })?;
 
         if dbg!(receipt.status.unwrap().0.as_u64()) != 1 {
-            let output = receipt.output.as_ref().map(|out| String::from_utf8_lossy(out));
-            return Err(TestError::Evm(EvmError::Internal(
-                format!("bft bridge creation transaction failed: {output:?}"),
-            )));
+            let output = receipt
+                .output
+                .as_ref()
+                .map(|out| String::from_utf8_lossy(out));
+            return Err(TestError::Evm(EvmError::Internal(format!(
+                "bft bridge creation transaction failed: {output:?}"
+            ))));
         }
 
         let bridge_address = receipt.contract_address.ok_or_else(|| {
@@ -357,7 +360,10 @@ pub trait TestContext {
         sender_ids: &[Id256],
         amount: u128,
     ) -> Result<U256> {
-        let sender_ids = sender_ids.iter().map(|id| Token::FixedBytes(id.0.to_vec())).collect();
+        let sender_ids = sender_ids
+            .iter()
+            .map(|id| Token::FixedBytes(id.0.to_vec()))
+            .collect();
         let input = NATIVE_TOKEN_DEPOSIT
             .encode_input(&[Token::Array(sender_ids)])
             .unwrap();
@@ -483,6 +489,7 @@ pub trait TestContext {
         amount: u128,
         operation_id: u32,
         approve_minted_tokens: Option<ApproveMintedTokens>,
+        fee_payer: Option<H160>,
     ) -> Result<u32> {
         self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
             .await?;
@@ -494,6 +501,7 @@ pub trait TestContext {
             recipient_address: wallet.address().into(),
             operation_id,
             approve_minted_tokens,
+            fee_payer,
         };
 
         Ok(self.minter_client(caller).burn_icrc2(reason).await??)
