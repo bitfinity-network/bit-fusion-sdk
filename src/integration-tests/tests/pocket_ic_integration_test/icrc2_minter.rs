@@ -278,7 +278,9 @@ async fn test_icrc2_tokens_approve_after_mint() {
 
     println!("John address: {john_address:?}");
 
-    let native_deposit_balance = ctx.native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone()).await;
+    let native_deposit_balance = ctx
+        .native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone())
+        .await;
     assert_eq!(native_deposit_balance, native_token_amount.into());
 
     let _operation_id = ctx
