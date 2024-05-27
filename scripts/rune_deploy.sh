@@ -18,6 +18,11 @@
 
 set -e
 
+if [ -z "$(which ord)" ]; then
+  echo "ord is missing; please install ord with: curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s"
+  exit 1
+fi
+
 CHAIN_ID=355113
 
 ORD_DATA=$PWD/target/ord
@@ -26,6 +31,11 @@ RUNE_ID=$(ord -r --data-dir $ORD_DATA --index-runes runes | jq -r .runes.SUPERMA
 rune_id_arr=(${RUNE_ID//:/ })
 RUNE_BLOCK=${rune_id_arr[0]}
 RUNE_TX_ID=${rune_id_arr[1]}
+
+if [ -z "$RUNE_BLOCK" ] || [ -z "$RUNE_TX_ID" ]; then
+  echo "Failed to get rune id"
+  exit 1
+fi
 
 echo "Found rune id: ${RUNE_BLOCK}:${RUNE_TX_ID}"
 
