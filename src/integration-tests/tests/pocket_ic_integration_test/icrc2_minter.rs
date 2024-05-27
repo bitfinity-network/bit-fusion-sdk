@@ -32,7 +32,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let evm_client = ctx.evm_client(ADMIN);
     let john_principal_id = Id256::from(&john());
-    let native_token_amount = 10_u64.pow(15);
+    let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
         bft_bridge.clone(),
@@ -43,8 +43,9 @@ async fn test_icrc2_tokens_roundtrip() {
     .await
     .unwrap();
 
-    eprintln!("burning icrc tokens and creating mint order");
     let john_address: H160 = john_wallet.address().into();
+
+    eprintln!("burning icrc tokens and creating mint order");
     let _operation_id = ctx
         .burn_icrc2(
             JOHN,
@@ -125,7 +126,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     let evm_client = ctx.evm_client(ADMIN);
     let john_principal_id = Id256::from(&john());
-    let native_token_amount = 10_u64.pow(15);
+    let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
         bft_bridge.clone(),
@@ -264,7 +265,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
 
     let evm_client = ctx.evm_client(ADMIN);
     let john_principal_id = Id256::from(&john());
-    let native_token_amount = 10_u64.pow(15);
+    let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
         bft_bridge.clone(),
@@ -274,6 +275,11 @@ async fn test_icrc2_tokens_approve_after_mint() {
     )
     .await
     .unwrap();
+
+    println!("John address: {john_address:?}");
+
+    let native_deposit_balance = ctx.native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone()).await;
+    assert_eq!(native_deposit_balance, native_token_amount.into());
 
     let _operation_id = ctx
         .burn_icrc2(
