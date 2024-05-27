@@ -70,7 +70,12 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         side: BridgeSide,
     ) -> Result<(), SchedulerError> {
-        let client = state.borrow().config.get_evm_info(side).link.get_client();
+        let client = state
+            .borrow()
+            .config
+            .get_evm_info(side)
+            .link
+            .get_json_rpc_client();
         let address = {
             let signer = state.borrow().signer.get().clone();
             signer.get_address().await.into_scheduler_result()?
@@ -103,7 +108,7 @@ impl BridgeTask {
             return Self::init_evm_state(state, side).await;
         };
 
-        let client = evm_info.link.get_client();
+        let client = evm_info.link.get_json_rpc_client();
 
         let logs = BridgeEvent::collect_logs(
             &client,
@@ -313,7 +318,7 @@ impl BridgeTask {
         tx.v = signature.v.0;
         tx.hash = tx.hash();
 
-        let client = evm_info.link.get_client();
+        let client = evm_info.link.get_json_rpc_client();
         client
             .send_raw_transaction(tx)
             .await

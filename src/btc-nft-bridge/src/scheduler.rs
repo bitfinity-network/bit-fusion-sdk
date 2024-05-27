@@ -31,7 +31,7 @@ pub enum NftTask {
 impl NftTask {
     pub async fn init_evm_state() -> Result<(), SchedulerError> {
         let state = get_state();
-        let client = state.borrow().get_evm_info().link.get_client();
+        let client = state.borrow().get_evm_info().link.get_json_rpc_client();
         let address = {
             let signer = state.borrow().signer().get().clone();
             signer.get_address().await.into_scheduler_result()?
@@ -62,7 +62,7 @@ impl NftTask {
             return Ok(());
         };
 
-        let client = evm_info.link.get_client();
+        let client = evm_info.link.get_json_rpc_client();
 
         let logs = BridgeEvent::collect_logs(
             &client,

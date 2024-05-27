@@ -197,7 +197,7 @@ async fn send_mint_order(
     tx.v = signature.v.0;
     tx.hash = tx.hash();
 
-    let client = evm_info.link.get_client();
+    let client = evm_info.link.get_json_rpc_client();
     let id = client
         .send_raw_transaction(tx)
         .await

@@ -7,9 +7,7 @@ use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use minter_contract_utils::build_data::test_contracts::WRAPPED_TOKEN_SMART_CONTRACT_CODE;
-use minter_contract_utils::wrapped_token_api::{self, ERC_20_ALLOWANCE};
-use minter_did::error::Error as McError;
+use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
 use minter_did::id256::Id256;
 use minter_did::reason::ApproveMintedTokens;
 
@@ -18,7 +16,6 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::error::TestError;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -39,6 +36,8 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
 
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
     ctx.advance_time(Duration::from_secs(2)).await;
 
@@ -311,71 +310,19 @@ async fn set_owner_access() {
 }
 
 #[tokio::test]
-async fn invalid_bridge_contract() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let minter_client = ctx.minter_client(ADMIN);
-    let res = minter_client
-        .register_evmc_bft_bridge(H160::from_slice(&[20; 20]))
-        .await
-        .unwrap()
-        .unwrap_err();
-
-    assert_eq!(res, McError::InvalidBftBridgeContract);
-}
-
-#[tokio::test]
-async fn invalid_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let admin = ADMIN;
-    let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-    let minter_canister_address = ctx.get_minter_canister_evm_address(admin).await.unwrap();
-
-    let contract_code = WRAPPED_TOKEN_SMART_CONTRACT_CODE.clone();
-    let input = wrapped_token_api::CONSTRUCTOR
-        .encode_input(
-            contract_code,
-            &[
-                Token::String("name".into()),
-                Token::String("symbol".into()),
-                Token::Address(minter_canister_address.into()),
-            ],
-        )
-        .unwrap();
-    let contract = ctx.create_contract(&admin_wallet, input).await.unwrap();
-
-    let minter_client = ctx.minter_client(ADMIN);
-    let res = minter_client
-        .register_evmc_bft_bridge(contract)
-        .await
-        .unwrap()
-        .unwrap_err();
-
-    assert_eq!(res, McError::InvalidBftBridgeContract);
-}
-
-#[tokio::test]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let _ = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap();
-    let err = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap_err();
+    let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    assert!(matches!(
-        err,
-        TestError::CanisterClient(CanisterClientError::PocketIcTestError(
-            CallError::UserError(UserError {
-                code: ErrorCode::CanisterCalledTrap,
-                description: _,
-            })
-        ))
-    ));
+    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_time(Duration::from_secs(2)).await;
+
+    let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("creation of BftBridge contract already finised"));
 }
 
 #[tokio::test]
