@@ -1656,8 +1656,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1671,7 +1671,6 @@ dependencies = [
  "ic-stable-structures 0.16.0",
  "jsonrpc-core",
  "log",
- "murmur3",
  "num",
  "once_cell",
  "rlp",
@@ -1954,8 +1953,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "async-trait",
  "candid",
@@ -2005,8 +2004,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "anyhow",
  "candid",
@@ -2015,7 +2014,7 @@ dependencies = [
  "hex",
  "ic-canister-client",
  "ic-exports",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "jsonrpc-core",
  "log",
  "reqwest 0.12.4",
@@ -2070,8 +2069,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "candid",
  "did",
@@ -5616,8 +5615,8 @@ dependencies = [
 
 [[package]]
 name = "icrc-client"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -5896,6 +5895,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -6274,8 +6282,8 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "candid",
  "did",
@@ -6313,8 +6321,8 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "candid",
  "did",
@@ -6399,12 +6407,6 @@ name = "multimap"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defc4c55412d89136f966bbb339008b474350e5e6e78d2714439c386b3137a03"
-
-[[package]]
-name = "murmur3"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9252111cf132ba0929b6f8e030cac2a24b507f3a4d6db6fb2896f27b354c714b"
 
 [[package]]
 name = "nix"
@@ -8422,8 +8424,8 @@ dependencies = [
 
 [[package]]
 name = "signature-verification-canister-client"
-version = "0.19.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.19.x#4e476d83da1fad4aff8af3ffc7e7fb682e948205"
+version = "0.20.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.20.x#412ef68c54787a61b3866787a0de6be287067f2a"
 dependencies = [
  "candid",
  "did",
