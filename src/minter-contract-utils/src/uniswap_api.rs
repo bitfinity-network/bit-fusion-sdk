@@ -12,7 +12,7 @@ pub static UNISWAP_FACTORY_CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constru
     }],
 });
 
-#[allow(deprecated)] // need to initialize `constant` field
+#[allow(deprecated)] // need to initialize `constant`  field
 pub static UNISWAP_FACTORY_CREATE_PAIR: Lazy<Function> = Lazy::new(|| Function {
     name: "createPair".into(),
     inputs: vec![
