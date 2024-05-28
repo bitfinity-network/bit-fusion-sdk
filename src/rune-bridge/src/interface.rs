@@ -1,8 +1,10 @@
+use crate::rune_info::RuneName;
 use candid::CandidType;
 use did::H256;
 use minter_did::order::SignedMintOrder;
 use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub struct PendingUtxo {}
@@ -62,8 +64,14 @@ pub struct DepositResponse {
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub enum DepositError {
-    NotingToDeposit,
+    NotInitialized,
+    NotScheduled,
+    NothingToDeposit,
     NoRunesToDeposit,
+    InvalidAmounts {
+        requested: HashMap<RuneName, u128>,
+        actual: HashMap<RuneName, u128>,
+    },
     NotEnoughBtc {
         received: u64,
         minimum: u64,
@@ -75,7 +83,6 @@ pub enum DepositError {
     },
     /// Error while signing the mint order.
     Sign(String),
-    NotInitialized,
     Evm(String),
 }
 

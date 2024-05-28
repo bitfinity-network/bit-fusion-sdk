@@ -33,4 +33,8 @@ impl MintOrdersStore {
     pub fn remove(&mut self, sender: Id256, nonce: u32) {
         self.0.remove(sender, SRC_TOKEN, nonce);
     }
+
+    pub fn get(&self, sender: Id256) -> Vec<(u32, SignedMintOrder)> {
+        self.0.get_all(sender, SRC_TOKEN)
+    }
 }

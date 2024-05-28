@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::str::FromStr;
 
 use bitcoin::Address;
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -16,7 +17,8 @@ use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
-use crate::canister::get_state;
+use crate::canister::{get_core, get_state};
+use crate::core::withdrawal::Withdrawal;
 
 pub type TasksStorage =
     StableUnboundedMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -27,6 +29,7 @@ pub type PersistentScheduler = Scheduler<RuneBridgeTask, TasksStorage>;
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
+    Deposit { eth_dst_address: H160 },
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
 }
@@ -163,6 +166,18 @@ impl Task for RuneBridgeTask {
         match self {
             RuneBridgeTask::InitEvmState => Box::pin(Self::init_evm_state()),
             RuneBridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
+            RuneBridgeTask::Deposit { eth_dst_address } => {
+                let eth_dst_address = eth_dst_address.clone();
+                Box::pin(async move {
+                    log::info!("Running deposit operation for ETH address {eth_dst_address}");
+                    let result = get_core()
+                        .run_scheduled_deposit(eth_dst_address.clone())
+                        .await;
+                    log::info!("Deposit operation for address {eth_dst_address} finished with result: {result:?}");
+
+                    Ok(())
+                })
+            }
             RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
@@ -171,6 +186,7 @@ impl Task for RuneBridgeTask {
                 recipient_id,
                 amount,
                 to_token,
+                sender,
                 ..
             }) => {
                 log::info!("ERC20 burn event received");
@@ -203,15 +219,13 @@ impl Task for RuneBridgeTask {
                     )));
                 };
 
+                let sender = sender.clone();
                 Box::pin(async move {
-                    let tx_id = crate::ops::withdraw(
-                        &get_state(),
-                        amount,
-                        rune_id,
-                        address.assume_checked(),
-                    )
-                    .await
-                    .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
+                    let withdrawal = Withdrawal::new(get_state());
+                    let tx_id = withdrawal
+                        .withdraw(amount, rune_id, sender, address.assume_checked())
+                        .await
+                        .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
                     log::info!("Created withdrawal transaction: {tx_id}",);
 

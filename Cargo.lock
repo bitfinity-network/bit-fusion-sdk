@@ -7768,6 +7768,7 @@ dependencies = [
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
+ "evm-canister-client",
  "futures",
  "hex",
  "ic-canister",
@@ -7787,6 +7788,7 @@ dependencies = [
  "ordinals",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

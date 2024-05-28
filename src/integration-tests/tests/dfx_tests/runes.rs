@@ -41,8 +41,9 @@ fn get_rune_info(name: &str) -> RuneInfo {
         .expect("failed to run 'ord' cli tool");
     if !output.status.success() {
         panic!(
-            "'ord' list runes command exited with status {}",
-            output.status
+            "'ord' list runes command exited with status {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout)
         )
     }
 
@@ -78,6 +79,7 @@ impl RunesContext {
             min_confirmations: 1,
             indexer_url: "https://localhost:8001".to_string(),
             deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
         };
         context
             .install_canister(
@@ -277,7 +279,7 @@ impl RunesContext {
                 .await
                 .expect("canister call failed")
             {
-                Err(DepositError::NotingToDeposit) | Err(DepositError::NotEnoughBtc { .. }) => {
+                Err(DepositError::NothingToDeposit) | Err(DepositError::NotEnoughBtc { .. }) => {
                     retry_count += 1
                 }
                 Ok(statuses) => match &statuses[0] {
@@ -297,7 +299,7 @@ impl RunesContext {
             }
         }
 
-        Err(DepositError::NotingToDeposit)
+        Err(DepositError::NothingToDeposit)
     }
 
     async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {

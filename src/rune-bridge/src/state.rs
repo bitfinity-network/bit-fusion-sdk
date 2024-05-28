@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
 use bitcoin::{Network, PrivateKey, PublicKey};
@@ -17,7 +18,7 @@ use minter_contract_utils::evm_link::EvmLink;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
 
-use crate::key::IcBtcSigner;
+use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::orders_store::MintOrdersStore;
@@ -27,16 +28,18 @@ use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
+const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
 
 pub struct State {
-    config: RuneBridgeConfig,
-    bft_config: BftBridgeConfig,
-    signer: SignerStorage,
-    orders_store: MintOrdersStore,
-    evm_params: Option<EvmParams>,
-    master_key: Option<MasterKey>,
-    ledger: UtxoLedger,
-    runes: HashMap<RuneName, RuneInfo>,
+    pub(crate) config: RuneBridgeConfig,
+    pub(crate) bft_config: BftBridgeConfig,
+    pub(crate) signer: SignerStorage,
+    pub(crate) orders_store: MintOrdersStore,
+    pub(crate) evm_params: Option<EvmParams>,
+    pub(crate) master_key: Option<MasterKey>,
+    pub(crate) ledger: UtxoLedger,
+    pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    pub(crate) scheduled_deposits: HashMap<H160, ScheduledDeposit>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +47,14 @@ pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
     pub key_id: EcdsaKeyId,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScheduledDeposit {
+    pub task_id: u32,
+    pub at_timestamp: u64,
+    pub eth_dst_address: H160,
+    pub amounts: Option<HashMap<RuneName, u128>>,
 }
 
 impl Default for State {
@@ -69,6 +80,7 @@ impl Default for State {
             master_key: None,
             ledger: Default::default(),
             runes: Default::default(),
+            scheduled_deposits: Default::default(),
         }
     }
 }
@@ -83,6 +95,7 @@ pub struct RuneBridgeConfig {
     pub min_confirmations: u32,
     pub indexer_url: String,
     pub deposit_fee: u64,
+    pub mempool_timeout: Duration,
 }
 
 impl Default for RuneBridgeConfig {
@@ -98,6 +111,7 @@ impl Default for RuneBridgeConfig {
             min_confirmations: 12,
             indexer_url: String::new(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
+            mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
         }
     }
 }
@@ -186,16 +200,20 @@ impl State {
         self.master_key.clone().expect("ecdsa is not initialized")
     }
 
-    /// Wallet to be used to sign transactions with the given derivation path.
-    pub fn wallet(&self) -> Wallet {
+    pub fn btc_signer(&self) -> BtcSignerType {
         match &self.config.signing_strategy {
-            SigningStrategy::Local { private_key } => Wallet::new_with_signer(LocalSigner::new(
+            SigningStrategy::Local { private_key } => BtcSignerType::Local(LocalSigner::new(
                 PrivateKey::from_slice(private_key, self.network()).expect("invalid private key"),
             )),
             SigningStrategy::ManagementCanister { .. } => {
-                Wallet::new_with_signer(IcBtcSigner::new(self.master_key(), self.network()))
+                BtcSignerType::Ic(IcBtcSigner::new(self.master_key(), self.network()))
             }
         }
+    }
+
+    /// Wallet to be used to sign transactions with the given derivation path.
+    pub fn wallet(&self) -> Wallet {
+        Wallet::new_with_signer(self.btc_signer())
     }
 
     /// BTC fee in SATs for a deposit request.
@@ -320,6 +338,18 @@ impl State {
     /// Mutable reference to the signed mint orders store.
     pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
         &mut self.orders_store
+    }
+
+    pub fn scheduled_deposits(&self) -> &HashMap<H160, ScheduledDeposit> {
+        &self.scheduled_deposits
+    }
+
+    pub fn scheduled_deposits_mut(&mut self) -> &mut HashMap<H160, ScheduledDeposit> {
+        &mut self.scheduled_deposits
+    }
+
+    pub fn mempool_timeout(&self) -> Duration {
+        self.config.mempool_timeout
     }
 }
 
