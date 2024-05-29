@@ -1,7 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use did::H160;
+use crate::canister::get_state;
+use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -10,12 +11,13 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
+use jsonrpc_core::serde_json;
+use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::query::{self, QueryType};
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
-
-use crate::canister::get_state;
 
 pub type TasksStorage =
     StableUnboundedMap<u32, InnerScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -105,6 +107,47 @@ impl BtcTask {
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
+        // Update the EvmParams
+        let address = {
+            let signer = state.borrow().signer().get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+
+        let mut data = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = data
+            .remove(&Id::Str("nonce".into()))
+            .and_then(|nonce| serde_json::from_value(nonce).ok())
+            .ok_or(SchedulerError::TaskExecutionFailed(
+                "Nonce not found in response".into(),
+            ))?;
+
+        let gas_price: U256 = data
+            .remove(&Id::Str("gasPrice".into()))
+            .and_then(|gas_price| serde_json::from_value(gas_price).ok())
+            .ok_or(SchedulerError::TaskExecutionFailed(
+                "Gas price not found in response".into(),
+            ))?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price: gas_price.into(),
+            ..params
+        };
+
+        state
+            .borrow_mut()
+            .update_evm_params(|old| *old = Some(params));
         Ok(())
     }
 

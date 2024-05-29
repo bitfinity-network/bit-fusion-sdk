@@ -1,24 +1,19 @@
 use core::fmt;
-use std::collections::HashMap;
 
 use anyhow::anyhow;
 use candid::CandidType;
 use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
-use ethers_core::types::{BlockNumber, Log, U256 as EthU256};
-use jsonrpc_core::{serde_json, Call, Id, MethodCall, Output, Params, Request, Response, Version};
+use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
+use ethers_core::types::{BlockNumber, U256 as EthU256};
+use jsonrpc_core::{serde_json, Id};
 use serde::{Deserialize, Serialize};
 
-use crate::bft_bridge_api::{self, BURNT_EVENT, MINTED_EVENT};
+use crate::bft_bridge_api;
 use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
 
-macro_rules! make_params_array {
-    ($($items:expr),*) => {
-        Params::Array(vec![$(serde_json::to_value($items)?, )*])
-    };
-}
+use crate::query::{self, batch_query, QueryType};
 
 /// Determined side of the bridge.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -78,11 +73,33 @@ impl EvmParams {
         evm_client: EthJsonRpcClient<impl Client>,
         address: H160,
     ) -> anyhow::Result<Self> {
-        let chain_id = evm_client.get_chain_id().await?;
-        let next_block = evm_client.get_block_number().await?;
-        let nonce = evm_client
-            .get_transaction_count(address.0, BlockNumber::Latest)
-            .await?;
+        let mut response = batch_query(
+            &evm_client,
+            &[
+                QueryType::ChainID,
+                QueryType::LatestBlock,
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+            ],
+        )
+        .await?;
+
+        let chain_id: u64 = response
+            .remove(&Id::Str("chainID".into()))
+            .ok_or_else(|| anyhow!("Chain ID not found in response"))?
+            .as_u64()
+            .ok_or_else(|| anyhow!("Chain ID is not a number"))?;
+
+        let next_block: U256 = response
+            .remove(&Id::Str("latestBlock".into()))
+            .and_then(|block| serde_json::from_value(block).ok())
+            .ok_or_else(|| anyhow!("Next block not found in response"))?;
+
+        let nonce: U256 = response
+            .remove(&Id::Str("nonce".into()))
+            .and_then(|nonce| serde_json::from_value(nonce).ok())
+            .ok_or_else(|| anyhow!("Nonce not found in response"))?;
 
         // TODO: Improve gas price selection strategy. https://infinityswap.atlassian.net/browse/EPROD-738
         let latest_block = evm_client
@@ -105,8 +122,8 @@ impl EvmParams {
 
         Ok(Self {
             chain_id,
-            next_block,
-            nonce,
+            next_block: next_block.0.as_u64(),
+            nonce: nonce.0.as_u64(),
             gas_price,
         })
     }
@@ -122,7 +139,7 @@ pub enum BftBridgeContractStatus {
 }
 
 impl BftBridgeContractStatus {
-    /// Starts Contract initialization if currenst status is None.
+    /// Starts Contract initialization if current status is None.
     /// Else, returns an error.
     pub async fn initialize(
         &mut self,
@@ -137,20 +154,32 @@ impl BftBridgeContractStatus {
                 return Err(anyhow!("creation of BftBridge contract already started"))
             }
             BftBridgeContractStatus::Created(_) => {
-                return Err(anyhow!("creation of BftBridge contract already finised"))
+                return Err(anyhow!("creation of BftBridge contract already finished"))
             }
         };
 
         let client = link.get_json_rpc_client();
         let sender = signer.get_address().await?.0;
-        let nonce = client
-            .get_transaction_count(sender, BlockNumber::Latest)
-            .await?;
-        let gas_price = client.gas_price().await?;
+
+        let mut data = query::batch_query(
+            &client,
+            &[QueryType::Nonce { address: sender }, QueryType::GasPrice],
+        )
+        .await?;
+
+        let nonce: U256 = data
+            .remove(&Id::Str("nonce".into()))
+            .and_then(|nonce| serde_json::from_value(nonce.clone()).ok())
+            .ok_or_else(|| anyhow!("Nonce not found in response"))?;
+        let gas_price: U256 = data
+            .remove(&Id::Str("gasPrice".into()))
+            .and_then(|gas_price| serde_json::from_value(gas_price.clone()).ok())
+            .ok_or_else(|| anyhow!("Gas price not found in response"))?;
+
         let mut transaction = bft_bridge_api::deploy_transaction(
             sender,
             nonce.into(),
-            gas_price,
+            gas_price.into(),
             chain_id,
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
             minter_address.into(),
@@ -217,102 +246,5 @@ impl BftBridgeContractStatus {
     #[must_use]
     pub fn is_creating(&self) -> bool {
         matches!(self, Self::Creating(..))
-    }
-}
-
-/// `EvmData` contains data related to an Ethereum Virtual Machine (EVM)
-/// transaction
-pub struct EvmData {
-    pub nonce: U256,
-    pub gas_price: U256,
-    pub events: Vec<Log>,
-}
-
-impl EvmData {
-    /// Queries the EVM bridge contract for relevant events within the specified block range.
-    ///
-    /// # Arguments
-    /// - `evm_client`: The EVM client to use for making the RPC requests.
-    /// - `bridge_contract`: The address of the bridge contract to query.
-    /// - `address`: The address to query the nonce and gas price for.
-    /// - `from_block`: The starting block number to query events from.
-    /// - `to_block`: The ending block number to query events to.
-    ///
-    /// # Returns
-    /// An `EvmData` struct containing the nonce, gas price, and relevant events.
-    pub async fn query(
-        evm_client: EvmLink,
-        bridge_contract: H160,
-        address: H160,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> anyhow::Result<Self> {
-        let evm_client = evm_client.get_client();
-
-        let calls = vec![
-            Call::MethodCall(MethodCall {
-                jsonrpc: Some(Version::V2),
-                method: "eth_getTransactionCount".into(),
-                params: make_params_array!(address.0, BlockNumber::Latest),
-                id: Id::Str("nonce".into()),
-            }),
-            Call::MethodCall(MethodCall {
-                jsonrpc: Some(Version::V2),
-                method: "eth_gasPrice".into(),
-                params: Params::Array(vec![]),
-                id: Id::Str("gasPrice".into()),
-            }),
-            Call::MethodCall(MethodCall {
-                jsonrpc: Some(Version::V2),
-                method: "eth_getLogs".into(),
-                params: Params::Array(vec![serde_json::to_value(EthGetLogsParams {
-                    address: Some(vec![bridge_contract.into()]),
-                    from_block,
-                    to_block,
-                    topics: Some(vec![vec![
-                        BURNT_EVENT.signature(),
-                        MINTED_EVENT.signature(),
-                    ]]),
-                })?]),
-                id: Id::Str("events".into()),
-            }),
-        ];
-
-        let request = Request::Batch(calls);
-        let Response::Batch(responses) = evm_client.send_rpc_request(request).await? else {
-            return Err(anyhow::anyhow!("Unexpected response format"));
-        };
-
-        let mut response_map = HashMap::new();
-        for response in responses {
-            if let Output::Success(success) = response {
-                response_map.insert(success.id, success.result);
-            } else {
-                return Err(anyhow::anyhow!("Failed to process response"));
-            }
-        }
-
-        let nonce = response_map
-            .remove(&Id::Str("nonce".into()))
-            .ok_or_else(|| anyhow::anyhow!("Nonce not found in response"))?;
-        let nonce = serde_json::from_value(nonce)?;
-
-        let gas_price = response_map
-            .remove(&Id::Str("gasPrice".into()))
-            .ok_or_else(|| anyhow::anyhow!("Gas price not found in response"))?;
-
-        let gas_price = serde_json::from_value(gas_price)?;
-
-        let events = response_map
-            .remove(&Id::Str("events".into()))
-            .ok_or_else(|| anyhow::anyhow!("Events not found in response"))?;
-
-        let events = serde_json::from_value(events)?;
-
-        Ok(Self {
-            nonce,
-            gas_price,
-            events,
-        })
     }
 }

@@ -59,10 +59,7 @@ impl MinterCanister {
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 // Tasks to collect EVMs events
-                let tasks = vec![
-                    Self::collect_evm_events_task(),
-                    Self::collect_evm_events_task(),
-                ];
+                let tasks = vec![Self::collect_evm_events_task()];
 
                 get_scheduler().borrow_mut().append_tasks(tasks);
 

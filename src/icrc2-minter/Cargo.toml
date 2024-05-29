@@ -19,6 +19,7 @@ ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
 ] }
 evm-canister-client = { workspace = true }
+jsonrpc-core = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }

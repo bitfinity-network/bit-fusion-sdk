@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use candid::{Nat, Principal};
+use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -13,8 +14,10 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use icrc_client::transfer::TransferError;
+use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::query::{self, QueryType};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
@@ -23,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use crate::constant::IC_CHAIN_ID;
 use crate::state::State;
 use crate::tokens::icrc2;
+
+use jsonrpc_core::serde_json;
 
 type SignedMintOrderData = Vec<u8>;
 type ShouldSendMintTx = bool;
@@ -154,6 +159,46 @@ impl BridgeTask {
         log::trace!("appending logs to tasks: {logs:?}");
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
+
+        // Update the EvmParams
+        let address = {
+            let signer = state.borrow().signer.get_transaction_signer();
+            signer.get_address().await.into_scheduler_result()?
+        };
+
+        let mut data = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = data
+            .remove(&Id::Str("nonce".into()))
+            .and_then(|nonce| serde_json::from_value(nonce).ok())
+            .ok_or(SchedulerError::TaskExecutionFailed(
+                "Nonce not found in response".into(),
+            ))?;
+
+        let gas_price: U256 = data
+            .remove(&Id::Str("gasPrice".into()))
+            .and_then(|gas_price| serde_json::from_value(gas_price).ok())
+            .ok_or(SchedulerError::TaskExecutionFailed(
+                "Gas price not found in response".into(),
+            ))?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price: gas_price.into(),
+            ..params
+        };
+
+        mut_state.config.update_evm_params(|p| *p = params);
 
         Ok(())
     }
@@ -291,47 +336,70 @@ impl BridgeTask {
                 "Bridge contract is not set".into(),
             ));
         };
-        let Some(evm_params) = state.borrow().config.get_evm_params() else {
+        let Some(mut evm_params) = state.borrow().config.get_evm_params() else {
             log::warn!("No evm parameters set");
             return Err(SchedulerError::TaskExecutionFailed(
                 "No evm parameters set".into(),
             ));
         };
 
-        let client = state.borrow().config.get_evm_client();
-        let nonce = client
-            .get_transaction_count(sender.0, BlockNumber::Latest)
-            .await
-            .into_scheduler_result()?;
-
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,
-            nonce.into(),
-            evm_params.gas_price.into(),
+            evm_params.nonce.into(),
+            evm_params.gas_price.clone().into(),
             order_data,
             evm_params.chain_id as _,
         );
 
-        let signature = signer
-            .sign_transaction(&(&tx).into())
-            .await
-            .into_scheduler_result()?;
-        tx.r = signature.r.0;
-        tx.s = signature.s.0;
-        tx.v = signature.v.0;
-        tx.hash = tx.hash();
+        async fn sign_and_update_tx(
+            signer: &impl TransactionSigner,
+            tx: &mut ethers_core::types::Transaction,
+        ) -> Result<(), SchedulerError> {
+            let signature = signer
+                .sign_transaction(&(&*tx).into())
+                .await
+                .into_scheduler_result()?;
+            tx.r = signature.r.0;
+            tx.s = signature.s.0;
+            tx.v = signature.v.0;
+            tx.hash = tx.hash();
+            Ok(())
+        }
 
-        let client = state.borrow().config.get_evm_client();
-        client
-            .send_raw_transaction(tx)
+        sign_and_update_tx(&signer, &mut tx).await?;
+
+        let client = state.borrow().config.get_evm_canister_client();
+        let res = client
+            .send_raw_transaction(tx.clone().into())
             .await
             .into_scheduler_result()?;
+
+        match res {
+            Ok(_) => {
+                evm_params.nonce += 1;
+            }
+            Err(EvmError::TransactionPool(TransactionPoolError::InvalidNonce {
+                expected,
+                actual,
+            })) => {
+                log::warn!("Nonce error: expected {expected}, got {actual}. Retrying...");
+                tx.nonce = expected.0;
+                evm_params.nonce = expected.0.as_u64();
+                sign_and_update_tx(&signer, &mut tx).await?;
+                client
+                    .send_raw_transaction(tx.clone().into())
+                    .await
+                    .into_scheduler_result()?
+                    .into_scheduler_result()?;
+            }
+            Err(e) => return Err(SchedulerError::TaskExecutionFailed(e.to_string())),
+        }
 
         state
             .borrow_mut()
             .config
-            .update_evm_params(|p| p.nonce += 1);
+            .update_evm_params(|p| *p = evm_params);
 
         log::trace!("Mint transaction sent");
 

@@ -5701,6 +5701,7 @@ dependencies = [
  "ic-storage",
  "ic-task-scheduler",
  "icrc-client",
+ "jsonrpc-core",
  "log",
  "minter-contract-utils",
  "minter-did",
