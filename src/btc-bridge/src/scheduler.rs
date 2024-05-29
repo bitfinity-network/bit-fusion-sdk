@@ -11,7 +11,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use jsonrpc_core::serde_json;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
@@ -31,6 +30,7 @@ pub enum BtcTask {
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
     MintErc20(H160),
+    UpdateEvmParams,
 }
 
 impl BtcTask {
@@ -107,40 +107,6 @@ impl BtcTask {
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
-        // Update the EvmParams
-        let address = {
-            let signer = state.borrow().signer().get().clone();
-            signer.get_address().await.into_scheduler_result()?
-        };
-
-        let responses = query::batch_query(
-            &client,
-            &[
-                QueryType::Nonce {
-                    address: address.into(),
-                },
-                QueryType::GasPrice,
-            ],
-        )
-        .await
-        .into_scheduler_result()?;
-
-        let nonce: U256 = responses
-            .get_value_by_id(Id::Str(NONCE_ID.into()))
-            .into_scheduler_result()?;
-        let gas_price: U256 = responses
-            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
-            .into_scheduler_result()?;
-
-        let params = EvmParams {
-            nonce: nonce.0.as_u64(),
-            gas_price: gas_price.into(),
-            ..params
-        };
-
-        state
-            .borrow_mut()
-            .update_evm_params(|old| *old = Some(params));
         Ok(())
     }
 
@@ -189,6 +155,55 @@ impl BtcTask {
 
         Ok(())
     }
+
+    pub async fn update_evm_params() -> Result<(), SchedulerError> {
+        let state = get_state();
+        let evm_info = state.borrow().get_evm_info();
+
+        let Some(initial_params) = evm_info.params else {
+            log::warn!("no evm params initialized");
+            return Ok(());
+        };
+
+        let address = {
+            let signer = state.borrow().signer.get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &evm_info.link.get_json_rpc_client(),
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        state
+            .borrow_mut()
+            .update_evm_params(|old| *old = Some(params));
+
+        log::trace!("evm params updated");
+
+        Ok(())
+    }
 }
 
 impl Task for BtcTask {
@@ -209,6 +224,11 @@ impl Task for BtcTask {
                     let result = crate::ops::btc_to_erc20(get_state(), address).await;
 
                     log::info!("ERC20 mint result from scheduler: {result:?}");
+
+                    //Update the EvmParams
+                    task_scheduler.append_task(
+                        BtcTask::UpdateEvmParams.into_scheduled(TaskOptions::default()),
+                    );
 
                     Ok(())
                 })
@@ -246,6 +266,7 @@ impl Task for BtcTask {
                     Ok(())
                 })
             }
+            BtcTask::UpdateEvmParams => Box::pin(Self::update_evm_params()),
         }
     }
 }

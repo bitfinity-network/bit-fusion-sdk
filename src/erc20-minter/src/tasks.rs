@@ -6,7 +6,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use jsonrpc_core::serde_json;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
@@ -31,6 +30,7 @@ pub enum BridgeTask {
     PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData, BridgeSide),
+    UpdateEvmParams(BridgeSide),
 }
 
 impl Task for BridgeTask {
@@ -59,6 +59,7 @@ impl Task for BridgeTask {
             BridgeTask::SendMintTransaction(order_data, side) => Box::pin(
                 Self::send_mint_transaction(state, order_data.clone(), *side),
             ),
+            BridgeTask::UpdateEvmParams(side) => Box::pin(Self::update_evm_params(state, *side)),
         }
     }
 }
@@ -124,14 +125,13 @@ impl BridgeTask {
 
         log::debug!("got logs from side {side}: {logs:?}");
 
-        let mut mut_state = state.borrow_mut();
-
         // Filter out logs that do not have block number.
         // Such logs are produced when the block is not finalized yet.
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state
+            state
+                .borrow_mut()
                 .config
                 .update_evm_params(|params| params.next_block = next_block_number, side);
         };
@@ -144,41 +144,9 @@ impl BridgeTask {
                 .collect(),
         );
 
-        // Update the EvmParams
-        let address = {
-            let signer = state.borrow().signer.get().clone();
-            signer.get_address().await.into_scheduler_result()?
-        };
-
-        let responses = query::batch_query(
-            &client,
-            &[
-                QueryType::Nonce {
-                    address: address.into(),
-                },
-                QueryType::GasPrice,
-            ],
-        )
-        .await
-        .into_scheduler_result()?;
-
-        let nonce: U256 = responses
-            .get_value_by_id(Id::Str(NONCE_ID.into()))
-            .into_scheduler_result()?;
-        let gas_price: U256 = responses
-            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
-            .into_scheduler_result()?;
-
-        let params = EvmParams {
-            nonce: nonce.0.as_u64(),
-            gas_price: gas_price.into(),
-            ..params
-        };
-
-        state
-            .borrow_mut()
-            .config
-            .update_evm_params(|old| *old = params, side);
+        // Update the EVM params
+        scheduler
+            .append_task(BridgeTask::UpdateEvmParams(side).into_scheduled(TaskOptions::default()));
 
         Ok(())
     }
@@ -260,6 +228,11 @@ impl BridgeTask {
         scheduler.append_task(
             BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec(), burn_side.other())
                 .into_scheduled(options),
+        );
+
+        // Update the EVM params
+        scheduler.append_task(
+            BridgeTask::UpdateEvmParams(burn_side).into_scheduled(TaskOptions::default()),
         );
 
         log::trace!("Mint order added");
@@ -364,6 +337,57 @@ impl BridgeTask {
             .into_scheduler_result()?;
 
         log::trace!("Mint transaction sent");
+
+        Ok(())
+    }
+
+    pub async fn update_evm_params(
+        state: Rc<RefCell<State>>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        let evm_info = state.borrow().config.get_evm_info(side);
+
+        let initial_params = state
+            .borrow()
+            .config
+            .get_evm_params(side)
+            .into_scheduler_result()?;
+        let address = {
+            let signer = state.borrow().signer.get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &evm_info.link.get_json_rpc_client(),
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        state
+            .borrow_mut()
+            .config
+            .update_evm_params(|p| *p = params, side);
+        log::trace!("evm params updated");
 
         Ok(())
     }

@@ -89,6 +89,11 @@ impl RuneBridgeTask {
             return Ok(());
         }
 
+        let address = {
+            let signer = state.borrow().signer().get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+
         let mut mut_state = state.borrow_mut();
 
         // Filter out logs that do not have block number.
@@ -108,10 +113,6 @@ impl RuneBridgeTask {
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
         // Update the EvmParams
-        let address = {
-            let signer = state.borrow().signer().get().clone();
-            signer.get_address().await.into_scheduler_result()?
-        };
 
         let responses = query::batch_query(
             &client,
@@ -138,9 +139,7 @@ impl RuneBridgeTask {
             ..params
         };
 
-        state
-            .borrow_mut()
-            .update_evm_params(|old| *old = Some(params));
+        mut_state.update_evm_params(|old| *old = Some(params));
 
         Ok(())
     }

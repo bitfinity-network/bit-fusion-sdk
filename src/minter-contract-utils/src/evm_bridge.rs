@@ -6,7 +6,7 @@ use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber, U256 as EthU256};
-use jsonrpc_core::{serde_json, Id};
+use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::bft_bridge_api;
@@ -87,7 +87,7 @@ impl EvmParams {
         )
         .await?;
 
-        let chain_id = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
+        let chain_id: U256 = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
         let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
         let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
 
@@ -111,7 +111,7 @@ impl EvmParams {
         };
 
         Ok(Self {
-            chain_id,
+            chain_id: chain_id.0.as_u64(),
             next_block: next_block.0.as_u64(),
             nonce: nonce.0.as_u64(),
             gas_price,
@@ -151,7 +151,7 @@ impl BftBridgeContractStatus {
         let client = link.get_json_rpc_client();
         let sender = signer.get_address().await?.0;
 
-        let mut responses = query::batch_query(
+        let responses = query::batch_query(
             &client,
             &[QueryType::Nonce { address: sender }, QueryType::GasPrice],
         )
