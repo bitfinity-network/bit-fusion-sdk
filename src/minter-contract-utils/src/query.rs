@@ -2,11 +2,18 @@ use std::collections::HashMap;
 
 use anyhow::anyhow;
 
+use did::BlockNumber;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::types::H160;
 use jsonrpc_core::{Call, Id, MethodCall, Output, Params, Request, Response, Value, Version};
 
 use jsonrpc_core::serde_json;
+use serde::de::DeserializeOwned;
+
+pub const CHAINID_ID: &str = "chainID";
+pub const GAS_PRICE_ID: &str = "gasPrice";
+pub const LATEST_BLOCK_ID: &str = "latestBlock";
+pub const NONCE_ID: &str = "nonce";
 
 /// Represents different types of queries that can be made to an EVM node
 pub enum QueryType {
@@ -19,14 +26,17 @@ pub enum QueryType {
 impl QueryType {
     fn to_method_call(&self) -> Call {
         let (method, params, id) = match self {
-            QueryType::GasPrice => ("eth_gasPrice", vec![], "gasPrice"),
+            QueryType::GasPrice => ("eth_gasPrice", vec![], GAS_PRICE_ID),
             QueryType::Nonce { address } => (
                 "eth_getTransactionCount",
-                vec![serde_json::to_value(address).expect("should be able to convert")],
-                "nonce",
+                vec![
+                    serde_json::to_value(address).expect("should be able to convert"),
+                    serde_json::to_value(BlockNumber::Pending).expect("should be able to convert"),
+                ],
+                NONCE_ID,
             ),
-            QueryType::LatestBlock => ("eth_blockNumber", vec![], "latestBlock"),
-            QueryType::ChainID => ("eth_chainId", vec![], "chainID"),
+            QueryType::LatestBlock => ("eth_blockNumber", vec![], LATEST_BLOCK_ID),
+            QueryType::ChainID => ("eth_chainId", vec![], CHAINID_ID),
         };
 
         Call::MethodCall(MethodCall {
@@ -62,4 +72,20 @@ pub async fn batch_query(
     }
 
     Ok(response_map)
+}
+
+pub trait Query {
+    fn get_value_by_id<R: DeserializeOwned>(&self, id: Id) -> anyhow::Result<R>;
+}
+
+impl Query for HashMap<Id, Value> {
+    fn get_value_by_id<R: DeserializeOwned>(&self, id: Id) -> anyhow::Result<R> {
+        let value = self
+            .get(&id)
+            .ok_or_else(|| anyhow!("Field not found in response"))?;
+
+        let value = serde_json::from_value(value.clone())?;
+
+        Ok(value)
+    }
 }

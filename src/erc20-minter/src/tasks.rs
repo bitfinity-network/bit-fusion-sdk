@@ -10,7 +10,7 @@ use jsonrpc_core::serde_json;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
-use minter_contract_utils::query::{self, QueryType};
+use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
@@ -150,7 +150,7 @@ impl BridgeTask {
             signer.get_address().await.into_scheduler_result()?
         };
 
-        let mut data = query::batch_query(
+        let responses = query::batch_query(
             &client,
             &[
                 QueryType::Nonce {
@@ -162,19 +162,12 @@ impl BridgeTask {
         .await
         .into_scheduler_result()?;
 
-        let nonce: U256 = data
-            .remove(&Id::Str("nonce".into()))
-            .and_then(|nonce| serde_json::from_value(nonce).ok())
-            .ok_or(SchedulerError::TaskExecutionFailed(
-                "Nonce not found in response".into(),
-            ))?;
-
-        let gas_price: U256 = data
-            .remove(&Id::Str("gasPrice".into()))
-            .and_then(|gas_price| serde_json::from_value(gas_price).ok())
-            .ok_or(SchedulerError::TaskExecutionFailed(
-                "Gas price not found in response".into(),
-            ))?;
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
 
         let params = EvmParams {
             nonce: nonce.0.as_u64(),
@@ -351,7 +344,7 @@ impl BridgeTask {
             evm_info.bridge_contract.0,
             evm_params.nonce.into(),
             evm_params.gas_price.into(),
-            order_data,
+            &order_data,
             evm_params.chain_id as _,
         );
 

@@ -543,11 +543,11 @@ pub fn mint_transaction(
     bridge: H160,
     nonce: U256,
     gas_price: U256,
-    mint_order_data: Vec<u8>,
+    mint_order_data: &[u8],
     chain_id: u32,
 ) -> Transaction {
     let data = MINT
-        .encode_input(&[Token::Bytes(mint_order_data)])
+        .encode_input(&[Token::Bytes(mint_order_data.to_vec())])
         .expect("mint order encoding should pass");
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;

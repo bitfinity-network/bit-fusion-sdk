@@ -13,7 +13,9 @@ use crate::bft_bridge_api;
 use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
 
-use crate::query::{self, batch_query, QueryType};
+use crate::query::{
+    self, batch_query, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+};
 
 /// Determined side of the bridge.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -73,7 +75,7 @@ impl EvmParams {
         evm_client: EthJsonRpcClient<impl Client>,
         address: H160,
     ) -> anyhow::Result<Self> {
-        let mut response = batch_query(
+        let responses = batch_query(
             &evm_client,
             &[
                 QueryType::ChainID,
@@ -85,21 +87,9 @@ impl EvmParams {
         )
         .await?;
 
-        let chain_id: u64 = response
-            .remove(&Id::Str("chainID".into()))
-            .ok_or_else(|| anyhow!("Chain ID not found in response"))?
-            .as_u64()
-            .ok_or_else(|| anyhow!("Chain ID is not a number"))?;
-
-        let next_block: U256 = response
-            .remove(&Id::Str("latestBlock".into()))
-            .and_then(|block| serde_json::from_value(block).ok())
-            .ok_or_else(|| anyhow!("Next block not found in response"))?;
-
-        let nonce: U256 = response
-            .remove(&Id::Str("nonce".into()))
-            .and_then(|nonce| serde_json::from_value(nonce).ok())
-            .ok_or_else(|| anyhow!("Nonce not found in response"))?;
+        let chain_id = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
+        let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
+        let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
 
         // TODO: Improve gas price selection strategy. https://infinityswap.atlassian.net/browse/EPROD-738
         let latest_block = evm_client
@@ -161,20 +151,14 @@ impl BftBridgeContractStatus {
         let client = link.get_json_rpc_client();
         let sender = signer.get_address().await?.0;
 
-        let mut data = query::batch_query(
+        let mut responses = query::batch_query(
             &client,
             &[QueryType::Nonce { address: sender }, QueryType::GasPrice],
         )
         .await?;
 
-        let nonce: U256 = data
-            .remove(&Id::Str("nonce".into()))
-            .and_then(|nonce| serde_json::from_value(nonce.clone()).ok())
-            .ok_or_else(|| anyhow!("Nonce not found in response"))?;
-        let gas_price: U256 = data
-            .remove(&Id::Str("gasPrice".into()))
-            .and_then(|gas_price| serde_json::from_value(gas_price.clone()).ok())
-            .ok_or_else(|| anyhow!("Gas price not found in response"))?;
+        let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
+        let gas_price: U256 = responses.get_value_by_id(Id::Str(GAS_PRICE_ID.into()))?;
 
         let mut transaction = bft_bridge_api::deploy_transaction(
             sender,
