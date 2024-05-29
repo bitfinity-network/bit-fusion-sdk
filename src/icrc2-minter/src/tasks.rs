@@ -25,14 +25,13 @@ use crate::state::State;
 use crate::tokens::icrc2;
 
 type SignedMintOrderData = Vec<u8>;
-type ShouldSendMintTx = bool;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
-    PrepareMintOrder(BurntIcrc2Data, ShouldSendMintTx),
+    PrepareMintOrder(BurntIcrc2Data),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData),
     MintIcrc2Tokens(BurntEventData),
@@ -48,9 +47,9 @@ impl Task for BridgeTask {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
             BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
-            BridgeTask::PrepareMintOrder(data, should_send_mint_tx) => Box::pin(
-                Self::prepare_mint_order(state, scheduler, data.clone(), *should_send_mint_tx),
-            ),
+            BridgeTask::PrepareMintOrder(data) => {
+                Box::pin(Self::prepare_mint_order(state, scheduler, data.clone()))
+            }
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(state, data) })
@@ -162,7 +161,6 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         burnt_data: BurntIcrc2Data,
-        should_send_mint_tx: ShouldSendMintTx,
     ) -> Result<(), SchedulerError> {
         log::trace!("preparing mint order: {burnt_data:?}");
 
@@ -181,6 +179,9 @@ impl BridgeTask {
 
         let nonce = burnt_data.operation_id;
 
+        // If there is no fee payer, user should send mint tx by himself.
+        let should_send_mint_tx = burnt_data.fee_payer.is_some();
+
         let mint_order = MintOrder {
             amount: burnt_data.amount,
             sender,
@@ -195,7 +196,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
-            fee_payer: H160::zero(),
+            fee_payer: burnt_data.fee_payer.unwrap_or_default(),
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
@@ -399,9 +400,10 @@ impl BridgeTask {
                         decimals: burnt_event.decimals,
                         approve_spender: H160::default(),
                         approve_amount: U256::zero(),
+                        fee_payer: None,
                     };
 
-                    let task = Self::PrepareMintOrder(burnt_data, false);
+                    let task = Self::PrepareMintOrder(burnt_data);
                     let options = TaskOptions::default()
                         .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
                         .with_backoff_policy(BackoffPolicy::Exponential {
@@ -447,4 +449,5 @@ pub struct BurntIcrc2Data {
     pub decimals: u8,
     pub approve_spender: H160,
     pub approve_amount: U256,
+    pub fee_payer: Option<H160>,
 }

@@ -195,12 +195,14 @@ async fn test_external_bridging() {
     // spender should deposit native tokens to bft bridge, to pay fee.
     let expected_init_native_balance = 10_u64.pow(15);
     let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let bob_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     let init_native_balance = ctx
         .context
         .native_token_deposit(
             &wrapped_evm_client,
             ctx.wrapped_bft_bridge.clone(),
             &ctx.bob_wallet,
+            &[bob_id],
             expected_init_native_balance.into(),
         )
         .await
@@ -360,11 +362,13 @@ async fn native_token_deposit_should_increase_minter_canister_balance() {
     // Deposit native tokens to bft bridge.
     let native_token_deposit = 10_000_000_u64;
     let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let bob_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     ctx.context
         .native_token_deposit(
             &wrapped_evm_client,
             ctx.wrapped_bft_bridge.clone(),
             &ctx.bob_wallet,
+            &[bob_id],
             native_token_deposit.into(),
         )
         .await

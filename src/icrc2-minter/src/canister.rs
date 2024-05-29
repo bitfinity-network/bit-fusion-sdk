@@ -392,21 +392,19 @@ impl MinterCanister {
             .with_max_retries_policy(u32::MAX);
 
         get_scheduler().borrow_mut().append_task(
-            BridgeTask::PrepareMintOrder(
-                BurntIcrc2Data {
-                    sender: caller,
-                    amount: reason.amount,
-                    operation_id,
-                    name,
-                    symbol,
-                    decimals: token_info.decimals,
-                    src_token: reason.icrc2_token_principal,
-                    recipient_address: reason.recipient_address,
-                    approve_spender,
-                    approve_amount,
-                },
-                true,
-            )
+            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
+                sender: caller,
+                amount: reason.amount,
+                operation_id,
+                name,
+                symbol,
+                decimals: token_info.decimals,
+                src_token: reason.icrc2_token_principal,
+                recipient_address: reason.recipient_address,
+                approve_spender,
+                approve_amount,
+                fee_payer: reason.fee_payer,
+            })
             .into_scheduled(options),
         );
 
