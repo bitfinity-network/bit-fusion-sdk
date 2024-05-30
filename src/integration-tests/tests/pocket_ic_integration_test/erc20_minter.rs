@@ -229,12 +229,6 @@ async fn test_external_bridging() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
-    // ctx.context.advance_time(Duration::from_secs(2)).await;
     ctx.context
         .advance_by_times(Duration::from_secs(2), 8)
         .await;
@@ -311,12 +305,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let balance = ctx
         .context
@@ -326,10 +317,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     assert_eq!(0, balance);
 
     // Wait for mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 4)
+        .await;
 
     // Check mint order is not removed
     let bob_address_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);

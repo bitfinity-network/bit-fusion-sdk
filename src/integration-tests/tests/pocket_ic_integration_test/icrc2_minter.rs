@@ -291,13 +291,13 @@ async fn double_register_bridge() {
 
     let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+    ctx.advance_by_times(Duration::from_secs(2), 2).await;
 
     let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
-    ctx.advance_by_times(Duration::from_secs(2), 8).await;
+
     assert!(err
         .to_string()
-        .contains("creation of BftBridge contract already finised"));
+        .contains("creation of BftBridge contract already finished"));
 }
 
 #[tokio::test]
