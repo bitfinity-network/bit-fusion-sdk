@@ -30,7 +30,6 @@ pub enum BtcTask {
     RemoveMintOrder(MintedEventData),
     MintBtc(BurntEventData),
     MintErc20(H160),
-    UpdateEvmParams,
 }
 
 impl BtcTask {
@@ -88,14 +87,12 @@ impl BtcTask {
             return Ok(());
         }
 
-        let mut mut_state = state.borrow_mut();
-
         // Filter out logs that do not have block number.
         // Such logs are produced when the block is not finalized yet.
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state.update_evm_params(|to_update| {
+            state.borrow_mut().update_evm_params(|to_update| {
                 *to_update = Some(EvmParams {
                     next_block: next_block_number,
                     ..params
@@ -106,6 +103,8 @@ impl BtcTask {
         log::trace!("appending logs to tasks");
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
+
+        Self::update_evm_params().await?;
 
         Ok(())
     }
@@ -221,14 +220,12 @@ impl Task for BtcTask {
             BtcTask::MintErc20(address) => {
                 let address = address.clone();
                 Box::pin(async move {
+                    // Update the EvmParams
+                    Self::update_evm_params().await?;
+
                     let result = crate::ops::btc_to_erc20(get_state(), address).await;
 
                     log::info!("ERC20 mint result from scheduler: {result:?}");
-
-                    //Update the EvmParams
-                    task_scheduler.append_task(
-                        BtcTask::UpdateEvmParams.into_scheduled(TaskOptions::default()),
-                    );
 
                     Ok(())
                 })
@@ -266,7 +263,6 @@ impl Task for BtcTask {
                     Ok(())
                 })
             }
-            BtcTask::UpdateEvmParams => Box::pin(Self::update_evm_params()),
         }
     }
 }

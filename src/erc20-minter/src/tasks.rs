@@ -30,7 +30,6 @@ pub enum BridgeTask {
     PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData, BridgeSide),
-    UpdateEvmParams(BridgeSide),
 }
 
 impl Task for BridgeTask {
@@ -59,7 +58,6 @@ impl Task for BridgeTask {
             BridgeTask::SendMintTransaction(order_data, side) => Box::pin(
                 Self::send_mint_transaction(state, order_data.clone(), *side),
             ),
-            BridgeTask::UpdateEvmParams(side) => Box::pin(Self::update_evm_params(state, *side)),
         }
     }
 }
@@ -145,8 +143,7 @@ impl BridgeTask {
         );
 
         // Update the EVM params
-        scheduler
-            .append_task(BridgeTask::UpdateEvmParams(side).into_scheduled(TaskOptions::default()));
+        Self::update_evm_params(state.clone(), side).await?;
 
         Ok(())
     }
@@ -224,15 +221,13 @@ impl BridgeTask {
             .mint_orders
             .insert(sender, src_token, nonce, &signed_mint_order);
 
+        // Update the EVM params
+        Self::update_evm_params(state.clone(), burn_side).await?;
+
         let options = TaskOptions::default();
         scheduler.append_task(
             BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec(), burn_side.other())
                 .into_scheduled(options),
-        );
-
-        // Update the EVM params
-        scheduler.append_task(
-            BridgeTask::UpdateEvmParams(burn_side).into_scheduled(TaskOptions::default()),
         );
 
         log::trace!("Mint order added");

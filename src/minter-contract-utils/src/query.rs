@@ -31,7 +31,7 @@ impl QueryType {
                 "eth_getTransactionCount",
                 vec![
                     serde_json::to_value(address).expect("should be able to convert"),
-                    serde_json::to_value(BlockNumber::Latest).expect("should be able to convert"),
+                    serde_json::to_value(BlockNumber::Pending).expect("should be able to convert"),
                 ],
                 NONCE_ID,
             ),
@@ -74,7 +74,9 @@ pub async fn batch_query(
     Ok(response_map)
 }
 
+/// A helper trait to simplify querying the response by id
 pub trait Query {
+    /// Get a value from the response by its id
     fn get_value_by_id<R: DeserializeOwned>(&self, id: Id) -> anyhow::Result<R>;
 }
 

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use candid::{CandidType, Deserialize, Principal};
 use did::{codec, H160};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use evm_canister_client::{EvmCanisterClient, IcCanisterClient};
+use evm_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
 use minter_contract_utils::evm_bridge::{BftBridgeContractStatus, EvmParams};
@@ -67,11 +67,6 @@ impl Config {
     /// Returns EVM client
     pub fn get_evm_client(&self) -> EthJsonRpcClient<impl Client> {
         EthJsonRpcClient::new(IcCanisterClient::new(self.get_evm_principal()))
-    }
-
-    /// Returns EVM Canister client
-    pub fn get_evm_canister_client(&self) -> EvmCanisterClient<IcCanisterClient> {
-        EvmCanisterClient::new(IcCanisterClient::new(self.get_evm_principal()))
     }
 
     pub fn get_bft_bridge_contract(&self) -> Option<H160> {

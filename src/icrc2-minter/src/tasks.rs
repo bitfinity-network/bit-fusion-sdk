@@ -38,7 +38,6 @@ pub enum BridgeTask {
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData),
     MintIcrc2Tokens(BurntEventData),
-    UpdateEvmParams,
 }
 
 impl Task for BridgeTask {
@@ -64,7 +63,6 @@ impl Task for BridgeTask {
             BridgeTask::MintIcrc2Tokens(burn_data) => {
                 Box::pin(Self::mint_icrc2(burn_data.clone(), state, scheduler))
             }
-            BridgeTask::UpdateEvmParams => Box::pin(Self::update_evm_params(state)),
         }
     }
 }
@@ -159,8 +157,7 @@ impl BridgeTask {
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
         // Update EVM params
-        let options = TaskOptions::default();
-        scheduler.append_task(BridgeTask::UpdateEvmParams.into_scheduled(options));
+        Self::update_evm_params(state.clone()).await?;
 
         Ok(())
     }
@@ -217,15 +214,14 @@ impl BridgeTask {
             .insert(sender, src_token, nonce, &signed_mint_order);
 
         if should_send_mint_tx {
+            // Update EVM params before sending the transaction.
+            Self::update_evm_params(state.clone()).await?;
+
             let options = TaskOptions::default();
             scheduler.append_task(
                 BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec())
                     .into_scheduled(options),
             );
-
-            // Update EVM params
-            scheduler
-                .append_task(BridgeTask::UpdateEvmParams.into_scheduled(TaskOptions::default()));
         }
 
         log::trace!("Mint order added");
@@ -309,6 +305,8 @@ impl BridgeTask {
             ));
         };
 
+        log::trace!("nooooooooooonce: {}", evm_params.nonce);
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,
@@ -332,11 +330,6 @@ impl BridgeTask {
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
-
-        state
-            .borrow_mut()
-            .config
-            .update_evm_params(|p| p.nonce += 1);
 
         log::trace!("Mint transaction sent");
 
@@ -433,6 +426,7 @@ impl BridgeTask {
                 "no evm parameters set".into(),
             ));
         };
+
         let address = {
             let signer = state.borrow().signer.get_transaction_signer();
             signer.get_address().await.into_scheduler_result()?
