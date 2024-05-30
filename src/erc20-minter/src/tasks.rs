@@ -1,3 +1,8 @@
+use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
+use std::rc::Rc;
+
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -13,10 +18,6 @@ use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_I
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
 
 use crate::canister::get_state;
 use crate::state::State;

@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use anyhow::anyhow;
-
 use did::BlockNumber;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::types::H160;
-use jsonrpc_core::{Call, Id, MethodCall, Output, Params, Request, Response, Value, Version};
-
-use jsonrpc_core::serde_json;
+use jsonrpc_core::{
+    serde_json, Call, Id, MethodCall, Output, Params, Request, Response, Value, Version,
+};
 use serde::de::DeserializeOwned;
 
 pub const CHAINID_ID: &str = "chainID";

@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::bft_bridge_api;
 use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
-
 use crate::query::{
     self, batch_query, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
 };
