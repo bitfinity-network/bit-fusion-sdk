@@ -15,7 +15,9 @@ candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "ic-canister-client",
+] }
 futures = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
@@ -35,3 +37,7 @@ ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+
+[dev-dependencies]
+tokio = { workspace = true }

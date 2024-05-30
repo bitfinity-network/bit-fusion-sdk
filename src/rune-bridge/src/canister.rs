@@ -78,6 +78,10 @@ impl RuneBridge {
 
     #[init]
     pub fn init(&mut self, config: RuneBridgeConfig) {
+        let admin = config.admin;
+
+        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
+
         get_state().borrow_mut().configure(config);
 
         {
@@ -268,6 +272,14 @@ impl RuneBridge {
         bytes
     }
 
+    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+        if principal == Principal::anonymous() {
+            return Err(minter_did::error::Error::AnonymousPrincipal);
+        }
+
+        Ok(())
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -321,4 +333,29 @@ pub fn get_state() -> Rc<RefCell<State>> {
 
 pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+#[cfg(test)]
+mod test {
+    use candid::Principal;
+    use ic_canister::{canister_call, Canister};
+    use ic_exports::ic_kit::MockContext;
+
+    use super::*;
+    use crate::RuneBridge;
+
+    #[tokio::test]
+    #[should_panic = "admin principal is anonymous"]
+    async fn disallow_anonymous_owner_in_init() {
+        MockContext::new().inject();
+        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
+        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
+        let mut canister = RuneBridge::from_principal(mock_canister_id);
+
+        let init_data = RuneBridgeConfig {
+            admin: Principal::anonymous(),
+            ..Default::default()
+        };
+        canister_call!(canister.init(init_data), ()).await.unwrap();
+    }
 }
