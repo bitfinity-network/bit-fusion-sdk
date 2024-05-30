@@ -305,8 +305,6 @@ impl BridgeTask {
             ));
         };
 
-        log::trace!("nooooooooooonce: {}", evm_params.nonce);
-
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,

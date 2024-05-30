@@ -229,12 +229,15 @@ async fn test_external_bridging() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    // ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let balance = ctx
         .context
@@ -244,9 +247,9 @@ async fn test_external_bridging() {
     assert_eq!(amount, balance);
 
     // Wait for mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 4)
+        .await;
     // Check mint order removed
     let bob_address_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     let erc20_minter_client = ctx
