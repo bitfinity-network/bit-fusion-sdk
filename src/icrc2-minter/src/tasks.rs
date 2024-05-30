@@ -180,7 +180,8 @@ impl BridgeTask {
         let nonce = burnt_data.operation_id;
 
         // If there is no fee payer, user should send mint tx by himself.
-        let should_send_mint_tx = burnt_data.fee_payer.is_some();
+        let fee_payer = burnt_data.fee_payer.unwrap_or_default();
+        let should_send_mint_tx = fee_payer != H160::zero();
 
         let mint_order = MintOrder {
             amount: burnt_data.amount,
@@ -196,7 +197,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
-            fee_payer: burnt_data.fee_payer.unwrap_or_default(),
+            fee_payer,
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
