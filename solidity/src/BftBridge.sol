@@ -203,21 +203,6 @@ contract BFTBridge {
         payable(minterCanisterAddress).transfer(msg.value);
     }
     
-    // Transfer the given amount from native token deposit to the given address.
-    function withdrawNativeTokens(address payable to, uint256 amount) external returns (uint256 balance) {
-        address from = msg.sender;
-
-        
-        balance = _userNativeDeposit[from];
-        require(balance >= amount, "Insufficient native token deposit balance");
-
-        balance -= amount;
-        _userNativeDeposit[from] = balance;
-
-        bool successful_send = to.send(amount);
-        require(successful_send, "Failed to send tokens");
-    }
-
     // Remove approved SpenderIDs
     function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
         for (uint i = 0; i < approvedSenderIDs.length; i++) {
