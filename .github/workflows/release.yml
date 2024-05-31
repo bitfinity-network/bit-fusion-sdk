@@ -70,6 +70,15 @@ jobs:
         run: |
           ./scripts/build.sh icrc2-minter erc20-minter
           ls -la .artifact
+      #  Compress the artifacts into a tar.gz file
+      - name: Compress artifacts
+        run: |
+          mkdir -p ./.release
+          cd ./.artifact
+          ls -la .
+
+          tar -czf ../.release/erc20-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions erc20-minter.wasm.gz erc20-minter.did
+          tar -czf ../.release/icrc2-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions icrc2-minter.wasm.gz icrc2-minter.did
 
       # Create a new GitHub release with the tag version
       - name: Create Release
@@ -82,9 +91,4 @@ jobs:
           prerelease: false
           token: ${{ secrets.GH_PKG_TOKEN }}
           files: |
-            .artifact/erc20-minter.did
-            .artifact/erc20-minter.wasm
-            .artifact/erc20-minter.wasm.gz
-            .artifact/icrc2-minter.did
-            .artifact/icrc2-minter.wasm
-            .artifact/icrc2-minter.wasm.gz
+            ./.release/*
