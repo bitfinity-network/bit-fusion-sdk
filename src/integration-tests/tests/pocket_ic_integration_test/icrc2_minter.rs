@@ -353,6 +353,73 @@ async fn test_icrc2_tokens_approve_after_mint() {
 }
 
 #[tokio::test]
+async fn test_icrc2_principal_access() {
+    let (ctx, john_wallet, _) = init_bridge().await;
+
+    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    let amount = 3_000_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    eprintln!("burning icrc tokens and creating mint order");
+    let john_address: H160 = john_wallet.address().into();
+    let error = ctx
+        .burn_icrc2(
+            JOHN,
+            &john_wallet,
+            amount as _,
+            42,
+            None,
+            Some(john_address),
+        )
+        .await
+        .unwrap_err();
+
+    assert!(error
+        .to_string()
+        .contains("token principal not in the whitelist"));
+
+    // Add principal to the whitelist.
+    let mut minter_client = ctx.minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let res = ctx
+        .burn_icrc2(
+            JOHN,
+            &john_wallet,
+            amount as _,
+            42,
+            None,
+            Some(john_address),
+        )
+        .await;
+
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
     let mut admin_client = ctx.minter_client(ADMIN);

@@ -37,7 +37,11 @@ async fn inspect_method(method: &str) -> Result<()> {
         }
         "burn_icrc2" => {
             let (reason,) = api::call::arg_data::<(Icrc2Burn,)>(Default::default());
-            MinterCanister::burn_icrc2_inspect_message_check(&reason)
+            MinterCanister::burn_icrc2_inspect_message_check(&reason, &state)
+        }
+        "add_to_whitelist" | "remove_from_whitelist" => {
+            let (principal,) = api::call::arg_data::<(Principal,)>(Default::default());
+            MinterCanister::access_control_inspect_message_check(ic::caller(), principal, &state)
         }
         _ => Ok(()),
     }

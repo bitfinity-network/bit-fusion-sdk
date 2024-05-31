@@ -130,9 +130,9 @@ impl MinterCanister {
 
         {
             let scheduler = get_scheduler();
-            let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.on_completion_callback(log_task_execution_error);
-            borrowed_scheduller.append_task(Self::init_evm_info_task());
+            let mut borrowed_scheduler = scheduler.borrow_mut();
+            borrowed_scheduler.on_completion_callback(log_task_execution_error);
+            borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
         self.set_timers();
@@ -335,8 +335,17 @@ impl MinterCanister {
     }
 
     /// burn_icrc2 inspect_message check
-    pub fn burn_icrc2_inspect_message_check(reason: &Icrc2Burn) -> Result<()> {
-        inspect_mint_reason(reason)
+    pub fn burn_icrc2_inspect_message_check(reason: &Icrc2Burn, state: &State) -> Result<()> {
+        inspect_mint_reason(reason)?;
+
+        // Check if the token is in the whitelist
+        if !state.access_list.contains(&reason.icrc2_token_principal) {
+            return Err(Error::Internal(
+                "token principal not in the whitelist".into(),
+            ));
+        }
+
+        Ok(())
     }
 
     /// Create signed withdraw order data according to the given withdraw `reason`.
@@ -348,7 +357,7 @@ impl MinterCanister {
 
         let caller = ic::caller();
         let state = get_state();
-        MinterCanister::burn_icrc2_inspect_message_check(&reason)?;
+        MinterCanister::burn_icrc2_inspect_message_check(&reason, &state.borrow())?;
 
         let (approve_spender, approve_amount) = if let Some(approval) = reason.approve_minted_tokens
         {
@@ -427,6 +436,51 @@ impl MinterCanister {
         canister_build_data()
     }
 
+    /// Adds the provided principal to the whitelist.
+    #[update]
+    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+        let state = get_state();
+
+        Self::access_control_inspect_message_check(ic::caller(), icrc2_principal, &state.borrow())?;
+
+        let mut state = state.borrow_mut();
+
+        state.access_list.add(icrc2_principal)?;
+
+        Ok(())
+    }
+
+    /// Remove a icrc2 principal token from the access list
+    #[update]
+    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+        let state = get_state();
+
+        Self::access_control_inspect_message_check(ic::caller(), icrc2_principal, &state.borrow())?;
+
+        let mut state = state.borrow_mut();
+
+        state.access_list.remove(&icrc2_principal);
+
+        Ok(())
+    }
+
+    /// Returns the list of all principals in the whitelist.
+    #[query]
+    fn get_whitelist(&self) -> Vec<Principal> {
+        get_state().borrow().access_list.get_all_principals()
+    }
+
+    fn access_control_inspect_message_check(
+        owner: Principal,
+        icrc2_principal: Principal,
+        state: &State,
+    ) -> Result<()> {
+        inspect_check_is_owner(owner, state)?;
+        check_anonymous_principal(icrc2_principal)?;
+
+        Ok(())
+    }
+
     /// Requirements for Http outcalls, used to ignore small differences in the data obtained
     /// by different nodes of the IC subnet to reach a consensus, more info:
     /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
@@ -483,6 +537,10 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
         return Err(Error::InvalidBurnOperation(
             "recipient address is zero".into(),
         ));
+    }
+
+    if reason.icrc2_token_principal == Principal::anonymous() {
+        return Err(Error::AnonymousPrincipal);
     }
 
     Ok(())
@@ -801,5 +859,38 @@ mod test {
             .unwrap();
 
         assert!(evm_address.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_access_list() {
+        let mut canister = init_canister().await;
+
+        let icrc2_principal = Principal::from_text("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
+
+        // Add to whitelist
+        inject::get_context().update_id(owner());
+        canister_call!(canister.add_to_whitelist(icrc2_principal), Result<()>)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Check if the principal is in the whitelist
+        let whitelist = canister_call!(canister.get_whitelist(), Vec<Principal>)
+            .await
+            .unwrap();
+        assert_eq!(whitelist, vec![icrc2_principal]);
+
+        // Remove from whitelist
+        canister_call!(canister.remove_from_whitelist(icrc2_principal), Result<()>)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Check if the principal is removed from the whitelist
+        let whitelist = canister_call!(canister.get_whitelist(), Vec<Principal>)
+            .await
+            .unwrap();
+
+        assert!(whitelist.is_empty());
     }
 }

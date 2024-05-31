@@ -499,7 +499,7 @@ pub trait TestContext {
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
-            operation_id,
+
             approve_minted_tokens,
             fee_payer,
         };
