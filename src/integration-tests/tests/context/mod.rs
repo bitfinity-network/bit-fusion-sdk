@@ -221,7 +221,7 @@ pub trait TestContext {
             ))
         })?;
 
-        if dbg!(receipt.status.unwrap().0.as_u64()) != 1 {
+        if receipt.status.unwrap().0.as_u64() != 1 {
             let output = receipt
                 .output
                 .as_ref()

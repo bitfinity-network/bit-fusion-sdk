@@ -526,30 +526,6 @@ pub static REMOVE_APPROVED_SPENDER_IDS: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::NonPayable,
 });
 
-#[allow(deprecated)] // need to initialize `constant` field
-pub static NATIVE_TOKEN_WITHDRAW: Lazy<Function> = Lazy::new(|| Function {
-    name: "nativeTokenWithdraw".into(),
-    inputs: vec![
-        Param {
-            name: "to".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "amount".into(),
-            kind: ParamType::Uint(256),
-            internal_type: None,
-        },
-    ],
-    outputs: vec![Param {
-        name: "balance".into(),
-        kind: ParamType::Uint(256),
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
 pub fn deploy_transaction(
     sender: H160,
     nonce: U256,
