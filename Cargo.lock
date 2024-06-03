@@ -868,6 +868,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -1927,6 +1928,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -7787,6 +7789,7 @@ dependencies = [
  "ordinals",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

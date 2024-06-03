@@ -123,7 +123,7 @@ pub struct ConfigData {
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
-            owner: Principal::anonymous(),
+            owner: Principal::management_canister(),
             evm_principal: Principal::anonymous(),
             evm_params: None,
             bft_bridge_contract_status: BftBridgeContractStatus::None,
