@@ -481,7 +481,7 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
 
 #[allow(deprecated)] // need to initialize `constant` field
 pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
-    name: "getWrappedToken".into(),
+    name: "listTokenPairs".into(),
     inputs: vec![],
     outputs: vec![
         Param {
