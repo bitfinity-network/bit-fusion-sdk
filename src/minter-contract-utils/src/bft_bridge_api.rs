@@ -480,6 +480,26 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
+pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
+    name: "listTokenPairs".into(),
+    inputs: vec![],
+    outputs: vec![
+        Param {
+            name: "wrapped".into(),
+            kind: ParamType::Array(Box::new(ParamType::Address)),
+            internal_type: None,
+        },
+        Param {
+            name: "base".into(),
+            kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
+            internal_type: None,
+        },
+    ],
+    constant: None,
+    state_mutability: StateMutability::View,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
 pub static NATIVE_TOKEN_BALANCE: Lazy<Function> = Lazy::new(|| Function {
     name: "nativeTokenBalance".into(),
     inputs: vec![Param {

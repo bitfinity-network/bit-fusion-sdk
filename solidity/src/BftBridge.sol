@@ -126,6 +126,9 @@ contract BFTBridge {
     // Mapping from Base tokens to Wrapped tokens
     mapping(address => bytes32) private _baseTokenRegistry;
 
+    // List of wrapped tokens.
+    address[] private _wrappedTokenList;
+
     // Address of minter canister
     address public minterCanisterAddress;
 
@@ -400,6 +403,18 @@ contract BFTBridge {
         return _baseTokenRegistry[wrappedTokenAddress];
     }
 
+    // Returns list of token pairs.
+    function listTokenPairs() external view returns (address[] memory wrapped, bytes32[] memory base) {
+        uint length = _wrappedTokenList.length;
+        wrapped = new address[](length);
+        base = new bytes32[](length);
+        for (uint i = 0; i < length; i++) {
+            address wrappedToken = _wrappedTokenList[i];
+            wrapped[i] = wrappedToken;
+            base[i] = _baseTokenRegistry[wrappedToken];
+        }
+    }
+
     // Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(
         string memory name,
@@ -420,6 +435,7 @@ contract BFTBridge {
 
         _erc20TokenRegistry[baseTokenID] = address(wrappedERC20);
         _baseTokenRegistry[address(wrappedERC20)] = baseTokenID;
+        _wrappedTokenList.push(address(wrappedERC20));
 
         emit WrappedTokenDeployedEvent(
             name,
