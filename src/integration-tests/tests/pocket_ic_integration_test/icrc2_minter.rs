@@ -259,6 +259,13 @@ async fn test_icrc2_token_canister_stopped() {
 async fn test_icrc2_tokens_approve_after_mint() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
+    let minter_client = ctx.minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
         .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
