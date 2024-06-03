@@ -228,6 +228,27 @@ contract BftBridgeTest is Test {
         assertEq(base_token_id, _bridge.getBaseToken(wrapped_address));
     }
 
+    function testListTokenPairs() public {
+        bytes32[3] memory base_token_ids = [
+            _createIdFromPrincipal(abi.encodePacked(uint8(1))),
+            _createIdFromPrincipal(abi.encodePacked(uint8(2))),
+            _createIdFromPrincipal(abi.encodePacked(uint8(3)))
+        ];
+
+        address[3] memory wrapped_tokens;
+        for (uint i = 0; i < 3; i++) {
+            address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_ids[i]);
+            wrapped_tokens[i] = wrapped_address;
+        }
+
+        (address[] memory wrapped, bytes32[] memory base) = _bridge.listTokenPairs();
+
+        for (uint i = 0; i < 3; i++) {
+            assertEq(wrapped[i], wrapped_tokens[i]);
+            assertEq(base[i], base_token_ids[i]);
+        }
+    }
+
     struct ExpectedBurnEvent {
         address sender;
         uint256 amount;
