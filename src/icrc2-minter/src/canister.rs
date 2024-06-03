@@ -257,7 +257,7 @@ impl MinterCanister {
     }
 
     /// Starts the BFT bridge contract deployment.
-    #[update]
+    // #[update]
     pub async fn init_bft_bridge_contract(&mut self) -> Result<H256> {
         let state = get_state();
         let signer = state.borrow().signer.get_transaction_signer();
@@ -291,8 +291,8 @@ impl MinterCanister {
             .set_bft_bridge_contract_status(status);
 
         let options = TaskOptions::default()
-            .with_max_retries_policy(u32::MAX)
-            .with_fixed_backoff_policy(4);
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_fixed_backoff_policy(2);
         get_scheduler()
             .borrow_mut()
             .append_task(ScheduledTask::with_options(

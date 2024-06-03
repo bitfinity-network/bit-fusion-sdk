@@ -4,8 +4,10 @@ pragma solidity ^0.8.7;
 import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
+import {RingBuffer} from "src/libraries/RingBuffer.sol";
 
 contract BFTBridge {
+    using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
     struct MintOrderData {
@@ -24,36 +26,6 @@ contract BFTBridge {
         address feePayer;
     }
 
-    struct RingBuffer {
-        uint8 begin;
-        uint8 end;
-    }
-
-    function increment(
-        RingBuffer memory buffer
-    ) public pure returns (RingBuffer memory) {
-        unchecked {
-            buffer.end = buffer.end + 1;
-        }
-        if (buffer.begin == buffer.end) {
-            unchecked {
-                buffer.begin = buffer.begin + 1;
-            }
-        }
-        return buffer;
-    }
-
-    // Function to get the size of the buffer
-    function size(RingBuffer memory buffer) public pure returns (uint8) {
-        uint8 sizeOf;
-        if (buffer.begin <= buffer.end) {
-            sizeOf = buffer.end - buffer.begin;
-        } else {
-            sizeOf = uint8(buffer.end + 256 - buffer.begin);
-        }
-
-        return sizeOf;
-    }
 
     function truncateUTF8(
         string memory input
@@ -117,8 +89,8 @@ contract BFTBridge {
     // Blocknumbers for users deposit Ids.
     mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
 
-    // Beginning and the end indices for the the user deposits
-    mapping(address => RingBuffer) private _lastUserDeposit;
+    // Last 255 user's burn operations.
+    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
 
     // Get the wrapped token addresses given their native token.
     mapping(bytes32 => address) private _erc20TokenRegistry;
@@ -297,22 +269,8 @@ contract BFTBridge {
     }
 
     // Getter function for block numbers
-    function getDepositBlocks() external view returns (uint32[] memory) {
-        RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-
-        // Get buffer size
-        uint8 bufferSize = size(buffer);
-
-        // Fill return buffer with values
-        uint32[] memory res = new uint32[](bufferSize);
-        for (uint8 i = buffer.begin; i != buffer.end;) {
-            res[i] = _userDepositBlocks[msg.sender][i]; // Assign values to the temporary array
-            unchecked {
-                i++;
-            }
-        }
-
-        return res;
+    function getDepositBlocks() external view returns (uint32[] memory blockNumbers) {
+        blockNumbers = _lastUserBurns[msg.sender].getAll();
     }
 
     // Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
@@ -333,12 +291,7 @@ contract BFTBridge {
         require(fromERC20 != address(0), "Invalid from address");
 
         // Update user information about burn operations.
-        // Additional scope required to save stack space and avoid StackTooDeep error.
-        {
-            RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-            _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
-            _lastUserDeposit[msg.sender] = increment(buffer);
-        }
+        _lastUserBurns[msg.sender].push(uint32(block.number));
 
         // get the token details
         TokenMetadata memory meta = getTokenMetadata(fromERC20);
