@@ -126,6 +126,9 @@ contract BFTBridge {
     // Mapping from Base tokens to Wrapped tokens
     mapping(address => bytes32) private _baseTokenRegistry;
 
+    // List of wrapped tokens.
+    address[] private _wrappedTokenList;
+
     // Address of minter canister
     address public minterCanisterAddress;
 
@@ -134,6 +137,9 @@ contract BFTBridge {
 
     // Mapping from user address to amount of native tokens on his deposit.
     mapping(address => uint256) private _userNativeDeposit;
+
+    // Mapping from user address to list of senderIDs, which are able to spend native deposit.
+    mapping(address => mapping(bytes32 => bool)) private _approvedSenderIDs;
 
     // Constructor to initialize minterCanisterAddress
     constructor(address minterAddress) {
@@ -186,9 +192,12 @@ contract BFTBridge {
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(address to) external payable returns (uint256 balance) {
-        if (to == address(0)) {
-            to = msg.sender;
+    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
+        address to = msg.sender;
+
+        // Add approved SpenderIDs
+        for (uint i = 0; i < approvedSenderIDs.length; i++) {
+            _approvedSenderIDs[to][approvedSenderIDs[i]] = true;
         }
 
         balance = _userNativeDeposit[to];
@@ -197,6 +206,13 @@ contract BFTBridge {
         payable(minterCanisterAddress).transfer(msg.value);
     }
     
+    // Remove approved SpenderIDs
+    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
+        for (uint i = 0; i < approvedSenderIDs.length; i++) {
+            delete _approvedSenderIDs[msg.sender][approvedSenderIDs[i]];
+        }
+    }
+
     // Returns user's native token deposit balance. 
     function nativeTokenBalance(address user) external view returns(uint256 balance) {
         if (user == address(0)) {
@@ -207,9 +223,10 @@ contract BFTBridge {
 
     // Take the given amount of fee from the user.
     // Require the user to have enough native token balance.
-    function _chargeFee(address from, uint256 amount) private {
+    function _chargeFee(address from, bytes32 senderID, uint256 amount) private {
         uint256 balance = _userNativeDeposit[from];
         require(balance >= amount, "insufficient balance to pay fee");
+        require(_approvedSenderIDs[from][senderID], "senderID is not approved");
 
         uint256 newBalance = balance - amount;
         _userNativeDeposit[from] = newBalance;
@@ -268,7 +285,7 @@ contract BFTBridge {
         if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
-            _chargeFee(order.feePayer, fee);
+            _chargeFee(order.feePayer, order.senderID, fee);
         }
 
         // Emit event
@@ -386,6 +403,18 @@ contract BFTBridge {
         return _baseTokenRegistry[wrappedTokenAddress];
     }
 
+    // Returns list of token pairs.
+    function listTokenPairs() external view returns (address[] memory wrapped, bytes32[] memory base) {
+        uint length = _wrappedTokenList.length;
+        wrapped = new address[](length);
+        base = new bytes32[](length);
+        for (uint i = 0; i < length; i++) {
+            address wrappedToken = _wrappedTokenList[i];
+            wrapped[i] = wrappedToken;
+            base[i] = _baseTokenRegistry[wrappedToken];
+        }
+    }
+
     // Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(
         string memory name,
@@ -406,6 +435,7 @@ contract BFTBridge {
 
         _erc20TokenRegistry[baseTokenID] = address(wrappedERC20);
         _baseTokenRegistry[address(wrappedERC20)] = baseTokenID;
+        _wrappedTokenList.push(address(wrappedERC20));
 
         emit WrappedTokenDeployedEvent(
             name,

@@ -1,10 +1,11 @@
+use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
+
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
 use ordinals::{Rune, RuneId};
 use serde::Deserializer;
-use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::str::FromStr;
 
 #[derive(Debug, Copy, Clone, CandidType, Deserialize)]
 pub struct RuneInfo {

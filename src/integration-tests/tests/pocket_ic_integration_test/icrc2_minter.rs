@@ -7,9 +7,7 @@ use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use minter_contract_utils::build_data::test_contracts::WRAPPED_TOKEN_SMART_CONTRACT_CODE;
-use minter_contract_utils::wrapped_token_api::{self, ERC_20_ALLOWANCE};
-use minter_did::error::Error as McError;
+use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
 use minter_did::id256::Id256;
 use minter_did::reason::ApproveMintedTokens;
 
@@ -18,7 +16,6 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::error::TestError;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -33,14 +30,35 @@ async fn test_icrc2_tokens_roundtrip() {
     let amount = 300_000u64;
     let operation_id = 42;
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
     eprintln!("burning icrc tokens and creating mint order");
     let _operation_id = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, operation_id, None)
+        .burn_icrc2(
+            JOHN,
+            &john_wallet,
+            amount as _,
+            operation_id,
+            None,
+            Some(john_address),
+        )
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -72,10 +90,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 4).await;
 
     println!("john principal: {}", john());
 
@@ -103,14 +118,34 @@ async fn test_icrc2_token_canister_stopped() {
 
     let amount = 3_000_000u64;
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
     eprintln!("burning icrc tokens and creating mint order");
+    let john_address: H160 = john_wallet.address().into();
     let _operation_id = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, 42, None)
+        .burn_icrc2(
+            JOHN,
+            &john_wallet,
+            amount as _,
+            42,
+            None,
+            Some(john_address),
+        )
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -148,15 +183,7 @@ async fn test_icrc2_token_canister_stopped() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let refund_mint_order = ctx
         .minter_client(ADMIN)
@@ -174,15 +201,7 @@ async fn test_icrc2_token_canister_stopped() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
 
     // Check if the amount is refunded as wrapped token.
     let base_balance = base_token_client
@@ -221,6 +240,26 @@ async fn test_icrc2_tokens_approve_after_mint() {
     let john_address: H160 = john_wallet.address().into();
     let spender_wallet = ctx.new_wallet(0).await.unwrap();
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    println!("John address: {john_address:?}");
+
+    let native_deposit_balance = ctx
+        .native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone())
+        .await;
+    assert_eq!(native_deposit_balance, native_token_amount.into());
+
     let _operation_id = ctx
         .burn_icrc2(
             JOHN,
@@ -232,12 +271,12 @@ async fn test_icrc2_tokens_approve_after_mint() {
                 approve_amount: approve_amount.clone(),
                 principal_signature,
             }),
+            Some(john_address.clone()),
         )
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -311,71 +350,18 @@ async fn set_owner_access() {
 }
 
 #[tokio::test]
-async fn invalid_bridge_contract() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let minter_client = ctx.minter_client(ADMIN);
-    let res = minter_client
-        .register_evmc_bft_bridge(H160::from_slice(&[20; 20]))
-        .await
-        .unwrap()
-        .unwrap_err();
-
-    assert_eq!(res, McError::InvalidBftBridgeContract);
-}
-
-#[tokio::test]
-async fn invalid_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let admin = ADMIN;
-    let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
-    let minter_canister_address = ctx.get_minter_canister_evm_address(admin).await.unwrap();
-
-    let contract_code = WRAPPED_TOKEN_SMART_CONTRACT_CODE.clone();
-    let input = wrapped_token_api::CONSTRUCTOR
-        .encode_input(
-            contract_code,
-            &[
-                Token::String("name".into()),
-                Token::String("symbol".into()),
-                Token::Address(minter_canister_address.into()),
-            ],
-        )
-        .unwrap();
-    let contract = ctx.create_contract(&admin_wallet, input).await.unwrap();
-
-    let minter_client = ctx.minter_client(ADMIN);
-    let res = minter_client
-        .register_evmc_bft_bridge(contract)
-        .await
-        .unwrap()
-        .unwrap_err();
-
-    assert_eq!(res, McError::InvalidBftBridgeContract);
-}
-
-#[tokio::test]
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-    let admin_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let _ = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap();
-    let err = ctx
-        .initialize_bft_bridge(ADMIN, &admin_wallet)
-        .await
-        .unwrap_err();
+    let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    assert!(matches!(
-        err,
-        TestError::CanisterClient(CanisterClientError::PocketIcTestError(
-            CallError::UserError(UserError {
-                code: ErrorCode::CanisterCalledTrap,
-                description: _,
-            })
-        ))
-    ));
+    ctx.advance_by_times(Duration::from_secs(2), 2).await;
+
+    let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("creation of BftBridge contract already finished"));
 }
 
 #[tokio::test]

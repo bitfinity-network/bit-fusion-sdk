@@ -256,7 +256,7 @@ async fn send_mint_order(
         evm_info.bridge_contract.0,
         evm_params.nonce.into(),
         evm_params.gas_price.into(),
-        mint_order.to_vec(),
+        &mint_order.to_vec(),
         evm_params.chain_id as _,
     );
 
@@ -270,7 +270,7 @@ async fn send_mint_order(
     tx.v = signature.v.0;
     tx.hash = tx.hash();
 
-    let client = evm_info.link.get_client();
+    let client = evm_info.link.get_json_rpc_client();
     let id = client
         .send_raw_transaction(tx)
         .await

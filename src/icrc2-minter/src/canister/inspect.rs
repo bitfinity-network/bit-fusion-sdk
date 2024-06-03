@@ -1,5 +1,4 @@
 use candid::Principal;
-use did::H160;
 use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;
 use ic_exports::ic_kit::ic;
@@ -39,14 +38,6 @@ async fn inspect_method(method: &str) -> Result<()> {
         "burn_icrc2" => {
             let (reason,) = api::call::arg_data::<(Icrc2Burn,)>(Default::default());
             MinterCanister::burn_icrc2_inspect_message_check(&reason)
-        }
-        "register_evmc_bft_bridge" => {
-            let (bft_bridge_address,) = api::call::arg_data::<(H160,)>(Default::default());
-            MinterCanister::register_evmc_bft_bridge_inspect_message_check(
-                ic::caller(),
-                bft_bridge_address,
-                &state,
-            )
         }
         _ => Ok(()),
     }

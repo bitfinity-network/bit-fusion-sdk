@@ -480,6 +480,26 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
+pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
+    name: "listTokenPairs".into(),
+    inputs: vec![],
+    outputs: vec![
+        Param {
+            name: "wrapped".into(),
+            kind: ParamType::Array(Box::new(ParamType::Address)),
+            internal_type: None,
+        },
+        Param {
+            name: "base".into(),
+            kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
+            internal_type: None,
+        },
+    ],
+    constant: None,
+    state_mutability: StateMutability::View,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
 pub static NATIVE_TOKEN_BALANCE: Lazy<Function> = Lazy::new(|| Function {
     name: "nativeTokenBalance".into(),
     inputs: vec![Param {
@@ -500,8 +520,8 @@ pub static NATIVE_TOKEN_BALANCE: Lazy<Function> = Lazy::new(|| Function {
 pub static NATIVE_TOKEN_DEPOSIT: Lazy<Function> = Lazy::new(|| Function {
     name: "nativeTokenDeposit".into(),
     inputs: vec![Param {
-        name: "to".into(),
-        kind: ParamType::Address,
+        name: "approvedSenderIDs".into(),
+        kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
         internal_type: None,
     }],
     outputs: vec![Param {
@@ -513,16 +533,54 @@ pub static NATIVE_TOKEN_DEPOSIT: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::Payable,
 });
 
+#[allow(deprecated)] // need to initialize `constant` field
+pub static REMOVE_APPROVED_SPENDER_IDS: Lazy<Function> = Lazy::new(|| Function {
+    name: "removeApprovedSenderIDs".into(),
+    inputs: vec![Param {
+        name: "approvedSenderIDs".into(),
+        kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
+        internal_type: None,
+    }],
+    outputs: vec![],
+    constant: None,
+    state_mutability: StateMutability::NonPayable,
+});
+
+pub fn deploy_transaction(
+    sender: H160,
+    nonce: U256,
+    gas_price: U256,
+    chain_id: u32,
+    code: Vec<u8>,
+    minter_address: H160,
+) -> Transaction {
+    let data = CONSTRUCTOR
+        .encode_input(code, &[Token::Address(minter_address)])
+        .expect("constructor parameters encoding should pass");
+
+    pub const DEFAULT_TX_GAS_LIMIT: u64 = 5_000_000;
+    ethers_core::types::Transaction {
+        from: sender,
+        nonce,
+        value: U256::zero(),
+        gas: DEFAULT_TX_GAS_LIMIT.into(),
+        gas_price: Some(gas_price),
+        input: data.into(),
+        chain_id: Some(chain_id.into()),
+        ..Default::default()
+    }
+}
+
 pub fn mint_transaction(
     sender: H160,
     bridge: H160,
     nonce: U256,
     gas_price: U256,
-    mint_order_data: Vec<u8>,
+    mint_order_data: &[u8],
     chain_id: u32,
 ) -> Transaction {
     let data = MINT
-        .encode_input(&[Token::Bytes(mint_order_data)])
+        .encode_input(&[Token::Bytes(mint_order_data.to_vec())])
         .expect("mint order encoding should pass");
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;

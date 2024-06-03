@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bitcoin::bip32::ChainCode;
 use bitcoin::{Network, PrivateKey, PublicKey};
 use candid::{CandidType, Deserialize, Principal};
@@ -14,7 +16,6 @@ use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
-use std::collections::HashMap;
 
 use crate::key::IcBtcSigner;
 use crate::ledger::UtxoLedger;

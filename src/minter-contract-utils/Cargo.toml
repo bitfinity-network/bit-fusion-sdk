@@ -21,7 +21,10 @@ ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
     "http-outcall",
 ] }
+evm-canister-client = { workspace = true }
+eth-signer = { workspace = true }
 anyhow = { workspace = true }
+
 
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }

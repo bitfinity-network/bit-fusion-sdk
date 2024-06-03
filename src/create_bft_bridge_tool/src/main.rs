@@ -12,7 +12,7 @@ use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use minter_contract_utils::build_data::test_contracts::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
 use minter_did::id256::Id256;
 use tokio::time::Instant;
@@ -253,7 +253,7 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         to: None,
         nonce,
         value: 0u64.into(),
-        gas: 3_000_000u64.into(),
+        gas: 5_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         input,
         signature: SigningMethod::SigningKey(wallet.signer()),
@@ -317,7 +317,7 @@ async fn create_token(args: CreateTokenArgs) {
         to: Some(bft_bridge.into()),
         nonce,
         value: 0u64.into(),
-        gas: 3_000_000u64.into(),
+        gas: 5_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         input,
         signature: SigningMethod::SigningKey(wallet.signer()),
@@ -427,7 +427,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
             Some(wallet.address().into()),
             Some(token.into()),
             None,
-            3_000_000u64,
+            5_000_000u64,
             Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
             Some(input.into()),
         )
@@ -453,7 +453,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         to: Some(token.into()),
         nonce,
         value: 0u64.into(),
-        gas: 3_000_000u64.into(),
+        gas: 5_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         input,
         signature: SigningMethod::SigningKey(wallet.signer()),
@@ -487,7 +487,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         to: Some(bft_bridge.into()),
         nonce,
         value: 0u64.into(),
-        gas: 3_000_000u64.into(),
+        gas: 5_000_000u64.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         input,
         signature: SigningMethod::SigningKey(wallet.signer()),
