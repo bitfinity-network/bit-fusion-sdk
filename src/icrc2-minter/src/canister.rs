@@ -257,7 +257,7 @@ impl MinterCanister {
     }
 
     /// Starts the BFT bridge contract deployment.
-    // #[update]
+    #[update]
     pub async fn init_bft_bridge_contract(&mut self) -> Result<H256> {
         let state = get_state();
         let signer = state.borrow().signer.get_transaction_signer();
