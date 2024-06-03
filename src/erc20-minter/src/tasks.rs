@@ -11,8 +11,10 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
+use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
+use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
@@ -76,6 +78,7 @@ impl BridgeTask {
             .get_evm_info(side)
             .link
             .get_json_rpc_client();
+
         let address = {
             let signer = state.borrow().signer.get().clone();
             signer.get_address().await.into_scheduler_result()?
@@ -121,14 +124,13 @@ impl BridgeTask {
 
         log::debug!("got logs from side {side}: {logs:?}");
 
-        let mut mut_state = state.borrow_mut();
-
         // Filter out logs that do not have block number.
         // Such logs are produced when the block is not finalized yet.
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state
+            state
+                .borrow_mut()
                 .config
                 .update_evm_params(|params| params.next_block = next_block_number, side);
         };
@@ -140,6 +142,9 @@ impl BridgeTask {
                 .filter_map(|l| Self::task_by_log(l, side))
                 .collect(),
         );
+
+        // Update the EVM params
+        Self::update_evm_params(state.clone(), side).await?;
 
         Ok(())
     }
@@ -216,6 +221,9 @@ impl BridgeTask {
             .borrow_mut()
             .mint_orders
             .insert(sender, src_token, nonce, &signed_mint_order);
+
+        // Update the EVM params
+        Self::update_evm_params(state.clone(), burn_side).await?;
 
         let options = TaskOptions::default();
         scheduler.append_task(
@@ -305,7 +313,7 @@ impl BridgeTask {
             evm_info.bridge_contract.0,
             evm_params.nonce.into(),
             evm_params.gas_price.into(),
-            order_data,
+            &order_data,
             evm_params.chain_id as _,
         );
 
@@ -325,6 +333,57 @@ impl BridgeTask {
             .into_scheduler_result()?;
 
         log::trace!("Mint transaction sent");
+
+        Ok(())
+    }
+
+    pub async fn update_evm_params(
+        state: Rc<RefCell<State>>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        let evm_info = state.borrow().config.get_evm_info(side);
+
+        let initial_params = state
+            .borrow()
+            .config
+            .get_evm_params(side)
+            .into_scheduler_result()?;
+        let address = {
+            let signer = state.borrow().signer.get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &evm_info.link.get_json_rpc_client(),
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        state
+            .borrow_mut()
+            .config
+            .update_evm_params(|p| *p = params, side);
+        log::trace!("evm params updated");
 
         Ok(())
     }

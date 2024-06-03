@@ -58,10 +58,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -93,10 +90,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 4).await;
 
     println!("john principal: {}", john());
 
@@ -151,8 +145,7 @@ async fn test_icrc2_token_canister_stopped() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -190,15 +183,7 @@ async fn test_icrc2_token_canister_stopped() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let refund_mint_order = ctx
         .minter_client(ADMIN)
@@ -216,15 +201,7 @@ async fn test_icrc2_token_canister_stopped() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
 
     // Check if the amount is refunded as wrapped token.
     let base_balance = base_token_client
@@ -299,8 +276,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -379,14 +355,13 @@ async fn double_register_bridge() {
 
     let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 2).await;
 
     let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
 
     assert!(err
         .to_string()
-        .contains("creation of BftBridge contract already finised"));
+        .contains("creation of BftBridge contract already finished"));
 }
 
 #[tokio::test]

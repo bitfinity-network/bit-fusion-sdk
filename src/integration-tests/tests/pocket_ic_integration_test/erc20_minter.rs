@@ -228,12 +228,9 @@ async fn test_external_bridging() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let balance = ctx
         .context
@@ -243,9 +240,9 @@ async fn test_external_bridging() {
     assert_eq!(amount, balance);
 
     // Wait for mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 4)
+        .await;
     // Check mint order removed
     let bob_address_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     let erc20_minter_client = ctx
@@ -264,7 +261,7 @@ async fn test_external_bridging() {
 }
 
 #[tokio::test]
-async fn native_token_deposit_inrease_and_decrease() {
+async fn native_token_deposit_increase_and_decrease() {
     let ctx = ContextWithBridges::new().await;
 
     // Approve ERC-20 transfer on behalf of some user in base EVM.
@@ -348,12 +345,9 @@ async fn native_token_deposit_inrease_and_decrease() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     // Check fee charged
     let native_balance_after_mint = ctx
@@ -400,12 +394,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let balance = ctx
         .context
@@ -422,10 +413,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .unwrap();
 
     // Wait for mint order removal
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 4)
+        .await;
 
     // Check mint order is not removed
     let bob_address_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);

@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::str::FromStr;
 
 use bitcoin::Address;
+use did::U256;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -11,8 +12,10 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
+use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
@@ -86,14 +89,12 @@ impl RuneBridgeTask {
             return Ok(());
         }
 
-        let mut mut_state = state.borrow_mut();
-
         // Filter out logs that do not have block number.
         // Such logs are produced when the block is not finalized yet.
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state.update_evm_params(|to_update| {
+            state.borrow_mut().update_evm_params(|to_update| {
                 *to_update = Some(EvmParams {
                     next_block: next_block_number,
                     ..params
@@ -104,6 +105,9 @@ impl RuneBridgeTask {
         log::trace!("appending logs to tasks");
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
+
+        // Update the EvmParams
+        Self::update_evm_params().await?;
 
         Ok(())
     }
@@ -150,6 +154,56 @@ impl RuneBridgeTask {
             .remove(sender_id, minted_event.nonce);
 
         log::trace!("Mint order removed");
+
+        Ok(())
+    }
+
+    pub async fn update_evm_params() -> Result<(), SchedulerError> {
+        let state = get_state();
+        let evm_info = state.borrow().get_evm_info();
+
+        let Some(initial_params) = evm_info.params else {
+            log::warn!("no evm params initialized");
+            return Ok(());
+        };
+
+        let address = {
+            let signer = state.borrow().signer().get().clone();
+            signer.get_address().await.into_scheduler_result()?
+        };
+
+        let client = evm_info.link.get_json_rpc_client();
+
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        state.borrow_mut().update_evm_params(|p| *p = Some(params));
+
+        log::trace!("evm params updated");
 
         Ok(())
     }
