@@ -1,9 +1,6 @@
 use candid::Principal;
-use did::ic::StorablePrincipal;
 use ic_stable_structures::stable_structures::Memory;
-use ic_stable_structures::{BTreeMapStructure, MemoryManager, StableBTreeMap};
-
-use crate::constant::ACCESS_LIST_MEMORY_ID;
+use ic_stable_structures::{BTreeMapStructure, StableBTreeMap};
 
 pub struct AccessList<M: Memory> {
     pub access_list: StableBTreeMap<Principal, (), M>,
@@ -53,9 +50,9 @@ impl<M: Memory> AccessList<M> {
 mod tests {
     use ic_exports::ic_kit::MockContext;
 
-    use crate::memory::MEMORY_MANAGER;
-
     use super::*;
+    use crate::constant::ACCESS_LIST_MEMORY_ID;
+    use crate::memory::MEMORY_MANAGER;
 
     #[test]
     fn test_access_list() {

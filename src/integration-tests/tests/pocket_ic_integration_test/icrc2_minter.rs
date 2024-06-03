@@ -21,6 +21,13 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 async fn test_icrc2_tokens_roundtrip() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
+    let minter_client = ctx.minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
         .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
@@ -116,6 +123,12 @@ async fn test_icrc2_tokens_roundtrip() {
 async fn test_icrc2_token_canister_stopped() {
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
+    let minter_client = ctx.minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
         .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
@@ -354,13 +367,11 @@ async fn test_icrc2_tokens_approve_after_mint() {
 
 #[tokio::test]
 async fn test_icrc2_principal_access() {
-    let (ctx, john_wallet, _) = init_bridge().await;
-
     let (ctx, john_wallet, bft_bridge) = init_bridge().await;
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
-    let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+
+    ctx.create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
         .await
         .unwrap();
 
@@ -388,7 +399,7 @@ async fn test_icrc2_principal_access() {
             amount as _,
             42,
             None,
-            Some(john_address),
+            Some(john_address.clone()),
         )
         .await
         .unwrap_err();
@@ -398,7 +409,7 @@ async fn test_icrc2_principal_access() {
         .contains("token principal not in the whitelist"));
 
     // Add principal to the whitelist.
-    let mut minter_client = ctx.minter_client(ADMIN);
+    let minter_client = ctx.minter_client(ADMIN);
     minter_client
         .add_to_whitelist(ctx.canisters().token_1())
         .await

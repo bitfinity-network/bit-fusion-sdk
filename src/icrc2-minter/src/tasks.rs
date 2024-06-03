@@ -26,7 +26,7 @@ use crate::tokens::icrc2;
 
 type SignedMintOrderData = Vec<u8>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Clone, Deserialize)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,

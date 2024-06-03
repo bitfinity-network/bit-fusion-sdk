@@ -487,7 +487,7 @@ pub trait TestContext {
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
-        operation_id: u32,
+        _operation_id: u32,
         approve_minted_tokens: Option<ApproveMintedTokens>,
         fee_payer: Option<H160>,
     ) -> Result<u32> {
