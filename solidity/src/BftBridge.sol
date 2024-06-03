@@ -63,23 +63,6 @@ contract BFTBridge {
         }
     }
 
-    function toIDfromBaseAddress(
-        uint32 chainID,
-        address toAddress
-    ) public pure returns (bytes32 toID) {
-        return
-            bytes32(
-            abi.encodePacked(
-                uint8(1),
-                chainID,
-                toAddress,
-                uint32(0),
-                uint16(0),
-                uint(8)
-            )
-        );
-    }
-
     // Additional gas amount for fee charge.
     uint256 constant additionalGasFee = 1000;
 
