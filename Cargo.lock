@@ -6318,9 +6318,14 @@ dependencies = [
  "ic-stable-structures 0.16.0",
  "jsonrpc-core",
  "minter-did",
+ "num-bigint 0.4.4",
+ "num-traits",
  "once_cell",
  "serde",
+ "serde_bytes",
+ "serde_json",
  "solidity-helper",
+ "thiserror",
 ]
 
 [[package]]
