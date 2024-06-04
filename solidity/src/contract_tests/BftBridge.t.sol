@@ -36,40 +36,10 @@ contract BftBridgeTest is Test {
     address _bob = vm.addr(_BOB_KEY);
 
     BFTBridge _bridge;
-    BFTBridge.RingBuffer _buffer;
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
         _bridge = new BFTBridge(_owner);
-    }
-
-    function testIncrementRingBuffer() public {
-        assertEq(_bridge.size(_buffer), 0);
-
-        for (uint32 i = 1; i < 256; i += 1) {
-            _buffer = _bridge.increment(_buffer);
-            assertEq(_buffer.begin, 0);
-            assertEq(_buffer.end, uint8(i));
-            assertEq(_bridge.size(_buffer), uint8(i));
-        }
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 1);
-        assertEq(_buffer.end, uint8(0));
-        assertEq(_bridge.size(_buffer), uint8(255));
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 2);
-        assertEq(_buffer.end, uint8(1));
-        assertEq(_bridge.size(_buffer), uint8(255));
-
-        _buffer.begin = 255;
-        _buffer.end = 254;
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 0);
-        assertEq(_buffer.end, uint8(255));
-        assertEq(_bridge.size(_buffer), uint8(255));
     }
 
     function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
