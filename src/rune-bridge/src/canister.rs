@@ -16,19 +16,19 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
-use ic_stable_structures::CellStructure;
+use ic_stable_structures::{CellStructure, StableMultimap, VirtualMemory};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
-use crate::core::deposit::DefaultRuneDeposit;
+use crate::core::deposit::{DepositStore, RuneDeposit, RuneDepositPayload};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::core::{DepositState, RuneBridgeCore};
-use crate::interface::{CreateEdictTxArgs, GetAddressError, WithdrawError};
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::interface::{CreateEdictTxArgs, DepositStateResponse, GetAddressError, WithdrawError};
+use crate::memory::{DEPOSIT_STORE_MEMORY_ID, MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::rune_info::RuneInfo;
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
@@ -101,9 +101,13 @@ impl RuneBridge {
         crate::key::get_transit_address(&get_state(), &eth_address).map(|v| v.to_string())
     }
 
-    #[update]
-    pub fn deposit(&self, eth_address: H160) -> DepositState {
-        get_core().schedule_deposit(eth_address, None)
+    #[query]
+    pub fn get_deposit_state(&self, eth_address: H160) -> DepositStateResponse {
+        let deposits = rune_deposit_store().get_by_address(&eth_address).into_iter().map(|request| request.state()).collect();
+        DepositStateResponse {
+            current_ts: ic::time(),
+            deposits,
+        }
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
@@ -170,7 +174,7 @@ impl RuneBridge {
             .expect("invalid address")
             .assume_checked();
 
-        let deposit = DefaultRuneDeposit::new(get_state());
+        let deposit = RuneDeposit::new(get_state());
         let utxos = deposit
             .get_deposit_utxos(&address)
             .await
@@ -326,6 +330,6 @@ pub(crate) fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
 }
 
-pub(crate) fn get_core() -> RuneBridgeCore {
-    RuneBridgeCore::new(get_state(), get_scheduler())
+pub(crate) fn rune_deposit_store() -> DepositStore<VirtualMemory<DefaultMemoryImpl>, RuneDepositPayload> {
+    MEMORY_MANAGER.with(|mm| DepositStore::with_memory(mm.get(DEPOSIT_STORE_MEMORY_ID)))
 }

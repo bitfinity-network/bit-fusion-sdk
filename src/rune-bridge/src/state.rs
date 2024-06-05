@@ -39,7 +39,6 @@ pub struct State {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
-    pub(crate) scheduled_deposits: HashMap<H160, ScheduledDeposit>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,14 +46,6 @@ pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
     pub key_id: EcdsaKeyId,
-}
-
-#[derive(Debug, Clone)]
-pub struct ScheduledDeposit {
-    pub task_id: u32,
-    pub at_timestamp: u64,
-    pub eth_dst_address: H160,
-    pub amounts: Option<HashMap<RuneName, u128>>,
 }
 
 impl Default for State {
@@ -80,7 +71,6 @@ impl Default for State {
             master_key: None,
             ledger: Default::default(),
             runes: Default::default(),
-            scheduled_deposits: Default::default(),
         }
     }
 }
@@ -338,14 +328,6 @@ impl State {
     /// Mutable reference to the signed mint orders store.
     pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
         &mut self.orders_store
-    }
-
-    pub fn scheduled_deposits(&self) -> &HashMap<H160, ScheduledDeposit> {
-        &self.scheduled_deposits
-    }
-
-    pub fn scheduled_deposits_mut(&mut self) -> &mut HashMap<H160, ScheduledDeposit> {
-        &mut self.scheduled_deposits
     }
 
     pub fn mempool_timeout(&self) -> Duration {

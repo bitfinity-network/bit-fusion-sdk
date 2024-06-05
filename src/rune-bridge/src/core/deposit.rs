@@ -1,3 +1,5 @@
+use crate::canister::{get_state, rune_deposit_store};
+use crate::core::deposit_store::{DepositRequest, DepositRequestId, DepositState};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::core::DepositResult;
@@ -7,6 +9,7 @@ use crate::rune_info::{RuneInfo, RuneName};
 use crate::state::State;
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
+use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
@@ -18,15 +21,17 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-pub(crate) trait RuneDeposit {
-    async fn deposit(
-        &self,
-        eth_address: &H160,
-        amounts: &Option<HashMap<RuneName, u128>>,
-    ) -> Result<Vec<DepositResult>, DepositError>;
-}
+pub use super::deposit_store::DepositStore;
+
+type Request = DepositRequest<RuneDepositPayload>;
 
 static NONCE: AtomicU32 = AtomicU32::new(0);
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RuneDepositPayload {
+    pub dst_eth_address: H160,
+    pub amounts: Option<HashMap<RuneName, u128>>,
+}
 
 struct RuneMintOrder {
     rune_name: RuneName,
@@ -35,7 +40,7 @@ struct RuneMintOrder {
     nonce: u32,
 }
 
-pub(crate) struct DefaultRuneDeposit<
+pub(crate) struct RuneDeposit<
     UTXO: UtxoProvider = IcUtxoProvider,
     INDEX: RuneIndexProvider = OrdIndexProvider,
 > {
@@ -46,7 +51,7 @@ pub(crate) struct DefaultRuneDeposit<
     index_provider: INDEX,
 }
 
-impl DefaultRuneDeposit<IcUtxoProvider, OrdIndexProvider> {
+impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
     pub fn new(state: Rc<RefCell<State>>) -> Self {
         let state_ref = state.borrow();
 
@@ -65,9 +70,13 @@ impl DefaultRuneDeposit<IcUtxoProvider, OrdIndexProvider> {
             index_provider: OrdIndexProvider::new(indexer_url),
         }
     }
+
+    pub fn get() -> Self {
+        Self::new(get_state())
+    }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> DefaultRuneDeposit<UTXO, INDEX> {
+impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     async fn get_transit_address(&self, eth_address: &H160) -> Address {
         self.signer
             .get_transit_address(eth_address, self.network)
@@ -392,10 +401,47 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> DefaultRuneDeposit<UTXO, INDE
 
         Ok(mint_orders)
     }
-}
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit for DefaultRuneDeposit<UTXO, INDEX> {
-    async fn deposit(
+    pub async fn process_deposit_request(&self, deposit_request: Request) {
+        let mut request = deposit_request;
+        while request.action_required() {
+            request = self.execute(request).await?;
+        }
+    }
+
+    async fn execute(&self, deposit_request: Request) -> Result<Request, DepositError> {
+        match deposit_request.state {
+            DepositState::Scheduled => self.prepare_mint_order(deposit_request),
+            DepositState::MintOrdersCreated => {}
+            DepositState::MintOrdersSigned => {}
+            DepositState::MintOrdersSent => {}
+            DepositState::Minted => {}
+            DepositState::Rejected { .. } => {}
+        }
+    }
+
+    pub async fn prepare_mint_orders(&self, deposit_request: Request) -> Result<Request, DepositError> {
+        let eth_address = &deposit_request.request_payload.dst_eth_address;
+        let amounts = &deposit_request.request_payload.amounts;
+
+        let transit_address = self.get_transit_address(eth_address).await;
+
+        let utxos = self.get_deposit_utxos(&transit_address).await?;
+        let (rune_info_amounts, used_utxos) = self.get_mint_amounts(&utxos, amounts).await?;
+        let mint_orders = self
+            .create_mint_orders(&rune_info_amounts, eth_address)
+            .await?;
+
+        if self.has_used_utxos(&used_utxos) {
+            // Some of the utxos were used concurrently, retry the task
+            return Err(DepositError::NothingToDeposit);
+        }
+
+        let mut store = rune_deposit_store();
+        store.split_request(deposit_request, |)
+    }
+
+    pub async fn deposit(
         &self,
         eth_address: &H160,
         amounts: &Option<HashMap<RuneName, u128>>,
@@ -567,7 +613,7 @@ mod tests {
 
     const MIN_CONFIRMATIONS: u32 = 12;
 
-    fn test_deposit() -> DefaultRuneDeposit<MockUtxoProvider, MockIndexProvider> {
+    fn test_deposit() -> RuneDeposit<MockUtxoProvider, MockIndexProvider> {
         let state = State {
             config: RuneBridgeConfig {
                 min_confirmations: MIN_CONFIRMATIONS,
@@ -576,7 +622,7 @@ mod tests {
             ..Default::default()
         };
 
-        DefaultRuneDeposit {
+        RuneDeposit {
             state: Rc::new(RefCell::new(state)),
             network: Network::Bitcoin,
             signer: BtcSignerType::Local(LocalSigner::new(

@@ -9,6 +9,7 @@ pub const LOGGER_SETTINGS_MEMORY_ID: MemoryId = MemoryId::new(4);
 pub const BURN_REQUEST_MEMORY_ID: MemoryId = MemoryId::new(5);
 pub const LEDGER_MEMORY_ID: MemoryId = MemoryId::new(6);
 pub const USED_UTXOS_REGISTRY_MEMORY_ID: MemoryId = MemoryId::new(7);
+pub const DEPOSIT_STORE_MEMORY_ID: MemoryId = MemoryId::new(8);
 
 thread_local! {
     pub static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());

@@ -1,3 +1,4 @@
+use crate::core::deposit_store::DepositState;
 use crate::rune_info::RuneName;
 use candid::CandidType;
 use did::H256;
@@ -118,4 +119,10 @@ pub struct CreateEdictTxArgs {
     pub rune_name: String,
     pub amount: u128,
     pub change_address: Option<String>,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct DepositStateResponse {
+    pub current_ts: u64,
+    pub deposits: Vec<DepositState>,
 }
