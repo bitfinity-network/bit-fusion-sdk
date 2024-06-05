@@ -229,6 +229,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
 pub enum BridgeEvent {
     Burnt(BurntEventData),
     Minted(MintedEventData),
+    Notify(NotifyMinterEventData),
 }
 
 impl BridgeEvent {
@@ -245,6 +246,7 @@ impl BridgeEvent {
             topics: Some(vec![vec![
                 BURNT_EVENT.signature(),
                 MINTED_EVENT.signature(),
+                NOTIFY_EVENT.signature(),
             ]]),
         };
 
@@ -267,7 +269,8 @@ impl TryFrom<RawLog> for BridgeEvent {
     fn try_from(log: RawLog) -> Result<Self, Self::Error> {
         BurntEventData::try_from(log.clone())
             .map(Self::Burnt)
-            .or_else(|_| MintedEventData::try_from(log).map(Self::Minted))
+            .or_else(|_| MintedEventData::try_from(log.clone()).map(Self::Minted))
+            .or_else(|_| NotifyMinterEventData::try_from(log).map(Self::Notify))
     }
 }
 
@@ -283,6 +286,11 @@ pub struct BurntEventData {
     pub name: Vec<u8>,
     pub symbol: Vec<u8>,
     pub decimals: u8,
+}
+
+fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
+    let msg = format!("missing event field `{}`", field);
+    move || ethers_core::abi::Error::Other(msg.into())
 }
 
 /// Builds `BurntEventData` from tokens.
@@ -303,11 +311,6 @@ impl BurntEventDataBuilder {
     /// Builds `BurntEventData` from tokens.
     /// All fields are required.
     fn build(self) -> Result<BurntEventData, ethers_core::abi::Error> {
-        fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
-            let msg = format!("missing event field `{}`", field);
-            move || ethers_core::abi::Error::Other(msg.into())
-        }
-
         Ok(BurntEventData {
             sender: self.sender.ok_or_else(not_found("sender"))?.into(),
             amount: self.amount.ok_or_else(not_found("amount"))?.into(),
@@ -391,6 +394,23 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
+pub static NOTIFY_EVENT: Lazy<Event> = Lazy::new(|| Event {
+    name: "NotifyMinterEvent".into(),
+    inputs: vec![
+        EventParam {
+            name: "notificationType".into(),
+            kind: ParamType::Uint(32),
+            indexed: false,
+        },
+        EventParam {
+            name: "userData".into(),
+            kind: ParamType::Bytes,
+            indexed: false,
+        },
+    ],
+    anonymous: false,
+});
+
 /// Event emitted when token is minted by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct MintedEventData {
@@ -417,11 +437,6 @@ impl MintedEventDataBuilder {
     /// Builds `MintedEventData` from tokens.
     /// All fields are required.
     fn build(self) -> Result<MintedEventData, ethers_core::abi::Error> {
-        fn not_found(field: &str) -> impl FnOnce() -> ethers_core::abi::Error {
-            let msg = format!("missing event field `{}`", field);
-            move || ethers_core::abi::Error::Other(msg.into())
-        }
-
         Ok(MintedEventData {
             amount: self.amount.ok_or_else(not_found("amount"))?.into(),
             from_token: self.from_token.ok_or_else(not_found("fromToken"))?,
@@ -462,6 +477,54 @@ impl TryFrom<RawLog> for MintedEventData {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
+pub struct NotifyMinterEventData {
+    pub notification_type: u32,
+    pub user_data: Vec<u8>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct NotifyMinterEventDataBuilder {
+    notification_type: Option<u32>,
+    user_data: Option<Vec<u8>>,
+}
+
+impl NotifyMinterEventDataBuilder {
+    fn build(self) -> Result<NotifyMinterEventData, ethers_core::abi::Error> {
+        Ok(NotifyMinterEventData {
+            notification_type: self
+                .notification_type
+                .ok_or_else(not_found("notificationType"))?,
+            user_data: self.user_data.ok_or_else(not_found("userData"))?,
+        })
+    }
+
+    fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
+        match name {
+            "notificationType" => self.notification_type = value.into_uint().map(|v| v.as_u32()),
+            "userData" => self.user_data = value.into_bytes().map(Into::into),
+            _ => {}
+        };
+        self
+    }
+}
+
+impl TryFrom<RawLog> for NotifyMinterEventData {
+    type Error = ethers_core::abi::Error;
+
+    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
+        let parsed = NOTIFY_EVENT.parse_log(log)?;
+
+        let mut data_builder = NotifyMinterEventDataBuilder::default();
+
+        for param in parsed.params {
+            data_builder = data_builder.with_field_from_token(&param.name, param.value);
+        }
+
+        data_builder.build()
+    }
+}
+
 #[allow(deprecated)] // need to initialize `constant` field
 pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
     name: "getWrappedToken".into(),
@@ -475,6 +538,26 @@ pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
         kind: ParamType::Address,
         internal_type: None,
     }],
+    constant: None,
+    state_mutability: StateMutability::View,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
+pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
+    name: "listTokenPairs".into(),
+    inputs: vec![],
+    outputs: vec![
+        Param {
+            name: "wrapped".into(),
+            kind: ParamType::Array(Box::new(ParamType::Address)),
+            internal_type: None,
+        },
+        Param {
+            name: "base".into(),
+            kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
+            internal_type: None,
+        },
+    ],
     constant: None,
     state_mutability: StateMutability::View,
 });
@@ -556,11 +639,11 @@ pub fn mint_transaction(
     bridge: H160,
     nonce: U256,
     gas_price: U256,
-    mint_order_data: Vec<u8>,
+    mint_order_data: &[u8],
     chain_id: u32,
 ) -> Transaction {
     let data = MINT
-        .encode_input(&[Token::Bytes(mint_order_data)])
+        .encode_input(&[Token::Bytes(mint_order_data.to_vec())])
         .expect("mint order encoding should pass");
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
