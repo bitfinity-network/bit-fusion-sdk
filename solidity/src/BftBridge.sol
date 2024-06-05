@@ -186,6 +186,15 @@ contract BFTBridge {
         uint8 decimals;
     }
 
+    event NotifyMinterEvent(
+        uint32 notificationType,
+        bytes userData
+    );
+
+    function notifyMinter(uint32 calldata notificationType, bytes calldata userData) external {
+        emit NotifyMinterEvent(notificationType, userData);
+    }
+
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees.
     // Returns user's balance after the operation.
@@ -202,12 +211,12 @@ contract BFTBridge {
         _userNativeDeposit[to] = balance;
         payable(minterCanisterAddress).transfer(msg.value);
     }
-    
+
     // Transfer the given amount from native token deposit to the given address.
     function withdrawNativeTokens(address payable to, uint256 amount) external returns (uint256 balance) {
         address from = msg.sender;
 
-        
+
         balance = _userNativeDeposit[from];
         require(balance >= amount, "Insufficient native token deposit balance");
 
@@ -226,7 +235,7 @@ contract BFTBridge {
     }
 
     // Returns user's native token deposit balance. 
-    function nativeTokenBalance(address user) external view returns(uint256 balance) {
+    function nativeTokenBalance(address user) external view returns (uint256 balance) {
         if (user == address(0)) {
             user = msg.sender;
         }
@@ -285,7 +294,7 @@ contract BFTBridge {
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
-        
+
         if (order.approveSpender != address(0) && order.approveAmount != 0) {
             WrappedToken(toToken).approveByOwner(
                 order.recipient,
