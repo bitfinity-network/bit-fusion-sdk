@@ -490,14 +490,20 @@ struct NotifyMinterEventDataBuilder {
 
 impl Default for NotifyMinterEventDataBuilder {
     fn default() -> Self {
-        Self { user_data: None, notification_type: None }
+        Self {
+            user_data: None,
+            notification_type: None,
+        }
     }
 }
 
 impl NotifyMinterEventDataBuilder {
     fn build(self) -> Result<NotifyMinterEventData, ethers_core::abi::Error> {
         Ok(NotifyMinterEventData {
-            notification_type: self.notification_type.ok_or_else(not_found("notificationType"))?.into(),
+            notification_type: self
+                .notification_type
+                .ok_or_else(not_found("notificationType"))?
+                .into(),
             user_data: self.user_data.ok_or_else(not_found("userData"))?.into(),
         })
     }
