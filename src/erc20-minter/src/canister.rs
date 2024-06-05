@@ -63,6 +63,9 @@ impl EvmMinter {
     #[init]
     pub fn init(&mut self, settings: Settings) {
         let admin = ic::caller();
+
+        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
+
         let state = get_state();
         state.borrow_mut().init(admin, settings);
 
@@ -169,6 +172,14 @@ impl EvmMinter {
         Some(())
     }
 
+    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+        if principal == Principal::anonymous() {
+            return Err(minter_did::error::Error::AnonymousPrincipal);
+        }
+
+        Ok(())
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -222,4 +233,39 @@ pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use candid::Principal;
+    use eth_signer::sign_strategy::SigningStrategy;
+    use ic_canister::{canister_call, Canister};
+    use ic_exports::ic_kit::inject::{self};
+    use ic_exports::ic_kit::MockContext;
+    use minter_contract_utils::evm_link::EvmLink;
+
+    use super::*;
+    use crate::EvmMinter;
+
+    #[tokio::test]
+    #[should_panic = "admin principal is anonymous"]
+    async fn disallow_anonymous_owner_in_init() {
+        MockContext::new().inject();
+        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
+        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
+
+        inject::get_context().update_id(Principal::anonymous());
+
+        let mut canister = EvmMinter::from_principal(mock_canister_id);
+
+        let init_data = Settings {
+            base_evm_link: EvmLink::Http("".to_string()),
+            wrapped_evm_link: EvmLink::Http("".to_string()),
+            base_bridge_contract: H160::zero(),
+            wrapped_bridge_contract: H160::zero(),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [0; 32],
+            },
+            log_settings: None,
+        };
+
+        canister_call!(canister.init(init_data), ()).await.unwrap();
+    }
+}

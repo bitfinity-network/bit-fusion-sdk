@@ -256,7 +256,7 @@ async fn send_mint_order(
         evm_info.bridge_contract.0,
         evm_params.nonce.into(),
         evm_params.gas_price.into(),
-        mint_order.to_vec(),
+        &mint_order.to_vec(),
         evm_params.chain_id as _,
     );
 

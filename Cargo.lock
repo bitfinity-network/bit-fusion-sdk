@@ -868,6 +868,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -1927,6 +1928,7 @@ dependencies = [
  "minter-contract-utils",
  "minter-did",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -5701,6 +5703,7 @@ dependencies = [
  "ic-storage",
  "ic-task-scheduler",
  "icrc-client",
+ "jsonrpc-core",
  "log",
  "minter-contract-utils",
  "minter-did",
@@ -6308,6 +6311,7 @@ dependencies = [
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
+ "evm-canister-client",
  "hex",
  "ic-canister-client",
  "ic-exports",

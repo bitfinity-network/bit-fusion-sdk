@@ -36,40 +36,10 @@ contract BftBridgeTest is Test {
     address _bob = vm.addr(_BOB_KEY);
 
     BFTBridge _bridge;
-    BFTBridge.RingBuffer _buffer;
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
         _bridge = new BFTBridge(_owner);
-    }
-
-    function testIncrementRingBuffer() public {
-        assertEq(_bridge.size(_buffer), 0);
-
-        for (uint32 i = 1; i < 256; i += 1) {
-            _buffer = _bridge.increment(_buffer);
-            assertEq(_buffer.begin, 0);
-            assertEq(_buffer.end, uint8(i));
-            assertEq(_bridge.size(_buffer), uint8(i));
-        }
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 1);
-        assertEq(_buffer.end, uint8(0));
-        assertEq(_bridge.size(_buffer), uint8(255));
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 2);
-        assertEq(_buffer.end, uint8(1));
-        assertEq(_bridge.size(_buffer), uint8(255));
-
-        _buffer.begin = 255;
-        _buffer.end = 254;
-
-        _buffer = _bridge.increment(_buffer);
-        assertEq(_buffer.begin, 0);
-        assertEq(_buffer.end, uint8(255));
-        assertEq(_bridge.size(_buffer), uint8(255));
     }
 
     function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
@@ -226,6 +196,27 @@ contract BftBridgeTest is Test {
         bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_id);
         assertEq(base_token_id, _bridge.getBaseToken(wrapped_address));
+    }
+
+    function testListTokenPairs() public {
+        bytes32[3] memory base_token_ids = [
+            _createIdFromPrincipal(abi.encodePacked(uint8(1))),
+            _createIdFromPrincipal(abi.encodePacked(uint8(2))),
+            _createIdFromPrincipal(abi.encodePacked(uint8(3)))
+        ];
+
+        address[3] memory wrapped_tokens;
+        for (uint i = 0; i < 3; i++) {
+            address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_ids[i]);
+            wrapped_tokens[i] = wrapped_address;
+        }
+
+        (address[] memory wrapped, bytes32[] memory base) = _bridge.listTokenPairs();
+
+        for (uint i = 0; i < 3; i++) {
+            assertEq(wrapped[i], wrapped_tokens[i]);
+            assertEq(base[i], base_token_ids[i]);
+        }
     }
 
     struct ExpectedBurnEvent {

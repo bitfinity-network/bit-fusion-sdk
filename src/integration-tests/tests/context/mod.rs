@@ -43,6 +43,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 #[async_trait::async_trait]
+
 pub trait TestContext {
     type Client: CanisterClient + Send + Sync;
 
@@ -127,6 +128,13 @@ pub trait TestContext {
     }
 
     async fn advance_time(&self, time: Duration);
+
+    /// Advances time by `duration` `times` times.
+    async fn advance_by_times(&self, duration: Duration, times: u64) {
+        for _ in 0..=times {
+            self.advance_time(duration).await;
+        }
+    }
 
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
@@ -213,7 +221,7 @@ pub trait TestContext {
             ))
         })?;
 
-        if dbg!(receipt.status.unwrap().0.as_u64()) != 1 {
+        if receipt.status.unwrap().0.as_u64() != 1 {
             let output = receipt
                 .output
                 .as_ref()

@@ -134,7 +134,7 @@ impl ConfigData {
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
-            admin: Principal::anonymous(),
+            admin: Principal::management_canister(),
             base_evm: EvmInfo::default(),
             wrapped_evm: EvmInfo::default(),
         }
