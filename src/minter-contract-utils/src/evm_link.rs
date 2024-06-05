@@ -30,7 +30,7 @@ impl Clients {
         Self::HttpOutCall(HttpOutcallClient::new(url))
     }
 
-    pub fn evm_rpc_canister(principal: Principal, rpc_service: RpcService) -> Self {
+    pub fn evm_rpc_canister(principal: Principal, rpc_service: &[RpcService]) -> Self {
         Self::EvmRpcCanister(EvmRpcCanisterClient::new(principal, rpc_service))
     }
 }
@@ -54,7 +54,7 @@ pub enum EvmLink {
     Ic(Principal),
     EvmRpcCanister {
         canister_id: Principal,
-        rpc_service: RpcService,
+        rpc_service: Vec<RpcService>,
     },
 }
 
@@ -88,7 +88,7 @@ impl EvmLink {
             EvmLink::EvmRpcCanister {
                 canister_id: principal,
                 rpc_service,
-            } => EthJsonRpcClient::new(Clients::evm_rpc_canister(*principal, rpc_service.clone())),
+            } => EthJsonRpcClient::new(Clients::evm_rpc_canister(*principal, rpc_service)),
         }
     }
 
@@ -100,7 +100,7 @@ impl EvmLink {
             EvmLink::EvmRpcCanister {
                 canister_id: principal,
                 rpc_service,
-            } => Clients::evm_rpc_canister(*principal, rpc_service.clone()),
+            } => Clients::evm_rpc_canister(*principal, rpc_service),
         }
     }
 }

@@ -1,3 +1,5 @@
+#![allow(clippy::enum_variant_names)]
+
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::api::call::CallResult as Result;
@@ -113,6 +115,7 @@ pub enum HttpOutcallError {
 }
 
 #[derive(Debug, Error, CandidType, Deserialize)]
+
 pub enum RpcError {
     #[error("JSON-RPC error: {0}")]
     JsonRpcError(JsonRpcError),

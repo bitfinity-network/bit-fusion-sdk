@@ -124,9 +124,9 @@ if [ "$IC_NETWORK" = "local" ]; then
   fi
   SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
   ICRC2_MINTER_ID=$(dfx canister id icrc2-minter)
-  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = variant { Custom = record { url = \"http://127.0.0.1:8545\"; headers = opt null } } } }"
+  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { Custom = record { url = \"http://127.0.0.1:8545\"; headers = opt null } } } } }"
 else
-  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = variant { EthMainnet = variant { Cloudflare } } } }"
+  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { EthMainnet = variant { Cloudflare } } } } }"
 fi
 
 
