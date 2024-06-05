@@ -142,6 +142,18 @@ contract BFTBridge {
         uint8 decimals;
     }
 
+    // Event that can be emited with a notification for the minter canister
+    event NotifyMinterEvent(
+        uint32 notificationType,
+        bytes userData
+    );
+
+    // Emit minter notification event with the given `userData`. For details about what should be in the user data,
+    // check the implementation of the corresponding minter.
+    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
+        emit NotifyMinterEvent(notificationType, userData);
+    }
+
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
         uint256 initGasLeft = gasleft();
