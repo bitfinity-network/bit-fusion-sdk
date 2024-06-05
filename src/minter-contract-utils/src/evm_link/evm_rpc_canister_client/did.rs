@@ -1,9 +1,10 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::api::call::CallResult as Result;
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EthSepoliaService {
     Alchemy,
     BlockPi,
@@ -11,7 +12,7 @@ pub enum EthSepoliaService {
     Ankr,
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub enum L2MainnetService {
     Alchemy,
     BlockPi,
@@ -19,35 +20,25 @@ pub enum L2MainnetService {
     Ankr,
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HttpHeader {
     pub value: String,
     pub name: String,
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RpcApi {
     pub url: String,
     pub headers: Option<Vec<HttpHeader>>,
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EthMainnetService {
     Alchemy,
     BlockPi,
     Cloudflare,
     PublicNode,
     Ankr,
-}
-
-#[derive(CandidType, Deserialize)]
-pub enum RpcServices {
-    EthSepolia(Option<Vec<EthSepoliaService>>),
-    BaseMainnet(Option<Vec<L2MainnetService>>),
-    Custom { chainId: u64, services: Vec<RpcApi> },
-    OptimismMainnet(Option<Vec<L2MainnetService>>),
-    ArbitrumOne(Option<Vec<L2MainnetService>>),
-    EthMainnet(Option<Vec<EthMainnetService>>),
 }
 
 #[derive(Debug, Error, CandidType, Deserialize)]
@@ -133,7 +124,7 @@ pub enum RpcError {
     HttpOutcallError(HttpOutcallError),
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RpcService {
     EthSepolia(EthSepoliaService),
     BaseMainnet(L2MainnetService),
@@ -145,7 +136,6 @@ pub enum RpcService {
     Provider(u64),
 }
 
-pub type ProviderId = u64;
 #[derive(CandidType, Deserialize)]
 pub enum RequestResult {
     Ok(String),

@@ -9,6 +9,8 @@ target
 debug/
 target/
 
+deps/
+
 dfx* 
 bitcoin
 
