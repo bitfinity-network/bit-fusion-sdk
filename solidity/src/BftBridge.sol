@@ -152,7 +152,7 @@ contract BFTBridge {
 
     // Emit minter notification event with the given `userData`. For details about what should be in the user data,
     // check the implementation of the corresponding minter.
-    function notifyMinter(uint32 calldata notificationType, bytes calldata userData) external {
+    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, userData);
     }
 
