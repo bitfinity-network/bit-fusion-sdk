@@ -134,6 +134,7 @@ impl RuneBridgeTask {
                 let remove_mint_order_task = RuneBridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::Notify(_)) => todo!(),
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
