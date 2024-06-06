@@ -1,7 +1,7 @@
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 
 use did::keccak::keccak_hash;
-use did::{H160, U256};
+use did::{BlockNumber, H160, U256};
 use eth_signer::Signer;
 use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
@@ -16,6 +16,7 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
+use crate::utils::CHAIN_ID;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -260,6 +261,24 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .await;
     assert_eq!(native_deposit_balance, native_token_amount.into());
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let nonce = evm_client
+        .eth_get_transaction_count(john_address.clone(), BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap()
+        .0
+        .as_u32();
+
+    let expiration = ctx
+        .client
+        .get_time()
+        .await
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 3_600;
+
     let _operation_id = ctx
         .burn_icrc2(
             JOHN,
@@ -269,7 +288,11 @@ async fn test_icrc2_tokens_approve_after_mint() {
             Some(ApproveMintedTokens {
                 approve_spender: spender_wallet.address().into(),
                 approve_amount: approve_amount.clone(),
-                principal_signature,
+                chain_id: CHAIN_ID as u32,
+                nonce,
+                expiration,
+                token_principal: ctx.canisters().token_1(),
+                signature: principal_signature,
             }),
             Some(john_address.clone()),
         )
