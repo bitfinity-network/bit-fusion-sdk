@@ -65,7 +65,7 @@ pub trait TestContext {
     }
 
     /// Returns client for the evm canister.
-    fn minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
+    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
         MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
     }
 
@@ -495,7 +495,6 @@ pub trait TestContext {
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
-        operation_id: u32,
         approve_minted_tokens: Option<ApproveMintedTokens>,
         fee_payer: Option<H160>,
     ) -> Result<u32> {
@@ -507,12 +506,11 @@ pub trait TestContext {
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
-            operation_id,
             approve_minted_tokens,
             fee_payer,
         };
 
-        Ok(self.minter_client(caller).burn_icrc2(reason).await??)
+        Ok(self.icrc_minter_client(caller).burn_icrc2(reason).await??)
     }
 
     /// Approves burning of ICRC-2 token.
@@ -730,8 +728,6 @@ pub trait TestContext {
                 let init_data = erc20_minter::state::Settings {
                     base_evm_link: EvmLink::Ic(external_evm_canister),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
-                    base_bridge_contract: H160::default(),
-                    wrapped_bridge_contract: H160::default(),
                     signing_strategy: SigningStrategy::Local {
                         private_key: rand::random(),
                     },

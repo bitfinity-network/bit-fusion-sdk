@@ -28,7 +28,7 @@ use crate::tokens::icrc2;
 
 type SignedMintOrderData = Vec<u8>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,
@@ -213,7 +213,7 @@ impl BridgeTask {
         state
             .borrow_mut()
             .mint_orders
-            .insert(sender, src_token, nonce, &signed_mint_order);
+            .insert(sender, src_token, nonce, signed_mint_order);
 
         if should_send_mint_tx {
             // Update EVM params before sending the transaction.

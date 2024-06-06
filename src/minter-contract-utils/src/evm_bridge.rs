@@ -230,4 +230,12 @@ impl BftBridgeContractStatus {
     pub fn is_creating(&self) -> bool {
         matches!(self, Self::Creating(..))
     }
+
+    pub fn as_created(&self) -> Option<&H160> {
+        if let Self::Created(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
