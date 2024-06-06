@@ -94,9 +94,10 @@ contract BFTBridge {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
-    // Constructor to initialize minterCanisterAddress
-    constructor(address minterAddress) {
+    // Constructor to initialize minterCanisterAddress and feeChargeContract.
+    constructor(address minterAddress, address feeChargeAddress) {
         minterCanisterAddress = minterAddress;
+        feeChargeContract = IFeeCharge(feeChargeAddress);
     }
 
     // Event for mint operation

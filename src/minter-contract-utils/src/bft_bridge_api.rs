@@ -8,11 +8,18 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
-    inputs: vec![Param {
-        name: "minterAddress".into(),
-        kind: ParamType::Address,
-        internal_type: None,
-    }],
+    inputs: vec![
+        Param {
+            name: "minterAddress".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+        Param {
+            name: "feeChargeAddress".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+    ],
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
