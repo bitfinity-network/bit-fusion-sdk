@@ -10,6 +10,7 @@ use ic_utils::interfaces::ManagementCanister;
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
+mod erc20_minter;
 mod runes;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";

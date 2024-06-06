@@ -1,8 +1,10 @@
+mod evm_rpc_canister;
+
 use std::collections::HashMap;
 use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
-use candid::{Nat, Principal};
+use candid::{CandidType, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
@@ -32,6 +34,7 @@ use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::{ApproveMintedTokens, Icrc2Burn};
+use serde::Deserialize;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -643,6 +646,28 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
+            CanisterType::EvmRpcCanister => {
+                println!("Installing default EVM RPC canister...");
+                let init_data = evm_rpc_canister_init_data();
+                self.install_canister(self.canisters().evm_rpc(), wasm, (init_data,))
+                    .await
+                    .unwrap();
+
+                // TODO: maybe authorize
+                // configure the EVM RPC canister provider
+                let args = evm_rpc_canister::RegisterProviderArgs {
+                    chain_id: 1,
+                    hostname: "cloudflare-eth.com".to_string(),
+                    credential_path: "/v1/mainnet".to_string(),
+                    cycles_per_call: 0,
+                    cycles_per_message_byte: 0,
+                    credentials_headers: None,
+                };
+
+                evm_rpc_canister::register_provider(self.canisters().evm_rpc(), args)
+                    .await
+                    .expect("failed to register provider");
+            }
             CanisterType::Signature => {
                 println!("Installing default Signature canister...");
                 let possible_canisters = [CanisterType::Evm, CanisterType::ExternalEvm];
@@ -888,6 +913,17 @@ pub fn evm_canister_init_data(
     }
 }
 
+pub fn evm_rpc_canister_init_data() -> EvmRpcCanisterInitData {
+    EvmRpcCanisterInitData {
+        nodes_in_subnet: 28,
+    }
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct EvmRpcCanisterInitData {
+    pub nodes_in_subnet: u32,
+}
+
 fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
     let minting_account = Account {
         owner: minter_principal,
@@ -974,6 +1010,13 @@ impl TestCanisters {
             .expect("external evm canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn evm_rpc(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::EvmRpcCanister)
+            .expect("evm rpc canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn signature_verification(&self) -> Principal {
         *self
             .0
@@ -1056,6 +1099,7 @@ impl TestCanisters {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CanisterType {
     Evm,
+    EvmRpcCanister,
     ExternalEvm,
     Signature,
     Token1,
@@ -1083,9 +1127,10 @@ impl CanisterType {
     ];
 
     /// EVM, SignatureVerification, Minter, Spender and Token1.
-    pub const EVM_MINTER_TEST_SET: [CanisterType; 4] = [
+    pub const EVM_MINTER_TEST_SET: [CanisterType; 5] = [
         CanisterType::Evm,
         CanisterType::ExternalEvm,
+        CanisterType::EvmRpcCanister,
         CanisterType::Signature,
         CanisterType::CkErc20Minter,
     ];
@@ -1106,6 +1151,7 @@ impl CanisterType {
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
+            CanisterType::EvmRpcCanister => get_evm_rpc_canister_bytecode().await,
             CanisterType::ExternalEvm => get_evm_testnet_canister_bytecode().await,
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,

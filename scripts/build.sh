@@ -131,6 +131,7 @@ build_requested_canisters() {
 
         cp "$project_dir/src/integration-tests/evm_testnet.did" "$WASM_DIR/evm_testnet.did"
         cp "$project_dir/src/integration-tests/evm_testnet.wasm.gz" "$WASM_DIR/evm_testnet.wasm.gz"
+        cp "$project_dir/src/integration-tests/evm_rpc.wasm.gz" "$WASM_DIR/evm_rpc.wasm.gz"
 
         cp "$project_dir/src/integration-tests/signature_verification.did" "$WASM_DIR/signature_verification.did"
         cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
