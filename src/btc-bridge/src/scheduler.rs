@@ -5,7 +5,7 @@ use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
@@ -20,11 +20,11 @@ use serde::{Deserialize, Serialize};
 use crate::canister::get_state;
 
 pub type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<BtcTask>, VirtualMemory<DefaultMemoryImpl>>;
 
 pub type PersistentScheduler = Scheduler<BtcTask, TasksStorage>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BtcTask {
     InitEvmState,
     CollectEvmEvents,
