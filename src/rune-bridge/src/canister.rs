@@ -54,6 +54,8 @@ impl RuneBridge {
             self.update_metrics_timer(std::time::Duration::from_secs(METRICS_UPDATE_INTERVAL_SEC));
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24); // once a day
+
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 get_scheduler()
                     .borrow_mut()
@@ -65,11 +67,21 @@ impl RuneBridge {
                     log::error!("task execution failed: {err}",);
                 }
             });
+
+            ic_exports::ic_cdk_timers::set_timer_interval(USED_UTXOS_REMOVE_INTERVAL, || {
+                ic_exports::ic_cdk::spawn(
+                    crate::task::RemoveUsedUtxosTask::from(get_state()).run(),
+                );
+            });
         }
     }
 
     #[init]
     pub fn init(&mut self, config: RuneBridgeConfig) {
+        let admin = config.admin;
+
+        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
+
         get_state().borrow_mut().configure(config);
 
         {
@@ -260,6 +272,14 @@ impl RuneBridge {
         bytes
     }
 
+    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+        if principal == Principal::anonymous() {
+            return Err(minter_did::error::Error::AnonymousPrincipal);
+        }
+
+        Ok(())
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -313,4 +333,29 @@ pub fn get_state() -> Rc<RefCell<State>> {
 
 pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+#[cfg(test)]
+mod test {
+    use candid::Principal;
+    use ic_canister::{canister_call, Canister};
+    use ic_exports::ic_kit::MockContext;
+
+    use super::*;
+    use crate::RuneBridge;
+
+    #[tokio::test]
+    #[should_panic = "admin principal is anonymous"]
+    async fn disallow_anonymous_owner_in_init() {
+        MockContext::new().inject();
+        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
+        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
+        let mut canister = RuneBridge::from_principal(mock_canister_id);
+
+        let init_data = RuneBridgeConfig {
+            admin: Principal::anonymous(),
+            ..Default::default()
+        };
+        canister_call!(canister.init(init_data), ()).await.unwrap();
+    }
 }

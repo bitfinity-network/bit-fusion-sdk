@@ -12,7 +12,10 @@ export-api = []
 anyhow = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client", "http-outcall"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "ic-canister-client",
+    "http-outcall",
+] }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
@@ -28,3 +31,6 @@ minter-did = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

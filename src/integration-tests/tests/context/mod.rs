@@ -43,6 +43,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 #[async_trait::async_trait]
+
 pub trait TestContext {
     type Client: CanisterClient + Send + Sync;
 
@@ -128,6 +129,13 @@ pub trait TestContext {
 
     async fn advance_time(&self, time: Duration);
 
+    /// Advances time by `duration` `times` times.
+    async fn advance_by_times(&self, duration: Duration, times: u64) {
+        for _ in 0..=times {
+            self.advance_time(duration).await;
+        }
+    }
+
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
@@ -212,6 +220,16 @@ pub trait TestContext {
                 "bft bridge creation transaction not processed".into(),
             ))
         })?;
+
+        if receipt.status.unwrap().0.as_u64() != 1 {
+            let output = receipt
+                .output
+                .as_ref()
+                .map(|out| String::from_utf8_lossy(out));
+            return Err(TestError::Evm(EvmError::Internal(format!(
+                "bft bridge creation transaction failed: {output:?}"
+            ))));
+        }
 
         let bridge_address = receipt.contract_address.ok_or_else(|| {
             TestError::Evm(EvmError::Internal(
@@ -347,10 +365,15 @@ pub trait TestContext {
         evm_client: &EvmCanisterClient<Self::Client>,
         bft_bridge: H160,
         user_wallet: &Wallet<'static, SigningKey>,
+        sender_ids: &[Id256],
         amount: u128,
     ) -> Result<U256> {
+        let sender_ids = sender_ids
+            .iter()
+            .map(|id| Token::FixedBytes(id.0.to_vec()))
+            .collect();
         let input = NATIVE_TOKEN_DEPOSIT
-            .encode_input(&[Token::Address(user_wallet.address())])
+            .encode_input(&[Token::Array(sender_ids)])
             .unwrap();
 
         let receipt = self
@@ -385,7 +408,7 @@ pub trait TestContext {
             to,
             nonce,
             value: value.into(),
-            gas: 3_000_000u64.into(),
+            gas: 5_000_000u64.into(),
             gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
@@ -472,8 +495,8 @@ pub trait TestContext {
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
-        operation_id: u32,
         approve_minted_tokens: Option<ApproveMintedTokens>,
+        fee_payer: Option<H160>,
     ) -> Result<u32> {
         self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
             .await?;
@@ -483,8 +506,8 @@ pub trait TestContext {
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
-            operation_id,
             approve_minted_tokens,
+            fee_payer,
         };
 
         Ok(self.icrc_minter_client(caller).burn_icrc2(reason).await??)

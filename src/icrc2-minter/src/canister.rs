@@ -14,7 +14,7 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -59,10 +59,7 @@ impl MinterCanister {
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 // Tasks to collect EVMs events
-                let tasks = vec![
-                    Self::collect_evm_events_task(),
-                    Self::collect_evm_events_task(),
-                ];
+                let tasks = vec![Self::collect_evm_events_task()];
 
                 get_scheduler().borrow_mut().append_tasks(tasks);
 
@@ -291,8 +288,8 @@ impl MinterCanister {
             .set_bft_bridge_contract_status(status);
 
         let options = TaskOptions::default()
-            .with_max_retries_policy(u32::MAX)
-            .with_fixed_backoff_policy(4);
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_fixed_backoff_policy(2);
         get_scheduler()
             .borrow_mut()
             .append_task(ScheduledTask::with_options(
@@ -392,21 +389,19 @@ impl MinterCanister {
             .with_max_retries_policy(u32::MAX);
 
         get_scheduler().borrow_mut().append_task(
-            BridgeTask::PrepareMintOrder(
-                BurntIcrc2Data {
-                    sender: caller,
-                    amount: reason.amount,
-                    operation_id,
-                    name,
-                    symbol,
-                    decimals: token_info.decimals,
-                    src_token: reason.icrc2_token_principal,
-                    recipient_address: reason.recipient_address,
-                    approve_spender,
-                    approve_amount,
-                },
-                true,
-            )
+            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
+                sender: caller,
+                amount: reason.amount,
+                operation_id,
+                name,
+                symbol,
+                decimals: token_info.decimals,
+                src_token: reason.icrc2_token_principal,
+                recipient_address: reason.recipient_address,
+                approve_spender,
+                approve_amount,
+                fee_payer: reason.fee_payer,
+            })
             .into_scheduled(options),
         );
 
@@ -491,7 +486,7 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
 fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {

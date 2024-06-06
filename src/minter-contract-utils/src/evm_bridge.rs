@@ -6,11 +6,15 @@ use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber, U256 as EthU256};
+use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::bft_bridge_api;
 use crate::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
 use crate::evm_link::EvmLink;
+use crate::query::{
+    self, batch_query, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+};
 
 /// Determined side of the bridge.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -70,11 +74,21 @@ impl EvmParams {
         evm_client: EthJsonRpcClient<impl Client>,
         address: H160,
     ) -> anyhow::Result<Self> {
-        let chain_id = evm_client.get_chain_id().await?;
-        let next_block = evm_client.get_block_number().await?;
-        let nonce = evm_client
-            .get_transaction_count(address.0, BlockNumber::Latest)
-            .await?;
+        let responses = batch_query(
+            &evm_client,
+            &[
+                QueryType::ChainID,
+                QueryType::LatestBlock,
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+            ],
+        )
+        .await?;
+
+        let chain_id: U256 = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
+        let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
+        let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
 
         // TODO: Improve gas price selection strategy. https://infinityswap.atlassian.net/browse/EPROD-738
         let latest_block = evm_client
@@ -96,9 +110,9 @@ impl EvmParams {
         };
 
         Ok(Self {
-            chain_id,
-            next_block,
-            nonce,
+            chain_id: chain_id.0.as_u64(),
+            next_block: next_block.0.as_u64(),
+            nonce: nonce.0.as_u64(),
             gas_price,
         })
     }
@@ -114,7 +128,7 @@ pub enum BftBridgeContractStatus {
 }
 
 impl BftBridgeContractStatus {
-    /// Starts Contract initialization if currenst status is None.
+    /// Starts Contract initialization if current status is None.
     /// Else, returns an error.
     pub async fn initialize(
         &mut self,
@@ -129,20 +143,26 @@ impl BftBridgeContractStatus {
                 return Err(anyhow!("creation of BftBridge contract already started"))
             }
             BftBridgeContractStatus::Created(_) => {
-                return Err(anyhow!("creation of BftBridge contract already finised"))
+                return Err(anyhow!("creation of BftBridge contract already finished"))
             }
         };
 
-        let client = link.get_client();
+        let client = link.get_json_rpc_client();
         let sender = signer.get_address().await?.0;
-        let nonce = client
-            .get_transaction_count(sender, BlockNumber::Latest)
-            .await?;
-        let gas_price = client.gas_price().await?;
+
+        let responses = query::batch_query(
+            &client,
+            &[QueryType::Nonce { address: sender }, QueryType::GasPrice],
+        )
+        .await?;
+
+        let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
+        let gas_price: U256 = responses.get_value_by_id(Id::Str(GAS_PRICE_ID.into()))?;
+
         let mut transaction = bft_bridge_api::deploy_transaction(
             sender,
             nonce.into(),
-            gas_price,
+            gas_price.into(),
             chain_id,
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
             minter_address.into(),
@@ -154,7 +174,6 @@ impl BftBridgeContractStatus {
         transaction.v = signature.v.0;
         transaction.hash = transaction.hash();
 
-        let client = link.get_client();
         let hash = client.send_raw_transaction(transaction).await?;
 
         *self = BftBridgeContractStatus::Creating(link, hash.into());
@@ -180,7 +199,7 @@ impl BftBridgeContractStatus {
     }
 
     async fn check_creation_tx(link: EvmLink, tx: H256) -> Result<H160, anyhow::Error> {
-        let client = link.get_client();
+        let client = link.get_json_rpc_client();
         let receipt = client.get_receipt_by_hash(tx.0).await?;
         let contract = receipt
             .contract_address

@@ -4,8 +4,10 @@ pragma solidity ^0.8.7;
 import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
+import {RingBuffer} from "src/libraries/RingBuffer.sol";
 
 contract BFTBridge {
+    using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
     struct MintOrderData {
@@ -24,36 +26,6 @@ contract BFTBridge {
         address feePayer;
     }
 
-    struct RingBuffer {
-        uint8 begin;
-        uint8 end;
-    }
-
-    function increment(
-        RingBuffer memory buffer
-    ) public pure returns (RingBuffer memory) {
-        unchecked {
-            buffer.end = buffer.end + 1;
-        }
-        if (buffer.begin == buffer.end) {
-            unchecked {
-                buffer.begin = buffer.begin + 1;
-            }
-        }
-        return buffer;
-    }
-
-    // Function to get the size of the buffer
-    function size(RingBuffer memory buffer) public pure returns (uint8) {
-        uint8 sizeOf;
-        if (buffer.begin <= buffer.end) {
-            sizeOf = buffer.end - buffer.begin;
-        } else {
-            sizeOf = uint8(buffer.end + 256 - buffer.begin);
-        }
-
-        return sizeOf;
-    }
 
     function truncateUTF8(
         string memory input
@@ -91,23 +63,6 @@ contract BFTBridge {
         }
     }
 
-    function toIDfromBaseAddress(
-        uint32 chainID,
-        address toAddress
-    ) public pure returns (bytes32 toID) {
-        return
-            bytes32(
-            abi.encodePacked(
-                uint8(1),
-                chainID,
-                toAddress,
-                uint32(0),
-                uint16(0),
-                uint(8)
-            )
-        );
-    }
-
     // Additional gas amount for fee charge.
     uint256 constant additionalGasFee = 1000;
 
@@ -117,14 +72,17 @@ contract BFTBridge {
     // Blocknumbers for users deposit Ids.
     mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
 
-    // Beginning and the end indices for the the user deposits
-    mapping(address => RingBuffer) private _lastUserDeposit;
+    // Last 255 user's burn operations.
+    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
 
     // Get the wrapped token addresses given their native token.
     mapping(bytes32 => address) private _erc20TokenRegistry;
 
     // Mapping from Base tokens to Wrapped tokens
     mapping(address => bytes32) private _baseTokenRegistry;
+
+    // List of wrapped tokens.
+    address[] private _wrappedTokenList;
 
     // Address of minter canister
     address public minterCanisterAddress;
@@ -134,6 +92,9 @@ contract BFTBridge {
 
     // Mapping from user address to amount of native tokens on his deposit.
     mapping(address => uint256) private _userNativeDeposit;
+
+    // Mapping from user address to list of senderIDs, which are able to spend native deposit.
+    mapping(address => mapping(bytes32 => bool)) private _approvedSenderIDs;
 
     // Constructor to initialize minterCanisterAddress
     constructor(address minterAddress) {
@@ -183,12 +144,27 @@ contract BFTBridge {
         uint8 decimals;
     }
 
+    // Event that can be emited with a notification for the minter canister
+    event NotifyMinterEvent(
+        uint32 notificationType,
+        bytes userData
+    );
+
+    // Emit minter notification event with the given `userData`. For details about what should be in the user data,
+    // check the implementation of the corresponding minter.
+    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
+        emit NotifyMinterEvent(notificationType, userData);
+    }
+
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(address to) external payable returns (uint256 balance) {
-        if (to == address(0)) {
-            to = msg.sender;
+    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
+        address to = msg.sender;
+
+        // Add approved SpenderIDs
+        for (uint i = 0; i < approvedSenderIDs.length; i++) {
+            _approvedSenderIDs[to][approvedSenderIDs[i]] = true;
         }
 
         balance = _userNativeDeposit[to];
@@ -196,9 +172,16 @@ contract BFTBridge {
         _userNativeDeposit[to] = balance;
         payable(minterCanisterAddress).transfer(msg.value);
     }
-    
+
+    // Remove approved SpenderIDs
+    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
+        for (uint i = 0; i < approvedSenderIDs.length; i++) {
+            delete _approvedSenderIDs[msg.sender][approvedSenderIDs[i]];
+        }
+    }
+
     // Returns user's native token deposit balance. 
-    function nativeTokenBalance(address user) external view returns(uint256 balance) {
+    function nativeTokenBalance(address user) external view returns (uint256 balance) {
         if (user == address(0)) {
             user = msg.sender;
         }
@@ -207,9 +190,10 @@ contract BFTBridge {
 
     // Take the given amount of fee from the user.
     // Require the user to have enough native token balance.
-    function _chargeFee(address from, uint256 amount) private {
+    function _chargeFee(address from, bytes32 senderID, uint256 amount) private {
         uint256 balance = _userNativeDeposit[from];
         require(balance >= amount, "insufficient balance to pay fee");
+        require(_approvedSenderIDs[from][senderID], "senderID is not approved");
 
         uint256 newBalance = balance - amount;
         _userNativeDeposit[from] = newBalance;
@@ -268,7 +252,7 @@ contract BFTBridge {
         if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
-            _chargeFee(order.feePayer, fee);
+            _chargeFee(order.feePayer, order.senderID, fee);
         }
 
         // Emit event
@@ -283,22 +267,8 @@ contract BFTBridge {
     }
 
     // Getter function for block numbers
-    function getDepositBlocks() external view returns (uint32[] memory) {
-        RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-
-        // Get buffer size
-        uint8 bufferSize = size(buffer);
-
-        // Fill return buffer with values
-        uint32[] memory res = new uint32[](bufferSize);
-        for (uint8 i = buffer.begin; i != buffer.end;) {
-            res[i] = _userDepositBlocks[msg.sender][i]; // Assign values to the temporary array
-            unchecked {
-                i++;
-            }
-        }
-
-        return res;
+    function getDepositBlocks() external view returns (uint32[] memory blockNumbers) {
+        blockNumbers = _lastUserBurns[msg.sender].getAll();
     }
 
     // Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
@@ -319,12 +289,7 @@ contract BFTBridge {
         require(fromERC20 != address(0), "Invalid from address");
 
         // Update user information about burn operations.
-        // Additional scope required to save stack space and avoid StackTooDeep error.
-        {
-            RingBuffer memory buffer = _lastUserDeposit[msg.sender];
-            _userDepositBlocks[msg.sender][buffer.end] = uint32(block.number);
-            _lastUserDeposit[msg.sender] = increment(buffer);
-        }
+        _lastUserBurns[msg.sender].push(uint32(block.number));
 
         // get the token details
         TokenMetadata memory meta = getTokenMetadata(fromERC20);
@@ -386,6 +351,18 @@ contract BFTBridge {
         return _baseTokenRegistry[wrappedTokenAddress];
     }
 
+    // Returns list of token pairs.
+    function listTokenPairs() external view returns (address[] memory wrapped, bytes32[] memory base) {
+        uint length = _wrappedTokenList.length;
+        wrapped = new address[](length);
+        base = new bytes32[](length);
+        for (uint i = 0; i < length; i++) {
+            address wrappedToken = _wrappedTokenList[i];
+            wrapped[i] = wrappedToken;
+            base[i] = _baseTokenRegistry[wrappedToken];
+        }
+    }
+
     // Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(
         string memory name,
@@ -406,6 +383,7 @@ contract BFTBridge {
 
         _erc20TokenRegistry[baseTokenID] = address(wrappedERC20);
         _baseTokenRegistry[address(wrappedERC20)] = baseTokenID;
+        _wrappedTokenList.push(address(wrappedERC20));
 
         emit WrappedTokenDeployedEvent(
             name,

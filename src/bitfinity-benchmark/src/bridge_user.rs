@@ -432,8 +432,8 @@ impl BridgeUser {
             from_subaccount: None,
             icrc2_token_principal: icrc2_token,
             recipient_address: self.address.clone(),
-            operation_id: 0,
             approve_minted_tokens: None,
+            fee_payer: None,
         };
 
         log::trace!("Burning ICRC-2 tokens by {} user", self.name);

@@ -13,8 +13,10 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use icrc_client::transfer::TransferError;
+use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
@@ -25,14 +27,13 @@ use crate::state::State;
 use crate::tokens::icrc2;
 
 type SignedMintOrderData = Vec<u8>;
-type ShouldSendMintTx = bool;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
-    PrepareMintOrder(BurntIcrc2Data, ShouldSendMintTx),
+    PrepareMintOrder(BurntIcrc2Data),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData),
     MintIcrc2Tokens(BurntEventData),
@@ -48,9 +49,9 @@ impl Task for BridgeTask {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
             BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
-            BridgeTask::PrepareMintOrder(data, should_send_mint_tx) => Box::pin(
-                Self::prepare_mint_order(state, scheduler, data.clone(), *should_send_mint_tx),
-            ),
+            BridgeTask::PrepareMintOrder(data) => {
+                Box::pin(Self::prepare_mint_order(state, scheduler, data.clone()))
+            }
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(state, data) })
@@ -139,14 +140,13 @@ impl BridgeTask {
 
         log::debug!("got evm logs: {logs:?}");
 
-        let mut mut_state = state.borrow_mut();
-
         // Filter out logs that do not have block number.
         // Such logs are produced when the block is not finalized yet.
         let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
         if let Some(last_log) = last_log {
             let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state
+            state
+                .borrow_mut()
                 .config
                 .update_evm_params(|params| params.next_block = next_block_number);
         };
@@ -155,6 +155,9 @@ impl BridgeTask {
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
+        // Update EVM params
+        Self::update_evm_params(state.clone()).await?;
+
         Ok(())
     }
 
@@ -162,7 +165,6 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         burnt_data: BurntIcrc2Data,
-        should_send_mint_tx: ShouldSendMintTx,
     ) -> Result<(), SchedulerError> {
         log::trace!("preparing mint order: {burnt_data:?}");
 
@@ -181,6 +183,10 @@ impl BridgeTask {
 
         let nonce = burnt_data.operation_id;
 
+        // If there is no fee payer, user should send mint tx by himself.
+        let fee_payer = burnt_data.fee_payer.unwrap_or_default();
+        let should_send_mint_tx = fee_payer != H160::zero();
+
         let mint_order = MintOrder {
             amount: burnt_data.amount,
             sender,
@@ -195,7 +201,7 @@ impl BridgeTask {
             decimals: burnt_data.decimals,
             approve_spender: burnt_data.approve_spender,
             approve_amount: burnt_data.approve_amount,
-            fee_payer: H160::zero(),
+            fee_payer,
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
@@ -207,9 +213,12 @@ impl BridgeTask {
         state
             .borrow_mut()
             .mint_orders
-            .insert(sender, src_token, nonce, &signed_mint_order);
+            .insert(sender, src_token, nonce, signed_mint_order);
 
         if should_send_mint_tx {
+            // Update EVM params before sending the transaction.
+            Self::update_evm_params(state.clone()).await?;
+
             let options = TaskOptions::default();
             scheduler.append_task(
                 BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec())
@@ -244,6 +253,7 @@ impl BridgeTask {
                 let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::Notify(_)) => todo!(),
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
@@ -298,18 +308,12 @@ impl BridgeTask {
             ));
         };
 
-        let client = state.borrow().config.get_evm_client();
-        let nonce = client
-            .get_transaction_count(sender.0, BlockNumber::Latest)
-            .await
-            .into_scheduler_result()?;
-
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
             bridge_contract.0,
-            nonce.into(),
-            evm_params.gas_price.into(),
-            order_data,
+            evm_params.nonce.into(),
+            evm_params.gas_price.clone().into(),
+            &order_data,
             evm_params.chain_id as _,
         );
 
@@ -327,11 +331,6 @@ impl BridgeTask {
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
-
-        state
-            .borrow_mut()
-            .config
-            .update_evm_params(|p| p.nonce += 1);
 
         log::trace!("Mint transaction sent");
 
@@ -364,7 +363,6 @@ impl BridgeTask {
         };
 
         // Transfer icrc2 tokens to the recipient.
-
         let amount = Nat::from(&burnt_event.amount);
 
         let mint_result = icrc2::mint(to_token, recipient, amount.clone(), true).await;
@@ -399,9 +397,10 @@ impl BridgeTask {
                         decimals: burnt_event.decimals,
                         approve_spender: H160::default(),
                         approve_amount: U256::zero(),
+                        fee_payer: None,
                     };
 
-                    let task = Self::PrepareMintOrder(burnt_data, false);
+                    let task = Self::PrepareMintOrder(burnt_data);
                     let options = TaskOptions::default()
                         .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
                         .with_backoff_policy(BackoffPolicy::Exponential {
@@ -416,6 +415,54 @@ impl BridgeTask {
         }
 
         log::trace!("Finished icrc2 mint to principal: {}", recipient);
+
+        Ok(())
+    }
+
+    pub async fn update_evm_params(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+        let client = state.borrow().config.get_evm_client();
+
+        let Some(initial_params) = state.borrow().config.get_evm_params() else {
+            log::warn!("no evm parameters set, unable to update");
+            return Err(SchedulerError::TaskExecutionFailed(
+                "no evm parameters set".into(),
+            ));
+        };
+
+        let address = {
+            let signer = state.borrow().signer.get_transaction_signer();
+            signer.get_address().await.into_scheduler_result()?
+        };
+
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .into_scheduler_result()?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .into_scheduler_result()?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        state.borrow_mut().config.update_evm_params(|p| *p = params);
+        log::trace!("evm params updated");
 
         Ok(())
     }
@@ -447,4 +494,5 @@ pub struct BurntIcrc2Data {
     pub decimals: u8,
     pub approve_spender: H160,
     pub approve_amount: U256,
+    pub fee_payer: Option<H160>,
 }

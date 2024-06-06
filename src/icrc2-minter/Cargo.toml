@@ -28,6 +28,7 @@ ic-stable-structures = { workspace = true }
 ic-task-scheduler = { workspace = true }
 ic-storage = { workspace = true }
 icrc-client = { workspace = true }
+jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }

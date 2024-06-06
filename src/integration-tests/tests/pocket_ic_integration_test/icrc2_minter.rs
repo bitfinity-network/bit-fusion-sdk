@@ -28,18 +28,29 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap();
 
     let amount = 300_000u64;
-    let operation_id = 42;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
 
     eprintln!("burning icrc tokens and creating mint order");
     let _operation_id = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, operation_id, None)
+        .burn_icrc2(JOHN, &john_wallet, amount as _, None, Some(john_address))
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -71,10 +82,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 4).await;
 
     println!("john principal: {}", john());
 
@@ -102,14 +110,27 @@ async fn test_icrc2_token_canister_stopped() {
 
     let amount = 3_000_000u64;
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
     eprintln!("burning icrc tokens and creating mint order");
+    let john_address: H160 = john_wallet.address().into();
     let _operation_id = ctx
-        .burn_icrc2(JOHN, &john_wallet, amount as _, 42, None)
+        .burn_icrc2(JOHN, &john_wallet, amount as _, None, Some(john_address))
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -147,15 +168,7 @@ async fn test_icrc2_token_canister_stopped() {
         .unwrap()
         .0;
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 8).await;
 
     let refund_mint_order = ctx
         .icrc_minter_client(ADMIN)
@@ -173,15 +186,7 @@ async fn test_icrc2_token_canister_stopped() {
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
 
     // Check if the amount is refunded as wrapped token.
     let base_balance = base_token_client
@@ -210,8 +215,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .unwrap();
 
     let amount = 300_000u64;
-    let operation_id = 42;
-
     let john_principal_hash = keccak_hash(john().as_slice());
     let principal_signature = john_wallet.sign_hash(john_principal_hash.0).unwrap().into();
     let approve_amount = U256::from(1000_u64);
@@ -220,23 +223,42 @@ async fn test_icrc2_tokens_approve_after_mint() {
     let john_address: H160 = john_wallet.address().into();
     let spender_wallet = ctx.new_wallet(0).await.unwrap();
 
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        bft_bridge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    println!("John address: {john_address:?}");
+
+    let native_deposit_balance = ctx
+        .native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone())
+        .await;
+    assert_eq!(native_deposit_balance, native_token_amount.into());
+
     let _operation_id = ctx
         .burn_icrc2(
             JOHN,
             &john_wallet,
             amount as _,
-            operation_id,
             Some(ApproveMintedTokens {
                 approve_spender: spender_wallet.address().into(),
                 approve_amount: approve_amount.clone(),
                 principal_signature,
             }),
+            Some(john_address.clone()),
         )
         .await
         .unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 6).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -315,14 +337,13 @@ async fn double_register_bridge() {
 
     let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
 
-    ctx.advance_time(Duration::from_secs(2)).await;
-    ctx.advance_time(Duration::from_secs(2)).await;
+    ctx.advance_by_times(Duration::from_secs(2), 2).await;
 
     let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
 
     assert!(err
         .to_string()
-        .contains("creation of BftBridge contract already finised"));
+        .contains("creation of BftBridge contract already finished"));
 }
 
 #[tokio::test]

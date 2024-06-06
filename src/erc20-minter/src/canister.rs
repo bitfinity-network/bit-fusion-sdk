@@ -8,7 +8,7 @@ use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl
 use ic_exports::ic_kit::ic;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -64,6 +64,9 @@ impl EvmMinter {
     #[init]
     pub fn init(&mut self, settings: Settings) {
         let admin = ic::caller();
+
+        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
+
         let state = get_state();
         state.borrow_mut().init(admin, settings);
 
@@ -163,10 +166,7 @@ impl EvmMinter {
         let evm_params = evm_info
             .params
             .ok_or_else(|| "EVM params not initialized".to_string())?;
-        let minter_address = signer
-            .get_address()
-            .await
-            .map_err(|e| e.to_string())?;
+        let minter_address = signer.get_address().await.map_err(|e| e.to_string())?;
 
         let mut status = state.borrow().config.get_bft_bridge_status(side);
 
@@ -197,6 +197,14 @@ impl EvmMinter {
         Ok(hash)
     }
 
+    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+        if principal == Principal::anonymous() {
+            return Err(minter_did::error::Error::AnonymousPrincipal);
+        }
+
+        Ok(())
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -210,7 +218,7 @@ impl Metrics for EvmMinter {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
 fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
@@ -250,4 +258,37 @@ pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use candid::Principal;
+    use eth_signer::sign_strategy::SigningStrategy;
+    use ic_canister::{canister_call, Canister};
+    use ic_exports::ic_kit::inject::{self};
+    use ic_exports::ic_kit::MockContext;
+    use minter_contract_utils::evm_link::EvmLink;
+
+    use super::*;
+    use crate::EvmMinter;
+
+    #[tokio::test]
+    #[should_panic = "admin principal is anonymous"]
+    async fn disallow_anonymous_owner_in_init() {
+        MockContext::new().inject();
+        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
+        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
+
+        inject::get_context().update_id(Principal::anonymous());
+
+        let mut canister = EvmMinter::from_principal(mock_canister_id);
+
+        let init_data = Settings {
+            base_evm_link: EvmLink::Http("".to_string()),
+            wrapped_evm_link: EvmLink::Http("".to_string()),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [0; 32],
+            },
+            log_settings: None,
+        };
+
+        canister_call!(canister.init(init_data), ()).await.unwrap();
+    }
+}
