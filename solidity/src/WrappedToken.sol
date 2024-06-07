@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.7;
 
@@ -42,7 +42,11 @@ contract WrappedToken is ERC20 {
     }
 
     /// This function allows the owner to change other wallet allowance.
-    function approveByOwner(address from, address spender, uint256 value) public virtual returns (bool) {
+    function approveByOwner(
+        address from,
+        address spender,
+        uint256 value
+    ) public virtual returns (bool) {
         if (_msgSender() != owner) {
             return false;
         }
@@ -66,7 +70,11 @@ contract WrappedToken is ERC20 {
     }
 
     // Updates token name, symbol and decimals if needed.
-    function setMetaData(bytes32 name_, bytes16 symbol_, uint8 decimals_) public {
+    function setMetaData(
+        bytes32 name_,
+        bytes16 symbol_,
+        uint8 decimals_
+    ) public {
         require(msg.sender == owner, "Unauthorised Access");
         if (symbol_ != 0x0) {
             if (bytes16(bytes(_symbol)) != symbol_) {
@@ -79,7 +87,7 @@ contract WrappedToken is ERC20 {
             }
         }
         if (decimals_ != 0 && _decimals != decimals_) {
-             _decimals = decimals_;
+            _decimals = decimals_;
         }
     }
 
