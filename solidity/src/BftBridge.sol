@@ -65,6 +65,7 @@ contract BFTBridge {
     }
 
     // Additional gas amount for fee charge.
+    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
     uint256 constant additionalGasFee = 1000;
 
     // Has a user's transaction nonce been used?
@@ -205,7 +206,7 @@ contract BFTBridge {
             );
         }
 
-        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
+        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress && address(feeChargeContract) != address(0)) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);

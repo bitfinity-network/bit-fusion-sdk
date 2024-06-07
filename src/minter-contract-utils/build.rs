@@ -27,6 +27,11 @@ fn main() -> anyhow::Result<()> {
         "BFTBridge",
         "BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE",
     );
+    set_contract_code(
+        &contracts,
+        "FeeCharge",
+        "BUILD_SMART_CONTRACT_FEE_CHARGE_HEX_CODE",
+    );
     set_deployed_contract_code(
         &contracts,
         "BFTBridge",

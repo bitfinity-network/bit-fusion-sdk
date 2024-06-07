@@ -19,7 +19,7 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
-    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
@@ -34,7 +34,7 @@ async fn test_icrc2_tokens_roundtrip() {
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
-        bft_bridge.clone(),
+        fee_charge.clone(),
         &john_wallet,
         &[john_principal_id],
         native_token_amount.into(),
@@ -100,7 +100,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
 #[tokio::test]
 async fn test_icrc2_token_canister_stopped() {
-    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
@@ -115,7 +115,7 @@ async fn test_icrc2_token_canister_stopped() {
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
-        bft_bridge.clone(),
+        fee_charge.clone(),
         &john_wallet,
         &[john_principal_id],
         native_token_amount.into(),
@@ -206,7 +206,7 @@ async fn test_icrc2_token_canister_stopped() {
 
 #[tokio::test]
 async fn test_icrc2_tokens_approve_after_mint() {
-    let (ctx, john_wallet, bft_bridge) = init_bridge().await;
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
@@ -228,7 +228,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
-        bft_bridge.clone(),
+        fee_charge.clone(),
         &john_wallet,
         &[john_principal_id],
         native_token_amount.into(),
@@ -239,7 +239,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     println!("John address: {john_address:?}");
 
     let native_deposit_balance = ctx
-        .native_token_deposit_balance(&evm_client, bft_bridge.clone(), john_address.clone())
+        .native_token_deposit_balance(&evm_client, fee_charge.clone(), john_address.clone())
         .await;
     assert_eq!(native_deposit_balance, native_token_amount.into());
 
@@ -335,11 +335,17 @@ async fn set_owner_access() {
 async fn double_register_bridge() {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
 
-    let _ = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
+    let _ = ctx
+        .initialize_bft_bridge(ADMIN, H160::default())
+        .await
+        .unwrap();
 
     ctx.advance_by_times(Duration::from_secs(2), 2).await;
 
-    let err = ctx.initialize_bft_bridge(ADMIN).await.unwrap_err();
+    let err = ctx
+        .initialize_bft_bridge(ADMIN, H160::default())
+        .await
+        .unwrap_err();
 
     assert!(err
         .to_string()
