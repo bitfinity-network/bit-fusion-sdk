@@ -137,40 +137,20 @@ contract WrappedTokenTest is Test {
         assertEq(_token.decimals(), 18);
 
         vm.prank(_owner);
-        _token.setMetaData(
-            bytes32(bytes("New token")),
-            bytes16(bytes("New symbol")),
-            42
-        );
-        assertEq(
-            _token.name(),
-            string(abi.encodePacked(bytes32(bytes("New token"))))
-        );
-        assertEq(
-            _token.symbol(),
-            string(abi.encodePacked(bytes16(bytes("New symbol"))))
-        );
+        _token.setMetaData(bytes32(bytes("New token")), bytes16(bytes("New symbol")), 42);
+        assertEq(_token.name(), string(abi.encodePacked(bytes32(bytes("New token")))));
+        assertEq(_token.symbol(), string(abi.encodePacked(bytes16(bytes("New symbol")))));
         assertEq(_token.decimals(), 42);
 
         vm.prank(_owner);
         _token.setMetaData(0x0, 0x0, 0);
-        assertEq(
-            _token.name(),
-            string(abi.encodePacked(bytes32(bytes("New token"))))
-        );
-        assertEq(
-            _token.symbol(),
-            string(abi.encodePacked(bytes16(bytes("New symbol"))))
-        );
+        assertEq(_token.name(), string(abi.encodePacked(bytes32(bytes("New token")))));
+        assertEq(_token.symbol(), string(abi.encodePacked(bytes16(bytes("New symbol")))));
         assertEq(_token.decimals(), 42);
     }
 
     function testSetMetadataInvalidCaller() public {
         vm.expectRevert("Unauthorised Access");
-        _token.setMetaData(
-            bytes32(bytes("New token")),
-            bytes16(bytes("New symbol")),
-            42
-        );
+        _token.setMetaData(bytes32(bytes("New token")), bytes16(bytes("New symbol")), 42);
     }
 }

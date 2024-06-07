@@ -12,11 +12,7 @@ contract WrappedToken is ERC20 {
     uint8 private _decimals;
 
     // Initializes contract with the given name and symbl
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        address _owner
-    ) ERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_, address _owner) ERC20(name_, symbol_) {
         owner = _owner;
         _name = name_;
         _symbol = symbol_;
@@ -25,10 +21,7 @@ contract WrappedToken is ERC20 {
 
     // Perform IERC20 transfer.
     // If `msg.sender` is `owner` then mint happens.
-    function transfer(
-        address to,
-        uint256 value
-    ) public virtual override returns (bool) {
+    function transfer(address to, uint256 value) public virtual override returns (bool) {
         if (msg.sender == owner) {
             _mint(owner, value);
         }
@@ -42,11 +35,7 @@ contract WrappedToken is ERC20 {
     }
 
     /// This function allows the owner to change other wallet allowance.
-    function approveByOwner(
-        address from,
-        address spender,
-        uint256 value
-    ) public virtual returns (bool) {
+    function approveByOwner(address from, address spender, uint256 value) public virtual returns (bool) {
         if (_msgSender() != owner) {
             return false;
         }
@@ -57,11 +46,7 @@ contract WrappedToken is ERC20 {
 
     // Perform IERC20 transfer from `sender` address.
     // If called by `owner` and `recipient` is `owner` then burn happens.
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public virtual override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         bool success = super.transferFrom(sender, recipient, amount);
         if (msg.sender == owner && recipient == owner && success) {
             _burn(owner, amount);
@@ -70,11 +55,7 @@ contract WrappedToken is ERC20 {
     }
 
     // Updates token name, symbol and decimals if needed.
-    function setMetaData(
-        bytes32 name_,
-        bytes16 symbol_,
-        uint8 decimals_
-    ) public {
+    function setMetaData(bytes32 name_, bytes16 symbol_, uint8 decimals_) public {
         require(msg.sender == owner, "Unauthorised Access");
         if (symbol_ != 0x0) {
             if (bytes16(bytes(_symbol)) != symbol_) {

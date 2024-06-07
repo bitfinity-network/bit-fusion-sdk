@@ -58,12 +58,7 @@ contract BFTBridge is TokenManager {
 
     // Event for mint operation
     event MintTokenEvent(
-        uint256 amount,
-        bytes32 fromToken,
-        bytes32 senderID,
-        address toERC20,
-        address recipient,
-        uint32 nonce
+        uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
     );
 
     // Event for burn operation
@@ -84,19 +79,14 @@ contract BFTBridge is TokenManager {
 
     // Emit minter notification event with the given `userData`. For details about what should be in the user data,
     // check the implementation of the corresponding minter.
-    function notifyMinter(
-        uint32 notificationType,
-        bytes calldata userData
-    ) external {
+    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, userData);
     }
 
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(
-        bytes32[] calldata approvedSenderIDs
-    ) external payable returns (uint256 balance) {
+    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
         address to = msg.sender;
 
         // Add approved SpenderIDs
@@ -111,18 +101,14 @@ contract BFTBridge is TokenManager {
     }
 
     // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(
-        bytes32[] calldata approvedSenderIDs
-    ) external {
+    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
         for (uint256 i = 0; i < approvedSenderIDs.length; i++) {
             delete _approvedSenderIDs[msg.sender][approvedSenderIDs[i]];
         }
     }
 
     // Returns user's native token deposit balance.
-    function nativeTokenBalance(
-        address user
-    ) external view returns (uint256 balance) {
+    function nativeTokenBalance(address user) external view returns (uint256 balance) {
         if (user == address(0)) {
             user = msg.sender;
         }
@@ -131,11 +117,7 @@ contract BFTBridge is TokenManager {
 
     // Take the given amount of fee from the user.
     // Require the user to have enough native token balance.
-    function _chargeFee(
-        address from,
-        bytes32 senderID,
-        uint256 amount
-    ) private {
+    function _chargeFee(address from, bytes32 senderID, uint256 amount) private {
         uint256 balance = _userNativeDeposit[from];
         require(balance >= amount, "insufficient balance to pay fee");
         require(_approvedSenderIDs[from][senderID], "senderID is not approved");
@@ -148,9 +130,7 @@ contract BFTBridge is TokenManager {
     function mint(bytes calldata encodedOrder) external {
         uint256 initGasLeft = gasleft();
 
-        MintOrderData memory order = _decodeAndValidateOrder(
-            encodedOrder[:269]
-        );
+        MintOrderData memory order = _decodeAndValidateOrder(encodedOrder[:269]);
 
         _checkMintOrderSignature(encodedOrder);
 
@@ -169,10 +149,7 @@ contract BFTBridge is TokenManager {
 
         // The toToken should be a valid token address.
         // This should never fail.
-        require(
-            toToken != address(0),
-            "toToken address should be specified correctly"
-        );
+        require(toToken != address(0), "toToken address should be specified correctly");
 
         // Update token's metadata
         updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
@@ -182,53 +159,29 @@ contract BFTBridge is TokenManager {
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
         if (order.approveSpender != address(0) && order.approveAmount != 0) {
-            WrappedToken(toToken).approveByOwner(
-                order.recipient,
-                order.approveSpender,
-                order.approveAmount
-            );
+            WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
-        if (
-            order.feePayer != address(0) && msg.sender == minterCanisterAddress
-        ) {
+        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
             _chargeFee(order.feePayer, order.senderID, fee);
         }
 
         // Emit event
-        emit MintTokenEvent(
-            order.amount,
-            order.fromTokenID,
-            order.senderID,
-            toToken,
-            order.recipient,
-            order.nonce
-        );
+        emit MintTokenEvent(order.amount, order.fromTokenID, order.senderID, toToken, order.recipient, order.nonce);
     }
 
     /// Getter function for block numbers
-    function getDepositBlocks()
-        external
-        view
-        returns (uint32[] memory blockNumbers)
-    {
+    function getDepositBlocks() external view returns (uint32[] memory blockNumbers) {
         blockNumbers = _lastUserBurns[msg.sender].getAll();
     }
 
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(
-        uint256 amount,
-        address fromERC20,
-        bytes memory recipientID
-    ) public returns (uint32) {
-        require(
-            fromERC20 != address(this),
-            "From address must not be BFT bridge address"
-        );
+    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
+        require(fromERC20 != address(this), "From address must not be BFT bridge address");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -246,15 +199,7 @@ contract BFTBridge is TokenManager {
         uint32 operationID = operationIDCounter++;
 
         emit BurnTokenEvent(
-            msg.sender,
-            amount,
-            fromERC20,
-            recipientID,
-            toTokenID,
-            operationID,
-            meta.name,
-            meta.symbol,
-            meta.decimals
+            msg.sender, amount, fromERC20, recipientID, toTokenID, operationID, meta.name, meta.symbol, meta.decimals
         );
 
         return operationID;
@@ -266,9 +211,7 @@ contract BFTBridge is TokenManager {
     }
 
     /// Function to decode and validate the order data
-    function _decodeAndValidateOrder(
-        bytes calldata encodedOrder
-    ) private view returns (MintOrderData memory order) {
+    function _decodeAndValidateOrder(bytes calldata encodedOrder) private view returns (MintOrderData memory order) {
         // Decode order data
         order.amount = uint256(bytes32(encodedOrder[:32]));
         order.senderID = bytes32(encodedOrder[32:64]);
@@ -299,16 +242,13 @@ contract BFTBridge is TokenManager {
 
         if (_baseTokenRegistry[order.toERC20] != bytes32(0)) {
             require(
-                _erc20TokenRegistry[order.fromTokenID] == order.toERC20,
-                "SRC token and DST token must be a valid pair"
+                _erc20TokenRegistry[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
             );
         }
     }
 
     /// Function to check encodedOrder signature
-    function _checkMintOrderSignature(
-        bytes calldata encodedOrder
-    ) private view {
+    function _checkMintOrderSignature(bytes calldata encodedOrder) private view {
         // Create a hash of the order data
         bytes32 hash = keccak256(encodedOrder[:269]);
 
