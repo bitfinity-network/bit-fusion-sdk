@@ -359,7 +359,7 @@ impl CkBtcSetup {
             .unwrap();
 
         let bft_bridge = (&context)
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap())
+            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None)
             .await
             .unwrap();
         let token_id = Id256::from(&Principal::from(ledger_id));

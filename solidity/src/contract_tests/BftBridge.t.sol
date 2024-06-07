@@ -39,7 +39,7 @@ contract BftBridgeTest is Test {
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-        _bridge = new BFTBridge(_owner);
+        _bridge = new BFTBridge(_owner, address(0));
     }
 
     function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {

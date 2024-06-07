@@ -9,7 +9,7 @@ use std::time::Duration;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H160, H256};
-use eth_signer::Wallet;
+use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
@@ -197,11 +197,24 @@ impl fmt::Debug for PocketIcTestContext {
 /// - john wallet with native tokens,
 /// - opetaion points for john,
 /// - bridge contract
-async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160) {
+async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
-    let bft_bridge = ctx.initialize_bft_bridge(ADMIN).await.unwrap();
+    let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
+    let expected_fee_charge_address =
+        ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
 
-    (ctx, john_wallet, bft_bridge)
+    let bft_bridge = ctx
+        .initialize_bft_bridge(ADMIN, expected_fee_charge_address.into())
+        .await
+        .unwrap();
+
+    let fee_charge_address = ctx
+        .initialize_fee_charge_contract(&fee_charge_deployer, &[bft_bridge.clone()])
+        .await
+        .unwrap();
+    assert_eq!(expected_fee_charge_address, fee_charge_address.0);
+
+    (ctx, john_wallet, bft_bridge, fee_charge_address)
 }
