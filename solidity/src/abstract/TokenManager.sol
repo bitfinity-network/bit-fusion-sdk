@@ -82,4 +82,9 @@ abstract contract TokenManager {
             base[i] = _baseTokenRegistry[wrappedToken];
         }
     }
+
+    /// Returns false/true if the given token is wrapped token
+    function isWrappedToken(address token) internal view returns (bool) {
+        return _baseTokenRegistry[token] != bytes32(0);
+    }
 }

@@ -51,17 +51,12 @@ contract BFTBridge is TokenManager {
     // Mapping from user address to list of senderIDs, which are able to spend native deposit.
     mapping(address => mapping(bytes32 => bool)) private _approvedSenderIDs;
 
-    // Constructor to initialize minterCanisterAddress
-    constructor(address minterAddress) {
-        minterCanisterAddress = minterAddress;
-    }
-
-    // Event for mint operation
+    /// Event for mint operation
     event MintTokenEvent(
         uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
     );
 
-    // Event for burn operation
+    /// Event for burn operation
     event BurnTokenEvent(
         address sender,
         uint256 amount,
@@ -74,11 +69,17 @@ contract BFTBridge is TokenManager {
         uint8 decimals
     );
 
-    // Event that can be emited with a notification for the minter canister
+    /// Event that can be emited with a notification for the minter canister
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
-    // Emit minter notification event with the given `userData`. For details about what should be in the user data,
-    // check the implementation of the corresponding minter.
+    // Constructor to initialize minterCanisterAddress
+    constructor(address minterAddress) {
+        minterCanisterAddress = minterAddress;
+    }
+
+    /// Emit minter notification event with the given `userData`. For details
+    /// about what should be in the user data,
+    /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, userData);
     }
@@ -151,14 +152,16 @@ contract BFTBridge is TokenManager {
         // This should never fail.
         require(toToken != address(0), "toToken address should be specified correctly");
 
-        // Update token's metadata
-        updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
+        // Update token's metadata only if it is a wrapped token
+        if (isWrappedToken(toToken)) {
+            updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
+        }
 
         // Execute the withdrawal
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0) {
+        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedToken(toToken)) {
             WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
