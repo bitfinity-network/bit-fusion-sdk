@@ -40,8 +40,6 @@ on:
 
 env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
-  # required for release downloader script
-  GHR_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
   build-test:
@@ -58,16 +56,24 @@ jobs:
       init-script: |
         ./scripts/build_solidity.sh
       artifact-pre-script: |
+        # Downloading release file
+        export WASMS_DIR="`pwd`/.artifact"
+        export GHR_TOKEN=$SECRET1
+        WASM_EVM="evm-testnet-v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1.tar.gz"
+        WASM_SIG="signature-verification-v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1.tar.gz"
+        
+        ./scripts/gh_get_priv_release.sh $WASMS_DIR bitfinity-network evm-canister \
+        "v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1" \
+        "$WASM_EVM" "$WASM_SIG"
+
+        tar -xvf $WASMS_DIR/$WASM_EVM -C $WASMS_DIR
+        tar -xvf $WASMS_DIR/$WASM_SIG -C $WASMS_DIR
+        rm -f $WASMS_DIR/$WASM_EVM $WASMS_DIR/$WASM_SIG
+
         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
         ./scripts/build.sh
       test-script: |
         export WASMS_DIR="`pwd`/.artifact"
-
-        # Downloading release file
-        ./gh_get_priv_release.sh $WASMS_DIR bitfinity-network evm-canister \
-        "v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1" \
-        "signature-verification-v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1.tar.gz" \
-        "evm-v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1.tar.gz"
 
         ./scripts/tests/tests_i686.sh
         ./scripts/tests/tests.sh
@@ -76,3 +82,4 @@ jobs:
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+      env_secret1: ${{ secrets.GH_PKG_TOKEN }}
