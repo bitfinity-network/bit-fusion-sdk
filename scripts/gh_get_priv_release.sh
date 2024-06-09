@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Usage: GHR_TOKEN="TOKEN" gh_get_priv_release.sh TARGET_DIR OWNER REPO RELEASE_TAG ASSET1_NAME [ASSET2_NAME ...]
+# Usage: GH_API_TOKEN="TOKEN" gh_get_priv_release.sh TARGET_DIR OWNER REPO RELEASE_TAG ASSET1_NAME [ASSET2_NAME ...]
 
 # Check dependencies.
 set -e
 type curl grep sed tr >&2
 
 # Validate settings.
-[ "$GHR_TOKEN" ] || { echo "Error: Please define GHR_TOKEN variable." >&2; exit 1; }
+[ "$GH_API_TOKEN" ] || { echo "Error: Please define GH_API_TOKEN variable." >&2; exit 1; }
 [ $# -lt 5 ] && { echo "Usage: $0 TARGET_DIR OWNER REPO RELEASE_TAG ASSET1_NAME [ASSET2_NAME ...]"; exit 1; }
 [ "$TRACE" ] && set -x
 
@@ -17,7 +17,7 @@ shift 4
 GH_API="https://api.github.com"
 GH_REPO="$GH_API/repos/$owner/$repo"
 GH_TAGS="$GH_REPO/releases/tags/$tag"
-AUTH="Authorization: token $GHR_TOKEN"
+AUTH="Authorization: token $GH_API_TOKEN"
 WGET_ARGS="--content-disposition --auth-no-challenge --no-cookie"
 CURL_ARGS="-LJO#"
 
@@ -52,7 +52,16 @@ echo "DOWNLOADING $name"
     # Download asset file.
     echo "Downloading asset \"$name\" ..." >&2
     rm -f "$name"
-    curl $CURL_ARGS -H "Authorization: token $GHR_TOKEN" -H 'Accept: application/octet-stream' "$GH_ASSET"
+    curl $CURL_ARGS -H "Authorization: token $GH_API_TOKEN" -H 'Accept: application/octet-stream' "$GH_ASSET"
+
+    case $name in
+        *.tar.gz)
+            # Unpack archive and remove it.
+            echo "Unpacking \"$name\""
+            tar -xvf $name
+            rm -f $name
+            ;;
+    esac
 done
 
 echo "$0 is done \(^_^)/" >&2

@@ -129,12 +129,6 @@ build_requested_canisters() {
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        # cp "$project_dir/src/integration-tests/evm_testnet.did" "$WASM_DIR/evm_testnet.did"
-        # cp "$project_dir/src/integration-tests/evm_testnet.wasm.gz" "$WASM_DIR/evm_testnet.wasm.gz"
-
-        # cp "$project_dir/src/integration-tests/signature_verification.did" "$WASM_DIR/signature_verification.did"
-        # cp "$project_dir/src/integration-tests/signature_verification.wasm.gz" "$WASM_DIR/signature_verification.wasm.gz"
-
         build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
