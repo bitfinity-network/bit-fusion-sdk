@@ -77,7 +77,6 @@ contract BFTBridge is TokenManager {
     /// Event that can be emited with a notification for the minter canister
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
-
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
@@ -123,7 +122,10 @@ contract BFTBridge is TokenManager {
             WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
-        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress && address(feeChargeContract) != address(0)) {
+        if (
+            order.feePayer != address(0) && msg.sender == minterCanisterAddress
+                && address(feeChargeContract) != address(0)
+        ) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
