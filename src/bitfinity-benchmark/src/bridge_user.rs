@@ -428,11 +428,11 @@ impl BridgeUser {
             .await?;
 
         let reason = Icrc2Burn {
+            sender: self.principal,
             amount: amount.try_into().unwrap(), // amount always less then U256::MAX
             from_subaccount: None,
             icrc2_token_principal: icrc2_token,
             recipient_address: self.address.clone(),
-            approve_minted_tokens: None,
             fee_payer: None,
         };
 

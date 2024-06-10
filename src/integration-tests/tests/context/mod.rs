@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
-use candid::{Nat, Principal};
+use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
@@ -26,14 +26,14 @@ use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE,
 };
-use minter_contract_utils::evm_link::EvmLink;
+use minter_contract_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use minter_contract_utils::fee_charge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
 use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
-use minter_did::reason::{ApproveMintedTokens, Icrc2Burn};
+use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -45,7 +45,6 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 #[async_trait::async_trait]
-
 pub trait TestContext {
     type Client: CanisterClient + Send + Sync;
 
@@ -54,6 +53,9 @@ pub trait TestContext {
 
     /// Returns client for the canister.
     fn client(&self, canister: Principal, caller: &str) -> Self::Client;
+
+    /// Returns principal by caller's name.
+    fn principal_by_caller_name(&self, caller: &str) -> Principal;
 
     /// Principal to use for canisters initialization.
     fn admin(&self) -> Principal;
@@ -547,29 +549,52 @@ pub trait TestContext {
         &self,
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
         amount: u128,
-        approve_minted_tokens: Option<ApproveMintedTokens>,
         fee_payer: Option<H160>,
-    ) -> Result<u32> {
-        self.approve_icrc2_burn(caller, amount + ICRC1_TRANSFER_FEE as u128)
-            .await?;
+    ) -> Result<()> {
+        let recipient_address = H160::from(wallet.address());
+        self.approve_icrc2_burn(
+            caller,
+            &recipient_address,
+            amount + ICRC1_TRANSFER_FEE as u128,
+        )
+        .await?;
 
         let reason = Icrc2Burn {
+            sender: self.principal_by_caller_name(caller),
             amount: amount.into(),
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
-            recipient_address: wallet.address().into(),
-            approve_minted_tokens,
+            recipient_address,
             fee_payer,
         };
 
-        Ok(self.icrc_minter_client(caller).burn_icrc2(reason).await??)
+        let encoded_reason = Encode!(&reason).unwrap();
+
+        let input = bft_bridge_api::NOTIFY_MINTER
+            .encode_input(&[
+                Token::Uint(Default::default()),
+                Token::Bytes(encoded_reason),
+            ])
+            .unwrap();
+        let _receipt = self
+            .call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)?;
+
+        Ok(())
     }
 
     /// Approves burning of ICRC-2 token.
-    async fn approve_icrc2_burn(&self, caller: &str, amount: u128) -> Result<()> {
+    async fn approve_icrc2_burn(&self, caller: &str, recipient: &H160, amount: u128) -> Result<()> {
         let client = self.icrc_token_1_client(caller);
-        let minter_canister = self.canisters().icrc2_minter().into();
+
+        let subaccount = Some(address_to_icrc_subaccount(&recipient.0));
+        let minter_canister = Account {
+            owner: self.canisters().icrc2_minter(),
+            subaccount,
+        };
 
         let approve_args = ApproveArgs {
             from_subaccount: None,
@@ -909,7 +934,6 @@ pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> 
         signing_strategy: SigningStrategy::Local {
             private_key: wallet.signer().to_bytes().into(),
         },
-        fee_charge_contract: None,
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,

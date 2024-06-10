@@ -1,7 +1,7 @@
 use evm_canister_client::IcCanisterClient;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
-use icrc_client::account::Account;
+use icrc_client::account::{Account, Subaccount};
 use icrc_client::transfer::{TransferArg, TransferError};
 use icrc_client::transfer_from::{TransferFromArgs, TransferFromError};
 use icrc_client::IcrcCanisterClient;
@@ -80,6 +80,7 @@ pub async fn mint(
 pub async fn burn(
     token: Principal,
     from: Account,
+    spender_subaccount: Option<Subaccount>,
     amount: Nat,
     repeat_on_bad_fee: bool,
 ) -> Result<Success> {
@@ -89,7 +90,7 @@ pub async fn burn(
 
     let args = TransferFromArgs {
         from,
-        spender_subaccount: None,
+        spender_subaccount,
         to: minter_canister_account,
         amount: amount.clone(),
         fee: None,
@@ -102,7 +103,7 @@ pub async fn burn(
     if repeat_on_bad_fee {
         if let Err(TransferFromError::BadFee { .. }) = &transfer_result {
             icrc1::refresh_token_configuration(token).await?;
-            return burn(token, from, amount, false).await;
+            return burn(token, from, spender_subaccount, amount, false).await;
         }
     }
 

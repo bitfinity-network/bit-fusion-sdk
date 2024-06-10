@@ -5,6 +5,7 @@ use std::pin::Pin;
 use candid::{CandidType, Principal};
 use ethereum_json_rpc_client::http_outcall::HttpOutcallClient;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
+use ethers_core::types::H160;
 use ic_canister_client::IcCanisterClient;
 use jsonrpc_core::{Request, Response};
 use serde::{Deserialize, Serialize};
@@ -74,4 +75,10 @@ impl EvmLink {
             EvmLink::Ic(principal) => Clients::canister(*principal),
         }
     }
+}
+
+pub fn address_to_icrc_subaccount(address: &H160) -> [u8; 32] {
+    let mut subaccount = [0u8; 32];
+    subaccount[..20].copy_from_slice(address.as_bytes());
+    subaccount
 }

@@ -1657,8 +1657,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1955,8 +1955,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "async-trait",
  "candid",
@@ -2006,8 +2006,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "anyhow",
  "candid",
@@ -2071,8 +2071,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "candid",
  "did",
@@ -5618,8 +5618,8 @@ dependencies = [
 
 [[package]]
 name = "icrc-client"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6286,8 +6286,8 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "candid",
  "did",
@@ -6326,8 +6326,8 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "candid",
  "did",
@@ -8430,8 +8430,8 @@ dependencies = [
 
 [[package]]
 name = "signature-verification-canister-client"
-version = "0.23.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=fee_charge_contract_address_in_minter_init_data#37ef33a03e0aa40cbceac11ab5063cf3ce7b0edd"
+version = "0.24.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=serializable_burn_event#c7711a5cee56bc6613881fb0b7e503fcae74c13a"
 dependencies = [
  "candid",
  "did",

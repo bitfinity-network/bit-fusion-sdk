@@ -86,6 +86,10 @@ impl TestContext for PocketIcTestContext {
         PocketIcClient::from_client(self.client.clone(), canister, caller_principal)
     }
 
+    fn principal_by_caller_name(&self, caller: &str) -> Principal {
+        Self::principal_of(caller)
+    }
+
     fn admin(&self) -> Principal {
         Self::admin()
     }
