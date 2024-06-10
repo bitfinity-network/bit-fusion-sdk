@@ -8,11 +8,18 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
-    inputs: vec![Param {
-        name: "minterAddress".into(),
-        kind: ParamType::Address,
-        internal_type: None,
-    }],
+    inputs: vec![
+        Param {
+            name: "minterAddress".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+        Param {
+            name: "_isWrappedSide".into(),
+            kind: ParamType::Bool,
+            internal_type: None,
+        },
+    ],
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
@@ -224,7 +231,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
-/// Emited when token is burnt or minted by BFTBridge.
+/// Emitted when token is burnt or minted by BFTBridge.
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum BridgeEvent {
     Burnt(BurntEventData),
@@ -274,7 +281,7 @@ impl TryFrom<RawLog> for BridgeEvent {
     }
 }
 
-/// Emited when token is burnt by BFTBridge.
+/// Emitted when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct BurntEventData {
     pub sender: did::H160,
