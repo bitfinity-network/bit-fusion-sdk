@@ -23,10 +23,12 @@ use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
 use minter_client::MinterCanisterClient;
-use minter_contract_utils::bft_bridge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
+use minter_contract_utils::build_data::{
+    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE,
+};
 use minter_contract_utils::evm_link::EvmLink;
-use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
+use minter_contract_utils::fee_charge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
+use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
@@ -65,7 +67,7 @@ pub trait TestContext {
     }
 
     /// Returns client for the evm canister.
-    fn minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
+    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
         MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
     }
 
@@ -113,7 +115,7 @@ pub trait TestContext {
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval * 2;
+        let timeout = tx_processing_interval * 10;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
@@ -167,6 +169,17 @@ pub trait TestContext {
         input: Vec<u8>,
     ) -> Result<H160> {
         let evm_client = self.evm_client(self.admin_name());
+        self.create_contract_on_evm(&evm_client, creator_wallet, input)
+            .await
+    }
+
+    /// Creates contract on the given EVM.
+    async fn create_contract_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        creator_wallet: &Wallet<'_, SigningKey>,
+        input: Vec<u8>,
+    ) -> Result<H160> {
         let creator_address: H160 = creator_wallet.address().into();
         let nonce = evm_client
             .account_basic(creator_address.clone())
@@ -180,7 +193,7 @@ pub trait TestContext {
             .send_raw_transaction(create_contract_tx)
             .await??;
         let receipt = self
-            .wait_transaction_receipt(&hash)
+            .wait_transaction_receipt_on_evm(evm_client, &hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
                 "transaction not processed".into(),
@@ -201,7 +214,7 @@ pub trait TestContext {
     }
 
     /// Crates BFTBridge contract in EVMc and registered it in minter canister
-    async fn initialize_bft_bridge(&self, caller: &str) -> Result<H160> {
+    async fn initialize_bft_bridge(&self, caller: &str, fee_charge_address: H160) -> Result<H160> {
         let minter_canister_address = self.get_icrc_minter_canister_evm_address(caller).await?;
 
         let client = self.evm_client(self.admin_name());
@@ -212,7 +225,7 @@ pub trait TestContext {
 
         let raw_client = self.client(self.canisters().icrc2_minter(), self.admin_name());
         let hash = raw_client
-            .update::<_, McResult<H256>>("init_bft_bridge_contract", ())
+            .update::<_, McResult<H256>>("init_bft_bridge_contract", (fee_charge_address,))
             .await??;
 
         let receipt = self.wait_transaction_receipt(&hash).await?.ok_or_else(|| {
@@ -243,15 +256,55 @@ pub trait TestContext {
         &self,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
+        fee_charge_address: Option<H160>,
     ) -> Result<H160> {
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
         let input = bft_bridge_api::CONSTRUCTOR
-            .encode_input(contract, &[Token::Address(minter_canister_address.into())])
+            .encode_input(
+                contract,
+                &[
+                    Token::Address(minter_canister_address.into()),
+                    Token::Address(fee_charge_address.unwrap_or_default().0),
+                ],
+            )
             .unwrap();
 
         let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
 
         Ok(bridge_address)
+    }
+
+    async fn initialize_fee_charge_contract(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        minter_canister_addresses: &[H160],
+    ) -> Result<H160> {
+        let evm = self.evm_client(self.admin_name());
+        self.initialize_fee_charge_contract_on_evm(&evm, wallet, minter_canister_addresses)
+            .await
+    }
+
+    async fn initialize_fee_charge_contract_on_evm(
+        &self,
+        evm: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+        minter_canister_addresses: &[H160],
+    ) -> Result<H160> {
+        let contract = FEE_CHARGE_SMART_CONTRACT_CODE.clone();
+        let minter_canister_addresses = minter_canister_addresses
+            .iter()
+            .map(|addr| Token::Address(addr.0))
+            .collect();
+        let input = fee_charge_api::CONSTRUCTOR
+            .encode_input(contract, &[Token::Array(minter_canister_addresses)])
+            .unwrap();
+
+        let fee_charge_address = self
+            .create_contract_on_evm(evm, wallet, input.clone())
+            .await
+            .unwrap();
+
+        Ok(fee_charge_address)
     }
 
     async fn burn_erc_20_tokens_raw(
@@ -329,7 +382,7 @@ pub trait TestContext {
     async fn native_token_deposit_balance(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        bft_bridge: H160,
+        fee_charge: H160,
         user: H160,
     ) -> U256 {
         let input = NATIVE_TOKEN_BALANCE
@@ -338,7 +391,7 @@ pub trait TestContext {
         let response = evm_client
             .eth_call(
                 Some(user),
-                Some(bft_bridge),
+                Some(fee_charge),
                 None,
                 3_000_000,
                 None,
@@ -363,7 +416,7 @@ pub trait TestContext {
     async fn native_token_deposit(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        bft_bridge: H160,
+        fee_charge: H160,
         user_wallet: &Wallet<'static, SigningKey>,
         sender_ids: &[Id256],
         amount: u128,
@@ -377,7 +430,7 @@ pub trait TestContext {
             .unwrap();
 
         let receipt = self
-            .call_contract_on_evm(evm_client, user_wallet, &bft_bridge, input, amount)
+            .call_contract_on_evm(evm_client, user_wallet, &fee_charge, input, amount)
             .await?
             .1;
 
@@ -495,7 +548,6 @@ pub trait TestContext {
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         amount: u128,
-        operation_id: u32,
         approve_minted_tokens: Option<ApproveMintedTokens>,
         fee_payer: Option<H160>,
     ) -> Result<u32> {
@@ -507,12 +559,11 @@ pub trait TestContext {
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address: wallet.address().into(),
-            operation_id,
             approve_minted_tokens,
             fee_payer,
         };
 
-        Ok(self.minter_client(caller).burn_icrc2(reason).await??)
+        Ok(self.icrc_minter_client(caller).burn_icrc2(reason).await??)
     }
 
     /// Approves burning of ICRC-2 token.
@@ -730,8 +781,6 @@ pub trait TestContext {
                 let init_data = erc20_minter::state::Settings {
                     base_evm_link: EvmLink::Ic(external_evm_canister),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
-                    base_bridge_contract: H160::default(),
-                    wrapped_bridge_contract: H160::default(),
                     signing_strategy: SigningStrategy::Local {
                         private_key: rand::random(),
                     },
@@ -860,6 +909,7 @@ pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> 
         signing_strategy: SigningStrategy::Local {
             private_key: wallet.signer().to_bytes().into(),
         },
+        fee_charge_contract: None,
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,

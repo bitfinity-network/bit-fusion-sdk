@@ -25,6 +25,7 @@ impl Config {
             evm_principal: settings.evm_principal,
             evm_params: None,
             bft_bridge_contract_status: BftBridgeContractStatus::None,
+            fee_charge_contract: settings.fee_charge_contract,
         };
 
         self.update_data(|data| *data = new_data);
@@ -48,6 +49,11 @@ impl Config {
     /// Sets principal of EVM canister with which the minter canister works.
     pub fn set_evm_principal(&mut self, evm: Principal) {
         self.update_data(|data| data.evm_principal = evm);
+    }
+
+    /// Returns address of a FeeCharge contract.
+    pub fn get_fee_charge_contract(&self) -> H160 {
+        self.with_data(|data| data.get().fee_charge_contract.clone())
     }
 
     /// Returns parameters of EVM canister with which the minter canister works.
@@ -118,6 +124,7 @@ pub struct ConfigData {
     pub evm_principal: Principal,
     pub evm_params: Option<EvmParams>,
     pub bft_bridge_contract_status: BftBridgeContractStatus,
+    pub fee_charge_contract: H160,
 }
 
 impl Default for ConfigData {
@@ -127,6 +134,7 @@ impl Default for ConfigData {
             evm_principal: Principal::anonymous(),
             evm_params: None,
             bft_bridge_contract_status: BftBridgeContractStatus::None,
+            fee_charge_contract: H160::default(),
         }
     }
 }
@@ -186,6 +194,7 @@ mod tests {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: H160::default(),
         };
 
         config.reset(settings.clone());

@@ -14,7 +14,7 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -121,6 +121,7 @@ impl MinterCanister {
             owner: init_data.owner,
             evm_principal: init_data.evm_principal,
             signing_strategy: init_data.signing_strategy,
+            fee_charge_contract: init_data.fee_charge_contract.unwrap_or_default(),
         };
 
         state.reset(settings);
@@ -255,7 +256,7 @@ impl MinterCanister {
 
     /// Starts the BFT bridge contract deployment.
     #[update]
-    pub async fn init_bft_bridge_contract(&mut self) -> Result<H256> {
+    pub async fn init_bft_bridge_contract(&mut self, fee_charge_contract: H160) -> Result<H256> {
         let state = get_state();
         let signer = state.borrow().signer.get_transaction_signer();
 
@@ -276,7 +277,13 @@ impl MinterCanister {
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
 
         let hash = status
-            .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
+            .initialize(
+                evm_link,
+                evm_params.chain_id as _,
+                signer,
+                minter_address,
+                fee_charge_contract,
+            )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
 
@@ -486,7 +493,7 @@ fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
 }
 
 type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
 fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
@@ -559,6 +566,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -579,6 +587,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -680,6 +689,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -745,6 +755,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -762,6 +773,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
@@ -788,6 +800,7 @@ mod test {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
+            fee_charge_contract: None,
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();

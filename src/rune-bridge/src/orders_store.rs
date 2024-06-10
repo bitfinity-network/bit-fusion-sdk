@@ -27,7 +27,7 @@ impl Default for MintOrdersStore {
 
 impl MintOrdersStore {
     pub fn push(&mut self, sender: Id256, nonce: u32, mint_order: SignedMintOrder) {
-        self.0.insert(sender, SRC_TOKEN, nonce, &mint_order);
+        self.0.insert(sender, SRC_TOKEN, nonce, mint_order);
     }
 
     pub fn remove(&mut self, sender: Id256, nonce: u32) {
