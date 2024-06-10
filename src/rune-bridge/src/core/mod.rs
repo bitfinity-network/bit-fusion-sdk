@@ -6,7 +6,6 @@ use serde::Deserialize;
 use crate::rune_info::RuneName;
 
 pub mod deposit;
-pub mod deposit_store;
 pub mod index_provider;
 pub mod utxo_provider;
 pub mod withdrawal;

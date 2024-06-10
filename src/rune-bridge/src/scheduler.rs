@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::time::Duration;
 
 use bitcoin::Address;
-use candid::Decode;
+use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -15,18 +14,19 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
 use minter_did::id256::Id256;
-use ordinals::Rune;
 use serde::{Deserialize, Serialize};
 
-use crate::canister::{get_state, rune_deposit_store};
-use crate::core::deposit::{RuneDeposit, RuneDepositPayload};
-use crate::core::deposit_store::{DepositRequest, DepositRequestId};
+use minter_contract_utils::bft_bridge_api::{
+    BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
+};
+use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::operation_store::MinterOperationId;
+
+use crate::canister::get_state;
+use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::Withdrawal;
 use crate::rune_info::RuneName;
-use crate::scheduler::minter_notify::RuneDepositRequest;
 
 pub type TasksStorage =
     StableUnboundedMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -39,16 +39,9 @@ mod minter_notify;
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
-    PrepareMintOrders {
-        dst_eth_address: H160,
-    },
-    SendMintOrder {
-        dst_eth_address: H160,
-        request_id: DepositRequestId,
-    },
+    Deposit(MinterOperationId),
     RemoveMintOrder(MintedEventData),
-    // todo: rename
-    MintBtc(BurntEventData),
+    Withdraw(BurntEventData),
 }
 
 impl RuneBridgeTask {
@@ -106,25 +99,34 @@ impl RuneBridgeTask {
             return Ok(());
         }
 
-        let mut mut_state = state.borrow_mut();
+        {
+            let mut mut_state = state.borrow_mut();
 
-        // Filter out logs that do not have block number.
-        // Such logs are produced when the block is not finalized yet.
-        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-        if let Some(last_log) = last_log {
-            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            mut_state.update_evm_params(|to_update| {
-                *to_update = Some(EvmParams {
-                    next_block: next_block_number,
-                    ..params
-                })
-            });
-        };
+            // Filter out logs that do not have block number.
+            // Such logs are produced when the block is not finalized yet.
+            let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
+            if let Some(last_log) = last_log {
+                let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
+                mut_state.update_evm_params(|to_update| {
+                    *to_update = Some(EvmParams {
+                        next_block: next_block_number,
+                        ..params
+                    })
+                });
+            };
+        }
 
         log::trace!("appending logs to tasks");
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
+        Ok(())
+    }
+
+    async fn deposit(deposit_request_id: MinterOperationId) -> Result<(), SchedulerError> {
+        RuneDeposit::get()
+            .process_deposit_request(deposit_request_id)
+            .await;
         Ok(())
     }
 
@@ -142,7 +144,7 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = RuneBridgeTask::MintBtc(burnt);
+                let mint_order_task = RuneBridgeTask::Withdraw(burnt);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
@@ -154,30 +156,15 @@ impl RuneBridgeTask {
                 if let Some(notification) = RuneMinterNotification::decode(event) {
                     return match notification {
                         RuneMinterNotification::Deposit(payload) => {
-                            let request = rune_deposit_store().new_request(&payload.dst_eth_address, payload);
+                            let request_id = RuneDeposit::get()
+                                .create_deposit_request(payload.dst_address, payload.amounts);
 
-                            const DEPOSIT_RETRY_INTERVAL: Duration = Duration::from_secs(60 * 5);
-                            const DEPOSIT_RETRY_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 24);
-
-                            let deposit_task = RuneBridgeTask::PrepareMintOrders {
-                                dst_eth_address: payload.dst_eth_address.clone(),
-                            };
-
-                            Some(
-                                deposit_task.into_scheduled(
-                                    TaskOptions::new()
-                                        .with_fixed_backoff_policy(DEPOSIT_RETRY_INTERVAL.as_secs() as u32)
-                                        .with_max_retries_policy(
-                                            (DEPOSIT_RETRY_TIMEOUT.as_secs()
-                                                / DEPOSIT_RETRY_INTERVAL.as_secs())
-                                                as u32,
-                                        ),
-                                ),
-                            )
+                            let deposit_task = RuneBridgeTask::Deposit(request_id);
+                            Some(deposit_task.into_scheduled(TaskOptions::new()))
                         }
-                    }
+                    };
                 }
-            },
+            }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
@@ -185,6 +172,8 @@ impl RuneBridgeTask {
     }
 
     fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
+        let mut deposit = RuneDeposit::get();
+        deposit.complete_mint_request(minted_event.recipient, minted_event.nonce);
         let state = get_state();
         let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
@@ -211,26 +200,12 @@ impl Task for RuneBridgeTask {
         match self {
             RuneBridgeTask::InitEvmState => Box::pin(Self::init_evm_state()),
             RuneBridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
-            RuneBridgeTask::PrepareMintOrders {
-                dst_eth_address,
-            } => {
-                Box::pin(async move {
-                    let result = RuneDeposit::get().prepare_mint_orders(dst_eth_address).await;
-
-                    if let Err(err) = result {
-                        return Err(SchedulerError::TaskExecutionFailed(format!(
-                            "PrepareMintOrders task failed: {err:?}"
-                        )));
-                    }
-
-                    Ok(())
-                })
-            }
+            RuneBridgeTask::Deposit(request_id) => Box::pin(Self::deposit(*request_id)),
             RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            RuneBridgeTask::MintBtc(BurntEventData {
+            RuneBridgeTask::Withdraw(BurntEventData {
                 recipient_id,
                 amount,
                 to_token,
@@ -298,24 +273,28 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
     }
 }
 
-enum RuneMinterNotification {
-    Deposit(RuneDepositPayload),
+pub enum RuneMinterNotification {
+    Deposit(RuneDepositRequestData),
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RuneDepositRequestData {
+    pub dst_address: H160,
+    pub amounts: Option<HashMap<RuneName, u128>>,
 }
 
 impl RuneMinterNotification {
-    const DEPOSIT_TYPE: u32 = 1;
+    pub const DEPOSIT_TYPE: u32 = 1;
 }
 
 impl RuneMinterNotification {
     fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
         match event_data.notification_type {
-            Self::DEPOSIT_TYPE => {
-                match Decode!(&event_data.user_data, RuneDepositPayload) {
-                    Ok(payload) => Some(Self::Deposit(payload)),
-                    Err(err) => {
-                        log::warn!("Failed to decode deposit request event data: {err:?}");
-                        None
-                    }
+            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
+                Ok(payload) => Some(Self::Deposit(payload)),
+                Err(err) => {
+                    log::warn!("Failed to decode deposit request event data: {err:?}");
+                    None
                 }
             },
             t => {

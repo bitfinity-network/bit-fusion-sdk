@@ -1,11 +1,13 @@
-use crate::core::deposit_store::DepositState;
-use crate::rune_info::RuneName;
+use std::collections::HashMap;
+
 use candid::CandidType;
 use did::H256;
 use minter_did::order::SignedMintOrder;
 use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
-use std::collections::HashMap;
+
+use crate::core::deposit::RuneDepositPayload;
+use crate::rune_info::RuneName;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub struct PendingUtxo {}
@@ -124,5 +126,5 @@ pub struct CreateEdictTxArgs {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct DepositStateResponse {
     pub current_ts: u64,
-    pub deposits: Vec<DepositState>,
+    pub deposits: Vec<RuneDepositPayload>,
 }

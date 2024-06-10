@@ -16,19 +16,18 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_metrics::{Metrics, MetricsStorage};
-use ic_stable_structures::{CellStructure, StableMultimap, VirtualMemory};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
-use crate::core::deposit::{DepositStore, RuneDeposit, RuneDepositPayload};
+use crate::core::deposit::RuneDeposit;
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::{CreateEdictTxArgs, DepositStateResponse, GetAddressError, WithdrawError};
-use crate::memory::{DEPOSIT_STORE_MEMORY_ID, MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
 use crate::rune_info::RuneInfo;
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
@@ -103,7 +102,7 @@ impl RuneBridge {
 
     #[query]
     pub fn get_deposit_state(&self, eth_address: H160) -> DepositStateResponse {
-        let deposits = rune_deposit_store().get_by_address(&eth_address).into_iter().map(|request| request.state()).collect();
+        let deposits = RuneDeposit::get().get_by_address(&eth_address);
         DepositStateResponse {
             current_ts: ic::time(),
             deposits,
@@ -174,13 +173,13 @@ impl RuneBridge {
             .expect("invalid address")
             .assume_checked();
 
-        let deposit = RuneDeposit::new(get_state());
+        let deposit = RuneDeposit::get();
         let utxos = deposit
             .get_deposit_utxos(&address)
             .await
             .expect("failed to get utxos");
         let (rune_info_amounts, _) = deposit
-            .get_mint_amounts(&utxos, &None)
+            .get_mint_amounts(&utxos.utxos, &None)
             .await
             .expect("failed to get rune amounts");
 
@@ -328,8 +327,4 @@ pub(crate) fn get_state() -> Rc<RefCell<State>> {
 
 pub(crate) fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
-}
-
-pub(crate) fn rune_deposit_store() -> DepositStore<VirtualMemory<DefaultMemoryImpl>, RuneDepositPayload> {
-    MEMORY_MANAGER.with(|mm| DepositStore::with_memory(mm.get(DEPOSIT_STORE_MEMORY_ID)))
 }

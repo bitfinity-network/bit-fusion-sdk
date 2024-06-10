@@ -6317,6 +6317,7 @@ dependencies = [
  "ic-exports",
  "ic-stable-structures 0.16.0",
  "jsonrpc-core",
+ "log",
  "minter-did",
  "once_cell",
  "serde",

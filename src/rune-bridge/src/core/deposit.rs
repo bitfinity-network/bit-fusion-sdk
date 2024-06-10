@@ -1,58 +1,136 @@
-use crate::canister::{get_state, rune_deposit_store};
-use crate::core::deposit_store::{DepositRequest, DepositRequestId, DepositState};
-use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
-use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::core::DepositResult;
-use crate::interface::DepositError;
-use crate::key::{get_derivation_path_ic, BtcSignerType};
-use crate::rune_info::{RuneInfo, RuneName};
-use crate::state::State;
-use bitcoin::hashes::Hash;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::ControlFlow;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
+
 use bitcoin::{Address, Network};
+use bitcoin::hashes::Hash;
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
-use ic_stable_structures::CellStructure;
+use ic_exports::ic_kit::ic;
+use ic_stable_structures::{CellStructure, VirtualMemory};
+use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::TaskOptions;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
-pub use super::deposit_store::DepositStore;
+use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 
-type Request = DepositRequest<RuneDepositPayload>;
+use crate::canister::{get_scheduler, get_state};
+use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
+use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
+use crate::interface::DepositError;
+use crate::key::BtcSignerType;
+use crate::memory::{DEPOSIT_REQUEST_MAP_MEMORY_ID, DEPOSIT_REQUEST_MEMORY_ID, MEMORY_MANAGER};
+use crate::rune_info::{RuneInfo, RuneName};
+use crate::scheduler::{PersistentScheduler, RuneBridgeTask};
+use crate::state::State;
 
 static NONCE: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct RuneDepositPayload {
-    pub dst_eth_address: H160,
-    pub amounts: Option<HashMap<RuneName, u128>>,
+pub enum DepositRequestStatus {
+    /// Deposit request received but is not yet executed.
+    Scheduled,
+    /// No utxos containing runes found at the deposit address. Waiting for the utxos to be mined
+    /// into a block.
+    WaitingForInputs {
+        requested_at: u64,
+        current_ts: u64,
+        next_retry_at: u64,
+        waiting_until: u64,
+        block_height: u32,
+    },
+    /// No utxos containing runes found at the deposit address. Deposit operation is cancelled.
+    NothingToDeposit {
+        block_height: u32,
+    },
+    /// Utxos with runes are found at the deposit address, but are not confirmed yet. Deposit will
+    /// proceed after enough confirmations are received.
+    WaitingForConfirmations {
+        utxos: Vec<Utxo>,
+        current_min_confirmations: u32,
+        required_confirmations: u32,
+        block_height: u32,
+    },
+    InvalidAmounts {
+        requested_amounts: HashMap<RuneName, u128>,
+        actual_amounts: HashMap<RuneName, u128>,
+    },
+    /// Mint orders are signed by the canister but are not sent to the BftBridge. The user may attempt
+    /// to send them by themselves or wait for the canister to retry the operation.
+    MintOrdersCreated {
+        orders: Vec<MintOrderDetails>,
+    },
+    Minted {
+        amounts: Vec<(RuneName, u128, H256)>,
+    },
+    InternalError {
+        details: String,
+    },
 }
 
-struct RuneMintOrder {
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct MintOrderDetails {
     rune_name: RuneName,
     amount: u128,
-    mint_order: SignedMintOrder,
-    nonce: u32,
+    status: MintOrderStatus,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub enum MintOrderStatus {
+    Created {
+        mint_order: SignedMintOrder,
+        nonce: u32,
+    },
+    Sent {
+        mint_order: SignedMintOrder,
+        nonce: u32,
+        tx_id: H256,
+    },
+    Completed {
+        tx_id: H256,
+    },
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RuneDepositPayload {
+    pub dst_address: H160,
+    pub requested_amounts: Option<HashMap<RuneName, u128>>,
+    pub request_ts: u64,
+    pub status: DepositRequestStatus,
+}
+
+impl RuneDepositPayload {
+    fn with_status(self, new_status: DepositRequestStatus) -> Self {
+        Self {
+            status: new_status,
+            ..self
+        }
+    }
 }
 
 pub(crate) struct RuneDeposit<
+    M: Memory,
     UTXO: UtxoProvider = IcUtxoProvider,
     INDEX: RuneIndexProvider = OrdIndexProvider,
 > {
     state: Rc<RefCell<State>>,
+    scheduler: Rc<RefCell<PersistentScheduler>>,
     network: Network,
     signer: BtcSignerType,
     utxo_provider: UTXO,
     index_provider: INDEX,
+    deposit_store: MinterOperationStore<M, RuneDepositPayload>,
 }
 
-impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
-    pub fn new(state: Rc<RefCell<State>>) -> Self {
+impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvider> {
+    pub fn new(state: Rc<RefCell<State>>, scheduler: Rc<RefCell<PersistentScheduler>>) -> Self {
         let state_ref = state.borrow();
 
         let network = state_ref.network();
@@ -62,31 +140,406 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
 
         drop(state_ref);
 
+        let requests_memory = MEMORY_MANAGER.with(|mm| mm.get(DEPOSIT_REQUEST_MEMORY_ID));
+        let addresses_memory = MEMORY_MANAGER.with(|mm| mm.get(DEPOSIT_REQUEST_MAP_MEMORY_ID));
+        let deposit_store =
+            MinterOperationStore::with_memory(requests_memory, addresses_memory, None);
+
         Self {
             state,
+            scheduler,
             network,
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
             index_provider: OrdIndexProvider::new(indexer_url),
+            deposit_store,
         }
     }
 
     pub fn get() -> Self {
-        Self::new(get_state())
+        Self::new(get_state(), get_scheduler())
     }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
+impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTXO, INDEX> {
+    pub fn create_deposit_request(
+        &mut self,
+        dst_address: H160,
+        amounts: Option<HashMap<RuneName, u128>>,
+    ) -> MinterOperationId {
+        self.deposit_store.new_operation(
+            dst_address.clone(),
+            RuneDepositPayload {
+                dst_address,
+                requested_amounts: amounts,
+                request_ts: ic::time(),
+                status: DepositRequestStatus::Scheduled,
+            },
+        )
+    }
+
+    pub async fn process_deposit_request(&mut self, request_id: MinterOperationId) {
+        loop {
+            let Some(request) = self.deposit_store.get(request_id) else {
+                log::error!("Deposit request {request_id} was not found in the request store.");
+                return;
+            };
+
+            if let ControlFlow::Break(_) = self.execute_request_step(request_id, request).await {
+                return;
+            }
+        }
+    }
+
+    pub fn complete_mint_request(&mut self, dst_address: H160, order_nonce: u32) {
+        let requests = self.deposit_store.get_for_address(&dst_address);
+        for (request_id, request) in requests {
+            if let DepositRequestStatus::MintOrdersCreated { mut orders } = request.status.clone() {
+                let mut is_updated = false;
+                for order in &mut orders {
+                    if let MintOrderStatus::Sent { nonce, tx_id, .. } = &mut order.status {
+                        if *nonce == order_nonce {
+                            order.status = MintOrderStatus::Completed {
+                                tx_id: tx_id.clone(),
+                            };
+                            is_updated = true;
+                        }
+                    }
+                }
+
+                if is_updated {
+                    if orders.iter().all(|order_info| {
+                        matches!(order_info.status, MintOrderStatus::Completed { .. })
+                    }) {
+                        self.complete_deposit_request(request_id, request, orders)
+                    } else {
+                        self.deposit_store.update(request_id, request);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    fn complete_deposit_request(
+        &mut self,
+        request_id: MinterOperationId,
+        request: RuneDepositPayload,
+        orders: Vec<MintOrderDetails>,
+    ) {
+        self.update_request_status(request_id, request, DepositRequestStatus::Minted { amounts: orders.into_iter().map(|order_details| {
+            let name = order_details.rune_name;
+            let amount = order_details.amount;
+            let tx_id = match order_details.status {
+                MintOrderStatus::Completed { tx_id } => tx_id,
+                s => {
+                    log::error!("Invalid state of the mint order when completing deposit request: {s:?}");
+                    H256::default()
+                },
+            };
+
+            (name, amount, tx_id)
+        }).collect() })
+    }
+
+    pub fn get_by_address(&self, dst_address: &H160) -> Vec<RuneDepositPayload> {
+        self.deposit_store
+            .get_for_address(dst_address)
+            .into_iter()
+            .map(|(_, payload)| payload)
+            .collect()
+    }
+
+    async fn execute_request_step(
+        &mut self,
+        request_id: MinterOperationId,
+        request: RuneDepositPayload,
+    ) -> ControlFlow<(), ()> {
+        match request.status.clone() {
+            DepositRequestStatus::Scheduled
+            | DepositRequestStatus::WaitingForInputs { .. }
+            | DepositRequestStatus::WaitingForConfirmations { .. } => {
+                self.prepare_mint_orders(request_id, request).await
+            }
+            DepositRequestStatus::NothingToDeposit { .. } => ControlFlow::Break(()),
+            DepositRequestStatus::InvalidAmounts { .. } => ControlFlow::Break(()),
+            DepositRequestStatus::MintOrdersCreated { orders } => {
+                let mut updated = vec![];
+                let mut has_changes = false;
+                for order_info in orders {
+                    let MintOrderDetails {
+                        rune_name,
+                        amount,
+                        status,
+                    } = order_info;
+                    if let MintOrderStatus::Created { mint_order, nonce } = status {
+                        if let Ok(tx_id) = self.send_mint_order(&mint_order).await {
+                            updated.push(MintOrderDetails {
+                                status: MintOrderStatus::Sent {
+                                    mint_order,
+                                    tx_id,
+                                    nonce,
+                                },
+                                rune_name,
+                                amount,
+                            });
+                            has_changes = true;
+
+                            continue;
+                        }
+                    }
+
+                    updated.push(MintOrderDetails {
+                        rune_name,
+                        amount,
+                        status,
+                    });
+                }
+
+                if has_changes {
+                    self.update_request_status(
+                        request_id,
+                        request,
+                        DepositRequestStatus::MintOrdersCreated { orders: updated },
+                    );
+                }
+
+                ControlFlow::Break(())
+            }
+            DepositRequestStatus::Minted { .. } => ControlFlow::Break(()),
+            DepositRequestStatus::InternalError { .. } => ControlFlow::Break(()),
+        }
+    }
+
+    async fn prepare_mint_orders(
+        &mut self,
+        request_id: MinterOperationId,
+        request: RuneDepositPayload,
+    ) -> ControlFlow<(), ()> {
+        let dst_address = &request.dst_address;
+        let transit_address = self.get_transit_address(dst_address).await;
+
+        let utxos_response = match self.get_deposit_utxos(&transit_address).await {
+            Ok(utxos_response) if utxos_response.utxos.is_empty() => {
+                self.wait_for_inputs(
+                    request_id,
+                    DepositRequestStatus::NothingToDeposit {
+                        block_height: utxos_response.tip_height,
+                    },
+                );
+
+                return ControlFlow::Break(());
+            }
+            Ok(utxos_response) => utxos_response,
+            Err(err) => {
+                self.wait_for_inputs(
+                    request_id,
+                    DepositRequestStatus::InternalError {
+                        details: format!("{err:?}"),
+                    },
+                );
+                return ControlFlow::Break(());
+            }
+        };
+
+        match self.validate_utxo_confirmations(&utxos_response) {
+            Ok(_) => {}
+            Err(min_confirmations) => {
+                self.wait_for_confirmations(request_id, utxos_response, min_confirmations);
+                return ControlFlow::Break(());
+            }
+        }
+
+        let utxos = utxos_response.utxos;
+
+        let (rune_info_amounts, used_utxos) = match self
+            .get_mint_amounts(&utxos, &request.requested_amounts)
+            .await
+        {
+            Ok((amounts, _)) if amounts.is_empty() => {
+                self.wait_for_inputs(
+                    request_id,
+                    DepositRequestStatus::NothingToDeposit {
+                        block_height: utxos_response.tip_height,
+                    },
+                );
+                return ControlFlow::Break(());
+            }
+            Ok(v) => v,
+            Err(err) => {
+                self.wait_for_inputs(
+                    request_id,
+                    DepositRequestStatus::InternalError {
+                        details: format!("{err:?}"),
+                    },
+                );
+                return ControlFlow::Break(());
+            }
+        };
+
+        if self.has_used_utxos(&used_utxos) {
+            self.wait_for_inputs(
+                request_id,
+                DepositRequestStatus::InternalError {
+                    details: "Utxos were consumed concurrently.".to_string(),
+                },
+            );
+            return ControlFlow::Break(());
+        }
+
+        let mint_order_details = match self
+            .create_mint_orders(&request.dst_address, &rune_info_amounts)
+            .await
+        {
+            Ok(v) => v,
+            Err(err) => {
+                self.wait_for_inputs(
+                    request_id,
+                    DepositRequestStatus::InternalError {
+                        details: format!("Failed to create a mint order: {err:?}"),
+                    },
+                );
+                return ControlFlow::Break(());
+            }
+        };
+
+        self.update_request_status(
+            request_id,
+            request,
+            DepositRequestStatus::MintOrdersCreated {
+                orders: mint_order_details,
+            },
+        );
+        self.mark_used_utxos(&used_utxos, &transit_address);
+
+        ControlFlow::Continue(())
+    }
+
+    fn wait_for_inputs(
+        &mut self,
+        request_id: MinterOperationId,
+        bail_status: DepositRequestStatus,
+    ) {
+        let Some(request) = self.deposit_store.get(request_id) else {
+            log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
+            return;
+        };
+
+        if self.is_request_timed_out(&request) {
+            self.update_request_status(request_id, request, bail_status);
+        } else {
+            let block_height =
+                if let DepositRequestStatus::NothingToDeposit { block_height } = bail_status {
+                    block_height
+                } else if let DepositRequestStatus::WaitingForInputs { block_height, .. } =
+                    request.status
+                {
+                    block_height
+                } else {
+                    0
+                };
+
+            self.update_request_status(
+                request_id,
+                request.clone(),
+                DepositRequestStatus::WaitingForInputs {
+                    requested_at: request.request_ts,
+                    current_ts: ic::time(),
+                    next_retry_at: ic::time() + self.deposit_retry_interval().as_nanos() as u64,
+                    waiting_until: request.request_ts + self.request_timeout().as_nanos() as u64,
+                    block_height,
+                },
+            );
+
+            self.reschedule_request(request_id);
+        }
+    }
+
+    fn is_request_timed_out(&self, request: &RuneDepositPayload) -> bool {
+        ic::time() > request.request_ts + self.request_timeout().as_nanos() as u64
+    }
+
+    fn request_timeout(&self) -> Duration {
+        const REQUEST_TIME_OUT: Duration = Duration::from_secs(60 * 60 * 24);
+        REQUEST_TIME_OUT
+    }
+
+    fn deposit_retry_interval(&self) -> Duration {
+        const RETRY_INTERVAL: Duration = Duration::from_secs(60 * 5);
+        RETRY_INTERVAL
+    }
+
+    fn min_confirmations(&self) -> u32 {
+        self.state.borrow().min_confirmations()
+    }
+
+    fn wait_for_confirmations(
+        &mut self,
+        request_id: MinterOperationId,
+        utxos_response: GetUtxosResponse,
+        current_min_confirmations: u32,
+    ) {
+        let Some(request) = self.deposit_store.get(request_id) else {
+            log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
+            return;
+        };
+
+        self.update_request_status(
+            request_id,
+            request,
+            DepositRequestStatus::WaitingForConfirmations {
+                utxos: utxos_response.utxos,
+                current_min_confirmations,
+                required_confirmations: self.min_confirmations(),
+                block_height: utxos_response.tip_height,
+            },
+        );
+
+        self.reschedule_request(request_id);
+    }
+
+    fn reschedule_request(&self, request_id: MinterOperationId) {
+        self.scheduler.borrow_mut().append_task(
+            RuneBridgeTask::Deposit(request_id).into_scheduled(
+                TaskOptions::new()
+                    .with_max_retries_policy(1)
+                    .with_fixed_backoff_policy(self.deposit_retry_interval().as_secs() as u32),
+            ),
+        );
+    }
+
+    fn get_nonce(&self) -> u32 {
+        NONCE.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn update_request_status(
+        &mut self,
+        request_id: MinterOperationId,
+        request: RuneDepositPayload,
+        new_status: DepositRequestStatus,
+    ) {
+        let updated_request = request.with_status(new_status);
+        self.deposit_store.update(request_id, updated_request);
+    }
+
+    pub async fn get_deposit_utxos(
+        &self,
+        transit_address: &Address,
+    ) -> Result<GetUtxosResponse, DepositError> {
+        let mut utxo_response = self.utxo_provider.get_utxos(transit_address).await?;
+        self.filter_out_used_utxos(&mut utxo_response);
+
+        Ok(utxo_response)
+    }
+
     async fn get_transit_address(&self, eth_address: &H160) -> Address {
         self.signer
             .get_transit_address(eth_address, self.network)
             .await
     }
 
-    fn validate_utxo_confirmations(
-        &self,
-        utxo_info: &GetUtxosResponse,
-    ) -> Result<(), DepositError> {
+    fn validate_utxo_confirmations(&self, utxo_info: &GetUtxosResponse) -> Result<(), u32> {
         let min_confirmations = self.state.borrow().min_confirmations();
         let utxo_min_confirmations = utxo_info
             .utxos
@@ -96,10 +549,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             .unwrap_or_default();
 
         if min_confirmations > utxo_min_confirmations {
-            Err(DepositError::Pending {
-                min_confirmations,
-                current_confirmations: utxo_min_confirmations,
-            })
+            Err(utxo_min_confirmations)
         } else {
             log::trace!(
                 "Current utxo confirmations {} satisfies minimum {}. Proceeding.",
@@ -217,6 +667,27 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
+    async fn create_mint_orders(
+        &self,
+        eth_address: &H160,
+        rune_amounts: &[(RuneInfo, u128)],
+    ) -> Result<Vec<MintOrderDetails>, DepositError> {
+        let mut result = vec![];
+        for (rune_info, amount) in rune_amounts {
+            let nonce = self.get_nonce();
+            let mint_order = self
+                .create_mint_order(eth_address, *amount, *rune_info, nonce)
+                .await?;
+            result.push(MintOrderDetails {
+                rune_name: rune_info.name,
+                amount: *amount,
+                status: MintOrderStatus::Created { mint_order, nonce },
+            });
+        }
+
+        Ok(result)
+    }
+
     async fn send_mint_order(&self, mint_order: &SignedMintOrder) -> Result<H256, DepositError> {
         log::trace!("Sending mint transaction");
 
@@ -243,7 +714,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             evm_info.bridge_contract.0,
             evm_params.nonce.into(),
             evm_params.gas_price.into(),
-            mint_order.to_vec(),
+            &mint_order.to_vec(),
             evm_params.chain_id as _,
         );
 
@@ -296,27 +767,12 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         })
     }
 
-    pub async fn get_deposit_utxos(
-        &self,
-        transit_address: &Address,
-    ) -> Result<Vec<Utxo>, DepositError> {
-        let mut utxo_response = self.utxo_provider.get_utxos(transit_address).await?;
-        self.filter_out_used_utxos(&mut utxo_response);
-
-        if utxo_response.utxos.is_empty() {
-            log::trace!("No utxos were found for address {transit_address}");
-            return Err(DepositError::NothingToDeposit);
+    fn mark_used_utxos(&self, utxos: &[Utxo], address: &Address) {
+        let mut state = self.state.borrow_mut();
+        let ledger = state.ledger_mut();
+        for utxo in utxos {
+            ledger.mark_as_used((&utxo.outpoint).into(), address.clone());
         }
-
-        log::trace!(
-            "Found {} utxos at the address {}",
-            utxo_response.utxos.len(),
-            transit_address
-        );
-
-        self.validate_utxo_confirmations(&utxo_response)?;
-
-        Ok(utxo_response.utxos)
     }
 
     pub async fn get_mint_amounts(
@@ -357,405 +813,5 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         };
 
         Ok((rune_info_amounts, used_utxos))
-    }
-
-    fn store_mint_orders(
-        &self,
-        eth_address: &H160,
-        transit_address: &Address,
-        utxos: &[Utxo],
-        mint_orders: &[RuneMintOrder],
-    ) {
-        let sender = Id256::from_evm_address(eth_address, self.state.borrow().erc20_chain_id());
-        let mut state = self.state.borrow_mut();
-        state
-            .ledger_mut()
-            .deposit(utxos, transit_address, get_derivation_path_ic(eth_address));
-
-        for mint_order in mint_orders {
-            state
-                .mint_orders_mut()
-                .push(sender, mint_order.nonce, mint_order.mint_order);
-        }
-    }
-
-    async fn create_mint_orders(
-        &self,
-        rune_info_amounts: &[(RuneInfo, u128)],
-        eth_address: &H160,
-    ) -> Result<Vec<RuneMintOrder>, DepositError> {
-        let mut mint_orders = vec![];
-        for (rune_info, amount) in rune_info_amounts {
-            let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
-            let mint_order = self
-                .create_mint_order(eth_address, *amount, *rune_info, nonce)
-                .await?;
-
-            mint_orders.push(RuneMintOrder {
-                rune_name: rune_info.name,
-                amount: *amount,
-                mint_order,
-                nonce,
-            })
-        }
-
-        Ok(mint_orders)
-    }
-
-    pub async fn process_deposit_request(&self, deposit_request: Request) {
-        let mut request = deposit_request;
-        while request.action_required() {
-            request = self.execute(request).await?;
-        }
-    }
-
-    async fn execute(&self, deposit_request: Request) -> Result<Request, DepositError> {
-        match deposit_request.state {
-            DepositState::Scheduled => self.prepare_mint_order(deposit_request),
-            DepositState::MintOrdersCreated => {}
-            DepositState::MintOrdersSigned => {}
-            DepositState::MintOrdersSent => {}
-            DepositState::Minted => {}
-            DepositState::Rejected { .. } => {}
-        }
-    }
-
-    pub async fn prepare_mint_orders(&self, deposit_request: Request) -> Result<Request, DepositError> {
-        let eth_address = &deposit_request.request_payload.dst_eth_address;
-        let amounts = &deposit_request.request_payload.amounts;
-
-        let transit_address = self.get_transit_address(eth_address).await;
-
-        let utxos = self.get_deposit_utxos(&transit_address).await?;
-        let (rune_info_amounts, used_utxos) = self.get_mint_amounts(&utxos, amounts).await?;
-        let mint_orders = self
-            .create_mint_orders(&rune_info_amounts, eth_address)
-            .await?;
-
-        if self.has_used_utxos(&used_utxos) {
-            // Some of the utxos were used concurrently, retry the task
-            return Err(DepositError::NothingToDeposit);
-        }
-
-        let mut store = rune_deposit_store();
-        store.split_request(deposit_request, |)
-    }
-
-    pub async fn deposit(
-        &self,
-        eth_address: &H160,
-        amounts: &Option<HashMap<RuneName, u128>>,
-    ) -> Result<Vec<DepositResult>, DepositError> {
-        log::trace!("Requested deposit for eth address: {eth_address}");
-
-        let transit_address = self.get_transit_address(eth_address).await;
-
-        let utxos = self.get_deposit_utxos(&transit_address).await?;
-        let (rune_info_amounts, used_utxos) = self.get_mint_amounts(&utxos, amounts).await?;
-        let mint_orders = self
-            .create_mint_orders(&rune_info_amounts, eth_address)
-            .await?;
-
-        if self.has_used_utxos(&used_utxos) {
-            return Err(DepositError::NothingToDeposit);
-        }
-
-        self.store_mint_orders(eth_address, &transit_address, &used_utxos, &mint_orders);
-
-        let mut results = vec![];
-        for RuneMintOrder {
-            rune_name,
-            amount,
-            mint_order,
-            ..
-        } in mint_orders
-        {
-            let result = match self.send_mint_order(&mint_order).await {
-                Ok(tx_id) => DepositResult::MintRequested {
-                    tx_id,
-                    rune_name,
-                    amount,
-                },
-                Err(_) => DepositResult::MintOrderSigned {
-                    mint_order: Box::new(mint_order),
-                    rune_name,
-                    amount,
-                },
-            };
-
-            results.push(result);
-        }
-
-        Ok(results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::interface::WithdrawError;
-    use crate::state::RuneBridgeConfig;
-    use bitcoin::{FeeRate, Network, PrivateKey, Transaction};
-    use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
-    use ord_rs::wallet::LocalSigner;
-    use ordinals::{RuneId, SpacedRune};
-    use std::collections::HashSet;
-    use std::str::FromStr;
-
-    struct MockUtxoProvider {
-        utxos_result: Result<GetUtxosResponse, DepositError>,
-    }
-
-    impl MockUtxoProvider {
-        fn set_utxo_result(&mut self, utxo_count: usize) -> Vec<Utxo> {
-            let curr_height = 123;
-
-            let mut utxos = vec![];
-            for i in 0..utxo_count {
-                utxos.push(Utxo {
-                    outpoint: Outpoint {
-                        txid: vec![i as u8 + 1; 32],
-                        vout: 0,
-                    },
-                    value: 10_000,
-                    height: curr_height - MIN_CONFIRMATIONS - i as u32,
-                })
-            }
-
-            self.utxos_result = Ok(GetUtxosResponse {
-                utxos: utxos.clone(),
-                tip_block_hash: vec![],
-                tip_height: curr_height,
-                next_page: None,
-            });
-
-            utxos
-        }
-    }
-
-    impl Default for MockUtxoProvider {
-        fn default() -> Self {
-            Self {
-                utxos_result: Err(DepositError::NotScheduled),
-            }
-        }
-    }
-
-    impl UtxoProvider for MockUtxoProvider {
-        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, DepositError> {
-            self.utxos_result.clone()
-        }
-
-        async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError> {
-            todo!()
-        }
-
-        async fn send_tx(&self, _transaction: &Transaction) -> Result<(), WithdrawError> {
-            todo!()
-        }
-    }
-
-    struct MockIndexProvider {
-        rune_amounts: HashMap<Utxo, HashMap<RuneName, u128>>,
-        run_before_amounts: Box<dyn Fn()>,
-    }
-
-    impl MockIndexProvider {
-        fn set_rune_amount(&mut self, utxo: &Utxo, rune_name: &str, amount: u128) {
-            self.rune_amounts.insert(
-                utxo.clone(),
-                [(RuneName::from_str(rune_name).unwrap(), amount)]
-                    .into_iter()
-                    .collect(),
-            );
-        }
-    }
-
-    impl Default for MockIndexProvider {
-        fn default() -> Self {
-            Self {
-                rune_amounts: HashMap::new(),
-                run_before_amounts: Box::new(|| ()),
-            }
-        }
-    }
-
-    impl RuneIndexProvider for MockIndexProvider {
-        async fn get_rune_amounts(
-            &self,
-            utxo: &Utxo,
-        ) -> Result<HashMap<RuneName, u128>, DepositError> {
-            (self.run_before_amounts)();
-
-            Ok(self.rune_amounts.get(utxo).cloned().unwrap_or_default())
-        }
-
-        async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, DepositError> {
-            let mut runes = HashSet::new();
-            for amounts in self.rune_amounts.values() {
-                for rune_name in amounts.keys() {
-                    runes.insert(rune_name);
-                }
-            }
-
-            Ok(runes
-                .iter()
-                .map(|rune_name| {
-                    (
-                        RuneId::new(123, 1).unwrap(),
-                        SpacedRune::new(rune_name.inner(), Default::default()),
-                        0,
-                    )
-                })
-                .collect())
-        }
-    }
-
-    const MIN_CONFIRMATIONS: u32 = 12;
-
-    fn test_deposit() -> RuneDeposit<MockUtxoProvider, MockIndexProvider> {
-        let state = State {
-            config: RuneBridgeConfig {
-                min_confirmations: MIN_CONFIRMATIONS,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        RuneDeposit {
-            state: Rc::new(RefCell::new(state)),
-            network: Network::Bitcoin,
-            signer: BtcSignerType::Local(LocalSigner::new(
-                PrivateKey::from_wif("5HpHagT65VRRsu5GMDiAUJYKKxg4tfjUp5SnASBcErBGxCXyxPV")
-                    .unwrap(),
-            )),
-            utxo_provider: MockUtxoProvider::default(),
-            index_provider: MockIndexProvider::default(),
-        }
-    }
-
-    fn eth_address(seed: u8) -> H160 {
-        [seed; H160::BYTE_SIZE].into()
-    }
-
-    fn rune_amounts(amounts: &[(&str, u128)]) -> Option<HashMap<RuneName, u128>> {
-        Some(
-            amounts
-                .iter()
-                .map(|(name, amount)| (RuneName::from_str(name).unwrap(), *amount))
-                .collect(),
-        )
-    }
-
-    #[tokio::test]
-    async fn deposit_creates_mint_order() {
-        let mut deposit = test_deposit();
-        let dst = eth_address(1);
-
-        let utxos = deposit.utxo_provider.set_utxo_result(1);
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[0], "TEST", 10000);
-
-        let result = deposit.deposit(&dst, &None).await.unwrap();
-        assert_eq!(result.len(), 1);
-        assert!(matches!(result[0], DepositResult::MintOrderSigned { .. }));
-
-        let sender = Id256::from_evm_address(&dst, deposit.state.borrow().erc20_chain_id());
-        let orders = deposit.state.borrow().orders_store.get(sender);
-        assert_eq!(orders.len(), 1);
-
-        if let DepositResult::MintOrderSigned { mint_order, .. } = &result[0] {
-            assert_eq!(orders[0].1, **mint_order);
-        }
-    }
-
-    #[tokio::test]
-    async fn concurrent_requests_to_deposit_dont_double_spend_utxos() {
-        let mut deposit = test_deposit();
-        let dst = eth_address(1);
-        let address = deposit.get_transit_address(&dst).await;
-        let derivation_path = get_derivation_path_ic(&dst);
-
-        let utxos = deposit.utxo_provider.set_utxo_result(1);
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[0], "TEST", 10000);
-
-        let state = deposit.state.clone();
-        deposit.index_provider.run_before_amounts = Box::new(move || {
-            state
-                .borrow_mut()
-                .ledger
-                .deposit(&utxos, &address, derivation_path.clone());
-        });
-
-        let result = deposit.deposit(&dst, &None).await;
-        assert!(
-            matches!(result, Err(DepositError::NothingToDeposit)),
-            "unexpected deposit result: {result:?}"
-        )
-    }
-
-    #[tokio::test]
-    async fn deposit_only_consumes_utxos_with_runes() {
-        let mut deposit = test_deposit();
-        let dst = eth_address(4);
-
-        let utxos = deposit.utxo_provider.set_utxo_result(4);
-
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[0], "TEST", 10000);
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[2], "TESTTEST", 1000);
-
-        let result = deposit.deposit(&dst, &None).await.unwrap();
-        assert_eq!(result.len(), 2);
-        assert!(matches!(result[0], DepositResult::MintOrderSigned { .. }));
-        assert!(matches!(result[1], DepositResult::MintOrderSigned { .. }));
-
-        assert!(!deposit.has_used_utxos(&[utxos[1].clone(), utxos[3].clone()]));
-        assert!(deposit.has_used_utxos(&[utxos[0].clone()]));
-        assert!(deposit.has_used_utxos(&[utxos[2].clone()]));
-    }
-
-    #[tokio::test]
-    async fn deposit_checks_requested_amounts() {
-        let mut deposit = test_deposit();
-        let dst = eth_address(4);
-
-        let utxos = deposit.utxo_provider.set_utxo_result(2);
-
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[0], "TEST", 10000);
-        deposit
-            .index_provider
-            .set_rune_amount(&utxos[1], "TESTTEST", 1000);
-
-        assert!(matches!(
-            deposit
-                .deposit(&dst, &rune_amounts(&[("TEST", 10000)]))
-                .await,
-            Err(DepositError::InvalidAmounts { .. })
-        ));
-        assert!(matches!(
-            deposit
-                .deposit(&dst, &rune_amounts(&[("TEST", 10001), ("TESTTEST", 1000)]))
-                .await,
-            Err(DepositError::InvalidAmounts { .. })
-        ));
-        assert!(matches!(
-            deposit.deposit(&dst, &rune_amounts(&[])).await,
-            Err(DepositError::InvalidAmounts { .. })
-        ));
-        assert!(matches!(
-            deposit
-                .deposit(&dst, &rune_amounts(&[("TEST", 10000), ("TESTTEST", 1000)]))
-                .await,
-            Ok(..)
-        ));
     }
 }
