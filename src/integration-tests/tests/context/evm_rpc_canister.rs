@@ -1,16 +1,25 @@
-use candid::{CandidType, Principal};
-use ic_exports::ic_cdk::api::call::CallResult as Result;
+#![allow(non_snake_case)]
+
+use candid::CandidType;
 use ic_exports::ic_cdk::api::management_canister::http_request::HttpHeader;
 use serde::Deserialize;
 
 #[derive(CandidType, Deserialize)]
 pub struct RegisterProviderArgs {
-    pub cycles_per_call: u64,
-    pub credential_path: String,
+    pub cyclesPerCall: u64,
+    pub credentialPath: String,
     pub hostname: String,
-    pub credentials_headers: Option<Vec<HttpHeader>>,
-    pub chain_id: u64,
-    pub cycles_per_message_byte: u64,
+    pub credentialsHeaders: Option<Vec<HttpHeader>>,
+    pub chainId: u64,
+    pub cyclesPerMessageByte: u64,
+}
+
+#[derive(CandidType, Deserialize)]
+pub enum Auth {
+    RegisterProvider,
+    FreeRpc,
+    PriorityRpc,
+    Manage,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -66,7 +75,7 @@ pub enum HttpOutcallError {
     InvalidHttpJsonRpcResponse {
         status: u16,
         body: String,
-        parsing_error: Option<String>,
+        parsingError: Option<String>,
     },
 }
 
@@ -78,6 +87,7 @@ pub enum RpcError {
     HttpOutcallError(HttpOutcallError),
 }
 
-pub async fn register_provider(principal: Principal, args: RegisterProviderArgs) -> Result<(u64,)> {
-    ic_exports::ic_cdk::call(principal, "registerProvider", (args,)).await
+#[derive(CandidType, Deserialize)]
+pub struct EvmRpcCanisterInitData {
+    pub nodesInSubnet: u32,
 }

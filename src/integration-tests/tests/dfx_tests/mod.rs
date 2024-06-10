@@ -6,6 +6,7 @@ use ic_canister_client::IcAgentClient;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_test_utils::{get_agent, Agent, Canister};
 use ic_utils::interfaces::ManagementCanister;
+use minter_contract_utils::evm_link::{EvmLink, RpcApi, RpcService};
 
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
@@ -14,7 +15,7 @@ mod erc20_minter;
 mod runes;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
-pub const INIT_CANISTER_CYCLES: u128 = 200_000_000_000;
+pub const INIT_CANISTER_CYCLES: u128 = 900_000_000_000;
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
@@ -101,6 +102,19 @@ impl TestContext for DfxTestContext {
 
     fn canisters(&self) -> TestCanisters {
         self.canisters.clone()
+    }
+
+    fn base_evm_link(&self) -> EvmLink {
+        EvmLink::EvmRpcCanister {
+            canister_id: self.canisters().evm_rpc(),
+            rpc_service: vec![RpcService::Custom(RpcApi {
+                url: format!(
+                    "http://127.0.0.1:8000/?canisterId={}",
+                    self.canisters().external_evm()
+                ),
+                headers: None,
+            })],
+        }
     }
 
     /// Creates an empty canister with cycles on it's balance.

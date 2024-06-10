@@ -1,4 +1,4 @@
-#![allow(clippy::enum_variant_names)]
+#![allow(clippy::enum_variant_names, non_snake_case)]
 
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_exports::ic_cdk;
@@ -87,7 +87,7 @@ pub enum RejectionCode {
     NoError,
     #[error("canister error")]
     CanisterError,
-    #[error("system error")]
+    #[error("system transient")]
     SysTransient,
     #[error("destination invalid")]
     DestinationInvalid,
@@ -106,11 +106,11 @@ pub enum HttpOutcallError {
         code: RejectionCode,
         message: String,
     },
-    #[error("invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsing_error:?}")]
+    #[error("invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsingError:?}")]
     InvalidHttpJsonRpcResponse {
         status: u16,
         body: String,
-        parsing_error: Option<String>,
+        parsingError: Option<String>,
     },
 }
 
@@ -149,17 +149,6 @@ pub enum RequestResult {
 pub enum RequestCostResult {
     Ok(candid::Nat),
     Err(RpcError),
-}
-
-#[derive(CandidType, Deserialize)]
-pub struct UpdateProviderArgs {
-    pub cycles_per_call: Option<u64>,
-    pub credential_path: Option<String>,
-    pub hostname: Option<String>,
-    pub credential_headers: Option<Vec<HttpHeader>>,
-    pub primary: Option<bool>,
-    pub cycles_per_message_byte: Option<u64>,
-    pub provider_id: u64,
 }
 
 pub struct Service(pub Principal);

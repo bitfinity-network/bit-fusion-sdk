@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e
 
 cargo build --tests -p integration-tests --features dfx_tests

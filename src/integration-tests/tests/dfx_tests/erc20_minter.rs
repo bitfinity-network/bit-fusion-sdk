@@ -83,6 +83,7 @@ impl ContextWithBridges {
         // Deploy the BFTBridge contract on the external EVM.
         let base_bft_bridge =
             create_bft_bridge(&ctx, base_evm, erc20_minter_address.clone(), &bob_wallet).await;
+        ctx.advance_time(Duration::from_secs(2)).await;
         let wrapped_bft_bridge = create_bft_bridge(
             &ctx,
             ctx.canisters().evm(),
@@ -156,6 +157,8 @@ impl ContextWithBridges {
             )
             .await
             .unwrap();
+
+        ctx.advance_time(Duration::from_secs(2)).await;
 
         Self {
             context: ctx,
@@ -263,6 +266,9 @@ async fn test_external_bridging() {
 #[tokio::test]
 async fn native_token_deposit_increase_and_decrease() {
     let ctx = ContextWithBridges::new().await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 1)
+        .await;
 
     // Approve ERC-20 transfer on behalf of some user in base EVM.
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
@@ -358,6 +364,8 @@ async fn native_token_deposit_increase_and_decrease() {
             ctx.bob_address(),
         )
         .await;
+    println!("native_balance_after_mint: {:?}", native_balance_after_mint);
+    println!("init_native_balance: {:?}", init_native_balance);
     assert!(native_balance_after_mint > U256::zero());
     assert!(native_balance_after_mint < init_native_balance);
 }
@@ -541,6 +549,8 @@ async fn create_bft_bridge(
         .await
         .unwrap()
         .unwrap();
+
+    ctx.advance_time(Duration::from_secs(2)).await;
 
     ctx.wait_transaction_receipt_on_evm(&evm_client, &hash)
         .await

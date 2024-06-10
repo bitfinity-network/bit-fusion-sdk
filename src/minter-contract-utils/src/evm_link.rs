@@ -7,12 +7,14 @@ use std::pin::Pin;
 use candid::{CandidType, Principal};
 use ethereum_json_rpc_client::http_outcall::HttpOutcallClient;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use evm_rpc_canister_client::RpcService;
 use ic_canister_client::IcCanisterClient;
 use jsonrpc_core::{Request, Response};
 use serde::{Deserialize, Serialize};
 
 use self::evm_rpc_canister_client::EvmRpcCanisterClient;
+pub use self::evm_rpc_canister_client::{
+    EthMainnetService, EthSepoliaService, L2MainnetService, RpcApi, RpcService,
+};
 
 #[derive(Debug, Clone)]
 pub enum Clients {

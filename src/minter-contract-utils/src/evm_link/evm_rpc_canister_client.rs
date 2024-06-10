@@ -7,7 +7,7 @@ use candid::Principal;
 use jsonrpc_core::{Request, Response};
 use num_traits::ToPrimitive;
 
-pub use self::did::RpcService;
+pub use self::did::{EthMainnetService, EthSepoliaService, L2MainnetService, RpcApi, RpcService};
 use self::did::{RequestCostResult, RequestResult, Service};
 
 #[derive(Debug, Clone)]
