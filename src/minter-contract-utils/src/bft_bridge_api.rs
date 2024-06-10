@@ -483,18 +483,10 @@ pub struct NotifyMinterEventData {
     pub user_data: Vec<u8>,
 }
 
+#[derive(Debug, Default, Clone)]
 struct NotifyMinterEventDataBuilder {
     notification_type: Option<u32>,
     user_data: Option<Vec<u8>>,
-}
-
-impl Default for NotifyMinterEventDataBuilder {
-    fn default() -> Self {
-        Self {
-            user_data: None,
-            notification_type: None,
-        }
-    }
 }
 
 impl NotifyMinterEventDataBuilder {
@@ -502,9 +494,8 @@ impl NotifyMinterEventDataBuilder {
         Ok(NotifyMinterEventData {
             notification_type: self
                 .notification_type
-                .ok_or_else(not_found("notificationType"))?
-                .into(),
-            user_data: self.user_data.ok_or_else(not_found("userData"))?.into(),
+                .ok_or_else(not_found("notificationType"))?,
+            user_data: self.user_data.ok_or_else(not_found("userData"))?,
         })
     }
 
