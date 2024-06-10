@@ -243,10 +243,17 @@ pub trait TestContext {
         &self,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
+        is_wrapped: bool,
     ) -> Result<H160> {
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
         let input = bft_bridge_api::CONSTRUCTOR
-            .encode_input(contract, &[Token::Address(minter_canister_address.into())])
+            .encode_input(
+                contract,
+                &[
+                    Token::Address(minter_canister_address.into()),
+                    Token::Bool(is_wrapped),
+                ],
+            )
             .unwrap();
 
         let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();

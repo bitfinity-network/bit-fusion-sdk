@@ -274,9 +274,15 @@ impl MinterCanister {
         let mut status = state.borrow().config.get_bft_bridge_contract_status();
 
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
-
+        let is_wrapped_side = true;
         let hash = status
-            .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
+            .initialize(
+                evm_link,
+                evm_params.chain_id as _,
+                signer,
+                minter_address,
+                is_wrapped_side,
+            )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
 

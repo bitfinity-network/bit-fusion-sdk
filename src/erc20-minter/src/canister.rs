@@ -173,7 +173,13 @@ impl EvmMinter {
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
 
         let hash = status
-            .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
+            .initialize(
+                evm_link,
+                evm_params.chain_id as _,
+                signer,
+                minter_address,
+                side == BridgeSide::Wrapped,
+            )
             .await
             .map_err(|e| e.to_string())?;
 

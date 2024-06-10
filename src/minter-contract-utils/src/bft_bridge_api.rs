@@ -623,9 +623,13 @@ pub fn deploy_transaction(
     chain_id: u32,
     code: Vec<u8>,
     minter_address: H160,
+    is_wrapped_side: bool,
 ) -> Transaction {
     let data = CONSTRUCTOR
-        .encode_input(code, &[Token::Address(minter_address)])
+        .encode_input(
+            code,
+            &[Token::Address(minter_address), Token::Bool(is_wrapped_side)],
+        )
         .expect("constructor parameters encoding should pass");
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 5_000_000;
