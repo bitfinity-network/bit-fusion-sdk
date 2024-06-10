@@ -81,7 +81,7 @@ fn compile(
         ))
     })?;
 
-    Command::new("/home/maxim/.foundry/bin/forge")
+    Command::new("forge")
         .args(["build", "--out", output_path_str, "--skip", "test"])
         .current_dir(solidity_root_path)
         .output()?;
@@ -159,7 +159,6 @@ fn parse_json_contract(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
