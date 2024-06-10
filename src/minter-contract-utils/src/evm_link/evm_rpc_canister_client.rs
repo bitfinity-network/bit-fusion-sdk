@@ -64,7 +64,7 @@ impl EvmRpcCanisterClient {
         request: &str,
     ) -> anyhow::Result<Response> {
         let service = Service(principal);
-        const MAX_RESPONSE_SIZE: u64 = 1024 * 10;
+        const MAX_RESPONSE_SIZE: u64 = 1818028217;
 
         // get request cost as cycles
         let (request_cost_result,) = service

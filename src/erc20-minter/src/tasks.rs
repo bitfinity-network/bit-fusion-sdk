@@ -84,14 +84,23 @@ impl BridgeTask {
             .link
             .get_json_rpc_client();
 
+        log::info!("preparing client for side {:?}", side);
+
         let address = {
             let signer = state.borrow().signer.get().clone();
             signer.get_address().await.into_scheduler_result()?
         };
 
-        let evm_params = EvmParams::query(client, address)
+        let evm_params = match EvmParams::query(client, address)
             .await
-            .into_scheduler_result()?;
+            .into_scheduler_result()
+        {
+            Ok(params) => params,
+            Err(e) => {
+                log::error!("failed to query evm params: {e}");
+                EvmParams::default()
+            }
+        };
 
         state
             .borrow_mut()

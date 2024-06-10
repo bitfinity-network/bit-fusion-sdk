@@ -6281,6 +6281,7 @@ dependencies = [
  "ic-exports",
  "ic-stable-structures 0.17.0",
  "jsonrpc-core",
+ "log",
  "minter-did",
  "num-bigint 0.4.4",
  "num-traits",

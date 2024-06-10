@@ -114,7 +114,7 @@ impl TestContext for DfxTestContext {
             canister_id: self.canisters().evm_rpc(),
             rpc_service: vec![RpcService::Custom(RpcApi {
                 url: format!(
-                    "http://127.0.0.1:8000/?canisterId={}",
+                    "https://127.0.0.1:8001/?canisterId={}",
                     self.canisters().external_evm()
                 ),
                 headers: None,

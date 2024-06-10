@@ -9,6 +9,7 @@ use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
+use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
@@ -751,7 +752,7 @@ pub trait TestContext {
                 let args = evm_rpc_canister::RegisterProviderArgs {
                     chainId: CHAIN_ID,
                     hostname: format!(
-                        "http://127.0.0.1:8000/?canisterId={}",
+                        "https://127.0.0.1:8001/?canisterId={}",
                         self.canisters().external_evm()
                     ),
                     credentialPath: "".to_string(),
@@ -851,8 +852,8 @@ pub trait TestContext {
                 let init_data = erc20_minter::state::Settings {
                     base_evm_link: self.base_evm_link(),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
-                    signing_strategy: SigningStrategy::Local {
-                        private_key: rand::random(),
+                    signing_strategy: SigningStrategy::ManagementCanister {
+                        key_id: SigningKeyId::Dfx,
                     },
                     log_settings: Some(LogSettings {
                         enable_console: true,
