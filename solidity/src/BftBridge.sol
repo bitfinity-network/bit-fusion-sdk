@@ -73,7 +73,7 @@ contract BFTBridge is TokenManager {
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
     // Constructor to initialize minterCanisterAddress
-    constructor(address minterAddress) {
+    constructor(address minterAddress, bool isWrappedSide_) TokenManager(isWrappedSide_) {
         minterCanisterAddress = minterAddress;
     }
 
@@ -153,7 +153,7 @@ contract BFTBridge is TokenManager {
         require(toToken != address(0), "toToken address should be specified correctly");
 
         // Update token's metadata only if it is a wrapped token
-        if (isWrappedToken(toToken)) {
+        if (isWrappedSide) {
             updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
         }
 
@@ -161,7 +161,7 @@ contract BFTBridge is TokenManager {
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedToken(toToken)) {
+        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedSide) {
             WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 

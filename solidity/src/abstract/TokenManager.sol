@@ -8,6 +8,9 @@ import "src/libraries/StringUtils.sol";
 abstract contract TokenManager {
     using SafeERC20 for IERC20;
 
+    // Indicates whether this contract is on the wrapped side
+    bool internal isWrappedSide;
+
     /// Mapping from Base tokens to Wrapped tokens
     mapping(bytes32 => address) internal _erc20TokenRegistry;
 
@@ -27,8 +30,15 @@ abstract contract TokenManager {
         uint8 decimals;
     }
 
+    // Constructor or an initializer where you set this variable
+    constructor(bool _isWrappedSide) {
+        isWrappedSide = _isWrappedSide;
+    }
+
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
+        require(isWrappedSide, "Only for wrapped side");
+
         require(_erc20TokenRegistry[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token
@@ -81,10 +91,5 @@ abstract contract TokenManager {
             wrapped[i] = wrappedToken;
             base[i] = _baseTokenRegistry[wrappedToken];
         }
-    }
-
-    /// Returns false/true if the given token is wrapped token
-    function isWrappedToken(address token) internal view returns (bool) {
-        return _baseTokenRegistry[token] != bytes32(0);
     }
 }
