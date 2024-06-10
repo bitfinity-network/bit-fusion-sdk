@@ -43,6 +43,10 @@ struct DeployBftArgs {
     #[arg(long)]
     minter_address: String,
 
+    /// ETH address of the FeeCharge contract.
+    #[arg(long)]
+    fee_charge_address: Option<String>,
+
     /// Principal of the EVM canister
     #[arg(long)]
     evm: Principal,
@@ -235,10 +239,20 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
 
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
+    let fee_charge = args
+        .fee_charge_address
+        .map(|address_str| {
+            H160::from_slice(
+                &hex::decode(address_str.trim_start_matches("0x"))
+                    .expect("failed to parse minter address"),
+            )
+        })
+        .unwrap_or_default();
+
     let input = bft_bridge_api::CONSTRUCTOR
         .encode_input(
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
-            &[Token::Address(minter)],
+            &[Token::Address(minter), Token::Address(fee_charge)],
         )
         .unwrap();
 

@@ -157,7 +157,11 @@ impl EvmMinter {
 
     /// Starts the BFT bridge contract deployment.
     #[update]
-    pub async fn init_bft_bridge_contract(&mut self, side: BridgeSide) -> Result<H256> {
+    pub async fn init_bft_bridge_contract(
+        &mut self,
+        side: BridgeSide,
+        fee_charge_address: H160,
+    ) -> Result<H256> {
         let state = get_state();
         let signer = state.borrow().signer.get().clone();
 
@@ -178,6 +182,7 @@ impl EvmMinter {
                 evm_params.chain_id as _,
                 signer,
                 minter_address,
+                fee_charge_address,
                 side == BridgeSide::Wrapped,
             )
             .await

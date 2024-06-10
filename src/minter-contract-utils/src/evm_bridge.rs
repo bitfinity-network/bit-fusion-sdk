@@ -136,7 +136,9 @@ impl BftBridgeContractStatus {
         chain_id: u32,
         signer: impl TransactionSigner,
         minter_address: H160,
-        is_wrapped_side: bool,
+        fee_charge_address: H160,
+                is_wrapped_side: bool,
+
     ) -> anyhow::Result<H256> {
         match self {
             BftBridgeContractStatus::None => {}
@@ -167,8 +169,8 @@ impl BftBridgeContractStatus {
             chain_id,
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
             minter_address.into(),
-            is_wrapped_side,
-        );
+            fee_charge_address.into(),
+            is_wrapped_side        );
         let signature = signer.sign_transaction(&(&transaction).into()).await?;
 
         transaction.r = signature.r.0;

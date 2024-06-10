@@ -90,6 +90,10 @@ impl TestContext for DfxTestContext {
         IcAgentClient::with_agent(canister, agent)
     }
 
+    fn principal_by_caller_name(&self, caller: &str) -> Principal {
+        self.agent_by_name(caller).get_principal().unwrap()
+    }
+
     fn admin(&self) -> Principal {
         self.agent_by_name(ADMIN).get_principal().unwrap()
     }

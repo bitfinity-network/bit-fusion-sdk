@@ -42,7 +42,7 @@ contract BftBridgeTest is Test {
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-        _bridge = new BFTBridge(_owner, true);
+        _bridge = new BFTBridge(_owner, address(0), true);
     }
 
     function testMinterCanisterAddress() public {
