@@ -51,6 +51,12 @@ pub async fn mint(
     // Fee deduction for approve operation.
     let effective_amount = amount.clone() - fee.clone();
 
+    if effective_amount == 0_u64 {
+        return Err(Error::InvalidBurnOperation(
+            "the effective amount to be transferred is 0".to_string(),
+        ));
+    }
+
     let args = TransferArg {
         to: recipient.into(),
         memo: None,
@@ -86,6 +92,12 @@ pub async fn burn(
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     let minter_canister_account = Account::from(ic::id());
+
+    if amount == 0_u64 {
+        return Err(Error::InvalidBurnOperation(
+            "the amount to be transferred is 0".to_string(),
+        ));
+    }
 
     let args = TransferFromArgs {
         from,
