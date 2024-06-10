@@ -2,7 +2,6 @@ use std::cell::RefCell;
 
 use candid::Principal;
 pub use config::Config;
-use did::H160;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
@@ -79,7 +78,6 @@ pub struct Settings {
     pub owner: Principal,
     pub evm_principal: Principal,
     pub signing_strategy: SigningStrategy,
-    pub fee_charge_contract: H160,
 }
 
 impl Default for Settings {
@@ -90,7 +88,6 @@ impl Default for Settings {
             signing_strategy: SigningStrategy::Local {
                 private_key: [218u8; 32],
             },
-            fee_charge_contract: H160::default(),
         }
     }
 }
