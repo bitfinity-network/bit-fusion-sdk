@@ -9,7 +9,7 @@ use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
@@ -29,13 +29,13 @@ use crate::core::withdrawal::Withdrawal;
 use crate::rune_info::RuneName;
 
 pub type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 
 pub type PersistentScheduler = Scheduler<RuneBridgeTask, TasksStorage>;
 
 mod minter_notify;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
