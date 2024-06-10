@@ -3,11 +3,11 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use candid::{Encode, Principal};
-use did::{BlockNumber, H160, H256, TransactionReceipt};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use eth_signer::{Signer, Wallet};
+use did::{BlockNumber, TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
@@ -27,7 +27,7 @@ use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
 
 use crate::context::{CanisterType, TestContext};
-use crate::dfx_tests::{ADMIN, DfxTestContext};
+use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 const RUNE_NAME: &str = "SUPERMAXRUNENAME";

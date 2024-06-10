@@ -5,15 +5,15 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use bitcoin::{Address, Network};
 use bitcoin::hashes::Hash;
+use bitcoin::{Address, Network};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::{CellStructure, VirtualMemory};
 use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
+use ic_stable_structures::{CellStructure, VirtualMemory};
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
 use minter_did::id256::Id256;

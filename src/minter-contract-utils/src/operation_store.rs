@@ -6,11 +6,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
+use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
-    Bound, BTreeMapStructure, CachedStableBTreeMap, IterableSortedMapStructure, StableBTreeMap,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, IterableSortedMapStructure, StableBTreeMap,
     Storable,
 };
-use ic_stable_structures::stable_structures::Memory;
 use serde::Serialize;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
@@ -186,11 +186,7 @@ where
             .unwrap_or_default()
             .0
             .into_iter()
-            .filter_map(|id| {
-                self.operations
-                    .get(&id)
-                    .map(|entry| (id, entry.payload))
-            })
+            .filter_map(|id| self.operations.get(&id).map(|entry| (id, entry.payload)))
             .collect()
     }
 
@@ -238,10 +234,14 @@ mod tests {
     use super::*;
 
     fn test_store(max_operations: u64) -> MinterOperationStore<VectorMemory, u32> {
-        MinterOperationStore::with_memory(VectorMemory::default(), VectorMemory::default(), Some(MinterOperationStoreOptions {
-            max_operations_count: max_operations,
-            cache_size: DEFAULT_CACHE_SIZE,
-        }))
+        MinterOperationStore::with_memory(
+            VectorMemory::default(),
+            VectorMemory::default(),
+            Some(MinterOperationStoreOptions {
+                max_operations_count: max_operations,
+                cache_size: DEFAULT_CACHE_SIZE,
+            }),
+        )
     }
 
     fn eth_address(seed: u8) -> H160 {
