@@ -10,5 +10,3 @@ pub const PENDING_TASKS_MEMORY_ID: MemoryId = MemoryId::new(86);
 pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
 
 pub const IC_CHAIN_ID: u32 = 0;
-
-pub const TASK_RETRY_DELAY_SECS: u32 = 5;

@@ -11,6 +11,7 @@ use minter_contract_utils::evm_link::{EvmLink, RpcApi, RpcService};
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
+mod ck_erc20;
 mod erc20_minter;
 mod runes;
 
@@ -90,6 +91,10 @@ impl TestContext for DfxTestContext {
     fn client(&self, canister: Principal, name: &str) -> Self::Client {
         let agent = self.agent_by_name(name);
         IcAgentClient::with_agent(canister, agent)
+    }
+
+    fn principal_by_caller_name(&self, caller: &str) -> Principal {
+        self.agent_by_name(caller).get_principal().unwrap()
     }
 
     fn admin(&self) -> Principal {

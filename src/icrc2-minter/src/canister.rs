@@ -3,18 +3,17 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::build::BuildData;
-use did::{H160, H256, U256};
+use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
-use ic_exports::icrc_types::icrc1::account::Account;
 use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableUnboundedMap, VirtualMemory};
+use ic_stable_structures::{StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -23,15 +22,13 @@ use minter_contract_utils::evm_link::EvmLink;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
-use minter_did::order::{self, SignedMintOrder};
-use minter_did::reason::Icrc2Burn;
+use minter_did::order::SignedMintOrder;
 
 use crate::build_data::canister_build_data;
-use crate::constant::{PENDING_TASKS_MEMORY_ID, TASK_RETRY_DELAY_SECS};
+use crate::constant::PENDING_TASKS_MEMORY_ID;
 use crate::memory::MEMORY_MANAGER;
 use crate::state::{Settings, State};
-use crate::tasks::{BridgeTask, BurntIcrc2Data};
-use crate::tokens::{icrc1, icrc2};
+use crate::tasks::BridgeTask;
 
 mod inspect;
 
@@ -255,7 +252,7 @@ impl MinterCanister {
 
     /// Starts the BFT bridge contract deployment.
     #[update]
-    pub async fn init_bft_bridge_contract(&mut self) -> Result<H256> {
+    pub async fn init_bft_bridge_contract(&mut self, fee_charge_contract: H160) -> Result<H256> {
         let state = get_state();
         let signer = state.borrow().signer.get_transaction_signer();
 
@@ -276,7 +273,13 @@ impl MinterCanister {
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
 
         let hash = status
-            .initialize(evm_link, evm_params.chain_id as _, signer, minter_address)
+            .initialize(
+                evm_link,
+                evm_params.chain_id as _,
+                signer,
+                minter_address,
+                fee_charge_contract,
+            )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
 
@@ -288,8 +291,8 @@ impl MinterCanister {
             .set_bft_bridge_contract_status(status);
 
         let options = TaskOptions::default()
-            .with_max_retries_policy(u32::MAX)
-            .with_fixed_backoff_policy(4);
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_fixed_backoff_policy(2);
         get_scheduler()
             .borrow_mut()
             .append_task(ScheduledTask::with_options(
@@ -329,83 +332,6 @@ impl MinterCanister {
             .borrow()
             .mint_orders
             .get(sender, src_token, operation_id)
-    }
-
-    /// burn_icrc2 inspect_message check
-    pub fn burn_icrc2_inspect_message_check(reason: &Icrc2Burn) -> Result<()> {
-        inspect_mint_reason(reason)
-    }
-
-    /// Create signed withdraw order data according to the given withdraw `reason`.
-    /// A token to mint will be selected automatically by the `reason`.
-    /// Returns operation id.
-    #[update]
-    pub async fn burn_icrc2(&mut self, reason: Icrc2Burn) -> Result<u32> {
-        debug!("creating ERC20 mint order with reason {reason:?}");
-
-        let caller = ic::caller();
-        let state = get_state();
-        MinterCanister::burn_icrc2_inspect_message_check(&reason)?;
-
-        let (approve_spender, approve_amount) = if let Some(approval) = reason.approve_minted_tokens
-        {
-            approval
-                .check_signature(&caller, &reason.recipient_address)
-                .ok_or_else(|| Error::InvalidBurnOperation("invalid principal signature".into()))?;
-
-            (approval.approve_spender, approval.approve_amount)
-        } else {
-            Default::default()
-        };
-
-        let caller_account = Account {
-            owner: caller,
-            subaccount: reason.from_subaccount,
-        };
-
-        let token_info = icrc1::query_token_info_or_read_from_cache(reason.icrc2_token_principal)
-            .await
-            .ok_or(Error::InvalidBurnOperation(
-                "failed to get token info".into(),
-            ))?;
-
-        let name = order::fit_str_to_array(&token_info.name);
-        let symbol = order::fit_str_to_array(&token_info.symbol);
-
-        icrc2::burn(
-            reason.icrc2_token_principal,
-            caller_account,
-            (&reason.amount).into(),
-            true,
-        )
-        .await?;
-
-        let operation_id = state.borrow_mut().next_nonce();
-
-        let options = TaskOptions::default()
-            .with_backoff_policy(BackoffPolicy::Fixed {
-                secs: TASK_RETRY_DELAY_SECS,
-            })
-            .with_max_retries_policy(u32::MAX);
-
-        get_scheduler().borrow_mut().append_task(
-            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
-                sender: caller,
-                amount: reason.amount,
-                operation_id,
-                name,
-                symbol,
-                decimals: token_info.decimals,
-                src_token: reason.icrc2_token_principal,
-                recipient_address: reason.recipient_address,
-                approve_spender,
-                approve_amount,
-                fee_payer: reason.fee_payer,
-            })
-            .into_scheduled(options),
-        );
-
-        Ok(operation_id)
     }
 
     /// Returns evm_address of the minter canister.
@@ -470,23 +396,8 @@ fn check_anonymous_principal(principal: Principal) -> Result<()> {
     Ok(())
 }
 
-/// Checks if addresses and amount are non-zero.
-fn inspect_mint_reason(reason: &Icrc2Burn) -> Result<()> {
-    if reason.amount == U256::zero() {
-        return Err(Error::InvalidBurnOperation("amount is zero".into()));
-    }
-
-    if reason.recipient_address == H160::zero() {
-        return Err(Error::InvalidBurnOperation(
-            "recipient address is zero".into(),
-        ));
-    }
-
-    Ok(())
-}
-
 type TasksStorage =
-    StableUnboundedMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
+    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
 
 fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {

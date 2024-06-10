@@ -136,6 +136,7 @@ impl BftBridgeContractStatus {
         chain_id: u32,
         signer: impl TransactionSigner,
         minter_address: H160,
+        fee_charge_address: H160,
     ) -> anyhow::Result<H256> {
         match self {
             BftBridgeContractStatus::None => {}
@@ -166,6 +167,7 @@ impl BftBridgeContractStatus {
             chain_id,
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
             minter_address.into(),
+            fee_charge_address.into(),
         );
         let signature = signer.sign_transaction(&(&transaction).into()).await?;
 
@@ -229,5 +231,13 @@ impl BftBridgeContractStatus {
     #[must_use]
     pub fn is_creating(&self) -> bool {
         matches!(self, Self::Creating(..))
+    }
+
+    pub fn as_created(&self) -> Option<&H160> {
+        if let Self::Created(v) = self {
+            Some(v)
+        } else {
+            None
+        }
     }
 }

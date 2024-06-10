@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::fmt;
 
 use candid::{CandidType, Principal};
-use did::{codec, H160};
+use did::codec;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
+use minter_contract_utils::evm_bridge::{BftBridgeContractStatus, BridgeSide, EvmInfo, EvmParams};
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
@@ -44,11 +44,9 @@ impl Config {
 
             let base_evm = &mut data.evm_info_by_side_mut(BridgeSide::Base);
             base_evm.link = settings.base_evm_link;
-            base_evm.bridge_contract = settings.base_bridge_contract;
 
             let wrapped_evm = &mut data.evm_info_by_side_mut(BridgeSide::Wrapped);
             wrapped_evm.link = settings.wrapped_evm_link;
-            wrapped_evm.bridge_contract = settings.wrapped_bridge_contract;
         })
     }
 
@@ -57,16 +55,22 @@ impl Config {
         self.data.get().evm_info_by_side(side).clone()
     }
 
+    /// Returns bft bridge status for the given bridge side.
+    pub fn get_bft_bridge_status(&self, side: BridgeSide) -> BftBridgeContractStatus {
+        self.data.get().bridge_status_by_side(side).clone()
+    }
+
+    /// Updates bft bridge status for the given bridge side.
+    pub fn set_bft_bridge_status(&mut self, side: BridgeSide, status: BftBridgeContractStatus) {
+        self.update_data(|data| *data.bridge_status_by_side_mut(side) = status)
+    }
+
     /// Sets owner principal.
     pub fn set_admin(&mut self, admin: Principal) {
         self.update_data(|data| data.admin = admin);
     }
 
-    /// Sets evm bridge contract address for the given bridge side.
-    pub fn set_bft_bridge_address(&mut self, side: BridgeSide, address: H160) {
-        self.update_data(|data| data.evm_info_by_side_mut(side).bridge_contract = address);
-    }
-
+    /// Returns evm params for the given bridge side.
     pub fn get_evm_params(&self, side: BridgeSide) -> anyhow::Result<EvmParams> {
         self.data
             .get()
@@ -78,6 +82,7 @@ impl Config {
             })
     }
 
+    /// Updates evm params for the given bridge side.
     pub fn update_evm_params<F: FnOnce(&mut EvmParams)>(&mut self, f: F, side: BridgeSide) {
         self.update_data(|data| {
             let mut params = data
@@ -113,9 +118,12 @@ pub struct ConfigData {
     pub admin: Principal,
     pub base_evm: EvmInfo,
     pub wrapped_evm: EvmInfo,
+    pub base_bft_bridge: BftBridgeContractStatus,
+    pub wrapped_bft_bridge: BftBridgeContractStatus,
 }
 
 impl ConfigData {
+    /// Returns evm info for the given bridge side.
     pub fn evm_info_by_side(&self, side: BridgeSide) -> &EvmInfo {
         match side {
             BridgeSide::Base => &self.base_evm,
@@ -123,10 +131,27 @@ impl ConfigData {
         }
     }
 
+    /// Returns mutable evm info for the given bridge side.
     pub fn evm_info_by_side_mut(&mut self, side: BridgeSide) -> &mut EvmInfo {
         match side {
             BridgeSide::Base => &mut self.base_evm,
             BridgeSide::Wrapped => &mut self.wrapped_evm,
+        }
+    }
+
+    /// Returns bft bridge status for the given bridge side.
+    pub fn bridge_status_by_side(&self, side: BridgeSide) -> &BftBridgeContractStatus {
+        match side {
+            BridgeSide::Base => &self.base_bft_bridge,
+            BridgeSide::Wrapped => &self.wrapped_bft_bridge,
+        }
+    }
+
+    /// Returns mutable bft bridge status for the given bridge side.
+    pub fn bridge_status_by_side_mut(&mut self, side: BridgeSide) -> &mut BftBridgeContractStatus {
+        match side {
+            BridgeSide::Base => &mut self.base_bft_bridge,
+            BridgeSide::Wrapped => &mut self.wrapped_bft_bridge,
         }
     }
 }
@@ -137,6 +162,8 @@ impl Default for ConfigData {
             admin: Principal::management_canister(),
             base_evm: EvmInfo::default(),
             wrapped_evm: EvmInfo::default(),
+            base_bft_bridge: Default::default(),
+            wrapped_bft_bridge: Default::default(),
         }
     }
 }

@@ -24,9 +24,11 @@ use crate::state::State;
 
 type SignedMintOrderData = Vec<u8>;
 
+/// Task for the ERC-20 bridge
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
+    RefreshBftBridgeCreationStatus(BridgeSide),
     CollectEvmEvents(BridgeSide),
     PrepareMintOrder(BurntEventData, BridgeSide),
     RemoveMintOrder(MintedEventData),
@@ -43,6 +45,9 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
+            BridgeTask::RefreshBftBridgeCreationStatus(side) => {
+                Box::pin(Self::refresh_bft_bridge(state, *side))
+            }
             BridgeTask::CollectEvmEvents(side) => {
                 Box::pin(Self::collect_evm_events(state, scheduler, *side))
             }
@@ -98,6 +103,24 @@ impl BridgeTask {
         Ok(())
     }
 
+    pub async fn refresh_bft_bridge(
+        state: Rc<RefCell<State>>,
+        side: BridgeSide,
+    ) -> Result<(), SchedulerError> {
+        log::trace!("refreshing bft bridge status");
+        let mut status = state.borrow().config.get_bft_bridge_status(side);
+        status.refresh().await.into_scheduler_result()?;
+
+        log::trace!("{side} bft bridge status refreshed: {status:?}");
+
+        state
+            .borrow_mut()
+            .config
+            .set_bft_bridge_status(side, status);
+
+        Ok(())
+    }
+
     async fn collect_evm_events(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
@@ -111,13 +134,19 @@ impl BridgeTask {
             return Self::init_evm_state(state, side).await;
         };
 
+        let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
+        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
+            log::warn!("failed to collect evm events: bft bridge is not created");
+            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
+        })?;
+
         let client = evm_info.link.get_json_rpc_client();
 
         let logs = BridgeEvent::collect_logs(
             &client,
             params.next_block.into(),
             BlockNumber::Safe,
-            evm_info.bridge_contract.0,
+            bft_bridge.0,
         )
         .await
         .into_scheduler_result()?;
@@ -220,7 +249,7 @@ impl BridgeTask {
         state
             .borrow_mut()
             .mint_orders
-            .insert(sender, src_token, nonce, &signed_mint_order);
+            .insert(sender, src_token, nonce, signed_mint_order);
 
         // Update the EVM params
         Self::update_evm_params(state.clone(), burn_side).await?;
@@ -258,6 +287,7 @@ impl BridgeTask {
                 let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::Notify(_)) => todo!(),
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
@@ -308,10 +338,22 @@ impl BridgeTask {
             .get_evm_params(side)
             .into_scheduler_result()?;
 
+        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
+        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
+            log::warn!("failed to send mint transaction: bft bridge is not created");
+            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
+        })?;
+
+        let client = evm_info.link.get_json_rpc_client();
+        let nonce = client
+            .get_transaction_count(sender.0, BlockNumber::Latest)
+            .await
+            .into_scheduler_result()?;
+
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
-            evm_info.bridge_contract.0,
-            evm_params.nonce.into(),
+            bft_bridge.into(),
+            nonce.into(),
             evm_params.gas_price.into(),
             &order_data,
             evm_params.chain_id as _,

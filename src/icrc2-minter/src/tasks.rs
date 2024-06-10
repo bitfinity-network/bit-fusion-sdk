@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use candid::{Nat, Principal};
+use candid::{Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -12,27 +12,31 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
+use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
+use minter_contract_utils::evm_link::address_to_icrc_subaccount;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
-use minter_did::order::MintOrder;
+use minter_did::order::{self, MintOrder};
+use minter_did::reason::Icrc2Burn;
 use serde::{Deserialize, Serialize};
 
 use crate::constant::IC_CHAIN_ID;
 use crate::state::State;
-use crate::tokens::icrc2;
+use crate::tokens::{icrc1, icrc2};
 
 type SignedMintOrderData = Vec<u8>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
+    BurnIcrc2Tokens(Icrc2Burn),
     PrepareMintOrder(BurntIcrc2Data),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData),
@@ -49,6 +53,9 @@ impl Task for BridgeTask {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
             BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
+            BridgeTask::BurnIcrc2Tokens(reason) => {
+                Box::pin(Self::burn_icrc2_tokens(state, scheduler, reason.clone()))
+            }
             BridgeTask::PrepareMintOrder(data) => {
                 Box::pin(Self::prepare_mint_order(state, scheduler, data.clone()))
             }
@@ -161,6 +168,61 @@ impl BridgeTask {
         Ok(())
     }
 
+    pub async fn burn_icrc2_tokens(
+        state: Rc<RefCell<State>>,
+        scheduler: Box<dyn 'static + TaskScheduler<Self>>,
+        reason: Icrc2Burn,
+    ) -> Result<(), SchedulerError> {
+        let caller_account = Account {
+            owner: reason.sender,
+            subaccount: reason.from_subaccount,
+        };
+
+        let token_info = icrc1::query_token_info_or_read_from_cache(reason.icrc2_token_principal)
+            .await
+            .ok_or(Error::InvalidBurnOperation(
+                "failed to get token info".into(),
+            ))
+            .into_scheduler_result()?;
+
+        let name = order::fit_str_to_array(&token_info.name);
+        let symbol = order::fit_str_to_array(&token_info.symbol);
+
+        let spender_subaccount = address_to_icrc_subaccount(&reason.recipient_address.0);
+        icrc2::burn(
+            reason.icrc2_token_principal,
+            caller_account,
+            Some(spender_subaccount),
+            (&reason.amount).into(),
+            true,
+        )
+        .await
+        .into_scheduler_result()?;
+
+        let operation_id = state.borrow_mut().next_nonce();
+
+        let options = TaskOptions::default()
+            .with_backoff_policy(BackoffPolicy::Fixed { secs: 4 })
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite);
+
+        scheduler.append_task(
+            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
+                sender: reason.sender,
+                amount: reason.amount,
+                operation_id,
+                name,
+                symbol,
+                decimals: token_info.decimals,
+                src_token: reason.icrc2_token_principal,
+                recipient_address: reason.recipient_address,
+                fee_payer: reason.fee_payer,
+            })
+            .into_scheduled(options),
+        );
+
+        Ok(())
+    }
+
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
@@ -199,8 +261,8 @@ impl BridgeTask {
             name: burnt_data.name,
             symbol: burnt_data.symbol,
             decimals: burnt_data.decimals,
-            approve_spender: burnt_data.approve_spender,
-            approve_amount: burnt_data.approve_amount,
+            approve_spender: Default::default(),
+            approve_amount: Default::default(),
             fee_payer,
         };
 
@@ -213,7 +275,7 @@ impl BridgeTask {
         state
             .borrow_mut()
             .mint_orders
-            .insert(sender, src_token, nonce, &signed_mint_order);
+            .insert(sender, src_token, nonce, signed_mint_order);
 
         if should_send_mint_tx {
             // Update EVM params before sending the transaction.
@@ -252,6 +314,18 @@ impl BridgeTask {
                 log::debug!("Adding RemoveMintOrder task");
                 let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
+            }
+            Ok(BridgeEvent::Notify(notification)) => {
+                log::debug!("Adding BurnIcrc2 task");
+                let icrc_burn = match Decode!(&notification.user_data, Icrc2Burn) {
+                    Ok(icrc_burn) => icrc_burn,
+                    Err(e) => {
+                        log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
+                        return None;
+                    }
+                };
+                let icrc_burn_task = BridgeTask::BurnIcrc2Tokens(icrc_burn);
+                return Some(icrc_burn_task.into_scheduled(options));
             }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
@@ -394,8 +468,6 @@ impl BridgeTask {
                         name,
                         symbol,
                         decimals: burnt_event.decimals,
-                        approve_spender: H160::default(),
-                        approve_amount: U256::zero(),
                         fee_payer: None,
                     };
 
@@ -491,7 +563,5 @@ pub struct BurntIcrc2Data {
     pub name: [u8; 32],
     pub symbol: [u8; 16],
     pub decimals: u8,
-    pub approve_spender: H160,
-    pub approve_amount: U256,
     pub fee_payer: Option<H160>,
 }

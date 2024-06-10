@@ -9,7 +9,7 @@ echo "forge install..."
 forge install
 
 echo "forge test..."
-forge test
+forge test -vv
 
 echo "forge build..."
 forge build --force
