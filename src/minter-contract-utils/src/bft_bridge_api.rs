@@ -426,26 +426,6 @@ pub static MINTED_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
-#[allow(deprecated)] // need to initialize `constant` field
-pub static NOTIFY_MINTER: Lazy<Function> = Lazy::new(|| Function {
-    name: "notifyMinter".to_string(),
-    inputs: vec![
-        Param {
-            name: "notificationType".into(),
-            kind: ParamType::Uint(32),
-            internal_type: None,
-        },
-        Param {
-            name: "userData".into(),
-            kind: ParamType::Bytes,
-            internal_type: None,
-        },
-    ],
-    outputs: vec![],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
 pub static NOTIFY_EVENT: Lazy<Event> = Lazy::new(|| Event {
     name: "NotifyMinterEvent".into(),
     inputs: vec![
