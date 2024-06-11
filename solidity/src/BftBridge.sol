@@ -5,10 +5,14 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract BFTBridge is TokenManager {
+contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
+
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
@@ -50,11 +54,20 @@ contract BFTBridge is TokenManager {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
-    // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide) TokenManager(_isWrappedSide) {
+    /// Constructor to initialize minterCanisterAddress and feeChargeContract
+    /// and whether this contract is on the wrapped side
+    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) public initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
+        TokenManager._initialize(_isWrappedSide);
+
+        // Call super initializer
+        __Ownable_init(tx.origin);
+        __UUPSUpgradeable_init();
     }
+
+    /// Restrict who can upgrade this contract
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 
     // Event for mint operation
     event MintTokenEvent(
@@ -221,4 +234,5 @@ contract BFTBridge is TokenManager {
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
     }
+
 }

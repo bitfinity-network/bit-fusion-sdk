@@ -9,6 +9,7 @@ import "./interfaces/IUniswapV2Factory.sol";
 import "./interfaces/IUniswapV2Callee.sol";
 
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
+
     using SafeMath for uint256;
     using UQ112x112 for uint224;
 
@@ -99,7 +100,9 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
                     uint256 numerator = totalSupply.mul(rootK.sub(rootKLast));
                     uint256 denominator = rootK.mul(5).add(rootKLast);
                     uint256 liquidity = numerator / denominator;
-                    if (liquidity > 0) _mint(feeTo, liquidity);
+                    if (liquidity > 0) {
+                        _mint(feeTo, liquidity);
+                    }
                 }
             }
         } else if (_kLast != 0) {
@@ -127,7 +130,9 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         _mint(to, liquidity);
 
         _update(balance0, balance1, _reserve0, _reserve1);
-        if (feeOn) kLast = uint256(reserve0).mul(reserve1); // reserve0 and reserve1 are up-to-date
+        if (feeOn) {
+            kLast = uint256(reserve0).mul(reserve1);
+        } // reserve0 and reserve1 are up-to-date
         emit Mint(msg.sender, amount0, amount1);
     }
 
@@ -152,7 +157,9 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         balance1 = IERC20(_token1).balanceOf(address(this));
 
         _update(balance0, balance1, _reserve0, _reserve1);
-        if (feeOn) kLast = uint256(reserve0).mul(reserve1); // reserve0 and reserve1 are up-to-date
+        if (feeOn) {
+            kLast = uint256(reserve0).mul(reserve1);
+        } // reserve0 and reserve1 are up-to-date
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -169,8 +176,12 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
             address _token0 = token0;
             address _token1 = token1;
             require(to != _token0 && to != _token1, "UniswapV2: INVALID_TO");
-            if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
-            if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
+            if (amount0Out > 0) {
+                _safeTransfer(_token0, to, amount0Out);
+            } // optimistically transfer tokens
+            if (amount1Out > 0) {
+                _safeTransfer(_token1, to, amount1Out);
+            } // optimistically transfer tokens
             if (data.length > 0) {
                 IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
             }
@@ -206,4 +217,5 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     function sync() external lock {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
+
 }

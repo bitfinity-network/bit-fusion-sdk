@@ -7,8 +7,11 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
+import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "openzeppelin-contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract BftBridgeTest is Test {
+
     using StringUtils for string;
 
     struct MintOrder {
@@ -42,7 +45,22 @@ contract BftBridgeTest is Test {
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-        _bridge = new BFTBridge(_owner, address(0), true);
+
+        // Deploy the implementation contract
+        BFTBridge implementation = new BFTBridge();
+
+        // Deploy the ProxyAdmin contract
+        ProxyAdmin admin = new ProxyAdmin(_owner);
+
+        // Encode the initialization call
+        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+
+        // Deploy the TransparentUpgradeableProxy contract
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), address(admin), initializeData);
+
+        // Cast the proxy to BFTBridge
+        _bridge = BFTBridge(address(proxy));
     }
 
     function testMinterCanisterAddress() public {
@@ -264,4 +282,5 @@ contract BftBridgeTest is Test {
     function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
+
 }

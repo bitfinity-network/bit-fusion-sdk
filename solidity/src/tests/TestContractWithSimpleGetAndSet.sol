@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 contract TestContractWithSimpleGetAndSet {
+
     uint256 a;
     uint256 b;
 
@@ -18,4 +19,5 @@ contract TestContractWithSimpleGetAndSet {
         a = val;
         return a;
     }
+
 }

@@ -2,10 +2,13 @@
 pragma solidity ^0.8.7;
 
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin-contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-abstract contract TokenManager {
+abstract contract TokenManager is Initializable {
+
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
@@ -31,7 +34,11 @@ abstract contract TokenManager {
     }
 
     // Constructor or an initializer where you set this variable
-    constructor(bool _isWrappedSide) {
+    // constructor(bool _isWrappedSide) {
+    //     isWrappedSide = _isWrappedSide;
+    // }
+
+    function _initialize(bool _isWrappedSide) internal initializer {
         isWrappedSide = _isWrappedSide;
     }
 
@@ -62,13 +69,13 @@ abstract contract TokenManager {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch {}
+        } catch { }
     }
 
     /// Returns wrapped token for the given base token
@@ -92,4 +99,5 @@ abstract contract TokenManager {
             base[i] = _baseTokenRegistry[wrappedToken];
         }
     }
+
 }

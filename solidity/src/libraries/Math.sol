@@ -3,6 +3,7 @@ pragma solidity =0.5.16;
 // a library for performing various math operations
 
 library Math {
+
     function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
         z = x < y ? x : y;
     }
@@ -20,4 +21,5 @@ library Math {
             z = 1;
         }
     }
+
 }
