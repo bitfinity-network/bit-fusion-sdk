@@ -279,7 +279,7 @@ impl MinterCanister {
                 signer,
                 minter_address,
                 fee_charge_contract,
-                is_wrapped_side
+                is_wrapped_side,
             )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;

@@ -19,7 +19,7 @@ pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
             kind: ParamType::Address,
             internal_type: None,
         },
-                Param {
+        Param {
             name: "_isWrappedSide".into(),
             kind: ParamType::Bool,
             internal_type: None,
@@ -594,6 +594,7 @@ pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::View,
 });
 
+#[allow(clippy::too_many_arguments)]
 pub fn deploy_transaction(
     sender: H160,
     nonce: U256,
@@ -602,7 +603,7 @@ pub fn deploy_transaction(
     code: Vec<u8>,
     minter_address: H160,
     fee_charge_address: H160,
-    is_wrapped_side: bool
+    is_wrapped_side: bool,
 ) -> Transaction {
     let data = CONSTRUCTOR
         .encode_input(
@@ -610,7 +611,7 @@ pub fn deploy_transaction(
             &[
                 Token::Address(minter_address),
                 Token::Address(fee_charge_address),
-                Token::Bool(is_wrapped_side)
+                Token::Bool(is_wrapped_side),
             ],
         )
         .expect("constructor parameters encoding should pass");
