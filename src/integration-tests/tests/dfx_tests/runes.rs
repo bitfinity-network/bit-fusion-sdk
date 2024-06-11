@@ -2,6 +2,7 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
+use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
@@ -13,11 +14,6 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
-use serde_json::Value;
-use tokio::process::Command;
-use tokio::time::Instant;
-
-use btc_bridge::state::BftBridgeConfig;
 use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::evm_link::EvmLink;
 use rune_bridge::core::deposit::DepositRequestStatus;
@@ -25,6 +21,9 @@ use rune_bridge::interface::{DepositError, DepositStateResponse, GetAddressError
 use rune_bridge::rune_info::{RuneInfo, RuneName};
 use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
+use serde_json::Value;
+use tokio::process::Command;
+use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::{DfxTestContext, ADMIN};

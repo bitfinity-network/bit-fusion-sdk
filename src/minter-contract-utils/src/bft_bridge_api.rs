@@ -36,26 +36,6 @@ pub static MINTER_CANISTER_ADDRESS: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
-pub static NOTIFY_MINTER: Lazy<Function> = Lazy::new(|| Function {
-    name: "notifyMinter".into(),
-    inputs: vec![
-        Param {
-            name: "notificationType".into(),
-            kind: ParamType::Uint(32),
-            internal_type: None,
-        },
-        Param {
-            name: "userData".into(),
-            kind: ParamType::Bytes,
-            internal_type: None,
-        },
-    ],
-    outputs: vec![],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
 pub static BURN: Lazy<Function> = Lazy::new(|| Function {
     name: "burn".into(),
     inputs: vec![
@@ -673,9 +653,8 @@ mod tests {
     use ethers_core::abi::{Bytes, RawLog, Token};
     use ethers_core::utils::hex::traits::FromHex;
 
-    use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
-
     use super::{BurntEventData, MintedEventData};
+    use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
 
     #[test]
     fn minted_event_data_builder_test() {

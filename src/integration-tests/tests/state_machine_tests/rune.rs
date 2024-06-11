@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -7,7 +9,6 @@ use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
 use rune_bridge::interface::GetAddressError;
 use rune_bridge::state::RuneBridgeConfig;
-use std::time::Duration;
 
 use crate::context::TestContext;
 use crate::state_machine_tests::StateMachineContext;

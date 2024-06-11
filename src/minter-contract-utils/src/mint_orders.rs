@@ -26,7 +26,7 @@ impl<M: Memory> MintOrders<M> {
         order: SignedMintOrder,
     ) -> Option<SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
-        self.mint_orders_map.insert(&key, &operation_id, *order)
+        self.mint_orders_map.insert(&key, &operation_id, order)
     }
 
     /// Returns the signed mint order for the given sender and token, if it exists.

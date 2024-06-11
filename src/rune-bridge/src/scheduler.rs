@@ -14,14 +14,13 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_did::id256::Id256;
-use serde::{Deserialize, Serialize};
-
 use minter_contract_utils::bft_bridge_api::{
     BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
 };
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::operation_store::MinterOperationId;
+use minter_did::id256::Id256;
+use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
 use crate::core::deposit::RuneDeposit;
