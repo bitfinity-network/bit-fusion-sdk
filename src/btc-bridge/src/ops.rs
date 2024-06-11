@@ -118,6 +118,10 @@ pub async fn mint_erc20(
         .checked_sub(fee)
         .ok_or(Erc20MintError::ValueTooSmall)?;
 
+    if amount_minus_fee == 0 {
+        return Err(Erc20MintError::ValueTooSmall);
+    }
+
     let mint_order =
         prepare_mint_order(state, eth_address.clone(), amount_minus_fee, nonce).await?;
     transfer_ckbtc_from_subaccount(state, &eth_address, amount_minus_fee).await?;

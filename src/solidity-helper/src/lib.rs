@@ -159,7 +159,6 @@ fn parse_json_contract(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

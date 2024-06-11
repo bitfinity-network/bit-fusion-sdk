@@ -56,10 +56,17 @@ jobs:
       init-script: |
         ./scripts/build_solidity.sh
       artifact-pre-script: |
+        # Get external dependencies
+        export WASMS_DIR="`pwd`/.artifact"
+        export GH_API_TOKEN=$SECRET1
+        ./scripts/get_dependencies.sh
+
+        # Build dependencies
         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
         ./scripts/build.sh
       test-script: |
         export WASMS_DIR="`pwd`/.artifact"
+
         ./scripts/tests/tests_i686.sh
         ./scripts/tests/tests.sh
       enable-target-cache: true
@@ -67,3 +74,4 @@ jobs:
     secrets:
       gh_token: ${{ secrets.GH_PKG_TOKEN }}
       gh_login: ${{ secrets.GH_PKG_LOGIN }}
+      env_secret1: ${{ secrets.GH_PKG_TOKEN }}

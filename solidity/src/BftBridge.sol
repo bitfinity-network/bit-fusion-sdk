@@ -4,6 +4,7 @@ pragma solidity ^0.8.7;
 import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
+import "src/interfaces/IFeeCharge.sol";
 import {RingBuffer} from "src/libraries/RingBuffer.sol";
 
 contract BFTBridge {
@@ -64,6 +65,7 @@ contract BFTBridge {
     }
 
     // Additional gas amount for fee charge.
+    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
     uint256 constant additionalGasFee = 1000;
 
     // Has a user's transaction nonce been used?
@@ -87,18 +89,16 @@ contract BFTBridge {
     // Address of minter canister
     address public minterCanisterAddress;
 
+    // Address of feeCharge contract
+    IFeeCharge public feeChargeContract;
+
     // Operataion ID counter
     uint32 public operationIDCounter;
 
-    // Mapping from user address to amount of native tokens on his deposit.
-    mapping(address => uint256) private _userNativeDeposit;
-
-    // Mapping from user address to list of senderIDs, which are able to spend native deposit.
-    mapping(address => mapping(bytes32 => bool)) private _approvedSenderIDs;
-
-    // Constructor to initialize minterCanisterAddress
-    constructor(address minterAddress) {
+    // Constructor to initialize minterCanisterAddress and feeChargeContract.
+    constructor(address minterAddress, address feeChargeAddress) {
         minterCanisterAddress = minterAddress;
+        feeChargeContract = IFeeCharge(feeChargeAddress);
     }
 
     // Event for mint operation
@@ -156,49 +156,6 @@ contract BFTBridge {
         emit NotifyMinterEvent(notificationType, userData);
     }
 
-    // Deposit `msg.value` amount of native token to user's address.
-    // The deposit could be used to pay fees.
-    // Returns user's balance after the operation.
-    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
-        address to = msg.sender;
-
-        // Add approved SpenderIDs
-        for (uint i = 0; i < approvedSenderIDs.length; i++) {
-            _approvedSenderIDs[to][approvedSenderIDs[i]] = true;
-        }
-
-        balance = _userNativeDeposit[to];
-        balance += msg.value;
-        _userNativeDeposit[to] = balance;
-        payable(minterCanisterAddress).transfer(msg.value);
-    }
-
-    // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
-        for (uint i = 0; i < approvedSenderIDs.length; i++) {
-            delete _approvedSenderIDs[msg.sender][approvedSenderIDs[i]];
-        }
-    }
-
-    // Returns user's native token deposit balance. 
-    function nativeTokenBalance(address user) external view returns (uint256 balance) {
-        if (user == address(0)) {
-            user = msg.sender;
-        }
-        balance = _userNativeDeposit[user];
-    }
-
-    // Take the given amount of fee from the user.
-    // Require the user to have enough native token balance.
-    function _chargeFee(address from, bytes32 senderID, uint256 amount) private {
-        uint256 balance = _userNativeDeposit[from];
-        require(balance >= amount, "insufficient balance to pay fee");
-        require(_approvedSenderIDs[from][senderID], "senderID is not approved");
-
-        uint256 newBalance = balance - amount;
-        _userNativeDeposit[from] = newBalance;
-    }
-
     // Main function to withdraw funds
     function mint(bytes calldata encodedOrder) external {
         uint256 initGasLeft = gasleft();
@@ -249,10 +206,10 @@ contract BFTBridge {
             );
         }
 
-        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress) {
+        if (order.feePayer != address(0) && msg.sender == minterCanisterAddress && address(feeChargeContract) != address(0)) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
-            _chargeFee(order.feePayer, order.senderID, fee);
+            feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
         }
 
         // Emit event

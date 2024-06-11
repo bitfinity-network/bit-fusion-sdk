@@ -180,8 +180,7 @@ impl UtxoLedger {
                             value: Amount::from_sat(details.value),
                             script_pubkey: details.script_buf.into(),
                         },
-                        derivation_path: ic_dp_to_derivation_path(&details.derivation_path)
-                            .expect("invalid derivation path"),
+                        derivation_path: ic_dp_to_derivation_path(&details.derivation_path),
                     },
                 )
             })

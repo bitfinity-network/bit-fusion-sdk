@@ -40,17 +40,21 @@ impl<'a> TestContext for &'a StateMachineContext {
     }
 
     fn client(&self, canister: Principal, caller_name: &str) -> Self::Client {
-        let caller = match &caller_name.to_lowercase()[..] {
-            "alice" => alice(),
-            "bob" => bob(),
-            "admin" => self.admin(),
-            _ => Principal::anonymous(),
-        };
+        let caller = self.principal_by_caller_name(caller_name);
 
         StateMachineClient {
             canister,
             caller,
             env: self.env.clone(),
+        }
+    }
+
+    fn principal_by_caller_name(&self, caller: &str) -> Principal {
+        match &caller.to_lowercase()[..] {
+            "alice" => alice(),
+            "bob" => bob(),
+            "admin" => self.admin(),
+            _ => Principal::anonymous(),
         }
     }
 

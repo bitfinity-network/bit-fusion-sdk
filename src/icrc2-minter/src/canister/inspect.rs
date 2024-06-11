@@ -3,7 +3,6 @@ use ic_exports::ic_cdk::{self, api};
 use ic_exports::ic_cdk_macros::inspect_message;
 use ic_exports::ic_kit::ic;
 use minter_did::error::Result;
-use minter_did::reason::Icrc2Burn;
 
 use crate::state::State;
 use crate::MinterCanister;
@@ -35,11 +34,7 @@ async fn inspect_method(method: &str) -> Result<()> {
             let (owner,) = api::call::arg_data::<(Principal,)>(Default::default());
             MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)
         }
-        "burn_icrc2" => {
-            let (reason,) = api::call::arg_data::<(Icrc2Burn,)>(Default::default());
-            MinterCanister::burn_icrc2_inspect_message_check(&reason, &state)
-        }
-        "add_to_whitelist" | "remove_from_whitelist" => {
+                "add_to_whitelist" | "remove_from_whitelist" => {
             let (principal,) = api::call::arg_data::<(Principal,)>(Default::default());
             MinterCanister::access_control_inspect_message_check(ic::caller(), principal, &state)
         }

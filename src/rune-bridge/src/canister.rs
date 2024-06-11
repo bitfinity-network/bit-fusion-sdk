@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -24,11 +23,12 @@ use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, Ta
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
-use crate::interface::{
-    CreateEdictTxArgs, DepositError, Erc20MintStatus, GetAddressError, WithdrawError,
-};
+use crate::core::deposit::RuneDeposit;
+use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
+use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
+use crate::interface::{CreateEdictTxArgs, DepositStateResponse, GetAddressError, WithdrawError};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
-use crate::ops::{get_fee_rate, get_rune_list, get_tx_outputs, get_utxos};
+use crate::rune_info::RuneInfo;
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
 use crate::{
@@ -78,10 +78,6 @@ impl RuneBridge {
 
     #[init]
     pub fn init(&mut self, config: RuneBridgeConfig) {
-        let admin = config.admin;
-
-        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
-
         get_state().borrow_mut().configure(config);
 
         {
@@ -101,12 +97,16 @@ impl RuneBridge {
 
     #[query]
     pub fn get_deposit_address(&self, eth_address: H160) -> Result<String, GetAddressError> {
-        crate::key::get_deposit_address(&get_state(), &eth_address).map(|v| v.to_string())
+        crate::key::get_transit_address(&get_state(), &eth_address).map(|v| v.to_string())
     }
 
-    #[update]
-    pub async fn deposit(&self, eth_address: H160) -> Result<Vec<Erc20MintStatus>, DepositError> {
-        crate::ops::deposit(get_state(), &eth_address).await
+    #[query]
+    pub fn get_deposit_state(&self, eth_address: H160) -> DepositStateResponse {
+        let deposits = RuneDeposit::get().get_by_address(&eth_address);
+        DepositStateResponse {
+            current_ts: ic::time(),
+            deposits,
+        }
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
@@ -168,27 +168,22 @@ impl RuneBridge {
     }
 
     #[update]
-    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(String, u128)> {
+    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
         let address = Address::from_str(&btc_address)
             .expect("invalid address")
             .assume_checked();
-        let state = get_state();
-        let utxos = get_utxos(&state, &address)
+
+        let deposit = RuneDeposit::get();
+        let utxos = deposit
+            .get_deposit_utxos(&address)
             .await
             .expect("failed to get utxos");
+        let (rune_info_amounts, _) = deposit
+            .get_mint_amounts(&utxos.utxos, &None)
+            .await
+            .expect("failed to get rune amounts");
 
-        let mut amounts: HashMap<String, u128> = HashMap::new();
-        for utxo in &utxos.utxos {
-            let outputs = get_tx_outputs(&state, utxo)
-                .await
-                .expect("failed to get utxo outputs");
-            for rune in outputs.runes {
-                let entry = amounts.entry(rune.0.rune.to_string()).or_default();
-                *entry += rune.1.amount;
-            }
-        }
-
-        amounts.into_iter().collect()
+        rune_info_amounts
     }
 
     #[update]
@@ -209,7 +204,9 @@ impl RuneBridge {
             .unwrap_or_else(|| from_addr.clone());
 
         let state = get_state();
-        let runes_list = get_rune_list(&state)
+        let index_provider = OrdIndexProvider::new(state.borrow().indexer_url());
+        let runes_list = index_provider
+            .get_rune_list()
             .await
             .expect("failed to get rune list");
         let rune_id = runes_list
@@ -218,7 +215,9 @@ impl RuneBridge {
             .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
             .0;
 
-        let input_utxos = get_utxos(&state, &from_addr)
+        let utxo_provider = IcUtxoProvider::new(state.borrow().ic_btc_network());
+        let input_utxos = utxo_provider
+            .get_utxos(&from_addr)
             .await
             .expect("failed to get input utxos");
         let inputs = input_utxos
@@ -239,7 +238,10 @@ impl RuneBridge {
             })
             .collect();
 
-        let fee_rate = get_fee_rate(&state).await.expect("failed to get fee rate");
+        let fee_rate = utxo_provider
+            .get_fee_rate()
+            .await
+            .expect("failed to get fee rate");
 
         let args = ord_rs::wallet::CreateEdictTxArgs {
             rune: rune_id,
@@ -270,14 +272,6 @@ impl RuneBridge {
             .expect("failed to encode transaction");
 
         bytes
-    }
-
-    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
-        if principal == Principal::anonymous() {
-            return Err(minter_did::error::Error::AnonymousPrincipal);
-        }
-
-        Ok(())
     }
 
     pub fn idl() -> Idl {
@@ -327,35 +321,10 @@ thread_local! {
     }));
 }
 
-pub fn get_state() -> Rc<RefCell<State>> {
+pub(crate) fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
 }
 
-pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
+pub(crate) fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
-}
-
-#[cfg(test)]
-mod test {
-    use candid::Principal;
-    use ic_canister::{canister_call, Canister};
-    use ic_exports::ic_kit::MockContext;
-
-    use super::*;
-    use crate::RuneBridge;
-
-    #[tokio::test]
-    #[should_panic = "admin principal is anonymous"]
-    async fn disallow_anonymous_owner_in_init() {
-        MockContext::new().inject();
-        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
-        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-        let mut canister = RuneBridge::from_principal(mock_canister_id);
-
-        let init_data = RuneBridgeConfig {
-            admin: Principal::anonymous(),
-            ..Default::default()
-        };
-        canister_call!(canister.init(init_data), ()).await.unwrap();
-    }
 }

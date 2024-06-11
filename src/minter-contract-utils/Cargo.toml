@@ -24,6 +24,7 @@ ethereum-json-rpc-client = { workspace = true, features = [
 evm-canister-client = { workspace = true }
 eth-signer = { workspace = true }
 anyhow = { workspace = true }
+log = { workspace = true }
 
 
 [build-dependencies]

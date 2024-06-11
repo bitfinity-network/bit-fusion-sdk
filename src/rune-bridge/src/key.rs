@@ -7,6 +7,7 @@ use bitcoin::secp256k1::{Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
+use ord_rs::wallet::LocalSigner;
 use ord_rs::BtcTxSigner;
 
 use crate::interface::GetAddressError;
@@ -77,7 +78,54 @@ impl BtcTxSigner for IcBtcSigner {
     }
 }
 
-pub fn get_deposit_address(
+pub enum BtcSignerType {
+    Local(LocalSigner),
+    Ic(IcBtcSigner),
+}
+
+impl BtcSignerType {
+    pub async fn get_transit_address(&self, eth_address: &H160, network: Network) -> Address {
+        let derivation_path = get_derivation_path(eth_address);
+        let public_key = self.ecdsa_public_key(&derivation_path).await;
+
+        Address::p2wpkh(&public_key, network)
+            .expect("used uncompressed public key to derive address")
+    }
+}
+
+#[async_trait]
+impl BtcTxSigner for BtcSignerType {
+    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> PublicKey {
+        match self {
+            BtcSignerType::Local(v) => v.ecdsa_public_key(derivation_path).await,
+            BtcSignerType::Ic(v) => v.ecdsa_public_key(derivation_path).await,
+        }
+    }
+
+    async fn sign_with_ecdsa(
+        &self,
+        message: Message,
+        derivation_path: &DerivationPath,
+    ) -> Result<Signature, Error> {
+        match self {
+            BtcSignerType::Local(v) => v.sign_with_ecdsa(message, derivation_path).await,
+            BtcSignerType::Ic(v) => v.sign_with_ecdsa(message, derivation_path).await,
+        }
+    }
+
+    async fn sign_with_schnorr(
+        &self,
+        message: Message,
+        derivation_path: &DerivationPath,
+    ) -> Result<bitcoin::secp256k1::schnorr::Signature, Error> {
+        match self {
+            BtcSignerType::Local(v) => v.sign_with_schnorr(message, derivation_path).await,
+            BtcSignerType::Ic(v) => v.sign_with_schnorr(message, derivation_path).await,
+        }
+    }
+}
+
+pub fn get_transit_address(
     state: &RefCell<State>,
     eth_address: &H160,
 ) -> Result<Address, GetAddressError> {
@@ -92,8 +140,7 @@ pub fn get_deposit_address(
         public_key: public_key.inner,
         chain_code,
     };
-    let derivation_path =
-        get_derivation_path(eth_address).map_err(|_| GetAddressError::Derivation)?;
+    let derivation_path = get_derivation_path(eth_address);
     let public_key = x_public_key
         .derive_pub(&Secp256k1::new(), &derivation_path)
         .map_err(|_| GetAddressError::Derivation)?
@@ -117,13 +164,11 @@ pub fn get_derivation_path_ic(eth_address: &H160) -> Vec<Vec<u8>> {
     dp
 }
 
-fn get_derivation_path(eth_address: &H160) -> Result<DerivationPath, GetAddressError> {
+pub fn get_derivation_path(eth_address: &H160) -> DerivationPath {
     ic_dp_to_derivation_path(&get_derivation_path_ic(eth_address))
 }
 
-pub fn ic_dp_to_derivation_path(
-    ic_derivation_path: &[Vec<u8>],
-) -> Result<DerivationPath, GetAddressError> {
+pub fn ic_dp_to_derivation_path(ic_derivation_path: &[Vec<u8>]) -> DerivationPath {
     let mut parts = vec![];
     for part in ic_derivation_path.iter() {
         let child_idx = u32::from_be_bytes(part[..].try_into().unwrap());
@@ -131,7 +176,7 @@ pub fn ic_dp_to_derivation_path(
         parts.push(child);
     }
 
-    Ok(DerivationPath::from(parts))
+    DerivationPath::from(parts)
 }
 
 fn derivation_path_to_ic(derivation_path: DerivationPath) -> Vec<Vec<u8>> {

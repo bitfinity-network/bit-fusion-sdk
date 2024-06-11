@@ -5,7 +5,7 @@ use std::str::FromStr;
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
 use ordinals::{Rune, RuneId};
-use serde::Deserializer;
+use serde::{Deserializer, Serialize};
 
 #[derive(Debug, Copy, Clone, CandidType, Deserialize)]
 pub struct RuneInfo {
@@ -53,6 +53,12 @@ impl RuneInfo {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RuneName(Rune);
 
+impl RuneName {
+    pub fn inner(&self) -> Rune {
+        self.0
+    }
+}
+
 impl FromStr for RuneName {
     type Err = <Rune as FromStr>::Err;
 
@@ -95,6 +101,15 @@ impl CandidType for RuneName {
         S: Serializer,
     {
         self.0 .0.idl_serialize(serializer)
+    }
+}
+
+impl Serialize for RuneName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0 .0.serialize(serializer)
     }
 }
 
