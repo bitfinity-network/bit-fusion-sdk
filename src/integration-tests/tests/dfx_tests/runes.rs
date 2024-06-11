@@ -119,7 +119,7 @@ impl RunesContext {
             .unwrap();
 
         let bft_bridge = context
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None)
+            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None, true)
             .await
             .unwrap();
 

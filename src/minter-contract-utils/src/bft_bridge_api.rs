@@ -19,6 +19,11 @@ pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
             kind: ParamType::Address,
             internal_type: None,
         },
+        Param {
+            name: "_isWrappedSide".into(),
+            kind: ParamType::Bool,
+            internal_type: None,
+        },
     ],
 });
 
@@ -251,7 +256,7 @@ pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
-/// Emited when token is burnt or minted by BFTBridge.
+/// Emitted when token is burnt or minted by BFTBridge.
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum BridgeEvent {
     Burnt(BurntEventData),
@@ -301,7 +306,7 @@ impl TryFrom<RawLog> for BridgeEvent {
     }
 }
 
-/// Emited when token is burnt by BFTBridge.
+/// Emitted when token is burnt by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct BurntEventData {
     pub sender: did::H160,
@@ -589,6 +594,7 @@ pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::View,
 });
 
+#[allow(clippy::too_many_arguments)]
 pub fn deploy_transaction(
     sender: H160,
     nonce: U256,
@@ -597,6 +603,7 @@ pub fn deploy_transaction(
     code: Vec<u8>,
     minter_address: H160,
     fee_charge_address: H160,
+    is_wrapped_side: bool,
 ) -> Transaction {
     let data = CONSTRUCTOR
         .encode_input(
@@ -604,6 +611,7 @@ pub fn deploy_transaction(
             &[
                 Token::Address(minter_address),
                 Token::Address(fee_charge_address),
+                Token::Bool(is_wrapped_side),
             ],
         )
         .expect("constructor parameters encoding should pass");
