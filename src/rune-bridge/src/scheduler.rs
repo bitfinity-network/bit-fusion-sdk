@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 
 use bitcoin::Address;
-use did::U256;
+use candid::{CandidType, Decode};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -12,26 +14,33 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::bft_bridge_api::{
+    BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
+};
 use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
+use minter_contract_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;
+use crate::core::deposit::RuneDeposit;
+use crate::core::withdrawal::Withdrawal;
+use crate::rune_info::RuneName;
 
 pub type TasksStorage =
     StableBTreeMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
 
 pub type PersistentScheduler = Scheduler<RuneBridgeTask, TasksStorage>;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+mod minter_notify;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
+    Deposit(MinterOperationId),
     RemoveMintOrder(MintedEventData),
-    MintBtc(BurntEventData),
+    Withdraw(BurntEventData),
 }
 
 impl RuneBridgeTask {
@@ -89,26 +98,34 @@ impl RuneBridgeTask {
             return Ok(());
         }
 
-        // Filter out logs that do not have block number.
-        // Such logs are produced when the block is not finalized yet.
-        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-        if let Some(last_log) = last_log {
-            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            state.borrow_mut().update_evm_params(|to_update| {
-                *to_update = Some(EvmParams {
-                    next_block: next_block_number,
-                    ..params
-                })
-            });
-        };
+        {
+            let mut mut_state = state.borrow_mut();
+
+            // Filter out logs that do not have block number.
+            // Such logs are produced when the block is not finalized yet.
+            let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
+            if let Some(last_log) = last_log {
+                let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
+                mut_state.update_evm_params(|to_update| {
+                    *to_update = Some(EvmParams {
+                        next_block: next_block_number,
+                        ..params
+                    })
+                });
+            };
+        }
 
         log::trace!("appending logs to tasks");
 
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
-        // Update the EvmParams
-        Self::update_evm_params().await?;
+        Ok(())
+    }
 
+    async fn deposit(deposit_request_id: MinterOperationId) -> Result<(), SchedulerError> {
+        RuneDeposit::get()
+            .process_deposit_request(deposit_request_id)
+            .await;
         Ok(())
     }
 
@@ -126,7 +143,7 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = RuneBridgeTask::MintBtc(burnt);
+                let mint_order_task = RuneBridgeTask::Withdraw(burnt);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
@@ -134,7 +151,19 @@ impl RuneBridgeTask {
                 let remove_mint_order_task = RuneBridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
-            Ok(BridgeEvent::Notify(_)) => todo!(),
+            Ok(BridgeEvent::Notify(event)) => {
+                if let Some(notification) = RuneMinterNotification::decode(event) {
+                    return match notification {
+                        RuneMinterNotification::Deposit(payload) => {
+                            let request_id = RuneDeposit::get()
+                                .create_deposit_request(payload.dst_address, payload.amounts);
+
+                            let deposit_task = RuneBridgeTask::Deposit(request_id);
+                            Some(deposit_task.into_scheduled(TaskOptions::new()))
+                        }
+                    };
+                }
+            }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 
@@ -142,6 +171,8 @@ impl RuneBridgeTask {
     }
 
     fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
+        let mut deposit = RuneDeposit::get();
+        deposit.complete_mint_request(minted_event.recipient, minted_event.nonce);
         let state = get_state();
         let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
@@ -158,56 +189,6 @@ impl RuneBridgeTask {
 
         Ok(())
     }
-
-    pub async fn update_evm_params() -> Result<(), SchedulerError> {
-        let state = get_state();
-        let evm_info = state.borrow().get_evm_info();
-
-        let Some(initial_params) = evm_info.params else {
-            log::warn!("no evm params initialized");
-            return Ok(());
-        };
-
-        let address = {
-            let signer = state.borrow().signer().get().clone();
-            signer.get_address().await.into_scheduler_result()?
-        };
-
-        let client = evm_info.link.get_json_rpc_client();
-
-        // Update the EvmParams
-        log::trace!("updating evm params");
-        let responses = query::batch_query(
-            &client,
-            &[
-                QueryType::Nonce {
-                    address: address.into(),
-                },
-                QueryType::GasPrice,
-            ],
-        )
-        .await
-        .into_scheduler_result()?;
-
-        let nonce: U256 = responses
-            .get_value_by_id(Id::Str(NONCE_ID.into()))
-            .into_scheduler_result()?;
-        let gas_price: U256 = responses
-            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
-            .into_scheduler_result()?;
-
-        let params = EvmParams {
-            nonce: nonce.0.as_u64(),
-            gas_price,
-            ..initial_params
-        };
-
-        state.borrow_mut().update_evm_params(|p| *p = Some(params));
-
-        log::trace!("evm params updated");
-
-        Ok(())
-    }
 }
 
 impl Task for RuneBridgeTask {
@@ -218,14 +199,16 @@ impl Task for RuneBridgeTask {
         match self {
             RuneBridgeTask::InitEvmState => Box::pin(Self::init_evm_state()),
             RuneBridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
+            RuneBridgeTask::Deposit(request_id) => Box::pin(Self::deposit(*request_id)),
             RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            RuneBridgeTask::MintBtc(BurntEventData {
+            RuneBridgeTask::Withdraw(BurntEventData {
                 recipient_id,
                 amount,
                 to_token,
+                sender,
                 ..
             }) => {
                 log::info!("ERC20 burn event received");
@@ -258,15 +241,13 @@ impl Task for RuneBridgeTask {
                     )));
                 };
 
+                let sender = sender.clone();
                 Box::pin(async move {
-                    let tx_id = crate::ops::withdraw(
-                        &get_state(),
-                        amount,
-                        rune_id,
-                        address.assume_checked(),
-                    )
-                    .await
-                    .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
+                    let withdrawal = Withdrawal::new(get_state());
+                    let tx_id = withdrawal
+                        .withdraw(amount, rune_id, sender, address.assume_checked())
+                        .await
+                        .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
                     log::info!("Created withdrawal transaction: {tx_id}",);
 
@@ -288,5 +269,37 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
 
     fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError> {
         self.map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
+    }
+}
+
+pub enum RuneMinterNotification {
+    Deposit(RuneDepositRequestData),
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize)]
+pub struct RuneDepositRequestData {
+    pub dst_address: H160,
+    pub amounts: Option<HashMap<RuneName, u128>>,
+}
+
+impl RuneMinterNotification {
+    pub const DEPOSIT_TYPE: u32 = 1;
+}
+
+impl RuneMinterNotification {
+    fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
+        match event_data.notification_type {
+            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
+                Ok(payload) => Some(Self::Deposit(payload)),
+                Err(err) => {
+                    log::warn!("Failed to decode deposit request event data: {err:?}");
+                    None
+                }
+            },
+            t => {
+                log::warn!("Unknown minter notify event type: {t}");
+                None
+            }
+        }
     }
 }

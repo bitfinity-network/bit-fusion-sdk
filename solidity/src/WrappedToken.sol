@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.7;
 
@@ -12,11 +12,7 @@ contract WrappedToken is ERC20 {
     uint8 private _decimals;
 
     // Initializes contract with the given name and symbl
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        address _owner
-    ) ERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_, address _owner) ERC20(name_, symbol_) {
         owner = _owner;
         _name = name_;
         _symbol = symbol_;
@@ -25,10 +21,7 @@ contract WrappedToken is ERC20 {
 
     // Perform IERC20 transfer.
     // If `msg.sender` is `owner` then mint happens.
-    function transfer(
-        address to,
-        uint256 value
-    ) public virtual override returns (bool) {
+    function transfer(address to, uint256 value) public virtual override returns (bool) {
         if (msg.sender == owner) {
             _mint(owner, value);
         }
@@ -53,11 +46,7 @@ contract WrappedToken is ERC20 {
 
     // Perform IERC20 transfer from `sender` address.
     // If called by `owner` and `recipient` is `owner` then burn happens.
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public virtual override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         bool success = super.transferFrom(sender, recipient, amount);
         if (msg.sender == owner && recipient == owner && success) {
             _burn(owner, amount);
@@ -79,7 +68,7 @@ contract WrappedToken is ERC20 {
             }
         }
         if (decimals_ != 0 && _decimals != decimals_) {
-             _decimals = decimals_;
+            _decimals = decimals_;
         }
     }
 

@@ -8,8 +8,8 @@ contract ChargeFeeTest is Test {
     address _alice = makeAddr("alice");
     bytes32 _aliceSender1 = bytes32(uint256(1));
     bytes32 _aliceSender2 = bytes32(uint256(2));
-    uint256 _aliceInitBalance = 10**18;
-    uint256 _aliceInitDeposit = 10**17;
+    uint256 _aliceInitBalance = 10 ** 18;
+    uint256 _aliceInitDeposit = 10 ** 17;
 
     address _bob = makeAddr("bob");
     bytes32 _bobSender1 = bytes32(uint256(3));
@@ -30,7 +30,7 @@ contract ChargeFeeTest is Test {
         aliceSenderIDs[1] = _aliceSender2;
         vm.deal(_alice, _aliceInitBalance);
         vm.prank(_alice);
-        _feeCharge.nativeTokenDeposit{ value: _aliceInitDeposit }(aliceSenderIDs);
+        _feeCharge.nativeTokenDeposit{value: _aliceInitDeposit}(aliceSenderIDs);
     }
 
     function testDeposit() public {
@@ -70,7 +70,7 @@ contract ChargeFeeTest is Test {
         assertEq(newBalance2, _aliceInitDeposit - fee * 2, "deposit balance should decrese");
         assertEq(_alice.balance, _aliceInitBalance - _aliceInitDeposit, "alice balance should not change");
         assertEq(_recepient.balance, fee * 2, "recepient balance should increase");
-        
+
         vm.prank(_alice);
         vm.expectRevert();
         _feeCharge.chargeFee(_alice, payable(_recepient), _aliceSender1, fee);

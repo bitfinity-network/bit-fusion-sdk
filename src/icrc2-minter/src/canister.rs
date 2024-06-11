@@ -124,9 +124,9 @@ impl MinterCanister {
 
         {
             let scheduler = get_scheduler();
-            let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.on_completion_callback(log_task_execution_error);
-            borrowed_scheduller.append_task(Self::init_evm_info_task());
+            let mut borrowed_scheduler = scheduler.borrow_mut();
+            borrowed_scheduler.on_completion_callback(log_task_execution_error);
+            borrowed_scheduler.append_task(Self::init_evm_info_task());
         }
 
         self.set_timers();
@@ -271,7 +271,7 @@ impl MinterCanister {
         let mut status = state.borrow().config.get_bft_bridge_contract_status();
 
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
-
+        let is_wrapped_side = true;
         let hash = status
             .initialize(
                 evm_link,
@@ -279,6 +279,7 @@ impl MinterCanister {
                 signer,
                 minter_address,
                 fee_charge_contract,
+                is_wrapped_side,
             )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
@@ -348,6 +349,51 @@ impl MinterCanister {
     #[query]
     pub fn get_canister_build_data(&self) -> BuildData {
         canister_build_data()
+    }
+
+    /// Adds the provided principal to the whitelist.
+    #[update]
+    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+        let state = get_state();
+
+        Self::access_control_inspect_message_check(ic::caller(), icrc2_principal, &state.borrow())?;
+
+        let mut state = state.borrow_mut();
+
+        state.access_list.add(icrc2_principal)?;
+
+        Ok(())
+    }
+
+    /// Remove a icrc2 principal token from the access list
+    #[update]
+    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+        let state = get_state();
+
+        Self::access_control_inspect_message_check(ic::caller(), icrc2_principal, &state.borrow())?;
+
+        let mut state = state.borrow_mut();
+
+        state.access_list.remove(&icrc2_principal);
+
+        Ok(())
+    }
+
+    /// Returns the list of all principals in the whitelist.
+    #[query]
+    fn get_whitelist(&self) -> Vec<Principal> {
+        get_state().borrow().access_list.get_all_principals()
+    }
+
+    fn access_control_inspect_message_check(
+        owner: Principal,
+        icrc2_principal: Principal,
+        state: &State,
+    ) -> Result<()> {
+        inspect_check_is_owner(owner, state)?;
+        check_anonymous_principal(icrc2_principal)?;
+
+        Ok(())
     }
 
     /// Requirements for Http outcalls, used to ignore small differences in the data obtained
@@ -709,5 +755,38 @@ mod test {
             .unwrap();
 
         assert!(evm_address.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_access_list() {
+        let mut canister = init_canister().await;
+
+        let icrc2_principal = Principal::from_text("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
+
+        // Add to whitelist
+        inject::get_context().update_id(owner());
+        canister_call!(canister.add_to_whitelist(icrc2_principal), Result<()>)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Check if the principal is in the whitelist
+        let whitelist = canister_call!(canister.get_whitelist(), Vec<Principal>)
+            .await
+            .unwrap();
+        assert_eq!(whitelist, vec![icrc2_principal]);
+
+        // Remove from whitelist
+        canister_call!(canister.remove_from_whitelist(icrc2_principal), Result<()>)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Check if the principal is removed from the whitelist
+        let whitelist = canister_call!(canister.get_whitelist(), Vec<Principal>)
+            .await
+            .unwrap();
+
+        assert!(whitelist.is_empty());
     }
 }

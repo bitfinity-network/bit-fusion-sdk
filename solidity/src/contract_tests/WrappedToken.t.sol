@@ -152,5 +152,5 @@ contract WrappedTokenTest is Test {
     function testSetMetadataInvalidCaller() public {
         vm.expectRevert("Unauthorised Access");
         _token.setMetaData(bytes32(bytes("New token")), bytes16(bytes("New symbol")), 42);
-}
+    }
 }

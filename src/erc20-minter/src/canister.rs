@@ -80,9 +80,9 @@ impl EvmMinter {
 
         {
             let scheduler = get_scheduler();
-            let mut borrowed_scheduller = scheduler.borrow_mut();
-            borrowed_scheduller.on_completion_callback(log_task_execution_error);
-            borrowed_scheduller.append_tasks(tasks);
+            let mut borrowed_scheduler = scheduler.borrow_mut();
+            borrowed_scheduler.on_completion_callback(log_task_execution_error);
+            borrowed_scheduler.append_tasks(tasks);
         }
 
         self.set_timers();
@@ -183,6 +183,7 @@ impl EvmMinter {
                 signer,
                 minter_address,
                 fee_charge_address,
+                side == BridgeSide::Wrapped,
             )
             .await
             .map_err(|e| e.to_string())?;

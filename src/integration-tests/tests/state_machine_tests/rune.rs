@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -46,6 +48,7 @@ impl RunesSetup {
             min_confirmations: 1,
             indexer_url: "https://indexer".to_string(),
             deposit_fee: 0,
+            mempool_timeout: Duration::from_secs(60),
         };
         (&context)
             .install_canister(

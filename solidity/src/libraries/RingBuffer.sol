@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-
 library RingBuffer {
     struct RingBufferUint32 {
         uint8 begin;
         uint8 end;
-        mapping(uint8 => uint32) values;    
+        mapping(uint8 => uint32) values;
     }
 
     // Append the value to the ring buffer.
@@ -47,4 +46,3 @@ library RingBuffer {
         }
     }
 }
-

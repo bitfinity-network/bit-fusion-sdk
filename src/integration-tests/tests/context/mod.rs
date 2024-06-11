@@ -268,6 +268,7 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
+        is_wrapped: bool,
     ) -> Result<H160> {
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
         let input = bft_bridge_api::CONSTRUCTOR
@@ -276,6 +277,7 @@ pub trait TestContext {
                 &[
                     Token::Address(minter_canister_address.into()),
                     Token::Address(fee_charge_address.unwrap_or_default().0),
+                    Token::Bool(is_wrapped),
                 ],
             )
             .unwrap();

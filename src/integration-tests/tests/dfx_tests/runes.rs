@@ -3,17 +3,23 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use btc_bridge::state::BftBridgeConfig;
-use candid::Principal;
-use did::{TransactionReceipt, H160, H256};
+use candid::{Encode, Principal};
+use did::constant::EIP1559_INITIAL_BASE_FEE;
+use did::{BlockNumber, TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
+use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
+use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::evm_link::EvmLink;
-use rune_bridge::interface::{DepositError, Erc20MintStatus, GetAddressError};
+use rune_bridge::core::deposit::DepositRequestStatus;
+use rune_bridge::interface::{DepositError, DepositStateResponse, GetAddressError};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
+use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
 use serde_json::Value;
 use tokio::process::Command;
@@ -41,8 +47,10 @@ fn get_rune_info(name: &str) -> RuneInfo {
         .expect("failed to run 'ord' cli tool");
     if !output.status.success() {
         panic!(
-            "'ord' list runes command exited with status {}",
-            output.status
+            "'ord' list runes command exited with status {}: {} {}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
         )
     }
 
@@ -78,6 +86,7 @@ impl RunesContext {
             min_confirmations: 1,
             indexer_url: "https://localhost:8001".to_string(),
             deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
         };
         context
             .install_canister(
@@ -109,7 +118,7 @@ impl RunesContext {
             .unwrap();
 
         let bft_bridge = context
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None)
+            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None, true)
             .await
             .unwrap();
 
@@ -266,38 +275,78 @@ impl RunesContext {
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
 
-    async fn deposit(&self, eth_address: &H160) -> Result<Erc20MintStatus, DepositError> {
-        const MAX_RETRIES: u32 = 3;
+    async fn deposit(
+        &self,
+        eth_address: &H160,
+    ) -> Result<Vec<(RuneName, u128, H256)>, DepositError> {
+        let client = self.inner.evm_client(ADMIN);
+        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let nonce = client
+            .eth_get_transaction_count(self.eth_wallet.address().into(), BlockNumber::Latest)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let data = RuneDepositRequestData {
+            dst_address: eth_address.clone(),
+            amounts: None,
+        };
+        let input = bft_bridge_api::NOTIFY_MINTER
+            .encode_input(&[
+                Token::Uint(RuneMinterNotification::DEPOSIT_TYPE.into()),
+                Token::Bytes(Encode!(&data).unwrap()),
+            ])
+            .unwrap();
+
+        let transaction = TransactionBuilder {
+            from: &self.eth_wallet.address().into(),
+            to: Some(self.bft_bridge_contract.clone()),
+            nonce,
+            value: Default::default(),
+            gas: 5_000_000u64.into(),
+            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            input,
+            signature: SigningMethod::SigningKey(self.eth_wallet.signer()),
+            chain_id,
+        }
+        .calculate_hash_and_build()
+        .expect("failed to sign the transaction");
+
+        let tx_id = client
+            .send_raw_transaction(transaction)
+            .await
+            .unwrap()
+            .unwrap();
+        self.wait_for_tx_success(&tx_id).await;
+        eprintln!("Deposit notification sent by tx: {}", hex::encode(tx_id.0));
+
+        const MAX_RETRIES: u32 = 5;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
-            match self
+            self.inner.advance_time(Duration::from_secs(2)).await;
+            retry_count += 1;
+
+            eprintln!("Checking deposit status. Try #{retry_count}...");
+
+            let response: DepositStateResponse = self
                 .inner
                 .client(self.bridge(), ADMIN)
-                .update::<_, Result<Vec<Erc20MintStatus>, DepositError>>("deposit", (eth_address,))
+                .update::<_, _>("get_deposit_state", (eth_address,))
                 .await
-                .expect("canister call failed")
-            {
-                Err(DepositError::NotingToDeposit) | Err(DepositError::NotEnoughBtc { .. }) => {
-                    retry_count += 1
-                }
-                Ok(statuses) => match &statuses[0] {
-                    res @ Erc20MintStatus::Minted { ref tx_id, .. } => {
-                        self.inner.advance_time(Duration::from_secs(2)).await;
-                        self.wait_for_tx_success(tx_id).await;
+                .expect("canister call failed");
 
-                        return Ok(res.clone());
-                    }
-                    status => return Ok(status.clone()),
-                },
-                result => {
-                    return Err(DepositError::Unavailable(format!(
-                        "Unexpected deposit result: {result:?}"
-                    )))
+            if !response.deposits.is_empty() {
+                if let DepositRequestStatus::Minted { amounts } = &response.deposits[0].status {
+                    eprintln!("Deposit successful with amounts: {amounts:?}");
+
+                    return Ok(amounts.clone());
                 }
             }
+
+            eprintln!("Deposit response: {response:?}");
         }
 
-        Err(DepositError::NotingToDeposit)
+        Err(DepositError::NothingToDeposit)
     }
 
     async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
