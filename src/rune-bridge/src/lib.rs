@@ -1,9 +1,9 @@
 pub mod canister;
+pub mod core;
 pub mod interface;
 pub mod key;
 pub mod ledger;
 pub mod memory;
-pub mod ops;
 pub mod orders_store;
 pub mod rune_info;
 pub mod scheduler;
