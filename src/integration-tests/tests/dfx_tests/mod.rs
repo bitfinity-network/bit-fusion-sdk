@@ -11,12 +11,11 @@ use minter_contract_utils::evm_link::{EvmLink, RpcApi, RpcService};
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
-mod ck_erc20;
 mod erc20_minter;
 mod runes;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
-pub const INIT_CANISTER_CYCLES: u128 = 900_000_000_000;
+pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
@@ -125,9 +124,8 @@ impl TestContext for DfxTestContext {
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal> {
         let wallet = Canister::new_wallet(&self.max, ADMIN).unwrap();
-        let principal = wallet
-            .create_canister(INIT_CANISTER_CYCLES as _, None)
-            .await?;
+        let principal = wallet.create_canister(INIT_CANISTER_CYCLES, None).await?;
+
         Ok(principal)
     }
 

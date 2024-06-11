@@ -144,9 +144,10 @@ impl BridgeTask {
         };
 
         let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
+        log::info!("BFT bridge status: {bft_bridge_status:?} for side {side}");
         let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to collect evm events: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
+            log::warn!("failed to collect evm events: bft bridge is not created for side {side}");
+            SchedulerError::TaskExecutionFailed(format!("bft bridge is not created for {side}"))
         })?;
 
         let client = evm_info.link.get_json_rpc_client();

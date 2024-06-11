@@ -738,6 +738,10 @@ pub trait TestContext {
                     .await
                     .unwrap();
 
+                for (key, principal) in self.canisters().0.iter() {
+                    println!("AH STRONZO {key:?}: {principal}");
+                }
+
                 let client = self.client(self.canisters().evm_rpc(), self.admin_name());
 
                 let res = client
@@ -748,16 +752,18 @@ pub trait TestContext {
                     .await
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
+                let hostname = format!(
+                    "https://127.0.0.1:8001/?canisterId={}",
+                    self.canisters().external_evm()
+                );
+                println!("EVM-RPC provider hostname: {hostname}");
                 // configure the EVM RPC canister provider
                 let args = evm_rpc_canister::RegisterProviderArgs {
                     chainId: CHAIN_ID,
-                    hostname: format!(
-                        "https://127.0.0.1:8001/?canisterId={}",
-                        self.canisters().external_evm()
-                    ),
+                    hostname,
                     credentialPath: "".to_string(),
-                    cyclesPerCall: 0,
-                    cyclesPerMessageByte: 0,
+                    cyclesPerCall: 1,
+                    cyclesPerMessageByte: 1,
                     credentialsHeaders: None,
                 };
 
@@ -1009,7 +1015,7 @@ pub fn evm_canister_init_data(
 }
 
 pub fn evm_rpc_canister_init_data() -> EvmRpcCanisterInitData {
-    EvmRpcCanisterInitData { nodesInSubnet: 28 }
+    EvmRpcCanisterInitData { nodesInSubnet: 1 }
 }
 
 fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
@@ -1215,7 +1221,15 @@ impl CanisterType {
     ];
 
     /// EVM, SignatureVerification, Minter, Spender and Token1.
-    pub const EVM_MINTER_TEST_SET: [CanisterType; 5] = [
+    pub const EVM_MINTER_TEST_SET: [CanisterType; 4] = [
+        CanisterType::Evm,
+        CanisterType::ExternalEvm,
+        CanisterType::Signature,
+        CanisterType::CkErc20Minter,
+    ];
+
+    /// EVM, SignatureVerification, Minter, Spender and Token1.
+    pub const EVM_MINTER_WITH_EVMRPC_TEST_SET: [CanisterType; 5] = [
         CanisterType::Evm,
         CanisterType::ExternalEvm,
         CanisterType::EvmRpcCanister,
