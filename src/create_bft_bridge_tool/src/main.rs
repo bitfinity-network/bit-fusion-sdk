@@ -4,7 +4,7 @@ use std::time::Duration;
 use candid::{CandidType, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{BlockNumber, Transaction, TransactionReceipt, H256};
+use did::{BlockNumber, Transaction, TransactionReceipt, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethereum_types::H160;
@@ -12,8 +12,10 @@ use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
-use minter_contract_utils::{bft_bridge_api, wrapped_token_api};
+use minter_contract_utils::build_data::{
+    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE,
+};
+use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::id256::Id256;
 use tokio::time::Instant;
 
@@ -35,6 +37,10 @@ enum CliCommand {
     BurnWrapped(BurnWrappedArgs),
     /// Return ETH wallet address.
     WalletAddress(WalletAddressArgs),
+    /// Create bft bridge contract.
+    DeployFeeCharge(DeployFeeChargeArgs),
+    /// Returns expected contract address for the given parameters.
+    ExpectedContractAddress(ExpectedContractAddress),
 }
 
 #[derive(Debug, Parser)]
@@ -54,6 +60,36 @@ struct DeployBftArgs {
     /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
     #[arg(long)]
     wallet: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+struct DeployFeeChargeArgs {
+    /// Principal of the EVM canister
+    #[arg(long)]
+    evm: Principal,
+
+    /// Hex-encoded PK to use to sign transaction.
+    #[arg(long)]
+    wallet: String,
+
+    /// Nonce for the transaction. Should be fixed to know the contract address before the deploy.
+    #[arg(long)]
+    nonce: u64,
+
+    /// Addresses of BftBridges, which should be able to charge fee.
+    #[arg(long)]
+    bridges: Vec<String>,
+}
+
+#[derive(Debug, Parser)]
+struct ExpectedContractAddress {
+    /// Hex-encoded PK of contract deployer.
+    #[arg(long)]
+    wallet: String,
+
+    /// Nonce used in contract deployment transaction.
+    #[arg(long)]
+    nonce: u64,
 }
 
 #[derive(Debug, Parser)]
@@ -137,6 +173,8 @@ async fn main() {
         CliCommand::CreateWallet(args) => create_wallet(args).await,
         CliCommand::BurnWrapped(args) => burn_wrapped(args).await,
         CliCommand::WalletAddress(args) => wallet_address(args),
+        CliCommand::DeployFeeCharge(args) => deploy_fee_charge(args).await,
+        CliCommand::ExpectedContractAddress(args) => expected_contract_address(args),
     }
 }
 
@@ -288,6 +326,76 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
 
     eprintln!("Created BFT Bridge contract");
     println!("{bft_contract_address:#x}");
+}
+
+async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
+    let client = EvmCanisterClient::new(
+        IcAgentClient::with_identity(args.evm, IDENTITY_PATH, "http://127.0.0.1:4943", None)
+            .await
+            .expect("failed to create evm client"),
+    );
+
+    let some_wallet = Some(args.wallet.clone());
+    let wallet = get_wallet(&some_wallet, &client).await;
+    let did_from: did::H160 = wallet.address().into();
+
+    let addresses = args
+        .bridges
+        .iter()
+        .map(|addr| {
+            let addr = H160::from_slice(
+                &hex::decode(addr.trim_start_matches("0x"))
+                    .expect("failed to parse bridge address"),
+            );
+            Token::Address(addr)
+        })
+        .collect();
+    let input = fee_charge_api::CONSTRUCTOR
+        .encode_input(
+            FEE_CHARGE_SMART_CONTRACT_CODE.clone(),
+            &[Token::Array(addresses)],
+        )
+        .expect("failed to encode constructor input");
+
+    let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+
+    let create_contract_tx = TransactionBuilder {
+        from: &did_from,
+        input,
+        nonce: args.nonce.into(),
+        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        to: None,
+        value: U256::zero(),
+        gas: 4_000_000_u64.into(),
+        signature: SigningMethod::SigningKey(wallet.signer()),
+        chain_id,
+    }
+    .calculate_hash_and_build()
+    .expect("failed to build transaction");
+
+    let hash = client
+        .send_raw_transaction(create_contract_tx)
+        .await
+        .expect("Failed to send raw transaction")
+        .expect("Failed to execute crate BFT contract transaction");
+    let receipt = wait_for_tx_success(&client, hash).await;
+    let fee_charge_contract_address = receipt
+        .contract_address
+        .expect("Receipt did not contain contract address");
+
+    eprintln!("Created FeeCharge contract");
+    println!("{fee_charge_contract_address:#x}");
+}
+
+fn expected_contract_address(args: ExpectedContractAddress) {
+    let wallet = Wallet::from_bytes(
+        &hex::decode(args.wallet.trim_start_matches("0x"))
+            .expect("invalid hex string for wallet PK"),
+    )
+    .expect("invalid wallet PK value");
+    let deployer = wallet.address();
+    let contract_address = ethers_core::utils::get_contract_address(deployer, args.nonce);
+    println!("{contract_address:#x}");
 }
 
 async fn create_token(args: CreateTokenArgs) {

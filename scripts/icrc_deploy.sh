@@ -1,4 +1,5 @@
 # Use latets vers
+source "$(dirname "$0")/deploy/deploy_functions.sh"
 
 set -e
 
@@ -102,7 +103,11 @@ start_icx
 
 
 ########## Deploy BFT and ICRC2 contracts ##########
-TEST_WALLET="0x0950f5Fb5d0feeb0BD56351A66179F4fB2e3419f"
+ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
+
+FEE_CHARGE_DEPLOY_TX_NONCE=0
+FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
 res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
 res=${res#*\"}
@@ -112,11 +117,18 @@ echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
 
 echo "Minting ETH tokens for ICRC2 Minter canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
-dfx canister call evm_testnet mint_native_tokens "(\"${TEST_WALLET}\", \"1000000000000000000\")"
 
 echo "Initializing bft bridge contract with icrc2-minter"
-dfx canister call icrc2-minter init_bft_bridge_contract
+dfx canister call icrc2-minter init_bft_bridge_contract "(\"${FEE_CHARGE_CONTRACT_ADDRESS}\",)"
+sleep 5
 
+res=$(dfx canister call icrc2-minter get_bft_bridge_contract)
+res=${res#*\"}
+BFT_BRIDGE_ADDRESS=${res%\"*}
+echo "Got BftBridge address: ${BFT_BRIDGE_ADDRESS}"
+
+echo "Deploying FeeCharge contract"
+deploy_fee_charge_contract $EVM $ETH_WALLET $FEE_CHARGE_DEPLOY_TX_NONCE $BFT_BRIDGE_ADDRESS
 sleep 5
 
 echo "Finished!!!!!"
