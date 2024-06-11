@@ -183,6 +183,7 @@ impl EvmMinter {
                 signer,
                 minter_address,
                 fee_charge_address,
+                side == BridgeSide::Wrapped,
             )
             .await
             .map_err(|e| e.to_string())?;

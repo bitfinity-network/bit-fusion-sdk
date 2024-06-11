@@ -7,13 +7,13 @@ interface IFeeCharge {
     // The deposit could be used to pay fees by the approvedSenderIDs.
     // Returns user's balance after the operation.
     function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance);
-    
+
     // Withdraw the amount of native token to user's address.
     // Returns user's balance after the operation.
     function nativeTokenWithdraw(uint256 amount) external payable returns (uint256 balance);
-    
-    // Returns user's native token deposit balance. 
-    function nativeTokenBalance(address user) external view returns(uint256 balance);
+
+    // Returns user's native token deposit balance.
+    function nativeTokenBalance(address user) external view returns (uint256 balance);
 
     // Remove approved SpenderIDs
     function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external;

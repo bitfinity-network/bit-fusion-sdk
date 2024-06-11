@@ -10,7 +10,6 @@ contract RingBufferTests is Test {
 
     RingBuffer.RingBufferUint32 _buffer;
 
-
     function testIncrementRingBuffer() public {
         assertEq(_buffer.size(), 0);
 
