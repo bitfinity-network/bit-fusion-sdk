@@ -87,11 +87,8 @@ impl EvmParams {
         .await?;
 
         let chain_id: U256 = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
-        log::error!("chain_id: {chain_id}");
         let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
-        log::error!("next_block: {next_block}");
         let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
-        log::error!("nonce: {nonce}");
 
         // TODO: Improve gas price selection strategy. https://infinityswap.atlassian.net/browse/EPROD-738
         let latest_block = evm_client

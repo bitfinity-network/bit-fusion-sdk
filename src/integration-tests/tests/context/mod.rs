@@ -735,7 +735,7 @@ pub trait TestContext {
                     "Installing default EVM RPC canister {}...",
                     self.canisters().evm_rpc()
                 );
-                let init_data = evm_rpc_canister_init_data();
+                let init_data = EvmRpcCanisterInitData { nodesInSubnet: 1 };
                 self.install_canister(self.canisters().evm_rpc(), wasm, (init_data,))
                     .await
                     .unwrap();
@@ -860,8 +860,8 @@ pub trait TestContext {
                 let init_data = erc20_minter::state::Settings {
                     base_evm_link: self.base_evm_link(),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
-                    signing_strategy: SigningStrategy::ManagementCanister {
-                        key_id: SigningKeyId::Dfx,
+                    signing_strategy: SigningStrategy::Local {
+                        private_key: rand::random(),
                     },
                     log_settings: Some(LogSettings {
                         enable_console: true,
@@ -1014,10 +1014,6 @@ pub fn evm_canister_init_data(
         owner,
         ..Default::default()
     }
-}
-
-pub fn evm_rpc_canister_init_data() -> EvmRpcCanisterInitData {
-    EvmRpcCanisterInitData { nodesInSubnet: 1 }
 }
 
 fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {

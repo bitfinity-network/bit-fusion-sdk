@@ -84,23 +84,14 @@ impl BridgeTask {
             .link
             .get_json_rpc_client();
 
-        log::info!("preparing client for side {:?}", side);
-
         let address = {
             let signer = state.borrow().signer.get().clone();
             signer.get_address().await.into_scheduler_result()?
         };
 
-        let evm_params = match EvmParams::query(client, address)
+        let evm_params = EvmParams::query(client, address)
             .await
-            .into_scheduler_result()
-        {
-            Ok(params) => params,
-            Err(e) => {
-                log::error!("failed to query evm params: {e}");
-                EvmParams::default()
-            }
-        };
+            .into_scheduler_result()?;
 
         state
             .borrow_mut()
@@ -144,7 +135,7 @@ impl BridgeTask {
         };
 
         let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
-        log::info!("BFT bridge status: {bft_bridge_status:?} for side {side}");
+        log::debug!("BFT bridge status: {bft_bridge_status:?} for side {side}");
         let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
             log::warn!("failed to collect evm events: bft bridge is not created for side {side}");
             SchedulerError::TaskExecutionFailed(format!("bft bridge is not created for {side}"))
