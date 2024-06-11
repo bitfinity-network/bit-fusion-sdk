@@ -71,6 +71,7 @@ pub mod test_contracts {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "test-contracts")]
     #[test]
     fn should_get_wrapped_token_smart_contract_code() {
         let code = &*test_contracts::WRAPPED_TOKEN_SMART_CONTRACT_CODE;
