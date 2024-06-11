@@ -6411,7 +6411,7 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "minter-did",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.5",
  "num-traits",
  "once_cell",
  "serde",
