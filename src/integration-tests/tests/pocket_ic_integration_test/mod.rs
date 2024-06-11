@@ -197,9 +197,9 @@ impl fmt::Debug for PocketIcTestContext {
     }
 }
 
-/// Initializez test environment with:
+/// Initialize test environment with:
 /// - john wallet with native tokens,
-/// - opetaion points for john,
+/// - operation points for john,
 /// - bridge contract
 async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;

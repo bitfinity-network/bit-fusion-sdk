@@ -1,4 +1,3 @@
-use crate::interface::{DepositError, WithdrawError};
 use bitcoin::consensus::Encodable;
 use bitcoin::{Address, FeeRate, Transaction};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
@@ -6,6 +5,8 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     BitcoinNetwork, GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse,
     SendTransactionRequest,
 };
+
+use crate::interface::{DepositError, WithdrawError};
 
 pub(crate) trait UtxoProvider {
     async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError>;

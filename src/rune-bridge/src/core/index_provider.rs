@@ -1,5 +1,5 @@
-use crate::interface::{DepositError, OutputResponse};
-use crate::rune_info::RuneName;
+use std::collections::HashMap;
+
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -7,7 +7,9 @@ use ic_exports::ic_cdk::api::management_canister::http_request::{
 use ordinals::{RuneId, SpacedRune};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
-use std::collections::HashMap;
+
+use crate::interface::{DepositError, OutputResponse};
+use crate::rune_info::RuneName;
 
 pub(crate) trait RuneIndexProvider {
     async fn get_rune_amounts(&self, utxo: &Utxo) -> Result<HashMap<RuneName, u128>, DepositError>;

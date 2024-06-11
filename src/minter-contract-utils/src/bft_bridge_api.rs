@@ -661,9 +661,8 @@ mod tests {
     use ethers_core::abi::{Bytes, RawLog, Token};
     use ethers_core::utils::hex::traits::FromHex;
 
-    use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
-
     use super::{BurntEventData, MintedEventData};
+    use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
 
     #[test]
     fn minted_event_data_builder_test() {

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 
+use access_list::AccessList;
 use candid::Principal;
 pub use config::Config;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
@@ -9,9 +10,10 @@ use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
 use self::signer::SignerInfo;
-use crate::constant::{MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
+use crate::constant::{ACCESS_LIST_MEMORY_ID, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
 use crate::memory::MEMORY_MANAGER;
 
+mod access_list;
 mod config;
 pub mod log;
 mod signer;
@@ -28,6 +30,8 @@ pub struct State {
     pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
 
     pub logger_config_service: LoggerConfigService,
+
+    pub access_list: AccessList<VirtualMemory<DefaultMemoryImpl>>,
 }
 
 impl Default for State {
@@ -38,6 +42,7 @@ impl Default for State {
             signer: SignerInfo::default(),
             mint_orders: MintOrders::new(memory_manager.get(MINT_ORDERS_MEMORY_ID)),
             logger_config_service: LoggerConfigService::default(),
+            access_list: AccessList::new(memory_manager.get(ACCESS_LIST_MEMORY_ID)),
         }
     }
 }
