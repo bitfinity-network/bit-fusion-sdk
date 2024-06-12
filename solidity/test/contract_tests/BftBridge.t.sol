@@ -61,7 +61,7 @@ contract BftBridgeTest is Test {
         //     initializeData
         // );
         address proxy = Upgrades.deployUUPSProxy(
-            "BftBridge.sol:BftBridge",
+            "BftBridge.sol:BFTBridge",
             initializeData
         );
 
@@ -71,7 +71,7 @@ contract BftBridgeTest is Test {
         vm.stopPrank();
     }
 
-    function testMinterCanisterAddress() public {
+    function testMinterCanisterAddress() public view {
         assertEq(_bridge.minterCanisterAddress(), _owner);
     }
 
