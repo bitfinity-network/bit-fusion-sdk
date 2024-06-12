@@ -6,6 +6,7 @@ ast = true
 ffi = true
 build_info = true
 extra_output = ["storageLayout"]
+script = "script"
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [fmt]
@@ -19,3 +20,8 @@ number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
 contract_new_lines = true
+
+
+[rpc_endpoints]
+mainnet = "https://mainnet.bitfinity.network"
+testnet = "https://testnet.bitfinity.network"

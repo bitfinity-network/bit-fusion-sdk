@@ -16,7 +16,7 @@ start_icx() {
 CHAIN_ID=355113
 
 dfx stop
-dfx start --host 127.0.0.1:4943 --background --clean 2> dfx_stderr.log
+dfx start --host 127.0.0.1:4943 --background --clean 2>dfx_stderr.log
 
 dfx identity new --force icrc-admin
 dfx identity use icrc-admin
@@ -81,8 +81,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-
-dfx deploy icrc2-minter  --argument "(record {
+dfx deploy icrc2-minter --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
         Local = record {
@@ -96,10 +95,7 @@ dfx deploy icrc2-minter  --argument "(record {
     owner = principal \"$ADMIN_PRINCIPAL\";
 })"
 
-
 start_icx
-
-
 
 ########## Deploy BFT and ICRC2 contracts ##########
 TEST_WALLET="0x0950f5Fb5d0feeb0BD56351A66179F4fB2e3419f"

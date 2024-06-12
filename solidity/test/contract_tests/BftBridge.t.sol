@@ -45,8 +45,6 @@ contract BftBridgeTest is Test {
     function setUp() public {
         vm.chainId(_CHAIN_ID);
         vm.startPrank(_owner);
-        // // Deploy the implementation contract
-        // BFTBridge implementation = new BFTBridge();
 
         // Encode the initialization call
         bytes memory initializeData = abi.encodeWithSelector(
@@ -56,10 +54,6 @@ contract BftBridgeTest is Test {
             true
         );
 
-        // UUPSProxy proxy = new UUPSProxy(
-        //     address(implementation),
-        //     initializeData
-        // );
         address proxy = Upgrades.deployUUPSProxy(
             "BftBridge.sol:BFTBridge",
             initializeData
