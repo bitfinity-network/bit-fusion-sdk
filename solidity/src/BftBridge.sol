@@ -5,14 +5,19 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import { RingBuffer } from "src/libraries/RingBuffer.sol";
+import {RingBuffer} from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
-
+contract BFTBridge is
+    TokenManager,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable
+{
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
@@ -54,24 +59,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
-    /// Constructor to initialize minterCanisterAddress and feeChargeContract
-    /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) public initializer {
-        minterCanisterAddress = minterAddress;
-        feeChargeContract = IFeeCharge(feeChargeAddress);
-        TokenManager._initialize(_isWrappedSide);
-
-        // Call super initializer
-        __Ownable_init(tx.origin);
-        __UUPSUpgradeable_init();
-    }
-
-    /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
-
     // Event for mint operation
     event MintTokenEvent(
-        uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
+        uint256 amount,
+        bytes32 fromToken,
+        bytes32 senderID,
+        address toERC20,
+        address recipient,
+        uint32 nonce
     );
 
     /// Event for burn operation
@@ -90,18 +85,63 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
     /// Event that can be emited with a notification for the minter canister
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Locks the contract and prevent any future re-initialization
+        _disableInitializers();
+    }
+
+    /// Constructor to initialize minterCanisterAddress and feeChargeContract
+    /// and whether this contract is on the wrapped side
+    function initialize(
+        address minterAddress,
+        address feeChargeAddress,
+        bool _isWrappedSide
+    ) public initializer {
+        minterCanisterAddress = minterAddress;
+        feeChargeContract = IFeeCharge(feeChargeAddress);
+        TokenManager._initialize(_isWrappedSide);
+
+        // Call super initializer
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __Pausable_init();
+    }
+
+    /// Restrict who can upgrade this contract
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
+    /// Pause the contract and prevent any future mint or burn operations
+    /// Can be called only by the owner
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// Unpause the contract
+    /// Can be called only by the owner
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
-    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
+    function notifyMinter(
+        uint32 notificationType,
+        bytes calldata userData
+    ) external {
         emit NotifyMinterEvent(notificationType, userData);
     }
 
-    // Main function to withdraw funds
-    function mint(bytes calldata encodedOrder) external {
+    /// Main function to withdraw funds
+    function mint(bytes calldata encodedOrder) external whenNotPaused {
         uint256 initGasLeft = gasleft();
 
-        MintOrderData memory order = _decodeAndValidateOrder(encodedOrder[:269]);
+        MintOrderData memory order = _decodeAndValidateOrder(
+            encodedOrder[:269]
+        );
 
         _checkMintOrderSignature(encodedOrder);
 
@@ -120,44 +160,84 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
 
         // The toToken should be a valid token address.
         // This should never fail.
-        require(toToken != address(0), "toToken address should be specified correctly");
+        require(
+            toToken != address(0),
+            "toToken address should be specified correctly"
+        );
 
         // Update token's metadata only if it is a wrapped token
         if (isWrappedSide) {
-            updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
+            updateTokenMetadata(
+                toToken,
+                order.name,
+                order.symbol,
+                order.decimals
+            );
         }
 
         // Execute the withdrawal
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(toToken).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedSide) {
-            WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
+        if (
+            order.approveSpender != address(0) &&
+            order.approveAmount != 0 &&
+            isWrappedSide
+        ) {
+            WrappedToken(toToken).approveByOwner(
+                order.recipient,
+                order.approveSpender,
+                order.approveAmount
+            );
         }
 
         if (
-            order.feePayer != address(0) && msg.sender == minterCanisterAddress
-                && address(feeChargeContract) != address(0)
+            order.feePayer != address(0) &&
+            msg.sender == minterCanisterAddress &&
+            address(feeChargeContract) != address(0)
         ) {
             uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
             uint256 fee = gasFee * tx.gasprice;
-            feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
+            feeChargeContract.chargeFee(
+                order.feePayer,
+                payable(minterCanisterAddress),
+                order.senderID,
+                fee
+            );
         }
 
         // Emit event
-        emit MintTokenEvent(order.amount, order.fromTokenID, order.senderID, toToken, order.recipient, order.nonce);
+        emit MintTokenEvent(
+            order.amount,
+            order.fromTokenID,
+            order.senderID,
+            toToken,
+            order.recipient,
+            order.nonce
+        );
     }
 
     /// Getter function for block numbers
-    function getDepositBlocks() external view returns (uint32[] memory blockNumbers) {
+    function getDepositBlocks()
+        external
+        view
+        returns (uint32[] memory blockNumbers)
+    {
         blockNumbers = _lastUserBurns[msg.sender].getAll();
     }
 
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
-        require(fromERC20 != address(this), "From address must not be BFT bridge address");
+    function burn(
+        uint256 amount,
+        address fromERC20,
+        bytes memory recipientID
+    ) public whenNotPaused returns (uint32) {
+        require(
+            fromERC20 != address(this),
+            "From address must not be BFT bridge address"
+        );
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -175,7 +255,15 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
         uint32 operationID = operationIDCounter++;
 
         emit BurnTokenEvent(
-            msg.sender, amount, fromERC20, recipientID, toTokenID, operationID, meta.name, meta.symbol, meta.decimals
+            msg.sender,
+            amount,
+            fromERC20,
+            recipientID,
+            toTokenID,
+            operationID,
+            meta.name,
+            meta.symbol,
+            meta.decimals
         );
 
         return operationID;
@@ -187,7 +275,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     /// Function to decode and validate the order data
-    function _decodeAndValidateOrder(bytes calldata encodedOrder) private view returns (MintOrderData memory order) {
+    function _decodeAndValidateOrder(
+        bytes calldata encodedOrder
+    ) private view returns (MintOrderData memory order) {
         // Decode order data
         order.amount = uint256(bytes32(encodedOrder[:32]));
         order.senderID = bytes32(encodedOrder[32:64]);
@@ -218,13 +308,16 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
 
         if (_baseTokenRegistry[order.toERC20] != bytes32(0)) {
             require(
-                _erc20TokenRegistry[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
+                _erc20TokenRegistry[order.fromTokenID] == order.toERC20,
+                "SRC token and DST token must be a valid pair"
             );
         }
     }
 
     /// Function to check encodedOrder signature
-    function _checkMintOrderSignature(bytes calldata encodedOrder) private view {
+    function _checkMintOrderSignature(
+        bytes calldata encodedOrder
+    ) private view {
         // Create a hash of the order data
         bytes32 hash = keccak256(encodedOrder[:269]);
 
@@ -234,5 +327,4 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable {
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
     }
-
 }

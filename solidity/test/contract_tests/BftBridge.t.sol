@@ -8,10 +8,9 @@ import "src/BftBridge.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "openzeppelin-contracts/proxy/transparent/ProxyAdmin.sol";
+import {Upgrades} from "@openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract BftBridgeTest is Test {
-
     using StringUtils for string;
 
     struct MintOrder {
@@ -45,22 +44,31 @@ contract BftBridgeTest is Test {
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-
-        // Deploy the implementation contract
-        BFTBridge implementation = new BFTBridge();
-
-        // Deploy the ProxyAdmin contract
-        ProxyAdmin admin = new ProxyAdmin(_owner);
+        vm.startPrank(_owner);
+        // // Deploy the implementation contract
+        // BFTBridge implementation = new BFTBridge();
 
         // Encode the initialization call
-        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+        bytes memory initializeData = abi.encodeWithSelector(
+            BFTBridge.initialize.selector,
+            _owner,
+            address(0),
+            true
+        );
 
-        // Deploy the TransparentUpgradeableProxy contract
-        TransparentUpgradeableProxy proxy =
-            new TransparentUpgradeableProxy(address(implementation), address(admin), initializeData);
+        // UUPSProxy proxy = new UUPSProxy(
+        //     address(implementation),
+        //     initializeData
+        // );
+        address proxy = Upgrades.deployUUPSProxy(
+            "BftBridge.sol:BftBridge",
+            initializeData
+        );
 
         // Cast the proxy to BFTBridge
         _bridge = BFTBridge(address(proxy));
+
+        vm.stopPrank();
     }
 
     function testMinterCanisterAddress() public {
@@ -73,7 +81,10 @@ contract BftBridgeTest is Test {
 
         _bridge.mint(encodedOrder);
 
-        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), order.amount);
+        assertEq(
+            WrappedToken(order.toERC20).balanceOf(order.recipient),
+            order.amount
+        );
     }
 
     function testMintERC20FromICRC2InvalidChainID() public {
@@ -141,21 +152,38 @@ contract BftBridgeTest is Test {
     }
 
     function testMintERC20FromICRC2InvalidOrderLength() public {
-        bytes memory encodedOrder = abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4));
+        bytes memory encodedOrder = abi.encodePacked(
+            uint8(1),
+            uint8(2),
+            uint8(3),
+            uint8(4)
+        );
 
         vm.expectRevert();
         _bridge.mint(encodedOrder);
     }
 
     function testGetWrappedToken() public {
-        bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_id);
+        bytes32 base_token_id = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1))
+        );
+        address wrapped_address = _bridge.deployERC20(
+            "Token",
+            "TKN",
+            base_token_id
+        );
         assertEq(wrapped_address, _bridge.getWrappedToken(base_token_id));
     }
 
     function testGetBaseToken() public {
-        bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_id);
+        bytes32 base_token_id = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1))
+        );
+        address wrapped_address = _bridge.deployERC20(
+            "Token",
+            "TKN",
+            base_token_id
+        );
         assertEq(base_token_id, _bridge.getBaseToken(wrapped_address));
     }
 
@@ -168,16 +196,37 @@ contract BftBridgeTest is Test {
 
         address[3] memory wrapped_tokens;
         for (uint256 i = 0; i < 3; i++) {
-            address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_ids[i]);
+            address wrapped_address = _bridge.deployERC20(
+                "Token",
+                "TKN",
+                base_token_ids[i]
+            );
             wrapped_tokens[i] = wrapped_address;
         }
 
-        (address[] memory wrapped, bytes32[] memory base) = _bridge.listTokenPairs();
+        (address[] memory wrapped, bytes32[] memory base) = _bridge
+            .listTokenPairs();
 
         for (uint256 i = 0; i < 3; i++) {
             assertEq(wrapped[i], wrapped_tokens[i]);
             assertEq(base[i], base_token_ids[i]);
         }
+    }
+
+    function testMintCallsAreRejectedWhenPaused() public {
+        vm.prank(_owner);
+
+        _bridge.pause();
+
+        MintOrder memory mintOrder = _createDefaultMintOrder();
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
+
+        vm.prank(_owner);
+        _bridge.unpause();
+
+        // mint will be success
+        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
     }
 
     struct ExpectedBurnEvent {
@@ -198,8 +247,10 @@ contract BftBridgeTest is Test {
 
         for (uint256 i = 0; i < entries.length; i += 1) {
             if (
-                entries[i].topics[0]
-                    == keccak256("BurnTokenEvent(address,uint256,address,bytes32,bytes32,bytes32,bytes16,uint8)")
+                entries[i].topics[0] ==
+                keccak256(
+                    "BurnTokenEvent(address,uint256,address,bytes32,bytes32,bytes32,bytes16,uint8)"
+                )
             ) {
                 assertEq(eventFound, false);
                 eventFound = true;
@@ -217,7 +268,19 @@ contract BftBridgeTest is Test {
                     bytes32 name,
                     bytes16 symbol,
                     uint8 decimals
-                ) = abi.decode(entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8));
+                ) = abi.decode(
+                        entries[i].data,
+                        (
+                            address,
+                            uint256,
+                            address,
+                            bytes32,
+                            bytes32,
+                            bytes32,
+                            bytes16,
+                            uint8
+                        )
+                    );
                 assertEq(expected.sender, sender);
                 assertEq(expected.amount, amount);
                 assertEq(expected.fromERC20, fromERC20);
@@ -232,10 +295,17 @@ contract BftBridgeTest is Test {
         assertEq(eventFound, true);
     }
 
-    function _createDefaultMintOrder() private returns (MintOrder memory order) {
+    function _createDefaultMintOrder()
+        private
+        returns (MintOrder memory order)
+    {
         order.amount = 1000;
-        order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
-        order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
+        order.senderID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3))
+        );
+        order.fromTokenID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4))
+        );
         order.recipient = _alice;
         order.toERC20 = _bridge.deployERC20("Token", "TKN", order.fromTokenID);
         order.nonce = 0;
@@ -251,7 +321,10 @@ contract BftBridgeTest is Test {
         order.feePayer = address(0);
     }
 
-    function _encodeMintOrder(MintOrder memory order, uint256 privateKey) private pure returns (bytes memory) {
+    function _encodeMintOrder(
+        MintOrder memory order,
+        uint256 privateKey
+    ) private pure returns (bytes memory) {
         // Encoding splitted in two parts to avoid problems with stack overflow.
         bytes memory encodedOrder = abi.encodePacked(
             order.amount,
@@ -275,12 +348,19 @@ contract BftBridgeTest is Test {
         return abi.encodePacked(encodedOrder, r, s, v);
     }
 
-    function _createIdFromPrincipal(bytes memory principal) private pure returns (bytes32) {
-        return bytes32(abi.encodePacked(uint8(0), uint8(principal.length), principal));
+    function _createIdFromPrincipal(
+        bytes memory principal
+    ) private pure returns (bytes32) {
+        return
+            bytes32(
+                abi.encodePacked(uint8(0), uint8(principal.length), principal)
+            );
     }
 
-    function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
+    function _createIdFromAddress(
+        address addr,
+        uint32 chainID
+    ) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
-
 }
