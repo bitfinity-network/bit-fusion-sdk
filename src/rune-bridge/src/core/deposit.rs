@@ -16,10 +16,9 @@ use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
 use ic_stable_structures::{CellStructure, VirtualMemory};
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
+use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
-
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 
 use crate::canister::{get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};

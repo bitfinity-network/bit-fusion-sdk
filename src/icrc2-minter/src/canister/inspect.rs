@@ -34,6 +34,10 @@ async fn inspect_method(method: &str) -> Result<()> {
             let (owner,) = api::call::arg_data::<(Principal,)>(Default::default());
             MinterCanister::set_owner_inspect_message_check(ic::caller(), owner, &state)
         }
+        "add_to_whitelist" | "remove_from_whitelist" => {
+            let (principal,) = api::call::arg_data::<(Principal,)>(Default::default());
+            MinterCanister::access_control_inspect_message_check(ic::caller(), principal, &state)
+        }
         _ => Ok(()),
     }
 }

@@ -15,6 +15,13 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 async fn test_icrc2_tokens_roundtrip() {
     let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
+    let minter_client = ctx.icrc_minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
         .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
@@ -101,6 +108,12 @@ async fn test_icrc2_tokens_roundtrip() {
 async fn test_icrc2_token_canister_stopped() {
     let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
+    let minter_client = ctx.icrc_minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
         .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)

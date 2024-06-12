@@ -1,7 +1,6 @@
-use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::interface::WithdrawError;
-use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
-use crate::state::State;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, Network, OutPoint, Transaction, TxOut, Txid};
 use did::H160;
@@ -9,8 +8,11 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::RuneId;
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
+use crate::interface::WithdrawError;
+use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
+use crate::state::State;
 
 pub(crate) struct Withdrawal<UTXO: UtxoProvider> {
     state: Rc<RefCell<State>>,
