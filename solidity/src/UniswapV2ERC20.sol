@@ -4,7 +4,6 @@ import "./interfaces/IUniswapV2ERC20.sol";
 import "./libraries/SafeMath.sol";
 
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
-
     using SafeMath for uint256;
 
     string public constant name = "Uniswap V2";
@@ -79,15 +78,9 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
         return true;
     }
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
         require(deadline >= block.timestamp, "UniswapV2: EXPIRED");
         bytes32 digest = keccak256(
             abi.encodePacked(
@@ -100,5 +93,4 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
         require(recoveredAddress != address(0) && recoveredAddress == owner, "UniswapV2: INVALID_SIGNATURE");
         _approve(owner, spender, value);
     }
-
 }

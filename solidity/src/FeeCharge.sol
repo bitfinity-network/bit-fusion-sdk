@@ -4,10 +4,9 @@ pragma solidity ^0.8.7;
 import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/interfaces/IFeeCharge.sol";
-import { RingBuffer } from "src/libraries/RingBuffer.sol";
+import {RingBuffer} from "src/libraries/RingBuffer.sol";
 
 contract FeeCharge is IFeeCharge {
-
     // Mapping from user address to amount of native tokens on his deposit.
     mapping(address => uint256) private _userBalance;
 
@@ -80,5 +79,4 @@ contract FeeCharge is IFeeCharge {
         _userBalance[from] = newBalance;
         to.transfer(amount);
     }
-
 }

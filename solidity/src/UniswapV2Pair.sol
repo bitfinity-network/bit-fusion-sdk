@@ -9,7 +9,6 @@ import "./interfaces/IUniswapV2Factory.sol";
 import "./interfaces/IUniswapV2Callee.sol";
 
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
-
     using SafeMath for uint256;
     using UQ112x112 for uint224;
 
@@ -217,5 +216,4 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     function sync() external lock {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
-
 }

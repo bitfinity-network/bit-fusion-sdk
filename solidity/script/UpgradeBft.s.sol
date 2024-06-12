@@ -19,12 +19,8 @@ contract UpgradeBft is Script {
         // Rename the contract version
         string memory newImplementation = "BftBridge.sol:BFTBridgeVx";
 
-        bytes memory initializeData = abi.encodeWithSelector(
-            BFTBridge.initialize.selector,
-            minterAddress,
-            feeChargeAddress,
-            isWrappedSide
-        );
+        bytes memory initializeData =
+            abi.encodeWithSelector(BFTBridge.initialize.selector, minterAddress, feeChargeAddress, isWrappedSide);
 
         // Upgrade the proxy to the new implementation
         Upgrades.upgradeProxy(proxyAddress, newImplementation, initializeData);
@@ -32,9 +28,7 @@ contract UpgradeBft is Script {
         vm.stopBroadcast();
         console.logString("BFTBridge Proxy upgraded at:");
         console.logAddress(proxyAddress);
-        address newImplementationAddress = Upgrades.getImplementationAddress(
-            proxyAddress
-        );
+        address newImplementationAddress = Upgrades.getImplementationAddress(proxyAddress);
         console.logString("New BFTBridge implementation deployed at:");
         console.logAddress(address(newImplementationAddress));
     }

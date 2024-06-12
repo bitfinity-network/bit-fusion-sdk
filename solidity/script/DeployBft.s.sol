@@ -15,17 +15,10 @@ contract DeployBft is Script {
 
         vm.startBroadcast();
 
-        bytes memory initializeData = abi.encodeWithSelector(
-            BFTBridge.initialize.selector,
-            minterAddress,
-            feeChargeAddress,
-            isWrappedSide
-        );
+        bytes memory initializeData =
+            abi.encodeWithSelector(BFTBridge.initialize.selector, minterAddress, feeChargeAddress, isWrappedSide);
 
-        address proxy = Upgrades.deployUUPSProxy(
-            "BftBridge.sol:BFTBridge",
-            initializeData
-        );
+        address proxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", initializeData);
 
         vm.stopBroadcast();
         console.logString("BFTBridge Proxy deployed at:");

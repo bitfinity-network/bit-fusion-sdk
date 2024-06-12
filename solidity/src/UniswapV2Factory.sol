@@ -4,7 +4,6 @@ import "./interfaces/IUniswapV2Factory.sol";
 import "./UniswapV2Pair.sol";
 
 contract UniswapV2Factory is IUniswapV2Factory {
-
     address public feeTo;
     address public feeToSetter;
 
@@ -47,5 +46,4 @@ contract UniswapV2Factory is IUniswapV2Factory {
         require(msg.sender == feeToSetter, "UniswapV2: FORBIDDEN");
         feeToSetter = _feeToSetter;
     }
-
 }
