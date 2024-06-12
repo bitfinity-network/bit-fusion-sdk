@@ -9,7 +9,6 @@ use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
-use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
