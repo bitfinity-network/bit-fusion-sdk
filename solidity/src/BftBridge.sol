@@ -50,10 +50,14 @@ contract BFTBridge is TokenManager {
     // Operataion ID counter
     uint32 public operationIDCounter;
 
+    // Minimum burn amount
+    uint256 public minBurnAmount = 1;
+
     // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide) TokenManager(_isWrappedSide) {
+    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide, uint256 _minBurnAmount) TokenManager(_isWrappedSide) {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
+        minBurnAmount = _minBurnAmount;
     }
 
     // Event for mint operation
@@ -145,12 +149,12 @@ contract BFTBridge is TokenManager {
     /// Returns operation ID if operation is succesfull.
     function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
+        require(amount >= minBurnAmount, "Invalid burn amount");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
         bytes32 toTokenID = _baseTokenRegistry[fromERC20];
 
-        require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
 
         // Update user information about burn operations.

@@ -604,6 +604,7 @@ pub fn deploy_transaction(
     minter_address: H160,
     fee_charge_address: H160,
     is_wrapped_side: bool,
+    min_burn_amount: U256,
 ) -> Transaction {
     let data = CONSTRUCTOR
         .encode_input(
@@ -612,6 +613,7 @@ pub fn deploy_transaction(
                 Token::Address(minter_address),
                 Token::Address(fee_charge_address),
                 Token::Bool(is_wrapped_side),
+                Token::Uint(min_burn_amount),
             ],
         )
         .expect("constructor parameters encoding should pass");

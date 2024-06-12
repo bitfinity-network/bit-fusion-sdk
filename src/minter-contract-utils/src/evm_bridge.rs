@@ -138,6 +138,7 @@ impl BftBridgeContractStatus {
         minter_address: H160,
         fee_charge_address: H160,
         is_wrapped_side: bool,
+        min_burn_amount: U256,
     ) -> anyhow::Result<H256> {
         match self {
             BftBridgeContractStatus::None => {}
@@ -170,6 +171,7 @@ impl BftBridgeContractStatus {
             minter_address.into(),
             fee_charge_address.into(),
             is_wrapped_side,
+            min_burn_amount.0,
         );
         let signature = signer.sign_transaction(&(&transaction).into()).await?;
 

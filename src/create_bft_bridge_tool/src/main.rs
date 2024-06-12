@@ -60,6 +60,14 @@ struct DeployBftArgs {
     /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
     #[arg(long)]
     wallet: Option<String>,
+
+    /// Set if on the wrapped side.
+    #[arg(long, default_value = "false")]
+    is_wrapped: bool,
+
+    /// minimum burn amount
+    #[arg(long, default_value = "1")]
+    min_burn_amount: u128,
 }
 
 #[derive(Debug, Parser)]
@@ -290,7 +298,12 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     let input = bft_bridge_api::CONSTRUCTOR
         .encode_input(
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
-            &[Token::Address(minter), Token::Address(fee_charge)],
+            &[
+                Token::Address(minter),
+                Token::Address(fee_charge),
+                Token::Bool(args.is_wrapped),
+                Token::Uint(ethereum_types::U256::from(args.min_burn_amount)),
+            ],
         )
         .unwrap();
 
