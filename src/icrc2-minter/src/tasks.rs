@@ -313,7 +313,7 @@ impl BridgeTask {
                 OperationState::Deposit(DepositOperationState::MintOrderSigned {
                     token_id: src_token,
                     amount: mint_order.amount,
-                    signed_mint_order,
+                    signed_mint_order: Box::new(signed_mint_order),
                 }),
             );
         } else {

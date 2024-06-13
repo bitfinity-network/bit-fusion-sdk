@@ -69,12 +69,12 @@ pub enum DepositOperationState {
     MintOrderSigned {
         token_id: Id256,
         amount: U256,
-        signed_mint_order: SignedMintOrder,
+        signed_mint_order: Box<SignedMintOrder>,
     },
     MintOrderSent {
         token_id: Id256,
         amount: U256,
-        signed_mint_order: SignedMintOrder,
+        signed_mint_order: Box<SignedMintOrder>,
         tx_id: H256,
     },
     Minted {
