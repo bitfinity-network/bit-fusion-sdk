@@ -302,7 +302,7 @@ pub(crate) async fn burn_ckbtc(
 
     let to_transfer = amount
         .checked_sub(fee)
-        .ok_or_else(|| RetrieveBtcError::AmountTooLow(amount))?;
+        .ok_or(RetrieveBtcError::AmountTooLow(amount))?;
 
     state
         .borrow_mut()
