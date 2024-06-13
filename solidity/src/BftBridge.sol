@@ -75,13 +75,13 @@ contract BFTBridge is TokenManager {
     );
 
     /// Event that can be emited with a notification for the minter canister
-    event NotifyMinterEvent(uint32 notificationType, bytes userData);
+    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData);
 
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
-        emit NotifyMinterEvent(notificationType, userData);
+        emit NotifyMinterEvent(notificationType, msg.sender, userData);
     }
 
     // Main function to withdraw funds

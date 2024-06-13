@@ -435,6 +435,11 @@ pub static NOTIFY_EVENT: Lazy<Event> = Lazy::new(|| Event {
             indexed: false,
         },
         EventParam {
+            name: "txSender".into(),
+            kind: ParamType::Address,
+            indexed: false,
+        },
+        EventParam {
             name: "userData".into(),
             kind: ParamType::Bytes,
             indexed: false,
@@ -512,12 +517,14 @@ impl TryFrom<RawLog> for MintedEventData {
 #[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
 pub struct NotifyMinterEventData {
     pub notification_type: u32,
+    pub tx_sender: did::H160,
     pub user_data: Vec<u8>,
 }
 
 #[derive(Debug, Default, Clone)]
 struct NotifyMinterEventDataBuilder {
     notification_type: Option<u32>,
+    tx_sender: Option<did::H160>,
     user_data: Option<Vec<u8>>,
 }
 
@@ -527,6 +534,7 @@ impl NotifyMinterEventDataBuilder {
             notification_type: self
                 .notification_type
                 .ok_or_else(not_found("notificationType"))?,
+            tx_sender: self.tx_sender.ok_or_else(not_found("txSender"))?,
             user_data: self.user_data.ok_or_else(not_found("userData"))?,
         })
     }
@@ -534,6 +542,7 @@ impl NotifyMinterEventDataBuilder {
     fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
         match name {
             "notificationType" => self.notification_type = value.into_uint().map(|v| v.as_u32()),
+            "txSender" => self.tx_sender = value.into_address().map(Into::into),
             "userData" => self.user_data = value.into_bytes().map(Into::into),
             _ => {}
         };

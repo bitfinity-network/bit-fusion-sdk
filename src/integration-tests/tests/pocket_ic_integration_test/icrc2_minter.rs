@@ -52,6 +52,7 @@ async fn test_icrc2_tokens_roundtrip() {
         &bft_bridge,
         amount as _,
         Some(john_address),
+        None,
     )
     .await
     .unwrap();
@@ -143,6 +144,7 @@ async fn test_icrc2_token_canister_stopped() {
         &bft_bridge,
         amount as _,
         Some(john_address),
+        None,
     )
     .await
     .unwrap();

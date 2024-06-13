@@ -23,7 +23,7 @@ use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_I
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::{self, MintOrder};
-use minter_did::reason::Icrc2Burn;
+use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_operations_store;
@@ -223,6 +223,7 @@ impl BridgeTask {
             src_token: reason.icrc2_token_principal,
             recipient_address: reason.recipient_address,
             fee_payer: reason.fee_payer,
+            approve_after_mint: reason.approve_after_mint,
         };
         operation_store.update(
             operation_id,
@@ -350,13 +351,19 @@ impl BridgeTask {
             }
             Ok(BridgeEvent::Notify(notification)) => {
                 log::debug!("Adding BurnIcrc2 task");
-                let icrc_burn = match Decode!(&notification.user_data, Icrc2Burn) {
+                let mut icrc_burn = match Decode!(&notification.user_data, Icrc2Burn) {
                     Ok(icrc_burn) => icrc_burn,
                     Err(e) => {
                         log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
                         return None;
                     }
                 };
+
+                // Approve tokens only if the burner owns recepient wallet.
+                if notification.tx_sender != icrc_burn.recipient_address {
+                    icrc_burn.approve_after_mint = None;
+                }
+
                 let operation_id = get_operations_store().new_operation(
                     icrc_burn.recipient_address.clone(),
                     OperationState::new_deposit(icrc_burn),
@@ -574,6 +581,7 @@ impl BridgeTask {
                     symbol,
                     decimals: burnt_event.decimals,
                     fee_payer: None,
+                    approve_after_mint: None,
                 };
 
                 operation_store.update(
@@ -673,4 +681,5 @@ pub struct BurntIcrc2Data {
     pub symbol: [u8; 16],
     pub decimals: u8,
     pub fee_payer: Option<H160>,
+    pub approve_after_mint: Option<ApproveAfterMint>,
 }

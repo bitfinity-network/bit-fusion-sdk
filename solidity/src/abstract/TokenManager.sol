@@ -6,6 +6,7 @@ import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
 
 abstract contract TokenManager {
+
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
@@ -62,13 +63,13 @@ abstract contract TokenManager {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch {}
+        } catch { }
     }
 
     /// Returns wrapped token for the given base token
@@ -92,4 +93,5 @@ abstract contract TokenManager {
             base[i] = _baseTokenRegistry[wrappedToken];
         }
     }
+
 }
