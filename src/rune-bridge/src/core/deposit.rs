@@ -16,7 +16,9 @@ use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
 use ic_stable_structures::{CellStructure, VirtualMemory};
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use minter_contract_utils::operation_store::{
+    MinterOperation, MinterOperationId, MinterOperationStore,
+};
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 
@@ -25,7 +27,7 @@ use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::BtcSignerType;
-use crate::memory::{DEPOSIT_REQUEST_MAP_MEMORY_ID, DEPOSIT_REQUEST_MEMORY_ID, MEMORY_MANAGER};
+use crate::memory::{MEMORY_MANAGER, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID};
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask};
 use crate::state::State;
@@ -114,6 +116,18 @@ impl RuneDepositPayload {
     }
 }
 
+impl MinterOperation for RuneDepositPayload {
+    fn is_complete(&self) -> bool {
+        matches!(
+            self.status,
+            DepositRequestStatus::NothingToDeposit { .. }
+                | DepositRequestStatus::InvalidAmounts { .. }
+                | DepositRequestStatus::Minted { .. }
+                | DepositRequestStatus::InternalError { .. }
+        )
+    }
+}
+
 pub(crate) struct RuneDeposit<
     M: Memory,
     UTXO: UtxoProvider = IcUtxoProvider,
@@ -139,10 +153,15 @@ impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvi
 
         drop(state_ref);
 
-        let requests_memory = MEMORY_MANAGER.with(|mm| mm.get(DEPOSIT_REQUEST_MEMORY_ID));
-        let addresses_memory = MEMORY_MANAGER.with(|mm| mm.get(DEPOSIT_REQUEST_MAP_MEMORY_ID));
-        let deposit_store =
-            MinterOperationStore::with_memory(requests_memory, addresses_memory, None);
+        let operations_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
+        let operations_log_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
+        let operations_map_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MAP_MEMORY_ID));
+        let deposit_store = MinterOperationStore::with_memory(
+            operations_memory,
+            operations_log_memory,
+            operations_map_memory,
+            None,
+        );
 
         Self {
             state,

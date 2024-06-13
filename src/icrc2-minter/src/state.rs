@@ -6,11 +6,10 @@ pub use config::Config;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
-use minter_contract_utils::mint_orders::MintOrders;
 
 use self::log::LoggerConfigService;
 use self::signer::SignerInfo;
-use crate::constant::{ACCESS_LIST_MEMORY_ID, MINT_ORDERS_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
+use crate::constant::{ACCESS_LIST_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
 use crate::memory::MEMORY_MANAGER;
 
 mod access_list;
@@ -26,9 +25,6 @@ pub struct State {
     /// Transaction signing info.
     pub signer: SignerInfo,
 
-    /// Signed mint orders.
-    pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
-
     pub logger_config_service: LoggerConfigService,
 
     pub access_list: AccessList<VirtualMemory<DefaultMemoryImpl>>,
@@ -40,7 +36,6 @@ impl Default for State {
         Self {
             config: Config::default(),
             signer: SignerInfo::default(),
-            mint_orders: MintOrders::new(memory_manager.get(MINT_ORDERS_MEMORY_ID)),
             logger_config_service: LoggerConfigService::default(),
             access_list: AccessList::new(memory_manager.get(ACCESS_LIST_MEMORY_ID)),
         }
@@ -54,7 +49,6 @@ impl State {
             .reset(settings.signing_strategy.clone(), 0)
             .expect("failed to set signer");
         self.config.reset(settings);
-        self.mint_orders.clear();
         NONCES_COUNTER
             .with(|cell| cell.borrow_mut().set(0))
             .expect("failed to reset nonce counter");

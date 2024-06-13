@@ -8,8 +8,7 @@ use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
-    BTreeMapStructure, Bound, CachedStableBTreeMap, IterableSortedMapStructure, StableBTreeMap,
-    Storable,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, StableBTreeMap, Storable,
 };
 use serde::Serialize;
 
@@ -110,6 +109,10 @@ impl Default for MinterOperationStoreOptions {
     }
 }
 
+pub trait MinterOperation {
+    fn is_complete(&self) -> bool;
+}
+
 /// A structure to store user-initiated operations in IC stable memory.
 ///
 /// Every operation in the store is attached to a ETH wallet address that initiated the operation.
@@ -120,29 +123,35 @@ impl Default for MinterOperationStoreOptions {
 pub struct MinterOperationStore<M, P>
 where
     M: Memory,
-    P: CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
 {
-    operations: CachedStableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
+    incomplete_operations: CachedStableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
+    operations_log: StableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
-    max_operation_count: u64,
+    max_operation_log_size: u64,
 }
 
 impl<M, P> MinterOperationStore<M, P>
 where
     M: Memory,
-    P: CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
 {
     /// Creates a new instance of the store.
     pub fn with_memory(
-        requests_memory: M,
+        curr_operations_memory: M,
+        operations_log_memory: M,
         map_memory: M,
         options: Option<MinterOperationStoreOptions>,
     ) -> Self {
         let options = options.unwrap_or_default();
         Self {
-            operations: CachedStableBTreeMap::new(requests_memory, options.cache_size),
+            incomplete_operations: CachedStableBTreeMap::new(
+                curr_operations_memory,
+                options.cache_size,
+            ),
+            operations_log: StableBTreeMap::new(operations_log_memory),
             address_operation_map: StableBTreeMap::new(map_memory),
-            max_operation_count: options.max_operations_count,
+            max_operation_log_size: options.max_operations_count,
         }
     }
 
@@ -150,13 +159,15 @@ where
     /// and stores it.
     pub fn new_operation(&mut self, dst_address: H160, payload: P) -> MinterOperationId {
         let id = MinterOperationId::next();
-        self.operations.insert(
-            id,
-            OperationStoreEntry {
-                dst_address: dst_address.clone(),
-                payload,
-            },
-        );
+        let entry = OperationStoreEntry {
+            dst_address: dst_address.clone(),
+            payload,
+        };
+        if entry.payload.is_complete() {
+            self.move_to_log(id, entry);
+        } else {
+            self.incomplete_operations.insert(id, entry);
+        }
 
         let mut ids = self
             .address_operation_map
@@ -165,18 +176,19 @@ where
         ids.0.push(id);
         self.address_operation_map.insert(dst_address, ids);
 
-        if self.operations.len() > self.max_operation_count() {
-            self.remove_oldest();
-        }
-
         id
     }
 
     /// Retrieves an operation by its ID.
     pub fn get(&self, operation_id: MinterOperationId) -> Option<P> {
-        self.operations
+        self.get_with_id(operation_id).map(|(_, p)| p)
+    }
+
+    fn get_with_id(&self, operation_id: MinterOperationId) -> Option<(MinterOperationId, P)> {
+        self.incomplete_operations
             .get(&operation_id)
-            .map(|entry| entry.payload)
+            .or_else(|| self.operations_log.get(&operation_id))
+            .map(|entry| (operation_id, entry.payload))
     }
 
     /// Retrieves all operations for the given ETH wallet address.
@@ -186,29 +198,43 @@ where
             .unwrap_or_default()
             .0
             .into_iter()
-            .filter_map(|id| self.operations.get(&id).map(|entry| (id, entry.payload)))
+            .filter_map(|id| self.get_with_id(id))
             .collect()
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
     /// is found, nothing is done (except an error message in the log).
     pub fn update(&mut self, operation_id: MinterOperationId, payload: P) {
-        let Some(mut entry) = self.operations.get(&operation_id) else {
+        let Some(mut entry) = self.incomplete_operations.get(&operation_id) else {
             log::error!("Cannot update operation {operation_id} status: not found");
             return;
         };
 
         entry.payload = payload;
-        self.operations.insert(operation_id, entry);
+
+        if entry.payload.is_complete() {
+            self.move_to_log(operation_id, entry);
+        } else {
+            self.incomplete_operations.insert(operation_id, entry);
+        }
     }
 
-    fn max_operation_count(&self) -> u64 {
-        self.max_operation_count
+    fn move_to_log(&mut self, operation_id: MinterOperationId, entry: OperationStoreEntry<P>) {
+        self.incomplete_operations.remove(&operation_id);
+        self.operations_log.insert(operation_id, entry);
+
+        if self.operations_log.len() > self.max_operation_log_size() {
+            self.remove_oldest();
+        }
+    }
+
+    fn max_operation_log_size(&self) -> u64 {
+        self.max_operation_log_size
     }
 
     fn remove_oldest(&mut self) {
-        if let Some((id, oldest)) = self.operations.iter().next() {
-            self.operations.remove(&id);
+        if let Some((id, oldest)) = self.operations_log.iter().next() {
+            self.operations_log.remove(&id);
             let mut ids = self
                 .address_operation_map
                 .get(&oldest.dst_address)
@@ -233,8 +259,16 @@ mod tests {
 
     use super::*;
 
+    const COMPLETE: u32 = u32::MAX;
+    impl MinterOperation for u32 {
+        fn is_complete(&self) -> bool {
+            *self == COMPLETE
+        }
+    }
+
     fn test_store(max_operations: u64) -> MinterOperationStore<VectorMemory, u32> {
         MinterOperationStore::with_memory(
+            VectorMemory::default(),
             VectorMemory::default(),
             VectorMemory::default(),
             Some(MinterOperationStoreOptions {
@@ -273,17 +307,17 @@ mod tests {
     }
 
     #[test]
-    fn operations_limit() {
+    fn operations_log_limit() {
         const LIMIT: u64 = 10;
         const COUNT: u64 = 42;
 
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            store.new_operation(eth_address(i as u8), i as u32);
+            store.new_operation(eth_address(i as u8), COMPLETE);
         }
 
-        assert_eq!(store.operations.len(), LIMIT);
+        assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.address_operation_map.len(), LIMIT);
 
         for i in 0..(COUNT - LIMIT) {
@@ -302,13 +336,56 @@ mod tests {
 
         let mut store = test_store(LIMIT);
 
-        for i in 0..COUNT {
-            store.new_operation(eth_address(1), i as u32);
+        for _ in 0..COUNT {
+            store.new_operation(eth_address(1), COMPLETE);
         }
 
-        assert_eq!(store.operations.len(), LIMIT);
+        assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.address_operation_map.len(), 1);
 
         assert_eq!(store.get_for_address(&eth_address(1)).len(), LIMIT as usize);
+    }
+
+    #[test]
+    fn incomplete_operations_are_not_removed() {
+        const LIMIT: u64 = 10;
+        const COUNT: u64 = 42;
+
+        let mut store = test_store(LIMIT);
+
+        for _ in 0..COUNT {
+            let id = store.new_operation(eth_address(1), 1);
+            store.update(id, 2);
+        }
+
+        assert_eq!(store.operations_log.len(), 0);
+        assert_eq!(store.incomplete_operations.len(), COUNT);
+        assert_eq!(store.address_operation_map.len(), 1);
+
+        assert_eq!(store.get_for_address(&eth_address(1)).len(), COUNT as usize);
+    }
+
+    #[test]
+    fn operations_are_moved_to_log_on_completion() {
+        const LIMIT: u64 = 10;
+        const COUNT: u64 = 42;
+
+        let mut store = test_store(LIMIT);
+
+        let mut ids = vec![];
+        for i in 0..COUNT {
+            ids.push(store.new_operation(eth_address(i as u8), 1));
+        }
+
+        for id in ids {
+            let count_before = store.incomplete_operations.len();
+            store.update(id, COMPLETE);
+            let count_after = store.incomplete_operations.len();
+            assert_eq!(count_after, count_before - 1);
+        }
+
+        assert_eq!(store.operations_log.len(), LIMIT);
+        assert_eq!(store.incomplete_operations.len(), 0);
+        assert_eq!(store.address_operation_map.len(), LIMIT);
     }
 }
