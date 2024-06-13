@@ -245,19 +245,23 @@ impl BridgeTask {
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let operation_state = operation_store.get(operation_id);
-        let Some(
-            OperationState::Deposit(DepositOperationState::Icrc2Burned(burnt_data))
-            | OperationState::Withdrawal(WithdrawalOperationState::RefundScheduled(burnt_data)),
-        ) = operation_state
-        else {
-            log::error!(
-                "deposit request was in incorrect state: {:?}",
-                operation_state
-            );
-            return Ok(());
+        let (burnt_data, is_deposit) = match operation_state {
+            Some(OperationState::Deposit(DepositOperationState::Icrc2Burned(burnt_data))) => {
+                (burnt_data, true)
+            }
+            Some(OperationState::Withdrawal(WithdrawalOperationState::RefundScheduled(
+                burnt_data,
+            ))) => (burnt_data, false),
+            _ => {
+                log::error!(
+                    "deposit request was in incorrect state: {:?}",
+                    operation_state
+                );
+                return Ok(());
+            }
         };
 
-        log::trace!("preparing mint order: {burnt_data:?}");
+        log::trace!("preparing mint order. Is deposit: {is_deposit}: {burnt_data:?}");
 
         let Some(evm_params) = state.borrow().config.get_evm_params() else {
             log::warn!("no evm parameters set, unable to prepare mint order");
@@ -295,20 +299,33 @@ impl BridgeTask {
             fee_payer,
         };
 
+        log::debug!("PREPARED MINT ORDER: {:?}", mint_order);
+
         let signer = state.borrow().signer.get_transaction_signer();
         let signed_mint_order = mint_order
             .encode_and_sign(&signer)
             .await
             .into_scheduler_result()?;
 
-        operation_store.update(
-            operation_id,
-            OperationState::Deposit(DepositOperationState::MintOrderSigned {
-                token_id: src_token,
-                amount: mint_order.amount,
-                signed_mint_order,
-            }),
-        );
+        if is_deposit {
+            operation_store.update(
+                operation_id,
+                OperationState::Deposit(DepositOperationState::MintOrderSigned {
+                    token_id: src_token,
+                    amount: mint_order.amount,
+                    signed_mint_order,
+                }),
+            );
+        } else {
+            operation_store.update(
+                operation_id,
+                OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSigned {
+                    token_id: src_token,
+                    amount: mint_order.amount,
+                    signed_mint_order,
+                }),
+            );
+        }
 
         if should_send_mint_tx {
             // Update EVM params before sending the transaction.
@@ -372,19 +389,9 @@ impl BridgeTask {
 
     fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
         log::trace!("mint order removing");
-        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
-            SchedulerError::TaskExecutionFailed(
-                "failed to decode sender id256 from minted event".into(),
-            )
-        })?;
-
-        let Ok((_, sender_address)) = sender_id.to_evm_address() else {
-            return Err(SchedulerError::TaskExecutionFailed(format!(
-                "invalid sender id: {sender_id:?}"
-            )));
-        };
 
         let src_token = Id256::from_slice(&minted_event.from_token).ok_or_else(|| {
+            log::error!("failed to decode token id256 from minted event",);
             SchedulerError::TaskExecutionFailed(
                 "failed to decode token id256 from minted event".into(),
             )
@@ -392,23 +399,34 @@ impl BridgeTask {
 
         let mut operation_store = get_operations_store();
         let nonce = minted_event.nonce;
-        let Some((operation_id, _)) = operation_store
-            .get_for_address(&sender_address)
+        let Some((operation_id, operation_state)) = operation_store
+            .get_for_address(&minted_event.recipient)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {
+            log::error!("operation with nonce {nonce} not found");
             return Err(SchedulerError::TaskExecutionFailed(format!(
                 "operation with nonce {nonce} not found"
             )));
         };
 
-        operation_store.update(
-            operation_id,
-            OperationState::Deposit(DepositOperationState::Minted {
-                token_id: src_token,
-                amount: minted_event.amount,
-            }),
-        );
+        if matches!(operation_state, OperationState::Deposit(_)) {
+            operation_store.update(
+                operation_id,
+                OperationState::Deposit(DepositOperationState::Minted {
+                    token_id: src_token,
+                    amount: minted_event.amount,
+                }),
+            );
+        } else {
+            operation_store.update(
+                operation_id,
+                OperationState::Withdrawal(WithdrawalOperationState::RefundMinted {
+                    token_id: src_token,
+                    amount: minted_event.amount,
+                }),
+            );
+        }
 
         log::trace!("Mint order removed");
 
@@ -470,7 +488,7 @@ impl BridgeTask {
         tx.hash = tx.hash();
 
         let client = state.borrow().config.get_evm_client();
-        client
+        let tx_id = client
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
@@ -481,10 +499,11 @@ impl BridgeTask {
                 token_id,
                 amount,
                 signed_mint_order,
+                tx_id: tx_id.into(),
             }),
         );
 
-        log::trace!("Mint transaction sent");
+        log::trace!("Mint transaction sent: {tx_id}");
 
         Ok(())
     }

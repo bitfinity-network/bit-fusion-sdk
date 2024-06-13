@@ -241,7 +241,7 @@ async fn test_external_bridging() {
 
     let balance = ctx
         .context
-        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet)
+        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet, None)
         .await
         .unwrap();
     assert_eq!(amount, balance);
@@ -407,7 +407,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     let balance = ctx
         .context
-        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet)
+        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet, None)
         .await
         .unwrap();
     assert_eq!(0, balance);

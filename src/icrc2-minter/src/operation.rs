@@ -1,5 +1,5 @@
 use candid::{CandidType, Nat, Principal};
-use did::U256;
+use did::{H256, U256};
 use icrc_client::account::Account;
 use minter_contract_utils::bft_bridge_api::BurntEventData;
 use minter_contract_utils::operation_store::MinterOperation;
@@ -50,6 +50,13 @@ impl OperationState {
             ) if for_token.is_none() || matches!(for_token, Some(id) if id == *token_id) => {
                 Some(signed_mint_order)
             }
+            Self::Withdrawal(WithdrawalOperationState::RefundMintOrderSigned {
+                signed_mint_order,
+                token_id,
+                ..
+            }) if for_token.is_none() || matches!(for_token, Some(id) if id == *token_id) => {
+                Some(signed_mint_order)
+            }
             _ => None,
         }
     }
@@ -68,6 +75,7 @@ pub enum DepositOperationState {
         token_id: Id256,
         amount: U256,
         signed_mint_order: SignedMintOrder,
+        tx_id: H256,
     },
     Minted {
         token_id: Id256,
@@ -91,10 +99,23 @@ pub enum WithdrawalOperationState {
         amount: Nat,
         tx_id: Nat,
     },
+    RefundMintOrderSigned {
+        token_id: Id256,
+        amount: U256,
+        signed_mint_order: SignedMintOrder,
+    },
+    RefundMinted {
+        token_id: Id256,
+        amount: U256,
+    },
 }
 
 impl WithdrawalOperationState {
     fn is_complete(&self) -> bool {
-        !matches!(self, WithdrawalOperationState::Scheduled(_))
+        matches!(
+            self,
+            WithdrawalOperationState::Transferred { .. }
+                | WithdrawalOperationState::RefundMinted { .. }
+        )
     }
 }
