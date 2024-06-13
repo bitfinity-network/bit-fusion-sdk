@@ -12,7 +12,7 @@ use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_contract_utils::evm_bridge::{BftBridgeInitArgs, BridgeSide};
 use minter_did::error::Result;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
@@ -177,15 +177,14 @@ impl EvmMinter {
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
 
         let hash = status
-            .initialize(
+            .initialize(BftBridgeInitArgs::new(
                 evm_link,
                 evm_params.chain_id as _,
-                signer,
+                Box::new(signer),
                 minter_address,
                 fee_charge_address,
                 side == BridgeSide::Wrapped,
-                U256::one(),
-            )
+            ))
             .await
             .map_err(|e| e.to_string())?;
 

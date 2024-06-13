@@ -18,6 +18,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
+use minter_contract_utils::evm_bridge::BftBridgeInitArgs;
 use minter_contract_utils::evm_link::EvmLink;
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
@@ -273,15 +274,14 @@ impl MinterCanister {
         log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
         let is_wrapped_side = true;
         let hash = status
-            .initialize(
+            .initialize(BftBridgeInitArgs::new(
                 evm_link,
                 evm_params.chain_id as _,
-                signer,
+                Box::new(signer),
                 minter_address,
                 fee_charge_contract,
                 is_wrapped_side,
-                U256::one(),
-            )
+            ))
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;
 

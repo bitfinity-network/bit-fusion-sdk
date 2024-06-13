@@ -127,19 +127,46 @@ pub enum BftBridgeContractStatus {
     Created(H160),
 }
 
-impl BftBridgeContractStatus {
-    /// Starts Contract initialization if current status is None.
-    /// Else, returns an error.
-    pub async fn initialize(
-        &mut self,
+pub struct BftBridgeInitArgs {
+    link: EvmLink,
+    chain_id: u32,
+    signer: Box<dyn TransactionSigner>,
+    minter_address: H160,
+    fee_charge_address: H160,
+    is_wrapped_side: bool,
+    min_burn_amount: U256,
+}
+
+impl BftBridgeInitArgs {
+    pub fn new(
         link: EvmLink,
         chain_id: u32,
-        signer: impl TransactionSigner,
+        signer: Box<dyn TransactionSigner>,
         minter_address: H160,
         fee_charge_address: H160,
         is_wrapped_side: bool,
-        min_burn_amount: U256,
-    ) -> anyhow::Result<H256> {
+    ) -> Self {
+        Self {
+            link,
+            chain_id,
+            signer,
+            minter_address,
+            fee_charge_address,
+            is_wrapped_side,
+            min_burn_amount: U256::one(),
+        }
+    }
+
+    pub fn min_burn_amount(mut self, min_burn_amount: U256) -> Self {
+        self.min_burn_amount = min_burn_amount;
+        self
+    }
+}
+
+impl BftBridgeContractStatus {
+    /// Starts Contract initialization if current status is None.
+    /// Else, returns an error.
+    pub async fn initialize(&mut self, args: BftBridgeInitArgs) -> anyhow::Result<H256> {
         match self {
             BftBridgeContractStatus::None => {}
             BftBridgeContractStatus::Creating(_, _) => {
@@ -150,8 +177,8 @@ impl BftBridgeContractStatus {
             }
         };
 
-        let client = link.get_json_rpc_client();
-        let sender = signer.get_address().await?.0;
+        let client = args.link.get_json_rpc_client();
+        let sender = args.signer.get_address().await?.0;
 
         let responses = query::batch_query(
             &client,
@@ -166,14 +193,14 @@ impl BftBridgeContractStatus {
             sender,
             nonce.into(),
             gas_price.into(),
-            chain_id,
+            args.chain_id,
             BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
-            minter_address.into(),
-            fee_charge_address.into(),
-            is_wrapped_side,
-            min_burn_amount.0,
+            args.minter_address.into(),
+            args.fee_charge_address.into(),
+            args.is_wrapped_side,
+            args.min_burn_amount.0,
         );
-        let signature = signer.sign_transaction(&(&transaction).into()).await?;
+        let signature = args.signer.sign_transaction(&(&transaction).into()).await?;
 
         transaction.r = signature.r.0;
         transaction.s = signature.s.0;
@@ -182,7 +209,7 @@ impl BftBridgeContractStatus {
 
         let hash = client.send_raw_transaction(transaction).await?;
 
-        *self = BftBridgeContractStatus::Creating(link, hash.into());
+        *self = BftBridgeContractStatus::Creating(args.link, hash.into());
         Ok(hash.into())
     }
 
