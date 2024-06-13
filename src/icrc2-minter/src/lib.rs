@@ -1,11 +1,3 @@
-mod build_data;
-pub mod canister;
-mod constant;
-mod memory;
-pub mod state;
-mod tasks;
-pub mod tokens;
-
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -13,6 +5,15 @@ use ic_metrics::Metrics;
 pub use state::SigningStrategy;
 
 pub use crate::canister::MinterCanister;
+
+mod build_data;
+pub mod canister;
+mod constant;
+mod memory;
+pub mod operation;
+pub mod state;
+mod tasks;
+pub mod tokens;
 
 type ForceNotSendAndNotSync = PhantomData<Rc<()>>;
 
