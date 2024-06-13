@@ -1,22 +1,27 @@
 //! Abstract stable storage for user-initiated operations in bridge canisters. It can be used
 //! to track an operation status and retrieve all operations for a given user ETH wallet.
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
-use ic_stable_structures::stable_structures::Memory;
+use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
 use ic_stable_structures::{
-    BTreeMapStructure, Bound, CachedStableBTreeMap, StableBTreeMap, Storable,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, IcMemoryManager, MemoryId,
+    StableBTreeMap, StableCell, Storable, VirtualMemory,
 };
 use serde::Serialize;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
 
+pub const OPERATION_ID_MEMORY_ID: MemoryId = MemoryId::new(253);
 thread_local! {
-    static NEXT_ID: AtomicU64 = const { AtomicU64::new(0) };
+    static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
+    static OPERATION_ID_COUNTER: RefCell<StableCell<u64, VirtualMemory<DefaultMemoryImpl>>> =
+        RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(OPERATION_ID_MEMORY_ID)), 0)
+            .expect("failed to initialize operation id cell"));
 }
 
 /// Unique ID of an operation.
@@ -27,7 +32,13 @@ pub struct MinterOperationId(u64);
 
 impl MinterOperationId {
     fn next() -> Self {
-        Self(NEXT_ID.with(|v| v.fetch_add(1, Ordering::Relaxed)))
+        let id = OPERATION_ID_COUNTER.with(|cell| {
+            let mut cell = cell.borrow_mut();
+            let id = *cell.get();
+            cell.set(id + 1).expect("failed to update nonce counter");
+            id
+        });
+        Self(id)
     }
 
     /// Returns a unique `nonce` value for given operation ID.
@@ -295,7 +306,11 @@ mod tests {
 
     #[test]
     fn nonce_should_not_overflow() {
-        NEXT_ID.with(|v| v.store(u32::MAX as u64 * 3 - 3, Ordering::Relaxed));
+        OPERATION_ID_COUNTER.with(|cell| {
+            let mut cell = cell.borrow_mut();
+            let id = u32::MAX as u64 * 3 - 3;
+            cell.set(id).unwrap();
+        });
 
         const CHECKS_NUM: usize = 100;
         let id1 = MinterOperationId::next();

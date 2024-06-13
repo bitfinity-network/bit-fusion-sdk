@@ -1,16 +1,13 @@
-use std::cell::RefCell;
-
 use access_list::AccessList;
 use candid::Principal;
 pub use config::Config;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{default_ic_memory_manager, CellStructure, StableCell, VirtualMemory};
+use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
 
 use self::log::LoggerConfigService;
 use self::signer::SignerInfo;
-use crate::constant::{ACCESS_LIST_MEMORY_ID, NONCES_COUNTER_MEMORY_ID};
-use crate::memory::MEMORY_MANAGER;
+use crate::constant::ACCESS_LIST_MEMORY_ID;
 
 mod access_list;
 mod config;
@@ -49,26 +46,7 @@ impl State {
             .reset(settings.signing_strategy.clone(), 0)
             .expect("failed to set signer");
         self.config.reset(settings);
-        NONCES_COUNTER
-            .with(|cell| cell.borrow_mut().set(0))
-            .expect("failed to reset nonce counter");
     }
-
-    /// Returns unique nonce and increases the counter.
-    pub fn next_nonce(&mut self) -> u32 {
-        NONCES_COUNTER.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let nonce = *cell.get();
-            cell.set(nonce + 1).expect("failed to update nonce counter");
-            nonce
-        })
-    }
-}
-
-thread_local! {
-    static NONCES_COUNTER: RefCell<StableCell<u32, VirtualMemory<DefaultMemoryImpl>>> =
-        RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(NONCES_COUNTER_MEMORY_ID)), 0)
-            .expect("failed to initialize nonces cell"));
 }
 
 /// State settings.
@@ -88,22 +66,5 @@ impl Default for Settings {
                 private_key: [218u8; 32],
             },
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
-
-    use ic_exports::ic_kit::MockContext;
-
-    use super::*;
-
-    #[test]
-    fn nonce_counter_works() {
-        MockContext::new().inject();
-        let mut state = State::default();
-        let nonces: HashSet<_> = (0..20).map(|_| state.next_nonce()).collect();
-        assert_eq!(nonces.len(), 20)
     }
 }

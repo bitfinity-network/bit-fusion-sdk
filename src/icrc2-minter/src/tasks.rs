@@ -69,7 +69,7 @@ impl Task for BridgeTask {
                 Box::pin(Self::send_mint_transaction(state, *operation_id))
             }
             BridgeTask::MintIcrc2Tokens(operation_id) => {
-                Box::pin(Self::mint_icrc2(*operation_id, state, scheduler))
+                Box::pin(Self::mint_icrc2(*operation_id, scheduler))
             }
         }
     }
@@ -491,7 +491,6 @@ impl BridgeTask {
 
     async fn mint_icrc2(
         operation_id: MinterOperationId,
-        state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
         log::trace!("Minting Icrc2 tokens");
@@ -569,7 +568,7 @@ impl BridgeTask {
                     amount: burnt_event.amount,
                     src_token: to_token,
                     recipient_address: burnt_event.sender,
-                    operation_id: state.borrow_mut().next_nonce(),
+                    operation_id: operation_id.nonce(),
                     name,
                     symbol,
                     decimals: burnt_event.decimals,
