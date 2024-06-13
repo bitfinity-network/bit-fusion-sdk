@@ -322,7 +322,7 @@ impl BridgeTask {
                 OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSigned {
                     token_id: src_token,
                     amount: mint_order.amount,
-                    signed_mint_order,
+                    signed_mint_order: Box::new(signed_mint_order),
                 }),
             );
         }

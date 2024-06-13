@@ -102,7 +102,7 @@ pub enum WithdrawalOperationState {
     RefundMintOrderSigned {
         token_id: Id256,
         amount: U256,
-        signed_mint_order: SignedMintOrder,
+        signed_mint_order: Box<SignedMintOrder>,
     },
     RefundMinted {
         token_id: Id256,
