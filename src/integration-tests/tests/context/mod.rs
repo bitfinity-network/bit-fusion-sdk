@@ -269,6 +269,7 @@ pub trait TestContext {
                     Token::Address(minter_canister_address.into()),
                     Token::Address(fee_charge_address.unwrap_or_default().0),
                     Token::Bool(is_wrapped),
+                    Token::Uint(ethereum_types::U256::one()),
                 ],
             )
             .unwrap();
