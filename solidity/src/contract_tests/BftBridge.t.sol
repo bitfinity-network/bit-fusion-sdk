@@ -42,7 +42,7 @@ contract BftBridgeTest is Test {
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-        _bridge = new BFTBridge(_owner, address(0), true, 1);
+        _bridge = new BFTBridge(_owner, address(0), true, 1000);
     }
 
     function testMinterCanisterAddress() public {
@@ -160,6 +160,12 @@ contract BftBridgeTest is Test {
             assertEq(wrapped[i], wrapped_tokens[i]);
             assertEq(base[i], base_token_ids[i]);
         }
+    }
+
+    function testBurnMinAmount() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+        vm.expectRevert(bytes("Invalid burn amount"));
+        _bridge.burn(100, _alice, principal);
     }
 
     struct ExpectedBurnEvent {

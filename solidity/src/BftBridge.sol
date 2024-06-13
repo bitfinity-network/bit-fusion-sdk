@@ -54,7 +54,9 @@ contract BFTBridge is TokenManager {
     uint256 public minBurnAmount = 1;
 
     // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide, uint256 _minBurnAmount) TokenManager(_isWrappedSide) {
+    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide, uint256 _minBurnAmount)
+        TokenManager(_isWrappedSide)
+    {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
         minBurnAmount = _minBurnAmount;
