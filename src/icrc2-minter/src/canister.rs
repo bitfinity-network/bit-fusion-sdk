@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use candid::Principal;
 use did::build::BuildData;
-use did::{H160, H256};
+use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
@@ -280,6 +280,7 @@ impl MinterCanister {
                 minter_address,
                 fee_charge_contract,
                 is_wrapped_side,
+                U256::one(),
             )
             .await
             .map_err(|e| Error::Internal(format!("failed to initialize BFT bridge: {e}")))?;

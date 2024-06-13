@@ -298,6 +298,11 @@ pub(crate) async fn burn_ckbtc(
     amount: u64,
 ) -> Result<RetrieveBtcOk, RetrieveBtcError> {
     log::trace!("Transferring {amount} ckBTC to {address} with request id {request_id}");
+    let fee = state.borrow().ck_btc_ledger_fee();
+
+    let to_transfer = amount
+        .checked_sub(fee)
+        .ok_or_else(|| RetrieveBtcError::AmountTooLow(amount))?;
 
     state
         .borrow_mut()
@@ -306,11 +311,9 @@ pub(crate) async fn burn_ckbtc(
 
     let ck_btc_ledger = state.borrow().ck_btc_ledger();
     let ck_btc_minter = state.borrow().ck_btc_minter();
-    let fee = state.borrow().ck_btc_ledger_fee();
     let account = get_ckbtc_withdrawal_account(ck_btc_minter).await?;
 
     // ICRC1 takes fee on top of the amount
-    let to_transfer = amount - fee;
     transfer_ckbtc(ck_btc_ledger, account, to_transfer, fee).await?;
 
     state

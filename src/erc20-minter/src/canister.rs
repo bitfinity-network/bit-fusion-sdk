@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use did::{H160, H256};
+use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
@@ -184,6 +184,7 @@ impl EvmMinter {
                 minter_address,
                 fee_charge_address,
                 side == BridgeSide::Wrapped,
+                U256::one(),
             )
             .await
             .map_err(|e| e.to_string())?;
