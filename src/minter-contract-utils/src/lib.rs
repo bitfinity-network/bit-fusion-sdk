@@ -6,5 +6,4 @@ pub mod fee_charge_api;
 pub mod mint_orders;
 pub mod operation_store;
 pub mod query;
-pub mod uniswap_api;
 pub mod wrapped_token_api;

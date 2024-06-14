@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use did::{H160, U256};
+use did::{H160, U256, U64};
 use eth_signer::Signer;
 use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
@@ -8,6 +8,7 @@ use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
 use minter_did::id256::Id256;
+use minter_did::order::SignedMintOrder;
 use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
@@ -72,7 +73,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     eprintln!("checking wrapped token balance");
     let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
         .await
         .unwrap();
     assert_eq!(
@@ -103,7 +104,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
     let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
         .await
         .unwrap();
     assert_eq!(wrapped_balance, 0);
@@ -148,7 +149,7 @@ async fn test_icrc2_token_canister_stopped() {
         &john_wallet,
         &bft_bridge,
         amount as _,
-        Some(john_address),
+        Some(john_address.clone()),
         None,
     )
     .await
@@ -164,7 +165,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     eprintln!("checking wrapped token balance");
     let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
         .await
         .unwrap();
     assert_eq!(
@@ -192,18 +193,25 @@ async fn test_icrc2_token_canister_stopped() {
         .unwrap()
         .0;
 
-    ctx.advance_by_times(Duration::from_secs(2), 8).await;
+    ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
-    let refund_mint_order = ctx
-        .icrc_minter_client(ADMIN)
-        .list_mint_orders(john_principal_id256, base_token_id)
+    let (_, refund_mint_order) = ctx
+        .client(ctx.canisters().icrc2_minter(), ADMIN)
+        .query::<_, Vec<(u32, SignedMintOrder)>>("list_mint_orders", (john_address, base_token_id))
         .await
-        .unwrap()[0]
-        .1;
+        .unwrap()[0];
 
-    ctx.mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
+    let receipt = ctx
+        .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
         .await
         .unwrap();
+
+    assert_eq!(
+        receipt.status,
+        Some(U64::one()),
+        "Refund transaction failed: {}",
+        String::from_utf8_lossy(&receipt.output.unwrap_or_default()),
+    );
 
     ctx.client
         .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
@@ -218,7 +226,7 @@ async fn test_icrc2_token_canister_stopped() {
         .await
         .unwrap();
     let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
         .await
         .unwrap();
     assert_eq!(
@@ -365,7 +373,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
 
     eprintln!("checking wrapped token balance");
     let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet)
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
         .await
         .unwrap();
     assert_eq!(

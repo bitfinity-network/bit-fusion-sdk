@@ -431,7 +431,7 @@ impl RunesContext {
 
     async fn wrapped_balance(&self, wallet: &Wallet<'_, SigningKey>) -> u128 {
         self.inner
-            .check_erc20_balance(&self.token_contract, wallet)
+            .check_erc20_balance(&self.token_contract, wallet, None)
             .await
             .expect("Failed to get wrapped token balance")
     }
