@@ -9,6 +9,8 @@
 [submodule "solidity/lib/openzeppelin-contracts-upgradeable"]
 	path = solidity/lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+	tag = v5.0.2
 [submodule "solidity/lib/openzeppelin-foundry-upgrades"]
 	path = solidity/lib/openzeppelin-foundry-upgrades
 	url = https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades
+	tag = v0.3.1
