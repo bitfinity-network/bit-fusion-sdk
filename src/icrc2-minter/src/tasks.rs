@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use candid::{Decode, Nat, Principal};
+use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -15,9 +15,10 @@ use ic_task_scheduler::SchedulerError;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::evm_link::address_to_icrc_subaccount;
+use minter_contract_utils::operation_store::MinterOperationId;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
@@ -25,22 +26,23 @@ use minter_did::order::{self, MintOrder};
 use minter_did::reason::Icrc2Burn;
 use serde::{Deserialize, Serialize};
 
+use crate::canister::get_operations_store;
 use crate::constant::IC_CHAIN_ID;
+use crate::operation::{DepositOperationState, OperationState, WithdrawalOperationState};
 use crate::state::State;
+use crate::tokens::icrc2::Success;
 use crate::tokens::{icrc1, icrc2};
-
-type SignedMintOrderData = Vec<u8>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmInfo,
     RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
-    BurnIcrc2Tokens(Icrc2Burn),
-    PrepareMintOrder(BurntIcrc2Data),
+    BurnIcrc2Tokens(MinterOperationId),
+    PrepareMintOrder(MinterOperationId),
     RemoveMintOrder(MintedEventData),
-    SendMintTransaction(SignedMintOrderData),
-    MintIcrc2Tokens(BurntEventData),
+    SendMintTransaction(MinterOperationId),
+    MintIcrc2Tokens(MinterOperationId),
 }
 
 impl Task for BridgeTask {
@@ -53,21 +55,21 @@ impl Task for BridgeTask {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
             BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
-            BridgeTask::BurnIcrc2Tokens(reason) => {
-                Box::pin(Self::burn_icrc2_tokens(state, scheduler, reason.clone()))
+            BridgeTask::BurnIcrc2Tokens(operation_id) => {
+                Box::pin(Self::burn_icrc2_tokens(scheduler, *operation_id))
             }
-            BridgeTask::PrepareMintOrder(data) => {
-                Box::pin(Self::prepare_mint_order(state, scheduler, data.clone()))
+            BridgeTask::PrepareMintOrder(operation_id) => {
+                Box::pin(Self::prepare_mint_order(state, scheduler, *operation_id))
             }
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
-                Box::pin(async move { Self::remove_mint_order(state, data) })
+                Box::pin(async move { Self::remove_mint_order(data) })
             }
-            BridgeTask::SendMintTransaction(order_data) => {
-                Box::pin(Self::send_mint_transaction(state, order_data.clone()))
+            BridgeTask::SendMintTransaction(operation_id) => {
+                Box::pin(Self::send_mint_transaction(state, *operation_id))
             }
-            BridgeTask::MintIcrc2Tokens(burn_data) => {
-                Box::pin(Self::mint_icrc2(burn_data.clone(), state, scheduler))
+            BridgeTask::MintIcrc2Tokens(operation_id) => {
+                Box::pin(Self::mint_icrc2(*operation_id, scheduler))
             }
         }
     }
@@ -169,10 +171,21 @@ impl BridgeTask {
     }
 
     pub async fn burn_icrc2_tokens(
-        state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        reason: Icrc2Burn,
+        operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
+        let mut operation_store = get_operations_store();
+        let operation_state = operation_store.get(operation_id);
+        let Some(OperationState::Deposit(DepositOperationState::Scheduled(reason))) =
+            operation_state
+        else {
+            log::error!(
+                "deposit request was in incorrect state: {:?}",
+                operation_state
+            );
+            return Ok(());
+        };
+
         let caller_account = Account {
             owner: reason.sender,
             subaccount: reason.from_subaccount,
@@ -199,26 +212,28 @@ impl BridgeTask {
         .await
         .into_scheduler_result()?;
 
-        let operation_id = state.borrow_mut().next_nonce();
+        let nonce = operation_id.nonce();
+        let burn_data = BurntIcrc2Data {
+            sender: reason.sender,
+            amount: reason.amount,
+            operation_id: nonce,
+            name,
+            symbol,
+            decimals: token_info.decimals,
+            src_token: reason.icrc2_token_principal,
+            recipient_address: reason.recipient_address,
+            fee_payer: reason.fee_payer,
+        };
+        operation_store.update(
+            operation_id,
+            OperationState::Deposit(DepositOperationState::Icrc2Burned(burn_data)),
+        );
 
         let options = TaskOptions::default()
             .with_backoff_policy(BackoffPolicy::Fixed { secs: 4 })
             .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite);
 
-        scheduler.append_task(
-            BridgeTask::PrepareMintOrder(BurntIcrc2Data {
-                sender: reason.sender,
-                amount: reason.amount,
-                operation_id,
-                name,
-                symbol,
-                decimals: token_info.decimals,
-                src_token: reason.icrc2_token_principal,
-                recipient_address: reason.recipient_address,
-                fee_payer: reason.fee_payer,
-            })
-            .into_scheduled(options),
-        );
+        scheduler.append_task(BridgeTask::PrepareMintOrder(operation_id).into_scheduled(options));
 
         Ok(())
     }
@@ -226,9 +241,27 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        burnt_data: BurntIcrc2Data,
+        operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
-        log::trace!("preparing mint order: {burnt_data:?}");
+        let mut operation_store = get_operations_store();
+        let operation_state = operation_store.get(operation_id);
+        let (burnt_data, is_deposit) = match operation_state {
+            Some(OperationState::Deposit(DepositOperationState::Icrc2Burned(burnt_data))) => {
+                (burnt_data, true)
+            }
+            Some(OperationState::Withdrawal(WithdrawalOperationState::RefundScheduled(
+                burnt_data,
+            ))) => (burnt_data, false),
+            _ => {
+                log::error!(
+                    "deposit request was in incorrect state: {:?}",
+                    operation_state
+                );
+                return Ok(());
+            }
+        };
+
+        log::trace!("preparing mint order. Is deposit: {is_deposit}: {burnt_data:?}");
 
         let Some(evm_params) = state.borrow().config.get_evm_params() else {
             log::warn!("no evm parameters set, unable to prepare mint order");
@@ -266,26 +299,41 @@ impl BridgeTask {
             fee_payer,
         };
 
+        log::debug!("PREPARED MINT ORDER: {:?}", mint_order);
+
         let signer = state.borrow().signer.get_transaction_signer();
         let signed_mint_order = mint_order
             .encode_and_sign(&signer)
             .await
             .into_scheduler_result()?;
 
-        state
-            .borrow_mut()
-            .mint_orders
-            .insert(sender, src_token, nonce, signed_mint_order);
+        if is_deposit {
+            operation_store.update(
+                operation_id,
+                OperationState::Deposit(DepositOperationState::MintOrderSigned {
+                    token_id: src_token,
+                    amount: mint_order.amount,
+                    signed_mint_order: Box::new(signed_mint_order),
+                }),
+            );
+        } else {
+            operation_store.update(
+                operation_id,
+                OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSigned {
+                    token_id: src_token,
+                    amount: mint_order.amount,
+                    signed_mint_order: Box::new(signed_mint_order),
+                }),
+            );
+        }
 
         if should_send_mint_tx {
             // Update EVM params before sending the transaction.
             Self::update_evm_params(state.clone()).await?;
 
             let options = TaskOptions::default();
-            scheduler.append_task(
-                BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec())
-                    .into_scheduled(options),
-            );
+            scheduler
+                .append_task(BridgeTask::SendMintTransaction(operation_id).into_scheduled(options));
         }
 
         log::trace!("Mint order added");
@@ -307,7 +355,9 @@ impl BridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding MintIcrc2 task");
-                let mint_icrc2_task = BridgeTask::MintIcrc2Tokens(burnt);
+                let operation_id = get_operations_store()
+                    .new_operation(burnt.sender.clone(), OperationState::new_withdrawal(burnt));
+                let mint_icrc2_task = BridgeTask::MintIcrc2Tokens(operation_id);
                 return Some(mint_icrc2_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
@@ -324,7 +374,11 @@ impl BridgeTask {
                         return None;
                     }
                 };
-                let icrc_burn_task = BridgeTask::BurnIcrc2Tokens(icrc_burn);
+                let operation_id = get_operations_store().new_operation(
+                    icrc_burn.recipient_address.clone(),
+                    OperationState::new_deposit(icrc_burn),
+                );
+                let icrc_burn_task = BridgeTask::BurnIcrc2Tokens(operation_id);
                 return Some(icrc_burn_task.into_scheduled(options));
             }
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
@@ -333,27 +387,46 @@ impl BridgeTask {
         None
     }
 
-    fn remove_mint_order(
-        state: Rc<RefCell<State>>,
-        minted_event: MintedEventData,
-    ) -> Result<(), SchedulerError> {
+    fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
         log::trace!("mint order removing");
-        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
-            SchedulerError::TaskExecutionFailed(
-                "failed to decode sender id256 from minted event".into(),
-            )
-        })?;
 
         let src_token = Id256::from_slice(&minted_event.from_token).ok_or_else(|| {
+            log::error!("failed to decode token id256 from minted event",);
             SchedulerError::TaskExecutionFailed(
                 "failed to decode token id256 from minted event".into(),
             )
         })?;
 
-        state
-            .borrow_mut()
-            .mint_orders
-            .remove(sender_id, src_token, minted_event.nonce);
+        let mut operation_store = get_operations_store();
+        let nonce = minted_event.nonce;
+        let Some((operation_id, operation_state)) = operation_store
+            .get_for_address(&minted_event.recipient)
+            .into_iter()
+            .find(|(operation_id, _)| operation_id.nonce() == nonce)
+        else {
+            log::error!("operation with nonce {nonce} not found");
+            return Err(SchedulerError::TaskExecutionFailed(format!(
+                "operation with nonce {nonce} not found"
+            )));
+        };
+
+        if matches!(operation_state, OperationState::Deposit(_)) {
+            operation_store.update(
+                operation_id,
+                OperationState::Deposit(DepositOperationState::Minted {
+                    token_id: src_token,
+                    amount: minted_event.amount,
+                }),
+            );
+        } else {
+            operation_store.update(
+                operation_id,
+                OperationState::Withdrawal(WithdrawalOperationState::RefundMinted {
+                    token_id: src_token,
+                    amount: minted_event.amount,
+                }),
+            );
+        }
 
         log::trace!("Mint order removed");
 
@@ -362,9 +435,24 @@ impl BridgeTask {
 
     async fn send_mint_transaction(
         state: Rc<RefCell<State>>,
-        order_data: Vec<u8>,
+        operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
         log::trace!("Sending mint transaction");
+
+        let mut operation_store = get_operations_store();
+        let operation_state = operation_store.get(operation_id);
+        let Some(OperationState::Deposit(DepositOperationState::MintOrderSigned {
+            signed_mint_order,
+            amount,
+            token_id,
+        })) = operation_state
+        else {
+            log::error!(
+                "deposit request was in incorrect state: {:?}",
+                operation_state
+            );
+            return Ok(());
+        };
 
         let signer = state.borrow().signer.get_transaction_signer();
         let sender = signer.get_address().await.into_scheduler_result()?;
@@ -386,7 +474,7 @@ impl BridgeTask {
             bridge_contract.0,
             evm_params.nonce.into(),
             evm_params.gas_price.clone().into(),
-            &order_data,
+            &signed_mint_order.0,
             evm_params.chain_id as _,
         );
 
@@ -400,22 +488,43 @@ impl BridgeTask {
         tx.hash = tx.hash();
 
         let client = state.borrow().config.get_evm_client();
-        client
+        let tx_id = client
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
 
-        log::trace!("Mint transaction sent");
+        operation_store.update(
+            operation_id,
+            OperationState::Deposit(DepositOperationState::MintOrderSent {
+                token_id,
+                amount,
+                signed_mint_order,
+                tx_id: tx_id.into(),
+            }),
+        );
+
+        log::trace!("Mint transaction sent: {tx_id}");
 
         Ok(())
     }
 
     async fn mint_icrc2(
-        burnt_event: BurntEventData,
-        state: Rc<RefCell<State>>,
+        operation_id: MinterOperationId,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
         log::trace!("Minting Icrc2 tokens");
+
+        let mut operation_store = get_operations_store();
+        let operation_state = operation_store.get(operation_id);
+        let Some(OperationState::Withdrawal(WithdrawalOperationState::Scheduled(burnt_event))) =
+            operation_state
+        else {
+            log::error!(
+                "deposit request was in incorrect state: {:?}",
+                operation_state
+            );
+            return Ok(());
+        };
 
         let Some(to_token) =
             Id256::from_slice(&burnt_event.to_token).and_then(|id| id.try_into().ok())
@@ -440,54 +549,72 @@ impl BridgeTask {
 
         let mint_result = icrc2::mint(to_token, recipient, amount.clone(), true).await;
 
-        if let Err(e) = mint_result {
-            match &e {
-                Error::Icrc2TransferError(TransferError::TooOld)
-                | Error::Icrc2TransferError(TransferError::CreatedInFuture { .. })
-                | Error::Icrc2TransferError(TransferError::TemporarilyUnavailable)
-                | Error::Icrc2TransferError(TransferError::GenericError { .. })
-                | Error::InterCanisterCallFailed(RejectionCode::SysTransient, _) => {
-                    log::warn!("Failed to perform icrc token mint due to: {e}. Retrying...");
-                    return Err(SchedulerError::TaskExecutionFailed(e.to_string()));
-                }
+        match mint_result {
+            Ok(Success { tx_id, amount }) => {
+                operation_store.update(
+                    operation_id,
+                    OperationState::Withdrawal(WithdrawalOperationState::Transferred {
+                        token: to_token,
+                        recipient: recipient.into(),
+                        amount,
+                        tx_id,
+                    }),
+                );
 
-                _ => {
-                    log::warn!(
-                        "Impossible to mint icrc token due to: {e}. Preparing refund MintOrder..."
-                    );
+                log::trace!("Finished icrc2 mint to principal: {}", recipient);
+                Ok(())
+            }
+            Err(
+                e @ Error::Icrc2TransferError(TransferError::TooOld)
+                | e @ Error::Icrc2TransferError(TransferError::CreatedInFuture { .. })
+                | e @ Error::Icrc2TransferError(TransferError::TemporarilyUnavailable)
+                | e @ Error::Icrc2TransferError(TransferError::GenericError { .. })
+                | e @ Error::InterCanisterCallFailed(RejectionCode::SysTransient, _),
+            ) => {
+                log::warn!("Failed to perform icrc token mint due to: {e}. Retrying...");
+                Err(SchedulerError::TaskExecutionFailed(e.to_string()))
+            }
+            Err(e) => {
+                log::warn!(
+                    "Impossible to mint icrc token due to: {e}. Preparing refund MintOrder..."
+                );
 
-                    // If we pass zero name or symbol, it will not be applied.
-                    let name = burnt_event.name.try_into().unwrap_or_default();
-                    let symbol = burnt_event.symbol.try_into().unwrap_or_default();
-                    let burnt_data = BurntIcrc2Data {
-                        sender: recipient,
-                        amount: burnt_event.amount,
-                        src_token: to_token,
-                        recipient_address: burnt_event.sender,
-                        operation_id: state.borrow_mut().next_nonce(),
-                        name,
-                        symbol,
-                        decimals: burnt_event.decimals,
-                        fee_payer: None,
-                    };
+                // If we pass zero name or symbol, it will not be applied.
+                let name = burnt_event.name.try_into().unwrap_or_default();
+                let symbol = burnt_event.symbol.try_into().unwrap_or_default();
+                let burnt_data = BurntIcrc2Data {
+                    sender: recipient,
+                    amount: burnt_event.amount,
+                    src_token: to_token,
+                    recipient_address: burnt_event.sender,
+                    operation_id: operation_id.nonce(),
+                    name,
+                    symbol,
+                    decimals: burnt_event.decimals,
+                    fee_payer: None,
+                };
 
-                    let task = Self::PrepareMintOrder(burnt_data);
-                    let options = TaskOptions::default()
-                        .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
-                        .with_backoff_policy(BackoffPolicy::Exponential {
-                            secs: 1,
-                            multiplier: 4,
-                        });
+                operation_store.update(
+                    operation_id,
+                    OperationState::Withdrawal(WithdrawalOperationState::RefundScheduled(
+                        burnt_data,
+                    )),
+                );
 
-                    let task_id = scheduler.append_task(task.into_scheduled(options));
-                    log::trace!("Appending refund mint order task#{task_id}.");
-                }
+                let task = Self::PrepareMintOrder(operation_id);
+                let options = TaskOptions::default()
+                    .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+                    .with_backoff_policy(BackoffPolicy::Exponential {
+                        secs: 1,
+                        multiplier: 4,
+                    });
+
+                let task_id = scheduler.append_task(task.into_scheduled(options));
+                log::trace!("Appending refund mint order task#{task_id}.");
+
+                Ok(())
             }
         }
-
-        log::trace!("Finished icrc2 mint to principal: {}", recipient);
-
-        Ok(())
     }
 
     pub async fn update_evm_params(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
@@ -553,7 +680,7 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub struct BurntIcrc2Data {
     pub sender: Principal,
     pub amount: did::U256,

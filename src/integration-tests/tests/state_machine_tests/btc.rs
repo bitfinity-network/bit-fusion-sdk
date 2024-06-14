@@ -1251,7 +1251,7 @@ async fn btc_to_erc20_test() {
 
     let expected_balance = (deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE) as u128;
     let balance = (&ckbtc.context)
-        .check_erc20_balance(&ckbtc.wrapped_token, &wallet)
+        .check_erc20_balance(&ckbtc.wrapped_token, &wallet, None)
         .await
         .unwrap();
     assert_eq!(balance, expected_balance);
