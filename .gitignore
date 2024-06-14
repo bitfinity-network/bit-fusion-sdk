@@ -39,6 +39,9 @@ solidity/out/
 # Ignores solidity development broadcast logs
 solidity/broadcast/
 
+# Ignore build info
+solidity/build-info
+
 # Dotenv file
 .env
 

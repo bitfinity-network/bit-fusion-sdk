@@ -30,6 +30,10 @@ pub static BFT_BRIDGE_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
 pub static FEE_CHARGE_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
     Lazy::new(|| get_contract_code(BUILD_SMART_CONTRACT_FEE_CHARGE_HEX_CODE));
 
+/// Proxy Contract bytecode
+pub static UUPS_PROXY_SMART_CONTRACT_CODE: Lazy<Vec<u8>> =
+    Lazy::new(|| get_contract_code("BUILD_SMART_CONTRACT_UUPS_PROXY_HEX_CODE"));
+
 #[cfg(feature = "test-contracts")]
 pub mod test_contracts {
     use once_cell::sync::Lazy;

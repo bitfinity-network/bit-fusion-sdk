@@ -141,11 +141,13 @@ fn parse_json_contract(
         ))?;
     let deployed_bytecode = hex::decode(&deployed_bytecode_hex)?;
 
-    let method_identifiers = contract_value.get("methodIdentifiers").ok_or(
-        SolidityHelperError::JsonFieldNotFoundError("methodIdentifiers"),
-    )?;
-    let method_identifiers: HashMap<String, String> =
-        serde_json::from_value(method_identifiers.clone())?;
+    let method_identifiers = contract_value.get("methodIdentifiers").cloned(); // Some contracts compiled are missing methodIdentifiers
+
+    let method_identifiers = if let Some(method_identifiers) = method_identifiers {
+        serde_json::from_value(method_identifiers)?
+    } else {
+        HashMap::new()
+    };
 
     Ok(SolidityContract {
         bytecode,

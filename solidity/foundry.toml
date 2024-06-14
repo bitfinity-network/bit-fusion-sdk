@@ -5,9 +5,12 @@ libs = ['lib']
 ast = true
 ffi = true
 build_info = true
+build_info_path = 'build-info'
 extra_output = ["storageLayout"]
 script = "script"
+force = true
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
 
 [fmt]
 line_length = 120
