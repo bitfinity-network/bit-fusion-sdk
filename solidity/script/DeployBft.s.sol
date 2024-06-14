@@ -21,12 +21,12 @@ contract DeployBft is Script {
         address proxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", initializeData);
 
         vm.stopBroadcast();
-        console.logString("BFTBridge Proxy deployed at:");
+        console.logString("Proxy");
         console.logAddress(address(proxy));
 
         address implementation = Upgrades.getImplementationAddress(proxy);
 
-        console.logString("BFTBridge implementation deployed at:");
+        console.logString("Implementation");
         console.logAddress(address(implementation));
     }
 }

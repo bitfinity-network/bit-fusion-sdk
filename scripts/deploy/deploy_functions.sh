@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
+DEPLOY_BFT_BRIDGE="forge script ../solidity/script/DeploBft.s.sol"
 
 assert_isset_param () {
   PARAM=$1
@@ -101,7 +101,7 @@ deploy_rune_bridge() {
   })"
 
   echo "deploying rune-bridge with args: $args"
-  
+
   dfx canister install --mode=$INSTALL_MODE --yes --wasm=./.artifact/rune-bridge.wasm.gz --network=$NETWORK --argument="$args" rune-bridge
 }
 
@@ -147,7 +147,7 @@ deploy_bft_bridge() {
   MINTER_ADDRESS="$2"
   WALLET="$3"
 
-  BRIDGE_ADDRESS=$($CREATE_BFT_BRIDGE_TOOL deploy-bft-bridge --minter-address="$MINTER_ADDRESS" --evm="$EVM_PRINCIPAL" --wallet="$WALLET")
+  # BRIDGE_ADDRESS=$($DEPLOY_BFT_BRIDGE deploy-bft-bridge --minter-address="$MINTER_ADDRESS" --evm="$EVM_PRINCIPAL" --wallet="$WALLET")
 
   echo "$BRIDGE_ADDRESS"
 }
@@ -312,4 +312,3 @@ start_icx() {
 
   curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc": "2.0", "method": "eth_chainId", "params": [], "id":1}' 'http://127.0.0.1:8545'
 }
-

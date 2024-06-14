@@ -23,7 +23,12 @@ To deploy the BFTBridge contract using the UUPS proxy pattern, follow these step
 
 3. Run the deployment script using Foundry:
 
-   forge script DeployBft --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast
+   ```bash
+   forge script script/DeployBft.s.sol --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast \
+         --skip-simulation \
+         --evm-version paris \
+         --optimize
+   ```
 
    Replace `<your-rpc-url>` with the URL of your Ethereum RPC endpoint and `<your-private-key>` with your private key.
 
@@ -45,7 +50,12 @@ To upgrade the BFTBridge contract to a new version, follow these steps:
 
 4. Run the upgrade script using Foundry:
 
-   forge script UpgradeBft --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast
+   ```bash
+   forge script script/DeployBft.s.sol --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast \
+         --skip-simulation \
+         --evm-version paris \
+         --optimize
+   ```
 
    Replace `<your-rpc-url>` with the URL of your Ethereum RPC endpoint and `<your-private-key>` with your private key.
 

@@ -25,3 +25,4 @@ contract_new_lines = true
 [rpc_endpoints]
 mainnet = "https://mainnet.bitfinity.network"
 testnet = "https://testnet.bitfinity.network"
+local = "http://localhost:8545"
