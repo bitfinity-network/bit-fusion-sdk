@@ -38,15 +38,15 @@ dfx deploy token2 --argument "(variant {Init = record {
     token_symbol = \"AUX\";
     token_name = \"Aux Token\";
     metadata = vec {};
-    initial_balances = vec {                                
-        record {                                            
-            record {                                        
-                owner = principal \"$USER_PRINCIPICAL\";   
-                subaccount = null;                          
-            };                                              
-            100_000_000_000                                 
-        }                                                   
-    };  
+    initial_balances = vec {
+        record {
+            record {
+                owner = principal \"$USER_PRINCIPICAL\";
+                subaccount = null;
+            };
+            100_000_000_000
+        }
+    };
     max_memo_length = opt 100;
     archive_options = record {
         num_blocks_to_archive = 1000;
@@ -114,8 +114,15 @@ echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
 echo "Minting ETH tokens for ICRC2 Minter canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
-echo "Initializing bft bridge contract with icrc2-minter"
-dfx canister call icrc2-minter init_bft_bridge_contract "(\"${FEE_CHARGE_CONTRACT_ADDRESS}\",)"
+echo "Deploying BftBridge contract"
+
+IS_WRAPPED="false"
+BFT_BRIDGE_ADDRESS=$(deploy_bft_bridge $EVM $ETH_WALLET_ADDRESS $ICRC2_MINTER_ECDSA_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS $IS_WRAPPED)
+
+echo "Got BftBridge address: ${BFT_BRIDGE_ADDRESS}"
+
+echo "Setting ICRC2 Minter BftBridge address"
+dfx canister call icrc2-minter set_bft_bridge_contract "(\"${BFT_BRIDGE_ADDRESS}\")"
 sleep 5
 
 res=$(dfx canister call icrc2-minter get_bft_bridge_contract)

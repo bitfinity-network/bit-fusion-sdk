@@ -1,8 +1,8 @@
 #!/bin/bash
 
-DEPLOY_BFT_BRIDGE="forge script ../solidity/script/DeploBft.s.sol"
+CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
 
-assert_isset_param () {
+assert_isset_param() {
   PARAM=$1
   NAME=$2
   if [ -z "$PARAM" ]; then
@@ -23,11 +23,11 @@ link_to_variant() {
 }
 
 create_canister() {
-    # Create canisters
-    NETWORK=$1
-    CANISTER=$2
+  # Create canisters
+  NETWORK=$1
+  CANISTER=$2
 
-    dfx canister --network=$NETWORK create --with-cycles=600000000000 $CANISTER
+  dfx canister --network=$NETWORK create --with-cycles=600000000000 $CANISTER
 }
 
 deploy_icrc2_minter() {
@@ -144,10 +144,12 @@ get_wallet() {
 
 deploy_bft_bridge() {
   EVM_PRINCIPAL="$1"
-  MINTER_ADDRESS="$2"
-  WALLET="$3"
+  WALLET="$2"
+  MINTER_ADDRESS="$3"
+  FEE_CHARGE_ADDRESS="$4"
+  IS_WRAPPED="$5"
 
-  # BRIDGE_ADDRESS=$($DEPLOY_BFT_BRIDGE deploy-bft-bridge --minter-address="$MINTER_ADDRESS" --evm="$EVM_PRINCIPAL" --wallet="$WALLET")
+  BRIDGE_ADDRESS=$($CREATE_BFT_BRIDGE_TOOL deploy-bft-bridge --minter-address="$MINTER_ADDRESS" --evm="$EVM_PRINCIPAL" --wallet="$WALLET" --fee-charge-address="$FEE_CHARGE_ADDRESS" --is-wrapped-side="$IS_WRAPPED")
 
   echo "$BRIDGE_ADDRESS"
 }
@@ -172,7 +174,6 @@ deploy_fee_charge_contract() {
 }
 
 # test canisters
-
 
 deploy_evm_testnet() {
   set -e
@@ -274,7 +275,6 @@ deploy_ckbtc_minter() {
   echo "$CKBTC_MINTER"
 }
 
-
 start_dfx() {
   echo "Attempting to create Alice's Identity"
   set +e
@@ -290,7 +290,7 @@ start_dfx() {
     echo "Stopping DFX"
     dfx stop
     echo "Starting DFX"
-    dfx start --clean --background $ENABLE_BITCOIN --artificial-delay 0 2> dfx_stderr.log
+    dfx start --clean --background $ENABLE_BITCOIN --artificial-delay 0 2>dfx_stderr.log
   else
     return
   fi

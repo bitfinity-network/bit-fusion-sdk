@@ -20,53 +20,54 @@ function usage() {
 ARGS=$(getopt -o e:i:m:h --long evm-principal,ic-network,install-mode,base-evm,wrapped-evm,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,help -- "$@")
 while true; do
   case "$1" in
-    -e|--evm-principal)
-      EVM_PRINCIPAL="$2"
-      shift 2
-      ;;
+  -e | --evm-principal)
+    EVM_PRINCIPAL="$2"
+    shift 2
+    ;;
 
-    -i|--ic-network)
-      IC_NETWORK="$2"
-      shift 2
-      ;;
+  -i | --ic-network)
+    IC_NETWORK="$2"
+    shift 2
+    ;;
 
-    -m|--install-mode)
-      INSTALL_MODE="$2"
-      shift 2
-      ;;
-    
-    --base-evm)
-      BASE_EVM_LINK=$(link_to_variant "$2")
-      shift 2
-      ;;
+  -m | --install-mode)
+    INSTALL_MODE="$2"
+    shift 2
+    ;;
 
-    --wrapped-evm)
-      WRAPPED_EVM_LINK=$(link_to_variant "$2")
-      shift 2
-      ;;
+  --base-evm)
+    BASE_EVM_LINK=$(link_to_variant "$2")
+    shift 2
+    ;;
 
-    --erc20-base-bridge-contract)
-      BASE_BRIDGE_CONTRACT="$2"
-      shift 2
-      ;;
+  --wrapped-evm)
+    WRAPPED_EVM_LINK=$(link_to_variant "$2")
+    shift 2
+    ;;
 
-    --erc20-wrapped-bridge-contract)
-      WRAPPED_BRIDGE_CONTRACT="$2"
-      shift 2
-      ;;
+  --erc20-base-bridge-contract)
+    BASE_BRIDGE_CONTRACT="$2"
+    shift 2
+    ;;
 
-    -h|--help)
-      usage
-      exit 255
-      ;;
+  --erc20-wrapped-bridge-contract)
+    WRAPPED_BRIDGE_CONTRACT="$2"
+    shift 2
+    ;;
 
-    --)
-      shift
-      break
-      ;;
+  -h | --help)
+    usage
+    exit 255
+    ;;
 
-    *)
-      break
+  --)
+    shift
+    break
+    ;;
+
+  *)
+    break
+    ;;
   esac
 done
 
@@ -100,13 +101,26 @@ if [ "$IC_NETWORK" = "local" ]; then
   MINTER_ADDRESS=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
   MINTER_ADDRESS=${MINTER_ADDRESS#*\"}
   MINTER_ADDRESS=${MINTER_ADDRESS%\"*}
+  # Get FEE_CHARGE_ADDRESS
+  FEE_CHARGE_DEPLOY_TX_NONCE=0
+  FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
+
   # get base bridge contract
   WALLET=$(get_wallet $EVM_PRINCIPAL)
-  BASE_BRIDGE_CONTRACT=$(deploy_bft_bridge $EVM_PRINCIPAL $MINTER_ADDRESS $WALLET)
+  IS_WRAPPED="false"
+  BASE_BRIDGE_CONTRACT=$(deploy_bft_bridge $EVM_PRINCIPAL $WALLET $MINTER_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS "$IS_WRAPPED")
   # get wrapped bridge contract
+  IS_WRAPPED="true"
   WRAPPED_EVM_PRINCIPAL=$EVM_PRINCIPAL
-  WRAPPED_BRIDGE_CONTRACT=$(deploy_bft_bridge $WRAPPED_EVM_PRINCIPAL $MINTER_ADDRESS $WALLET)
+  WRAPPED_BRIDGE_CONTRACT=$(deploy_bft_bridge $WRAPPED_EVM_PRINCIPAL $WALLET $MINTER_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS "$IS_WRAPPED")
   echo "Wrapped EVM Principal: $WRAPPED_EVM_PRINCIPAL"
+
+  echo "Deploying FeeCharge contract"
+
+  BRIDGES=($BASE_BRIDGE_CONTRACT $WRAPPED_BRIDGE_CONTRACT)
+
+  deploy_fee_charge_contract $EVM $ETH_WALLET $FEE_CHARGE_DEPLOY_TX_NONCE $BRIDGES
+
 fi
 
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
