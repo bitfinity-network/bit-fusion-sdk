@@ -283,6 +283,11 @@ impl BridgeTask {
         let fee_payer = burnt_data.fee_payer.unwrap_or_default();
         let should_send_mint_tx = fee_payer != H160::zero();
 
+        let (approve_spender, approve_amount) = burnt_data
+            .approve_after_mint
+            .map(|approve| (approve.approve_spender, approve.approve_amount))
+            .unwrap_or_default();
+
         let mint_order = MintOrder {
             amount: burnt_data.amount,
             sender,
@@ -295,8 +300,8 @@ impl BridgeTask {
             name: burnt_data.name,
             symbol: burnt_data.symbol,
             decimals: burnt_data.decimals,
-            approve_spender: Default::default(),
-            approve_amount: Default::default(),
+            approve_spender,
+            approve_amount,
             fee_payer,
         };
 
