@@ -51,7 +51,7 @@ To upgrade the BFTBridge contract to a new version, follow these steps:
 4. Run the upgrade script using Foundry:
 
    ```bash
-   forge script script/DeployBft.s.sol --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast \
+   forge script script/UpgradeBft.s.sol --rpc-url <your-rpc-url> --private-key <your-private-key> --broadcast \
          --skip-simulation \
          --evm-version paris \
          --optimize
