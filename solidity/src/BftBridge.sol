@@ -5,7 +5,7 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -13,6 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
+
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
@@ -95,7 +96,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 
     /// Pause the contract and prevent any future mint or burn operations
     /// Can be called only by the owner
@@ -253,4 +254,5 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");
     }
+
 }

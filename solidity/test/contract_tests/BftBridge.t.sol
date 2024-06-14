@@ -8,9 +8,10 @@ import "src/BftBridge.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
 import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Upgrades} from "@openzeppelin-foundry-upgrades/Upgrades.sol";
+import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract BftBridgeTest is Test {
+
     using StringUtils for string;
 
     struct MintOrder {
@@ -292,4 +293,5 @@ contract BftBridgeTest is Test {
     function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
+
 }
