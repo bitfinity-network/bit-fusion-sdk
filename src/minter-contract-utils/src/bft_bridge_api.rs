@@ -24,6 +24,11 @@ pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
             kind: ParamType::Bool,
             internal_type: None,
         },
+        Param {
+            name: "_minBurnAmount".into(),
+            kind: ParamType::Uint(256),
+            internal_type: None,
+        },
     ],
 });
 
