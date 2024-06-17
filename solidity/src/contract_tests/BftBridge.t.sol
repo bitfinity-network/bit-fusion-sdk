@@ -162,6 +162,25 @@ contract BftBridgeTest is Test {
         }
     }
 
+    function testBurnEligibilityWithDeployedErc20() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+        vm.expectRevert(bytes("Invalid from address"));
+        _bridge.burn(100, _alice, principal);
+
+        // deploy erc20 so it can be used
+        MintOrder memory order = _createSelfMintOrder();
+        bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
+
+        vm.prank(address(_owner));
+        IERC20(order.toERC20).approve(address(_bridge), 1000);
+        _bridge.mint(encodedOrder);
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
+
+        vm.prank(address(_owner));
+        _bridge.burn(1, order.toERC20, principal);
+    }
+
     struct ExpectedBurnEvent {
         address sender;
         uint256 amount;
@@ -219,6 +238,25 @@ contract BftBridgeTest is Test {
         order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
         order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
         order.recipient = _alice;
+        order.toERC20 = _bridge.deployERC20("Token", "TKN", order.fromTokenID);
+        order.nonce = 0;
+        order.senderChainID = 0;
+        order.recipientChainID = _CHAIN_ID;
+        // order.name = _bridge.truncateUTF8("Token");
+        order.name = StringUtils.truncateUTF8("Token");
+        // order.symbol = bytes16(_bridge.truncateUTF8("Token"));
+        order.symbol = bytes16(StringUtils.truncateUTF8("Token"));
+        order.decimals = 18;
+        order.approveSpender = address(0);
+        order.approveAmount = 0;
+        order.feePayer = address(0);
+    }
+
+    function _createSelfMintOrder() private returns (MintOrder memory order) {
+        order.amount = 1000;
+        order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
+        order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
+        order.recipient = address(_owner);
         order.toERC20 = _bridge.deployERC20("Token", "TKN", order.fromTokenID);
         order.nonce = 0;
         order.senderChainID = 0;

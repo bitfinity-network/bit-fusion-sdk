@@ -12,6 +12,25 @@ contract BFTBridge is TokenManager {
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
+    // Additional gas amount for fee charge.
+    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
+    uint256 constant additionalGasFee = 1000;
+
+    // Has a user's transaction nonce been used?
+    mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
+
+    // Blocknumbers for users deposit Ids.
+    mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
+
+    // Last 255 user's burn operations.
+    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
+
+    // Address of feeCharge contract
+    IFeeCharge public feeChargeContract;
+
+    // Operataion ID counter
+    uint32 public operationIDCounter;
+
     struct MintOrderData {
         uint256 amount;
         bytes32 senderID;
@@ -26,34 +45,6 @@ contract BFTBridge is TokenManager {
         address approveSpender;
         uint256 approveAmount;
         address feePayer;
-    }
-
-    // Additional gas amount for fee charge.
-    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
-    uint256 constant additionalGasFee = 1000;
-
-    // Has a user's transaction nonce been used?
-    mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
-
-    // Blocknumbers for users deposit Ids.
-    mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
-
-    // Last 255 user's burn operations.
-    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
-
-    // Address of minter canister
-    address public minterCanisterAddress;
-
-    // Address of feeCharge contract
-    IFeeCharge public feeChargeContract;
-
-    // Operataion ID counter
-    uint32 public operationIDCounter;
-
-    // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide) TokenManager(_isWrappedSide) {
-        minterCanisterAddress = minterAddress;
-        feeChargeContract = IFeeCharge(feeChargeAddress);
     }
 
     // Event for mint operation
@@ -77,6 +68,13 @@ contract BFTBridge is TokenManager {
     /// Event that can be emited with a notification for the minter canister
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
+    // Constructor to initialize minterCanisterAddress and feeChargeContract.
+    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide)
+        TokenManager(minterAddress, _isWrappedSide)
+    {
+        feeChargeContract = IFeeCharge(feeChargeAddress);
+    }
+
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
@@ -92,34 +90,24 @@ contract BFTBridge is TokenManager {
 
         _checkMintOrderSignature(encodedOrder);
 
-        // Cases:
-        // 1. `_erc20TokenRegistry` contains the `order.fromTokenID`. So, we are in WrappedToken side.
-        // 2. `_erc20TokenRegistry` does not contain the `order.fromTokenID`. So:
-        //   a. We are in BaseToken side.
-        //   b. We are minting NativeToken.
-        address toToken = _erc20TokenRegistry[order.fromTokenID];
-
-        // If we mint base token we don't have information about token pairs.
-        // So, we need to get it from the order.
-        if (toToken == address(0)) {
-            toToken = order.toERC20;
-        }
-
-        // The toToken should be a valid token address.
-        // This should never fail.
-        require(toToken != address(0), "toToken address should be specified correctly");
+        require(
+            _baseToRemoteWrapped[order.toERC20] == order.fromTokenID
+                || _wrappedToRemoteBase[order.toERC20] == order.fromTokenID,
+            "Invalid token pair"
+        );
 
         // Update token's metadata only if it is a wrapped token
-        if (isWrappedSide) {
-            updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
+        bool isWrapped = _wrappedToRemoteBase[order.toERC20] == order.fromTokenID;
+        if (isWrapped) {
+            updateTokenMetadata(order.toERC20, order.name, order.symbol, order.decimals);
         }
 
         // Execute the withdrawal
         _isNonceUsed[order.senderID][order.nonce] = true;
-        IERC20(toToken).safeTransfer(order.recipient, order.amount);
+        IERC20(order.toERC20).safeTransfer(order.recipient, order.amount);
 
         if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedSide) {
-            WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
+            WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
         if (
@@ -132,7 +120,9 @@ contract BFTBridge is TokenManager {
         }
 
         // Emit event
-        emit MintTokenEvent(order.amount, order.fromTokenID, order.senderID, toToken, order.recipient, order.nonce);
+        emit MintTokenEvent(
+            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce
+        );
     }
 
     /// Getter function for block numbers
@@ -145,10 +135,19 @@ contract BFTBridge is TokenManager {
     /// Returns operation ID if operation is succesfull.
     function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
+        require(
+            _wrappedToRemoteBase[fromERC20] != bytes32(0) || _baseToRemoteWrapped[fromERC20] != bytes32(0),
+            "Invalid from address"
+        );
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
-        bytes32 toTokenID = _baseTokenRegistry[fromERC20];
+        bytes32 toTokenID;
+        if (_wrappedToRemoteBase[fromERC20] != bytes32(0)) {
+            toTokenID = _wrappedToRemoteBase[fromERC20];
+        } else {
+            toTokenID = _baseToRemoteWrapped[fromERC20];
+        }
 
         require(amount > 0, "Invalid burn amount");
         require(fromERC20 != address(0), "Invalid from address");
@@ -203,9 +202,9 @@ contract BFTBridge is TokenManager {
         // Check if withdrawal is happening on the correct chain
         require(block.chainid == recipientChainID, "Invalid chain ID");
 
-        if (_baseTokenRegistry[order.toERC20] != bytes32(0)) {
+        if (_wrappedToRemoteBase[order.toERC20] != bytes32(0)) {
             require(
-                _erc20TokenRegistry[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
+                _remoteBaseToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
             );
         }
     }
