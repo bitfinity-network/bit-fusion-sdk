@@ -57,6 +57,7 @@ async fn test_icrc2_tokens_roundtrip() {
         JOHN,
         &john_wallet,
         &bft_bridge,
+        &wrapped_token,
         amount as _,
         Some(john_address),
     )
@@ -148,6 +149,7 @@ async fn test_icrc2_token_canister_stopped() {
         JOHN,
         &john_wallet,
         &bft_bridge,
+        &wrapped_token,
         amount as _,
         Some(john_address.clone()),
     )

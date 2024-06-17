@@ -552,6 +552,7 @@ pub trait TestContext {
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         bridge: &H160,
+        erc20_token_address: &H160,
         amount: u128,
         fee_payer: Option<H160>,
     ) -> Result<()> {
@@ -568,8 +569,10 @@ pub trait TestContext {
             amount: amount.into(),
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
+            erc20_token_address: erc20_token_address.clone(),
             recipient_address,
             fee_payer,
+            approve_after_mint: None,
         };
 
         let encoded_reason = Encode!(&reason).unwrap();

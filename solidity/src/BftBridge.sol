@@ -135,6 +135,7 @@ contract BFTBridge is TokenManager {
     /// Returns operation ID if operation is succesfull.
     function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
+        require(fromERC20 != address(0), "Invalid from address");
         require(
             _wrappedToRemoteBase[fromERC20] != bytes32(0) || _baseToRemoteWrapped[fromERC20] != bytes32(0),
             "Invalid from address"
@@ -150,7 +151,6 @@ contract BFTBridge is TokenManager {
         }
 
         require(amount > 0, "Invalid burn amount");
-        require(fromERC20 != address(0), "Invalid from address");
 
         // Update user information about burn operations.
         _lastUserBurns[msg.sender].push(uint32(block.number));

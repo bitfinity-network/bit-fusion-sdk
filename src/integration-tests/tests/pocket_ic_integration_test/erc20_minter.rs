@@ -218,6 +218,17 @@ async fn test_external_bridging() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    assert!(ctx
+        .context
+        .register_base(
+            &ctx.bob_wallet,
+            &ctx.base_bft_bridge,
+            &ctx.base_token_address,
+            &alice_id
+        )
+        .await
+        .is_ok());
+
     let burn_operation_id = ctx
         .context
         .burn_erc_20_tokens(

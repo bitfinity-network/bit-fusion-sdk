@@ -48,7 +48,6 @@ abstract contract TokenManager {
     /// Registers base address for the given remote wrapped token
     function registerBase(address base, bytes32 remoteWrapped) public {
         require(msg.sender == minterCanisterAddress, "Only minter can call");
-        require(isWrappedSide, "Only for wrapped side");
         require(_wrappedToRemoteBase[base] == bytes32(0), "Base already registered");
 
         _remoteWrappedToBase[remoteWrapped] = base;
