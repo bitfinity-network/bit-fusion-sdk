@@ -43,15 +43,15 @@ solidity-helper = { path = "../solidity-helper" }
 serde_bytes = "0.11.14"
 
 # state machine tests deps
-ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01", optional = true }
+ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-06-12_23-01-base", optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
