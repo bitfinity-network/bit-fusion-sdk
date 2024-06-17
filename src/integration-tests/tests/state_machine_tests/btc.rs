@@ -641,21 +641,12 @@ impl CkBtcSetup {
         let ledger_id = self.ledger_id;
         let env = self.env();
         let result = tokio::task::spawn_blocking(move || {
-            env
-                    .query(
-                        ledger_id,
-                        "icrc1_balance_of",
-                        Encode!(&account).unwrap()
-                    )
-                    .expect("failed to query balance on the ledger")
-        }).await.unwrap();
-        Decode!(
-            &assert_reply(
-                result
-            ),
-            Nat
-        )
-        .unwrap()
+            env.query(ledger_id, "icrc1_balance_of", Encode!(&account).unwrap())
+                .expect("failed to query balance on the ledger")
+        })
+        .await
+        .unwrap();
+        Decode!(&assert_reply(result), Nat).unwrap()
     }
 
     pub fn withdrawal_account(&self, owner: PrincipalId) -> Account {
@@ -767,46 +758,32 @@ impl CkBtcSetup {
         let env = self.env();
         let minter_id = self.minter_id;
         let result = tokio::task::spawn_blocking(move || {
-            env
-            .query(
+            env.query(
                 minter_id,
                 "retrieve_btc_status",
-                Encode!(&RetrieveBtcStatusRequest { block_index }).unwrap()
+                Encode!(&RetrieveBtcStatusRequest { block_index }).unwrap(),
             )
             .expect("failed to get ckbtc withdrawal account")
         })
         .await
         .unwrap();
-        Decode!(
-            &assert_reply(
-                result
-            ),
-            RetrieveBtcStatus
-        )
-        .unwrap()
+        Decode!(&assert_reply(result), RetrieveBtcStatus).unwrap()
     }
 
     pub async fn retrieve_btc_status_v2(&self, block_index: u64) -> RetrieveBtcStatusV2 {
         let env = self.env();
         let minter_id = self.minter_id;
         let result = tokio::task::spawn_blocking(move || {
-            env
-                    .query(
-                        minter_id,
-                        "retrieve_btc_status_v2",
-                        Encode!(&RetrieveBtcStatusRequest { block_index }).unwrap()
-                    )
-                    .expect("failed to retrieve_btc_status_v2")
+            env.query(
+                minter_id,
+                "retrieve_btc_status_v2",
+                Encode!(&RetrieveBtcStatusRequest { block_index }).unwrap(),
+            )
+            .expect("failed to retrieve_btc_status_v2")
         })
         .await
         .unwrap();
-        Decode!(
-            &assert_reply(
-                result
-            ),
-            RetrieveBtcStatusV2
-        )
-        .unwrap()
+        Decode!(&assert_reply(result), RetrieveBtcStatusV2).unwrap()
     }
 
     pub fn retrieve_btc_status_v2_by_account(
@@ -1276,10 +1253,12 @@ async fn btc_to_erc20_test() {
         .unwrap();
     assert_eq!(balance, expected_balance);
 
-    let canister_balance = ckbtc.balance_of(Account {
-        owner: ckbtc.context.canisters.btc_bridge(),
-        subaccount: None,
-    }).await;
+    let canister_balance = ckbtc
+        .balance_of(Account {
+            owner: ckbtc.context.canisters.btc_bridge(),
+            subaccount: None,
+        })
+        .await;
     assert_eq!(canister_balance, expected_balance);
 
     ckbtc.async_drop().await;
