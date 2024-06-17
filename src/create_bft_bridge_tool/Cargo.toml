@@ -14,7 +14,7 @@ ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true, features = ["ic-agent-client"] }
 hex = { workspace = true }
-ic-agent = "0.33"
+ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 minter-contract-utils = { path = "../minter-contract-utils", features = [
     "test-contracts",
