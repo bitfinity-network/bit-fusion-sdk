@@ -477,12 +477,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "auto_ops"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7460f7dd8e100147b82a63afca1a20eb6c231ee36b90ba7272e14951cb58af59"
-
-[[package]]
 name = "autocfg"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1308,7 +1302,7 @@ dependencies = [
  "ethers-core",
  "evm-canister-client",
  "hex",
- "ic-agent 0.33.0",
+ "ic-agent",
  "ic-canister-client",
  "minter-contract-utils",
  "minter-did",
@@ -1364,7 +1358,6 @@ checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
 dependencies = [
  "generic-array",
  "rand_core",
- "serdect",
  "subtle",
  "zeroize",
 ]
@@ -2717,46 +2710,6 @@ dependencies = [
 
 [[package]]
 name = "ic-agent"
-version = "0.33.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f32c4711ca94eee9b7966116698b69ca99e7e24cba68c1f3dd86f2ed70218a7e"
-dependencies = [
- "backoff",
- "cached 0.46.1",
- "candid",
- "ed25519-consensus",
- "futures-util",
- "hex",
- "http 0.2.12",
- "http-body 0.4.6",
- "ic-certification 2.5.0",
- "ic-transport-types 0.33.0",
- "ic-verify-bls-signature",
- "k256",
- "leb128",
- "p256",
- "pem 2.0.1",
- "pkcs8",
- "rand",
- "rangemap",
- "reqwest 0.11.27",
- "ring 0.16.20",
- "rustls-webpki 0.101.7",
- "sec1",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "serde_repr",
- "sha2 0.10.8",
- "simple_asn1",
- "thiserror",
- "time",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "ic-agent"
 version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "555eda283b8ba1a996d44d80b6c9a6d38a6cbb81797a7b7bbee134fdde64ce48"
@@ -2770,7 +2723,7 @@ dependencies = [
  "http 1.1.0",
  "http-body 1.0.0",
  "ic-certification 2.5.0",
- "ic-transport-types 0.34.0",
+ "ic-transport-types",
  "ic-verify-bls-signature",
  "k256",
  "leb128",
@@ -2894,7 +2847,7 @@ source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c8
 dependencies = [
  "async-trait",
  "candid",
- "ic-agent 0.34.0",
+ "ic-agent",
  "ic-canister",
  "ic-exports",
  "serde",
@@ -4200,25 +4153,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ic-helpers"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
-dependencies = [
- "async-trait",
- "auto_ops",
- "candid",
- "crypto-bigint",
- "ic-canister",
- "ic-exports",
- "k256",
- "num-bigint 0.4.5",
- "num-traits",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "ic-https-outcalls-consensus"
 version = "0.9.0"
 source = "git+https://github.com/dfinity/ic.git?tag=release-2024-04-03_23-01-base#ff10ea1dba07c0f66c66536a46a97146cf260e90"
@@ -5192,27 +5126,10 @@ dependencies = [
  "candid",
  "dirs",
  "garcon",
- "ic-agent 0.34.0",
+ "ic-agent",
  "serde",
  "serde_bytes",
  "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "ic-transport-types"
-version = "0.33.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d595b9f72e5952bcb22e5cda37ae1c8d6579a24aaa224b63b8d245f386bdcbb2"
-dependencies = [
- "candid",
- "hex",
- "ic-certification 2.5.0",
- "leb128",
- "serde",
- "serde_bytes",
- "serde_repr",
- "sha2 0.10.8",
  "thiserror",
 ]
 
@@ -5311,7 +5228,7 @@ dependencies = [
  "async-trait",
  "candid",
  "futures-util",
- "ic-agent 0.34.0",
+ "ic-agent",
  "once_cell",
  "semver 1.0.23",
  "serde",
@@ -5808,7 +5725,7 @@ dependencies = [
  "evm-canister-client",
  "futures",
  "hex",
- "ic-agent 0.34.0",
+ "ic-agent",
  "ic-base-types",
  "ic-bitcoin-canister-mock",
  "ic-btc-interface 0.2.2",
@@ -5819,7 +5736,6 @@ dependencies = [
  "ic-ckbtc-minter",
  "ic-config",
  "ic-exports",
- "ic-helpers",
  "ic-icrc1-ledger",
  "ic-log",
  "ic-management-canister-types",
@@ -5835,7 +5751,6 @@ dependencies = [
  "minter-did",
  "once_cell",
  "rand",
- "rlp",
  "rune-bridge",
  "serde",
  "serde_bytes",
@@ -7683,7 +7598,6 @@ dependencies = [
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
- "k256",
  "log",
  "minter-contract-utils",
  "minter-did",
@@ -8212,16 +8126,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
-]
-
-[[package]]
-name = "serdect"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
-dependencies = [
- "base16ct",
- "serde",
 ]
 
 [[package]]

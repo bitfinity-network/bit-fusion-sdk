@@ -849,7 +849,6 @@ impl CkBtcSetup {
     pub async fn await_btc_transaction(&self, block_index: u64, max_ticks: usize) -> Txid {
         let mut last_status = None;
         for _ in 0..max_ticks {
-            // dbg!(self.get_logs());
             let status_v2 = self.retrieve_btc_status_v2(block_index).await;
             let status = self.retrieve_btc_status(block_index).await;
             assert_eq!(RetrieveBtcStatusV2::from(status.clone()), status_v2);
