@@ -287,7 +287,7 @@ impl BridgeTask {
             sender,
             src_token,
             recipient: burnt_data.recipient_address,
-            dst_token: H160::default(), // will be selected in the contract.
+            dst_token: H160::default(), // will be selected in the contract. TODO: always specify the token
             nonce,
             sender_chain_id,
             recipient_chain_id,
