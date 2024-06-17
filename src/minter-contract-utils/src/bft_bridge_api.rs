@@ -61,6 +61,26 @@ pub static NOTIFY_MINTER: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
+pub static REGISTER_BASE: Lazy<Function> = Lazy::new(|| Function {
+    name: "registerBase".into(),
+    inputs: vec![
+        Param {
+            name: "base".into(),
+            kind: ParamType::Address,
+            internal_type: None,
+        },
+        Param {
+            name: "remoteWrapped".into(),
+            kind: ParamType::FixedBytes(32),
+            internal_type: None,
+        },
+    ],
+    outputs: vec![],
+    constant: None,
+    state_mutability: StateMutability::NonPayable,
+});
+
+#[allow(deprecated)] // need to initialize `constant` field
 pub static BURN: Lazy<Function> = Lazy::new(|| Function {
     name: "burn".into(),
     inputs: vec![

@@ -29,6 +29,12 @@ async fn test_icrc2_tokens_roundtrip() {
         .await
         .unwrap();
 
+    // TODO: register base token
+    assert!(ctx
+        .register_base(&john_wallet, &bft_bridge, &wrapped_token, &base_token_id)
+        .await
+        .is_ok());
+
     let amount = 300_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);

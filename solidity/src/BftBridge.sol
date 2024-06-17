@@ -106,7 +106,7 @@ contract BFTBridge is TokenManager {
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(order.toERC20).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedSide) {
+        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrapped) {
             WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 

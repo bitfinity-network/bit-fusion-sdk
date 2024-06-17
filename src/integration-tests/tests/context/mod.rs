@@ -588,6 +588,27 @@ pub trait TestContext {
         Ok(())
     }
 
+    async fn register_base(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+        base: &H160,
+        remote: &Id256,
+    ) -> Result<()> {
+        let input = bft_bridge_api::REGISTER_BASE
+            .encode_input(&[
+                Token::Address(base.0.clone()),
+                Token::FixedBytes(remote.0.to_vec()),
+            ])
+            .unwrap();
+        let _receipt = self
+            .call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)?;
+
+        Ok(())
+    }
+
     /// Approves burning of ICRC-2 token.
     async fn approve_icrc2_burn(&self, caller: &str, recipient: &H160, amount: u128) -> Result<()> {
         let client = self.icrc_token_1_client(caller);
