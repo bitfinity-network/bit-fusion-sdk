@@ -605,7 +605,7 @@ pub trait TestContext {
     ) -> Result<()> {
         let input = bft_bridge_api::REGISTER_BASE
             .encode_input(&[
-                Token::Address(base.0.clone()),
+                Token::Address(base.0),
                 Token::FixedBytes(remote.0.to_vec()),
             ])
             .unwrap();
