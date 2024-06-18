@@ -16,8 +16,10 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
 use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::evm_link::EvmLink;
+use minter_contract_utils::operation_store::MinterOperationId;
 use rune_bridge::core::deposit::DepositRequestStatus;
-use rune_bridge::interface::{DepositError, DepositStateResponse, GetAddressError};
+use rune_bridge::interface::{DepositError, GetAddressError};
+use rune_bridge::operation::OperationState;
 use rune_bridge::rune_info::{RuneInfo, RuneName};
 use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
@@ -69,6 +71,12 @@ fn get_rune_info(name: &str) -> RuneInfo {
 impl RunesContext {
     async fn new() -> Self {
         let context = DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
+        context
+            .evm_client(ADMIN)
+            .set_logger_filter("info")
+            .await
+            .expect("failed to set logger filter")
+            .unwrap();
 
         let bridge = context.canisters().rune_bridge();
         let init_args = RuneBridgeConfig {
@@ -328,18 +336,20 @@ impl RunesContext {
 
             eprintln!("Checking deposit status. Try #{retry_count}...");
 
-            let response: DepositStateResponse = self
+            let response: Vec<(MinterOperationId, OperationState)> = self
                 .inner
                 .client(self.bridge(), ADMIN)
-                .update::<_, _>("get_deposit_state", (eth_address,))
+                .update::<_, _>("get_operations_list", (eth_address,))
                 .await
                 .expect("canister call failed");
 
-            if !response.deposits.is_empty() {
-                if let DepositRequestStatus::Minted { amounts } = &response.deposits[0].status {
-                    eprintln!("Deposit successful with amounts: {amounts:?}");
+            if !response.is_empty() {
+                if let OperationState::Deposit(payload) = &response[0].1 {
+                    if let DepositRequestStatus::Minted { amounts } = &payload.status {
+                        eprintln!("Deposit successful with amounts: {amounts:?}");
 
-                    return Ok(amounts.clone());
+                        return Ok(amounts.clone());
+                    }
                 }
             }
 

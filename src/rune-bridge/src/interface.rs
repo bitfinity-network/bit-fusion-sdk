@@ -98,6 +98,7 @@ pub enum WithdrawError {
     TransactionSending,
     FeeRateRequest,
     ChangeAddress,
+    InternalError(String),
 }
 
 #[derive(Debug, Copy, Clone, CandidType, Deserialize, Hash, PartialEq, Eq)]

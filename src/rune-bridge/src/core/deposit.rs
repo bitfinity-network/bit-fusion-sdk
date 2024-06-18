@@ -12,22 +12,19 @@ use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
-use ic_stable_structures::{CellStructure, VirtualMemory};
+use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use minter_contract_utils::operation_store::{
-    MinterOperation, MinterOperationId, MinterOperationStore,
-};
+use minter_contract_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 
-use crate::canister::{get_scheduler, get_state};
+use crate::canister::{get_operations_store, get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::BtcSignerType;
-use crate::memory::{MEMORY_MANAGER, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID};
+use crate::operation::{OperationState, RuneOperationStore};
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask};
 use crate::state::State;
@@ -114,10 +111,8 @@ impl RuneDepositPayload {
             ..self
         }
     }
-}
 
-impl MinterOperation for RuneDepositPayload {
-    fn is_complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         matches!(
             self.status,
             DepositRequestStatus::NothingToDeposit { .. }
@@ -129,7 +124,6 @@ impl MinterOperation for RuneDepositPayload {
 }
 
 pub(crate) struct RuneDeposit<
-    M: Memory,
     UTXO: UtxoProvider = IcUtxoProvider,
     INDEX: RuneIndexProvider = OrdIndexProvider,
 > {
@@ -139,10 +133,10 @@ pub(crate) struct RuneDeposit<
     signer: BtcSignerType,
     utxo_provider: UTXO,
     index_provider: INDEX,
-    deposit_store: MinterOperationStore<M, RuneDepositPayload>,
+    operation_store: RuneOperationStore,
 }
 
-impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvider> {
+impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
     pub fn new(state: Rc<RefCell<State>>, scheduler: Rc<RefCell<PersistentScheduler>>) -> Self {
         let state_ref = state.borrow();
 
@@ -153,16 +147,6 @@ impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvi
 
         drop(state_ref);
 
-        let operations_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
-        let operations_log_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
-        let operations_map_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MAP_MEMORY_ID));
-        let deposit_store = MinterOperationStore::with_memory(
-            operations_memory,
-            operations_log_memory,
-            operations_map_memory,
-            None,
-        );
-
         Self {
             state,
             scheduler,
@@ -170,7 +154,7 @@ impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvi
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
             index_provider: OrdIndexProvider::new(indexer_url),
-            deposit_store,
+            operation_store: get_operations_store(),
         }
     }
 
@@ -179,62 +163,84 @@ impl RuneDeposit<VirtualMemory<DefaultMemoryImpl>, IcUtxoProvider, OrdIndexProvi
     }
 }
 
-impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTXO, INDEX> {
+impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     pub fn create_deposit_request(
         &mut self,
         dst_address: H160,
         amounts: Option<HashMap<RuneName, u128>>,
     ) -> MinterOperationId {
-        self.deposit_store.new_operation(
+        let id = self.operation_store.new_operation(
             dst_address.clone(),
-            RuneDepositPayload {
-                dst_address,
+            OperationState::Deposit(RuneDepositPayload {
+                dst_address: dst_address.clone(),
                 requested_amounts: amounts,
                 request_ts: ic::time(),
                 status: DepositRequestStatus::Scheduled,
-            },
-        )
+            }),
+        );
+
+        log::trace!(
+            "New deposit operation requested for address {}. Operation id: {id}.",
+            hex::encode(&dst_address.0)
+        );
+
+        id
     }
 
     pub async fn process_deposit_request(&mut self, request_id: MinterOperationId) {
         loop {
-            let Some(request) = self.deposit_store.get(request_id) else {
+            let Some(request) = self.operation_store.get(request_id) else {
                 log::error!("Deposit request {request_id} was not found in the request store.");
                 return;
             };
 
-            if let ControlFlow::Break(_) = self.execute_request_step(request_id, request).await {
+            let OperationState::Deposit(payload) = request else {
+                log::error!("Request {request_id} was found but is not a deposit request.");
+                return;
+            };
+
+            log::trace!(
+                "Executing deposit operation {request_id} with status {:?}.",
+                payload.status
+            );
+
+            if let ControlFlow::Break(_) = self.execute_request_step(request_id, payload).await {
                 return;
             }
         }
     }
 
     pub fn complete_mint_request(&mut self, dst_address: H160, order_nonce: u32) {
-        let requests = self.deposit_store.get_for_address(&dst_address);
+        let requests = self.operation_store.get_for_address(&dst_address);
         for (request_id, request) in requests {
-            if let DepositRequestStatus::MintOrdersCreated { mut orders } = request.status.clone() {
-                let mut is_updated = false;
-                for order in &mut orders {
-                    if let MintOrderStatus::Sent { nonce, tx_id, .. } = &mut order.status {
-                        if *nonce == order_nonce {
-                            order.status = MintOrderStatus::Completed {
-                                tx_id: tx_id.clone(),
-                            };
-                            is_updated = true;
+            if let OperationState::Deposit(payload) = request {
+                if let DepositRequestStatus::MintOrdersCreated { mut orders } =
+                    payload.status.clone()
+                {
+                    let mut is_updated = false;
+                    for order in &mut orders {
+                        if let MintOrderStatus::Sent { nonce, tx_id, .. } = &mut order.status {
+                            if *nonce == order_nonce {
+                                order.status = MintOrderStatus::Completed {
+                                    tx_id: tx_id.clone(),
+                                };
+                                is_updated = true;
+                            }
                         }
                     }
-                }
 
-                if is_updated {
-                    if orders.iter().all(|order_info| {
-                        matches!(order_info.status, MintOrderStatus::Completed { .. })
-                    }) {
-                        self.complete_deposit_request(request_id, request, orders)
-                    } else {
-                        self.deposit_store.update(request_id, request);
+                    if is_updated {
+                        if orders.iter().all(|order_info| {
+                            matches!(order_info.status, MintOrderStatus::Completed { .. })
+                        }) {
+                            self.complete_deposit_request(request_id, payload, orders)
+                        } else {
+                            self.operation_store
+                                .update(request_id, OperationState::Deposit(payload));
+                        }
+
+                        break;
                     }
-
-                    break;
                 }
             }
         }
@@ -259,14 +265,6 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
 
             (name, amount, tx_id)
         }).collect() })
-    }
-
-    pub fn get_by_address(&self, dst_address: &H160) -> Vec<RuneDepositPayload> {
-        self.deposit_store
-            .get_for_address(dst_address)
-            .into_iter()
-            .map(|(_, payload)| payload)
-            .collect()
     }
 
     async fn execute_request_step(
@@ -335,6 +333,8 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
         request_id: MinterOperationId,
         request: RuneDepositPayload,
     ) -> ControlFlow<(), ()> {
+        log::trace!("Preparing mint orders for operation {request_id}");
+
         let dst_address = &request.dst_address;
         let transit_address = self.get_transit_address(dst_address).await;
 
@@ -376,6 +376,8 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
             .await
         {
             Ok((amounts, _)) if amounts.is_empty() => {
+                log::trace!("No runes found in the input utxos for request {request_id}.");
+
                 self.wait_for_inputs(
                     request_id,
                     DepositRequestStatus::NothingToDeposit {
@@ -395,6 +397,12 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
                 return ControlFlow::Break(());
             }
         };
+
+        log::trace!(
+            "Found runes {:?} in utxos: {:?}",
+            rune_info_amounts,
+            used_utxos
+        );
 
         if self.has_used_utxos(&used_utxos) {
             self.wait_for_inputs(
@@ -439,19 +447,24 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
         request_id: MinterOperationId,
         bail_status: DepositRequestStatus,
     ) {
-        let Some(request) = self.deposit_store.get(request_id) else {
+        let Some(request) = self.operation_store.get(request_id) else {
             log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
             return;
         };
 
-        if self.is_request_timed_out(&request) {
-            self.update_request_status(request_id, request, bail_status);
+        let OperationState::Deposit(payload) = request else {
+            log::error!("Request {request_id} is found but is not a deposit request.");
+            return;
+        };
+
+        if self.is_request_timed_out(&payload) {
+            self.update_request_status(request_id, payload, bail_status);
         } else {
             let block_height =
                 if let DepositRequestStatus::NothingToDeposit { block_height } = bail_status {
                     block_height
                 } else if let DepositRequestStatus::WaitingForInputs { block_height, .. } =
-                    request.status
+                    payload.status
                 {
                     block_height
                 } else {
@@ -460,12 +473,12 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
 
             self.update_request_status(
                 request_id,
-                request.clone(),
+                payload.clone(),
                 DepositRequestStatus::WaitingForInputs {
-                    requested_at: request.request_ts,
+                    requested_at: payload.request_ts,
                     current_ts: ic::time(),
                     next_retry_at: ic::time() + self.deposit_retry_interval().as_nanos() as u64,
-                    waiting_until: request.request_ts + self.request_timeout().as_nanos() as u64,
+                    waiting_until: payload.request_ts + self.request_timeout().as_nanos() as u64,
                     block_height,
                 },
             );
@@ -498,14 +511,19 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
         utxos_response: GetUtxosResponse,
         current_min_confirmations: u32,
     ) {
-        let Some(request) = self.deposit_store.get(request_id) else {
+        let Some(request) = self.operation_store.get(request_id) else {
             log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
+            return;
+        };
+
+        let OperationState::Deposit(payload) = request else {
+            log::error!("Request {request_id} is found but is not a deposit request.");
             return;
         };
 
         self.update_request_status(
             request_id,
-            request,
+            payload,
             DepositRequestStatus::WaitingForConfirmations {
                 utxos: utxos_response.utxos,
                 current_min_confirmations,
@@ -538,7 +556,9 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
         new_status: DepositRequestStatus,
     ) {
         let updated_request = request.with_status(new_status);
-        self.deposit_store.update(request_id, updated_request);
+        log::trace!("Changing status of deposit request: {request_id}: {updated_request:?}");
+        self.operation_store
+            .update(request_id, OperationState::Deposit(updated_request));
     }
 
     pub async fn get_deposit_utxos(
@@ -546,7 +566,19 @@ impl<M: Memory, UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<M, UTX
         transit_address: &Address,
     ) -> Result<GetUtxosResponse, DepositError> {
         let mut utxo_response = self.utxo_provider.get_utxos(transit_address).await?;
+
+        log::trace!(
+            "Found {} utxos at address {transit_address}: {:?}.",
+            utxo_response.utxos.len(),
+            utxo_response.utxos
+        );
+
         self.filter_out_used_utxos(&mut utxo_response);
+
+        log::trace!(
+            "Utxos at address {transit_address} after filtering out used utxos: {:?}",
+            utxo_response.utxos
+        );
 
         Ok(utxo_response)
     }

@@ -174,6 +174,9 @@ where
             dst_address: dst_address.clone(),
             payload,
         };
+
+        log::trace!("Operation {id} is created.");
+
         if entry.payload.is_complete() {
             self.move_to_log(id, entry);
         } else {
@@ -204,6 +207,7 @@ where
 
     /// Retrieves all operations for the given ETH wallet address.
     pub fn get_for_address(&self, dst_address: &H160) -> Vec<(MinterOperationId, P)> {
+        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(&dst_address.0), self.address_operation_map.get(dst_address));
         self.address_operation_map
             .get(dst_address)
             .unwrap_or_default()
@@ -234,6 +238,8 @@ where
         self.incomplete_operations.remove(&operation_id);
         self.operations_log.insert(operation_id, entry);
 
+        log::trace!("Operation {operation_id} is marked as complete and moved to the log.");
+
         if self.operations_log.len() > self.max_operation_log_size() {
             self.remove_oldest();
         }
@@ -260,6 +266,8 @@ where
                     self.address_operation_map.insert(oldest.dst_address, ids);
                 }
             }
+
+            log::trace!("Operation {id} is evicted from the operation log");
         }
     }
 }
