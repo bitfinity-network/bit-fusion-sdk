@@ -25,6 +25,7 @@ pub struct ContextWithBridges {
     pub base_token_address: H160,
     pub wrapped_token_address: H160,
     pub fee_charge_address: H160,
+    pub token_id: Id256,
 }
 
 impl ContextWithBridges {
@@ -173,6 +174,7 @@ impl ContextWithBridges {
             base_token_address,
             wrapped_token_address,
             fee_charge_address,
+            token_id,
         }
     }
 
@@ -218,16 +220,12 @@ async fn test_external_bridging() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
-    assert!(ctx
-        .context
-        .register_base(
-            &ctx.bob_wallet,
-            &ctx.base_bft_bridge,
-            &ctx.base_token_address,
-            &alice_id
-        )
-        .await
-        .is_ok());
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let burn_operation_id = ctx
         .context
@@ -347,6 +345,13 @@ async fn native_token_deposit_increase_and_decrease() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
     // Perform an operation to pay a fee for it.
     ctx.context
         .burn_erc_20_tokens(
@@ -394,6 +399,13 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         ctx.context
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
+
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
 
     let burn_operation_id = ctx
         .context

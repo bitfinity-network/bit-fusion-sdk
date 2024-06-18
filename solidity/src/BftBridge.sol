@@ -135,10 +135,10 @@ contract BFTBridge is TokenManager {
     /// Returns operation ID if operation is succesfull.
     function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
-        require(fromERC20 != address(0), "Invalid from address");
+        require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         require(
             _wrappedToRemoteBase[fromERC20] != bytes32(0) || _baseToRemoteWrapped[fromERC20] != bytes32(0),
-            "Invalid from address"
+            "Invalid from address; not registered in the bridge"
         );
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);

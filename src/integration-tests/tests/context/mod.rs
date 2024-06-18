@@ -536,6 +536,7 @@ pub trait TestContext {
 
         let results = self.call_contract(wallet, bft_bridge, input, 0).await?;
         let output = results.1.output.unwrap();
+        println!("Deployed Wrapped token on block {}", results.1.block_number);
 
         Ok(bft_bridge_api::DEPLOY_WRAPPED_TOKEN
             .decode_output(&output)
@@ -604,10 +605,20 @@ pub trait TestContext {
                 Token::FixedBytes(remote.0.to_vec()),
             ])
             .unwrap();
-        let _receipt = self
+        let receipt = self
             .call_contract(wallet, bridge, input, 0)
             .await
             .map(|(_, receipt)| receipt)?;
+
+        let decoded_output = bft_bridge_api::REGISTER_BASE
+            .decode_output(receipt.output.as_ref().unwrap())
+            .unwrap();
+        if receipt.status != Some(U64::one()) {
+            return Err(TestError::Generic(format!(
+                "Register base transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
+                String::from_utf8_lossy(receipt.output.as_ref().unwrap())
+            )));
+        }
 
         Ok(())
     }

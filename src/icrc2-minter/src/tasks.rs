@@ -382,6 +382,7 @@ impl BridgeTask {
                 let icrc_burn_task = BridgeTask::BurnIcrc2Tokens(operation_id);
                 return Some(icrc_burn_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::WrappedTokenDeployed(_)) => todo!(),
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
 

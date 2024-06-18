@@ -151,6 +151,7 @@ impl RuneBridgeTask {
                 let remove_mint_order_task = RuneBridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::WrappedTokenDeployed(_)) => todo!(),
             Ok(BridgeEvent::Notify(event)) => {
                 if let Some(notification) = RuneMinterNotification::decode(event) {
                     return match notification {

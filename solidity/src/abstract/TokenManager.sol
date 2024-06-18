@@ -11,16 +11,16 @@ abstract contract TokenManager {
     // Indicates whether this contract is on the wrapped side
     bool internal isWrappedSide;
 
-    /// Mapping from remote Base tokens to Wrapped tokens
+    /// Mapping from Base `remote token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
     mapping(bytes32 => address) internal _remoteBaseToWrapped;
 
-    /// Mapping from Base tokens to Wrapped tokens
+    /// Mapping from Wrapped ERC20 token address to remote Base token id (can be anything, also ERC20 address)
     mapping(address => bytes32) internal _wrappedToRemoteBase;
 
-    /// Mapping from remote Wrapped tokens to Base tokens
+    /// Mapping from Wrapped `remote token id` (can be anything, also ERC20 address) to Base tokens ERC20 address
     mapping(bytes32 => address) internal _remoteWrappedToBase;
 
-    /// Mapping from Wrapped tokens to Base tokens
+    /// Mapping from Base ERC20 token address to remote Wrapped token id (can be anything, also ERC20 address)
     mapping(address => bytes32) internal _baseToRemoteWrapped;
 
     /// List of wrapped tokens.
@@ -48,6 +48,7 @@ abstract contract TokenManager {
     /// Registers base address for the given remote wrapped token
     function registerBase(address base, bytes32 remoteWrapped) public {
         require(msg.sender == minterCanisterAddress, "Only minter can call");
+        require(!isWrappedSide, "Only for base side");
         require(_wrappedToRemoteBase[base] == bytes32(0), "Base already registered");
 
         _remoteWrappedToBase[remoteWrapped] = base;
@@ -57,7 +58,6 @@ abstract contract TokenManager {
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
         require(isWrappedSide, "Only for wrapped side");
-
         require(_remoteBaseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token

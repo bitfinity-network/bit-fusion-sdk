@@ -12,7 +12,9 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::bft_bridge_api::{
+    self, BridgeEvent, BurntEventData, MintedEventData, WrappedTokenDeployedEventData,
+};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
@@ -31,6 +33,7 @@ pub enum BridgeTask {
     RefreshBftBridgeCreationStatus(BridgeSide),
     CollectEvmEvents(BridgeSide),
     PrepareMintOrder(BurntEventData, BridgeSide),
+    RegisterBaseToken(WrappedTokenDeployedEventData),
     RemoveMintOrder(MintedEventData),
     SendMintTransaction(SignedMintOrderData, BridgeSide),
 }
@@ -57,6 +60,10 @@ impl Task for BridgeTask {
                 data.clone(),
                 *side,
             )),
+            BridgeTask::RegisterBaseToken(data) => {
+                let data = data.clone();
+                Box::pin(Self::register_base_token(state, data))
+            }
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(state, data) })
@@ -287,6 +294,16 @@ impl BridgeTask {
                 let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
+            Ok(BridgeEvent::WrappedTokenDeployed(deployed)) => {
+                if sender_side == BridgeSide::Wrapped {
+                    log::debug!("Adding RegisterBaseToken task");
+                    let register_base_token_task = BridgeTask::RegisterBaseToken(deployed);
+                    return Some(register_base_token_task.into_scheduled(options));
+                } else {
+                    log::debug!("Skipping RegisterBaseToken task for side {sender_side}");
+                    return None;
+                }
+            }
             Ok(BridgeEvent::Notify(_)) => todo!(),
             Err(e) => log::warn!("collected log is incompatible with expected events: {e}"),
         }
@@ -316,6 +333,83 @@ impl BridgeTask {
             .remove(sender_id, src_token, minted_event.nonce);
 
         log::trace!("Mint order removed");
+
+        Ok(())
+    }
+
+    async fn register_base_token(
+        state: Rc<RefCell<State>>,
+        deployed_event: WrappedTokenDeployedEventData,
+    ) -> Result<(), SchedulerError> {
+        log::trace!("Registering base token");
+        let side = BridgeSide::Base;
+
+        let signer = state.borrow().signer.get().clone();
+        let sender = signer.get_address().await.into_scheduler_result()?;
+
+        let evm_info = state.borrow().config.get_evm_info(side);
+        let wrapped_chain_id = state
+            .borrow()
+            .config
+            .get_evm_params(BridgeSide::Wrapped)
+            .into_scheduler_result()?
+            .chain_id;
+
+        let evm_params = state
+            .borrow()
+            .config
+            .get_evm_params(side)
+            .into_scheduler_result()?;
+
+        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
+        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
+            log::warn!("failed to send register base tx: bft bridge is not created");
+            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
+        })?;
+
+        let client = evm_info.link.get_json_rpc_client();
+        let nonce = client
+            .get_transaction_count(sender.0, BlockNumber::Latest)
+            .await
+            .into_scheduler_result()?;
+
+        let base_address = Id256::from_slice(&deployed_event.base_token_id)
+            .and_then(|id| id.to_evm_address().ok())
+            .unwrap_or_default()
+            .1;
+        let remote =
+            Id256::from_evm_address(&deployed_event.wrapped_erc20, wrapped_chain_id as u32);
+        log::debug!(
+            "registering base token: base address {base_address}; wrapped {}",
+            deployed_event.wrapped_erc20
+        );
+
+        let mut tx = bft_bridge_api::register_base_transaction(
+            base_address.into(),
+            remote.0.to_vec(),
+            sender.0,
+            bft_bridge.into(),
+            nonce.into(),
+            evm_params.gas_price.into(),
+            evm_params.chain_id as _,
+        );
+
+        let signature = signer
+            .sign_transaction(&(&tx).into())
+            .await
+            .into_scheduler_result()?;
+        tx.r = signature.r.0;
+        tx.s = signature.s.0;
+        tx.v = signature.v.0;
+        tx.hash = tx.hash();
+
+        let client = evm_info.link.get_json_rpc_client();
+        let hash = client
+            .send_raw_transaction(tx)
+            .await
+            .into_scheduler_result()?;
+
+        log::debug!("Register base transaction sent with hash {hash}");
 
         Ok(())
     }

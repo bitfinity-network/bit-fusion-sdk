@@ -164,7 +164,7 @@ contract BftBridgeTest is Test {
 
     function testBurnEligibilityWithDeployedErc20() public {
         bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
-        vm.expectRevert(bytes("Invalid from address"));
+        vm.expectRevert(bytes("Invalid from address; not registered in the bridge"));
         _bridge.burn(100, _alice, principal);
 
         // deploy erc20 so it can be used
