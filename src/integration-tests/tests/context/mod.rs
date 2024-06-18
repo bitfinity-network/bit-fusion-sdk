@@ -604,10 +604,7 @@ pub trait TestContext {
         remote: &Id256,
     ) -> Result<()> {
         let input = bft_bridge_api::REGISTER_BASE
-            .encode_input(&[
-                Token::Address(base.0),
-                Token::FixedBytes(remote.0.to_vec()),
-            ])
+            .encode_input(&[Token::Address(base.0), Token::FixedBytes(remote.0.to_vec())])
             .unwrap();
         let receipt = self
             .call_contract(wallet, bridge, input, 0)
