@@ -156,7 +156,7 @@ impl EvmMinter {
 
     /// Sets the BFT bridge contract address.
     #[update]
-    pub async fn set_bft_bridge_contract(&mut self, side: BridgeSide, address: H160) {
+    pub async fn set_bft_bridge_contract(&mut self, address: H160, side: BridgeSide) {
         get_state()
             .borrow_mut()
             .config

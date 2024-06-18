@@ -96,7 +96,10 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+
+    }
+
 
     /// Pause the contract and prevent any future mint or burn operations
     /// Can be called only by the owner

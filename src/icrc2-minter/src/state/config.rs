@@ -75,8 +75,8 @@ impl Config {
     }
 
     /// Set bridge contract address for EVM.
-    pub fn set_bft_bridge_contract(&mut self, new_status: H160) {
-        self.update_data(|data| data.bft_bridge_contract_address = Some(new_status));
+    pub fn set_bft_bridge_contract(&mut self, address: H160) {
+        self.update_data(|data| data.bft_bridge_contract_address = Some(address));
     }
 
     fn with_data<F, T>(&self, f: F) -> T

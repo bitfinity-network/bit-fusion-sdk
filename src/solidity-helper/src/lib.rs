@@ -5,6 +5,8 @@ use std::process::Command;
 
 use error::SolidityHelperError;
 
+const BUILD_INFO_DIR: &str = "build-info";
+
 pub mod error;
 pub struct SolidityContract {
     pub name: String,
@@ -29,6 +31,16 @@ pub fn compile_solidity_contracts(
     let mut contracts = HashMap::new();
 
     for (name, path) in contract_paths {
+        // This is a hack to ignore the build-info folder since it's not a
+        // contract
+        if path
+            .to_str()
+            .expect("should be possible to convert path to string")
+            .contains(BUILD_INFO_DIR)
+        {
+            continue;
+        }
+
         println!(
             "Parsing compiled contract [{name}] from path: [{}]",
             path.display()
@@ -108,7 +120,8 @@ fn contract_paths(root: PathBuf) -> Result<HashMap<String, PathBuf>, SolidityHel
         .flatten()
         .flat_map(|dir| dir.path().read_dir()) // read all sub directories
         .flatten()
-        .flatten() // ignore errors...
+        .flatten()
+        // ignore errors...
         .map(|e| e.path())
         .filter(json_only) // filter out anything that isn't a .json file
         .filter_map(stem_and_path)
