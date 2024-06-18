@@ -11,5 +11,5 @@ fn test_should_return_the_token_contract_code() {
     let smart_token_bytecode = &*BFT_BRIDGE_SMART_CONTRACT_CODE;
 
     // Assert
-    //assert_eq!(&smart_contract.bytecode, smart_token_bytecode);
+    assert_eq!(&smart_contract.bytecode, smart_token_bytecode);
 }

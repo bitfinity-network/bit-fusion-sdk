@@ -987,7 +987,7 @@ impl CkBtcSetup {
         .expect("minter self-check failed")
     }
 
-    pub fn btc_to_eth20(&self, eth_address: &H160) -> Vec<Result<Erc20MintStatus, Erc20MintError>> {
+    pub fn btc_to_erc20(&self, eth_address: &H160) -> Vec<Result<Erc20MintStatus, Erc20MintError>> {
         let payload = Encode!(eth_address).unwrap();
         let result = self
             .env()
@@ -1045,7 +1045,7 @@ impl CkBtcSetup {
         self.push_utxo(deposit_address, utxo.clone());
 
         self.advance_blocks(MIN_CONFIRMATIONS as usize);
-        let result = &self.btc_to_eth20(&caller_eth_address)[0];
+        let result = &self.btc_to_erc20(&caller_eth_address)[0];
         if let Ok(Erc20MintStatus::Minted { amount, .. }) = result {
             *amount
         } else {
@@ -1197,7 +1197,7 @@ async fn btc_to_erc20_test() {
     let deposit_address = ckbtc.get_btc_address(deposit_account);
     ckbtc.push_utxo(deposit_address, utxo.clone());
 
-    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    let result = ckbtc.btc_to_erc20(&caller_eth_address);
     assert_eq!(
         result[0],
         Ok(Erc20MintStatus::Scheduled {
@@ -1217,7 +1217,7 @@ async fn btc_to_erc20_test() {
 
     ckbtc.advance_blocks(6);
 
-    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    let result = ckbtc.btc_to_erc20(&caller_eth_address);
     assert_eq!(
         result[0],
         Ok(Erc20MintStatus::Scheduled {
@@ -1237,16 +1237,18 @@ async fn btc_to_erc20_test() {
 
     ckbtc.advance_blocks(6);
 
-    let result = ckbtc.btc_to_eth20(&caller_eth_address);
+    let result = ckbtc.btc_to_erc20(&caller_eth_address);
     assert_eq!(result[0], Err(Erc20MintError::NothingToMint));
 
     (&ckbtc.context).advance_time(Duration::from_secs(2)).await;
 
     if let Ok(Erc20MintStatus::Minted { tx_id, .. }) = &result[0] {
-        let _receipt = (&ckbtc.context)
+        let receipt = (&ckbtc.context)
             .wait_transaction_receipt(tx_id)
             .await
             .unwrap();
+
+        println!("Receipt: {:#?}", receipt);
     }
 
     let expected_balance = (deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE) as u128;

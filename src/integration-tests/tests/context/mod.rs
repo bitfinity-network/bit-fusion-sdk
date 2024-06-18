@@ -536,15 +536,19 @@ pub trait TestContext {
 
         let results = self.call_contract(wallet, bft_bridge, input, 0).await?;
         let output = results.1.output.unwrap();
-        println!("Deployed Wrapped token on block {}", results.1.block_number);
 
-        Ok(bft_bridge_api::DEPLOY_WRAPPED_TOKEN
+        let token_address = bft_bridge_api::DEPLOY_WRAPPED_TOKEN
             .decode_output(&output)
             .unwrap()[0]
             .clone()
             .into_address()
-            .unwrap()
-            .into())
+            .unwrap();
+        println!(
+            "Deployed Wrapped token on block {} with address {token_address}",
+            results.1.block_number
+        );
+
+        Ok(token_address.into())
     }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
