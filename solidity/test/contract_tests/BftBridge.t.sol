@@ -200,9 +200,17 @@ contract BftBridgeTest is Test {
     }
 
     function testAddAllowedImplementation() public {
-        vm.prank(_owner);
+        vm.startPrank(_owner);
+
+        BFTBridge _newImpl = new BFTBridge();
+
+        newImplementation = address(_newImpl);
+
         _bridge.addAllowedImplementation(newImplementation);
+
         assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
+
+        vm.stopPrank();
     }
 
     function testAddAllowedImplementationOnlyOwner() public {
@@ -223,7 +231,8 @@ contract BftBridgeTest is Test {
     }
 
     /// Test that the bridge can be upgraded to a new implementation
-    /// and the new implementation has been added to the list of allowed implementations
+    /// and the new implementation has been added to the list of allowed
+    /// implementations
     function testUpgradeBridgeWithAllowedImplementation() public {
         vm.startPrank(_owner);
 

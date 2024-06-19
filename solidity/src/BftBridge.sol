@@ -117,6 +117,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Add a new implementation to the allowed list
     function addAllowedImplementation(address newImplementation) external onlyOwner {
         require(newImplementation != address(0), "Invalid implementation address");
+        require(newImplementation.code.length > 0, "Not a contract");
 
         allowedImplementations[newImplementation.codehash] = true;
     }
