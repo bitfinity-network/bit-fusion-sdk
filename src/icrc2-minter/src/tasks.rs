@@ -410,22 +410,47 @@ impl BridgeTask {
             )));
         };
 
-        if matches!(operation_state, OperationState::Deposit(_)) {
-            operation_store.update(
-                operation_id,
-                OperationState::Deposit(DepositOperationState::Minted {
-                    token_id: src_token,
-                    amount: minted_event.amount,
-                }),
-            );
-        } else {
-            operation_store.update(
-                operation_id,
-                OperationState::Withdrawal(WithdrawalOperationState::RefundMinted {
-                    token_id: src_token,
-                    amount: minted_event.amount,
-                }),
-            );
+        match operation_state {
+            OperationState::Deposit(DepositOperationState::MintOrderSent {
+                token_id,
+                tx_id,
+                ..
+            }) if token_id == src_token => {
+                operation_store.update(
+                    operation_id,
+                    OperationState::Deposit(DepositOperationState::Minted {
+                        token_id: src_token,
+                        amount: minted_event.amount,
+                        tx_id,
+                    }),
+                );
+            }
+            OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSent {
+                token_id,
+                tx_id,
+                ..
+            }) if token_id == src_token => {
+                operation_store.update(
+                    operation_id,
+                    OperationState::Withdrawal(WithdrawalOperationState::RefundMinted {
+                        token_id: src_token,
+                        amount: minted_event.amount,
+                        tx_id,
+                    }),
+                );
+            }
+            OperationState::Deposit(DepositOperationState::MintOrderSent { token_id, .. })
+            | OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSent {
+                token_id,
+                ..
+            }) => {
+                return Err(SchedulerError::TaskExecutionFailed(format!("Operation {operation_id} with nonce {nonce} corresponds to token id {token_id:?} but burnt event was produced by {src_token:?}")));
+            }
+            _ => {
+                return Err(SchedulerError::TaskExecutionFailed(format!(
+                    "Operation {operation_id} was in invalid state: {operation_state:?}"
+                )));
+            }
         }
 
         log::trace!("Mint order removed");
@@ -440,18 +465,29 @@ impl BridgeTask {
         log::trace!("Sending mint transaction");
 
         let mut operation_store = get_operations_store();
-        let operation_state = operation_store.get(operation_id);
-        let Some(OperationState::Deposit(DepositOperationState::MintOrderSigned {
-            signed_mint_order,
-            amount,
-            token_id,
-        })) = operation_state
-        else {
-            log::error!(
-                "deposit request was in incorrect state: {:?}",
-                operation_state
-            );
+        let Some(operation_state) = operation_store.get(operation_id) else {
+            log::error!("Operation {operation_id} not found");
             return Ok(());
+        };
+
+        let (signed_mint_order, amount, token_id, is_despoit) = match operation_state {
+            OperationState::Deposit(DepositOperationState::MintOrderSigned {
+                signed_mint_order,
+                amount,
+                token_id,
+            }) => (signed_mint_order, amount, token_id, true),
+            OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSigned {
+                signed_mint_order,
+                amount,
+                token_id,
+            }) => (signed_mint_order, amount, token_id, false),
+            _ => {
+                log::error!(
+                    "deposit request was in incorrect state: {:?}",
+                    operation_state
+                );
+                return Ok(());
+            }
         };
 
         let signer = state.borrow().signer.get_transaction_signer();
@@ -493,15 +529,27 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        operation_store.update(
-            operation_id,
-            OperationState::Deposit(DepositOperationState::MintOrderSent {
-                token_id,
-                amount,
-                signed_mint_order,
-                tx_id: tx_id.into(),
-            }),
-        );
+        if is_despoit {
+            operation_store.update(
+                operation_id,
+                OperationState::Deposit(DepositOperationState::MintOrderSent {
+                    token_id,
+                    amount,
+                    signed_mint_order,
+                    tx_id: tx_id.into(),
+                }),
+            );
+        } else {
+            operation_store.update(
+                operation_id,
+                OperationState::Withdrawal(WithdrawalOperationState::RefundMintOrderSent {
+                    token_id,
+                    amount,
+                    signed_mint_order,
+                    tx_id: tx_id.into(),
+                }),
+            );
+        }
 
         log::trace!("Mint transaction sent: {tx_id}");
 

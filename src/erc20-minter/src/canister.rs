@@ -13,11 +13,16 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
+use minter_contract_utils::operation_store::MinterOperationStore;
 use minter_did::error::Result;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::memory::{
+    MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
+    PENDING_TASKS_MEMORY_ID,
+};
+use crate::operation::OperationPayload;
 use crate::state::{Settings, State};
 use crate::tasks::BridgeTask;
 
@@ -118,28 +123,36 @@ impl EvmMinter {
         self.set_timers();
     }
 
-    /// Returns `(operaion_id, signed_mint_order)` pairs for the given sender id.
+    /// Returns `(nonce, mint_order)` pairs for the given sender id.
     #[query]
-    pub async fn list_mint_orders(
+    pub fn list_mint_orders(
         &self,
-        sender: Id256,
+        wallet_address: H160,
         src_token: Id256,
     ) -> Vec<(u32, SignedMintOrder)> {
-        get_state().borrow().mint_orders.get_all(sender, src_token)
+        get_operations_store()
+            .get_for_address(&wallet_address)
+            .into_iter()
+            .filter_map(|(operation_id, status)| {
+                status
+                    .get_signed_mint_order(Some(src_token))
+                    .map(|mint_order| (operation_id.nonce(), *mint_order))
+            })
+            .collect()
     }
 
-    /// Returns the `signed_mint_order` if present.
+    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
     #[query]
-    pub async fn get_mint_order(
+    pub fn get_mint_order(
         &self,
-        sender: Id256,
+        wallet_address: H160,
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        get_state()
-            .borrow()
-            .mint_orders
-            .get(sender, src_token, operation_id)
+        self.list_mint_orders(wallet_address, src_token)
+            .into_iter()
+            .find(|(nonce, _)| *nonce == operation_id)
+            .map(|(_, mint_order)| mint_order)
     }
 
     /// Returns EVM address of the canister.
@@ -266,6 +279,18 @@ pub fn get_state() -> Rc<RefCell<State>> {
 
 pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+pub fn get_operations_store(
+) -> MinterOperationStore<VirtualMemory<DefaultMemoryImpl>, OperationPayload> {
+    MEMORY_MANAGER.with(|mm| {
+        MinterOperationStore::with_memory(
+            mm.get(OPERATIONS_MEMORY_ID),
+            mm.get(OPERATIONS_LOG_MEMORY_ID),
+            mm.get(OPERATIONS_MAP_MEMORY_ID),
+            None,
+        )
+    })
 }
 
 #[cfg(test)]
