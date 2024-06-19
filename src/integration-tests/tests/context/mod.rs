@@ -641,9 +641,10 @@ pub trait TestContext {
         &self,
         token: &H160,
         wallet: &Wallet<'_, SigningKey>,
+        address: Option<&H160>,
     ) -> Result<u128> {
         let evm_client = self.evm_client(self.admin_name());
-        self.check_erc20_balance_on_evm(&evm_client, token, wallet)
+        self.check_erc20_balance_on_evm(&evm_client, token, wallet, address)
             .await
     }
 
@@ -653,9 +654,15 @@ pub trait TestContext {
         evm_client: &EvmCanisterClient<Self::Client>,
         token: &H160,
         wallet: &Wallet<'_, SigningKey>,
+        address: Option<&H160>,
     ) -> Result<u128> {
         let input = wrapped_token_api::ERC_20_BALANCE
-            .encode_input(&[Token::Address(wallet.address())])
+            .encode_input(&[Token::Address(
+                address
+                    .cloned()
+                    .unwrap_or_else(|| wallet.address().into())
+                    .into(),
+            )])
             .unwrap();
         let results = self
             .call_contract_on_evm(evm_client, wallet, token, input, 0)
@@ -738,10 +745,6 @@ pub trait TestContext {
                 self.install_canister(self.canisters().evm_rpc(), wasm, (init_data,))
                     .await
                     .unwrap();
-
-                for (key, principal) in self.canisters().0.iter() {
-                    println!("AH STRONZO {key:?}: {principal}");
-                }
 
                 let client = self.client(self.canisters().evm_rpc(), self.admin_name());
 

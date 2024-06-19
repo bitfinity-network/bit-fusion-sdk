@@ -164,6 +164,15 @@ deploy_erc721_bridge() {
   echo "$BRIDGE_ADDRESS"
 }
 
+deploy_fee_charge_contract() {
+  EVM_PRINCIPAL="$1"
+  WALLET="$2"
+  NONCE="$3"
+  BRIDGES="$4"
+
+  FEE_CHARGE_ADDRESS=$($CREATE_BFT_BRIDGE_TOOL deploy-fee-charge --evm="$EVM_PRINCIPAL" --wallet="$WALLET" --nonce="$NONCE" --bridges="$BRIDGES")
+}
+
 # test canisters
 
 

@@ -39,16 +39,6 @@ fn main() -> anyhow::Result<()> {
     );
     set_contract_code(
         &contracts,
-        "UniswapV2Factory",
-        "BUILD_SMART_CONTRACT_UNISWAP_FACTORY_HEX_CODE",
-    );
-    set_contract_code(
-        &contracts,
-        "UniswapV2ERC20",
-        "BUILD_SMART_CONTRACT_UNISWAP_TOKEN_HEX_CODE",
-    );
-    set_contract_code(
-        &contracts,
         "WatermelonToken",
         "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
     );
