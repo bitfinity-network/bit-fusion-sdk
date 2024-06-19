@@ -9,7 +9,7 @@ import "forge-std/console.sol";
 
 contract DeployBft is Script {
     function run() external {
-        address minterAddress = vm.envAddress("MINTER_ADDRESS");
+        address minterAddress = vm.envAddress("BRIDGE_ADDRESS");
         address feeChargeAddress = vm.envAddress("FEE_CHARGE_ADDRESS");
         bool isWrappedSide = vm.envBool("IS_WRAPPED_SIDE");
 
