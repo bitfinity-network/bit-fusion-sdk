@@ -10,6 +10,7 @@ use num_traits::ToPrimitive;
 pub use self::did::{EthMainnetService, EthSepoliaService, L2MainnetService, RpcApi, RpcService};
 use self::did::{RequestCostResult, RequestResult, Service};
 
+/// Client for sending RPC requests to the EVM-RPC canister.
 #[derive(Debug, Clone)]
 pub struct EvmRpcCanisterClient {
     principal: Principal,
@@ -17,6 +18,7 @@ pub struct EvmRpcCanisterClient {
 }
 
 impl EvmRpcCanisterClient {
+    /// Creates a new client with the given principal and RPC services to forward requests to.
     pub fn new(principal: Principal, rpc_service: &[RpcService]) -> Self {
         Self {
             principal,
@@ -24,6 +26,7 @@ impl EvmRpcCanisterClient {
         }
     }
 
+    /// Sends an RPC request to the EVM-RPC canister.
     pub fn send_rpc_request(
         &self,
         request: Request,
@@ -58,6 +61,7 @@ impl EvmRpcCanisterClient {
         }
     }
 
+    /// Sends an RPC request to the EVM-RPC canister using the given service.
     async fn __send_rpc_request(
         principal: Principal,
         rpc_service: &RpcService,

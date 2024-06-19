@@ -6016,7 +6016,6 @@ dependencies = [
  "num-traits",
  "once_cell",
  "serde",
- "serde_bytes",
  "serde_json",
  "solidity-helper",
  "thiserror",
