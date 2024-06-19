@@ -21,7 +21,6 @@ quote_style = 'double'
 number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
-contract_new_lines = true
 
 
 [rpc_endpoints]
