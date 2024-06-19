@@ -1638,7 +1638,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1926,7 +1926,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "async-trait",
  "candid",
@@ -1977,7 +1977,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "anyhow",
  "candid",
@@ -2042,7 +2042,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "candid",
  "did",
@@ -5595,7 +5595,7 @@ dependencies = [
 [[package]]
 name = "icrc-client"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6378,7 +6378,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "candid",
  "did",
@@ -6419,7 +6419,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "candid",
  "did",
@@ -8508,7 +8508,7 @@ dependencies = [
 [[package]]
 name = "signature-verification-canister-client"
 version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-885-btc-bft-run-to-tokenid-ignored-in-burn-event-allows-btcrune-minting-out-of-thin-air#8b45107d532c5da081ef27ad3f95b493bfdcd801"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
 dependencies = [
  "candid",
  "did",
