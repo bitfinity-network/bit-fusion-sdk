@@ -146,9 +146,9 @@ impl State {
     }
 
     pub fn rune_info(&self, rune_id: RuneId) -> Option<RuneInfo> {
-        for (_, rune_info) in &self.runes {
+        for rune_info in self.runes.values() {
             if rune_info.id() == rune_id {
-                return Some(rune_info.clone());
+                return Some(*rune_info);
             }
         }
 

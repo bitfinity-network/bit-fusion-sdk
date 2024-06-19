@@ -207,7 +207,7 @@ where
 
     /// Retrieves all operations for the given ETH wallet address.
     pub fn get_for_address(&self, dst_address: &H160) -> Vec<(MinterOperationId, P)> {
-        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(&dst_address.0), self.address_operation_map.get(dst_address));
+        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
         self.address_operation_map
             .get(dst_address)
             .unwrap_or_default()

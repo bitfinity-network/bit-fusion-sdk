@@ -181,7 +181,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
 
         log::trace!(
             "New deposit operation requested for address {}. Operation id: {id}.",
-            hex::encode(&dst_address.0)
+            hex::encode(dst_address.0)
         );
 
         id
