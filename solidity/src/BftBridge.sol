@@ -5,7 +5,7 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -54,6 +54,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     // Operataion ID counter
     uint32 public operationIDCounter;
 
+    /// Allowed implementations hash list
+    mapping(bytes32 => bool) public allowedImplementations;
+
     // Event for mint operation
     event MintTokenEvent(
         uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
@@ -95,7 +98,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(allowedImplementations[newImplementation.codehash], "Not allowed implementation");
+    }
 
     /// Pause the contract and prevent any future mint or burn operations
     /// Can be called only by the owner
@@ -107,6 +112,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Can be called only by the owner
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// Add a new implementation to the allowed list
+    function addAllowedImplementation(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "Invalid implementation address");
+        require(newImplementation.code.length > 0, "Not a contract");
+
+        allowedImplementations[newImplementation.codehash] = true;
     }
 
     /// Emit minter notification event with the given `userData`. For details

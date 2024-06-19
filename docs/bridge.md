@@ -8,7 +8,7 @@ Before proceeding with the deployment and upgrade process, ensure that you have 
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) installed and set up in your development environment.
 - The necessary environment variables set:
-  - `MINTER_ADDRESS`: The address of the minter contract.
+  - `BRIDGE_ADDRESS`: The address of the minter contract.
   - `FEE_CHARGE_ADDRESS`: The address where fees will be charged.
   - `IS_WRAPPED_SIDE`: A boolean indicating whether the contract is on the wrapped side.
   - `PROXY_ADDRESS` (for upgrades): The address of the existing proxy contract.
@@ -35,6 +35,8 @@ To deploy the BFTBridge contract using the UUPS proxy pattern, follow these step
 4. The script will deploy the BFTBridge contract using the UUPS proxy pattern and initialize it with the provided parameters.
 
 5. After the deployment is complete, the script will output the addresses of the deployed proxy contract and the implementation contract.
+
+Note: You can also use the bash script located [here]("../scripts/BftBridge/deploy.sh) to deploy the contract.
 
 ## Upgrade
 

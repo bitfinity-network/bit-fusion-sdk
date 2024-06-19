@@ -27,7 +27,7 @@ fi
 # Assign the provided arguments to variables
 RPC_URL=$1
 PRIVATE_KEY=$2
-MINTER_ADDRESS=$3
+BRIDGE_ADDRESS=$3
 FEE_CHARGE_ADDRESS=$4
 IS_WRAPPED_SIDE=$5
 
@@ -42,7 +42,7 @@ if [[ ! $PRIVATE_KEY =~ ^0x[a-fA-F0-9]{64}$ ]]; then
     usage
 fi
 
-if [[ ! $MINTER_ADDRESS =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+if [[ ! $BRIDGE_ADDRESS =~ ^0x[a-fA-F0-9]{40}$ ]]; then
     echo "Error: Invalid minter address format."
     usage
 fi
@@ -58,7 +58,7 @@ if [[ $IS_WRAPPED_SIDE != true && $IS_WRAPPED_SIDE != false ]]; then
 fi
 
 # Export the environment variables
-export MINTER_ADDRESS="$MINTER_ADDRESS"
+export BRIDGE_ADDRESS="$BRIDGE_ADDRESS"
 export FEE_CHARGE_ADDRESS="$FEE_CHARGE_ADDRESS"
 export IS_WRAPPED_SIDE="$IS_WRAPPED_SIDE"
 

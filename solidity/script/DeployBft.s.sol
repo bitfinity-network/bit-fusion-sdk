@@ -2,14 +2,14 @@
 
 pragma solidity ^0.8.10;
 
-import {Script} from "forge-std/Script.sol";
+import { Script } from "forge-std/Script.sol";
 import "src/BftBridge.sol";
-import {Upgrades} from "@openzeppelin-foundry-upgrades/Upgrades.sol";
+import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
 import "forge-std/console.sol";
 
 contract DeployBft is Script {
     function run() external {
-        address minterAddress = vm.envAddress("MINTER_ADDRESS");
+        address minterAddress = vm.envAddress("BRIDGE_ADDRESS");
         address feeChargeAddress = vm.envAddress("FEE_CHARGE_ADDRESS");
         bool isWrappedSide = vm.envBool("IS_WRAPPED_SIDE");
 
