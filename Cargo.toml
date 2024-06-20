@@ -70,16 +70,17 @@ vergen = { version = "8.3", default-features = false, features = [
     "rustc",
 ] }
 
+
 # state machine tests deps
-ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-03_23-01-base" }
+ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 
 [profile.dev]
 debug = false
