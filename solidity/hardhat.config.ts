@@ -8,6 +8,7 @@ dotenv.config();
 
 
 import "./tasks/deploy-bft";
+import "./tasks/fee-charge-address";
 
 const MAINNET_URL = "https://mainnet.bitfinity.network"
 

@@ -1,3 +1,17 @@
+/// Creates a Hardhat task for deploying the BFT contract.
+///
+/// This task takes three parameters:
+/// - `minterAddress`: The address of the minter.
+/// - `feeChargeAddress`: The address of the fee charge.
+/// - `isWrappedSide`: A boolean indicating whether this is the wrapped side.
+///
+/// The task will:
+/// 1. Compile the contract.
+/// 2. Validate the provided addresses.
+/// 3. Deploy the BFT contract using the provided parameters.
+/// 4. Wait for the deployment to be confirmed.
+/// 5. Log the deployed proxy address and implementation address.
+
 import { task } from 'hardhat/config';
 import { boolean } from 'hardhat/internal/core/params/argumentTypes';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
@@ -12,8 +26,9 @@ task('deploy-bft', 'Deploys the BFT contract')
             { minterAddress, feeChargeAddress, isWrappedSide },
             hre: HardhatRuntimeEnvironment
         ) => {
-            // Compile the contracts
+            console.log('Compiling contract');
             await hre.run('compile');
+            console.log('Contract compiled');
 
             // Validate the arguments that it is address
             for (const address of [minterAddress, feeChargeAddress]) {
@@ -33,15 +48,13 @@ task('deploy-bft', 'Deploys the BFT contract')
 
             const BFTBridge = await hre.ethers.getContractFactory('BFTBridge');
 
-            const bridge = await hre.upgrades.deployProxy(
-                BFTBridge,
-                [minterAddress, feeChargeAddress, isWrappedSide],
-                {
-                    txOverrides: {
-                        nonce: await deployer.getNonce('pending'),
-                    },
-                }
-            );
+            console.log('Deploying BFT contract');
+            const bridge = await hre.upgrades.deployProxy(BFTBridge, [
+                minterAddress,
+                feeChargeAddress,
+                isWrappedSide,
+            ]);
+
             // Wait for the deployment to be confirmed
             await bridge.waitForDeployment();
 

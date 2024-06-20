@@ -3,12 +3,12 @@ pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
-import "openzeppelin-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
 import { Options } from "@openzeppelin-foundry-upgrades/Options.sol";
 
