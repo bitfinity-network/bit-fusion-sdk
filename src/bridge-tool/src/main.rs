@@ -21,7 +21,7 @@ use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
 // identity.
-const IDENTITY_PATH: &str = "src/create_bft_bridge_tool/identity.pem";
+const IDENTITY_PATH: &str = "src/bridge-tool/identity.pem";
 
 /// Some operations with BFT bridge.
 #[derive(Parser, Debug)]

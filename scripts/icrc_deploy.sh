@@ -99,11 +99,11 @@ dfx deploy icrc2-minter --argument "(record {
 start_icx
 
 ########## Deploy BFT and ICRC2 contracts ##########
-ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
-ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
+ETH_WALLET=$(cargo run -q -p bridge-tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET")
 
 FEE_CHARGE_DEPLOY_TX_NONCE=0
-FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
+FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
 res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
 res=${res#*\"}

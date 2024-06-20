@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
+CREATE_BFT_BRIDGE_TOOL="cargo run -q -p bridge-tool --"
 
 assert_isset_param() {
   PARAM=$1

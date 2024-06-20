@@ -103,7 +103,7 @@ if [ "$IC_NETWORK" = "local" ]; then
   MINTER_ADDRESS=${MINTER_ADDRESS%\"*}
   # Get FEE_CHARGE_ADDRESS
   FEE_CHARGE_DEPLOY_TX_NONCE=0
-  FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
+  FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
   # get base bridge contract
   WALLET=$(get_wallet $EVM_PRINCIPAL)

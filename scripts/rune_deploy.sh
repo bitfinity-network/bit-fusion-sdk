@@ -94,9 +94,9 @@ dfx canister call rune-bridge admin_configure_ecdsa
 
 ########## Deploy BFT and Token contracts ##########
 
-ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
-ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
-ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+ETH_WALLET=$(cargo run -q -p bridge-tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET")
+ETH_WALLET_CANDID=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET" --candid)
 
 echo "ETH wallet PK: $ETH_WALLET"
 
@@ -111,10 +111,10 @@ echo "Rune bridge eth address: ${RUNE_BRIDGE_ETH_ADDRESS}"
 echo "Minting ETH tokens for Rune bridge canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${RUNE_BRIDGE_ETH_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
-BFT_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$RUNE_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
+BFT_ETH_ADDRESS=$(cargo run -q -p bridge-tool -- deploy-bft-bridge --minter-address="$RUNE_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "BFT ETH address: $BFT_ETH_ADDRESS"
 
-TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
+TOKEN_ETH_ADDRESS=$(cargo run -q -p bridge-tool -- create-token \
   --bft-bridge-address="$BFT_ETH_ADDRESS" \
   --token-name=RUNE \
   --token-id="$RUNE_ID" \
@@ -193,7 +193,7 @@ $ordw balance
 
 echo "Runes withdrawal receiver: $RECEIVER"
 
-cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+cargo run -q -p bridge-tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \
   --evm-canister="$EVM" \
   --bft-bridge="$BFT_ETH_ADDRESS" \

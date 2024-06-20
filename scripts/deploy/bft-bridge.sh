@@ -2,7 +2,7 @@
 
 source "$(dirname "$0")/deploy_functions.sh"
 
-CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
+CREATE_BFT_BRIDGE_TOOL="cargo run -q -p bridge-tool --"
 DFX_SETUP=0
 IS_WRAPPED=false
 

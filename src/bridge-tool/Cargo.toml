@@ -1,5 +1,5 @@
 [package]
-name = "bridge_tool"
+name = "bridge-tool"
 version.workspace = true
 edition.workspace = true
 
