@@ -757,7 +757,7 @@ pub trait TestContext {
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
                 let hostname = format!(
-                    "https://127.0.0.1:8001/?canisterId={}",
+                    "https://127.0.0.1:8002/?canisterId={}",
                     self.canisters().external_evm()
                 );
                 println!("EVM-RPC provider hostname: {hostname}");

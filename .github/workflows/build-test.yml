@@ -55,7 +55,7 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm wget
+        apt update && apt install -y npm wget docker-compose
         npm install -g local-ssl-proxy
         cp btc-deploy/mkcert/* /etc/ssl/
       artifact-pre-script: |
@@ -72,7 +72,7 @@ jobs:
 
         ./scripts/tests/tests_i686.sh
         ./scripts/tests/tests.sh
-        ./scripts/tests/dfx_tests.sh --docker
+        ./scripts/tests/dfx_tests.sh --github-ci
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
     secrets:

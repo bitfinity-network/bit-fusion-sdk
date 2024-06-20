@@ -11,6 +11,13 @@ setup_docker() {
     cd $PREV_PATH
 }
 
+stop_docker() {
+    PREV_PATH=$(pwd)
+    cd btc-deploy/
+    docker-compose down
+    cd $PREV_PATH
+}
+
 kill_ssl_proxy() {
     PID="$(ps aux | grep local-ssl-proxy | grep -v grep | awk '{print $2}')"
     if [ -n "$PID" ]; then
@@ -18,14 +25,26 @@ kill_ssl_proxy() {
     fi
 }
 
+WITH_DOCKER="0"
+if [ "$1" == "--docker" ]; then
+    WITH_DOCKER="1"
+    shift
+fi
+
+# set dfxvm to use the correct version and use docker
+if [ "$1" == "--github-ci" ]; then
+    shift
+    WITH_DOCKER="1"
+    dfxvm default 0.16.1
+fi
+
 
 kill_ssl_proxy || true
 killall -9 icx-proxy || true
 dfx stop
 
-if [ "$1" == "--docker" ]; then
+if [ "$WITH_DOCKER" -eq 1 ]; then
     setup_docker
-    shift
 fi
 
 set -e
@@ -45,7 +64,7 @@ set +e
 dfx start --background --clean --enable-bitcoin 2> "$LOGFILE"
 start_icx
 
-local-ssl-proxy --source 8001 --target 8545 --key ./btc-deploy/mkcert/localhost+3-key.pem --cert ./btc-deploy/mkcert/localhost+3.pem &
+local-ssl-proxy --source 8002 --target 8545 --key ./btc-deploy/mkcert/localhost+3-key.pem --cert ./btc-deploy/mkcert/localhost+3.pem &
 
 dfx identity use max
 wallet_principal=$(dfx identity get-wallet)
@@ -60,3 +79,7 @@ kill_ssl_proxy || true
 killall -9 icx-proxy || true
 
 dfx stop
+
+if [ "$WITH_DOCKER" -eq 1 ]; then
+    stop_docker
+fi
