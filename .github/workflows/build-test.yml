@@ -55,8 +55,7 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm wget docker-compose
-        npm install -g local-ssl-proxy
+        apt update && apt install -y npm wget curl
         cp btc-deploy/mkcert/* /etc/ssl/
       artifact-pre-script: |
         # Get external dependencies
