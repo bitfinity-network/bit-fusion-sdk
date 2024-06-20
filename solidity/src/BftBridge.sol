@@ -90,14 +90,10 @@ contract BFTBridge is TokenManager {
 
         _checkMintOrderSignature(encodedOrder);
 
-        require(
-            _baseToRemoteWrapped[order.toERC20] == order.fromTokenID
-                || _wrappedToRemoteBase[order.toERC20] == order.fromTokenID,
-            "Invalid token pair"
-        );
+        require(_wrappedToRemote[order.toERC20] == order.fromTokenID, "Invalid token pair");
 
         // Update token's metadata only if it is a wrapped token
-        bool isWrapped = _wrappedToRemoteBase[order.toERC20] == order.fromTokenID;
+        bool isWrapped = _wrappedToRemote[order.toERC20] == order.fromTokenID;
         if (isWrapped) {
             updateTokenMetadata(order.toERC20, order.name, order.symbol, order.decimals);
         }
@@ -136,21 +132,12 @@ contract BFTBridge is TokenManager {
     function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
-        require(
-            _wrappedToRemoteBase[fromERC20] != bytes32(0) || _baseToRemoteWrapped[fromERC20] != bytes32(0),
-            "Invalid from address; not registered in the bridge"
-        );
+        require(_wrappedToRemote[fromERC20] != bytes32(0), "Invalid from address; not registered in the bridge");
+        require(amount > 0, "Invalid burn amount");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
 
-        bytes32 toTokenID;
-        if (_wrappedToRemoteBase[fromERC20] != bytes32(0)) {
-            toTokenID = _wrappedToRemoteBase[fromERC20];
-        } else {
-            toTokenID = _baseToRemoteWrapped[fromERC20];
-        }
-
-        require(amount > 0, "Invalid burn amount");
+        bytes32 toTokenID = _wrappedToRemote[fromERC20];
 
         // Update user information about burn operations.
         _lastUserBurns[msg.sender].push(uint32(block.number));
@@ -202,9 +189,9 @@ contract BFTBridge is TokenManager {
         // Check if withdrawal is happening on the correct chain
         require(block.chainid == recipientChainID, "Invalid chain ID");
 
-        if (_wrappedToRemoteBase[order.toERC20] != bytes32(0)) {
+        if (_wrappedToRemote[order.toERC20] != bytes32(0)) {
             require(
-                _remoteBaseToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
+                _remoteToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
             );
         }
     }
