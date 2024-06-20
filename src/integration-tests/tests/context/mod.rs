@@ -336,7 +336,7 @@ pub trait TestContext {
             Token::Bool(true)
         );
 
-        println!("burning src tokens using BftBridge");
+        println!("Burning src tokens using BftBridge");
         let input = bft_bridge_api::BURN
             .encode_input(&[
                 Token::Uint(amount),

@@ -300,7 +300,7 @@ impl BridgeTask {
                 log::debug!("Adding PrepareMintOrder task");
                 let operation_id = get_operations_store().new_operation(
                     burnt.sender.clone(),
-                    OperationPayload::new(sender_side, burnt),
+                    OperationPayload::new(sender_side.other(), burnt),
                 );
                 let mint_order_task = BridgeTask::PrepareMintOrder(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
@@ -394,7 +394,7 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
-        let operation_store = get_operations_store();
+        let mut operation_store = get_operations_store();
         let Some(operation) = operation_store.get(operation_id) else {
             return Err(SchedulerError::TaskExecutionFailed(format!(
                 "Operation {operation_id} is not found in the operation store."
@@ -403,7 +403,9 @@ impl BridgeTask {
 
         let side = operation.side;
         let OperationStatus::MintOrderSigned {
-            signed_mint_order, ..
+            token_id,
+            amount,
+            signed_mint_order,
         } = operation.status
         else {
             return Err(SchedulerError::TaskExecutionFailed(format!("Operation {operation_id} was expected to be in `MintOrderSigned` state, but found: {operation:?}")));
@@ -453,12 +455,25 @@ impl BridgeTask {
         tx.hash = tx.hash();
 
         let client = evm_info.link.get_json_rpc_client();
-        client
+        let tx_id = client
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
 
-        log::trace!("Mint transaction sent");
+        operation_store.update(
+            operation_id,
+            OperationPayload {
+                side,
+                status: OperationStatus::MintOrderSent {
+                    token_id,
+                    amount,
+                    signed_mint_order,
+                    tx_id: tx_id.into(),
+                },
+            },
+        );
+
+        log::trace!("Mint transaction sent. Operation id: {operation_id}. Tx id: {tx_id}");
 
         Ok(())
     }

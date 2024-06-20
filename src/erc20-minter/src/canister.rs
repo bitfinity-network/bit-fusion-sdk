@@ -13,7 +13,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::operation_store::MinterOperationStore;
+use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use minter_did::error::Result;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
@@ -153,6 +153,14 @@ impl EvmMinter {
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
+    }
+
+    #[query]
+    pub fn get_operations_list(
+        &self,
+        wallet_address: H160,
+    ) -> Vec<(MinterOperationId, OperationPayload)> {
+        get_operations_store().get_for_address(&wallet_address)
     }
 
     /// Returns EVM address of the canister.
