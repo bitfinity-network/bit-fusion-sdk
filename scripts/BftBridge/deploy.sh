@@ -72,7 +72,9 @@ cd solidity/script || {
 forge script DeployBft.s.sol --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --broadcast \
     --skip-simulation \
     --evm-version paris \
-    --optimize
+    --optimize \
+    --slow \
+    -vv
 
 # Check if the deployment was successful
 if [ $? -eq 0 ]; then

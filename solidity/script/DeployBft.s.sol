@@ -14,6 +14,7 @@ contract DeployBft is Script {
         bool isWrappedSide = vm.envBool("IS_WRAPPED_SIDE");
 
         vm.startBroadcast();
+        vm.txGasPrice(10);
 
         bytes memory initializeData =
             abi.encodeWithSelector(BFTBridge.initialize.selector, minterAddress, feeChargeAddress, isWrappedSide);
