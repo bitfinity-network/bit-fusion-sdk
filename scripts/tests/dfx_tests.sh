@@ -2,6 +2,7 @@
 
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
+LOGFILE=./target/dfx_tests.log
 
 setup_docker() {
     PREV_PATH=$(pwd)
@@ -38,12 +39,10 @@ start_icx() {
     sleep 2
 }
 
-cargo build --tests -p integration-tests --features dfx_tests
-
-rm -f dfx_tests.log
+rm -f "$LOGFILE"
 
 set +e
-dfx start --background --clean --enable-bitcoin 2> ./target/dfx_tests.log
+dfx start --background --clean --enable-bitcoin 2> "$LOGFILE"
 start_icx
 
 local-ssl-proxy --source 8001 --target 8545 --key ./btc-deploy/mkcert/localhost+3-key.pem --cert ./btc-deploy/mkcert/localhost+3.pem &

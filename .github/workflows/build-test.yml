@@ -55,7 +55,7 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm
+        apt update && apt install -y npm wget
         npm install -g local-ssl-proxy
         cp btc-deploy/mkcert/* /etc/ssl/
       artifact-pre-script: |
