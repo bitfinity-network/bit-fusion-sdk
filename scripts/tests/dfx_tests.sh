@@ -3,20 +3,31 @@
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 
+setup_docker() {
+    PREV_PATH=$(pwd)
+    cd btc-deploy/
+    docker-compose up -d --build
+    cd $PREV_PATH
+}
+
 kill_ssl_proxy() {
-    set +e
     PID="$(ps aux | grep local-ssl-proxy | grep -v grep | awk '{print $2}')"
     if [ -n "$PID" ]; then
         kill -9 $PID
     fi
-    set -e
 }
 
-set -e
 
 kill_ssl_proxy || true
 killall -9 icx-proxy || true
 dfx stop
+
+if [ "$1" == "--docker" ]; then
+    setup_docker
+    shift
+fi
+
+set -e
 
 start_icx() {
     killall icx-proxy

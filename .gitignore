@@ -10,8 +10,8 @@ debug/
 target/
 
 deps/
-
-dfx* 
+dfx_log.txt
+dfx_tests.log
 bitcoin
 
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries

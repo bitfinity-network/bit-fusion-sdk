@@ -1,4 +1,4 @@
-name: 'Build and Deploy'
+name: "Build and Deploy"
 
 on:
   workflow_call:
@@ -6,26 +6,26 @@ on:
       installation-method:
         required: true
         type: string
-        description: 'installation method, can be any of create, reinstall, upgrade'
+        description: "installation method, can be any of create, reinstall, upgrade"
       network:
         type: string
         required: false
-        description: 'network where canister will be deployed to'
-        default: 'ic'
+        description: "network where canister will be deployed to"
+        default: "ic"
       wallet:
         type: string
         required: false
-        description: 'owner wallet for canister'
-        default: '4cfzs-sqaaa-aaaak-aegca-cai'
+        description: "owner wallet for canister"
+        default: "4cfzs-sqaaa-aaaak-aegca-cai"
       chain_id:
         type: number
         required: false
-        description: 'chain id'
+        description: "chain id"
         default: 355113
       force_deploy:
         type: boolean
         required: false
-        description: 'if true, force deploy ignoring main branch'
+        description: "if true, force deploy ignoring main branch"
         default: false
 
     secrets:
@@ -43,18 +43,21 @@ env:
 
 jobs:
   build-test:
-    name: 'Build and Test'
+    name: "Build and Test"
     uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
     with:
       runs-on: 4x150g-runner
       container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.77-dfx0.19
-      git-fetch-depth: '0'
+      git-fetch-depth: "0"
       skip-test: ${{ github.ref_type == 'tag' }}
       audit-allow-warnings: true
-      cargo-clippy-extra-args: '-- -D warnings'
+      cargo-clippy-extra-args: "-- -D warnings"
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
+        apt update && apt install -y npm
+        npm install -g local-ssl-proxy
+        cp btc-deploy/mkcert/* /etc/ssl/
       artifact-pre-script: |
         # Get external dependencies
         export WASMS_DIR="`pwd`/.artifact"
@@ -69,6 +72,7 @@ jobs:
 
         ./scripts/tests/tests_i686.sh
         ./scripts/tests/tests.sh
+        ./scripts/tests/dfx_tests.sh --docker
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
     secrets:
