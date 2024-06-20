@@ -69,8 +69,8 @@ contract BFTBridge is TokenManager {
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
     // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool _isWrappedSide)
-        TokenManager(minterAddress, _isWrappedSide)
+    constructor(address minterAddress, address feeChargeAddress, bool isWrappedSide)
+        TokenManager(minterAddress, isWrappedSide)
     {
         feeChargeContract = IFeeCharge(feeChargeAddress);
     }

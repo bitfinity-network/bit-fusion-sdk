@@ -9,7 +9,7 @@ abstract contract TokenManager {
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
-    bool internal isWrappedSide;
+    bool internal _isWrappedSide;
 
     /// Mapping from `remote token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
     mapping(bytes32 => address) internal _remoteToWrapped;
@@ -34,15 +34,15 @@ abstract contract TokenManager {
     }
 
     // Constructor or an initializer where you set this variable
-    constructor(address minterAddress, bool _isWrappedSide) {
+    constructor(address minterAddress, bool isWrappedSide) {
         minterCanisterAddress = minterAddress;
-        isWrappedSide = _isWrappedSide;
+        _isWrappedSide = isWrappedSide;
     }
 
     /// Registers base address for the given remote wrapped token
     function registerBase(address base, bytes32 remoteWrapped) public {
         require(msg.sender == minterCanisterAddress, "Only minter can call");
-        require(!isWrappedSide, "Only for base side");
+        require(!_isWrappedSide, "Only for base side");
         require(_wrappedToRemote[base] == bytes32(0), "Base already registered");
 
         _remoteToWrapped[remoteWrapped] = base;
@@ -51,7 +51,7 @@ abstract contract TokenManager {
 
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
-        require(isWrappedSide, "Only for wrapped side");
+        require(_isWrappedSide, "Only for wrapped side");
         require(_remoteToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token
