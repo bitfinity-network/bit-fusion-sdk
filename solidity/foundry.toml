@@ -2,8 +2,14 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
-
+ast = true
+ffi = true
+build_info = true
+extra_output = ["storageLayout"]
+script = "script"
+force = true
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
 
 [fmt]
 line_length = 120
@@ -15,4 +21,9 @@ quote_style = 'double'
 number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
-contract_new_lines = true
+
+
+[rpc_endpoints]
+mainnet = "https://mainnet.bitfinity.network"
+testnet = "https://testnet.bitfinity.network"
+local = "http://localhost:8545"

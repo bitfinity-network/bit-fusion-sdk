@@ -2,7 +2,7 @@
 
 source "$(dirname "$0")/deploy_functions.sh"
 
-CREATE_BFT_BRIDGE_TOOL="cargo run -q -p create_bft_bridge_tool --"
+CREATE_BFT_BRIDGE_TOOL="cargo run -q -p bridge-tool --"
 
 function usage() {
   echo "Usage: $0 [options]"
@@ -18,38 +18,39 @@ ARGS=$(getopt -o e:w:m:h --long evm-canister,wallet,minter-address,dfx-setup,hel
 while true; do
   case "$1" in
 
-    -w|--wallet)
-      WALLET="$2"
-      shift 2
-      ;;
+  -w | --wallet)
+    WALLET="$2"
+    shift 2
+    ;;
 
-    -e|--evm-canister)
-      EVM_PRINCIPAL="$2"
-      shift 2
-      ;;
+  -e | --evm-canister)
+    EVM_PRINCIPAL="$2"
+    shift 2
+    ;;
 
-    -m|--minter-address)
-      MINTER_ADDRESS="$2"
-      shift 2
-      ;;
+  -m | --minter-address)
+    MINTER_ADDRESS="$2"
+    shift 2
+    ;;
 
-    --dfx-setup)
-      DFX_SETUP=1
-      shift
-      ;;
+  --dfx-setup)
+    DFX_SETUP=1
+    shift
+    ;;
 
-    -h|--help)
-      usage
-      exit 255
-      ;;
+  -h | --help)
+    usage
+    exit 255
+    ;;
 
-    --)
-      shift
-      break
-      ;;
+  --)
+    shift
+    break
+    ;;
 
-    *)
-      break
+  *)
+    break
+    ;;
   esac
 done
 

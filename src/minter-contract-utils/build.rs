@@ -43,6 +43,12 @@ fn main() -> anyhow::Result<()> {
         "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
     );
 
+    set_contract_code(
+        &contracts,
+        "UUPSProxy",
+        "BUILD_SMART_CONTRACT_UUPS_PROXY_HEX_CODE",
+    );
+
     Ok(())
 }
 

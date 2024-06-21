@@ -42,6 +42,9 @@ solidity/out/
 # Ignores solidity development broadcast logs
 solidity/broadcast/
 
+# Ignore build info
+solidity/build-info
+
 # Dotenv file
 .env
 
@@ -69,3 +72,6 @@ rust-toolchain.toml
 # solidity-coverage files
 */coverage
 */coverage.json
+
+#node_modules
+node_modules
