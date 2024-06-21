@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "src/create_bft_bridge_tool",
+    "src/bridge-tool",
     "src/minter-contract-utils",
     "src/integration-tests",
     "src/icrc2-minter",

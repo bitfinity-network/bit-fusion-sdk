@@ -7,7 +7,7 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use evm_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::{BftBridgeContractStatus, EvmParams};
+use minter_contract_utils::evm_bridge::EvmParams;
 
 use super::Settings;
 use crate::constant::CONFIG_MEMORY_ID;
@@ -24,7 +24,7 @@ impl Config {
             owner: settings.owner,
             evm_principal: settings.evm_principal,
             evm_params: None,
-            bft_bridge_contract_status: BftBridgeContractStatus::None,
+            bft_bridge_contract_address: None,
         };
 
         self.update_data(|data| *data = new_data);
@@ -69,19 +69,14 @@ impl Config {
         EthJsonRpcClient::new(IcCanisterClient::new(self.get_evm_principal()))
     }
 
+    /// Returns bridge contract address for EVM.
     pub fn get_bft_bridge_contract(&self) -> Option<H160> {
-        self.with_data(|data| match &data.get().bft_bridge_contract_status {
-            BftBridgeContractStatus::Created(address) => Some(address.clone()),
-            _ => None,
-        })
+        self.with_data(|data| data.get().bft_bridge_contract_address.clone())
     }
 
-    pub fn set_bft_bridge_contract_status(&mut self, new_status: BftBridgeContractStatus) {
-        self.update_data(|data| data.bft_bridge_contract_status = new_status);
-    }
-
-    pub fn get_bft_bridge_contract_status(&self) -> BftBridgeContractStatus {
-        self.with_data(|data| data.get().bft_bridge_contract_status.clone())
+    /// Set bridge contract address for EVM.
+    pub fn set_bft_bridge_contract(&mut self, address: H160) {
+        self.update_data(|data| data.bft_bridge_contract_address = Some(address));
     }
 
     fn with_data<F, T>(&self, f: F) -> T
@@ -117,7 +112,7 @@ pub struct ConfigData {
     pub owner: Principal,
     pub evm_principal: Principal,
     pub evm_params: Option<EvmParams>,
-    pub bft_bridge_contract_status: BftBridgeContractStatus,
+    pub bft_bridge_contract_address: Option<H160>,
 }
 
 impl Default for ConfigData {
@@ -126,7 +121,7 @@ impl Default for ConfigData {
             owner: Principal::management_canister(),
             evm_principal: Principal::anonymous(),
             evm_params: None,
-            bft_bridge_contract_status: BftBridgeContractStatus::None,
+            bft_bridge_contract_address: None,
         }
     }
 }

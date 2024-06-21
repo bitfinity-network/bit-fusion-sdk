@@ -1,3 +1,5 @@
-openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 forge-std/=lib/forge-std/src/
 src/=src/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src

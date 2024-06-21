@@ -22,48 +22,49 @@ function usage() {
 ARGS=$(getopt -o e:b:i:m:h --long evm-principal,ic-network,install-mode,bitcoin-network,ckbtc-ledger,ckbtc-minter,help -- "$@")
 while true; do
   case "$1" in
-    -e|--evm-principal)
-      EVM_PRINCIPAL="$2"
-      shift 2
-      ;;
+  -e | --evm-principal)
+    EVM_PRINCIPAL="$2"
+    shift 2
+    ;;
 
-    -i|--ic-network)
-      IC_NETWORK="$2"
-      shift 2
-      ;;
+  -i | --ic-network)
+    IC_NETWORK="$2"
+    shift 2
+    ;;
 
-    -b|--bitcoin-network)
-      BITCOIN_NETWORK="$2"
-      shift 2
-      ;;
+  -b | --bitcoin-network)
+    BITCOIN_NETWORK="$2"
+    shift 2
+    ;;
 
-    -m|--install-mode)
-      INSTALL_MODE="$2"
-      shift 2
-      ;;
+  -m | --install-mode)
+    INSTALL_MODE="$2"
+    shift 2
+    ;;
 
-    --ckbtc-minter)
-      CKBTC_MINTER="$2"
-      shift 2
-      ;;
-    
-    --ckbtc-ledger)
-      CKBTC_LEDGER="$2"
-      shift 2
-      ;;
+  --ckbtc-minter)
+    CKBTC_MINTER="$2"
+    shift 2
+    ;;
 
-    -h|--help)
-      usage
-      exit 255
-      ;;
+  --ckbtc-ledger)
+    CKBTC_LEDGER="$2"
+    shift 2
+    ;;
 
-    --)
-      shift
-      break
-      ;;
+  -h | --help)
+    usage
+    exit 255
+    ;;
 
-    *)
-      break
+  --)
+    shift
+    break
+    ;;
+
+  *)
+    break
+    ;;
   esac
 done
 
@@ -80,17 +81,22 @@ SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Pro
 if [ "$IC_NETWORK" = "local" ]; then
   start_dfx 1
   SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
+
   EVM_PRINCIPAL=$(deploy_evm_testnet)
   CKBTC_LEDGER=$(deploy_ckbtc_ledger)
+
   echo "CKBTC Ledger: $CKBTC_LEDGER"
+
   deploy_ckbtc_kyt
+
   CKBTC_MINTER=$(deploy_ckbtc_minter)
+
   echo "CKBTC Minter: $CKBTC_MINTER"
 fi
 
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
   INSTALL_MODE="install"
-fi 
+fi
 
 if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$INSTALL_MODE" != "reinstall" ]; then
   echo "Usage: $0 <create|init|upgrade|reinstall>"

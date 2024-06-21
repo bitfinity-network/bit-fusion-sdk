@@ -251,27 +251,6 @@ async fn set_owner_access() {
 }
 
 #[tokio::test]
-async fn double_register_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-
-    let _ = ctx
-        .initialize_bft_bridge(ADMIN, H160::default())
-        .await
-        .unwrap();
-
-    ctx.advance_by_times(Duration::from_secs(2), 2).await;
-
-    let err = ctx
-        .initialize_bft_bridge(ADMIN, H160::default())
-        .await
-        .unwrap_err();
-
-    assert!(err
-        .to_string()
-        .contains("creation of BftBridge contract already finished"));
-}
-
-#[tokio::test]
 async fn canister_log_config_should_still_be_storable_after_upgrade() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
 

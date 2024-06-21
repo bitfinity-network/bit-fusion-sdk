@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::fmt;
 
 use candid::{CandidType, Principal};
-use did::codec;
+use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::{BftBridgeContractStatus, BridgeSide, EvmInfo, EvmParams};
+use minter_contract_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
@@ -55,14 +55,14 @@ impl Config {
         self.data.get().evm_info_by_side(side).clone()
     }
 
-    /// Returns bft bridge status for the given bridge side.
-    pub fn get_bft_bridge_status(&self, side: BridgeSide) -> BftBridgeContractStatus {
-        self.data.get().bridge_status_by_side(side).clone()
+    /// Returns bft bridge contract for the given bridge side.
+    pub fn get_bft_bridge_contract(&self, side: BridgeSide) -> Option<H160> {
+        self.data.get().bridge_contract_by_side(side).clone()
     }
 
-    /// Updates bft bridge status for the given bridge side.
-    pub fn set_bft_bridge_status(&mut self, side: BridgeSide, status: BftBridgeContractStatus) {
-        self.update_data(|data| *data.bridge_status_by_side_mut(side) = status)
+    /// Updates bft bridge contract for the given bridge side.
+    pub fn set_bft_bridge_contract(&mut self, side: BridgeSide, contract: H160) {
+        self.update_data(|data| *data.bridge_contract_by_side_mut(side) = Some(contract))
     }
 
     /// Sets owner principal.
@@ -118,8 +118,8 @@ pub struct ConfigData {
     pub admin: Principal,
     pub base_evm: EvmInfo,
     pub wrapped_evm: EvmInfo,
-    pub base_bft_bridge: BftBridgeContractStatus,
-    pub wrapped_bft_bridge: BftBridgeContractStatus,
+    pub base_bft_bridge: Option<H160>,
+    pub wrapped_bft_bridge: Option<H160>,
 }
 
 impl ConfigData {
@@ -140,15 +140,15 @@ impl ConfigData {
     }
 
     /// Returns bft bridge status for the given bridge side.
-    pub fn bridge_status_by_side(&self, side: BridgeSide) -> &BftBridgeContractStatus {
+    pub fn bridge_contract_by_side(&self, side: BridgeSide) -> &Option<H160> {
         match side {
             BridgeSide::Base => &self.base_bft_bridge,
             BridgeSide::Wrapped => &self.wrapped_bft_bridge,
         }
     }
 
-    /// Returns mutable bft bridge status for the given bridge side.
-    pub fn bridge_status_by_side_mut(&mut self, side: BridgeSide) -> &mut BftBridgeContractStatus {
+    /// Returns mutable bft bridge contract for the given bridge side.
+    pub fn bridge_contract_by_side_mut(&mut self, side: BridgeSide) -> &mut Option<H160> {
         match side {
             BridgeSide::Base => &mut self.base_bft_bridge,
             BridgeSide::Wrapped => &mut self.wrapped_bft_bridge,

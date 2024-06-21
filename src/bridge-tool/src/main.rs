@@ -13,7 +13,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
 use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE,
+    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::id256::Id256;
@@ -21,7 +21,7 @@ use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
 // identity.
-const IDENTITY_PATH: &str = "src/create_bft_bridge_tool/identity.pem";
+const IDENTITY_PATH: &str = "src/bridge-tool/identity.pem";
 
 /// Some operations with BFT bridge.
 #[derive(Parser, Debug)]
@@ -53,13 +53,25 @@ struct DeployBftArgs {
     #[arg(long)]
     fee_charge_address: Option<String>,
 
-    /// Principal of the EVM canister
+    /// IsWrappedSide
+    #[arg(long, default_value_t = false)]
+    is_wrapped_side: bool,
+
+    /// Evm Principal
     #[arg(long)]
     evm: Principal,
+
+    /// IC host
+    #[arg(long)]
+    ic_host: Option<String>,
 
     /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
     #[arg(long)]
     wallet: Option<String>,
+
+    /// Identity Path
+    #[arg(long)]
+    identity_path: Option<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -67,6 +79,13 @@ struct DeployFeeChargeArgs {
     /// Principal of the EVM canister
     #[arg(long)]
     evm: Principal,
+
+    #[arg(long)]
+    identity_path: Option<String>,
+
+    /// IC host
+    #[arg(long)]
+    ic_host: Option<String>,
 
     /// Hex-encoded PK to use to sign transaction.
     #[arg(long)]
@@ -268,11 +287,15 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         &hex::decode(args.minter_address.trim_start_matches("0x"))
             .expect("failed to parse minter address"),
     );
+
+    let identity = args.identity_path.as_deref().unwrap_or(IDENTITY_PATH);
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
     let client = EvmCanisterClient::new(
-        IcAgentClient::with_identity(args.evm, IDENTITY_PATH, "http://127.0.0.1:4943", None)
+        IcAgentClient::with_identity(args.evm, identity, host, None)
             .await
             .expect("failed to create evm client"),
     );
+
     let wallet = get_wallet(&args.wallet, &client).await;
 
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
@@ -287,50 +310,82 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         })
         .unwrap_or_default();
 
-    let input = bft_bridge_api::CONSTRUCTOR
-        .encode_input(
-            BFT_BRIDGE_SMART_CONTRACT_CODE.clone(),
-            &[Token::Address(minter), Token::Address(fee_charge)],
-        )
-        .unwrap();
+    async fn deploy_contract(
+        client: &EvmCanisterClient<IcAgentClient>,
+        wallet: &Wallet<'_, SigningKey>,
+        input: Vec<u8>,
+        chain_id: u64,
+    ) -> H160 {
+        let nonce = client
+            .eth_get_transaction_count(wallet.address().into(), BlockNumber::Pending)
+            .await
+            .unwrap()
+            .unwrap();
 
-    let nonce = client
-        .eth_get_transaction_count(wallet.address().into(), BlockNumber::Latest)
-        .await
-        .unwrap()
-        .unwrap();
+        let tx = TransactionBuilder {
+            from: &wallet.address().into(),
+            to: None,
+            nonce,
+            value: 0u64.into(),
+            gas: 5_000_000u64.into(),
+            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            input,
+            signature: SigningMethod::SigningKey(wallet.signer()),
+            chain_id: chain_id as _,
+        }
+        .calculate_hash_and_build()
+        .expect("Failed to sign the transaction");
 
-    let create_contract_tx = TransactionBuilder {
-        from: &wallet.address().into(),
-        to: None,
-        nonce,
-        value: 0u64.into(),
-        gas: 5_000_000u64.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
-        input,
-        signature: SigningMethod::SigningKey(wallet.signer()),
-        chain_id: chain_id as _,
+        let hash = client
+            .send_raw_transaction(tx)
+            .await
+            .expect("Failed to send raw transaction")
+            .expect("Failed to execute contract deployment transaction");
+        let receipt = wait_for_tx_success(client, hash).await;
+        receipt
+            .contract_address
+            .expect("Receipt did not contain contract address")
+            .into()
     }
-    .calculate_hash_and_build()
-    .expect("Failed to sign the transaction");
 
-    let hash = client
-        .send_raw_transaction(create_contract_tx)
-        .await
-        .expect("Failed to send raw transaction")
-        .expect("Failed to execute crate BFT contract transaction");
-    let receipt = wait_for_tx_success(&client, hash).await;
-    let bft_contract_address = receipt
-        .contract_address
-        .expect("Receipt did not contain contract address");
+    let bft_contract_input = bft_bridge_api::CONSTRUCTOR
+        .encode_input(BFT_BRIDGE_SMART_CONTRACT_CODE.clone(), &[])
+        .unwrap();
+
+    let bft_contract_address =
+        deploy_contract(&client, &wallet, bft_contract_input, chain_id).await;
+
+    let initialize_data = bft_bridge_api::proxy::INITIALISER
+        .encode_input(&[
+            Token::Address(minter),
+            Token::Address(fee_charge),
+            Token::Bool(args.is_wrapped_side),
+        ])
+        .expect("failed to encode initialize data");
+
+    let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
+        .encode_input(
+            UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
+            &[
+                Token::Address(bft_contract_address),
+                Token::Bytes(initialize_data),
+            ],
+        )
+        .expect("failed to encode proxy constructor input");
+
+    let bft_proxy_address = deploy_contract(&client, &wallet, proxy_input, chain_id).await;
 
     eprintln!("Created BFT Bridge contract");
-    println!("{bft_contract_address:#x}");
+    println!("Implementation address: {bft_contract_address:#x}");
+    println!("Proxy address: {bft_proxy_address:#x}");
+    println!("{bft_proxy_address:#x}");
 }
 
 async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
+    let identity = args.identity_path.as_deref().unwrap_or(IDENTITY_PATH);
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
     let client = EvmCanisterClient::new(
-        IcAgentClient::with_identity(args.evm, IDENTITY_PATH, "http://127.0.0.1:4943", None)
+        IcAgentClient::with_identity(args.evm, identity, host, None)
             .await
             .expect("failed to create evm client"),
     );
