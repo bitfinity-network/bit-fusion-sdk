@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use did::{H160, H256};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
@@ -13,7 +13,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_did::error::Result;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -118,7 +117,7 @@ impl EvmMinter {
         self.set_timers();
     }
 
-    /// Returns `(operaion_id, signed_mint_order)` pairs for the given sender id.
+    /// Returns `(operation_id, signed_mint_order)` pairs for the given sender id.
     #[query]
     pub async fn list_mint_orders(
         &self,
@@ -155,57 +154,20 @@ impl EvmMinter {
         }
     }
 
-    /// Starts the BFT bridge contract deployment.
+    /// Sets the BFT bridge contract address.
     #[update]
-    pub async fn init_bft_bridge_contract(
-        &mut self,
-        side: BridgeSide,
-        fee_charge_address: H160,
-    ) -> Result<H256> {
-        let state = get_state();
-        let signer = state.borrow().signer.get().clone();
-
-        let evm_info = state.borrow().config.get_evm_info(side);
-        let evm_link = evm_info.link;
-        let evm_params = evm_info
-            .params
-            .ok_or_else(|| "EVM params not initialized".to_string())?;
-        let minter_address = signer.get_address().await.map_err(|e| e.to_string())?;
-
-        let mut status = state.borrow().config.get_bft_bridge_status(side);
-
-        log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
-
-        let hash = status
-            .initialize(
-                evm_link,
-                evm_params.chain_id as _,
-                signer,
-                minter_address,
-                fee_charge_address,
-                side == BridgeSide::Wrapped,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-
-        log::trace!("BftBridge contract initialization started with status: {status:?}");
-
-        state
+    pub async fn set_bft_bridge_contract(&mut self, address: H160, side: BridgeSide) {
+        get_state()
             .borrow_mut()
             .config
-            .set_bft_bridge_status(side, status);
+            .set_bft_bridge_contract(side, address);
+    }
 
-        let options = TaskOptions::default()
-            .with_max_retries_policy(10)
-            .with_fixed_backoff_policy(4);
-        get_scheduler()
-            .borrow_mut()
-            .append_task(ScheduledTask::with_options(
-                BridgeTask::RefreshBftBridgeCreationStatus(side),
-                options,
-            ));
-
-        Ok(hash)
+    /// Returns bridge contract address for EVM.
+    /// If contract isn't initialized yet - returns None.
+    #[query]
+    pub fn get_bft_bridge_contract(&mut self, side: BridgeSide) -> Option<H160> {
+        get_state().borrow().config.get_bft_bridge_contract(side)
     }
 
     fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {

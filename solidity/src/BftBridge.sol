@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
 import {RingBuffer} from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract BFTBridge is TokenManager {
+contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
@@ -30,6 +34,9 @@ contract BFTBridge is TokenManager {
 
     // Operataion ID counter
     uint32 public operationIDCounter;
+
+    /// Allowed implementations hash list
+    mapping(bytes32 => bool) public allowedImplementations;
 
     struct MintOrderData {
         uint256 amount;
@@ -68,11 +75,47 @@ contract BFTBridge is TokenManager {
     /// Event that can be emited with a notification for the minter canister
     event NotifyMinterEvent(uint32 notificationType, bytes userData);
 
-    // Constructor to initialize minterCanisterAddress and feeChargeContract.
-    constructor(address minterAddress, address feeChargeAddress, bool isWrappedSide)
-        TokenManager(minterAddress, isWrappedSide)
-    {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Locks the contract and prevent any future re-initialization
+        _disableInitializers();
+    }
+
+    /// Constructor to initialize minterCanisterAddress and feeChargeContract
+    /// and whether this contract is on the wrapped side
+    function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
         feeChargeContract = IFeeCharge(feeChargeAddress);
+        TokenManager._initialize(minterAddress, isWrappedSide);
+
+        // Call super initializer
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __Pausable_init();
+    }
+
+    /// Restrict who can upgrade this contract
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+        require(allowedImplementations[newImplementation.codehash], "Not allowed implementation");
+    }
+
+    /// Pause the contract and prevent any future mint or burn operations
+    /// Can be called only by the owner
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// Unpause the contract
+    /// Can be called only by the owner
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /// Add a new implementation to the allowed list
+    function addAllowedImplementation(address newImplementation) external onlyOwner {
+        require(newImplementation != address(0), "Invalid implementation address");
+        require(newImplementation.code.length > 0, "Not a contract");
+
+        allowedImplementations[newImplementation.codehash] = true;
     }
 
     /// Emit minter notification event with the given `userData`. For details
@@ -82,8 +125,8 @@ contract BFTBridge is TokenManager {
         emit NotifyMinterEvent(notificationType, userData);
     }
 
-    // Main function to withdraw funds
-    function mint(bytes calldata encodedOrder) external {
+    /// Main function to withdraw funds
+    function mint(bytes calldata encodedOrder) external whenNotPaused {
         uint256 initGasLeft = gasleft();
 
         MintOrderData memory order = _decodeAndValidateOrder(encodedOrder[:269]);
@@ -129,7 +172,7 @@ contract BFTBridge is TokenManager {
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public returns (uint32) {
+    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         require(_wrappedToRemote[fromERC20] != bytes32(0), "Invalid from address; not registered in the bridge");

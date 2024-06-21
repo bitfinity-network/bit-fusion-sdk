@@ -30,7 +30,6 @@ type SignedMintOrderData = Vec<u8>;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
-    RefreshBftBridgeCreationStatus(BridgeSide),
     CollectEvmEvents(BridgeSide),
     PrepareMintOrder(BurntEventData, BridgeSide),
     RegisterBaseToken(WrappedTokenDeployedEventData),
@@ -48,9 +47,6 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            BridgeTask::RefreshBftBridgeCreationStatus(side) => {
-                Box::pin(Self::refresh_bft_bridge(state, *side))
-            }
             BridgeTask::CollectEvmEvents(side) => {
                 Box::pin(Self::collect_evm_events(state, scheduler, *side))
             }
@@ -110,24 +106,6 @@ impl BridgeTask {
         Ok(())
     }
 
-    pub async fn refresh_bft_bridge(
-        state: Rc<RefCell<State>>,
-        side: BridgeSide,
-    ) -> Result<(), SchedulerError> {
-        log::trace!("refreshing bft bridge status");
-        let mut status = state.borrow().config.get_bft_bridge_status(side);
-        status.refresh().await.into_scheduler_result()?;
-
-        log::trace!("{side} bft bridge status refreshed: {status:?}");
-
-        state
-            .borrow_mut()
-            .config
-            .set_bft_bridge_status(side, status);
-
-        Ok(())
-    }
-
     async fn collect_evm_events(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
@@ -141,11 +119,13 @@ impl BridgeTask {
             return Self::init_evm_state(state, side).await;
         };
 
-        let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
-        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to collect evm events: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
-        })?;
+        let bft_bridge = state
+            .borrow()
+            .config
+            .get_bft_bridge_contract(side)
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("no bft bridge contract set".into())
+            })?;
 
         let client = evm_info.link.get_json_rpc_client();
 
@@ -361,11 +341,15 @@ impl BridgeTask {
             .get_evm_params(side)
             .into_scheduler_result()?;
 
-        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
-        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to send register base tx: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
-        })?;
+        let bft_bridge = match state.borrow().config.get_bft_bridge_contract(side) {
+            Some(bft_bridge) => bft_bridge,
+            None => {
+                log::warn!("failed to send register base tx: bft bridge is not configured");
+                return Err(SchedulerError::TaskExecutionFailed(
+                    "bft bridge is not configured".into(),
+                ));
+            }
+        };
 
         let client = evm_info.link.get_json_rpc_client();
         let nonce = client
@@ -432,11 +416,14 @@ impl BridgeTask {
             .get_evm_params(side)
             .into_scheduler_result()?;
 
-        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
-        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to send mint transaction: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
-        })?;
+        let bft_bridge = &state
+            .borrow()
+            .config
+            .get_bft_bridge_contract(side)
+            .ok_or_else(|| {
+                log::warn!("failed to send mint transaction: bft bridge is not configured");
+                SchedulerError::TaskExecutionFailed("bft bridge is not configured".into())
+            })?;
 
         let client = evm_info.link.get_json_rpc_client();
         let nonce = client
@@ -446,7 +433,7 @@ impl BridgeTask {
 
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
-            bft_bridge.into(),
+            bft_bridge.0,
             nonce.into(),
             evm_params.gas_price.into(),
             &order_data,

@@ -36,7 +36,6 @@ use crate::tokens::{icrc1, icrc2};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmInfo,
-    RefreshBftBridgeCreationStatus,
     CollectEvmEvents,
     BurnIcrc2Tokens(MinterOperationId),
     PrepareMintOrder(MinterOperationId),
@@ -53,7 +52,6 @@ impl Task for BridgeTask {
         let state = crate::canister::get_state();
         match self {
             BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
-            BridgeTask::RefreshBftBridgeCreationStatus => Box::pin(Self::refresh_bft_bridge(state)),
             BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
             BridgeTask::BurnIcrc2Tokens(operation_id) => {
                 Box::pin(Self::burn_icrc2_tokens(scheduler, *operation_id))
@@ -99,21 +97,6 @@ impl BridgeTask {
             .update_evm_params(|p| *p = evm_params);
 
         log::trace!("evm parameters initialized");
-
-        Ok(())
-    }
-
-    pub async fn refresh_bft_bridge(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
-        log::trace!("refreshing bft bridge status");
-        let mut status = state.borrow().config.get_bft_bridge_contract_status();
-        status.refresh().await.into_scheduler_result()?;
-
-        log::trace!("bft bridge status refreshed: {status:?}");
-
-        state
-            .borrow_mut()
-            .config
-            .set_bft_bridge_contract_status(status);
 
         Ok(())
     }

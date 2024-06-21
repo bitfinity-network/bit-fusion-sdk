@@ -17,7 +17,7 @@ start_icx() {
 CHAIN_ID=355113
 
 dfx stop
-dfx start --host 127.0.0.1:4943 --background --clean 2> dfx_stderr.log
+dfx start --host 127.0.0.1:4943 --background --clean 2>dfx_stderr.log
 
 dfx identity new --force icrc-admin
 dfx identity use icrc-admin
@@ -38,15 +38,15 @@ dfx deploy token2 --argument "(variant {Init = record {
     token_symbol = \"AUX\";
     token_name = \"Aux Token\";
     metadata = vec {};
-    initial_balances = vec {                                
-        record {                                            
-            record {                                        
-                owner = principal \"$USER_PRINCIPICAL\";   
-                subaccount = null;                          
-            };                                              
-            100_000_000_000                                 
-        }                                                   
-    };  
+    initial_balances = vec {
+        record {
+            record {
+                owner = principal \"$USER_PRINCIPICAL\";
+                subaccount = null;
+            };
+            100_000_000_000
+        }
+    };
     max_memo_length = opt 100;
     archive_options = record {
         num_blocks_to_archive = 1000;
@@ -82,8 +82,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-
-dfx deploy icrc2-minter  --argument "(record {
+dfx deploy icrc2-minter --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
         Local = record {
@@ -97,17 +96,14 @@ dfx deploy icrc2-minter  --argument "(record {
     owner = principal \"$ADMIN_PRINCIPAL\";
 })"
 
-
 start_icx
 
-
-
 ########## Deploy BFT and ICRC2 contracts ##########
-ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
-ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
+ETH_WALLET=$(cargo run -q -p bridge-tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET")
 
 FEE_CHARGE_DEPLOY_TX_NONCE=0
-FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
+FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
 res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
 res=${res#*\"}
@@ -118,8 +114,15 @@ echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
 echo "Minting ETH tokens for ICRC2 Minter canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
-echo "Initializing bft bridge contract with icrc2-minter"
-dfx canister call icrc2-minter init_bft_bridge_contract "(\"${FEE_CHARGE_CONTRACT_ADDRESS}\",)"
+echo "Deploying BftBridge contract"
+
+IS_WRAPPED="false"
+BFT_BRIDGE_ADDRESS=$(deploy_bft_bridge $EVM $ETH_WALLET_ADDRESS $ICRC2_MINTER_ECDSA_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS $IS_WRAPPED)
+
+echo "Got BftBridge address: ${BFT_BRIDGE_ADDRESS}"
+
+echo "Setting ICRC2 Minter BftBridge address"
+dfx canister call icrc2-minter set_bft_bridge_contract "(\"${BFT_BRIDGE_ADDRESS}\")"
 sleep 5
 
 res=$(dfx canister call icrc2-minter get_bft_bridge_contract)

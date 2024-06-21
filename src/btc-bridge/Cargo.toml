@@ -18,6 +18,7 @@ ethereum-json-rpc-client = { workspace = true, features = [
 futures = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
+ic-ckbtc-minter = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
@@ -32,7 +33,6 @@ minter-contract-utils = { path = "../minter-contract-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 
-ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-02-21_23-01" }
 
 [dev-dependencies]
 tokio = { workspace = true }
