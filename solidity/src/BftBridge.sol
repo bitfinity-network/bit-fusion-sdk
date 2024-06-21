@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
 import { RingBuffer } from "src/libraries/RingBuffer.sol";
@@ -98,7 +98,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
         require(allowedImplementations[newImplementation.codehash], "Not allowed implementation");
     }
 

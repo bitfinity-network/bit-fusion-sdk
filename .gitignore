@@ -69,3 +69,6 @@ rust-toolchain.toml
 # solidity-coverage files
 */coverage
 */coverage.json
+
+#node_modules
+node_modules
