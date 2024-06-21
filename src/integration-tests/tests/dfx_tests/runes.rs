@@ -278,6 +278,7 @@ impl RunesContext {
     async fn deposit(
         &self,
         eth_address: &H160,
+        erc20_address: &H160,
     ) -> Result<Vec<(RuneName, u128, H256)>, DepositError> {
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
@@ -289,6 +290,7 @@ impl RunesContext {
 
         let data = RuneDepositRequestData {
             dst_address: eth_address.clone(),
+            erc20_address: erc20_address.clone(),
             amounts: None,
         };
         let input = bft_bridge_api::NOTIFY_MINTER
@@ -470,7 +472,7 @@ impl RunesContext {
 
         self.inner.advance_time(Duration::from_secs(5)).await;
 
-        self.deposit(&wallet_address.into())
+        self.deposit(&wallet_address.into(), &self.token_contract)
             .await
             .expect("failed to deposit runes");
 
