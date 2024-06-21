@@ -2,6 +2,7 @@
 
 - [Deploy](#deploy)
   - [Requirements](#requirements)
+    - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
   - [Build](#build)
   - [Canisters deployment](#canisters-deployment)
     - [BFT Bridge](#bft-bridge)
@@ -27,7 +28,6 @@
 
 - Install libunwind: `sudo apt install libunwind-dev`
 - Install protobuf: `sudo apt install protobuf-compiler`
-
 
 ## Build
 
