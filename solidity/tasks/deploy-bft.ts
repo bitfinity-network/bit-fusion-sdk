@@ -1,22 +1,20 @@
-/// Creates a Hardhat task for deploying the BFT contract.
+import { task } from 'hardhat/config';
+import { boolean } from 'hardhat/internal/core/params/argumentTypes';
+import { HardhatRuntimeEnvironment } from 'hardhat/types';
+
+/// Deploys the BFT contract using the provided parameters.
 ///
-/// This task takes three parameters:
-/// - `minterAddress`: The address of the minter.
-/// - `feeChargeAddress`: The address of the fee charge.
-/// - `isWrappedSide`: A boolean indicating whether this is the wrapped side.
+/// @param minterAddress The address of the minter.
+/// @param feeChargeAddress The address of the fee charge.
+/// @param isWrappedSide A boolean indicating whether this is the wrapped side.
 ///
-/// The task will:
+/// This task will:
 /// 1. Compile the contract.
 /// 2. Validate the provided addresses.
 /// 3. Deploy the BFT contract using the provided parameters.
 /// 4. Wait for the deployment to be confirmed.
 /// 5. Log the deployed proxy address and implementation address.
 
-import { task } from 'hardhat/config';
-import { boolean } from 'hardhat/internal/core/params/argumentTypes';
-import { HardhatRuntimeEnvironment } from 'hardhat/types';
-
-/// Create a task for deployment of the BFT contract
 task('deploy-bft', 'Deploys the BFT contract')
     .addParam('minterAddress', 'The address of the minter')
     .addParam('feeChargeAddress', 'The address of the fee charge')
@@ -38,8 +36,6 @@ task('deploy-bft', 'Deploys the BFT contract')
             }
 
             console.log('Deploying BFT contract');
-
-            const [deployer] = await hre.ethers.getSigners();
             const { network } = hre.hardhatArguments;
 
             if (!network) {

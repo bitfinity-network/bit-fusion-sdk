@@ -7,8 +7,13 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 
+/// Tasks that are used to interact with the BFT contract
 import "./tasks/deploy-bft";
 import "./tasks/fee-charge-address";
+import "./tasks/deploy-fee-charge";
+import "./tasks/upgrade-bft";
+import "./tasks/pause-unpause";
+
 
 const MAINNET_URL = "https://mainnet.bitfinity.network"
 
