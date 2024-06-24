@@ -6,7 +6,6 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-
 use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::build_data::test_contracts::TEST_WTM_HEX_CODE;
 use minter_contract_utils::build_data::{

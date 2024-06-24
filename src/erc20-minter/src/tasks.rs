@@ -44,10 +44,6 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            BridgeTask::RefreshBftBridgeCreationStatus(side) => {
-                let side = *side;
-                Box::pin(Self::refresh_bft_bridge(state, side))
-            }
             BridgeTask::CollectEvmEvents(side) => {
                 let side = *side;
                 Box::pin(Self::collect_evm_events(state, scheduler, side))
