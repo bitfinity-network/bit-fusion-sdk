@@ -7,7 +7,7 @@ use bitcoin::Address;
 use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::{BlockNumber, Log};
+use ethers_core::types::Log;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
@@ -82,11 +82,12 @@ impl RuneBridgeTask {
         };
 
         let client = evm_info.link.get_json_rpc_client();
+        let last_block = client.get_block_number().await.into_scheduler_result()?;
 
         let logs = BridgeEvent::collect_logs(
             &client,
-            params.next_block.into(),
-            BlockNumber::Safe,
+            params.next_block,
+            last_block,
             evm_info.bridge_contract.0,
         )
         .await

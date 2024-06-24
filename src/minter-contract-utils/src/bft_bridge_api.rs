@@ -249,9 +249,57 @@ pub enum BridgeEvent {
 impl BridgeEvent {
     pub async fn collect_logs(
         evm_client: &EthJsonRpcClient<impl Client>,
+        mut from_block: u64,
+        blocks_to_fetch: u64,
+        bridge_contract: H160,
+    ) -> Result<Vec<Log>, anyhow::Error> {
+        const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
+
+        let mut offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
+        let mut logs = Vec::new();
+
+        while from_block < blocks_to_fetch {
+            match Self::collect_logs_from_to(
+                evm_client,
+                bridge_contract,
+                EthBlockNumber::Number(from_block.into()),
+                EthBlockNumber::Number((from_block + offset).into()),
+            )
+            .await
+            {
+                Ok(new_logs) if new_logs.is_empty() => break,
+                Ok(new_logs) => {
+                    logs.extend(new_logs);
+                    from_block += offset;
+                    // reset offset to default value
+                    offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
+                }
+                Err(err) => {
+                    log::error!(
+                        "failed to collect logs from {from_block} to {}: {}",
+                        from_block + offset,
+                        err
+                    );
+                    // reduce offset to retry fetching logs; if offset is 1, skip the block
+                    if offset > 1 {
+                        offset /= 2;
+                    } else {
+                        log::error!("unable to collect logs for block {from_block}. Skipping it.");
+                        from_block += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(logs)
+    }
+
+    /// Collects logs from the given range of blocks.
+    async fn collect_logs_from_to(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        bridge_contract: H160,
         from_block: EthBlockNumber,
         to_block: EthBlockNumber,
-        bridge_contract: H160,
     ) -> Result<Vec<Log>, anyhow::Error> {
         let params = EthGetLogsParams {
             address: Some(vec![bridge_contract]),
@@ -263,7 +311,6 @@ impl BridgeEvent {
                 NOTIFY_EVENT.signature(),
             ]]),
         };
-
         evm_client.get_logs(params).await
     }
 

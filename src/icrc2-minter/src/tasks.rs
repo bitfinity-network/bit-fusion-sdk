@@ -6,7 +6,7 @@ use std::rc::Rc;
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::{BlockNumber, Log};
+use ethers_core::types::Log;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
@@ -121,14 +121,12 @@ impl BridgeTask {
             ));
         };
 
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block.into(),
-            BlockNumber::Safe,
-            bridge_contract.0,
-        )
-        .await
-        .into_scheduler_result()?;
+        let last_block = client.get_block_number().await.into_scheduler_result()?;
+
+        let logs =
+            BridgeEvent::collect_logs(&client, params.next_block, last_block, bridge_contract.0)
+                .await
+                .into_scheduler_result()?;
 
         log::debug!("got evm logs: {logs:?}");
 
