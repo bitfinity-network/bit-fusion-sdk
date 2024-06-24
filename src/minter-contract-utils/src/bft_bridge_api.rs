@@ -77,6 +77,11 @@ pub static BURN: Lazy<Function> = Lazy::new(|| Function {
             internal_type: None,
         },
         Param {
+            name: "toTokenID".into(),
+            kind: ParamType::FixedBytes(32),
+            internal_type: None,
+        },
+        Param {
             name: "recipientID".into(),
             kind: ParamType::Bytes,
             internal_type: None,

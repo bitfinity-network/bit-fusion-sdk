@@ -16,6 +16,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
 use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::evm_link::EvmLink;
+use minter_did::id256::Id256;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, DepositStateResponse, GetAddressError};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
@@ -38,6 +39,7 @@ struct RunesContext {
     eth_wallet: Wallet<'static, SigningKey>,
     token_contract: H160,
     bft_bridge_contract: H160,
+    rune_id: Id256,
 }
 
 fn get_rune_info(name: &str) -> RuneInfo {
@@ -156,6 +158,7 @@ impl RunesContext {
             inner: context,
             eth_wallet: wallet,
             token_contract: token,
+            rune_id: rune_info.id().into(),
             bft_bridge_contract: bft_bridge,
         }
     }
@@ -404,6 +407,7 @@ impl RunesContext {
                 &client,
                 &self.eth_wallet,
                 &self.token_contract,
+                self.rune_id.0.as_slice(),
                 withdrawal_address.as_bytes().to_vec(),
                 &self.bft_bridge_contract,
                 amount,

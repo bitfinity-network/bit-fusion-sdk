@@ -164,6 +164,10 @@ struct BurnWrappedArgs {
     #[arg(long)]
     token_address: String,
 
+    /// to Token ID.
+    #[arg(long)]
+    to_token_id: String,
+
     /// BTC address to transfer BTC to.
     #[arg(long)]
     address: String,
@@ -650,6 +654,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .encode_input(&[
             Token::Uint(amount),
             Token::Address(token),
+            Token::FixedBytes(args.to_token_id.into_bytes()),
             Token::Bytes(args.address.into_bytes()),
         ])
         .unwrap();

@@ -313,11 +313,13 @@ pub trait TestContext {
         Ok(fee_charge_address)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens_raw(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Vec<u8>,
         bridge: &H160,
         amount: u128,
@@ -343,6 +345,7 @@ pub trait TestContext {
             .encode_input(&[
                 Token::Uint(amount),
                 Token::Address(from_token.0),
+                Token::FixedBytes(to_token_id.to_vec()),
                 Token::Bytes(recipient),
             ])
             .unwrap();
@@ -364,11 +367,13 @@ pub trait TestContext {
         Ok((operation_id, tx_hash))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Id256,
         bridge: &H160,
         amount: u128,
@@ -377,6 +382,7 @@ pub trait TestContext {
             evm_client,
             wallet,
             from_token,
+            to_token_id,
             recipient.0.to_vec(),
             bridge,
             amount,

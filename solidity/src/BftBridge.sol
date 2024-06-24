@@ -133,7 +133,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         _checkMintOrderSignature(encodedOrder);
 
-        require(_wrappedToRemote[order.toERC20] == order.fromTokenID, "Invalid token pair");
+        // the token must be registered or the side must be base
+        require(isBaseSide() || _wrappedToRemote[order.toERC20] == order.fromTokenID, "Invalid token pair");
 
         // Update token's metadata only if it is a wrapped token
         bool isWrapped = _wrappedToRemote[order.toERC20] == order.fromTokenID;
@@ -172,15 +173,21 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public whenNotPaused returns (uint32) {
+    function burn(uint256 amount, address fromERC20, bytes32 toTokenID, bytes memory recipientID)
+        public
+        whenNotPaused
+        returns (uint32)
+    {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
-        require(_wrappedToRemote[fromERC20] != bytes32(0), "Invalid from address; not registered in the bridge");
+        // Check if the token is registered on the bridge or the side is base
+        require(
+            isBaseSide() || (_wrappedToRemote[fromERC20] != bytes32(0) && _remoteToWrapped[toTokenID] != address(0)),
+            "Invalid from address; not registered in the bridge"
+        );
         require(amount > 0, "Invalid burn amount");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
-
-        bytes32 toTokenID = _wrappedToRemote[fromERC20];
 
         // Update user information about burn operations.
         _lastUserBurns[msg.sender].push(uint32(block.number));

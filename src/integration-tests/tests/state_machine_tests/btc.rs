@@ -46,6 +46,7 @@ use ic_exports::icrc_types::icrc3::transactions::{
 };
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
+use ic_stable_structures::Storable;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 use minter_contract_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
@@ -200,6 +201,7 @@ struct CkBtcSetup {
     pub minter_id: CanisterId,
     pub kyt_id: CanisterId,
     pub tip_height: AtomicU32,
+    pub token_id: Id256,
     pub wrapped_token: H160,
     pub bft_bridge: H160,
 }
@@ -402,6 +404,7 @@ impl CkBtcSetup {
             kyt_id,
             wrapped_token: token,
             bft_bridge,
+            token_id,
             tip_height: AtomicU32::default(),
         }
     }
@@ -1084,6 +1087,7 @@ impl CkBtcSetup {
                 &(&self.context).evm_client("admin"),
                 wallet,
                 from_token,
+                &self.token_id.to_bytes(),
                 recipient,
                 &self.bft_bridge,
                 amount as u128,

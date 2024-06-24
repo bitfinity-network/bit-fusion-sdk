@@ -222,7 +222,9 @@ contract BftBridgeTest is Test {
         vm.expectRevert(
             bytes("Invalid from address; not registered in the bridge")
         );
-        _bridge.burn(100, _alice, principal);
+
+        bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        _bridge.burn(100, _alice, toTokenId, principal);
 
         // deploy erc20 so it can be used
         MintOrder memory order = _createSelfMintOrder();
@@ -238,7 +240,7 @@ contract BftBridgeTest is Test {
         );
 
         vm.prank(address(_owner));
-        _bridge.burn(1, order.toERC20, principal);
+        _bridge.burn(1, order.toERC20, order.fromTokenID, principal);
     }
 
     function testMintCallsAreRejectedWhenPaused() public {
