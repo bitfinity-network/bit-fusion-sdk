@@ -16,33 +16,34 @@ function usage() {
 ARGS=$(getopt -o e:i:m:h --long evm-principal,ic-network,install-mode,help -- "$@")
 while true; do
   case "$1" in
-    -e|--evm-principal)
-      EVM_PRINCIPAL="$2"
-      shift 2
-      ;;
+  -e | --evm-principal)
+    EVM_PRINCIPAL="$2"
+    shift 2
+    ;;
 
-    -i|--ic-network)
-      IC_NETWORK="$2"
-      shift 2
-      ;;
+  -i | --ic-network)
+    IC_NETWORK="$2"
+    shift 2
+    ;;
 
-    -m|--install-mode)
-      INSTALL_MODE="$2"
-      shift 2
-      ;;
+  -m | --install-mode)
+    INSTALL_MODE="$2"
+    shift 2
+    ;;
 
-    -h|--help)
-      usage
-      exit 255
-      ;;
+  -h | --help)
+    usage
+    exit 255
+    ;;
 
-    --)
-      shift
-      break
-      ;;
+  --)
+    shift
+    break
+    ;;
 
-    *)
-      break
+  *)
+    break
+    ;;
   esac
 done
 
@@ -63,9 +64,7 @@ fi
 
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
   INSTALL_MODE="install"
-fi
-
-if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$INSTALL_MODE" != "reinstall" ]; then
+elif [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$INSTALL_MODE" != "reinstall" ]; then
   echo "Usage: $0 <create|init|upgrade|reinstall>"
   exit 1
 fi

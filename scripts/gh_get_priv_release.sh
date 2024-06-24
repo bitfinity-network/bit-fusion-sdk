@@ -43,8 +43,7 @@ cd $target_dir
 echo "DOWNLOADING $name"
     # Get ID of the asset based on given name.
     eval $(echo "$response" | grep -C3 "name.:.\+$name" | grep -w id | tr : = | tr -cd '[[:alnum:]]=')
-    #id=$(echo "$response" | jq --arg name "$name" '.assets[] | select(.name == $name).id') # If jq is installed, this can be used instead. 
-    
+    #id=$(echo "$response" | jq --arg name "$name" '.assets[] | select(.name == $name).id') # If jq is installed, this can be used instead.
     [ "$id" ] || { echo "Error: Failed to get asset id for \"$name\", response: $response" | awk 'length($0)<100' >&2; exit 1; }
 
     GH_ASSET="$GH_REPO/releases/assets/$id"
