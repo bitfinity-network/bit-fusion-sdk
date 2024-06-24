@@ -146,13 +146,10 @@ impl State {
     }
 
     pub fn rune_info(&self, rune_id: RuneId) -> Option<RuneInfo> {
-        for rune_info in self.runes.values() {
-            if rune_info.id() == rune_id {
-                return Some(*rune_info);
-            }
-        }
-
-        None
+        self.runes
+            .values()
+            .find(|rune_info| rune_info.id() == rune_id)
+            .copied()
     }
 
     pub fn update_rune_list(&mut self, runes: HashMap<RuneName, RuneInfo>) {
