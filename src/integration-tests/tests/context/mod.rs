@@ -85,7 +85,7 @@ pub trait TestContext {
     }
 
     fn rune_bridge_client(&self, caller: &str) -> RuneBridgeClient<Self::Client> {
-        RuneBridgeClient::new(self.client(self.canister().rune_bridge(), caller))
+        RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
     /// Returns client for the ICRC token 1 canister.
