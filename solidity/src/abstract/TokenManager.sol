@@ -13,17 +13,14 @@ abstract contract TokenManager is Initializable {
     // Indicates whether this contract is on the wrapped side
     bool internal _isWrappedSide;
 
-    /// Mapping from `remote token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
-    mapping(bytes32 => address) internal _remoteToWrapped;
+    /// Mapping from `base token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
+    mapping(bytes32 => address) internal _baseToWrapped;
 
-    /// Mapping from Wrapped ERC20 token address to remote token id (can be anything, also ERC20 address)
-    mapping(address => bytes32) internal _wrappedToRemote;
+    /// Mapping from Wrapped ERC20 token address to base token id (can be anything, also ERC20 address)
+    mapping(address => bytes32) internal _wrappedToBase;
 
     /// List of wrapped tokens.
     address[] private _wrappedTokenList;
-
-    // Address of minter canister
-    address public minterCanisterAddress;
 
     /// Event for new wrapped token creation
     event WrappedTokenDeployedEvent(string name, string symbol, bytes32 baseTokenID, address wrappedERC20);
@@ -35,8 +32,7 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function _initialize(address minterAddress, bool isWrappedSide) internal initializer {
-        minterCanisterAddress = minterAddress;
+    function _initialize(bool isWrappedSide) internal initializer {
         _isWrappedSide = isWrappedSide;
     }
 
@@ -49,13 +45,13 @@ abstract contract TokenManager is Initializable {
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
         require(_isWrappedSide, "Only for wrapped side");
-        require(_remoteToWrapped[baseTokenID] == address(0), "Wrapper already exist");
+        require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token
         WrappedToken wrappedERC20 = new WrappedToken(name, symbol, address(this));
 
-        _remoteToWrapped[baseTokenID] = address(wrappedERC20);
-        _wrappedToRemote[address(wrappedERC20)] = baseTokenID;
+        _baseToWrapped[baseTokenID] = address(wrappedERC20);
+        _wrappedToBase[address(wrappedERC20)] = baseTokenID;
         _wrappedTokenList.push(address(wrappedERC20));
 
         emit WrappedTokenDeployedEvent(name, symbol, baseTokenID, address(wrappedERC20));
@@ -83,12 +79,12 @@ abstract contract TokenManager is Initializable {
 
     /// Returns wrapped token for the given base token
     function getWrappedToken(bytes32 baseTokenID) external view returns (address) {
-        return _remoteToWrapped[baseTokenID];
+        return _baseToWrapped[baseTokenID];
     }
 
     /// Returns base token for the given wrapped token
     function getBaseToken(address wrappedTokenAddress) external view returns (bytes32) {
-        return _wrappedToRemote[wrappedTokenAddress];
+        return _wrappedToBase[wrappedTokenAddress];
     }
 
     /// Returns list of token pairs.
@@ -99,7 +95,7 @@ abstract contract TokenManager is Initializable {
         for (uint256 i = 0; i < length; i++) {
             address wrappedToken = _wrappedTokenList[i];
             wrapped[i] = wrappedToken;
-            base[i] = _wrappedToRemote[wrappedToken];
+            base[i] = _wrappedToBase[wrappedToken];
         }
     }
 }

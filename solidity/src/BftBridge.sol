@@ -35,6 +35,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     // Operataion ID counter
     uint32 public operationIDCounter;
 
+    // Address of minter canister
+    address public minterCanisterAddress;
+
     /// Allowed implementations hash list
     mapping(bytes32 => bool) public allowedImplementations;
 
@@ -85,7 +88,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// and whether this contract is on the wrapped side
     function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        TokenManager._initialize(minterAddress, isWrappedSide);
+        minterCanisterAddress = minterAddress;
+        TokenManager._initialize(isWrappedSide);
 
         // Call super initializer
         __Ownable_init(msg.sender);
@@ -133,12 +137,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         _checkMintOrderSignature(encodedOrder);
 
-        // the token must be registered or the side must be base
-        require(isBaseSide() || _wrappedToRemote[order.toERC20] == order.fromTokenID, "Invalid token pair");
-
         // Update token's metadata only if it is a wrapped token
-        bool isWrapped = _wrappedToRemote[order.toERC20] == order.fromTokenID;
-        if (isWrapped) {
+        bool isTokenWrapped = _wrappedToBase[order.toERC20] == order.fromTokenID;
+        // the token must be registered or the side must be base
+        require(isBaseSide() || isTokenWrapped, "Invalid token pair");
+
+        if (isTokenWrapped) {
             updateTokenMetadata(order.toERC20, order.name, order.symbol, order.decimals);
         }
 
@@ -146,7 +150,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _isNonceUsed[order.senderID][order.nonce] = true;
         IERC20(order.toERC20).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrapped) {
+        if (order.approveSpender != address(0) && order.approveAmount != 0 && isTokenWrapped) {
             WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
@@ -182,7 +186,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         // Check if the token is registered on the bridge or the side is base
         require(
-            isBaseSide() || (_wrappedToRemote[fromERC20] != bytes32(0) && _remoteToWrapped[toTokenID] != address(0)),
+            isBaseSide() || (_wrappedToBase[fromERC20] != bytes32(0) && _baseToWrapped[toTokenID] != address(0)),
             "Invalid from address; not registered in the bridge"
         );
         require(amount > 0, "Invalid burn amount");
@@ -239,10 +243,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         // Check if withdrawal is happening on the correct chain
         require(block.chainid == recipientChainID, "Invalid chain ID");
 
-        if (_wrappedToRemote[order.toERC20] != bytes32(0)) {
-            require(
-                _remoteToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
-            );
+        if (_wrappedToBase[order.toERC20] != bytes32(0)) {
+            require(_baseToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair");
         }
     }
 

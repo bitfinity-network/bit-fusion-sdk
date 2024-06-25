@@ -269,7 +269,6 @@ pub enum BridgeEvent {
     Burnt(BurntEventData),
     Minted(MintedEventData),
     Notify(NotifyMinterEventData),
-    WrappedTokenDeployed(WrappedTokenDeployedEventData),
 }
 
 impl BridgeEvent {
@@ -287,7 +286,6 @@ impl BridgeEvent {
                 BURNT_EVENT.signature(),
                 MINTED_EVENT.signature(),
                 NOTIFY_EVENT.signature(),
-                WRAPPED_TOKEN_DEPLOYED_EVENT.signature(),
             ]]),
         };
 
@@ -312,9 +310,6 @@ impl TryFrom<RawLog> for BridgeEvent {
             .map(Self::Burnt)
             .or_else(|_| MintedEventData::try_from(log.clone()).map(Self::Minted))
             .or_else(|_| NotifyMinterEventData::try_from(log.clone()).map(Self::Notify))
-            .or_else(|_| {
-                WrappedTokenDeployedEventData::try_from(log).map(Self::WrappedTokenDeployed)
-            })
     }
 }
 
@@ -455,33 +450,6 @@ pub static NOTIFY_EVENT: Lazy<Event> = Lazy::new(|| Event {
     anonymous: false,
 });
 
-pub static WRAPPED_TOKEN_DEPLOYED_EVENT: Lazy<Event> = Lazy::new(|| Event {
-    name: "WrappedTokenDeployedEvent".into(),
-    inputs: vec![
-        EventParam {
-            name: "name".into(),
-            kind: ParamType::String,
-            indexed: false,
-        },
-        EventParam {
-            name: "symbol".into(),
-            kind: ParamType::String,
-            indexed: false,
-        },
-        EventParam {
-            name: "baseTokenID".into(),
-            kind: ParamType::FixedBytes(32),
-            indexed: false,
-        },
-        EventParam {
-            name: "wrappedERC20".into(),
-            kind: ParamType::Address,
-            indexed: false,
-        },
-    ],
-    anonymous: false,
-});
-
 /// Event emitted when token is minted by BFTBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct MintedEventData {
@@ -587,61 +555,6 @@ impl TryFrom<RawLog> for NotifyMinterEventData {
         let parsed = NOTIFY_EVENT.parse_log(log)?;
 
         let mut data_builder = NotifyMinterEventDataBuilder::default();
-
-        for param in parsed.params {
-            data_builder = data_builder.with_field_from_token(&param.name, param.value);
-        }
-
-        data_builder.build()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
-pub struct WrappedTokenDeployedEventData {
-    pub name: String,
-    pub symbol: String,
-    pub base_token_id: Vec<u8>,
-    pub wrapped_erc20: did::H160,
-}
-
-// string name, string symbol, bytes32 baseTokenID, address wrappedERC20
-#[derive(Debug, Default, Clone)]
-struct WrappedTokenDeployedEventDataBuilder {
-    name: Option<String>,
-    symbol: Option<String>,
-    base_token_id: Option<Vec<u8>>,
-    wrapped_erc20: Option<did::H160>,
-}
-
-impl WrappedTokenDeployedEventDataBuilder {
-    fn build(self) -> Result<WrappedTokenDeployedEventData, ethers_core::abi::Error> {
-        Ok(WrappedTokenDeployedEventData {
-            name: self.name.ok_or_else(not_found("name"))?,
-            symbol: self.symbol.ok_or_else(not_found("symbol"))?,
-            base_token_id: self.base_token_id.ok_or_else(not_found("baseTokenID"))?,
-            wrapped_erc20: self.wrapped_erc20.ok_or_else(not_found("wrappedERC20"))?,
-        })
-    }
-
-    fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
-        match name {
-            "name" => self.name = value.into_string().map(Into::into),
-            "symbol" => self.symbol = value.into_string().map(Into::into),
-            "baseTokenID" => self.base_token_id = value.into_fixed_bytes(),
-            "wrappedERC20" => self.wrapped_erc20 = value.into_address().map(Into::into),
-            _ => {}
-        };
-        self
-    }
-}
-
-impl TryFrom<RawLog> for WrappedTokenDeployedEventData {
-    type Error = ethers_core::abi::Error;
-
-    fn try_from(log: RawLog) -> Result<Self, Self::Error> {
-        let parsed = WRAPPED_TOKEN_DEPLOYED_EVENT.parse_log(log)?;
-
-        let mut data_builder = WrappedTokenDeployedEventDataBuilder::default();
 
         for param in parsed.params {
             data_builder = data_builder.with_field_from_token(&param.name, param.value);
