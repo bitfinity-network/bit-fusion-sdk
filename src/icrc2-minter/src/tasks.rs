@@ -123,10 +123,14 @@ impl BridgeTask {
 
         let last_block = client.get_block_number().await.into_scheduler_result()?;
 
-        let logs =
-            BridgeEvent::collect_logs(&client, params.next_block, last_block, bridge_contract.0)
-                .await
-                .into_scheduler_result()?;
+        let logs = BridgeEvent::collect_logs(
+            &client,
+            params.next_block,
+            Some(last_block),
+            bridge_contract.0,
+        )
+        .await
+        .into_scheduler_result()?;
 
         log::debug!("got evm logs: {logs:?}");
 

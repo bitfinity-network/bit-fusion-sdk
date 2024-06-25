@@ -123,9 +123,10 @@ impl BridgeTask {
         let client = evm_info.link.get_json_rpc_client();
         let last_block = client.get_block_number().await.into_scheduler_result()?;
 
-        let logs = BridgeEvent::collect_logs(&client, params.next_block, last_block, bft_bridge.0)
-            .await
-            .into_scheduler_result()?;
+        let logs =
+            BridgeEvent::collect_logs(&client, params.next_block, Some(last_block), bft_bridge.0)
+                .await
+                .into_scheduler_result()?;
 
         log::debug!("got logs from side {side}: {logs:?}");
 

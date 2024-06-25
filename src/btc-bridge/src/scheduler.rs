@@ -77,7 +77,7 @@ impl BtcTask {
         let logs = BridgeEvent::collect_logs(
             &client,
             params.next_block,
-            last_block,
+            Some(last_block),
             evm_info.bridge_contract.0,
         )
         .await

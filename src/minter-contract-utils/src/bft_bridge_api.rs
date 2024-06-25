@@ -250,28 +250,37 @@ impl BridgeEvent {
     pub async fn collect_logs(
         evm_client: &EthJsonRpcClient<impl Client>,
         mut from_block: u64,
-        blocks_to_fetch: u64,
+        to_block: Option<u64>,
         bridge_contract: H160,
     ) -> Result<Vec<Log>, anyhow::Error> {
         const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
 
+        if let Some(to_block) = to_block {
+            log::debug!("collecting logs from {from_block} to {to_block}",);
+        } else {
+            log::debug!("collecting logs from {from_block} to the latest block",);
+        }
+
         let mut offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
         let mut logs = Vec::new();
+        let to_block = to_block.unwrap_or(u64::MAX);
 
-        while from_block < blocks_to_fetch {
-            let to_block = (from_block + offset).min(blocks_to_fetch);
+        while from_block <= to_block {
+            let to_block_for_page = (from_block + offset).min(to_block);
+            log::debug!("collecting logs from {from_block} to {to_block_for_page}");
             match Self::collect_logs_from_to(
                 evm_client,
                 bridge_contract,
                 EthBlockNumber::Number(from_block.into()),
-                EthBlockNumber::Number(to_block.into()),
+                EthBlockNumber::Number(to_block_for_page.into()),
             )
             .await
             {
                 Ok(new_logs) if new_logs.is_empty() => break,
                 Ok(new_logs) => {
                     logs.extend(new_logs);
-                    from_block += offset;
+                    // offset is inclusive, so we need to add 1
+                    from_block += offset + 1;
                     // reset offset to default value
                     offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
                 }
@@ -281,8 +290,8 @@ impl BridgeEvent {
                         from_block + offset,
                         err
                     );
-                    // reduce offset to retry fetching logs; if offset is 1, skip the block
-                    if offset > 1 {
+                    // reduce offset to retry fetching logs; if offset is 0, skip the block
+                    if offset > 0 {
                         offset /= 2;
                     } else {
                         log::error!("unable to collect logs for block {from_block}. Skipping it.");
