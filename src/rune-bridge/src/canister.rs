@@ -20,14 +20,19 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
+use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
 use crate::core::deposit::RuneDeposit;
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::interface::{CreateEdictTxArgs, DepositStateResponse, GetAddressError, WithdrawError};
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::interface::{CreateEdictTxArgs, GetAddressError, WithdrawError};
+use crate::memory::{
+    MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
+    PENDING_TASKS_MEMORY_ID,
+};
+use crate::operation::{OperationState, RuneOperationStore};
 use crate::rune_info::RuneInfo;
 use crate::scheduler::{PersistentScheduler, RuneBridgeTask, TasksStorage};
 use crate::state::{BftBridgeConfig, RuneBridgeConfig, State};
@@ -101,12 +106,11 @@ impl RuneBridge {
     }
 
     #[query]
-    pub fn get_deposit_state(&self, eth_address: H160) -> DepositStateResponse {
-        let deposits = RuneDeposit::get().get_by_address(&eth_address);
-        DepositStateResponse {
-            current_ts: ic::time(),
-            deposits,
-        }
+    pub fn get_operations_list(
+        &self,
+        wallet_address: H160,
+    ) -> Vec<(MinterOperationId, OperationState)> {
+        get_operations_store().get_for_address(&wallet_address)
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
@@ -327,4 +331,16 @@ pub(crate) fn get_state() -> Rc<RefCell<State>> {
 
 pub(crate) fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+pub(crate) fn get_operations_store() -> RuneOperationStore {
+    let operations_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
+    let operations_log_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_LOG_MEMORY_ID));
+    let operations_map_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MAP_MEMORY_ID));
+    MinterOperationStore::with_memory(
+        operations_memory,
+        operations_log_memory,
+        operations_map_memory,
+        None,
+    )
 }
