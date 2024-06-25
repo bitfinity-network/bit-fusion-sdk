@@ -259,11 +259,12 @@ impl BridgeEvent {
         let mut logs = Vec::new();
 
         while from_block < blocks_to_fetch {
+            let to_block = (from_block + offset).min(blocks_to_fetch);
             match Self::collect_logs_from_to(
                 evm_client,
                 bridge_contract,
                 EthBlockNumber::Number(from_block.into()),
-                EthBlockNumber::Number((from_block + offset).into()),
+                EthBlockNumber::Number(to_block.into()),
             )
             .await
             {
