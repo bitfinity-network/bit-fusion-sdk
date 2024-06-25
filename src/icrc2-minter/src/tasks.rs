@@ -2,12 +2,13 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::time::Duration;
 
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_kit::{ic, RejectionCode};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
@@ -32,6 +33,47 @@ use crate::operation::{DepositOperationState, OperationState, WithdrawalOperatio
 use crate::state::State;
 use crate::tokens::icrc2::Success;
 use crate::tokens::{icrc1, icrc2};
+
+const COLLECT_EVM_LOGS_TIMEOUT: Duration = Duration::from_secs(60);
+thread_local! {
+    static COLLECT_EVM_LOGS_TS: RefCell<Option<u64>> = RefCell::new(None);
+}
+
+/// This lock is used to prevent several evm log collection tasks to run concurrently. When the
+/// task starts, it takes the lock and holds it until the evm params are updates, so no other
+/// task would receive logs from the same block numbers.
+///
+/// To prevent the lock to get stuck locked in case of panic after an async call, we set the timeout
+/// of 1 minute, after which the lock is released even if the task didn't release it.
+struct CollectLogsLock {
+    ts: u64,
+}
+
+impl CollectLogsLock {
+    fn take() -> Option<Self> {
+        match COLLECT_EVM_LOGS_TS.with(|v| *v.borrow()) {
+            Some(ts) if (ts + COLLECT_EVM_LOGS_TIMEOUT.as_nanos() as u64) < ic::time() => None,
+            _ => {
+                let ts = ic::time();
+                COLLECT_EVM_LOGS_TS.with(|v| *v.borrow_mut() = Some(ts));
+                Some(Self { ts })
+            }
+        }
+    }
+}
+
+impl Drop for CollectLogsLock {
+    fn drop(&mut self) {
+        COLLECT_EVM_LOGS_TS.with(|v| {
+            let mut curr_lock = v.borrow_mut();
+            if let Some(ts) = *curr_lock {
+                if ts <= self.ts {
+                    *curr_lock = None;
+                }
+            }
+        });
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
@@ -105,6 +147,11 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
+        let Some(_lock) = CollectLogsLock::take() else {
+            log::trace!("Another collect evm events task is in progress. Skipping.");
+            return Ok(());
+        };
+
         log::trace!("collecting evm events");
 
         let client = state.borrow().config.get_evm_client();
