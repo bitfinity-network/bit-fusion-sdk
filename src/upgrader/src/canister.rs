@@ -29,11 +29,6 @@ pub enum CanisterType {
     ERC20(Option<erc20_minter::state::Settings>),
 }
 
-pub enum CanisterArg {
-    Init,
-    Upgrade(Principal),
-}
-
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
 pub struct UpgraderCanister {
@@ -87,6 +82,7 @@ impl UpgraderCanister {
                 reserved_cycles_limit: None,
             }),
         };
+
         // Create empty canister
         let canister_id = Management::create_canister(args, CREATE_CYCLES)
             .await
@@ -119,6 +115,40 @@ impl UpgraderCanister {
         let arg: Vec<u8> = encode_args(()).unwrap();
         let arg = InstallCodeArgument {
             mode: CanisterInstallMode::Upgrade(None),
+            canister_id: principal,
+            wasm_module: wasm,
+            arg,
+        };
+        Management::install_code(arg).await.unwrap();
+    }
+
+    pub async fn reinstall(
+        &self,
+        canister_type: CanisterType,
+        principal: Principal,
+        wasm: Vec<u8>,
+    ) {
+        self.validate(&canister_type, wasm.clone());
+
+        let arg = match canister_type {
+            CanisterType::ICRC(args) => {
+                let Some(args) = args else {
+                    panic!("ICRC canister requires init data")
+                };
+
+                Encode!(&args).unwrap()
+            }
+            CanisterType::ERC20(settings) => {
+                let Some(settings) = settings else {
+                    panic!("ERC20 canister requires settings")
+                };
+
+                Encode!(&settings).unwrap()
+            }
+        };
+
+        let arg = InstallCodeArgument {
+            mode: CanisterInstallMode::Reinstall,
             canister_id: principal,
             wasm_module: wasm,
             arg,

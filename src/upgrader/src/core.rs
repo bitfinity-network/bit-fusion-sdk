@@ -13,10 +13,6 @@ use serde::de::DeserializeOwned;
 
 pub type CanisterId = Principal;
 
-/// Represents the type of cycles to use when making a call to the management canister.
-///
-/// `Cycles(u128)`: Indicates that the call should be made with the specified number of cycles.
-/// `Free`: Indicates that the call should be made without any cycles.
 pub enum CallCycles {
     Cycles(u128),
     Free,

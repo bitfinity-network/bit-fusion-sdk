@@ -1,1 +1,0 @@
-(variant { Ok = record { logs = vec {}; all_logs_count = 0 : nat64 } })
