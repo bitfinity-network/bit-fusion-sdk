@@ -22,7 +22,6 @@ use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
@@ -37,12 +36,20 @@ use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
+use crate::context::erc20_bridge_client::Erc20BridgeClient;
+use crate::context::icrc2_bridge_client::Icrc2BridgeClient;
+use crate::context::rune_bridge_client::RuneBridgeClient;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
+
+pub mod bridge_client;
+pub mod erc20_bridge_client;
+pub mod icrc2_bridge_client;
+pub mod rune_bridge_client;
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -69,8 +76,16 @@ pub trait TestContext {
     }
 
     /// Returns client for the evm canister.
-    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
-        MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    fn icrc_minter_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
+        Icrc2BridgeClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    }
+
+    fn erc_minter_client(&self, caller: &str) -> Erc20BridgeClient<Self::Client> {
+        Erc20BridgeClient::new(self.client(self.canisters().ck_erc20_minter(), caller))
+    }
+
+    fn rune_bridge_client(&self, caller: &str) -> RuneBridgeClient<Self::Client> {
+        RuneBridgeClient::new(self.client(self.canister().rune_bridge(), caller))
     }
 
     /// Returns client for the ICRC token 1 canister.

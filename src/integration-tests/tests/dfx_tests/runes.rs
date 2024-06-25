@@ -338,8 +338,8 @@ impl RunesContext {
 
             let response: Vec<(MinterOperationId, OperationState)> = self
                 .inner
-                .client(self.bridge(), ADMIN)
-                .update::<_, _>("get_operations_list", (eth_address,))
+                .rune_bridge_client(ADMIN)
+                .get_operations_list(eth_address)
                 .await
                 .expect("canister call failed");
 

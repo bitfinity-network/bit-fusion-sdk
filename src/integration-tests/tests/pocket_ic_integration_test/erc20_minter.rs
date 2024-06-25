@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use did::{H160, U256, U64};
-use erc20_minter::operation::{OperationPayload, OperationStatus};
+use erc20_minter::operation::OperationStatus;
 use eth_signer::{Signer, Wallet};
 use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -12,11 +12,11 @@ use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use super::PocketIcTestContext;
+use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::CHAIN_ID;
@@ -370,16 +370,11 @@ async fn native_token_deposit_increase_and_decrease() {
         .advance_by_times(Duration::from_secs(2), 8)
         .await;
 
-    let erc20_minter_client = ctx
-        .context
-        .client(ctx.context.canisters().ck_erc20_minter(), ADMIN);
+    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
     let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
 
     let operations = erc20_minter_client
-        .update::<_, Vec<(MinterOperationId, OperationPayload)>>(
-            "get_operations_list",
-            (ctx.bob_address.clone(),),
-        )
+        .get_operations_list(&ctx.bob_address)
         .await
         .unwrap();
 
@@ -398,14 +393,7 @@ async fn native_token_deposit_increase_and_decrease() {
     }
 
     let signed_order = erc20_minter_client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (
-                ctx.bob_address.to_hex_str(),
-                base_token_id,
-                burn_operation_id,
-            ),
-        )
+        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
         .await
         .unwrap();
     assert!(signed_order.is_none());
@@ -479,19 +467,10 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await;
 
     // Check mint order is not removed
-    let erc20_minter_client = ctx
-        .context
-        .client(ctx.context.canisters().ck_erc20_minter(), ADMIN);
+    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
     let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
     let signed_order = erc20_minter_client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (
-                ctx.bob_address.to_hex_str(),
-                base_token_id,
-                burn_operation_id,
-            ),
-        )
+        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
         .await
         .unwrap();
 
@@ -515,14 +494,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // check mint order removed after successful mint
     let signed_order = erc20_minter_client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (
-                ctx.bob_address.to_hex_str(),
-                base_token_id,
-                burn_operation_id,
-            ),
-        )
+        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
         .await
         .unwrap();
     assert!(signed_order.is_none());
