@@ -9,11 +9,10 @@ use ic_log::LogSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use minter_contract_utils::evm_link::EvmLink;
-use minter_contract_utils::mint_orders::MintOrders;
 use serde::Deserialize;
 
 use self::log::LoggerConfigService;
-use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID, SIGNER_MEMORY_ID};
+use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 
 mod config;
 mod log;
@@ -23,7 +22,6 @@ type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 pub struct State {
     pub config: Config,
     pub signer: SignerStorage,
-    pub mint_orders: MintOrders<VirtualMemory<DefaultMemoryImpl>>,
     pub logger: LoggerConfigService,
 }
 
@@ -37,14 +35,11 @@ impl Default for State {
         )
         .expect("failed to initialize transaction signer");
 
-        let mint_orders = MintOrders::new(MEMORY_MANAGER.with(|mm| mm.get(MINT_ORDERS_MEMORY_ID)));
-
         let logger = LoggerConfigService::default();
 
         Self {
             config: Default::default(),
             signer,
-            mint_orders,
             logger,
         }
     }

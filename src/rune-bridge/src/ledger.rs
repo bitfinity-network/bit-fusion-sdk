@@ -196,6 +196,8 @@ impl UtxoLedger {
                 owner_address: address.to_string(),
             },
         );
+
+        log::trace!("Utxo {key} is marked as used.");
     }
 
     /// Lists all used utxos in the store.

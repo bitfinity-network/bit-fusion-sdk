@@ -9,6 +9,7 @@ use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
+use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE};
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 
