@@ -8,6 +8,7 @@ members = [
     "src/solidity-helper",
     "src/btc-bridge",
     "src/rune-bridge",
+    "src/upgrader",
 ]
 resolver = "2"
 
@@ -38,6 +39,7 @@ ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.17.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.17.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.17.x" }
+ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", tag = "v0.17.x" }
 ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.17.x" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.17.x", features = [
     "export-api",
@@ -60,6 +62,7 @@ serde = "1.0"
 serde_bytes = "0.11.14"
 serde_json = "1.0"
 signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.22.x" }
+strum = "0.26"
 thiserror = "1.0"
 tokio = { version = "1.36", features = ["macros", "rt"] }
 vergen = { version = "8.3", default-features = false, features = [
