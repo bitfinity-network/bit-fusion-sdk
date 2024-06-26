@@ -26,8 +26,8 @@ use minter_did::order::SignedMintOrder;
 
 use crate::build_data::canister_build_data;
 use crate::constant::{
-    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID,
+    MAX_OPERATIONS_LIST_SIZE, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
 };
 use crate::memory::MEMORY_MANAGER;
 use crate::operation::OperationState;
@@ -276,16 +276,15 @@ impl MinterCanister {
         &self,
         wallet_address: H160,
         src_token: Id256,
+        offset: usize,
+        count: usize,
     ) -> Vec<(u32, SignedMintOrder)> {
-        get_operations_store()
-            .get_for_address(&wallet_address)
-            .into_iter()
-            .filter_map(|(operation_id, status)| {
-                status
-                    .get_signed_mint_order(Some(src_token))
-                    .map(|mint_order| (operation_id.nonce(), *mint_order))
-            })
-            .collect()
+        Self::token_mint_orders(
+            wallet_address,
+            src_token,
+            Some(offset),
+            Some(count.min(MAX_OPERATIONS_LIST_SIZE)),
+        )
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
@@ -296,7 +295,7 @@ impl MinterCanister {
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        self.list_mint_orders(wallet_address, src_token)
+        Self::token_mint_orders(wallet_address, src_token, None, None)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
@@ -306,8 +305,14 @@ impl MinterCanister {
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        offset: usize,
+        count: usize,
     ) -> Vec<(MinterOperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address)
+        get_operations_store().get_page_for_address(
+            &wallet_address,
+            offset,
+            count.min(MAX_OPERATIONS_LIST_SIZE),
+        )
     }
 
     /// Returns evm_address of the minter canister.
@@ -387,6 +392,29 @@ impl MinterCanister {
     /// This should be the last fn to see previous endpoints in macro.
     pub fn idl() -> Idl {
         generate_idl!()
+    }
+
+    /// Get mint orders for the given wallet address and token;
+    /// if `offset` and `count` are provided, returns a page of mint orders.
+    fn token_mint_orders(
+        wallet_address: H160,
+        src_token: Id256,
+        offset: Option<usize>,
+        count: Option<usize>,
+    ) -> Vec<(u32, SignedMintOrder)> {
+        match (offset, count) {
+            (Some(offset), Some(count)) => {
+                get_operations_store().get_page_for_address(&wallet_address, offset, count)
+            }
+            _ => get_operations_store().get_for_address(&wallet_address),
+        }
+        .into_iter()
+        .filter_map(|(operation_id, status)| {
+            status
+                .get_signed_mint_order(Some(src_token))
+                .map(|mint_order| (operation_id.nonce(), *mint_order))
+        })
+        .collect()
     }
 }
 

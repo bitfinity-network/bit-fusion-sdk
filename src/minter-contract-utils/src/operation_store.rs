@@ -207,6 +207,25 @@ where
 
     /// Retrieves all operations for the given ETH wallet address.
     pub fn get_for_address(&self, dst_address: &H160) -> Vec<(MinterOperationId, P)> {
+        self.op_for_address(dst_address, None, None)
+    }
+
+    /// Retrieves all operations for the given ETH wallet address, starting from `offset` returning a max of `count` items
+    pub fn get_page_for_address(
+        &self,
+        dst_address: &H160,
+        offset: usize,
+        count: usize,
+    ) -> Vec<(MinterOperationId, P)> {
+        self.op_for_address(dst_address, Some(offset), Some(count))
+    }
+
+    fn op_for_address(
+        &self,
+        dst_address: &H160,
+        offset: Option<usize>,
+        count: Option<usize>,
+    ) -> Vec<(MinterOperationId, P)> {
         log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
         self.address_operation_map
             .get(dst_address)
@@ -214,6 +233,8 @@ where
             .0
             .into_iter()
             .filter_map(|id| self.get_with_id(id))
+            .skip(offset.unwrap_or(0))
+            .take(count.unwrap_or(usize::MAX))
             .collect()
     }
 
@@ -350,6 +371,28 @@ mod tests {
         for i in (COUNT - LIMIT)..COUNT {
             assert_eq!(store.get_for_address(&eth_address(i as u8)).len(), 1);
         }
+    }
+
+    #[test]
+    fn should_get_page_for_operations() {
+        const LIMIT: u64 = 100;
+        const COUNT: u64 = 42;
+
+        let mut store = test_store(LIMIT);
+
+        for _ in 0..COUNT {
+            store.new_operation(eth_address(0), COMPLETE);
+        }
+
+        assert_eq!(store.operations_log.len(), COUNT);
+
+        let page = store.get_page_for_address(&eth_address(0), 0, 10);
+        assert_eq!(page.len(), 10);
+        let page = store.get_page_for_address(&eth_address(0), 0, 120);
+        assert_eq!(page.len() as u64, COUNT);
+
+        let page = store.get_page_for_address(&eth_address(0), 100, 10);
+        assert!(page.is_empty());
     }
 
     #[test]

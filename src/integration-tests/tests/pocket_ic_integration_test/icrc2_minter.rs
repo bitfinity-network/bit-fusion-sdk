@@ -191,7 +191,10 @@ async fn test_icrc2_token_canister_stopped() {
 
     let (_, refund_mint_order) = ctx
         .client(ctx.canisters().icrc2_minter(), ADMIN)
-        .query::<_, Vec<(u32, SignedMintOrder)>>("list_mint_orders", (john_address, base_token_id))
+        .query::<_, Vec<(u32, SignedMintOrder)>>(
+            "list_mint_orders",
+            (john_address, base_token_id, 0u64, 1024u64),
+        )
         .await
         .unwrap()[0];
 
