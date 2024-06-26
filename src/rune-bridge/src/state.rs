@@ -17,11 +17,11 @@ use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
+use ordinals::RuneId;
 
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
 use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
-use crate::orders_store::MintOrdersStore;
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
@@ -34,7 +34,6 @@ pub struct State {
     pub(crate) config: RuneBridgeConfig,
     pub(crate) bft_config: BftBridgeConfig,
     pub(crate) signer: SignerStorage,
-    pub(crate) orders_store: MintOrdersStore,
     pub(crate) evm_params: Option<EvmParams>,
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
@@ -66,7 +65,6 @@ impl Default for State {
             config: Default::default(),
             bft_config: Default::default(),
             signer,
-            orders_store: Default::default(),
             evm_params: None,
             master_key: None,
             ledger: Default::default(),
@@ -145,6 +143,13 @@ impl State {
 
     pub fn runes(&self) -> &HashMap<RuneName, RuneInfo> {
         &self.runes
+    }
+
+    pub fn rune_info(&self, rune_id: RuneId) -> Option<RuneInfo> {
+        self.runes
+            .values()
+            .find(|rune_info| rune_info.id() == rune_id)
+            .copied()
     }
 
     pub fn update_rune_list(&mut self, runes: HashMap<RuneName, RuneInfo>) {
@@ -318,16 +323,6 @@ impl State {
     /// Configures the link to BFT bridge contract.
     pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
         self.bft_config = bft_config;
-    }
-
-    /// Store of the signed mint orders.
-    pub fn mint_orders(&self) -> &MintOrdersStore {
-        &self.orders_store
-    }
-
-    /// Mutable reference to the signed mint orders store.
-    pub fn mint_orders_mut(&mut self) -> &mut MintOrdersStore {
-        &mut self.orders_store
     }
 
     pub fn mempool_timeout(&self) -> Duration {

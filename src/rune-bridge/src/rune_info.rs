@@ -48,6 +48,15 @@ impl RuneInfo {
     pub fn decimals(&self) -> u8 {
         self.decimals
     }
+
+    pub fn invalid() -> Self {
+        Self {
+            name: RuneName(Rune(0)),
+            decimals: 0,
+            block: 0,
+            tx: 0,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]

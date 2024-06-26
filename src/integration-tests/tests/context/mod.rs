@@ -1,3 +1,5 @@
+mod evm_rpc_canister;
+
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -12,6 +14,7 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
+use evm_rpc_canister::EvmRpcCanisterInitData;
 use ic_exports::ic_kit::mock_principals::alice;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -22,7 +25,6 @@ use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
@@ -33,16 +35,24 @@ use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
-use minter_did::reason::Icrc2Burn;
+use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
+use crate::context::erc20_bridge_client::Erc20BridgeClient;
+use crate::context::icrc2_bridge_client::Icrc2BridgeClient;
+use crate::context::rune_bridge_client::RuneBridgeClient;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
 use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
+
+pub mod bridge_client;
+pub mod erc20_bridge_client;
+pub mod icrc2_bridge_client;
+pub mod rune_bridge_client;
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -63,14 +73,27 @@ pub trait TestContext {
     /// Principal to use for canisters initialization.
     fn admin_name(&self) -> &str;
 
+    /// Returns the base EVM LINK
+    fn base_evm_link(&self) -> EvmLink {
+        EvmLink::Ic(self.canisters().external_evm())
+    }
+
     /// Returns client for the evm canister.
     fn evm_client(&self, caller: &str) -> EvmCanisterClient<Self::Client> {
         EvmCanisterClient::new(self.client(self.canisters().evm(), caller))
     }
 
     /// Returns client for the evm canister.
-    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
-        MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    fn icrc_minter_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
+        Icrc2BridgeClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    }
+
+    fn erc_minter_client(&self, caller: &str) -> Erc20BridgeClient<Self::Client> {
+        Erc20BridgeClient::new(self.client(self.canisters().ck_erc20_minter(), caller))
+    }
+
+    fn rune_bridge_client(&self, caller: &str) -> RuneBridgeClient<Self::Client> {
+        RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
     /// Returns client for the ICRC token 1 canister.
@@ -338,7 +361,7 @@ pub trait TestContext {
             Token::Bool(true)
         );
 
-        println!("burning src tokens using BftBridge");
+        println!("Burning src tokens using BftBridge");
         let input = bft_bridge_api::BURN
             .encode_input(&[
                 Token::Uint(amount),
@@ -556,6 +579,7 @@ pub trait TestContext {
         bridge: &H160,
         amount: u128,
         fee_payer: Option<H160>,
+        approve_after_mint: Option<ApproveAfterMint>,
     ) -> Result<()> {
         let recipient_address = H160::from(wallet.address());
         self.approve_icrc2_burn(
@@ -572,6 +596,7 @@ pub trait TestContext {
             icrc2_token_principal: self.canisters().token_1(),
             recipient_address,
             fee_payer,
+            approve_after_mint,
         };
 
         let encoded_reason = Encode!(&reason).unwrap();
@@ -731,6 +756,46 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
+            CanisterType::EvmRpcCanister => {
+                println!(
+                    "Installing default EVM RPC canister {}...",
+                    self.canisters().evm_rpc()
+                );
+                let init_data = EvmRpcCanisterInitData { nodesInSubnet: 1 };
+                self.install_canister(self.canisters().evm_rpc(), wasm, (init_data,))
+                    .await
+                    .unwrap();
+
+                let client = self.client(self.canisters().evm_rpc(), self.admin_name());
+
+                let res = client
+                    .update::<_, bool>(
+                        "authorize",
+                        (self.admin(), evm_rpc_canister::Auth::RegisterProvider),
+                    )
+                    .await
+                    .expect("authorize failed");
+                assert!(res, "authorize failed");
+                let hostname = format!(
+                    "https://127.0.0.1:8002/?canisterId={}",
+                    self.canisters().external_evm()
+                );
+                println!("EVM-RPC provider hostname: {hostname}");
+                // configure the EVM RPC canister provider
+                let args = evm_rpc_canister::RegisterProviderArgs {
+                    chainId: CHAIN_ID,
+                    hostname,
+                    credentialPath: "".to_string(),
+                    cyclesPerCall: 1,
+                    cyclesPerMessageByte: 1,
+                    credentialsHeaders: None,
+                };
+
+                client
+                    .update::<_, u64>("registerProvider", (args,))
+                    .await
+                    .expect("registerProvider failed");
+            }
             CanisterType::Signature => {
                 println!("Installing default Signature canister...");
                 let possible_canisters = [CanisterType::Evm, CanisterType::ExternalEvm];
@@ -814,9 +879,8 @@ pub trait TestContext {
             }
             CanisterType::CkErc20Minter => {
                 let evm_canister = self.canisters().evm();
-                let external_evm_canister = self.canisters().external_evm();
                 let init_data = erc20_minter::state::Settings {
-                    base_evm_link: EvmLink::Ic(external_evm_canister),
+                    base_evm_link: self.base_evm_link(),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
                     signing_strategy: SigningStrategy::Local {
                         private_key: rand::random(),
@@ -1060,6 +1124,13 @@ impl TestCanisters {
             .expect("external evm canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn evm_rpc(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::EvmRpcCanister)
+            .expect("evm rpc canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn signature_verification(&self) -> Principal {
         *self
             .0
@@ -1142,6 +1213,7 @@ impl TestCanisters {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CanisterType {
     Evm,
+    EvmRpcCanister,
     ExternalEvm,
     Signature,
     Token1,
@@ -1176,6 +1248,15 @@ impl CanisterType {
         CanisterType::CkErc20Minter,
     ];
 
+    /// EVM, SignatureVerification, Minter, Spender and Token1.
+    pub const EVM_MINTER_WITH_EVMRPC_TEST_SET: [CanisterType; 5] = [
+        CanisterType::Evm,
+        CanisterType::ExternalEvm,
+        CanisterType::EvmRpcCanister,
+        CanisterType::Signature,
+        CanisterType::CkErc20Minter,
+    ];
+
     pub const BTC_CANISTER_SET: [CanisterType; 4] = [
         CanisterType::Btc,
         CanisterType::CkBtcMinter,
@@ -1192,6 +1273,7 @@ impl CanisterType {
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
+            CanisterType::EvmRpcCanister => get_evm_rpc_canister_bytecode().await,
             CanisterType::ExternalEvm => get_evm_testnet_canister_bytecode().await,
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,

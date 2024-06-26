@@ -8,7 +8,7 @@ function usage() {
   echo "Usage: $0 [options]"
   echo "Options:"
   echo "  -h, --help                                      Display this help message"
-  echo "  -e, --evm-principal <principal>                 EVM Principal"
+  echo "  -e, --evm-rpc-url <principal>                   EVM RPC URL canister Principal"
   echo "  -i, --ic-network <network>                      Internet Computer network (local, ic) (default: local)"
   echo "  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)"
   echo "  --base-evm <canister-id>                        Base EVM link canister ID"
@@ -17,13 +17,13 @@ function usage() {
   echo "  --erc20-wrapped-bridge-contract <canister-id>   ERC20 Wrapped bridge contract canister ID"
 }
 
-ARGS=$(getopt -o e:i:m:h --long evm-principal,ic-network,install-mode,base-evm,wrapped-evm,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,help -- "$@")
+ARGS=$(getopt -o e:i:m:h --long evm-rpc-url,ic-network,install-mode,base-evm,wrapped-evm,erc20-base-bridge-contract,erc20-wrapped-bridge-contract,help -- "$@")
 while true; do
   case "$1" in
-  -e | --evm-principal)
-    EVM_PRINCIPAL="$2"
-    shift 2
-    ;;
+    -e|--evm-rpc-url)
+      EVM_RPC_PRINCIPAL="$2"
+      shift 2
+      ;;
 
   -i | --ic-network)
     IC_NETWORK="$2"
@@ -73,7 +73,7 @@ done
 
 assert_isset_param "$INSTALL_MODE" "INSTALL_MODE"
 if [ "$IC_NETWORK" != "local" ]; then
-  assert_isset_param "$EVM_PRINCIPAL" "EVM_PRINCIPAL"
+  assert_isset_param "$EVM_RPC_PRINCIPAL" "EVM_RPC_PRINCIPAL"
   assert_isset_param "$BASE_EVM_LINK" "BASE_EVM_LINK"
   assert_isset_param "$WRAPPED_EVM_LINK" "WRAPPED_EVM_LINK"
   assert_isset_param "$WRAPPED_BRIDGE_CONTRACT" "WRAPPED_BRIDGE_CONTRACT"
@@ -91,16 +91,43 @@ OWNER=$(dfx identity get-principal)
 SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Production }; } }"
 
 if [ "$IC_NETWORK" = "local" ]; then
-  start_dfx
   SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
-  EVM_PRINCIPAL=$(deploy_evm_testnet)
-  ICRC2_MINTER_ID=$(dfx canister id icrc2-minter)
+  start_dfx
+  # deploy evm-rpc canister
+  dfx deps pull
+  dfx deps init evm_rpc --argument '(record { nodesInSubnet = 28 })'
+  dfx deps deploy
+
+  WRAPPED_EVM_PRINCIPAL=$(deploy_evm_testnet)
+  echo "Wrapped EVM Principal: $WRAPPED_EVM_PRINCIPAL"
   if [ -z "$ICRC2_MINTER_ID" ]; then
-    deploy_icrc2_minter "local" "install" "$EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
+    deploy_icrc2_minter "local" "install" "$WRAPPED_EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
   fi
   MINTER_ADDRESS=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
+  echo "Minter Address: $MINTER_ADDRESS"
   MINTER_ADDRESS=${MINTER_ADDRESS#*\"}
   MINTER_ADDRESS=${MINTER_ADDRESS%\"*}
+
+  # get base bridge contract
+  EVM_RPC_PRINCIPAL="$(dfx canister id evm_rpc)"
+  WALLET=$(get_wallet $WRAPPED_EVM_PRINCIPAL)
+  echo "Deploying bridge $WRAPPED_EVM_PRINCIPAL"
+  BASE_BRIDGE_CONTRACT=$(deploy_bft_bridge $WRAPPED_EVM_PRINCIPAL $MINTER_ADDRESS $WALLET)
+  if [ -z "$BASE_BRIDGE_CONTRACT" ]; then
+    echo "Failed to deploy base bridge contract"
+    exit 1
+  fi
+  # get wrapped bridge contract
+  WRAPPED_BRIDGE_CONTRACT=$(deploy_bft_bridge $WRAPPED_EVM_PRINCIPAL $MINTER_ADDRESS $WALLET)
+  if [ -z "$WRAPPED_BRIDGE_CONTRACT" ]; then
+    echo "Failed to deploy wrapped bridge contract"
+    exit 1
+  fi
+  SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
+  ICRC2_MINTER_ID=$(dfx canister id icrc2-minter)
+  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { Custom = record { url = \"http://127.0.0.1:8545\"; headers = opt null } } } } }"
+else
+  LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { EthMainnet = variant { Cloudflare } } } } }"
   # Get FEE_CHARGE_ADDRESS
   FEE_CHARGE_DEPLOY_TX_NONCE=0
   FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
@@ -123,6 +150,8 @@ if [ "$IC_NETWORK" = "local" ]; then
 
 fi
 
+
+
 if [ "$INSTALL_MODE" = "create" ] || [ "$INSTALL_MODE" = "init" ]; then
   INSTALL_MODE="install"
 fi
@@ -133,9 +162,9 @@ if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$I
 fi
 
 set -e
-deploy_erc20_minter "$IC_NETWORK" "$INSTALL_MODE" "$EVM_PRINCIPAL" "$WRAPPED_EVM_PRINCIPAL" "$BASE_BRIDGE_CONTRACT" "$WRAPPED_BRIDGE_CONTRACT" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
+deploy_erc20_minter "$IC_NETWORK" "$INSTALL_MODE" "$LOCAL_EVM_LINK" "$WRAPPED_EVM_PRINCIPAL" "$BASE_BRIDGE_CONTRACT" "$WRAPPED_BRIDGE_CONTRACT" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
 set +e
 
 if [ "$IC_NETWORK" == "local" ]; then
-  start_icx "$EVM_PRINCIPAL"
+  start_icx "$WRAPPED_EVM_PRINCIPAL"
 fi
