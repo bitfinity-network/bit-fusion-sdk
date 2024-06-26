@@ -207,7 +207,7 @@ where
 
     /// Retrieves all operations for the given ETH wallet address.
     pub fn get_for_address(&self, dst_address: &H160) -> Vec<(MinterOperationId, P)> {
-        self.op_for_address(dst_address, None, None)
+        self.operations_for_address(dst_address, None, None)
     }
 
     /// Retrieves all operations for the given ETH wallet address, starting from `offset` returning a max of `count` items
@@ -217,25 +217,7 @@ where
         offset: usize,
         count: usize,
     ) -> Vec<(MinterOperationId, P)> {
-        self.op_for_address(dst_address, Some(offset), Some(count))
-    }
-
-    fn op_for_address(
-        &self,
-        dst_address: &H160,
-        offset: Option<usize>,
-        count: Option<usize>,
-    ) -> Vec<(MinterOperationId, P)> {
-        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
-        self.address_operation_map
-            .get(dst_address)
-            .unwrap_or_default()
-            .0
-            .into_iter()
-            .filter_map(|id| self.get_with_id(id))
-            .skip(offset.unwrap_or(0))
-            .take(count.unwrap_or(usize::MAX))
-            .collect()
+        self.operations_for_address(dst_address, Some(offset), Some(count))
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
@@ -290,6 +272,27 @@ where
 
             log::trace!("Operation {id} is evicted from the operation log");
         }
+    }
+
+    /// Retrieves all operations for the given ETH wallet address, starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning.
+    /// If `count` is `None`, it returns all operations.
+    fn operations_for_address(
+        &self,
+        dst_address: &H160,
+        offset: Option<usize>,
+        count: Option<usize>,
+    ) -> Vec<(MinterOperationId, P)> {
+        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
+        self.address_operation_map
+            .get(dst_address)
+            .unwrap_or_default()
+            .0
+            .into_iter()
+            .filter_map(|id| self.get_with_id(id))
+            .skip(offset.unwrap_or(0))
+            .take(count.unwrap_or(usize::MAX))
+            .collect()
     }
 }
 
