@@ -123,27 +123,17 @@ impl BridgeTask {
 
         let last_block = client.get_block_number().await.into_scheduler_result()?;
 
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block,
-            Some(last_block),
-            bridge_contract.0,
-        )
-        .await
-        .into_scheduler_result()?;
+        let logs =
+            BridgeEvent::collect_logs(&client, params.next_block, last_block, bridge_contract.0)
+                .await
+                .into_scheduler_result()?;
 
         log::debug!("got evm logs: {logs:?}");
 
-        // Filter out logs that do not have block number.
-        // Such logs are produced when the block is not finalized yet.
-        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-        if let Some(last_log) = last_log {
-            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            state
-                .borrow_mut()
-                .config
-                .update_evm_params(|params| params.next_block = next_block_number);
-        };
+        state
+            .borrow_mut()
+            .config
+            .update_evm_params(|params| params.next_block = last_block + 1);
 
         log::trace!("appending logs to tasks: {logs:?}");
 

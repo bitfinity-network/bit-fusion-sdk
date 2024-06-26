@@ -9,8 +9,6 @@ use serde::{Deserialize, Serialize};
 
 pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor { inputs: vec![] });
 
-const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
-
 #[allow(deprecated)] // need to initialize `constant` field
 pub static MINTER_CANISTER_ADDRESS: Lazy<Function> = Lazy::new(|| Function {
     name: "minterCanisterAddress".into(),
@@ -251,34 +249,11 @@ pub enum BridgeEvent {
 impl BridgeEvent {
     pub async fn collect_logs(
         evm_client: &EthJsonRpcClient<impl Client>,
-        from_block: u64,
-        to_block: Option<u64>,
-        bridge_contract: H160,
-    ) -> Result<Vec<Log>, anyhow::Error> {
-        match to_block {
-            Some(to_block) => {
-                Self::collect_logs_with_bounded_to_block(
-                    evm_client,
-                    from_block,
-                    to_block,
-                    bridge_contract,
-                )
-                .await
-            }
-            None => {
-                Self::collect_logs_with_unbounded_to_block(evm_client, from_block, bridge_contract)
-                    .await
-            }
-        }
-    }
-
-    /// Try to collect logs from the given range of blocks with bounded `to_block`.
-    async fn collect_logs_with_bounded_to_block(
-        evm_client: &EthJsonRpcClient<impl Client>,
         mut from_block: u64,
         to_block: u64,
         bridge_contract: H160,
     ) -> Result<Vec<Log>, anyhow::Error> {
+        const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
         log::debug!("collecting logs from {from_block} to {to_block}",);
 
         let mut offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
@@ -314,49 +289,6 @@ impl BridgeEvent {
                         log::error!("unable to collect logs for block {from_block}. Skipping it.");
                         from_block += 1;
                     }
-                }
-            }
-        }
-
-        Ok(logs)
-    }
-
-    /// Try to collect logs from the given range of blocks with unbounded `to_block`.
-    /// If the call fails, it will retry with a smaller range of blocks.
-    /// And then it will retry with the new from block exluding the already collected logs.
-    async fn collect_logs_with_unbounded_to_block(
-        evm_client: &EthJsonRpcClient<impl Client>,
-        mut from_block: u64,
-        bridge_contract: H160,
-    ) -> Result<Vec<Log>, anyhow::Error> {
-        let mut logs = Vec::new();
-        loop {
-            match Self::collect_logs_from_to(
-                evm_client,
-                bridge_contract,
-                EthBlockNumber::Number(from_block.into()),
-                EthBlockNumber::Latest,
-            )
-            .await
-            {
-                Ok(new_logs) => {
-                    logs.extend(new_logs);
-                    break;
-                }
-                Err(err) => {
-                    log::error!(
-                        "failed to collect logs from {from_block} to the latest block: {err}",
-                    );
-                    let to_block = from_block + DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
-                    let collected_logs = Self::collect_logs_with_bounded_to_block(
-                        evm_client,
-                        from_block,
-                        to_block,
-                        bridge_contract,
-                    )
-                    .await?;
-                    logs.extend(collected_logs);
-                    from_block = to_block + 1;
                 }
             }
         }
@@ -898,63 +830,36 @@ mod tests {
         let evm_client = EthJsonRpcClient::new(client);
 
         // get from 0 to 100
-        let logs = BridgeEvent::collect_logs(
-            &evm_client,
-            0,
-            Some(100),
-            ethers_core::types::H160::default(),
-        )
-        .await
-        .unwrap();
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 0, 100, ethers_core::types::H160::default())
+                .await
+                .unwrap();
         assert_eq!(logs.len(), 0);
 
         // get from 80 to 220 (first result will be empty)
-        let logs = BridgeEvent::collect_logs(
-            &evm_client,
-            80,
-            Some(220),
-            ethers_core::types::H160::default(),
-        )
-        .await
-        .unwrap();
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 80, 220, ethers_core::types::H160::default())
+                .await
+                .unwrap();
         assert_eq!(logs.len(), 21);
 
         // get from 100 to 800 (multiple requests)
-        let logs = BridgeEvent::collect_logs(
-            &evm_client,
-            100,
-            Some(800),
-            ethers_core::types::H160::default(),
-        )
-        .await
-        .unwrap();
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 100, 800, ethers_core::types::H160::default())
+                .await
+                .unwrap();
         assert_eq!(logs.len(), 601);
 
         // get error block
-        let logs = BridgeEvent::collect_logs(
-            &evm_client,
-            801,
-            Some(950),
-            ethers_core::types::H160::default(),
-        )
-        .await
-        .unwrap();
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 801, 950, ethers_core::types::H160::default())
+                .await
+                .unwrap();
         assert_eq!(logs.len(), 950 - 801); // error will be skipped
 
         // get with more blocks than available
-        let logs = BridgeEvent::collect_logs(
-            &evm_client,
-            10,
-            Some(2000),
-            ethers_core::types::H160::default(),
-        )
-        .await
-        .unwrap();
-        assert_eq!(logs.len(), 800);
-
-        // get unbounded logs
         let logs =
-            BridgeEvent::collect_logs(&evm_client, 10, None, ethers_core::types::H160::default())
+            BridgeEvent::collect_logs(&evm_client, 10, 2000, ethers_core::types::H160::default())
                 .await
                 .unwrap();
         assert_eq!(logs.len(), 800);
