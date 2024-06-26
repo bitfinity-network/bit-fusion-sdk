@@ -43,26 +43,6 @@ pub static NOTIFY_MINTER: Lazy<Function> = Lazy::new(|| Function {
 });
 
 #[allow(deprecated)] // need to initialize `constant` field
-pub static REGISTER_BASE: Lazy<Function> = Lazy::new(|| Function {
-    name: "registerBase".into(),
-    inputs: vec![
-        Param {
-            name: "base".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "remoteWrapped".into(),
-            kind: ParamType::FixedBytes(32),
-            internal_type: None,
-        },
-    ],
-    outputs: vec![],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
 pub static BURN: Lazy<Function> = Lazy::new(|| Function {
     name: "burn".into(),
     inputs: vec![
@@ -623,34 +603,6 @@ pub fn mint_transaction(
         .expect("mint order encoding should pass");
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
-    ethers_core::types::Transaction {
-        from: sender,
-        to: bridge.into(),
-        nonce,
-        value: U256::zero(),
-        gas: DEFAULT_TX_GAS_LIMIT.into(),
-        gas_price: Some(gas_price),
-        input: data.into(),
-        chain_id: Some(chain_id.into()),
-        ..Default::default()
-    }
-}
-
-pub fn register_base_transaction(
-    base: H160,
-    remote: Vec<u8>,
-    sender: H160,
-    bridge: H160,
-    nonce: U256,
-    gas_price: U256,
-    chain_id: u32,
-) -> Transaction {
-    let data = REGISTER_BASE
-        .encode_input(&[Token::Address(base), Token::FixedBytes(remote)])
-        .expect("register base encoding should pass");
-
-    pub const DEFAULT_TX_GAS_LIMIT: u64 = 2_000_000;
-
     ethers_core::types::Transaction {
         from: sender,
         to: bridge.into(),
