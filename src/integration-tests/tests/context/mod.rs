@@ -32,7 +32,7 @@ use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
 use minter_did::order::SignedMintOrder;
-use minter_did::reason::Icrc2Burn;
+use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -583,6 +583,7 @@ pub trait TestContext {
         erc20_token_address: &H160,
         amount: u128,
         fee_payer: Option<H160>,
+        approve_after_mint: Option<ApproveAfterMint>,
     ) -> Result<()> {
         let recipient_address = H160::from(wallet.address());
         self.approve_icrc2_burn(
@@ -600,7 +601,7 @@ pub trait TestContext {
             erc20_token_address: erc20_token_address.clone(),
             recipient_address,
             fee_payer,
-            approve_after_mint: None,
+            approve_after_mint,
         };
 
         let encoded_reason = Encode!(&reason).unwrap();
