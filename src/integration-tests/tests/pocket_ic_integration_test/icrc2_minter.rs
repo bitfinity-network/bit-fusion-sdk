@@ -12,6 +12,7 @@ use minter_did::order::SignedMintOrder;
 use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
+use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
@@ -255,27 +256,6 @@ async fn set_owner_access() {
     // Now Alice is owner, so she can update owner.
     let mut alice_client = ctx.icrc_minter_client(ALICE);
     alice_client.set_owner(alice()).await.unwrap().unwrap();
-}
-
-#[tokio::test]
-async fn double_register_bridge() {
-    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
-
-    let _ = ctx
-        .initialize_bft_bridge(ADMIN, H160::default())
-        .await
-        .unwrap();
-
-    ctx.advance_by_times(Duration::from_secs(2), 2).await;
-
-    let err = ctx
-        .initialize_bft_bridge(ADMIN, H160::default())
-        .await
-        .unwrap_err();
-
-    assert!(err
-        .to_string()
-        .contains("creation of BftBridge contract already finished"));
 }
 
 #[tokio::test]

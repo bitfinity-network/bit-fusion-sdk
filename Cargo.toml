@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "src/create_bft_bridge_tool",
+    "src/bridge-tool",
     "src/minter-contract-utils",
     "src/integration-tests",
     "src/icrc2-minter",
@@ -17,6 +17,7 @@ edition = "2021"
 
 [workspace.dependencies]
 anyhow = "1.0"
+async-recursion = "1.0.4"
 async-trait = "0.1"
 bitcoin = "0.31"
 candid = { version = "0.10", features = ["value"] }
@@ -37,7 +38,6 @@ ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.17.x" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.17.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.17.x" }
-ic-helpers = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-helpers", tag = "v0.17.x" }
 ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.17.x" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.17.x", features = [
     "export-api",
@@ -47,7 +47,6 @@ ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.17.x" }
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.17.x" }
 jsonrpc-core = "18.0"
-k256 = { version = "0.13", features = ["ecdsa"] }
 log = "0.4"
 minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.25.x" }
 minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.25.x" }
@@ -57,8 +56,8 @@ ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.1.2" }
 ordinals = "0.0.7"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.12", default-features = false }
-rlp = "0.5"
 serde = "1.0"
+serde_bytes = "0.11.14"
 serde_json = "1.0"
 signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.25.x" }
 thiserror = "1.0"
@@ -70,6 +69,18 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
+
+
+# state machine tests deps
+ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 
 [profile.dev]
 debug = false

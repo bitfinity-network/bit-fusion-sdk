@@ -7,25 +7,7 @@ use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
-    inputs: vec![
-        Param {
-            name: "minterAddress".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "feeChargeAddress".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "_isWrappedSide".into(),
-            kind: ParamType::Bool,
-            internal_type: None,
-        },
-    ],
-});
+pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor { inputs: vec![] });
 
 #[allow(deprecated)] // need to initialize `constant` field
 pub static MINTER_CANISTER_ADDRESS: Lazy<Function> = Lazy::new(|| Function {
@@ -603,41 +585,6 @@ pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
     state_mutability: StateMutability::View,
 });
 
-#[allow(clippy::too_many_arguments)]
-pub fn deploy_transaction(
-    sender: H160,
-    nonce: U256,
-    gas_price: U256,
-    chain_id: u32,
-    code: Vec<u8>,
-    minter_address: H160,
-    fee_charge_address: H160,
-    is_wrapped_side: bool,
-) -> Transaction {
-    let data = CONSTRUCTOR
-        .encode_input(
-            code,
-            &[
-                Token::Address(minter_address),
-                Token::Address(fee_charge_address),
-                Token::Bool(is_wrapped_side),
-            ],
-        )
-        .expect("constructor parameters encoding should pass");
-
-    pub const DEFAULT_TX_GAS_LIMIT: u64 = 5_000_000;
-    ethers_core::types::Transaction {
-        from: sender,
-        nonce,
-        value: U256::zero(),
-        gas: DEFAULT_TX_GAS_LIMIT.into(),
-        gas_price: Some(gas_price),
-        input: data.into(),
-        chain_id: Some(chain_id.into()),
-        ..Default::default()
-    }
-}
-
 pub fn mint_transaction(
     sender: H160,
     bridge: H160,
@@ -662,6 +609,50 @@ pub fn mint_transaction(
         chain_id: Some(chain_id.into()),
         ..Default::default()
     }
+}
+
+/// Proxy contract
+pub mod proxy {
+    use super::*;
+    pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
+        inputs: vec![
+            Param {
+                name: "_implementation".into(),
+                kind: ParamType::Address,
+                internal_type: None,
+            },
+            Param {
+                name: "_data".into(),
+                kind: ParamType::Bytes,
+                internal_type: None,
+            },
+        ],
+    });
+
+    #[allow(deprecated)]
+    pub static INITIALISER: Lazy<Function> = Lazy::new(|| Function {
+        name: "initialize".into(),
+        inputs: vec![
+            Param {
+                name: "minterAddress".into(),
+                kind: ParamType::Address,
+                internal_type: None,
+            },
+            Param {
+                name: "feeChargeAddress".into(),
+                kind: ParamType::Address,
+                internal_type: None,
+            },
+            Param {
+                name: "_isWrappedSide".into(),
+                kind: ParamType::Bool,
+                internal_type: None,
+            },
+        ],
+        outputs: vec![],
+        constant: None,
+        state_mutability: StateMutability::NonPayable,
+    });
 }
 
 #[cfg(test)]

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-abstract contract TokenManager {
-
+abstract contract TokenManager is Initializable {
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
@@ -32,7 +33,11 @@ abstract contract TokenManager {
     }
 
     // Constructor or an initializer where you set this variable
-    constructor(bool _isWrappedSide) {
+    // constructor(bool _isWrappedSide) {
+    //     isWrappedSide = _isWrappedSide;
+    // }
+
+    function _initialize(bool _isWrappedSide) internal initializer {
         isWrappedSide = _isWrappedSide;
     }
 
@@ -93,5 +98,4 @@ abstract contract TokenManager {
             base[i] = _baseTokenRegistry[wrappedToken];
         }
     }
-
 }

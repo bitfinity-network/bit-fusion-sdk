@@ -36,7 +36,7 @@ impl OrdIndexProvider {
         let indexer_url = self.indexer_url();
         let url = format!("{indexer_url}/{uri}");
 
-        log::trace!("Requesting rune balance from url: {url}");
+        log::trace!("Sending indexer request to: {url}");
 
         let request_params = CanisterHttpRequestArgument {
             url,

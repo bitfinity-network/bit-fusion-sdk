@@ -9,7 +9,7 @@ default = []
 export-api = []
 
 [dependencies]
-async-recursion = "1.0.4"
+async-recursion = { workspace = true }
 async-trait = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }

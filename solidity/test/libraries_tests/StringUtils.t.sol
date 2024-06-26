@@ -21,7 +21,7 @@ contract StringUtilsTest is Test {
         return string(bytesArray);
     }
 
-    function testTruncateUTF8() public {
+    function testTruncateUTF8() public pure {
         {
             bytes32 result = StringUtils.truncateUTF8("");
             assertEq(bytes32ToString(result), "");

@@ -15,12 +15,19 @@
 
 - [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if you don't have it already.
 - [Install the Rust toolchain](https://www.rust-lang.org/tools/install) if it's not already installed.
+- Install the rust wasm32 target: `rustup target add wasm32-unknown-unknown`
 - [Download and install Docker, with Compose](https://www.docker.com/products/docker-desktop/) if you don't already have it.
 - Install [foundry](https://book.getfoundry.sh/getting-started/installation).
 
     ```sh
     curl -L https://foundry.paradigm.xyz | bash
     ```
+
+### Ubuntu 24.04 additional dependencies
+
+- Install libunwind: `sudo apt install libunwind-dev`
+- Install protobuf: `sudo apt install protobuf-compiler`
+
 
 ## Build
 

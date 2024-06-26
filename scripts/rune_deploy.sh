@@ -45,14 +45,13 @@ INDEXER_URL="https://127.0.0.1:8001"
 
 dfx stop
 rm -f dfx_stderr.log
-dfx start --background --clean --enable-bitcoin 2> dfx_stderr.log
+dfx start --background --clean --enable-bitcoin 2>dfx_stderr.log
 
 dfx identity new --force btc-admin
 dfx identity use btc-admin
 
 ADMIN_PRINCIPAL=$(dfx identity get-principal)
 ADMIN_WALLET=$(dfx identity get-wallet)
-
 
 ########## Deploy EVM and Rune bridge ##########
 
@@ -82,9 +81,9 @@ dfx deploy rune-bridge --argument "(record {
     signing_strategy = variant { ManagementCanister = record { key_id = variant { Dfx } } };
     admin = principal \"${ADMIN_PRINCIPAL}\";
     log_settings = record {
-       enable_console = true;
-       in_memory_records = opt 10000;
-       log_filter = opt \"trace,rune_bridge::scheduler=warn\";
+        enable_console = true;
+        in_memory_records = opt 10000;
+        log_filter = opt \"trace,rune_bridge::scheduler=warn\";
     };
     min_confirmations = 1;
     indexer_url = \"$INDEXER_URL\";
@@ -95,9 +94,9 @@ dfx canister call rune-bridge admin_configure_ecdsa
 
 ########## Deploy BFT and Token contracts ##########
 
-ETH_WALLET=$(cargo run -q -p create_bft_bridge_tool -- create-wallet --evm-canister="$EVM")
-ETH_WALLET_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET")
-ETH_WALLET_CANDID=$(cargo run -q -p create_bft_bridge_tool -- wallet-address --wallet="$ETH_WALLET" --candid)
+ETH_WALLET=$(cargo run -q -p bridge-tool -- create-wallet --evm-canister="$EVM")
+ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET")
+ETH_WALLET_CANDID=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ETH_WALLET" --candid)
 
 echo "ETH wallet PK: $ETH_WALLET"
 
@@ -112,10 +111,10 @@ echo "Rune bridge eth address: ${RUNE_BRIDGE_ETH_ADDRESS}"
 echo "Minting ETH tokens for Rune bridge canister"
 dfx canister call evm_testnet mint_native_tokens "(\"${RUNE_BRIDGE_ETH_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
-BFT_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- deploy-bft-bridge --minter-address="$RUNE_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
+BFT_ETH_ADDRESS=$(cargo run -q -p bridge-tool -- deploy-bft-bridge --minter-address="$RUNE_BRIDGE_ETH_ADDRESS" --evm="$EVM" --wallet="$ETH_WALLET")
 echo "BFT ETH address: $BFT_ETH_ADDRESS"
 
-TOKEN_ETH_ADDRESS=$(cargo run -q -p create_bft_bridge_tool -- create-token \
+TOKEN_ETH_ADDRESS=$(cargo run -q -p bridge-tool -- create-token \
   --bft-bridge-address="$BFT_ETH_ADDRESS" \
   --token-name=RUNE \
   --token-id="$RUNE_ID" \
@@ -136,10 +135,8 @@ dfx canister call rune-bridge admin_configure_bft_bridge "(record {
 
 ########### Deposit runes ##########
 
-if ! command -v bitcoin-cli &> /dev/null
-then
-  if command -v bitcoin-core.cli &> /dev/null
-  then
+if ! command -v bitcoin-cli &>/dev/null; then
+  if command -v bitcoin-core.cli &>/dev/null; then
     bc="bitcoin-core.cli -conf=$PWD/btc-deploy/bitcoin.conf -rpcwallet=admin"
     echo "Using bitcoin-core.cli as bitcoin-cli"
   else
@@ -170,8 +167,7 @@ sleep 5
 $ordw send --fee-rate 10 $DEPOSIT_ADDRESS "0.0049 btc"
 $bc generatetoaddress 1 bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts
 
-for i in 1 2 3
-do
+for i in 1 2 3; do
   sleep 5
   echo "Trying to deposit"
   response=$(dfx canister call rune-bridge deposit "(\"$ETH_WALLET_ADDRESS\")")
@@ -197,7 +193,7 @@ $ordw balance
 
 echo "Runes withdrawal receiver: $RECEIVER"
 
-cargo run -q -p create_bft_bridge_tool -- burn-wrapped \
+cargo run -q -p bridge-tool -- burn-wrapped \
   --wallet="$ETH_WALLET" \
   --evm-canister="$EVM" \
   --bft-bridge="$BFT_ETH_ADDRESS" \

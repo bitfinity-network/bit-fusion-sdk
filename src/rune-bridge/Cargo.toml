@@ -28,7 +28,6 @@ ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
-k256 = { workspace = true }
 log = { workspace = true }
 minter-did = { workspace = true, features = ["runes"] }
 minter-contract-utils = { path = "../minter-contract-utils" }

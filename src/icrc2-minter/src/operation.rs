@@ -80,6 +80,7 @@ pub enum DepositOperationState {
     Minted {
         token_id: Id256,
         amount: U256,
+        tx_id: H256,
     },
 }
 
@@ -104,9 +105,16 @@ pub enum WithdrawalOperationState {
         amount: U256,
         signed_mint_order: Box<SignedMintOrder>,
     },
+    RefundMintOrderSent {
+        token_id: Id256,
+        amount: U256,
+        signed_mint_order: Box<SignedMintOrder>,
+        tx_id: H256,
+    },
     RefundMinted {
         token_id: Id256,
         amount: U256,
+        tx_id: H256,
     },
 }
 

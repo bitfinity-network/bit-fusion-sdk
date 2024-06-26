@@ -3,10 +3,14 @@ pragma solidity ^0.8.7;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
+import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
+import { Options } from "@openzeppelin-foundry-upgrades/Options.sol";
 
 contract BftBridgeTest is Test {
 
@@ -41,12 +45,29 @@ contract BftBridgeTest is Test {
 
     BFTBridge _bridge;
 
+    address newImplementation = address(8);
+
+    address proxy;
+
     function setUp() public {
         vm.chainId(_CHAIN_ID);
-        _bridge = new BFTBridge(_owner, address(0), true);
+        vm.startPrank(_owner);
+
+        // Encode the initialization call
+        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+        Options memory opts;
+        // Skips all upgrade safety checks
+        opts.unsafeSkipAllChecks = true;
+
+        proxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", initializeData, opts);
+
+        // Cast the proxy to BFTBridge
+        _bridge = BFTBridge(address(proxy));
+
+        vm.stopPrank();
     }
 
-    function testMinterCanisterAddress() public {
+    function testMinterCanisterAddress() public view {
         assertEq(_bridge.minterCanisterAddress(), _owner);
     }
 
@@ -161,6 +182,92 @@ contract BftBridgeTest is Test {
             assertEq(wrapped[i], wrapped_tokens[i]);
             assertEq(base[i], base_token_ids[i]);
         }
+    }
+
+    function testMintCallsAreRejectedWhenPaused() public {
+        vm.prank(_owner);
+
+        _bridge.pause();
+
+        MintOrder memory mintOrder = _createDefaultMintOrder();
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
+
+        vm.prank(_owner);
+        _bridge.unpause();
+
+        // mint will be success
+        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
+    }
+
+    function testAddAllowedImplementation() public {
+        vm.startPrank(_owner);
+
+        BFTBridge _newImpl = new BFTBridge();
+
+        newImplementation = address(_newImpl);
+
+        _bridge.addAllowedImplementation(newImplementation);
+
+        assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
+
+        vm.stopPrank();
+    }
+
+    function testAddAllowedImplementationOnlyOwner() public {
+        vm.prank(address(10));
+
+        vm.expectRevert();
+
+        _bridge.addAllowedImplementation(newImplementation);
+    }
+
+    function testAddAllowedImplementationEmptyAddress() public {
+        vm.prank(_owner);
+        newImplementation = address(0);
+
+        vm.expectRevert();
+
+        _bridge.addAllowedImplementation(newImplementation);
+    }
+
+    /// Test that the bridge can be upgraded to a new implementation
+    /// and the new implementation has been added to the list of allowed
+    /// implementations
+    function testUpgradeBridgeWithAllowedImplementation() public {
+        vm.startPrank(_owner);
+
+        BFTBridge _newImpl = new BFTBridge();
+
+        newImplementation = address(_newImpl);
+
+        _bridge.addAllowedImplementation(newImplementation);
+        assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
+
+        // Wrap in ABI for easier testing
+        BFTBridge wrappedProxy = BFTBridge(proxy);
+
+        // pass empty calldata to initialize
+        bytes memory data = new bytes(0);
+
+        wrappedProxy.upgradeToAndCall(address(_newImpl), data);
+
+        vm.stopPrank();
+    }
+
+    function testUpgradeBridgeWithNotAllowedImplementation() public {
+        vm.startPrank(_owner);
+        BFTBridge _newImpl = new BFTBridge();
+        newImplementation = address(_newImpl);
+        // Wrap in ABI for easier testing
+
+        BFTBridge wrappedProxy = BFTBridge(proxy);
+        // pass empty calldata to initialize
+        bytes memory data = new bytes(0);
+        vm.expectRevert();
+        wrappedProxy.upgradeToAndCall(address(_newImpl), data);
+
+        vm.stopPrank();
     }
 
     struct ExpectedBurnEvent {

@@ -22,9 +22,8 @@ use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use minter_client::MinterCanisterClient;
 use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE,
+    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use minter_contract_utils::fee_charge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
@@ -37,6 +36,9 @@ use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
+use crate::context::erc20_bridge_client::Erc20BridgeClient;
+use crate::context::icrc2_bridge_client::Icrc2BridgeClient;
+use crate::context::rune_bridge_client::RuneBridgeClient;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
@@ -44,11 +46,16 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
+pub mod bridge_client;
+pub mod erc20_bridge_client;
+pub mod icrc2_bridge_client;
+pub mod rune_bridge_client;
+
 #[async_trait::async_trait]
 pub trait TestContext {
     type Client: CanisterClient + Send + Sync;
 
-    /// Returns principals for cansters in the context.
+    /// Returns principals for canisters in the context.
     fn canisters(&self) -> TestCanisters;
 
     /// Returns client for the canister.
@@ -69,8 +76,16 @@ pub trait TestContext {
     }
 
     /// Returns client for the evm canister.
-    fn icrc_minter_client(&self, caller: &str) -> MinterCanisterClient<Self::Client> {
-        MinterCanisterClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    fn icrc_minter_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
+        Icrc2BridgeClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    }
+
+    fn erc_minter_client(&self, caller: &str) -> Erc20BridgeClient<Self::Client> {
+        Erc20BridgeClient::new(self.client(self.canisters().ck_erc20_minter(), caller))
+    }
+
+    fn rune_bridge_client(&self, caller: &str) -> RuneBridgeClient<Self::Client> {
+        RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
     /// Returns client for the ICRC token 1 canister.
@@ -225,35 +240,24 @@ pub trait TestContext {
             .await??;
         self.advance_time(Duration::from_secs(2)).await;
 
+        let bridge_address = self
+            .initialize_bft_bridge_with_minter(
+                &self.new_wallet(u64::MAX.into()).await?,
+                minter_canister_address,
+                Some(fee_charge_address),
+                true,
+            )
+            .await?;
+
         let raw_client = self.client(self.canisters().icrc2_minter(), self.admin_name());
-        let hash = raw_client
-            .update::<_, McResult<H256>>("init_bft_bridge_contract", (fee_charge_address,))
-            .await??;
+        raw_client
+            .update("set_bft_bridge_contract", (bridge_address.clone(),))
+            .await?;
 
-        let receipt = self.wait_transaction_receipt(&hash).await?.ok_or_else(|| {
-            TestError::Evm(EvmError::Internal(
-                "bft bridge creation transaction not processed".into(),
-            ))
-        })?;
-
-        if receipt.status.unwrap().0.as_u64() != 1 {
-            let output = receipt
-                .output
-                .as_ref()
-                .map(|out| String::from_utf8_lossy(out));
-            return Err(TestError::Evm(EvmError::Internal(format!(
-                "bft bridge creation transaction failed: {output:?}"
-            ))));
-        }
-
-        let bridge_address = receipt.contract_address.ok_or_else(|| {
-            TestError::Evm(EvmError::Internal(
-                "bft bridge creation transaction succeeded, but it doesn't contain the contract address".into(),
-            ))
-        })?;
         Ok(bridge_address)
     }
 
+    /// Creates BFTBridge contract in EVMC and registered it in minter canister
     async fn initialize_bft_bridge_with_minter(
         &self,
         wallet: &Wallet<'_, SigningKey>,
@@ -263,19 +267,32 @@ pub trait TestContext {
     ) -> Result<H160> {
         let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
         let input = bft_bridge_api::CONSTRUCTOR
-            .encode_input(
-                contract,
-                &[
-                    Token::Address(minter_canister_address.into()),
-                    Token::Address(fee_charge_address.unwrap_or_default().0),
-                    Token::Bool(is_wrapped),
-                ],
-            )
+            .encode_input(contract, &[])
             .unwrap();
 
         let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
 
-        Ok(bridge_address)
+        let initialize_data = bft_bridge_api::proxy::INITIALISER
+            .encode_input(&[
+                Token::Address(minter_canister_address.0),
+                Token::Address(fee_charge_address.unwrap_or_default().0),
+                Token::Bool(is_wrapped),
+            ])
+            .expect("encode input");
+
+        let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
+            .encode_input(
+                UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
+                &[
+                    Token::Address(bridge_address.0),
+                    Token::Bytes(initialize_data),
+                ],
+            )
+            .unwrap();
+
+        let proxy_address = self.create_contract(wallet, proxy_input).await.unwrap();
+
+        Ok(proxy_address)
     }
 
     async fn initialize_fee_charge_contract(
@@ -336,7 +353,7 @@ pub trait TestContext {
             Token::Bool(true)
         );
 
-        println!("burning src tokens using BftBridge");
+        println!("Burning src tokens using BftBridge");
         let input = bft_bridge_api::BURN
             .encode_input(&[
                 Token::Uint(amount),
@@ -662,6 +679,7 @@ pub trait TestContext {
             .call_contract_on_evm(evm_client, wallet, token, input, 0)
             .await?;
         let output = results.1.output.unwrap();
+        println!("output: {:?}", hex::encode(&output));
 
         Ok(wrapped_token_api::ERC_20_BALANCE
             .decode_output(&output)
@@ -702,7 +720,7 @@ pub trait TestContext {
     ) -> Result<()>;
 
     /// Installs code to test context's canister with the given type.
-    /// If the canister depends on not-created canister, Principal::anonimous() is used.
+    /// If the canister depends on not-created canister, Principal::anonymous() is used.
     async fn install_default_canister(&self, canister_type: CanisterType) {
         let wasm = canister_type.default_canister_wasm().await;
         match canister_type {

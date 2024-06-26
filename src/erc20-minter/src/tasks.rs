@@ -12,27 +12,26 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, BurntEventData, MintedEventData};
+use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
+use minter_contract_utils::operation_store::MinterOperationId;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
 
-use crate::canister::get_state;
+use crate::canister::{get_operations_store, get_state};
+use crate::operation::{OperationPayload, OperationStatus};
 use crate::state::State;
-
-type SignedMintOrderData = Vec<u8>;
 
 /// Task for the ERC-20 bridge
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
-    RefreshBftBridgeCreationStatus(BridgeSide),
     CollectEvmEvents(BridgeSide),
-    PrepareMintOrder(BurntEventData, BridgeSide),
-    RemoveMintOrder(MintedEventData),
-    SendMintTransaction(SignedMintOrderData, BridgeSide),
+    PrepareMintOrder(MinterOperationId),
+    RemoveMintOrder(MintedEventData, BridgeSide),
+    SendMintTransaction(MinterOperationId),
 }
 
 impl Task for BridgeTask {
@@ -45,25 +44,23 @@ impl Task for BridgeTask {
         let state = get_state();
         match self {
             BridgeTask::InitEvmState(side) => Box::pin(Self::init_evm_state(state, *side)),
-            BridgeTask::RefreshBftBridgeCreationStatus(side) => {
-                Box::pin(Self::refresh_bft_bridge(state, *side))
-            }
             BridgeTask::CollectEvmEvents(side) => {
-                Box::pin(Self::collect_evm_events(state, scheduler, *side))
+                let side = *side;
+                Box::pin(Self::collect_evm_events(state, scheduler, side))
             }
-            BridgeTask::PrepareMintOrder(data, side) => Box::pin(Self::prepare_mint_order(
-                state,
-                scheduler,
-                data.clone(),
-                *side,
-            )),
-            BridgeTask::RemoveMintOrder(data) => {
-                let data = data.clone();
-                Box::pin(async move { Self::remove_mint_order(state, data) })
+            BridgeTask::PrepareMintOrder(operation_id) => {
+                let operation_id = *operation_id;
+                Box::pin(Self::prepare_mint_order(state, scheduler, operation_id))
             }
-            BridgeTask::SendMintTransaction(order_data, side) => Box::pin(
-                Self::send_mint_transaction(state, order_data.clone(), *side),
-            ),
+            BridgeTask::RemoveMintOrder(event_data, sender_side) => {
+                let event_data = event_data.clone();
+                let sender_side = *sender_side;
+                Box::pin(async move { Self::remove_mint_order(event_data, sender_side) })
+            }
+            BridgeTask::SendMintTransaction(operation_id) => {
+                let operation_id = *operation_id;
+                Box::pin(Self::send_mint_transaction(state, operation_id))
+            }
         }
     }
 }
@@ -103,24 +100,6 @@ impl BridgeTask {
         Ok(())
     }
 
-    pub async fn refresh_bft_bridge(
-        state: Rc<RefCell<State>>,
-        side: BridgeSide,
-    ) -> Result<(), SchedulerError> {
-        log::trace!("refreshing bft bridge status");
-        let mut status = state.borrow().config.get_bft_bridge_status(side);
-        status.refresh().await.into_scheduler_result()?;
-
-        log::trace!("{side} bft bridge status refreshed: {status:?}");
-
-        state
-            .borrow_mut()
-            .config
-            .set_bft_bridge_status(side, status);
-
-        Ok(())
-    }
-
     async fn collect_evm_events(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
@@ -134,11 +113,13 @@ impl BridgeTask {
             return Self::init_evm_state(state, side).await;
         };
 
-        let bft_bridge_status = state.borrow().config.get_bft_bridge_status(side);
-        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to collect evm events: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
-        })?;
+        let bft_bridge = state
+            .borrow()
+            .config
+            .get_bft_bridge_contract(side)
+            .ok_or_else(|| {
+                SchedulerError::TaskExecutionFailed("no bft bridge contract set".into())
+            })?;
 
         let client = evm_info.link.get_json_rpc_client();
 
@@ -181,9 +162,20 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        burn_event: BurntEventData,
-        burn_side: BridgeSide,
+        operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
+        let mut operation_store = get_operations_store();
+        let Some(operation) = operation_store.get(operation_id) else {
+            return Err(SchedulerError::TaskExecutionFailed(format!(
+                "Operation {operation_id} is not found in the operation store."
+            )));
+        };
+
+        let burn_side = operation.side;
+        let OperationStatus::Scheduled(burn_event) = operation.status else {
+            return Err(SchedulerError::TaskExecutionFailed(format!("Operation {operation_id} was expected to be in `Scheduled` state, but found: {operation:?}")));
+        };
+
         log::trace!("preparing mint order: {burn_event:?}");
 
         let burn_evm_params = state
@@ -222,9 +214,10 @@ impl BridgeTask {
         }
 
         let nonce = burn_event.operation_id;
+        let amount = burn_event.amount;
 
         let mint_order = MintOrder {
-            amount: burn_event.amount,
+            amount: amount.clone(),
             sender,
             src_token,
             recipient,
@@ -246,19 +239,24 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        state
-            .borrow_mut()
-            .mint_orders
-            .insert(sender, src_token, nonce, signed_mint_order);
+        operation_store.update(
+            operation_id,
+            OperationPayload {
+                side: burn_side,
+                status: OperationStatus::MintOrderSigned {
+                    token_id: src_token,
+                    amount,
+                    signed_mint_order: Box::new(signed_mint_order),
+                },
+            },
+        );
 
         // Update the EVM params
         Self::update_evm_params(state.clone(), burn_side).await?;
 
         let options = TaskOptions::default();
-        scheduler.append_task(
-            BridgeTask::SendMintTransaction(signed_mint_order.0.to_vec(), burn_side.other())
-                .into_scheduled(options),
-        );
+        scheduler
+            .append_task(BridgeTask::SendMintTransaction(operation_id).into_scheduled(options));
 
         log::trace!("Mint order added");
 
@@ -279,12 +277,16 @@ impl BridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = BridgeTask::PrepareMintOrder(burnt, sender_side);
+                let operation_id = get_operations_store().new_operation(
+                    burnt.sender.clone(),
+                    OperationPayload::new(sender_side.other(), burnt),
+                );
+                let mint_order_task = BridgeTask::PrepareMintOrder(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
                 log::debug!("Adding RemoveMintOrder task");
-                let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted);
+                let remove_mint_order_task = BridgeTask::RemoveMintOrder(minted, sender_side);
                 return Some(remove_mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Notify(_)) => todo!(),
@@ -295,14 +297,40 @@ impl BridgeTask {
     }
 
     fn remove_mint_order(
-        state: Rc<RefCell<State>>,
         minted_event: MintedEventData,
+        sender_side: BridgeSide,
     ) -> Result<(), SchedulerError> {
-        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
-            SchedulerError::TaskExecutionFailed(
-                "failed to decode sender id256 from minted event".into(),
-            )
-        })?;
+        let wallet_id = match sender_side {
+            BridgeSide::Base => minted_event.recipient,
+            BridgeSide::Wrapped => {
+                Id256::from_slice(&minted_event.sender_id)
+                    .ok_or_else(|| {
+                        SchedulerError::TaskExecutionFailed(
+                            "failed to decode sender id256 from minted event".into(),
+                        )
+                    })?
+                    .to_evm_address()
+                    .map_err(|_| {
+                        SchedulerError::TaskExecutionFailed(
+                            "sender id was not an EVM address".into(),
+                        )
+                    })?
+                    .1
+            }
+        };
+
+        let mut operation_store = get_operations_store();
+        let nonce = minted_event.nonce;
+        let Some((operation_id, operation_state)) = operation_store
+            .get_for_address(&wallet_id)
+            .into_iter()
+            .find(|(operation_id, _)| operation_id.nonce() == nonce)
+        else {
+            log::error!("operation with nonce {nonce} not found");
+            return Err(SchedulerError::TaskExecutionFailed(format!(
+                "operation with nonce {nonce} not found"
+            )));
+        };
 
         let src_token = Id256::from_slice(&minted_event.from_token).ok_or_else(|| {
             SchedulerError::TaskExecutionFailed(
@@ -310,21 +338,58 @@ impl BridgeTask {
             )
         })?;
 
-        state
-            .borrow_mut()
-            .mint_orders
-            .remove(sender_id, src_token, minted_event.nonce);
+        if let OperationStatus::MintOrderSent {
+            token_id,
+            amount,
+            tx_id,
+            ..
+        } = operation_state.status
+        {
+            if token_id == src_token {
+                operation_store.update(
+                    operation_id,
+                    OperationPayload {
+                        side: operation_state.side,
+                        status: OperationStatus::Minted {
+                            amount,
+                            token_id,
+                            tx_id,
+                        },
+                    },
+                );
 
-        log::trace!("Mint order removed");
+                log::trace!("Mint order removed");
+            } else {
+                log::warn!("Operation {operation_id} was created for token id {token_id:?} but the mint event is emitted by {src_token:?}.");
+            }
+        } else {
+            log::error!("Operation {operation_id} was expected to be in `MintOrderSent` state, but was found: {operation_state:?}");
+        }
 
         Ok(())
     }
 
     async fn send_mint_transaction(
         state: Rc<RefCell<State>>,
-        order_data: Vec<u8>,
-        side: BridgeSide,
+        operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
+        let mut operation_store = get_operations_store();
+        let Some(operation) = operation_store.get(operation_id) else {
+            return Err(SchedulerError::TaskExecutionFailed(format!(
+                "Operation {operation_id} is not found in the operation store."
+            )));
+        };
+
+        let side = operation.side;
+        let OperationStatus::MintOrderSigned {
+            token_id,
+            amount,
+            signed_mint_order,
+        } = operation.status
+        else {
+            return Err(SchedulerError::TaskExecutionFailed(format!("Operation {operation_id} was expected to be in `MintOrderSigned` state, but found: {operation:?}")));
+        };
+
         log::trace!("Sending mint transaction");
 
         let signer = state.borrow().signer.get().clone();
@@ -338,11 +403,14 @@ impl BridgeTask {
             .get_evm_params(side)
             .into_scheduler_result()?;
 
-        let bft_bridge_status = &state.borrow().config.get_bft_bridge_status(side);
-        let bft_bridge = bft_bridge_status.as_created().cloned().ok_or_else(|| {
-            log::warn!("failed to send mint transaction: bft bridge is not created");
-            SchedulerError::TaskExecutionFailed("bft bridge is not created".into())
-        })?;
+        let bft_bridge = &state
+            .borrow()
+            .config
+            .get_bft_bridge_contract(side)
+            .ok_or_else(|| {
+                log::warn!("failed to send mint transaction: bft bridge is not configured");
+                SchedulerError::TaskExecutionFailed("bft bridge is not configured".into())
+            })?;
 
         let client = evm_info.link.get_json_rpc_client();
         let nonce = client
@@ -352,10 +420,10 @@ impl BridgeTask {
 
         let mut tx = bft_bridge_api::mint_transaction(
             sender.0,
-            bft_bridge.into(),
+            bft_bridge.0,
             nonce.into(),
             evm_params.gas_price.into(),
-            &order_data,
+            &signed_mint_order.0,
             evm_params.chain_id as _,
         );
 
@@ -369,12 +437,25 @@ impl BridgeTask {
         tx.hash = tx.hash();
 
         let client = evm_info.link.get_json_rpc_client();
-        client
+        let tx_id = client
             .send_raw_transaction(tx)
             .await
             .into_scheduler_result()?;
 
-        log::trace!("Mint transaction sent");
+        operation_store.update(
+            operation_id,
+            OperationPayload {
+                side,
+                status: OperationStatus::MintOrderSent {
+                    token_id,
+                    amount,
+                    signed_mint_order,
+                    tx_id: tx_id.into(),
+                },
+            },
+        );
+
+        log::trace!("Mint transaction sent. Operation id: {operation_id}. Tx id: {tx_id}");
 
         Ok(())
     }

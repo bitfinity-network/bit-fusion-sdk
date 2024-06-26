@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::Principal;
-use did::{H160, H256};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
@@ -13,11 +13,15 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_did::error::Result;
+use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::memory::{
+    MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
+    PENDING_TASKS_MEMORY_ID,
+};
+use crate::operation::OperationPayload;
 use crate::state::{Settings, State};
 use crate::tasks::BridgeTask;
 
@@ -118,28 +122,44 @@ impl EvmMinter {
         self.set_timers();
     }
 
-    /// Returns `(operaion_id, signed_mint_order)` pairs for the given sender id.
+    /// Returns `(nonce, mint_order)` pairs for the given sender id.
     #[query]
-    pub async fn list_mint_orders(
+    pub fn list_mint_orders(
         &self,
-        sender: Id256,
+        wallet_address: H160,
         src_token: Id256,
     ) -> Vec<(u32, SignedMintOrder)> {
-        get_state().borrow().mint_orders.get_all(sender, src_token)
+        get_operations_store()
+            .get_for_address(&wallet_address)
+            .into_iter()
+            .filter_map(|(operation_id, status)| {
+                status
+                    .get_signed_mint_order(Some(src_token))
+                    .map(|mint_order| (operation_id.nonce(), *mint_order))
+            })
+            .collect()
     }
 
-    /// Returns the `signed_mint_order` if present.
+    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
     #[query]
-    pub async fn get_mint_order(
+    pub fn get_mint_order(
         &self,
-        sender: Id256,
+        wallet_address: H160,
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        get_state()
-            .borrow()
-            .mint_orders
-            .get(sender, src_token, operation_id)
+        self.list_mint_orders(wallet_address, src_token)
+            .into_iter()
+            .find(|(nonce, _)| *nonce == operation_id)
+            .map(|(_, mint_order)| mint_order)
+    }
+
+    #[query]
+    pub fn get_operations_list(
+        &self,
+        wallet_address: H160,
+    ) -> Vec<(MinterOperationId, OperationPayload)> {
+        get_operations_store().get_for_address(&wallet_address)
     }
 
     /// Returns EVM address of the canister.
@@ -155,57 +175,20 @@ impl EvmMinter {
         }
     }
 
-    /// Starts the BFT bridge contract deployment.
+    /// Sets the BFT bridge contract address.
     #[update]
-    pub async fn init_bft_bridge_contract(
-        &mut self,
-        side: BridgeSide,
-        fee_charge_address: H160,
-    ) -> Result<H256> {
-        let state = get_state();
-        let signer = state.borrow().signer.get().clone();
-
-        let evm_info = state.borrow().config.get_evm_info(side);
-        let evm_link = evm_info.link;
-        let evm_params = evm_info
-            .params
-            .ok_or_else(|| "EVM params not initialized".to_string())?;
-        let minter_address = signer.get_address().await.map_err(|e| e.to_string())?;
-
-        let mut status = state.borrow().config.get_bft_bridge_status(side);
-
-        log::trace!("Starting BftBridge contract initialization with current status: {status:?}");
-
-        let hash = status
-            .initialize(
-                evm_link,
-                evm_params.chain_id as _,
-                signer,
-                minter_address,
-                fee_charge_address,
-                side == BridgeSide::Wrapped,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-
-        log::trace!("BftBridge contract initialization started with status: {status:?}");
-
-        state
+    pub async fn set_bft_bridge_contract(&mut self, address: H160, side: BridgeSide) {
+        get_state()
             .borrow_mut()
             .config
-            .set_bft_bridge_status(side, status);
+            .set_bft_bridge_contract(side, address);
+    }
 
-        let options = TaskOptions::default()
-            .with_max_retries_policy(10)
-            .with_fixed_backoff_policy(4);
-        get_scheduler()
-            .borrow_mut()
-            .append_task(ScheduledTask::with_options(
-                BridgeTask::RefreshBftBridgeCreationStatus(side),
-                options,
-            ));
-
-        Ok(hash)
+    /// Returns bridge contract address for EVM.
+    /// If contract isn't initialized yet - returns None.
+    #[query]
+    pub fn get_bft_bridge_contract(&mut self, side: BridgeSide) -> Option<H160> {
+        get_state().borrow().config.get_bft_bridge_contract(side)
     }
 
     fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
@@ -266,6 +249,18 @@ pub fn get_state() -> Rc<RefCell<State>> {
 
 pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
+}
+
+pub fn get_operations_store(
+) -> MinterOperationStore<VirtualMemory<DefaultMemoryImpl>, OperationPayload> {
+    MEMORY_MANAGER.with(|mm| {
+        MinterOperationStore::with_memory(
+            mm.get(OPERATIONS_MEMORY_ID),
+            mm.get(OPERATIONS_LOG_MEMORY_ID),
+            mm.get(OPERATIONS_MAP_MEMORY_ID),
+            None,
+        )
+    })
 }
 
 #[cfg(test)]

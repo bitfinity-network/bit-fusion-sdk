@@ -79,11 +79,11 @@ get_ckbtc_binaries() {
     cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz $WASM_DIR/ic-bitcoin-canister-mock.wasm.gz
 }
 
-build_create_bft_bridge_tool() {
+build_bridge_tool() {
     echo "Building create BFTBridge tool"
 
-    cargo build -p create_bft_bridge_tool --release
-    cp target/release/create_bft_bridge_tool "$WASM_DIR/create_bft_bridge_tool"
+    cargo build -p bridge-tool --release
+    cp target/release/bridge-tool "$WASM_DIR/bridge-tool"
 }
 
 # Function to build a single canister with a feature flag
@@ -135,7 +135,7 @@ build_requested_canisters() {
         build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
         # Build tools
-        build_create_bft_bridge_tool
+        build_bridge_tool
     else
         for canister in "$@"; do
             case "$canister" in
