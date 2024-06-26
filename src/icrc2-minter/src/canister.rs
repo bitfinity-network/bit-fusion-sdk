@@ -282,8 +282,7 @@ impl MinterCanister {
         Self::token_mint_orders(
             wallet_address,
             src_token,
-            Some(offset),
-            Some(count.min(MAX_OPERATIONS_LIST_SIZE)),
+            Some((offset, count.min(MAX_OPERATIONS_LIST_SIZE))),
         )
     }
 
@@ -295,7 +294,7 @@ impl MinterCanister {
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, src_token, None, None)
+        Self::token_mint_orders(wallet_address, src_token, None)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
@@ -399,14 +398,13 @@ impl MinterCanister {
     fn token_mint_orders(
         wallet_address: H160,
         src_token: Id256,
-        offset: Option<usize>,
-        count: Option<usize>,
+        offset_and_count: Option<(usize, usize)>,
     ) -> Vec<(u32, SignedMintOrder)> {
-        match (offset, count) {
-            (Some(offset), Some(count)) => {
+        match offset_and_count {
+            Some((offset, count)) => {
                 get_operations_store().get_page_for_address(&wallet_address, offset, count)
             }
-            _ => get_operations_store().get_for_address(&wallet_address),
+            None => get_operations_store().get_for_address(&wallet_address),
         }
         .into_iter()
         .filter_map(|(operation_id, status)| {
