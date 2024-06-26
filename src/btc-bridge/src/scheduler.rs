@@ -72,16 +72,11 @@ impl BtcTask {
         };
 
         let client = evm_info.link.get_json_rpc_client();
-        let last_block = client.get_block_number().await.into_scheduler_result()?;
 
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block,
-            Some(last_block),
-            evm_info.bridge_contract.0,
-        )
-        .await
-        .into_scheduler_result()?;
+        let logs =
+            BridgeEvent::collect_logs(&client, params.next_block, None, evm_info.bridge_contract.0)
+                .await
+                .into_scheduler_result()?;
 
         log::debug!("got {} logs from evm", logs.len());
 
