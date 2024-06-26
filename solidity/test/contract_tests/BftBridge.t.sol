@@ -230,6 +230,22 @@ contract BftBridgeTest is Test {
         _bridge.addAllowedImplementation(newImplementation);
     }
 
+    function testAddAllowedImplementationByAController() public {
+        vm.startPrank(_owner);
+        BFTBridge _newImpl = new BFTBridge();
+
+        newImplementation = address(_newImpl);
+
+        address controller = address(55);
+        _bridge.addController(controller);
+
+        vm.stopPrank();
+
+        vm.prank(controller);
+
+        _bridge.addAllowedImplementation(newImplementation);
+    }
+
     /// Test that the bridge can be upgraded to a new implementation
     /// and the new implementation has been added to the list of allowed
     /// implementations

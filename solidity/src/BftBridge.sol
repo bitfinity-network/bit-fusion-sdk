@@ -57,6 +57,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Allowed implementations hash list
     mapping(bytes32 => bool) public allowedImplementations;
 
+    /// Controller AccessList for adding implementations
+    mapping(address => bool) public controllerAccessList;
+
     // Event for mint operation
     event MintTokenEvent(
         uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
@@ -91,6 +94,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         feeChargeContract = IFeeCharge(feeChargeAddress);
         TokenManager._initialize(_isWrappedSide);
 
+        // Add the owner to the controller access list
+        controllerAccessList[msg.sender] = true;
+
         // Call super initializer
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -114,8 +120,16 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _unpause();
     }
 
+    /// Modifier that restricts access to only addresses in the
+    /// `controllerAccessList`.
+    /// This modifier can be used on functions that should only be callable by authorized controllers.
+    modifier onlyControllers() {
+        require(controllerAccessList[msg.sender], "Not allowed");
+        _;
+    }
+
     /// Add a new implementation to the allowed list
-    function addAllowedImplementation(address newImplementation) external onlyOwner {
+    function addAllowedImplementation(address newImplementation) external onlyControllers {
         require(newImplementation != address(0), "Invalid implementation address");
         require(newImplementation.code.length > 0, "Not a contract");
 
@@ -127,6 +141,18 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, userData);
+    }
+
+    /// Adds the given `controller` address to the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function addController(address controller) external onlyOwner {
+        controllerAccessList[controller] = true;
+    }
+
+    /// Removes the given `controller` address from the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function removeController(address controller) external onlyOwner {
+        controllerAccessList[controller] = false;
     }
 
     /// Main function to withdraw funds
