@@ -575,6 +575,7 @@ pub trait TestContext {
     }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
+    #[allow(clippy::too_many_arguments)]
     async fn burn_icrc2(
         &self,
         caller: &str,
