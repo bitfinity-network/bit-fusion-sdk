@@ -2,7 +2,7 @@ services:
   bitcoind:
     container_name: bitcoind
     image: lncm/bitcoind:v26.0
-    command: [ "-txindex" ]
+    command: ["-txindex"]
     ports:
       - "18443:18443"
       - "18444:18444"
@@ -20,6 +20,15 @@ services:
     ports:
       - "8000:8000"
       - "8001:8001"
+
+  evm-rpc-canister-proxy:
+    container_name: evm-rpc-canister-proxy
+    build:
+      dockerfile: evm-rpc-canister-proxy.dockerfile
+    ports:
+      - "8002:8002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   bitcoin-data:

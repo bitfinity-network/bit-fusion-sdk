@@ -2,6 +2,7 @@
 
 - [Deploy](#deploy)
   - [Requirements](#requirements)
+    - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
   - [Build](#build)
   - [Canisters deployment](#canisters-deployment)
     - [BFT Bridge](#bft-bridge)
@@ -23,11 +24,21 @@
     curl -L https://foundry.paradigm.xyz | bash
     ```
 
+- Install [local-ssl-proxy](https://github.com/cameronhunter/local-ssl-proxy) to run Dfx tests. Required since to make calls to evm-rpc canister we require HTTPS.
+- Install SSL certificates to make local-ssl-proxy able to work.
+
+    On linux systems it should be enough to run
+
+    ```sh
+    sudo cp btc-deploy/mkcert/* /etc/ssl/
+    ```
+
+    While on MacOS you should install them by clicking on the certificates in the mkcert folder.
+
 ### Ubuntu 24.04 additional dependencies
 
 - Install libunwind: `sudo apt install libunwind-dev`
 - Install protobuf: `sudo apt install protobuf-compiler`
-
 
 ## Build
 
