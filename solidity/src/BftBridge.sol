@@ -76,7 +76,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     );
 
     /// Event that can be emited with a notification for the minter canister
-    event NotifyMinterEvent(uint32 notificationType, bytes userData);
+    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -126,7 +126,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
-        emit NotifyMinterEvent(notificationType, userData);
+        emit NotifyMinterEvent(notificationType, msg.sender, userData);
     }
 
     /// Main function to withdraw funds

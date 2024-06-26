@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 import "src/libraries/StringUtils.sol";
 
 contract StringUtilsTest is Test {
+
     function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
         uint8 i = 0;
         while (i < 32 && _bytes32[i] != 0) {
@@ -65,4 +66,5 @@ contract StringUtilsTest is Test {
             assertEq(bytes32ToString(result), unicode"ї");
         }
     }
+
 }
