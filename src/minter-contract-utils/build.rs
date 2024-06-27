@@ -163,25 +163,13 @@ impl SolidityFileTimesWatcher {
         if current_file_times.files.len() != new_file_times.files.len() {
             return true;
         }
-        for key in current_file_times.files.keys() {
-            if current_file_times.files.get(key) != new_file_times.files.get(key) {
-                return true;
-            }
-        }
-        for key in new_file_times.files.keys() {
-            if current_file_times.files.get(key) != new_file_times.files.get(key) {
-                return true;
-            }
-        }
 
-        // check each file
-        for (file, saved_time) in current_file_times.files.iter() {
-            if Some(saved_time) != new_file_times.files.get(file) {
-                return true;
-            }
-        }
-
-        false
+        // check whether the files have changed
+        current_file_times
+            .files
+            .keys()
+            .chain(new_file_times.files.keys())
+            .any(|key| current_file_times.files.get(key) != new_file_times.files.get(key))
     }
 
     /// Saves the file times to the times file
