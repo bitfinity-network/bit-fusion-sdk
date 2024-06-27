@@ -2,7 +2,7 @@ use candid::Principal;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{BTreeMapStructure, StableBTreeMap};
 
-pub struct AccessList<M: Memory> {
+pub(crate) struct AccessList<M: Memory> {
     pub access_list: StableBTreeMap<Principal, (), M>,
 }
 

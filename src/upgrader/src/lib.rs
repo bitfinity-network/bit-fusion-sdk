@@ -1,5 +1,7 @@
 pub mod canister;
 mod core;
+mod state;
+mod memory;
 
 pub fn idl() -> String {
     // use api::{CanisterType, ParentInitArgs};

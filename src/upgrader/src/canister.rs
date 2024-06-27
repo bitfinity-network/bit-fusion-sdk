@@ -1,16 +1,26 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use candid::utils::ArgumentEncoder;
 use candid::{encode_args, CandidType, Encode, Principal};
-use ic_canister::{init, query, Canister, MethodType, PreUpdate};
+use did::H160;
+use ic_canister::{init, query, update, Canister, MethodType, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::main::{
     CanisterIdRecord, CanisterInstallMode, CanisterStatusType, CreateCanisterArgument,
     InstallCodeArgument,
 };
 
+use ic_exports::ic_kit::ic;
+use ic_log::LogSettings;
+use icrc2_minter::SigningStrategy;
 use minter_did::init::InitData;
 
 use crate::core::{CanisterId, Management};
+use crate::state::{Settings, State};
 
 use ic_exports::ic_cdk::api::management_canister::provisional::CanisterSettings;
+
+use eth_signer::sign_strategy::TransactionSigner;
 
 pub const CREATE_CYCLES: u128 = 2_000_000_000;
 
@@ -39,6 +49,7 @@ pub struct UpgraderCanister {
 pub struct UpgraderInitData {
     /// The principal which will be the owner of the newly created canister.
     pub owner: Principal,
+    pub signing_strategy: SigningStrategy,
 }
 
 impl PreUpdate for UpgraderCanister {
@@ -47,7 +58,59 @@ impl PreUpdate for UpgraderCanister {
 
 impl UpgraderCanister {
     // #[init]
-    fn init(&self, init: UpgraderInitData) {}
+    fn init(&self, init: UpgraderInitData) {
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        check_anonymous_principal(init.owner).expect("anonymous principal not allowed");
+
+        let settings = Settings {
+            owner: init.owner,
+            signing_strategy: init.signing_strategy,
+        };
+
+        state.reset(settings);
+    }
+
+    /// Returns principal of canister owner.
+    #[query]
+    pub fn get_owner(&self) -> Principal {
+        get_state().borrow().config.get_owner()
+    }
+
+    /// set_owner inspect_message check
+    pub(crate) fn set_owner_inspect_message_check(
+        principal: Principal,
+        owner: Principal,
+        state: &State,
+    ) -> Result<(), ()> {
+        check_anonymous_principal(owner).unwrap();
+        inspect_check_is_owner(principal, state).unwrap();
+
+        Ok(())
+    }
+
+    /// Sets a new principal for canister owner.
+    ///
+    /// This method should be called only by current owner,
+    /// else `Error::NotAuthorised` will be returned.
+    #[update]
+    pub fn set_owner(&mut self, owner: Principal) -> Result<(), String> {
+        let state = get_state();
+        let mut state = state.borrow_mut();
+
+        UpgraderCanister::set_owner_inspect_message_check(ic::caller(), owner, &state).unwrap();
+        state.config.set_owner(owner);
+
+        Ok(())
+    }
+
+    /// Returns evm_address of the minter canister.
+    #[update]
+    pub async fn get_canister_evm_address(&mut self) -> Result<H160, ()> {
+        let signer = get_state().borrow().signer.get_transaction_signer();
+        Ok(signer.get_address().await.unwrap())
+    }
 
     // #[query]
     pub fn validate(&self, canister_type: &CanisterType, wasm: Vec<u8>) {
@@ -183,4 +246,32 @@ impl UpgraderCanister {
     }
 
     // add new implementation for bft
+}
+
+thread_local! {
+    pub static STATE: Rc<RefCell<State>> = Rc::default();
+}
+
+pub(crate) fn get_state() -> Rc<RefCell<State>> {
+    STATE.with(|state| state.clone())
+}
+
+/// inspect function to check whether provided principal is owner
+fn inspect_check_is_owner(principal: Principal, state: &State) -> Result<(), ()> {
+    let owner = state.config.get_owner();
+
+    // if owner != principal {
+    //     return Err(Error::NotAuthorized);
+    // }
+
+    todo!()
+}
+
+/// inspect function to check whether the provided principal is anonymous
+fn check_anonymous_principal(principal: Principal) -> Result<(), ()> {
+    // if principal == Principal::anonymous() {
+    //     return Err(Error::AnonymousPrincipal);
+    // }
+
+    todo!()
 }

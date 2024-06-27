@@ -115,7 +115,7 @@ impl<Src, Dst> ValidBurn<Src, Dst> {
 }
 
 /// Checks if `evm` has valid BftBridge contract deployed.
-pub async fn check_bft_bridge_contract(
+pub(crate) async fn check_bft_bridge_contract(
     evm: &EthJsonRpcClient<impl Client>,
     bft_address: H160,
     state: Rc<RefCell<State>>,
