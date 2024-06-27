@@ -23,35 +23,11 @@ pub enum UpgraderError {
     #[error("Canister: {0} not running after operation")]
     CanisterNotRunning(Principal),
 
-    #[error("Missing arguments for operation")]
-    MissingArguments,
-
-    #[error("Invalid canister ID")]
-    InvalidCanisterId,
-
-    #[error("Insufficient cycles for operation")]
-    InsufficientCycles,
-
     #[error("Management canister error: Rejection Code :{0} Error: {1}")]
     ManagementCanisterError(String, String),
 
     #[error("Candid error: {0}")]
     CandidError(String),
-
-    #[error("Invalid signing strategy")]
-    InvalidSigningStrategy,
-
-    #[error("Canister status check failed")]
-    CanisterStatusCheckFailed,
-
-    #[error("Operation timeout")]
-    OperationTimeout,
-
-    #[error("Network error: {0}")]
-    NetworkError(String),
-
-    #[error("Unexpected error: {0}")]
-    UnexpectedError(String),
 
     #[error("Validation error: the provided canister wasm module is invalid")]
     ValidationError,
