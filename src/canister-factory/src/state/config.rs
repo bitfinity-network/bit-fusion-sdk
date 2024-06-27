@@ -2,16 +2,12 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use candid::{CandidType, Deserialize, Principal};
-use did::{codec, H160};
-use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use evm_canister_client::IcCanisterClient;
+use did::codec;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::EvmParams;
 
 use super::Settings;
-use crate::memory::CONFIG_MEMORY_ID;
-use crate::memory::MEMORY_MANAGER;
+use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 /// Minter canister configuration.
 #[derive(Default, Clone)]

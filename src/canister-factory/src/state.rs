@@ -1,11 +1,14 @@
 use candid::Principal;
 use config::Config;
 use eth_signer::sign_strategy::SigningStrategy;
-use ic_stable_structures::default_ic_memory_manager;
+use registry::Registry;
 use signer::SignerInfo;
 
 mod config;
+mod registry;
 pub mod signer;
+
+pub use registry::{CanisterInfo, CanisterStatus};
 
 /// State of a minter canister.
 #[derive(Default)]
@@ -15,6 +18,9 @@ pub struct State {
 
     /// Transaction signing info.
     pub signer: SignerInfo,
+
+    /// Registry of deployed canisters.
+    registry: Registry,
 }
 
 impl State {
@@ -24,6 +30,16 @@ impl State {
             .reset(settings.signing_strategy.clone(), 0)
             .expect("failed to set signer");
         self.config.reset(settings);
+        self.registry.clear();
+    }
+
+    /// Returns the registry of deployed canisters.
+    pub fn registry(&self) -> &Registry {
+        &self.registry
+    }
+
+    pub fn mut_registry(&mut self) -> &mut Registry {
+        &mut self.registry
     }
 }
 

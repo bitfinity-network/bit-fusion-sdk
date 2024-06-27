@@ -6,10 +6,9 @@ use eth_signer::sign_strategy::{
 };
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
-use minter_did::error::{Error, Result};
 
-use crate::memory::TX_SIGNER_MEMORY_ID;
-use crate::memory::MEMORY_MANAGER;
+use crate::error::{Result, UpgraderError};
+use crate::memory::{MEMORY_MANAGER, TX_SIGNER_MEMORY_ID};
 
 /// A component that provides the access to the signer
 #[derive(Default, Clone)]
@@ -17,10 +16,10 @@ pub struct SignerInfo {}
 
 impl SignerInfo {
     /// Reset the signer with the given strategy and chain id.
-    pub fn reset(&self, signing_type: SigningStrategy, chain_id: u32) -> Result<()> {
+    pub fn reset(&self, signing_type: SigningStrategy, chain_id: u32) -> Result {
         let signer = signing_type
             .make_signer(chain_id as _)
-            .map_err(|e| Error::from(format!("failed to init signer: {e}")))?;
+            .map_err(|e| UpgraderError::TransactionSignerError(e.to_string()))?;
 
         TX_SIGNER.with(|s| {
             s.borrow_mut()

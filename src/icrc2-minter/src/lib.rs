@@ -4,7 +4,7 @@ use std::rc::Rc;
 use ic_metrics::Metrics;
 pub use state::SigningStrategy;
 
-pub use crate::canister::MinterCanister;
+pub(crate) use crate::canister::MinterCanister;
 
 mod build_data;
 pub mod canister;

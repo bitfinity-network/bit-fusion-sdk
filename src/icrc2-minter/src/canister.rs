@@ -38,7 +38,7 @@ mod inspect;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
-pub struct MinterCanister {
+pub(crate) struct MinterCanister {
     #[id]
     id: Principal,
 }

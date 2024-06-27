@@ -940,6 +940,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "canister-factory"
+version = "0.2.0"
+dependencies = [
+ "async-recursion",
+ "async-trait",
+ "btc-bridge",
+ "candid",
+ "did",
+ "erc20-minter",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "evm-canister-client",
+ "hex",
+ "ic-canister",
+ "ic-exports",
+ "ic-helpers",
+ "ic-log",
+ "ic-metrics 0.17.0",
+ "ic-stable-structures 0.17.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "icrc-client",
+ "icrc2-minter",
+ "jsonrpc-core",
+ "log",
+ "minter-contract-utils",
+ "minter-did",
+ "rune-bridge",
+ "serde",
+ "sha3",
+ "thiserror",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9099,39 +9134,6 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
-
-[[package]]
-name = "upgrader"
-version = "0.2.0"
-dependencies = [
- "async-recursion",
- "async-trait",
- "candid",
- "did",
- "erc20-minter",
- "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
- "evm-canister-client",
- "hex",
- "ic-canister",
- "ic-exports",
- "ic-helpers",
- "ic-log",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
- "ic-storage",
- "ic-task-scheduler",
- "icrc-client",
- "icrc2-minter",
- "jsonrpc-core",
- "log",
- "minter-contract-utils",
- "minter-did",
- "serde",
- "strum 0.26.2",
- "thiserror",
-]
 
 [[package]]
 name = "url"

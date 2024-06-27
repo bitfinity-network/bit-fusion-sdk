@@ -244,6 +244,11 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         return minterCanisterAddress;
     }
 
+    /// Getter function for fee charge contract address
+    function getFeeChargeAddress() external view returns (address) {
+        return address(feeChargeContract);
+    }
+
     /// Function to decode and validate the order data
     function _decodeAndValidateOrder(bytes calldata encodedOrder) private view returns (MintOrderData memory order) {
         // Decode order data
