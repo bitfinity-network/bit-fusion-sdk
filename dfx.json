@@ -1,5 +1,9 @@
 {
   "canisters": {
+    "evm_rpc": {
+      "type": "pull",
+      "id": "7hfb6-caaaa-aaaar-qadga-cai"
+    },
     "evm_testnet": {
       "build": "",
       "candid": ".artifact/evm_testnet.did",

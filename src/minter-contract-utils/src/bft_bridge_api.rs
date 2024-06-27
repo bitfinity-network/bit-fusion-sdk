@@ -249,9 +249,59 @@ pub enum BridgeEvent {
 impl BridgeEvent {
     pub async fn collect_logs(
         evm_client: &EthJsonRpcClient<impl Client>,
+        mut from_block: u64,
+        to_block: u64,
+        bridge_contract: H160,
+    ) -> Result<Vec<Log>, anyhow::Error> {
+        const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
+        log::debug!("collecting logs from {from_block} to {to_block}",);
+
+        let mut offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
+        let mut logs = Vec::new();
+
+        while from_block <= to_block {
+            let to_block_for_page = (from_block + offset).min(to_block);
+            log::debug!("collecting logs from {from_block} to {to_block_for_page}");
+            match Self::collect_logs_from_to(
+                evm_client,
+                bridge_contract,
+                EthBlockNumber::Number(from_block.into()),
+                EthBlockNumber::Number(to_block_for_page.into()),
+            )
+            .await
+            {
+                Ok(new_logs) => {
+                    logs.extend(new_logs);
+                    // offset is inclusive, so we need to add 1
+                    from_block = to_block_for_page + 1;
+                    // reset offset to default value
+                    offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
+                }
+                Err(err) => {
+                    log::error!(
+                        "failed to collect logs from {from_block} to {to_block_for_page}: {}",
+                        err
+                    );
+                    // reduce offset to retry fetching logs; if offset is 0, skip the block
+                    if offset > 0 {
+                        offset /= 2;
+                    } else {
+                        log::error!("unable to collect logs for block {from_block}. Skipping it.");
+                        from_block += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(logs)
+    }
+
+    /// Collects logs from the given range of blocks.
+    async fn collect_logs_from_to(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        bridge_contract: H160,
         from_block: EthBlockNumber,
         to_block: EthBlockNumber,
-        bridge_contract: H160,
     ) -> Result<Vec<Log>, anyhow::Error> {
         let params = EthGetLogsParams {
             address: Some(vec![bridge_contract]),
@@ -263,7 +313,6 @@ impl BridgeEvent {
                 NOTIFY_EVENT.signature(),
             ]]),
         };
-
         evm_client.get_logs(params).await
     }
 
@@ -417,6 +466,11 @@ pub static NOTIFY_EVENT: Lazy<Event> = Lazy::new(|| Event {
             indexed: false,
         },
         EventParam {
+            name: "txSender".into(),
+            kind: ParamType::Address,
+            indexed: false,
+        },
+        EventParam {
             name: "userData".into(),
             kind: ParamType::Bytes,
             indexed: false,
@@ -494,12 +548,14 @@ impl TryFrom<RawLog> for MintedEventData {
 #[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
 pub struct NotifyMinterEventData {
     pub notification_type: u32,
+    pub tx_sender: did::H160,
     pub user_data: Vec<u8>,
 }
 
 #[derive(Debug, Default, Clone)]
 struct NotifyMinterEventDataBuilder {
     notification_type: Option<u32>,
+    tx_sender: Option<did::H160>,
     user_data: Option<Vec<u8>>,
 }
 
@@ -509,6 +565,7 @@ impl NotifyMinterEventDataBuilder {
             notification_type: self
                 .notification_type
                 .ok_or_else(not_found("notificationType"))?,
+            tx_sender: self.tx_sender.ok_or_else(not_found("txSender"))?,
             user_data: self.user_data.ok_or_else(not_found("userData"))?,
         })
     }
@@ -516,6 +573,7 @@ impl NotifyMinterEventDataBuilder {
     fn with_field_from_token(mut self, name: &str, value: Token) -> Self {
         match name {
             "notificationType" => self.notification_type = value.into_uint().map(|v| v.as_u32()),
+            "txSender" => self.tx_sender = value.into_address().map(Into::into),
             "userData" => self.user_data = value.into_bytes().map(Into::into),
             _ => {}
         };
@@ -648,11 +706,13 @@ pub mod proxy {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use did::{H160, H256};
     use ethers_core::abi::{Bytes, RawLog, Token};
     use ethers_core::utils::hex::traits::FromHex;
 
-    use super::{BurntEventData, MintedEventData};
+    use super::*;
     use crate::bft_bridge_api::{BurntEventDataBuilder, MintedEventDataBuilder};
 
     #[test]
@@ -736,5 +796,157 @@ mod tests {
         };
 
         let _event = BurntEventData::try_from(raw).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_should_get_paginated_logs() {
+        env_logger::init();
+        // fill logs with from 200 to 1_000 blocks (total 800 blocks);
+        // set error for block 802
+        let mut logs = HashMap::new();
+        for block in 200..=1000 {
+            logs.insert(
+                block,
+                vec![Log {
+                    address: ethers_core::types::H160::default(),
+                    topics: vec![],
+                    data: ethers_core::types::Bytes::default(),
+                    block_hash: None,
+                    block_number: None,
+                    transaction_hash: None,
+                    transaction_index: None,
+                    log_index: None,
+                    transaction_log_index: None,
+                    log_type: None,
+                    removed: None,
+                }],
+            );
+        }
+
+        let client = FakeEthJsonRpcClient {
+            logs,
+            error: Some(802),
+        };
+        let evm_client = EthJsonRpcClient::new(client);
+
+        // get from 0 to 100
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 0, 100, ethers_core::types::H160::default())
+                .await
+                .unwrap();
+        assert_eq!(logs.len(), 0);
+
+        // get from 80 to 220 (first result will be empty)
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 80, 220, ethers_core::types::H160::default())
+                .await
+                .unwrap();
+        assert_eq!(logs.len(), 21);
+
+        // get from 100 to 800 (multiple requests)
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 100, 800, ethers_core::types::H160::default())
+                .await
+                .unwrap();
+        assert_eq!(logs.len(), 601);
+
+        // get error block
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 801, 950, ethers_core::types::H160::default())
+                .await
+                .unwrap();
+        assert_eq!(logs.len(), 950 - 801); // error will be skipped
+
+        // get with more blocks than available
+        let logs =
+            BridgeEvent::collect_logs(&evm_client, 10, 2000, ethers_core::types::H160::default())
+                .await
+                .unwrap();
+        assert_eq!(logs.len(), 800);
+    }
+
+    #[derive(Clone)]
+    struct FakeEthJsonRpcClient {
+        /// block number -> logs
+        logs: HashMap<u64, Vec<Log>>,
+        error: Option<u64>,
+    }
+
+    impl Client for FakeEthJsonRpcClient {
+        fn send_rpc_request(
+            &self,
+            request: jsonrpc_core::Request,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = anyhow::Result<jsonrpc_core::Response>> + Send>,
+        > {
+            // get block number for eth_getLogs request
+            let (id, from_block, to_block) = match request {
+                jsonrpc_core::Request::Single(jsonrpc_core::Call::MethodCall(method_call)) => {
+                    match method_call.params {
+                        jsonrpc_core::Params::Array(params) => {
+                            let obj = params[0].as_object().unwrap();
+                            let from_block = obj.get("fromBlock").unwrap();
+                            let to_block = obj.get("toBlock").unwrap();
+
+                            let to_block = match to_block.as_str().unwrap() {
+                                "latest" => u64::MAX,
+                                _ => u64::from_str_radix(
+                                    to_block.as_str().unwrap().trim_start_matches("0x"),
+                                    16,
+                                )
+                                .unwrap(),
+                            };
+
+                            (
+                                method_call.id,
+                                u64::from_str_radix(
+                                    from_block.as_str().unwrap().trim_start_matches("0x"),
+                                    16,
+                                )
+                                .unwrap(),
+                                to_block,
+                            )
+                        }
+                        params => unimplemented!("expected array params: {params:?}"),
+                    }
+                }
+                _ => unimplemented!("expected single method call request"),
+            };
+
+            let mut logs = vec![];
+            let max_block = self.logs.keys().max().cloned().unwrap_or(0);
+            let to_block = to_block.min(max_block);
+            log::warn!("from_block: {}, to_block: {}", from_block, to_block);
+            for block_number in from_block..=to_block {
+                if Some(block_number) == self.error {
+                    return Box::pin(async {
+                        Ok(jsonrpc_core::Response::Single(
+                            jsonrpc_core::Output::Failure(jsonrpc_core::Failure {
+                                jsonrpc: None,
+                                error: jsonrpc_core::Error {
+                                    code: jsonrpc_core::ErrorCode::ServerError(-32000),
+                                    message: "fake error".to_string(),
+                                    data: None,
+                                },
+                                id,
+                            }),
+                        ))
+                    });
+                }
+                if let Some(block_logs) = self.logs.get(&block_number) {
+                    logs.extend_from_slice(block_logs);
+                }
+            }
+
+            let response = jsonrpc_core::Response::Single(jsonrpc_core::Output::Success(
+                jsonrpc_core::Success {
+                    jsonrpc: None,
+                    result: serde_json::json!(logs),
+                    id,
+                },
+            ));
+
+            Box::pin(async { Ok(response) })
+        }
     }
 }

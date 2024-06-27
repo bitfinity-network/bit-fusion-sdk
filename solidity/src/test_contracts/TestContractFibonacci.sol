@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 contract TestContractFibonacci {
+
     uint256 last;
 
     constructor() {
@@ -24,4 +25,5 @@ contract TestContractFibonacci {
 
         return b;
     }
+
 }
