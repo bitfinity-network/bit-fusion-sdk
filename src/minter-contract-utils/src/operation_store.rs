@@ -205,19 +205,26 @@ where
             .map(|entry| (operation_id, entry.payload))
     }
 
-    /// Retrieves all operations for the given ETH wallet address.
-    pub fn get_for_address(&self, dst_address: &H160) -> Vec<(MinterOperationId, P)> {
-        self.operations_for_address(dst_address, None, None)
-    }
-
-    /// Retrieves all operations for the given ETH wallet address, starting from `offset` returning a max of `count` items
-    pub fn get_page_for_address(
+    /// Retrieves all operations for the given ETH wallet address,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning.
+    /// If `count` is `None`, it returns all operations.
+    pub fn get_for_address(
         &self,
         dst_address: &H160,
-        offset: usize,
-        count: usize,
+        offset: Option<usize>,
+        count: Option<usize>,
     ) -> Vec<(MinterOperationId, P)> {
-        self.operations_for_address(dst_address, Some(offset), Some(count))
+        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
+        self.address_operation_map
+            .get(dst_address)
+            .unwrap_or_default()
+            .0
+            .into_iter()
+            .filter_map(|id| self.get_with_id(id))
+            .skip(offset.unwrap_or(0))
+            .take(count.unwrap_or(usize::MAX))
+            .collect()
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
@@ -272,27 +279,6 @@ where
 
             log::trace!("Operation {id} is evicted from the operation log");
         }
-    }
-
-    /// Retrieves all operations for the given ETH wallet address, starting from `offset` returning a max of `count` items
-    /// If `offset` is `None`, it starts from the beginning.
-    /// If `count` is `None`, it returns all operations.
-    fn operations_for_address(
-        &self,
-        dst_address: &H160,
-        offset: Option<usize>,
-        count: Option<usize>,
-    ) -> Vec<(MinterOperationId, P)> {
-        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
-        self.address_operation_map
-            .get(dst_address)
-            .unwrap_or_default()
-            .0
-            .into_iter()
-            .filter_map(|id| self.get_with_id(id))
-            .skip(offset.unwrap_or(0))
-            .take(count.unwrap_or(usize::MAX))
-            .collect()
     }
 }
 
@@ -368,11 +354,18 @@ mod tests {
         assert_eq!(store.address_operation_map.len(), LIMIT);
 
         for i in 0..(COUNT - LIMIT) {
-            assert!(store.get_for_address(&eth_address(i as u8)).is_empty());
+            assert!(store
+                .get_for_address(&eth_address(i as u8), None, None)
+                .is_empty());
         }
 
         for i in (COUNT - LIMIT)..COUNT {
-            assert_eq!(store.get_for_address(&eth_address(i as u8)).len(), 1);
+            assert_eq!(
+                store
+                    .get_for_address(&eth_address(i as u8), None, None)
+                    .len(),
+                1,
+            );
         }
     }
 
@@ -389,13 +382,28 @@ mod tests {
 
         assert_eq!(store.operations_log.len(), COUNT);
 
-        let page = store.get_page_for_address(&eth_address(0), 0, 10);
+        // No offset, with count
+        let page = store.get_for_address(&eth_address(0), None, Some(10));
         assert_eq!(page.len(), 10);
-        let page = store.get_page_for_address(&eth_address(0), 0, 120);
+        // No offset with count > total
+        let page = store.get_for_address(&eth_address(0), None, Some(120));
         assert_eq!(page.len() as u64, COUNT);
 
-        let page = store.get_page_for_address(&eth_address(0), 100, 10);
+        // Offset with count
+        let page = store.get_for_address(&eth_address(0), Some(20), Some(15));
+        assert_eq!(page.len(), 15);
+
+        // Offset with count beyond total
+        let page = store.get_for_address(&eth_address(0), Some(100), Some(10));
         assert!(page.is_empty());
+
+        // Offset without count
+        let page = store.get_for_address(&eth_address(0), Some(20), None);
+        assert_eq!(page.len(), COUNT as usize - 20usize);
+
+        // No offset, no count
+        let page = store.get_for_address(&eth_address(0), None, None);
+        assert_eq!(page.len(), COUNT as usize);
     }
 
     #[test]
@@ -412,7 +420,10 @@ mod tests {
         assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.address_operation_map.len(), 1);
 
-        assert_eq!(store.get_for_address(&eth_address(1)).len(), LIMIT as usize);
+        assert_eq!(
+            store.get_for_address(&eth_address(1), None, None).len(),
+            LIMIT as usize
+        );
     }
 
     #[test]
@@ -431,7 +442,10 @@ mod tests {
         assert_eq!(store.incomplete_operations.len(), COUNT);
         assert_eq!(store.address_operation_map.len(), 1);
 
-        assert_eq!(store.get_for_address(&eth_address(1)).len(), COUNT as usize);
+        assert_eq!(
+            store.get_for_address(&eth_address(1), None, None).len(),
+            COUNT as usize
+        );
     }
 
     #[test]

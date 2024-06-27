@@ -12,5 +12,3 @@ pub const OPERATIONS_MAP_MEMORY_ID: MemoryId = MemoryId::new(90);
 pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
 
 pub const IC_CHAIN_ID: u32 = 0;
-
-pub const MAX_OPERATIONS_LIST_SIZE: usize = 1024;

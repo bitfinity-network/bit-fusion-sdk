@@ -26,8 +26,8 @@ use minter_did::order::SignedMintOrder;
 
 use crate::build_data::canister_build_data;
 use crate::constant::{
-    MAX_OPERATIONS_LIST_SIZE, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
-    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
+    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
+    PENDING_TASKS_MEMORY_ID,
 };
 use crate::memory::MEMORY_MANAGER;
 use crate::operation::OperationState;
@@ -271,19 +271,17 @@ impl MinterCanister {
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
+    /// Offset, if set, defines the starting index of the page,
+    /// Count, if set, defines the number of elements in the page.
     #[query]
     pub fn list_mint_orders(
         &self,
         wallet_address: H160,
         src_token: Id256,
-        offset: usize,
-        count: usize,
+        offset: Option<usize>,
+        count: Option<usize>,
     ) -> Vec<(u32, SignedMintOrder)> {
-        Self::token_mint_orders(
-            wallet_address,
-            src_token,
-            Some((offset, count.min(MAX_OPERATIONS_LIST_SIZE))),
-        )
+        Self::token_mint_orders(wallet_address, src_token, offset, count)
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
@@ -294,24 +292,23 @@ impl MinterCanister {
         src_token: Id256,
         operation_id: u32,
     ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, src_token, None)
+        Self::token_mint_orders(wallet_address, src_token, None, None)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
     }
 
     #[query]
+    /// Returns the list of operations for the given wallet address.
+    /// Offset, if set, defines the starting index of the page,
+    /// Count, if set, defines the number of elements in the page.
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
-        offset: usize,
-        count: usize,
+        offset: Option<usize>,
+        count: Option<usize>,
     ) -> Vec<(MinterOperationId, OperationState)> {
-        get_operations_store().get_page_for_address(
-            &wallet_address,
-            offset,
-            count.min(MAX_OPERATIONS_LIST_SIZE),
-        )
+        get_operations_store().get_for_address(&wallet_address, offset, count)
     }
 
     /// Returns evm_address of the minter canister.
@@ -398,21 +395,18 @@ impl MinterCanister {
     fn token_mint_orders(
         wallet_address: H160,
         src_token: Id256,
-        offset_and_count: Option<(usize, usize)>,
+        offset: Option<usize>,
+        count: Option<usize>,
     ) -> Vec<(u32, SignedMintOrder)> {
-        match offset_and_count {
-            Some((offset, count)) => {
-                get_operations_store().get_page_for_address(&wallet_address, offset, count)
-            }
-            None => get_operations_store().get_for_address(&wallet_address),
-        }
-        .into_iter()
-        .filter_map(|(operation_id, status)| {
-            status
-                .get_signed_mint_order(Some(src_token))
-                .map(|mint_order| (operation_id.nonce(), *mint_order))
-        })
-        .collect()
+        get_operations_store()
+            .get_for_address(&wallet_address, offset, count)
+            .into_iter()
+            .filter_map(|(operation_id, status)| {
+                status
+                    .get_signed_mint_order(Some(src_token))
+                    .map(|mint_order| (operation_id.nonce(), *mint_order))
+            })
+            .collect()
     }
 }
 
