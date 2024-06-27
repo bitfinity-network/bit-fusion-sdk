@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "src/WrappedToken.sol";
 
 contract WrappedTokenTest is Test {
+
     address _owner = makeAddr("owner");
     address _alice = makeAddr("alice");
     address _bob = makeAddr("bob");
@@ -153,4 +154,5 @@ contract WrappedTokenTest is Test {
         vm.expectRevert("Unauthorised Access");
         _token.setMetaData(bytes32(bytes("New token")), bytes16(bytes("New symbol")), 42);
     }
+
 }

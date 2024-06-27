@@ -2,6 +2,7 @@
 pragma solidity ^0.8.7;
 
 library StringUtils {
+
     // Function to truncate UTF8 strings
     function truncateUTF8(string memory input) internal pure returns (bytes32 result) {
         // If the last byte starts with 0xxxxx, return the data as is
@@ -36,4 +37,5 @@ library StringUtils {
             }
         }
     }
+
 }

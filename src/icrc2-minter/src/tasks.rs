@@ -2,13 +2,12 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::time::Duration;
 
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::{BlockNumber, Log};
-use ic_exports::ic_kit::{ic, RejectionCode};
+use ethers_core::types::Log;
+use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
@@ -24,7 +23,7 @@ use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_I
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::{self, MintOrder};
-use minter_did::reason::Icrc2Burn;
+use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_operations_store;
@@ -33,47 +32,6 @@ use crate::operation::{DepositOperationState, OperationState, WithdrawalOperatio
 use crate::state::State;
 use crate::tokens::icrc2::Success;
 use crate::tokens::{icrc1, icrc2};
-
-const COLLECT_EVM_LOGS_TIMEOUT: Duration = Duration::from_secs(60);
-thread_local! {
-    static COLLECT_EVM_LOGS_TS: RefCell<Option<u64>> = RefCell::new(None);
-}
-
-/// This lock is used to prevent several evm log collection tasks to run concurrently. When the
-/// task starts, it takes the lock and holds it until the evm params are updates, so no other
-/// task would receive logs from the same block numbers.
-///
-/// To prevent the lock to get stuck locked in case of panic after an async call, we set the timeout
-/// of 1 minute, after which the lock is released even if the task didn't release it.
-struct CollectLogsLock {
-    ts: u64,
-}
-
-impl CollectLogsLock {
-    fn take() -> Option<Self> {
-        match COLLECT_EVM_LOGS_TS.with(|v| *v.borrow()) {
-            Some(ts) if (ts + COLLECT_EVM_LOGS_TIMEOUT.as_nanos() as u64) < ic::time() => None,
-            _ => {
-                let ts = ic::time();
-                COLLECT_EVM_LOGS_TS.with(|v| *v.borrow_mut() = Some(ts));
-                Some(Self { ts })
-            }
-        }
-    }
-}
-
-impl Drop for CollectLogsLock {
-    fn drop(&mut self) {
-        COLLECT_EVM_LOGS_TS.with(|v| {
-            let mut curr_lock = v.borrow_mut();
-            if let Some(ts) = *curr_lock {
-                if ts <= self.ts {
-                    *curr_lock = None;
-                }
-            }
-        });
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
@@ -147,11 +105,6 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
-        let Some(_lock) = CollectLogsLock::take() else {
-            log::trace!("Another collect evm events task is in progress. Skipping.");
-            return Ok(());
-        };
-
         log::trace!("collecting evm events");
 
         let client = state.borrow().config.get_evm_client();
@@ -168,27 +121,19 @@ impl BridgeTask {
             ));
         };
 
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block.into(),
-            BlockNumber::Safe,
-            bridge_contract.0,
-        )
-        .await
-        .into_scheduler_result()?;
+        let last_block = client.get_block_number().await.into_scheduler_result()?;
+
+        let logs =
+            BridgeEvent::collect_logs(&client, params.next_block, last_block, bridge_contract.0)
+                .await
+                .into_scheduler_result()?;
 
         log::debug!("got evm logs: {logs:?}");
 
-        // Filter out logs that do not have block number.
-        // Such logs are produced when the block is not finalized yet.
-        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-        if let Some(last_log) = last_log {
-            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            state
-                .borrow_mut()
-                .config
-                .update_evm_params(|params| params.next_block = next_block_number);
-        };
+        state
+            .borrow_mut()
+            .config
+            .update_evm_params(|params| params.next_block = last_block + 1);
 
         log::trace!("appending logs to tasks: {logs:?}");
 
@@ -253,6 +198,7 @@ impl BridgeTask {
             src_token: reason.icrc2_token_principal,
             recipient_address: reason.recipient_address,
             fee_payer: reason.fee_payer,
+            approve_after_mint: reason.approve_after_mint,
         };
         operation_store.update(
             operation_id,
@@ -312,6 +258,11 @@ impl BridgeTask {
         let fee_payer = burnt_data.fee_payer.unwrap_or_default();
         let should_send_mint_tx = fee_payer != H160::zero();
 
+        let (approve_spender, approve_amount) = burnt_data
+            .approve_after_mint
+            .map(|approve| (approve.approve_spender, approve.approve_amount))
+            .unwrap_or_default();
+
         let mint_order = MintOrder {
             amount: burnt_data.amount,
             sender,
@@ -324,8 +275,8 @@ impl BridgeTask {
             name: burnt_data.name,
             symbol: burnt_data.symbol,
             decimals: burnt_data.decimals,
-            approve_spender: Default::default(),
-            approve_amount: Default::default(),
+            approve_spender,
+            approve_amount,
             fee_payer,
         };
 
@@ -397,13 +348,19 @@ impl BridgeTask {
             }
             Ok(BridgeEvent::Notify(notification)) => {
                 log::debug!("Adding BurnIcrc2 task");
-                let icrc_burn = match Decode!(&notification.user_data, Icrc2Burn) {
+                let mut icrc_burn = match Decode!(&notification.user_data, Icrc2Burn) {
                     Ok(icrc_burn) => icrc_burn,
                     Err(e) => {
                         log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
                         return None;
                     }
                 };
+
+                // Approve tokens only if the burner owns recepient wallet.
+                if notification.tx_sender != icrc_burn.recipient_address {
+                    icrc_burn.approve_after_mint = None;
+                }
+
                 let operation_id = get_operations_store().new_operation(
                     icrc_burn.recipient_address.clone(),
                     OperationState::new_deposit(icrc_burn),
@@ -670,6 +627,7 @@ impl BridgeTask {
                     symbol,
                     decimals: burnt_event.decimals,
                     fee_payer: None,
+                    approve_after_mint: None,
                 };
 
                 operation_store.update(
@@ -769,4 +727,5 @@ pub struct BurntIcrc2Data {
     pub symbol: [u8; 16],
     pub decimals: u8,
     pub fee_payer: Option<H160>,
+    pub approve_after_mint: Option<ApproveAfterMint>,
 }
