@@ -15,7 +15,13 @@ ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
     "http-outcall",
 ] }
-anyhow = { workspace = true }
+ethers-core = { workspace = true }
+evm-canister-client = { workspace = true }
+hex = { workspace = true }
+ic-canister-client = { workspace = true }
+ic-exports = { workspace = true }
+ic-stable-structures = { workspace = true }
+jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-did = { workspace = true }
 num-bigint = { workspace = true }
