@@ -18,7 +18,7 @@ fn main() -> anyhow::Result<()> {
     let file_times_builder = SolidityFileTimesWatcher::new(CONTRACTS_SUBPATHS);
     let current_file_times = file_times_builder.load_file_times().ok();
 
-    let contracts = if file_times_builder.has_files_changed(current_file_times.as_ref()) {
+    let contracts = if file_times_builder.have_files_changed(current_file_times.as_ref()) {
         let output_path = file_times_builder.solidity_output_dir.clone();
         let contracts = match compile_solidity_contracts(None, Some(
             output_path.display().to_string().as_str(),
@@ -150,7 +150,7 @@ impl SolidityFileTimesWatcher {
     }
 
     /// Checks whether the files have changed since the last time they were checked
-    pub fn has_files_changed(&self, current_file_times: Option<&SolidityFileTimes>) -> bool {
+    pub fn have_files_changed(&self, current_file_times: Option<&SolidityFileTimes>) -> bool {
         let current_file_times = match current_file_times {
             Some(file_times) => file_times,
             None => {
