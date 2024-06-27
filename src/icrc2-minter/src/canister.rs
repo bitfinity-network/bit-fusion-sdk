@@ -91,11 +91,11 @@ impl MinterCanister {
     fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
         const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
 
-        let options = TaskOptions::default();
-        // .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
-        // .with_backoff_policy(BackoffPolicy::Fixed {
-        //     secs: EVM_EVENTS_COLLECTING_DELAY,
-        // });
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: EVM_EVENTS_COLLECTING_DELAY,
+            });
 
         BridgeTask::CollectEvmEvents.into_scheduled(options)
     }

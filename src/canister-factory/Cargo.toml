@@ -9,8 +9,6 @@ default = []
 export-api = []
 
 [dependencies]
-async-recursion = { workspace = true }
-async-trait = { workspace = true }
 btc-bridge = { path = "../btc-bridge" }
 candid = { workspace = true }
 did = { workspace = true }
@@ -24,16 +22,10 @@ evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
-ic-helpers = { workspace = true, features = ["management_canister"] }
-ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
-ic-task-scheduler = { workspace = true }
 ic-storage = { workspace = true }
-icrc-client = { workspace = true }
 icrc2-minter = { path = "../icrc2-minter" }
-jsonrpc-core = { workspace = true }
-log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 minter-did = { workspace = true }
 rune-bridge = { path = "../rune-bridge" }

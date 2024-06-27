@@ -27,8 +27,6 @@ impl SignerInfo {
                 .expect("failed to update transaction signer")
         });
 
-        log::trace!("Signer reset finished");
-
         Ok(())
     }
 
