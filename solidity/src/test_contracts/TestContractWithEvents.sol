@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 contract TestContractWithEvents {
+
     event valueEvent(uint256 indexed oldNumber, uint256 indexed newNumber, uint256 valueIndex, address sender);
 
     uint256 a;
@@ -23,4 +24,5 @@ contract TestContractWithEvents {
         a = val;
         return a;
     }
+
 }

@@ -13,8 +13,10 @@ assert_isset_param() {
 }
 
 link_to_variant() {
-  LINK=$1
-  if [[ $URL == "http"* ]]; then
+  LINK="$1"
+  if [[ $LINK == "variant"* ]]; then
+    IC_TYPE="$LINK"
+  elif [[ $LINK == "http"* ]]; then
     IC_TYPE="variant { Http = \"${LINK}\" }"
   else
     IC_TYPE="variant { Ic = principal \"${LINK}\" }"

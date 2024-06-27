@@ -1,31 +1,29 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::str::FromStr;
 
-use bitcoin::Address;
 use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::{BlockNumber, Log};
+use ethers_core::types::Log;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{
-    BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
-};
+use minter_contract_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::operation_store::MinterOperationId;
-use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
-use crate::canister::get_state;
+use crate::canister::{get_operations_store, get_state};
 use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::Withdrawal;
+use crate::operation::OperationState;
 use crate::rune_info::RuneName;
+use crate::state::State;
 
 pub type TasksStorage =
     StableBTreeMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -40,7 +38,7 @@ pub enum RuneBridgeTask {
     CollectEvmEvents,
     Deposit(MinterOperationId),
     RemoveMintOrder(MintedEventData),
-    Withdraw(BurntEventData),
+    Withdraw(MinterOperationId),
 }
 
 impl RuneBridgeTask {
@@ -82,11 +80,12 @@ impl RuneBridgeTask {
         };
 
         let client = evm_info.link.get_json_rpc_client();
+        let last_block = client.get_block_number().await.into_scheduler_result()?;
 
         let logs = BridgeEvent::collect_logs(
             &client,
-            params.next_block.into(),
-            BlockNumber::Safe,
+            params.next_block,
+            last_block,
             evm_info.bridge_contract.0,
         )
         .await
@@ -101,23 +100,21 @@ impl RuneBridgeTask {
         {
             let mut mut_state = state.borrow_mut();
 
-            // Filter out logs that do not have block number.
-            // Such logs are produced when the block is not finalized yet.
-            let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-            if let Some(last_log) = last_log {
-                let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-                mut_state.update_evm_params(|to_update| {
-                    *to_update = Some(EvmParams {
-                        next_block: next_block_number,
-                        ..params
-                    })
-                });
-            };
+            mut_state.update_evm_params(|to_update| {
+                *to_update = Some(EvmParams {
+                    next_block: last_block + 1,
+                    ..params
+                })
+            });
         }
 
         log::trace!("appending logs to tasks");
 
-        scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
+        scheduler.append_tasks(
+            logs.into_iter()
+                .filter_map(|task| Self::task_by_log(task, &state))
+                .collect(),
+        );
 
         Ok(())
     }
@@ -129,7 +126,7 @@ impl RuneBridgeTask {
         Ok(())
     }
 
-    fn task_by_log(log: Log) -> Option<ScheduledTask<RuneBridgeTask>> {
+    fn task_by_log(log: Log, state: &RefCell<State>) -> Option<ScheduledTask<RuneBridgeTask>> {
         log::trace!("creating task from the log: {log:?}");
 
         const TASK_RETRY_DELAY_SECS: u32 = 5;
@@ -143,7 +140,11 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let mint_order_task = RuneBridgeTask::Withdraw(burnt);
+                let operation_id = get_operations_store().new_operation(
+                    burnt.sender.clone(),
+                    OperationState::new_withdrawal(burnt, &state.borrow()),
+                );
+                let mint_order_task = RuneBridgeTask::Withdraw(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
             Ok(BridgeEvent::Minted(minted)) => {
@@ -171,21 +172,7 @@ impl RuneBridgeTask {
     }
 
     fn remove_mint_order(minted_event: MintedEventData) -> Result<(), SchedulerError> {
-        let mut deposit = RuneDeposit::get();
-        deposit.complete_mint_request(minted_event.recipient, minted_event.nonce);
-        let state = get_state();
-        let sender_id = Id256::from_slice(&minted_event.sender_id).ok_or_else(|| {
-            SchedulerError::TaskExecutionFailed(
-                "failed to decode sender id256 from minted event".into(),
-            )
-        })?;
-
-        state
-            .borrow_mut()
-            .mint_orders_mut()
-            .remove(sender_id, minted_event.nonce);
-
-        log::trace!("Mint order removed");
+        RuneDeposit::get().complete_mint_request(minted_event.recipient, minted_event.nonce);
 
         Ok(())
     }
@@ -204,48 +191,14 @@ impl Task for RuneBridgeTask {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
-            RuneBridgeTask::Withdraw(BurntEventData {
-                recipient_id,
-                amount,
-                to_token,
-                sender,
-                ..
-            }) => {
+            RuneBridgeTask::Withdraw(operation_id) => {
                 log::info!("ERC20 burn event received");
 
-                let amount = amount.0.as_u128();
-
-                let Ok(address_string) = String::from_utf8(recipient_id.clone()) else {
-                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
-                        format!(
-                            "Failed to decode recipient address from raw data: {recipient_id:?}"
-                        ),
-                    )));
-                };
-
-                let Ok(address) = Address::from_str(&address_string) else {
-                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
-                        format!("Failed to decode recipient address from string: {address_string}"),
-                    )));
-                };
-
-                let Some(token_id) = Id256::from_slice(to_token) else {
-                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
-                        format!("Failed to decode token id from the value {to_token:?}"),
-                    )));
-                };
-
-                let Ok(rune_id) = token_id.try_into() else {
-                    return Box::pin(futures::future::err(SchedulerError::TaskExecutionFailed(
-                        format!("Failed to decode rune id from the token id {to_token:?}"),
-                    )));
-                };
-
-                let sender = sender.clone();
+                let operation_id = *operation_id;
                 Box::pin(async move {
-                    let withdrawal = Withdrawal::new(get_state());
+                    let mut withdrawal = Withdrawal::new(get_state());
                     let tx_id = withdrawal
-                        .withdraw(amount, rune_id, sender, address.assume_checked())
+                        .withdraw(operation_id)
                         .await
                         .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))?;
 
