@@ -160,10 +160,6 @@ deploy_bft_bridge() {
 
   BRIDGE_ADDRESS=$($CREATE_BFT_BRIDGE_TOOL deploy-bft-bridge --minter-address="$MINTER_ADDRESS" --evm="$EVM_PRINCIPAL" --wallet="$WALLET" --fee-charge-address="$FEE_CHARGE_ADDRESS" $IS_WRAPPED)
 
-  #   Implementation address: 0xb5ff54065f7e38b944c32f14e92aa6322b090e21
-  # Proxy address: 0x199fafc490fa3a1daa26f2b116b2e7045f3c032f
-  # 0x199fafc490fa3a1daa26f2b116b2e7045f3c032f
-
   # extract the last line
   BRIDGE_ADDRESS=$(echo "$BRIDGE_ADDRESS" | tail -n 1)
 
