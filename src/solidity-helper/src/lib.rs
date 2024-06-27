@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::{create_dir_all, read_to_string};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use error::SolidityHelperError;
@@ -26,6 +26,13 @@ pub fn compile_solidity_contracts(
         contracts_subpath.map(Into::into),
         output_path.map(Into::into),
     )?;
+
+    get_solidity_contracts(output_path)
+}
+
+pub fn get_solidity_contracts(
+    output_path: PathBuf,
+) -> Result<HashMap<String, SolidityContract>, SolidityHelperError> {
     let contract_paths = contract_paths(output_path)?;
 
     let mut contracts = HashMap::new();
@@ -58,27 +65,8 @@ fn compile(
     contracts_subpath: Option<PathBuf>,
     output_path: Option<PathBuf>,
 ) -> Result<PathBuf, SolidityHelperError> {
-    let workspace_root_path: PathBuf = std::env::var("CARGO_MANIFEST_DIR")
-        .map_err(|err| {
-            SolidityHelperError::GenericError(format!(
-                "cannot read CARGO_MANIFEST_DIR env var. Error: {err:?}"
-            ))
-        })?
-        .into();
-
-    // Tricky hack, there's no clean way in cargo to get the workspace root folder
-    let workspace_root_path: PathBuf = workspace_root_path
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| {
-            SolidityHelperError::GenericError("cannot access workspace parent folder.".to_string())
-        })?
-        .into();
-
-    let solidity_root_path = workspace_root_path.join("solidity");
-    let solidity_root_path = contracts_subpath
-        .map(|contracts_subpath| solidity_root_path.join(contracts_subpath))
-        .unwrap_or(solidity_root_path);
+    let workspace_root_path = workspace_root_path()?;
+    let solidity_root_path = solidity_root_path(&workspace_root_path, contracts_subpath)?;
 
     let output_path = output_path.map(PathBuf::from).unwrap_or_else(|| {
         let target_path = workspace_root_path.join("target");
@@ -99,6 +87,40 @@ fn compile(
         .output()?;
 
     Ok(output_path)
+}
+
+/// Returns the workspace root path
+pub fn workspace_root_path() -> Result<PathBuf, SolidityHelperError> {
+    let workspace_root_path: PathBuf = std::env::var("CARGO_MANIFEST_DIR")
+        .map_err(|err| {
+            SolidityHelperError::GenericError(format!(
+                "cannot read CARGO_MANIFEST_DIR env var. Error: {err:?}"
+            ))
+        })?
+        .into();
+
+    // Tricky hack, there's no clean way in cargo to get the workspace root folder
+    let workspace_root_path: PathBuf = workspace_root_path
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| {
+            SolidityHelperError::GenericError("cannot access workspace parent folder.".to_string())
+        })?
+        .into();
+
+    Ok(workspace_root_path)
+}
+
+/// Returns the solidity root path
+pub fn solidity_root_path(
+    workspace_root_path: &Path,
+    contracts_subpath: Option<PathBuf>,
+) -> Result<PathBuf, SolidityHelperError> {
+    let solidity_root_path = workspace_root_path.join("solidity");
+
+    Ok(contracts_subpath
+        .map(|contracts_subpath| solidity_root_path.join(contracts_subpath))
+        .unwrap_or(solidity_root_path))
 }
 
 /// Returns a map with:

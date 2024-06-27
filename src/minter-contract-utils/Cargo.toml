@@ -32,8 +32,12 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [build-dependencies]
-solidity-helper = { path = "../solidity-helper" }
 anyhow = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+solidity-helper = { path = "../solidity-helper" }
+toml = { workspace = true }
+
 
 [dev-dependencies]
 candid = { workspace = true }

@@ -52,7 +52,7 @@ impl From<ApproveError> for TestError {
 
 impl From<CallError> for TestError {
     fn from(e: CallError) -> Self {
-        e.into()
+        Self::CanisterClient(CanisterClientError::PocketIcTestError(e))
     }
 }
 
