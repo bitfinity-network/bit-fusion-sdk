@@ -399,13 +399,15 @@ impl MinterCanister {
         count: Option<usize>,
     ) -> Vec<(u32, SignedMintOrder)> {
         get_operations_store()
-            .get_for_address(&wallet_address, offset, count)
+            .get_for_address(&wallet_address, None, None)
             .into_iter()
             .filter_map(|(operation_id, status)| {
                 status
                     .get_signed_mint_order(Some(src_token))
                     .map(|mint_order| (operation_id.nonce(), *mint_order))
             })
+            .skip(offset.unwrap_or_default())
+            .take(count.unwrap_or(std::usize::MAX))
             .collect()
     }
 }
