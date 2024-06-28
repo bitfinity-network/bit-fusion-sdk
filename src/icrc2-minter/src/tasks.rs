@@ -148,7 +148,8 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
-        let Some(_lock) = CollectLogsLock::take() else {
+        // We need to get a local variable for the lock here to make sure it's not dropped immediately.
+        let Some(lock) = CollectLogsLock::take() else {
             log::trace!("Another collect evm events task is in progress. Skipping.");
             return Ok(());
         };
@@ -194,6 +195,12 @@ impl BridgeTask {
 
         // Update EVM params
         Self::update_evm_params(state.clone()).await?;
+
+        // This line is not necessary as the lock variable will not be dropped anyway only at the
+        // end of the function or on any early return from the function. But I couldn't find
+        // explicit guarantees by the language for this behaviour, so let's make sure it's not dropped
+        // until now.
+        drop(lock);
 
         Ok(())
     }
