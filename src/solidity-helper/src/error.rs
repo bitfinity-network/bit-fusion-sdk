@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+pub type SolidityHelperResult<T> = Result<T, SolidityHelperError>;
+
 #[derive(Debug, Error)]
 pub enum SolidityHelperError {
     #[error("GenericError: {0:?}")]
