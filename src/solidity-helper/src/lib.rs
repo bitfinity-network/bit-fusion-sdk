@@ -408,7 +408,6 @@ mod tests {
         write_solidity_contract(&solidity_tmp_subpath, "TestContractV2");
         // build
         let contracts = builder.build_updated_contracts().unwrap().contracts;
-        let contract = contracts.get("TestContractV2").unwrap();
         assert!(contracts.get("TestContract").is_some());
         // should have changed
         assert!(builder
