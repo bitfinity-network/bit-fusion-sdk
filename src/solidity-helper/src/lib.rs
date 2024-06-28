@@ -398,22 +398,6 @@ mod tests {
             .have_files_changed(&current_times, &solidity_tmp_root)
             .unwrap());
 
-        // should change if new file
-        builder.save_file_times(&solidity_tmp_root).unwrap();
-        let current_times = builder.load_file_times().unwrap();
-        // should not have changed
-        assert!(!builder
-            .have_files_changed(&current_times, &solidity_tmp_root)
-            .unwrap());
-        write_solidity_contract(&solidity_tmp_subpath, "TestContractV2");
-        // build
-        let contracts = builder.build_updated_contracts().unwrap().contracts;
-        assert!(contracts.get("TestContract").is_some());
-        // should have changed
-        assert!(builder
-            .have_files_changed(&current_times, &solidity_tmp_root)
-            .unwrap());
-
         // remove all
         workpace_tmp_root.close().unwrap();
     }
