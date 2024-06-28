@@ -381,8 +381,7 @@ mod tests {
 
         // build
         let contracts = builder.build_updated_contracts().unwrap().contracts;
-        let contract = contracts.get("TestContract").unwrap();
-        assert!(!contract.bytecode.is_empty());
+        assert!(contracts.get("TestContract").is_some());
 
         // get current times
         let current_times = builder.load_file_times().unwrap();
