@@ -1,3 +1,7 @@
+//! A module for interacting with the management canister.
+//!
+//! This module provides a set of functions for interacting with the management canister.
+
 use candid::{CandidType, Principal};
 use ic_exports::ic_cdk::api::call::{call, call_with_payment128};
 use ic_exports::ic_cdk::api::management_canister::main::{

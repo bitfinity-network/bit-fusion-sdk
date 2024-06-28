@@ -2,8 +2,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{CandidType, Principal};
-use did::H160;
+use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ethers_core::abi::Token;
+use ethers_core::types::transaction::eip2718::TypedTransaction;
+use ethers_core::utils::keccak256;
+use evm_canister_client::{EvmCanisterClient, IcCanisterClient};
 use ic_canister::{init, query, update, Canister, Idl, MethodType, PreUpdate};
 use ic_exports::ic_cdk::api::management_canister::main::{
     CanisterIdRecord, CanisterInstallMode, CanisterStatusType, CreateCanisterArgument,
@@ -326,6 +330,63 @@ impl CanisterFactory {
         state.registry().get_all_canisters()
     }
 
+    #[update]
+    pub async fn add_implementation_to_bft(
+        &self,
+        bridge_address: H160,
+        evm: Principal,
+        bytecode: String,
+    ) -> Result<H256> {
+        let client = IcCanisterClient::new(evm);
+        let evm_canister = EvmCanisterClient::new(client);
+        let signer = get_state().borrow().signer.get_transaction_signer();
+
+        let hashed_bytecode = keccak256(&bytecode);
+        let encoded_data = minter_contract_utils::bft_bridge_api::ADD_IMPLEMENTATION
+            .encode_input(&[Token::Bytes(hashed_bytecode.into())])
+            .map_err(|e| UpgraderError::InternalError(e.to_string()))?;
+
+        let from = signer
+            .get_address()
+            .await
+            .map_err(|e| UpgraderError::TransactionSignerError(e.to_string()))?;
+
+        let nonce = evm_canister
+            .account_basic(from.clone())
+            .await
+            .map_err(|e| UpgraderError::InternalError(e.to_string()))?
+            .nonce;
+
+        pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
+
+        let mut tx = ethers_core::types::Transaction {
+            nonce: nonce.into(),
+            gas: DEFAULT_TX_GAS_LIMIT.into(),
+            from: from.into(),
+            to: Some(bridge_address.into()),
+            input: encoded_data.into(),
+            ..Default::default()
+        };
+
+        let signature = signer
+            .sign_transaction(&(&tx).into())
+            .await
+            .map_err(|e| UpgraderError::TransactionSignerError(e.to_string()))?;
+
+        tx.r = signature.r.0;
+        tx.s = signature.s.0;
+        tx.v = signature.v.0;
+        tx.hash = tx.hash();
+
+        let tx_id = evm_canister
+            .send_raw_transaction(tx.into())
+            .await
+            .map_err(|e| UpgraderError::InternalError(e.to_string()))?
+            .map_err(|e| UpgraderError::InternalError(e.to_string()))?;
+
+        Ok(tx_id)
+    }
+
     /// Helper function to deploy a canister with the provided principal, WASM
     /// code, and arguments.
     async fn deploy_canister(
@@ -404,4 +465,73 @@ fn check_anonymous_principal(principal: Principal) -> Result {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use ic_canister::canister_call;
+    use ic_exports::ic_kit::MockContext;
+
+    use super::*;
+
+    #[test]
+    fn test_canister_type_marker() {
+        let canister_type = CanisterType::ERC20;
+        let marker = canister_type.marker();
+
+        assert_eq!(marker, "ERC20");
+    }
+
+    #[test]
+    fn test_canister_wasm_validation() {
+        MockContext::new().inject();
+
+        let canister_type = CanisterType::ERC20;
+        let wasm = b"ERC20_BRIDGE_CANISTER".to_vec();
+
+        let factory = CanisterFactory::from_principal(Principal::anonymous());
+
+        let result = factory.validate(&canister_type, wasm);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_canister_wasm_validation_invalid() {
+        MockContext::new().inject();
+
+        let canister_type = CanisterType::ERC20;
+        let wasm = b"INVALID_WASM".to_vec();
+
+        let factory = CanisterFactory::from_principal(Principal::anonymous());
+
+        let result = factory.validate(&canister_type, wasm);
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_owner() {
+        let context = MockContext::new().inject();
+        let owner = Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap();
+
+        let init = UpgraderInitData {
+            owner,
+            signing_strategy: SigningStrategy::Local {
+                private_key: [5; 32],
+            },
+        };
+
+        let canister_principal = Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap();
+
+        let factory = CanisterFactory::from_principal(canister_principal);
+
+        context.update_id(canister_principal);
+
+        canister_call!(factory.init(init), ()).await.unwrap();
+
+        let result = factory.get_owner();
+
+        assert_eq!(result, owner);
+    }
 }

@@ -129,11 +129,10 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Add a new implementation to the allowed list
-    function addAllowedImplementation(address newImplementation) external onlyControllers {
-        require(newImplementation != address(0), "Invalid implementation address");
-        require(newImplementation.code.length > 0, "Not a contract");
+    function addAllowedImplementation(bytes32 bytecodeHash) external onlyControllers {
+        require(!allowedImplementations[bytecodeHash], "Implementation already allowed");
 
-        allowedImplementations[newImplementation.codehash] = true;
+        allowedImplementations[bytecodeHash] = true;
     }
 
     /// Emit minter notification event with the given `userData`. For details

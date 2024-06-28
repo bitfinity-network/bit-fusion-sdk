@@ -13,7 +13,6 @@ import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
 import { Options } from "@openzeppelin-foundry-upgrades/Options.sol";
 
 contract BftBridgeTest is Test {
-
     using StringUtils for string;
 
     struct MintOrder {
@@ -207,7 +206,7 @@ contract BftBridgeTest is Test {
 
         newImplementation = address(_newImpl);
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _bridge.addAllowedImplementation(newImplementation.codehash);
 
         assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
 
@@ -219,7 +218,7 @@ contract BftBridgeTest is Test {
 
         vm.expectRevert();
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _bridge.addAllowedImplementation(newImplementation.codehash);
     }
 
     function testAddAllowedImplementationEmptyAddress() public {
@@ -228,7 +227,7 @@ contract BftBridgeTest is Test {
 
         vm.expectRevert();
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _bridge.addAllowedImplementation(newImplementation.codehash);
     }
 
     function testAddAllowedImplementationByAController() public {
@@ -244,7 +243,7 @@ contract BftBridgeTest is Test {
 
         vm.prank(controller);
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _bridge.addAllowedImplementation(newImplementation.codehash);
     }
 
     /// Test that the bridge can be upgraded to a new implementation
@@ -257,7 +256,7 @@ contract BftBridgeTest is Test {
 
         newImplementation = address(_newImpl);
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _bridge.addAllowedImplementation(newImplementation.codehash);
         assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
 
         // Wrap in ABI for easier testing
@@ -388,5 +387,4 @@ contract BftBridgeTest is Test {
     function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
-
 }

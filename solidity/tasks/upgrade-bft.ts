@@ -52,10 +52,30 @@ task('upgrade-bft', 'Upgrades the BFT contract')
 
             validateAddresses(proxyAddress, minterAddress, feeChargeAddress);
 
+
             console.log('Deploying new implementation contract...');
 
             /// Make use of versioned contract to deploy the new implementation contract
             const bftBridgeUpgrade = await hre.ethers.getContractFactory('BFTBridge');
+
+            let bytecodeHash = keccak256(bftBridgeUpgrade.bytecode);
+
+            /// Make sure you use the proxy contract address to get the
+            /// contract instance
+            /// and the old implementation contract should be the one that is currently deployed
+            const proxyContract = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
+
+            console.log('Adding new implementation to the proxy contract...');
+            let res = await proxyContract.addAllowedImplementation(bytecodeHash);
+
+            let receipt = await res.wait();
+
+            if (receipt!.status === 0) {
+                throw new Error('Failed to add new implementation to the proxy contract.');
+            }
+
+
+            console.log('New implementation added successfully.');
 
             const newImplementationDeployment: DeployImplementationResponse = await hre.upgrades.prepareUpgrade(proxyAddress, bftBridgeUpgrade, {
                 kind: 'uups',
@@ -67,23 +87,6 @@ task('upgrade-bft', 'Upgrades the BFT contract')
             console.log(`New implementation contract deployed at: ${newImplementationAddress}`);
 
             console.log('Retrieving current proxy contract...');
-
-            /// Make sure you use the proxy contract address to get the
-            /// contract instance
-            /// and the old implementation contract should be the one that is currently deployed
-            const proxyContract = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
-
-            console.log('Adding new implementation to the proxy contract...');
-            let res = await proxyContract.addAllowedImplementation(newImplementationAddress);
-            let receipt = await res.wait();
-
-            if (receipt!.status === 0) {
-                throw new Error('Failed to add new implementation to the proxy contract.');
-            }
-
-
-            console.log('New implementation added successfully.');
-
 
             const initData: string = bftBridgeUpgrade.interface.encodeFunctionData('initialize', [minterAddress, feeChargeAddress, isWrapped]);
 

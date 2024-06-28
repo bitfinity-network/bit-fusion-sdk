@@ -37,6 +37,8 @@ pub enum UpgraderError {
 
     #[error("Transaction signer error: {0}")]
     TransactionSignerError(String),
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 impl From<(RejectionCode, String)> for UpgraderError {
