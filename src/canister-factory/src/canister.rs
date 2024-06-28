@@ -5,7 +5,6 @@ use candid::{CandidType, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::abi::Token;
-use ethers_core::types::transaction::eip2718::TypedTransaction;
 use ethers_core::utils::keccak256;
 use evm_canister_client::{EvmCanisterClient, IcCanisterClient};
 use ic_canister::{init, query, update, Canister, Idl, MethodType, PreUpdate};
