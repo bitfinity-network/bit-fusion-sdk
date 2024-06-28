@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use candid::{CandidType, IDLArgs, Principal, TypeEnv};
+use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, Transaction, TransactionReceipt, H256, U256};
@@ -17,6 +17,7 @@ use minter_contract_utils::build_data::{
 };
 use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::id256::Id256;
+use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
@@ -41,6 +42,56 @@ enum CliCommand {
     DeployFeeCharge(DeployFeeChargeArgs),
     /// Returns expected contract address for the given parameters.
     ExpectedContractAddress(ExpectedContractAddress),
+    /// Request ICRC2 deposit
+    DepositIcrc(DepositIcrcArgs),
+    /// Get wallet nonce
+    GetNonce(GetNonceArgs),
+}
+
+#[derive(Debug, Parser)]
+struct GetNonceArgs {
+    /// Evm canister principal
+    #[arg(long)]
+    evm: Principal,
+    #[arg(long)]
+
+    /// PK of the EVM wallet to get nonce for
+    wallet: Option<String>,
+
+    /// IC host (uses local dfx deployment by default)
+    #[arg(long)]
+    ic_host: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+struct DepositIcrcArgs {
+    /// Evm canister principal
+    #[arg(long)]
+    evm: Principal,
+
+    /// EVM address of the BFT bridge
+    #[arg(long)]
+    bft_bridge: String,
+
+    /// Amount to deposit
+    #[arg(long)]
+    amount: u128,
+
+    /// Principal of the sender (from which account ICRC tokens are taken)
+    #[arg(long)]
+    sender: Principal,
+
+    /// Principal of the ICRC2 token to be bridged
+    #[arg(long)]
+    token: Principal,
+
+    /// IC host
+    #[arg(long)]
+    ic_host: Option<String>,
+
+    /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
+    #[arg(long)]
+    wallet: Option<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -134,6 +185,14 @@ struct CreateTokenArgs {
     #[arg(long)]
     evm_canister: Principal,
 
+    /// IC host
+    #[arg(long)]
+    ic_host: Option<String>,
+
+    /// Identity Path
+    #[arg(long)]
+    identity_path: Option<String>,
+
     /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
     #[arg(long)]
     wallet: Option<String>,
@@ -179,7 +238,7 @@ struct WalletAddressArgs {
     #[arg(long)]
     wallet: String,
 
-    /// If set, returns the address in candid form. Otherwise in hex form.
+    /// If set, returns the address in candid form. Otherwise, in hex form.
     #[arg(long)]
     candid: bool,
 }
@@ -194,7 +253,93 @@ async fn main() {
         CliCommand::WalletAddress(args) => wallet_address(args),
         CliCommand::DeployFeeCharge(args) => deploy_fee_charge(args).await,
         CliCommand::ExpectedContractAddress(args) => expected_contract_address(args),
+        CliCommand::DepositIcrc(args) => deposit_icrc(args).await,
+        CliCommand::GetNonce(args) => get_nonce(args).await,
     }
+}
+
+async fn get_nonce(args: GetNonceArgs) {
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
+
+    let client = EvmCanisterClient::new(
+        IcAgentClient::with_identity(args.evm, IDENTITY_PATH, host, None)
+            .await
+            .expect("Failed to create client"),
+    );
+
+    let wallet = get_wallet(&args.wallet, &client).await;
+    let nonce = client
+        .eth_get_transaction_count(wallet.address().into(), BlockNumber::Pending)
+        .await
+        .unwrap()
+        .unwrap();
+
+    println!("{nonce}");
+}
+
+async fn deposit_icrc(args: DepositIcrcArgs) {
+    let bft_bridge = H160::from_slice(
+        &hex::decode(args.bft_bridge.trim_start_matches("0x"))
+            .expect("failed to parse bft bridge address"),
+    );
+
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
+
+    let client = EvmCanisterClient::new(
+        IcAgentClient::with_identity(args.evm, IDENTITY_PATH, host, None)
+            .await
+            .expect("Failed to create client"),
+    );
+
+    let wallet = get_wallet(&args.wallet, &client).await;
+    let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+
+    let data = Icrc2Burn {
+        sender: args.sender,
+        amount: args.amount.into(),
+        icrc2_token_principal: args.token,
+        from_subaccount: None,
+        recipient_address: wallet.address().into(),
+        approve_after_mint: None,
+        fee_payer: None,
+    };
+
+    let input = bft_bridge_api::NOTIFY_MINTER
+        .encode_input(&[
+            Token::Uint(0u32.into()),
+            Token::Bytes(Encode!(&data).unwrap()),
+        ])
+        .unwrap();
+
+    let nonce = client
+        .account_basic(wallet.address().into())
+        .await
+        .expect("Failed to get account info.")
+        .nonce;
+    let notify_minter_tx = TransactionBuilder {
+        from: &wallet.address().into(),
+        to: Some(bft_bridge.into()),
+        nonce,
+        value: 0u64.into(),
+        gas: 5_000_000u64.into(),
+        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        input,
+        signature: SigningMethod::SigningKey(wallet.signer()),
+        chain_id,
+    }
+    .calculate_hash_and_build()
+    .expect("failed to sign the transaction");
+
+    let hash = client
+        .send_raw_transaction(notify_minter_tx)
+        .await
+        .expect("Failed to send raw transaction")
+        .expect("Failed to execute deposit notification transaction");
+
+    let receipt = wait_for_tx_success(&client, hash).await;
+
+    eprintln!("Deposit notification sent");
+    eprintln!("Transaction receipt: {receipt:?}");
 }
 
 async fn get_wallet<'a>(
@@ -462,15 +607,13 @@ async fn create_token(args: CreateTokenArgs) {
     let token_id = decode_token_id(&args.token_id)
         .unwrap_or_else(|| panic!("Invalid token id format: {}", args.token_id));
 
+    let identity = args.identity_path.as_deref().unwrap_or(IDENTITY_PATH);
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
+
     let client = EvmCanisterClient::new(
-        IcAgentClient::with_identity(
-            args.evm_canister,
-            IDENTITY_PATH,
-            "http://127.0.0.1:4943",
-            None,
-        )
-        .await
-        .expect("Failed to create client"),
+        IcAgentClient::with_identity(args.evm_canister, identity, host, None)
+            .await
+            .expect("Failed to create client"),
     );
 
     let wallet = get_wallet(&args.wallet, &client).await;
