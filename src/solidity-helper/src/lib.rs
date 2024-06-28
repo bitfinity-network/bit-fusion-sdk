@@ -10,6 +10,7 @@ const BUILD_INFO_DIR: &str = "build-info";
 const CONTRACTS_SUBPATHS: &[&str] = &["src/"];
 
 pub mod error;
+
 pub struct SolidityContract {
     pub name: String,
     pub bytecode: Vec<u8>,
@@ -19,11 +20,13 @@ pub struct SolidityContract {
     pub method_identifiers: HashMap<String, String>,
 }
 
+/// Solidity contracts build outputs
 pub struct BuiltSolidityContracts {
     pub contracts: HashMap<String, SolidityContract>,
     pub output_dir: PathBuf,
 }
 
+/// Solidity file times with output directory
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SolidityFileTimes {
     /// Map between the file path to modified time
@@ -40,6 +43,7 @@ impl SolidityFileTimes {
     }
 }
 
+/// Solidity contracts builder
 pub struct SolidityBuilder {
     /// The subpaths to watch for changes
     subpaths_to_watch: Vec<PathBuf>,
@@ -52,7 +56,7 @@ pub struct SolidityBuilder {
 }
 
 impl SolidityBuilder {
-    /// Creates a new SolidityFileTimesWatcher
+    /// Tries to create a new SolidityBuilder
     pub fn new() -> SolidityHelperResult<Self> {
         let workspace_root_path = Self::workspace_root_path()?;
         let solidity_root_path = workspace_root_path.join("solidity");
@@ -329,6 +333,8 @@ impl SolidityBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -354,5 +360,83 @@ mod tests {
         assert!(!contract.bytecode.is_empty());
         assert!(!contract.deployed_bytecode.is_empty());
         assert!(contract.method_identifiers.contains_key("do_ripemd160()"));
+    }
+
+    #[test]
+    fn test_should_detect_changes_when_building_contracts() {
+        let times_file_path = tempfile::NamedTempFile::new().unwrap();
+        let workpace_tmp_root = tempfile::tempdir().unwrap();
+        let solidity_tmp_root = workpace_tmp_root.path().join("solidity");
+        let solidity_tmp_subpath = solidity_tmp_root.join("src");
+        // create
+        std::fs::create_dir_all(&solidity_tmp_subpath).unwrap();
+        // write solidity contract
+        write_solidity_contract(&solidity_tmp_subpath, "TestContract");
+
+        let mut builder = SolidityBuilder::new().unwrap();
+        builder.workspace_root_path = workpace_tmp_root.path().to_path_buf();
+        builder.solidity_root_path.clone_from(&solidity_tmp_root);
+        builder.times_file_path = times_file_path.path().to_path_buf();
+        builder.subpaths_to_watch = vec![solidity_tmp_subpath.clone()];
+
+        // build
+        let contracts = builder.build_updated_contracts().unwrap().contracts;
+        let contract = contracts.get("TestContract").unwrap();
+        assert!(!contract.bytecode.is_empty());
+
+        // get current times
+        let current_times = builder.load_file_times().unwrap();
+        // should not have changed
+        assert!(!builder
+            .have_files_changed(&current_times, &solidity_tmp_root)
+            .unwrap());
+
+        // update file
+        std::thread::sleep(Duration::from_secs(1));
+        write_solidity_contract(&solidity_tmp_subpath, "TestContract");
+        // should have changed
+        assert!(builder
+            .have_files_changed(&current_times, &solidity_tmp_root)
+            .unwrap());
+
+        // should change if new file
+        builder.save_file_times(&solidity_tmp_root).unwrap();
+        let current_times = builder.load_file_times().unwrap();
+        // should not have changed
+        assert!(!builder
+            .have_files_changed(&current_times, &solidity_tmp_root)
+            .unwrap());
+        write_solidity_contract(&solidity_tmp_subpath, "TestContractV2");
+        // build
+        let contracts = builder.build_updated_contracts().unwrap().contracts;
+        let contract = contracts.get("TestContract").unwrap();
+        assert!(!contract.bytecode.is_empty());
+        // should have changed
+        assert!(builder
+            .have_files_changed(&current_times, &solidity_tmp_root)
+            .unwrap());
+
+        // remove all
+        workpace_tmp_root.close().unwrap();
+    }
+
+    fn write_solidity_contract(p: &Path, name: &str) -> PathBuf {
+        let p = p.join(format!("{name}.sol"));
+
+        let contract = format!(
+            r#"
+        pragma solidity ^0.8.0;
+
+        contract {name} {{
+            function doSomething() public pure returns (uint256) {{
+                return 42;
+            }}
+        }}
+        "#
+        );
+
+        std::fs::write(&p, contract).unwrap();
+
+        p
     }
 }
