@@ -8239,7 +8239,9 @@ version = "0.2.0"
 dependencies = [
  "hex",
  "rand",
+ "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
