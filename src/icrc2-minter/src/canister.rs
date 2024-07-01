@@ -57,7 +57,7 @@ impl MinterCanister {
 
             self.update_metrics_timer(Duration::from_secs(60 * 60));
 
-            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
+            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(2);
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 // Tasks to collect EVMs events
                 let tasks = vec![Self::collect_evm_events_task()];
@@ -89,14 +89,7 @@ impl MinterCanister {
 
     #[cfg(target_family = "wasm")]
     fn collect_evm_events_task() -> ScheduledTask<BridgeTask> {
-        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
-
-        let options = TaskOptions::default()
-            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
-            .with_backoff_policy(BackoffPolicy::Fixed {
-                secs: EVM_EVENTS_COLLECTING_DELAY,
-            });
-
+        let options = TaskOptions::default();
         BridgeTask::CollectEvmEvents.into_scheduled(options)
     }
 

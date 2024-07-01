@@ -2,12 +2,13 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::time::Duration;
 
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::Log;
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_kit::{ic, RejectionCode};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
@@ -32,6 +33,48 @@ use crate::operation::{DepositOperationState, OperationState, WithdrawalOperatio
 use crate::state::State;
 use crate::tokens::icrc2::Success;
 use crate::tokens::{icrc1, icrc2};
+
+const MAX_LOG_REQUEST_COUNT: u64 = 1000;
+const COLLECT_EVM_LOGS_TIMEOUT: Duration = Duration::from_secs(60);
+thread_local! {
+    static COLLECT_EVM_LOGS_TS: RefCell<Option<u64>> = const { RefCell::new(None) };
+}
+
+/// This lock is used to prevent several evm log collection tasks to run concurrently. When the
+/// task starts, it takes the lock and holds it until the evm params are updates, so no other
+/// task would receive logs from the same block numbers.
+///
+/// To prevent the lock to get stuck locked in case of panic after an async call, we set the timeout
+/// of 1 minute, after which the lock is released even if the task didn't release it.
+struct CollectLogsLock {
+    ts: u64,
+}
+
+impl CollectLogsLock {
+    fn take() -> Option<Self> {
+        match COLLECT_EVM_LOGS_TS.with(|v| *v.borrow()) {
+            Some(ts) if (ts + COLLECT_EVM_LOGS_TIMEOUT.as_nanos() as u64) >= ic::time() => None,
+            _ => {
+                let ts = ic::time();
+                COLLECT_EVM_LOGS_TS.with(|v| *v.borrow_mut() = Some(ts));
+                Some(Self { ts })
+            }
+        }
+    }
+}
+
+impl Drop for CollectLogsLock {
+    fn drop(&mut self) {
+        COLLECT_EVM_LOGS_TS.with(|v| {
+            let mut curr_lock = v.borrow_mut();
+            if let Some(ts) = *curr_lock {
+                if ts <= self.ts {
+                    *curr_lock = None;
+                }
+            }
+        });
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
@@ -105,6 +148,12 @@ impl BridgeTask {
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
+        // We need to get a local variable for the lock here to make sure it's not dropped immediately.
+        let Some(lock) = CollectLogsLock::take() else {
+            log::trace!("Another collect evm events task is in progress. Skipping.");
+            return Ok(());
+        };
+
         log::trace!("collecting evm events");
 
         let client = state.borrow().config.get_evm_client();
@@ -121,19 +170,24 @@ impl BridgeTask {
             ));
         };
 
-        let last_block = client.get_block_number().await.into_scheduler_result()?;
+        let last_chain_block = client.get_block_number().await.into_scheduler_result()?;
+        let last_request_block = last_chain_block.min(params.next_block + MAX_LOG_REQUEST_COUNT);
 
-        let logs =
-            BridgeEvent::collect_logs(&client, params.next_block, last_block, bridge_contract.0)
-                .await
-                .into_scheduler_result()?;
+        let logs = BridgeEvent::collect_logs(
+            &client,
+            params.next_block,
+            last_request_block,
+            bridge_contract.0,
+        )
+        .await
+        .into_scheduler_result()?;
 
-        log::debug!("got evm logs: {logs:?}");
+        log::debug!("Got evm logs between blocks {} and {last_request_block} (last chain block is {last_chain_block}: {logs:?}", params.next_block);
 
         state
             .borrow_mut()
             .config
-            .update_evm_params(|params| params.next_block = last_block + 1);
+            .update_evm_params(|params| params.next_block = last_request_block + 1);
 
         log::trace!("appending logs to tasks: {logs:?}");
 
@@ -142,6 +196,12 @@ impl BridgeTask {
         // Update EVM params
         Self::update_evm_params(state.clone()).await?;
 
+        // This line is not necessary as the lock variable will not be dropped anyway only at the
+        // end of the function or on any early return from the function. But I couldn't find
+        // explicit guarantees by the language for this behaviour, so let's make sure it's not dropped
+        // until now.
+        drop(lock);
+
         Ok(())
     }
 
@@ -149,17 +209,21 @@ impl BridgeTask {
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
+        log::trace!("Operation {operation_id}: String burn_icrc2_tokens");
+
         let mut operation_store = get_operations_store();
         let operation_state = operation_store.get(operation_id);
         let Some(OperationState::Deposit(DepositOperationState::Scheduled(reason))) =
             operation_state
         else {
             log::error!(
-                "deposit request was in incorrect state: {:?}",
+                "Operation {operation_id}: deposit request was in incorrect state: {:?}",
                 operation_state
             );
             return Ok(());
         };
+
+        log::trace!("Operation {operation_id}: got operation data from the store: {reason:?}");
 
         let caller_account = Account {
             owner: reason.sender,
@@ -172,6 +236,8 @@ impl BridgeTask {
                 "failed to get token info".into(),
             ))
             .into_scheduler_result()?;
+
+        log::trace!("Operation {operation_id}: got token info: {token_info:?}");
 
         let name = order::fit_str_to_array(&token_info.name);
         let symbol = order::fit_str_to_array(&token_info.symbol);
@@ -187,6 +253,8 @@ impl BridgeTask {
         .await
         .into_scheduler_result()?;
 
+        log::trace!("Operation {operation_id}: transferred icrc tokens to the bridge account");
+
         let nonce = operation_id.nonce();
         let burn_data = BurntIcrc2Data {
             sender: reason.sender,
@@ -200,6 +268,11 @@ impl BridgeTask {
             fee_payer: reason.fee_payer,
             approve_after_mint: reason.approve_after_mint,
         };
+
+        log::trace!(
+            "Operation {operation_id}: storing new operation status Icrc2Burned({burn_data:?})"
+        );
+
         operation_store.update(
             operation_id,
             OperationState::Deposit(DepositOperationState::Icrc2Burned(burn_data)),
@@ -209,7 +282,12 @@ impl BridgeTask {
             .with_backoff_policy(BackoffPolicy::Fixed { secs: 4 })
             .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite);
 
-        scheduler.append_task(BridgeTask::PrepareMintOrder(operation_id).into_scheduled(options));
+        let task_id = scheduler
+            .append_task(BridgeTask::PrepareMintOrder(operation_id).into_scheduled(options));
+
+        log::trace!(
+            "Operation {operation_id}: PrepareMintOrder task {task_id} is added to the scheduler"
+        );
 
         Ok(())
     }
@@ -712,7 +790,11 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
     type Success = T;
 
     fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError> {
-        self.map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
+        self.map_err(|e| {
+            let message = e.to_string();
+            log::error!("Task execution failed: {message}");
+            SchedulerError::TaskExecutionFailed(message)
+        })
     }
 }
 
