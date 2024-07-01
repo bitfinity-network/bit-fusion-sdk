@@ -57,6 +57,9 @@ jobs:
         ./scripts/build_solidity.sh
         apt update && apt install -y npm wget curl
         cp btc-deploy/mkcert/* /etc/ssl/
+        wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
+        tar -xzf /tmp/bitcoin.tar.gz -C /tmp
+        cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
       artifact-pre-script: |
         # Get external dependencies
         export WASMS_DIR="`pwd`/.artifact"

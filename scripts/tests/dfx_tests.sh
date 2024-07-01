@@ -70,8 +70,6 @@ if [ "$DOCKER" -gt 0 ]; then
     setup_docker
 fi
 
-set -e
-
 start_icx() {
     killall icx-proxy
     sleep 2
@@ -83,7 +81,6 @@ start_icx() {
 
 rm -f "$LOGFILE"
 
-set +e
 dfx start --background --clean --enable-bitcoin 2> "$LOGFILE"
 start_icx
 
@@ -94,7 +91,8 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
 
-cargo test -p integration-tests --features dfx_tests $1
+cargo test -p integration-tests --features dfx_tests $@
+TEST_RESULT=$?
 
 killall -9 icx-proxy || true
 
@@ -103,3 +101,5 @@ dfx stop
 if [ "$DOCKER" -gt 0 ]; then
     stop_docker
 fi
+
+exit $TEST_RESULT
