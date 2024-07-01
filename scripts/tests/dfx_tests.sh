@@ -26,7 +26,7 @@ stop_docker() {
     cd $PREV_PATH
 }
 
-WITH_DOCKER="0"
+DOCKER="0"
 GITHUB_CI="0"
 
 ARGS=$(getopt -o h --long docker,github-ci,help -- "$@")
@@ -63,11 +63,10 @@ if [ "$GITHUB_CI" -gt 0 ]; then
     dfxvm default 0.18.0
 fi
 
-
 killall -9 icx-proxy || true
 dfx stop
 
-if [ "$WITH_DOCKER" -gt 0 ]; then
+if [ "$DOCKER" -gt 0 ]; then
     setup_docker
 fi
 
@@ -101,6 +100,6 @@ killall -9 icx-proxy || true
 
 dfx stop
 
-if [ "$WITH_DOCKER" -gt 0 ]; then
+if [ "$DOCKER" -gt 0 ]; then
     stop_docker
 fi
