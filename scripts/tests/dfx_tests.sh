@@ -13,10 +13,12 @@ usage() {
 }
 
 setup_docker() {
+    set -e
     PREV_PATH=$(pwd)
     cd btc-deploy/
     docker compose up -d --build
     cd $PREV_PATH
+    set +e
 }
 
 stop_docker() {
