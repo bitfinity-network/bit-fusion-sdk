@@ -16,7 +16,7 @@ setup_docker() {
     set -e
     PREV_PATH=$(pwd)
     cd btc-deploy/
-    docker compose up -d --build
+    docker compose up -d --build || docker-compose up -d --build
     cd $PREV_PATH
     set +e
 }
@@ -24,7 +24,7 @@ setup_docker() {
 stop_docker() {
     PREV_PATH=$(pwd)
     cd btc-deploy/
-    docker compose down
+    docker compose down || docker-compose down
     cd $PREV_PATH
 }
 
