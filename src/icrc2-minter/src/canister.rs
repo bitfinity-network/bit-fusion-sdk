@@ -407,7 +407,7 @@ impl MinterCanister {
                     .map(|mint_order| (operation_id.nonce(), *mint_order))
             })
             .skip(offset.unwrap_or_default())
-            .take(count.unwrap_or(std::usize::MAX))
+            .take(count.unwrap_or(usize::MAX))
             .collect()
     }
 }
@@ -496,12 +496,14 @@ pub fn get_operations_store(
 #[cfg(test)]
 mod test {
     use candid::Principal;
+    use did::U256;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::{inject, MockContext};
     use minter_did::error::Error;
 
     use super::*;
+    use crate::operation::DepositOperationState;
     use crate::MinterCanister;
 
     fn owner() -> Principal {
@@ -797,5 +799,113 @@ mod test {
             .unwrap();
 
         assert!(whitelist.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_should_paginate_token_mint_orders() {
+        fn eth_address(seed: u8) -> H160 {
+            H160::from([seed; H160::BYTE_SIZE])
+        }
+
+        let token_id = eth_address(0);
+        let token_id_id256 = Id256::from_evm_address(&token_id, 5);
+
+        let op_state = OperationState::Deposit(DepositOperationState::MintOrderSigned {
+            token_id: token_id_id256,
+            amount: U256::one(),
+            signed_mint_order: Box::new(SignedMintOrder([0; 334])),
+        });
+
+        let token_id_other = eth_address(1);
+        let token_id_other_id256 = Id256::from_evm_address(&token_id_other, 5);
+
+        let op_state_other = OperationState::Deposit(DepositOperationState::MintOrderSigned {
+            token_id: token_id_other_id256,
+            amount: U256::one(),
+            signed_mint_order: Box::new(SignedMintOrder([0; 334])),
+        });
+
+        const COUNT: usize = 42;
+        const COUNT_OTHER: usize = 10;
+
+        let canister = init_canister().await;
+
+        inject::get_context().update_id(owner());
+        let mut op_store = get_operations_store();
+
+        let owner = eth_address(2);
+        let owner_other = eth_address(3);
+
+        for _ in 0..COUNT {
+            op_store.new_operation(owner.clone(), op_state.clone());
+        }
+
+        for _ in 0..COUNT_OTHER {
+            op_store.new_operation(owner_other.clone(), op_state_other.clone());
+        }
+
+        // get orders for the first token
+        let orders = canister_call!(
+            canister.list_mint_orders(owner.clone(), token_id_id256, None, Some(COUNT)),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(orders.len(), COUNT);
+
+        // get with offset
+        let orders = canister_call!(
+            canister.list_mint_orders(owner.clone(), token_id_id256, Some(10), Some(20)),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert_eq!(orders.len(), 20);
+
+        // get with offset to the end
+        let orders = canister_call!(
+            canister.list_mint_orders(owner.clone(), token_id_id256, Some(COUNT - 5), Some(100)),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert_eq!(orders.len(), 5);
+
+        // get orders with no limit
+        let orders = canister_call!(
+            canister.list_mint_orders(owner.clone(), token_id_id256, None, None),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert_eq!(orders.len(), COUNT);
+
+        // get orders with offset but no limit
+        let orders = canister_call!(
+            canister.list_mint_orders(owner.clone(), token_id_id256, Some(10), None),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert_eq!(orders.len(), COUNT - 10);
+
+        // get orders for the second token but `owner`
+        let orders = canister_call!(
+            canister.list_mint_orders(owner, token_id_other_id256, None, None),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert!(orders.is_empty());
+
+        // get orders for the second token
+        let orders = canister_call!(
+            canister.list_mint_orders(owner_other.clone(), token_id_other_id256, None, None),
+            Vec<(u32, SignedMintOrder)>
+        )
+        .await
+        .unwrap();
+        assert_eq!(orders.len(), COUNT_OTHER);
     }
 }
