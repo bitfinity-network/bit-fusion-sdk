@@ -89,10 +89,10 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     /// Constructor to initialize minterCanisterAddress and feeChargeContract
     /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) public initializer {
+    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) external initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        TokenManager._initialize(_isWrappedSide);
+        __TokenManager_init(_isWrappedSide);
 
         controllerAccessList[msg.sender] = true;
 

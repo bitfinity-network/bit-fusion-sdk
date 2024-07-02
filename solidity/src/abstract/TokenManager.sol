@@ -32,12 +32,7 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    // Constructor or an initializer where you set this variable
-    // constructor(bool _isWrappedSide) {
-    //     isWrappedSide = _isWrappedSide;
-    // }
-
-    function _initialize(bool _isWrappedSide) internal initializer {
+    function __TokenManager_init(bool _isWrappedSide) internal onlyInitializing {
         isWrappedSide = _isWrappedSide;
     }
 

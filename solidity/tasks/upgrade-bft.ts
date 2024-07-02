@@ -5,7 +5,7 @@ import { DeployImplementationResponse } from '@openzeppelin/hardhat-upgrades/dis
 
 interface UpgradeBftParams {
     proxyAddress: string;
-    isWrapped: boolean;
+    isWrappedSide: boolean;
     minterAddress: string;
     feeChargeAddress: string;
 }
@@ -17,16 +17,15 @@ interface UpgradeBftParams {
    * @param isWrapped - Whether the token is wrapped or not.
    * @param minterAddress - The address of the minter.
    * @param feeChargeAddress - The address of the fee charge address.
-   * @param hre - The Hardhat Runtime Environment.
    * @returns The upgraded BFT contract.
    */
 task('upgrade-bft', 'Upgrades the BFT contract')
     .addParam('proxyAddress', 'The address of the BFT proxy contract')
-    .addParam('isWrapped', 'Whether the token is wrapped or not')
+    .addParam('isWrappedSide', 'Whether the token is wrapped or not')
     .addParam('minterAddress', 'The address of the minter')
     .addParam('feeChargeAddress', 'The address of the fee charge address')
     .setAction(async (
-        { proxyAddress, isWrapped, minterAddress, feeChargeAddress }: UpgradeBftParams,
+        { proxyAddress, isWrappedSide, minterAddress, feeChargeAddress }: UpgradeBftParams,
         hre: HardhatRuntimeEnvironment
     ): Promise<void> => {
         try {
@@ -55,18 +54,35 @@ task('upgrade-bft', 'Upgrades the BFT contract')
 
             console.log('Deploying new implementation contract...');
 
-            /// Make use of versioned contract to deploy the new implementation contract
-            const bftBridgeUpgrade = await hre.ethers.getContractFactory('BFTBridge');
+            //! Change this to the new implementation contract
+            const BftBridgeV2 = await hre.ethers.getContractFactory('BFTBridgeV2');
 
-            let bytecodeHash = keccak256(bftBridgeUpgrade.bytecode);
+
 
             /// Make sure you use the proxy contract address to get the
             /// contract instance
             /// and the old implementation contract should be the one that is currently deployed
-            const proxyContract = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
+            const BftBridge = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
+
+
+
+            const newImplementationDeployment: DeployImplementationResponse = await hre.upgrades.prepareUpgrade(proxyAddress, BftBridgeV2, {
+                kind: 'uups'
+            });
+
+            const newImplementationAddress: string = typeof newImplementationDeployment === 'string' ? newImplementationDeployment : await newImplementationDeployment.wait().then((tx) => tx?.contractAddress!);
+
+
+            console.log(`New implementation contract deployed at: ${newImplementationAddress}`);
 
             console.log('Adding new implementation to the proxy contract...');
-            let res = await proxyContract.addAllowedImplementation(bytecodeHash);
+            let deployedByteCode = await hre.ethers.provider.getCode(
+                newImplementationAddress);
+
+            /// Get the bytecode hash
+            let bytecodeHash = keccak256(deployedByteCode);
+
+            let res = await BftBridge.addAllowedImplementation(bytecodeHash);
 
             let receipt = await res.wait();
 
@@ -74,21 +90,21 @@ task('upgrade-bft', 'Upgrades the BFT contract')
                 throw new Error('Failed to add new implementation to the proxy contract.');
             }
 
-
             console.log('New implementation added successfully.');
 
-            const newImplementationDeployment: DeployImplementationResponse = await hre.upgrades.prepareUpgrade(proxyAddress, bftBridgeUpgrade, {
-                kind: 'uups',
-                getTxResponse: false,
-            });
-
-            const newImplementationAddress: string = typeof newImplementationDeployment === 'string' ? newImplementationDeployment : await newImplementationDeployment.wait().then((tx) => tx?.contractAddress!);
-
-            console.log(`New implementation contract deployed at: ${newImplementationAddress}`);
 
             console.log('Retrieving current proxy contract...');
 
-            const initData: string = bftBridgeUpgrade.interface.encodeFunctionData('initialize', [minterAddress, feeChargeAddress, isWrapped]);
+            const proxyContract = await hre.ethers.getContractAt(
+                "BFTBridge",
+                proxyAddress
+            );
+
+            let newImpl = await hre.ethers.getContractAt(
+                "BFTBridgeV2",
+                newImplementationAddress);
+
+            const initData: string = newImpl.interface.encodeFunctionData('__BridgeV2_init');
 
             console.log('Upgrading proxy contract to new implementation...');
             await proxyContract.upgradeToAndCall(newImplementationAddress, initData);
@@ -98,7 +114,6 @@ task('upgrade-bft', 'Upgrades the BFT contract')
             console.log(`Proxy address: ${proxyAddress}`);
             console.log(`New implementation address: ${newImplementationAddress}`);
         } catch (error) {
-            console.error('Error during BFT contract upgrade:', error);
             throw error;
         }
     });
