@@ -96,15 +96,26 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
 
-if [ "$GITHUB_CI" ]; then
-  sleep 30
-fi
+
+BTC_ENDPOINT_READY=255
+BTC_ENDPOINT_ELAPSED=0
+
+while [ "$BTC_ENDPOINT_READY" -ne 0 ]; do
+  curl http://127.0.0.1:18443
+  BTC_ENDPOINT_READY=$?
+  echo "BITCOIN READY $BTC_ENDPOINT_READY"
+  sleep 5
+  let BTC_ENDPOINT_ELAPSED=$BTC_ENDPOINT_ELAPSED+5
+  if [ "$BTC_ENDPOINT_ELAPSED" -gt 120 ]; then
+    echo "Bitcoin endpoint not ready after 2 minutes"
+    exit 1
+  fi
+done
 
 cd btc-deploy/
 docker compose logs bitcoind
 cd -
 curl http://127.0.0.1:18443
-curl http://127.0.0.1:18444
 
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
