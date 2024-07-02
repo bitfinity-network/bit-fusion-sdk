@@ -54,6 +54,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 erc20-minter = { path = "../erc20-minter" }
 rune-bridge = { path = "../rune-bridge" }
+canister-factory = { path = "../canister-factory/canister-factory" }
 
 # IC deps
 

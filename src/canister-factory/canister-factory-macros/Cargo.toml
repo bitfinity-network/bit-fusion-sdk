@@ -1,0 +1,14 @@
+[package]
+name = "canister-factory-macros"
+version.workspace = true
+edition.workspace = true
+
+
+[dependencies]
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.17.x" }
+
+[lib]
+proc-macro = true

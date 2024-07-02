@@ -8,7 +8,7 @@ mod config;
 mod registry;
 pub mod signer;
 
-pub use registry::{CanisterInfo, CanisterStatus};
+pub use registry::CanisterInfo;
 
 /// State of a minter canister.
 #[derive(Default)]

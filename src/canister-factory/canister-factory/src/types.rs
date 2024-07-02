@@ -60,3 +60,16 @@ impl CanisterArgs {
         }
     }
 }
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub enum CanisterStatus {
+    Deployed,
+    Upgraded,
+    Reinstalled,
+}
+
+impl CanisterStatus {
+    pub fn is_deployed(&self) -> bool {
+        matches!(self, Self::Deployed)
+    }
+}

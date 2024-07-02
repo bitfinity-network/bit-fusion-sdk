@@ -933,6 +933,7 @@ version = "0.2.0"
 dependencies = [
  "btc-bridge",
  "candid",
+ "canister-factory-macros",
  "did",
  "erc20-minter",
  "eth-signer",
@@ -941,6 +942,7 @@ dependencies = [
  "evm-canister-client",
  "hex",
  "ic-canister",
+ "ic-canister-client",
  "ic-exports",
  "ic-metrics 0.17.0",
  "ic-stable-structures 0.17.0",
@@ -953,6 +955,16 @@ dependencies = [
  "sha3",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "canister-factory-macros"
+version = "0.2.0"
+dependencies = [
+ "ic-canister-client",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.68",
 ]
 
 [[package]]
@@ -5601,6 +5613,7 @@ dependencies = [
  "bitcoin 0.31.2",
  "btc-bridge",
  "candid",
+ "canister-factory",
  "did",
  "erc20-minter",
  "eth-signer",

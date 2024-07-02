@@ -1,19 +1,10 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use candid::{CandidType, Deserialize, Principal};
 use did::codec;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{BTreeMapStructure, StableBTreeMap, Storable, VirtualMemory};
 
 use crate::memory::{CANISTER_REGISTRY_MEMORY_ID, MEMORY_MANAGER};
-use crate::types::{CanisterArgs, CanisterType};
-
-#[derive(CandidType, Deserialize, Clone, Debug)]
-pub enum CanisterStatus {
-    Deployed,
-    Upgraded,
-    Reinstalled,
-}
+use crate::types::{CanisterArgs, CanisterStatus, CanisterType};
 
 #[derive(CandidType, Deserialize, Debug, Clone)]
 /// `CanisterInfo` represents the metadata associated with a canister in the registry.
@@ -25,9 +16,9 @@ pub enum CanisterStatus {
 /// - `timestamp`: The timestamp when the canister was registered.
 pub struct CanisterInfo {
     pub canister_type: CanisterType,
-    with_args: CanisterArgs,
+    pub with_args: CanisterArgs,
     hash: String,
-    status: CanisterStatus,
+    pub status: CanisterStatus,
     timestamp: u64,
 }
 
@@ -94,10 +85,7 @@ impl Registry {
                 info.hash = new_hash;
             }
 
-            info.timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs();
+            info.timestamp = time_secs();
 
             self.canisters.insert(principal, info);
         }
@@ -132,7 +120,10 @@ pub fn time_secs() -> u64 {
 
     // ic::time() return the nano_sec, we need to change it to sec.
     #[cfg(target_family = "wasm")]
-    (ic_exports::ic_kit::ic::time() / crate::constant::E_9)
+    {
+        const E_9: u64 = 1_000_000_000;
+        ic_exports::ic_kit::ic::time() / E_9
+    }
 }
 
 #[cfg(test)]

@@ -30,7 +30,7 @@ pub async fn get_signature_verification_canister_bytecode() -> Vec<u8> {
 /// Returns the bytecode of the minter evm
 pub async fn get_ck_erc20_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, "erc20-minter.wasm.gz").await
+    get_or_load_wasm(&CANISTER_BYTECODE, "erc20-minter.wasm").await
 }
 
 /// Returns the bytecode of the evmc canister - Testnet
@@ -74,6 +74,11 @@ pub async fn get_btc_bridge_canister_bytecode() -> Vec<u8> {
 pub async fn get_rune_bridge_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, "rune-bridge.wasm.gz").await
+}
+
+pub async fn get_canister_factory_bytecode() -> Vec<u8> {
+    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
+    get_or_load_wasm(&CANISTER_BYTECODE, "canister-factory.wasm.gz").await
 }
 
 async fn load_wasm_bytecode_or_panic(wasm_name: &str) -> Vec<u8> {

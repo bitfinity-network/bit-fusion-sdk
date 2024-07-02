@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use candid::{CandidType, Principal};
+use canister_factory_macros::canister_client;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::abi::Token;
@@ -16,12 +17,14 @@ use ic_exports::ic_cdk::api::management_canister::provisional::CanisterSettings;
 use ic_exports::ic_kit::ic;
 use ic_metrics::{Metrics, MetricsStorage};
 use icrc2_minter::SigningStrategy;
+use serde::Deserialize;
 
 use crate::error::{Result, UpgraderError};
 use crate::hash;
 use crate::management::Management;
-use crate::state::{CanisterInfo, CanisterStatus, Settings, State};
+use crate::state::{CanisterInfo, Settings, State};
 use crate::types::*;
+use ic_canister_client::{CanisterClient, CanisterClientResult};
 
 pub const CREATE_CYCLES: u128 = 2_000_000_000;
 
@@ -32,7 +35,7 @@ pub struct CanisterFactory {
     id: Principal,
 }
 
-#[derive(CandidType)]
+#[derive(CandidType, Deserialize)]
 pub struct UpgraderInitData {
     pub owner: Principal,
     pub signing_strategy: SigningStrategy,
@@ -42,6 +45,7 @@ impl PreUpdate for CanisterFactory {
     fn pre_update(&self, _method_name: &str, _method_type: MethodType) {}
 }
 
+#[canister_client]
 impl CanisterFactory {
     #[init]
     fn init(&self, init: UpgraderInitData) {
@@ -129,7 +133,7 @@ impl CanisterFactory {
     ) -> Result<Principal> {
         let canister_type = canister_args._type();
 
-        self.validate(&canister_type, wasm.clone())?;
+        self.validate(&canister_type, &wasm.clone())?;
         let args = CreateCanisterArgument { settings };
 
         let wasm_hash = hash::hash_wasm_module_hex(&wasm);
@@ -170,7 +174,7 @@ impl CanisterFactory {
     /// A result indicating whether the upgrade was successful.
     #[update]
     pub async fn upgrade(&self, canister_type: CanisterType, wasm: Vec<u8>) -> Result {
-        self.validate(&canister_type, wasm.clone())?;
+        self.validate(&canister_type, &wasm.clone())?;
 
         let wasm_hash = hash::hash_wasm_module_hex(&wasm);
 
@@ -223,7 +227,7 @@ impl CanisterFactory {
     pub async fn reinstall(&self, canister_args: CanisterArgs, wasm: Vec<u8>) -> Result {
         let canister_type = canister_args._type();
 
-        self.validate(&canister_type, wasm.clone())?;
+        self.validate(&canister_type, &wasm.clone())?;
 
         let wasm_hash = hash::hash_wasm_module_hex(&wasm);
 
@@ -296,14 +300,11 @@ impl CanisterFactory {
     /// # Returns
     /// The CanisterType for the given principal, if it exists in the registry. Otherwise, `None`.
     #[query]
-    pub fn get_canister_info(&self, principal: Principal) -> Option<CanisterType> {
+    pub fn get_canister_info(&self, principal: Principal) -> Option<CanisterInfo> {
         let state = get_state();
         let state = state.borrow();
 
-        state
-            .registry()
-            .get_canister_info(&principal)
-            .map(|info| info.canister_type.clone())
+        state.registry().get_canister_info(&principal)
     }
 
     /// Returns the principal of the canister with the given canister type, if it exists in the registry.
@@ -412,7 +413,7 @@ impl CanisterFactory {
     }
 
     /// Validates the provided WASM code for the given canister type.
-    pub fn validate(&self, canister_type: &CanisterType, wasm: Vec<u8>) -> Result {
+    pub fn validate(&self, canister_type: &CanisterType, wasm: &[u8]) -> Result {
         let marker = canister_type.marker();
 
         let marker_is_valid = wasm
@@ -490,7 +491,7 @@ mod tests {
 
         let factory = CanisterFactory::from_principal(Principal::anonymous());
 
-        let result = factory.validate(&canister_type, wasm);
+        let result = factory.validate(&canister_type, &wasm);
 
         assert!(result.is_ok());
     }
@@ -504,7 +505,7 @@ mod tests {
 
         let factory = CanisterFactory::from_principal(Principal::anonymous());
 
-        let result = factory.validate(&canister_type, wasm);
+        let result = factory.validate(&canister_type, &wasm);
 
         assert!(result.is_err());
     }

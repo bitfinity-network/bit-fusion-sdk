@@ -24,11 +24,10 @@ fi
 
 # Function to print help instructions
 print_help() {
-    echo "Usage: $0 [all|evm|evm_testnet|signature_verification|spender|minter]"
+    echo "Usage: $0 [all|minter|canister-factory]"
     echo "Examples:"
     echo "  $0                      # Build all canisters, download binaries and build tools (default)"
     echo "  $0 all                  # Build all canisters and download binaries and build tools"
-    echo "  $0 evm_testnet          # Build only the EVM canister for testnet"
     echo "  $0 spender minter       # Build the spender and minter canisters"
 }
 
@@ -133,22 +132,14 @@ build_requested_canisters() {
         build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
         build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
+        build_canister "canister-factory" "export-api" "canister-factory.wasm" "canister-factory"
 
         # Build tools
         build_bridge_tool
     else
         for canister in "$@"; do
             case "$canister" in
-            evm)
-                build_canister "evm_canister" "$EVM_FEATURES" "evm.wasm" "evm"
-                ;;
-            evm_testnet)
-                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet.wasm" "evm_testnet"
-                ;;
-            signature_verification | spender | minter)
-                build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
-                ;;
-            btc-bridge | rune-bridge | icrc2-minter | erc20-minter)
+            btc-bridge | rune-bridge | icrc2-minter | erc20-minter | canister-factory)
                 build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)

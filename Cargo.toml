@@ -8,7 +8,8 @@ members = [
     "src/solidity-helper",
     "src/btc-bridge",
     "src/rune-bridge",
-    "src/canister-factory",
+    "src/canister-factory/canister-factory",
+    "src/canister-factory/canister-factory-macros",
 ]
 resolver = "2"
 

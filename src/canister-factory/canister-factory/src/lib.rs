@@ -8,7 +8,7 @@ mod hash;
 mod management;
 mod memory;
 mod state;
-pub(crate) mod types;
+pub mod types;
 
 pub fn idl() -> String {
     let factory_idl = CanisterFactory::idl();

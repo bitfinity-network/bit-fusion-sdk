@@ -43,7 +43,8 @@
       "build": "",
       "candid": ".artifact/erc20-minter.did",
       "wasm": ".artifact/erc20-minter.wasm.gz",
-      "type": "custom"
+      "type": "custom",
+      "optimize": "cycles"
     },
     "spender": {
       "build": "",

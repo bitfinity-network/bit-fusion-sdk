@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
+use canister_factory::canister::UpgraderInitData;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
@@ -81,6 +82,10 @@ pub trait TestContext {
     /// Returns client for the evm canister.
     fn evm_client(&self, caller: &str) -> EvmCanisterClient<Self::Client> {
         EvmCanisterClient::new(self.client(self.canisters().evm(), caller))
+    }
+
+    fn new_client(&self, canister: Principal, caller: &str) -> Self::Client {
+        self.client(canister, caller)
     }
 
     /// Returns client for the evm canister.
@@ -895,6 +900,18 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
+            CanisterType::CanisterFactory => {
+                let data = UpgraderInitData {
+                    signing_strategy: SigningStrategy::Local {
+                        private_key: rand::random(),
+                    },
+                    owner: self.admin(),
+                };
+
+                self.install_canister(self.canisters().canister_factory(), wasm, (data,))
+                    .await
+                    .unwrap();
+            }
             CanisterType::BtcBridge => {
                 todo!()
             }
@@ -1194,6 +1211,13 @@ impl TestCanisters {
             .expect("rune bridge canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn canister_factory(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::CanisterFactory)
+            .expect("canister factory should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -1226,6 +1250,7 @@ pub enum CanisterType {
     Icrc1Ledger,
     BtcBridge,
     RuneBridge,
+    CanisterFactory,
 }
 
 impl CanisterType {
@@ -1286,6 +1311,7 @@ impl CanisterType {
             CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
+            CanisterType::CanisterFactory => get_canister_factory_bytecode().await,
         }
     }
 }

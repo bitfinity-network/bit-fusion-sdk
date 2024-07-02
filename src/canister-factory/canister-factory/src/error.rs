@@ -1,10 +1,11 @@
 use candid::{CandidType, Principal};
 use ic_exports::ic_kit::RejectionCode;
+use serde::Deserialize;
 use thiserror::Error;
 
 pub type Result<T = (), E = UpgraderError> = std::result::Result<T, E>;
 
-#[derive(Error, Debug, CandidType)]
+#[derive(Error, Debug, CandidType, Deserialize)]
 pub enum UpgraderError {
     #[error("Unauthorized: caller {caller} is not the owner")]
     Unauthorized { caller: Principal },
