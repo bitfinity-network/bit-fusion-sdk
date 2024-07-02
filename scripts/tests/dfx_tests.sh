@@ -99,7 +99,12 @@ sleep 10
 if [ "$GITHUB_CI" ]; then
   sleep 30
 fi
+
+cd btc-deploy/
+docker compose logs bitcoind
+cd -
 curl http://127.0.0.1:18443
+curl http://127.0.0.1:18444
 
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
