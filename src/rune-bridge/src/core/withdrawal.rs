@@ -332,7 +332,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
         let rune_change_address = self.get_change_address().await;
-        let fee_rate = self.utxo_provider.get_fee_rate().await?;
+        let fee_rate = self.state.borrow().get_fee_rate();
 
         let args = CreateEdictTxArgs {
             rune,
