@@ -96,6 +96,9 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
 
+if [ "$GITHUB_CI" ]; then
+  sleep 30
+fi
 curl http://127.0.0.1:18443
 
 cargo test -p integration-tests --features dfx_tests $@
