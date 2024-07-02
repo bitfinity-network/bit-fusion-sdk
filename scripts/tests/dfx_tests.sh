@@ -87,6 +87,8 @@ dfx start --background --clean --enable-bitcoin 2> "$LOGFILE"
 start_icx
 
 dfx identity new --storage-mode=plaintext --force max
+dfx identity new --storage-mode=plaintext --force alice
+dfx identity new --storage-mode=plaintext --force alex
 dfx identity use max
 wallet_principal=$(dfx identity get-wallet)
 echo "Wallet Principal: $wallet_principal"
