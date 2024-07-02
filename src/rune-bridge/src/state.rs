@@ -17,7 +17,7 @@ use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
 use minter_contract_utils::evm_link::EvmLink;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
-use ordinals::RuneId;
+use ordinals::{RuneId, SpacedRune};
 
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
@@ -38,6 +38,9 @@ pub struct State {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    /// Existing runes.
+    rune_list: Vec<(RuneId, SpacedRune, u8)>,
+    /// Current fee rate for btc network.
     fee_rate: FeeRate,
 }
 
@@ -70,6 +73,7 @@ impl Default for State {
             master_key: None,
             ledger: Default::default(),
             runes: Default::default(),
+            rune_list: Default::default(),
             fee_rate: FeeRate::ZERO,
         }
     }
@@ -268,6 +272,16 @@ impl State {
     /// Returns EVM parameters.
     pub fn get_evm_params(&self) -> &Option<EvmParams> {
         &self.evm_params
+    }
+
+    /// Returns the list of existing runes.
+    pub fn get_rune_list(&self) -> &Vec<(RuneId, SpacedRune, u8)> {
+        &self.rune_list
+    }
+
+    /// Updates the list of existing runes.
+    pub fn set_rune_list(&mut self, rune_list: Vec<(RuneId, SpacedRune, u8)>) {
+        self.rune_list = rune_list;
     }
 
     /// Returns the fee rate used by the canister.

@@ -638,7 +638,8 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         &self,
         rune_amounts: &HashMap<RuneName, u128>,
     ) -> Option<Vec<(RuneInfo, u128)>> {
-        let rune_list = self.index_provider.get_rune_list().await.ok()?;
+        let borrowed_state = self.state.borrow();
+        let rune_list = borrowed_state.get_rune_list();
         let runes: HashMap<RuneName, RuneInfo> = rune_list
             .iter()
             .map(|(rune_id, spaced_rune, decimals)| {

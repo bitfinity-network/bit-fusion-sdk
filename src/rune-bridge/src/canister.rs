@@ -25,7 +25,6 @@ use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
 use crate::core::deposit::RuneDeposit;
-use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::{CreateEdictTxArgs, GetAddressError, WithdrawError};
 use crate::memory::{
@@ -61,6 +60,7 @@ impl RuneBridge {
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24); // once a day
             const GET_FEE_RATE_INTERVAL: Duration = Duration::from_secs(60 * 60); // once an hour
+            const REFRESH_RUNE_LIST_INTERVAL: Duration = Duration::from_secs(60 * 60); // once an hour
 
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 get_scheduler()
@@ -84,6 +84,18 @@ impl RuneBridge {
                 get_scheduler()
                     .borrow_mut()
                     .append_task(Self::get_fee_rate_task());
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
+            });
+
+            ic_exports::ic_cdk_timers::set_timer_interval(REFRESH_RUNE_LIST_INTERVAL, || {
+                get_scheduler()
+                    .borrow_mut()
+                    .append_task(Self::refresh_rune_list_task());
 
                 let task_execution_result = get_scheduler().borrow_mut().run();
 
@@ -197,6 +209,19 @@ impl RuneBridge {
         RuneBridgeTask::GetFeeRate.into_scheduled(options)
     }
 
+    #[cfg(target_family = "wasm")]
+    fn refresh_rune_list_task() -> ScheduledTask<RuneBridgeTask> {
+        const REFRESH_RUNE_LIST_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: REFRESH_RUNE_LIST_DELAY,
+            });
+
+        RuneBridgeTask::RefreshRuneList.into_scheduled(options)
+    }
+
     #[update]
     pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
         let address = Address::from_str(&btc_address)
@@ -234,16 +259,15 @@ impl RuneBridge {
             .unwrap_or_else(|| from_addr.clone());
 
         let state = get_state();
-        let index_provider = OrdIndexProvider::new(state.borrow().indexer_url());
-        let runes_list = index_provider
-            .get_rune_list()
-            .await
-            .expect("failed to get rune list");
-        let rune_id = runes_list
-            .into_iter()
-            .find(|(_, spaced_rune, _)| args.rune_name == spaced_rune.to_string())
-            .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
-            .0;
+        let rune_id = {
+            let state_borrowed = state.borrow();
+            let runes_list = state_borrowed.get_rune_list();
+            runes_list
+                .iter()
+                .find(|(_, spaced_rune, _)| args.rune_name == spaced_rune.to_string())
+                .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
+                .0
+        };
 
         let utxo_provider = IcUtxoProvider::new(state.borrow().ic_btc_network());
         let input_utxos = utxo_provider

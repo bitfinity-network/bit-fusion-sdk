@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};
 use crate::core::deposit::RuneDeposit;
+use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider as _};
 use crate::core::withdrawal::Withdrawal;
 use crate::operation::OperationState;
@@ -39,6 +40,7 @@ pub enum RuneBridgeTask {
     CollectEvmEvents,
     Deposit(MinterOperationId),
     GetFeeRate,
+    RefreshRuneList,
     RemoveMintOrder(MintedEventData),
     Withdraw(MinterOperationId),
 }
@@ -128,17 +130,32 @@ impl RuneBridgeTask {
         Ok(())
     }
 
+    async fn refresh_rune_list() -> Result<(), SchedulerError> {
+        let state = get_state();
+        let index_url = state.borrow().indexer_url();
+        let runes = OrdIndexProvider::new(index_url)
+            .get_rune_list()
+            .await
+            .map_err(|e| {
+                SchedulerError::TaskExecutionFailed(format!("failed to get rune list: {e:?}"))
+            })?;
+
+        state.borrow_mut().set_rune_list(runes);
+
+        Ok(())
+    }
+
     /// Get fee rate from the Bitcoin network and store it in the state
     async fn get_fee_rate() -> Result<(), SchedulerError> {
-        let state = get_state();
-        let fee_rate = IcUtxoProvider::new(state.borrow().ic_btc_network())
+        let btc_network = get_state().borrow().ic_btc_network();
+        let fee_rate = IcUtxoProvider::new(btc_network)
             .get_fee_rate()
             .await
             .map_err(|e| {
                 SchedulerError::TaskExecutionFailed(format!("failed to get fee rate: {e:?}"))
             })?;
 
-        state.borrow_mut().set_fee_rate(fee_rate);
+        get_state().borrow_mut().set_fee_rate(fee_rate);
 
         Ok(())
     }
@@ -205,6 +222,7 @@ impl Task for RuneBridgeTask {
             RuneBridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(task_scheduler)),
             RuneBridgeTask::Deposit(request_id) => Box::pin(Self::deposit(*request_id)),
             RuneBridgeTask::GetFeeRate => Box::pin(Self::get_fee_rate()),
+            RuneBridgeTask::RefreshRuneList => Box::pin(Self::refresh_rune_list()),
             RuneBridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
