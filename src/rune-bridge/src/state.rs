@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PrivateKey, PublicKey};
+use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use candid::{CandidType, Deserialize, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
@@ -38,6 +38,7 @@ pub struct State {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    fee_rate: FeeRate,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +70,7 @@ impl Default for State {
             master_key: None,
             ledger: Default::default(),
             runes: Default::default(),
+            fee_rate: FeeRate::ZERO,
         }
     }
 }
@@ -266,6 +268,16 @@ impl State {
     /// Returns EVM parameters.
     pub fn get_evm_params(&self) -> &Option<EvmParams> {
         &self.evm_params
+    }
+
+    /// Returns the fee rate used by the canister.
+    pub fn get_fee_rate(&self) -> FeeRate {
+        self.fee_rate
+    }
+
+    /// Sets the fee rate used by the canister.
+    pub fn set_fee_rate(&mut self, fee_rate: FeeRate) {
+        self.fee_rate = fee_rate;
     }
 
     /// Updates EVM parameters with the given closure.

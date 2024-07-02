@@ -190,7 +190,7 @@ impl RuneBridge {
         rune_info_amounts
     }
 
-    #[update]
+    //#[update]
     pub async fn create_edict_tx(&self, args: CreateEdictTxArgs) -> Vec<u8> {
         let from_addr = Address::from_str(&args.from_address)
             .expect("failed to parse from address")
@@ -242,10 +242,7 @@ impl RuneBridge {
             })
             .collect();
 
-        let fee_rate = utxo_provider
-            .get_fee_rate()
-            .await
-            .expect("failed to get fee rate");
+        let fee_rate = state.borrow().get_fee_rate();
 
         let args = ord_rs::wallet::CreateEdictTxArgs {
             rune: rune_id,
