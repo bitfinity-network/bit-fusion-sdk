@@ -67,8 +67,6 @@ jobs:
         tar -xzf /tmp/bitcoin.tar.gz -C /tmp
         cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
         curl -fsSL https://get.docker.com | sh -
-        curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
-        ln -s $HOME/bin/ord /usr/bin/ord
       artifact-pre-script: |
         # Get external dependencies
         export WASMS_DIR="`pwd`/.artifact"
