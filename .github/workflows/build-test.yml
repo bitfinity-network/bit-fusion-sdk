@@ -55,7 +55,7 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm wget curl libssl-dev
+        apt update && apt install -y npm wget curl libssl3
         cp btc-deploy/mkcert/* /etc/ssl/
         wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
         tar -xzf /tmp/bitcoin.tar.gz -C /tmp
