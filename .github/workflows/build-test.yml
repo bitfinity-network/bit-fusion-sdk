@@ -55,14 +55,12 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm wget curl build-essential
-        wget https://github.com/openssl/openssl/releases/download/openssl-3.0.8/openssl-3.0.8.tar.gz -O /tmp/openssl.tar.gz
-        tar -xzf /tmp/openssl.tar.gz -C /tmp
-        cd /tmp/openssl-3.0.8
-        ./config
-        make
-        make install
-        ldconfig
+        apt update && apt install -y npm wget curl build-essential libssl-dev pkg-config
+        git clone https://github.com/ordinals/ord.git /tmp/ord
+        cd /tmp/ord/
+        git checkout 0.18.5
+        cargo build --release
+        cp target/release/ord /usr/bin/ord
         cd -
         cp btc-deploy/mkcert/* /etc/ssl/
         wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
