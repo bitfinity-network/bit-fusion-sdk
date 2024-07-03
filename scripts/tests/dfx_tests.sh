@@ -99,10 +99,10 @@ sleep 10
 BTC_ENDPOINT_READY=255
 BTC_ENDPOINT_ELAPSED=0
 BTC_ENDPOINT_SLEEP_SECONDS=5
-BTC_ENDPOINT_TIMEOUT_SECONDS=300
+BTC_ENDPOINT_TIMEOUT_SECONDS=60
 
 while [ "$BTC_ENDPOINT_READY" -ne 0 ]; do
-  curl http://127.0.0.1:18443
+  curl http://bitcoind:18443
   BTC_ENDPOINT_READY=$?
   echo "BITCOIN READY $BTC_ENDPOINT_READY"
   sleep $BTC_ENDPOINT_SLEEP_SECONDS
@@ -111,9 +111,6 @@ while [ "$BTC_ENDPOINT_READY" -ne 0 ]; do
     echo "Bitcoin endpoint not ready after $BTC_ENDPOINT_TIMEOUT_SECONDS seconds; aborting"
     exit 1
   fi
-  cd btc-deploy/
-  docker compose logs bitcoind | tail -n 20
-  cd -
 done
 
 cargo test -p integration-tests --features dfx_tests $@
