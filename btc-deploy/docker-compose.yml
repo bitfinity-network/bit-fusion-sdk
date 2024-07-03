@@ -9,7 +9,7 @@ services:
       - "28332:28332"
       - "28333:28333"
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://localhost:18443/"]
+      test: ["CMD", "curl", "-X", "-f", "http://127.0.0.1:18443/"]
       interval: 30s
       timeout: 10s
       retries: 5
