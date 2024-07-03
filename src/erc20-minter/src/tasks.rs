@@ -122,28 +122,18 @@ impl BridgeTask {
             })?;
 
         let client = evm_info.link.get_json_rpc_client();
+        let last_block = client.get_block_number().await.into_scheduler_result()?;
 
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block.into(),
-            BlockNumber::Safe,
-            bft_bridge.0,
-        )
-        .await
-        .into_scheduler_result()?;
+        let logs = BridgeEvent::collect_logs(&client, params.next_block, last_block, bft_bridge.0)
+            .await
+            .into_scheduler_result()?;
 
         log::debug!("got logs from side {side}: {logs:?}");
 
-        // Filter out logs that do not have block number.
-        // Such logs are produced when the block is not finalized yet.
-        let last_log = logs.iter().take_while(|l| l.block_number.is_some()).last();
-        if let Some(last_log) = last_log {
-            let next_block_number = last_log.block_number.unwrap().as_u64() + 1;
-            state
-                .borrow_mut()
-                .config
-                .update_evm_params(|params| params.next_block = next_block_number, side);
-        };
+        state
+            .borrow_mut()
+            .config
+            .update_evm_params(|params| params.next_block = last_block + 1, side);
 
         log::trace!("appending logs to tasks: {side:?}: {logs:?}");
 
@@ -322,7 +312,7 @@ impl BridgeTask {
         let mut operation_store = get_operations_store();
         let nonce = minted_event.nonce;
         let Some((operation_id, operation_state)) = operation_store
-            .get_for_address(&wallet_id)
+            .get_for_address(&wallet_id, None, None)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {

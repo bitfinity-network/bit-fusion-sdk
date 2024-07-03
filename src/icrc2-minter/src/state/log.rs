@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use candid::{Decode, Encode};
+use ic_exports::ic_kit::ic;
 use ic_log::{init_log, LogSettings, LoggerConfig};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, CellStructure, StableCell, Storable, VirtualMemory};
@@ -59,6 +60,11 @@ impl LoggerConfigService {
         let logger_config = init_log(&log_settings)
             .map_err(|e| Error::Internal(format!("Logger init error: {e}")))?;
         LOGGER_CONFIG.with(|config| config.borrow_mut().replace(logger_config));
+
+        // Print this out without using log in case the given parameters prevent logs to be printed.
+        ic::print(format!(
+            "Initialized logging with settings: {log_settings:?}"
+        ));
 
         Ok(())
     }

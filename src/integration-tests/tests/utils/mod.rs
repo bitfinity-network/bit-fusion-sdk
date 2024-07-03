@@ -8,7 +8,7 @@ use ethers_core::abi::{Function, Param, StateMutability};
 use ic_exports::ic_kit::mock_principals::bob;
 use ic_log::LogSettings;
 use once_cell::sync::OnceCell;
-use solidity_helper::{compile_solidity_contracts, SolidityContract};
+use solidity_helper::{SolidityBuilder, SolidityContract};
 
 pub mod btc;
 pub mod error;
@@ -51,7 +51,11 @@ pub fn new_evm_init_data(
 pub fn get_solidity_smart_contracts() -> &'static HashMap<String, SolidityContract> {
     static INSTANCE: OnceCell<HashMap<String, SolidityContract>> = OnceCell::new();
     INSTANCE.get_or_init(|| {
-        compile_solidity_contracts(None, None).expect("Should compile solidity smart contracts")
+        let builder = SolidityBuilder::new().unwrap();
+        builder
+            .build_updated_contracts()
+            .expect("Should compile solidity smart contracts")
+            .contracts
     })
 }
 

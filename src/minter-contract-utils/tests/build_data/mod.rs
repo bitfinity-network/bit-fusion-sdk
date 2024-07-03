@@ -1,10 +1,11 @@
 use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_CODE;
-use solidity_helper::compile_solidity_contracts;
+use solidity_helper::SolidityBuilder;
 
 #[test]
 fn test_should_return_the_token_contract_code() {
     // Arrange
-    let contracts = compile_solidity_contracts(None, None).unwrap();
+    let builder = SolidityBuilder::new().unwrap();
+    let contracts = builder.build_updated_contracts().unwrap().contracts;
     let smart_contract = contracts.get("BFTBridge").unwrap();
 
     // Act
