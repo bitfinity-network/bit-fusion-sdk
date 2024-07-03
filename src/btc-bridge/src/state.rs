@@ -5,8 +5,8 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::{init_log, LogSettings};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
-use minter_contract_utils::evm_bridge::{EvmInfo, EvmParams};
-use minter_contract_utils::evm_link::EvmLink;
+use bridge_utils::evm_bridge::{EvmInfo, EvmParams};
+use bridge_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
 use crate::burn_request_store::BurnRequestStore;

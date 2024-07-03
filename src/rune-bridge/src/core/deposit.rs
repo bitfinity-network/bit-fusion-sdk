@@ -15,7 +15,7 @@ use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use minter_contract_utils::operation_store::MinterOperationId;
+use bridge_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 
@@ -759,7 +759,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             (evm_info, evm_params)
         };
 
-        let mut tx = minter_contract_utils::bft_bridge_api::mint_transaction(
+        let mut tx = bridge_utils::bft_bridge_api::mint_transaction(
             sender.0,
             evm_info.bridge_contract.0,
             evm_params.nonce.into(),

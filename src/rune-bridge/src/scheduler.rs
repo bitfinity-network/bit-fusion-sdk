@@ -13,9 +13,9 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::operation_store::MinterOperationId;
+use bridge_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::operation_store::MinterOperationId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};

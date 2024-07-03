@@ -1,190 +1,17 @@
+
+use alloy_sol_types::SolCall;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::abi::{
-    Constructor, Event, EventParam, Function, Param, ParamType, RawLog, StateMutability, Token,
+    Constructor, Event, EventParam, ParamType, RawLog, Token,
 };
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
+use crate::BFTBridge;
+
 pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor { inputs: vec![] });
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static MINTER_CANISTER_ADDRESS: Lazy<Function> = Lazy::new(|| Function {
-    name: "minterCanisterAddress".into(),
-    inputs: vec![],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Address,
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::View,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static NOTIFY_MINTER: Lazy<Function> = Lazy::new(|| Function {
-    name: "notifyMinter".into(),
-    inputs: vec![
-        Param {
-            name: "notificationType".into(),
-            kind: ParamType::Uint(32),
-            internal_type: None,
-        },
-        Param {
-            name: "userData".into(),
-            kind: ParamType::Bytes,
-            internal_type: None,
-        },
-    ],
-    outputs: vec![],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static BURN: Lazy<Function> = Lazy::new(|| Function {
-    name: "burn".into(),
-    inputs: vec![
-        Param {
-            name: "amount".into(),
-            kind: ParamType::Uint(256),
-            internal_type: None,
-        },
-        Param {
-            name: "fromERC20".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "recipientID".into(),
-            kind: ParamType::Bytes,
-            internal_type: None,
-        },
-    ],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Uint(32),
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-pub fn decode_burn_operation_id(raw_data: &[u8]) -> anyhow::Result<u32> {
-    let id = BURN
-        .decode_output(raw_data)?
-        .first()
-        .cloned()
-        .ok_or_else(|| anyhow::Error::msg("no tokens in burn operation output"))?
-        .into_uint()
-        .ok_or_else(|| anyhow::Error::msg("wrong token in burn operation output"))?
-        .as_u32();
-    Ok(id)
-}
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static GET_PENDING_BURN_INFO: Lazy<Function> = Lazy::new(|| Function {
-    name: "getPendingBurnInfo".into(),
-    inputs: vec![
-        Param {
-            name: "user".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "operationID".into(),
-            kind: ParamType::Uint(32),
-            internal_type: None,
-        },
-    ],
-    outputs: vec![
-        Param {
-            name: "sender".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "amount".into(),
-            kind: ParamType::Uint(256),
-            internal_type: None,
-        },
-        Param {
-            name: "fromERC20".into(),
-            kind: ParamType::Address,
-            internal_type: None,
-        },
-        Param {
-            name: "recipientID".into(),
-            kind: ParamType::FixedBytes(32),
-            internal_type: None,
-        },
-        Param {
-            name: "toToken".into(),
-            kind: ParamType::FixedBytes(32),
-            internal_type: None,
-        },
-        Param {
-            name: "name".into(),
-            kind: ParamType::FixedBytes(32),
-            internal_type: None,
-        },
-        Param {
-            name: "symbol".into(),
-            kind: ParamType::FixedBytes(16),
-            internal_type: None,
-        },
-        Param {
-            name: "decimals".into(),
-            kind: ParamType::Uint(8),
-            internal_type: None,
-        },
-    ],
-    constant: None,
-    state_mutability: StateMutability::View,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static MINT: Lazy<Function> = Lazy::new(|| Function {
-    name: "mint".into(),
-    inputs: vec![Param {
-        name: "encodedOrder".into(),
-        kind: ParamType::Bytes,
-        internal_type: None,
-    }],
-    outputs: vec![],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static DEPLOY_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
-    name: "deployERC20".into(),
-    inputs: vec![
-        Param {
-            name: "name".into(),
-            kind: ParamType::String,
-            internal_type: None,
-        },
-        Param {
-            name: "symbol".into(),
-            kind: ParamType::String,
-            internal_type: None,
-        },
-        Param {
-            name: "baseTokenID".into(),
-            kind: ParamType::FixedBytes(32),
-            internal_type: None,
-        },
-    ],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Address,
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::NonPayable,
-});
 
 pub static BURNT_EVENT: Lazy<Event> = Lazy::new(|| Event {
     name: "BurnTokenEvent".into(),
@@ -597,43 +424,6 @@ impl TryFrom<RawLog> for NotifyMinterEventData {
     }
 }
 
-#[allow(deprecated)] // need to initialize `constant` field
-pub static GET_WRAPPED_TOKEN: Lazy<Function> = Lazy::new(|| Function {
-    name: "getWrappedToken".into(),
-    inputs: vec![Param {
-        name: "baseTokenID".into(),
-        kind: ParamType::FixedBytes(32),
-        internal_type: None,
-    }],
-    outputs: vec![Param {
-        name: "".into(),
-        kind: ParamType::Address,
-        internal_type: None,
-    }],
-    constant: None,
-    state_mutability: StateMutability::View,
-});
-
-#[allow(deprecated)] // need to initialize `constant` field
-pub static LIST_TOKEN_PAIRS: Lazy<Function> = Lazy::new(|| Function {
-    name: "listTokenPairs".into(),
-    inputs: vec![],
-    outputs: vec![
-        Param {
-            name: "wrapped".into(),
-            kind: ParamType::Array(Box::new(ParamType::Address)),
-            internal_type: None,
-        },
-        Param {
-            name: "base".into(),
-            kind: ParamType::Array(Box::new(ParamType::FixedBytes(32))),
-            internal_type: None,
-        },
-    ],
-    constant: None,
-    state_mutability: StateMutability::View,
-});
-
 pub fn mint_transaction(
     sender: H160,
     bridge: H160,
@@ -642,9 +432,10 @@ pub fn mint_transaction(
     mint_order_data: &[u8],
     chain_id: u32,
 ) -> Transaction {
-    let data = MINT
-        .encode_input(&[Token::Bytes(mint_order_data.to_vec())])
-        .expect("mint order encoding should pass");
+    let data = BFTBridge::mintCall {
+        encodedOrder: mint_order_data.to_vec().into(),
+    }
+    .abi_encode();
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
     ethers_core::types::Transaction {
@@ -658,50 +449,6 @@ pub fn mint_transaction(
         chain_id: Some(chain_id.into()),
         ..Default::default()
     }
-}
-
-/// Proxy contract
-pub mod proxy {
-    use super::*;
-    pub static CONSTRUCTOR: Lazy<Constructor> = Lazy::new(|| Constructor {
-        inputs: vec![
-            Param {
-                name: "_implementation".into(),
-                kind: ParamType::Address,
-                internal_type: None,
-            },
-            Param {
-                name: "_data".into(),
-                kind: ParamType::Bytes,
-                internal_type: None,
-            },
-        ],
-    });
-
-    #[allow(deprecated)]
-    pub static INITIALISER: Lazy<Function> = Lazy::new(|| Function {
-        name: "initialize".into(),
-        inputs: vec![
-            Param {
-                name: "minterAddress".into(),
-                kind: ParamType::Address,
-                internal_type: None,
-            },
-            Param {
-                name: "feeChargeAddress".into(),
-                kind: ParamType::Address,
-                internal_type: None,
-            },
-            Param {
-                name: "_isWrappedSide".into(),
-                kind: ParamType::Bool,
-                internal_type: None,
-            },
-        ],
-        outputs: vec![],
-        constant: None,
-        state_mutability: StateMutability::NonPayable,
-    });
 }
 
 #[cfg(test)]

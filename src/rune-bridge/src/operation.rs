@@ -1,8 +1,8 @@
 use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
-use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::operation_store::{MinterOperation, MinterOperationStore};
+use bridge_utils::bft_bridge_api::BurntEventData;
+use bridge_utils::operation_store::{MinterOperation, MinterOperationStore};
 use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;

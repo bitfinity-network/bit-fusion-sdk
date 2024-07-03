@@ -47,7 +47,7 @@ use ic_exports::icrc_types::icrc3::transactions::{
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use minter_contract_utils::evm_link::EvmLink;
+use bridge_utils::evm_link::EvmLink;
 use minter_did::id256::Id256;
 
 use crate::context::{CanisterType, TestContext};

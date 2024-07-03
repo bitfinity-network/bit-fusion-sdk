@@ -8,12 +8,8 @@ import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
-import { Options } from "@openzeppelin-foundry-upgrades/Options.sol";
 
 contract BftBridgeTest is Test {
-
     using StringUtils for string;
 
     struct MintOrder {
@@ -55,11 +51,12 @@ contract BftBridgeTest is Test {
 
         // Encode the initialization call
         bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
-        Options memory opts;
-        // Skips all upgrade safety checks
-        opts.unsafeSkipAllChecks = true;
 
-        proxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", initializeData, opts);
+        BFTBridge impl = new BFTBridge();
+
+        UUPSProxy proxyContract = new UUPSProxy(address(impl), initializeData);
+
+        proxy = address(proxyContract);
 
         // Cast the proxy to BFTBridge
         _bridge = BFTBridge(address(proxy));
@@ -372,5 +369,4 @@ contract BftBridgeTest is Test {
     function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
-
 }

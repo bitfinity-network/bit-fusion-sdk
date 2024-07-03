@@ -20,7 +20,7 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 

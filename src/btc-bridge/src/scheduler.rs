@@ -11,9 +11,9 @@ use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
+use bridge_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 

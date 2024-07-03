@@ -1,5 +1,6 @@
-@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
-forge-std/=lib/forge-std/src/
-src/=src/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-@openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+ds-test/=lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/
+forge-std/=lib/forge-std/src/
+src/=src

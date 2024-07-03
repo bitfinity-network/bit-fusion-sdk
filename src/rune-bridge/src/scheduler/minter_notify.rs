@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use candid::{CandidType, Decode, Deserialize};
 use did::H160;
-use minter_contract_utils::bft_bridge_api::NotifyMinterEventData;
+use bridge_utils::bft_bridge_api::NotifyMinterEventData;
 
 use crate::rune_info::RuneName;
 

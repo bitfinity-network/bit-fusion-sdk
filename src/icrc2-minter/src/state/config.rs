@@ -7,7 +7,7 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use evm_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::EvmParams;
+use bridge_utils::evm_bridge::EvmParams;
 
 use super::Settings;
 use crate::constant::CONFIG_MEMORY_ID;

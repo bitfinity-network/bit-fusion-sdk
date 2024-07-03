@@ -12,8 +12,8 @@ use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use bridge_utils::evm_bridge::BridgeSide;
+use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -270,7 +270,7 @@ mod test {
     use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::inject::{self};
     use ic_exports::ic_kit::MockContext;
-    use minter_contract_utils::evm_link::EvmLink;
+    use bridge_utils::evm_link::EvmLink;
 
     use super::*;
     use crate::EvmMinter;

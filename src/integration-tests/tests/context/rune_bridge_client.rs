@@ -1,6 +1,6 @@
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use minter_contract_utils::operation_store::MinterOperationId;
+use bridge_utils::operation_store::MinterOperationId;
 use rune_bridge::operation::OperationState;
 
 use crate::context::bridge_client::BridgeCanisterClient;
