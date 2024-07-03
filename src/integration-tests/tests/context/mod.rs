@@ -273,26 +273,11 @@ pub trait TestContext {
         let mut bridge_input = BFTBridge::BYTECODE.to_vec();
         let constructor = BFTBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
-        // input.extend_from_slice(&bytecode);
-        // input.extend_from_slice(&constructor);
-
-        // input = input.abi_encode();
-
-        println!("input: {}", hex::encode(&bridge_input));
 
         let bridge_address = self
             .create_contract(wallet, bridge_input.clone())
             .await
             .unwrap();
-        println!("bridge_address: {}", bridge_address);
-
-        // let initialize_data = bft_bridge_api::proxy::INITIALISER
-        //     .encode_input(&[
-        //         Token::Address(minter_canister_address.0),
-        //         Token::Address(fee_charge_address.unwrap_or_default().0),
-        //         Token::Bool(is_wrapped),
-        //     ])
-        //     .expect("encode input");
 
         let init_data = BFTBridge::initializeCall {
             minterAddress: minter_canister_address.into(),
@@ -300,16 +285,6 @@ pub trait TestContext {
             _isWrappedSide: is_wrapped,
         }
         .abi_encode();
-
-        // let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
-        //     .encode_input(
-        //         UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
-        //         &[
-        //             Token::Address(bridge_address.0),
-        //             Token::Bytes(initialize_data),
-        //         ],
-        //     )
-        //     .unwrap();
 
         let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
         let constructor = UUPSProxy::constructorCall {
@@ -346,9 +321,6 @@ pub trait TestContext {
             .iter()
             .map(|addr| addr.clone().into())
             .collect();
-        // let input = fee_charge_api::CONSTRUCTOR
-        //     .encode_input(contract, &[Token::Array(minter_canister_addresses)])
-        //     .unwrap();
 
         let mut fee_charge_input = FeeCharge::BYTECODE.to_vec();
 
@@ -377,9 +349,6 @@ pub trait TestContext {
         amount: u128,
     ) -> Result<(u32, H256)> {
         let amount: U256 = amount.into();
-        // let input = wrapped_token_api::ERC_20_APPROVE
-        //     .encode_input(&[Token::Address(bridge.0), Token::Uint(amount.0.into())])
-        //     .unwrap();
 
         let input = WrappedToken::approveCall {
             spender: bridge.clone().into(),
@@ -450,10 +419,6 @@ pub trait TestContext {
         fee_charge: H160,
         user: H160,
     ) -> U256 {
-        // let input = NATIVE_TOKEN_BALANCE
-        //     .encode_input(&[Token::Address(user.0)])
-        //     .unwrap();
-
         let input = FeeCharge::nativeTokenBalanceCall {
             user: user.clone().into(),
         }
@@ -470,16 +435,6 @@ pub trait TestContext {
             .await
             .unwrap()
             .unwrap();
-
-        // NATIVE_TOKEN_BALANCE
-        //     .decode_output(&hex::decode(response.trim_start_matches("0x")).unwrap())
-        //     .unwrap()
-        //     .first()
-        //     .cloned()
-        //     .unwrap()
-        //     .into_uint()
-        //     .unwrap()
-        //     .into()
 
         let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(
             &hex::decode(response.trim_start_matches("0x")).unwrap(),
@@ -502,9 +457,6 @@ pub trait TestContext {
         amount: u128,
     ) -> Result<U256> {
         let sender_ids = sender_ids.iter().map(|id| id.0.into()).collect();
-        // let input = NATIVE_TOKEN_DEPOSIT
-        //     .encode_input(&[Token::Array(sender_ids)])
-        //     .unwrap();
 
         let input = FeeCharge::nativeTokenDepositCall {
             approvedSenderIDs: sender_ids,
@@ -515,15 +467,6 @@ pub trait TestContext {
             .call_contract_on_evm(evm_client, user_wallet, &fee_charge, input, amount)
             .await?
             .1;
-
-        // let new_balance = NATIVE_TOKEN_DEPOSIT
-        //     .decode_output(receipt.output.as_ref().unwrap())
-        //     .unwrap()
-        //     .first()
-        //     .cloned()
-        //     .unwrap()
-        //     .into_uint()
-        //     .unwrap();
 
         let new_balance = FeeCharge::nativeTokenDepositCall::abi_decode_returns(
             receipt.output.as_ref().unwrap(),
@@ -611,14 +554,6 @@ pub trait TestContext {
         bft_bridge: &H160,
         base_token_id: Id256,
     ) -> Result<H160> {
-        // let input = bft_bridge_api::DEPLOY_WRAPPED_TOKEN
-        //     .encode_input(&[
-        //         Token::String("wrapper".into()),
-        //         Token::String("WPT".into()),
-        //         Token::FixedBytes(base_token_id.0.to_vec()),
-        //     ])
-        //     .unwrap();
-
         let input = BFTBridge::deployERC20Call {
             name: "Wrapper".into(),
             symbol: "WPT".into(),
@@ -715,9 +650,6 @@ pub trait TestContext {
         bridge: &H160,
         order: SignedMintOrder,
     ) -> Result<TransactionReceipt> {
-        // let input = bft_bridge_api::MINT
-        //     .encode_input(&[Token::Bytes(order.0.to_vec())])
-        //     .unwrap();
         let input = BFTBridge::mintCall {
             encodedOrder: order.0.to_vec().into(),
         }
@@ -748,14 +680,6 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         address: Option<&H160>,
     ) -> Result<u128> {
-        // let input = wrapped_token_api::ERC_20_BALANCE
-        //     .encode_input(&[Token::Address(
-        //         address
-        //             .cloned()
-        //             .unwrap_or_else(|| wallet.address().into())
-        //             .into(),
-        //     )])
-        //     .unwrap();
         let account = address.cloned().unwrap_or_else(|| wallet.address().into());
         let input = WrappedToken::balanceOfCall {
             account: account.into(),
@@ -767,14 +691,6 @@ pub trait TestContext {
             .await?;
         let output = results.1.output.unwrap();
         println!("output: {:?}", hex::encode(&output));
-
-        // Ok(wrapped_token_api::ERC_20_BALANCE
-        //     .decode_output(&output)
-        //     .unwrap()[0]
-        //     .clone()
-        //     .into_uint()
-        //     .unwrap()
-        //     .as_u128())
 
         let balance = WrappedToken::balanceOfCall::abi_decode_returns(&output, true)
             .unwrap()

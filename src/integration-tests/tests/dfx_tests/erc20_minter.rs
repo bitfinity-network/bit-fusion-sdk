@@ -119,18 +119,6 @@ impl ContextWithBridges {
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
         // Deploy ERC-20 token on external EVM.
-        // let data: Constructor = Constructor {
-        //     inputs: vec![Param {
-        //         name: "initialSupply".into(),
-        //         kind: ParamType::Uint(256),
-        //         internal_type: None,
-        //     }],
-        // };
-
-        // let data = data
-        //     .encode_input(TEST_WTM_HEX_CODE.clone(), &[Token::Uint(u64::MAX.into())])
-        //     .unwrap();
-
         let mut erc20_input = TestWTM::BYTECODE.to_vec();
         let constructor = TestWTM::constructorCall {
             initialSupply: U256::from(u64::MAX).into(),

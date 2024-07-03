@@ -299,12 +299,6 @@ impl RunesContext {
             dst_address: eth_address.clone(),
             amounts: None,
         };
-        // let input = bft_bridge_api::NOTIFY_MINTER
-        //     .encode_input(&[
-        //         Token::Uint(RuneMinterNotification::DEPOSIT_TYPE.into()),
-        //         Token::Bytes(Encode!(&data).unwrap()),
-        //     ])
-        //     .unwrap();
 
         let input = BFTBridge::notifyMinterCall {
             notificationType: RuneMinterNotification::DEPOSIT_TYPE,

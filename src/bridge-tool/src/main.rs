@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use alloy_sol_types::{SolCall, SolConstructor, SolEvent};
+use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
@@ -491,22 +491,13 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
             .into()
     }
 
-    // let bft_contract_input = bft_bridge_api::CONSTRUCTOR
-    //     .encode_input(BFT_BRIDGE_SMART_CONTRACT_CODE.clone(), &[])
-    //     .unwrap();
-
-    let bft_contract_input = BFTBridge::constructorCall {}.abi_encode();
+    let mut bft_contract_input = BFTBridge::BYTECODE.to_vec();
+    let constructor = BFTBridge::constructorCall {}.abi_encode();
+    bft_contract_input.extend_from_slice(&constructor);
 
     let bft_contract_address =
         deploy_contract(&client, &wallet, bft_contract_input, chain_id).await;
 
-    // let initialize_data = bft_bridge_api::proxy::INITIALISER
-    //     .encode_input(&[
-    //         Token::Address(minter),
-    //         Token::Address(fee_charge),
-    //         Token::Bool(args.is_wrapped_side),
-    //     ])
-    //     .expect("failed to encode initialize data");
     let init_data = BFTBridge::initializeCall {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
@@ -514,21 +505,14 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     }
     .abi_encode();
 
-    // let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
-    //     .encode_input(
-    //         UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
-    //         &[
-    //             Token::Address(bft_contract_address),
-    //             Token::Bytes(initialize_data),
-    //         ],
-    //     )
-    //     .expect("failed to encode proxy constructor input");
+    let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
 
-    let proxy_input = UUPSProxy::constructorCall {
+    let constructor = UUPSProxy::constructorCall {
         _implementation: bft_contract_address.0.into(),
         _data: init_data.into(),
     }
     .abi_encode();
+    proxy_input.extend_from_slice(&constructor);
 
     let bft_proxy_address = deploy_contract(&client, &wallet, proxy_input, chain_id).await;
 
@@ -562,23 +546,19 @@ async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
             addr.0.into()
         })
         .collect();
-    // let input = fee_charge_api::CONSTRUCTOR
-    //     .encode_input(
-    //         FEE_CHARGE_SMART_CONTRACT_CODE.clone(),
-    //         &[Token::Array(addresses)],
-    //     )
-    //     .expect("failed to encode constructor input");
-
-    let input = FeeCharge::constructorCall {
+    let mut fee_charge_input = FeeCharge::BYTECODE.to_vec();
+    let constructor = FeeCharge::constructorCall {
         canChargeFee: addresses,
     }
     .abi_encode();
+
+    fee_charge_input.extend_from_slice(&constructor);
 
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
     let create_contract_tx = TransactionBuilder {
         from: &did_from,
-        input,
+        input: fee_charge_input,
         nonce: args.nonce.into(),
         gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
         to: None,
@@ -635,14 +615,6 @@ async fn create_token(args: CreateTokenArgs) {
 
     let wallet = get_wallet(&args.wallet, &client).await;
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
-
-    // let input = bft_bridge_api::DEPLOY_WRAPPED_TOKEN
-    //     .encode_input(&[
-    //         Token::String(args.token_name.clone()),
-    //         Token::String(args.token_name),
-    //         Token::FixedBytes(token_id.0.to_vec()),
-    //     ])
-    //     .unwrap();
 
     let input = BFTBridge::deployERC20Call {
         name: args.token_name.clone(),
@@ -761,9 +733,6 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
             .expect("failed to parse bft bridge address"),
     );
 
-    // let input = wrapped_token_api::ERC_20_BALANCE
-    //     .encode_input(&[Token::Address(wallet.address())])
-    //     .unwrap();
     let input = WrappedToken::balanceOfCall {
         account: wallet.address().0.into(),
     }
@@ -786,9 +755,6 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     eprintln!("Current wrapped token balance: {balance}");
 
     let amount: U256 = args.amount.into();
-    // let input = wrapped_token_api::ERC_20_APPROVE
-    //     .encode_input(&[Token::Address(bft_bridge), Token::Uint(amount.into())])
-    //     .unwrap();
 
     let input = WrappedToken::approveCall {
         spender: bft_bridge.0.into(),
@@ -820,14 +786,6 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .expect("Failed to send raw transaction")
         .expect("Failed to execute approve transaction");
     wait_for_tx_success(&client, hash).await;
-
-    // let input = bft_bridge_api::BURN
-    //     .encode_input(&[
-    //         Token::Uint(amount),
-    //         Token::Address(token),
-    //         Token::Bytes(args.address.into_bytes()),
-    //     ])
-    //     .unwrap();
 
     let input = BFTBridge::burnCall {
         amount: amount.into(),

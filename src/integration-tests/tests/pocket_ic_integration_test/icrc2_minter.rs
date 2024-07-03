@@ -362,12 +362,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
     );
     assert_eq!(wrapped_balance as u64, amount);
 
-    // let input = ERC_20_ALLOWANCE
-    //     .encode_input(&[
-    //         Token::Address(john_address.0),
-    //         Token::Address(spender_wallet.address()),
-    //     ])
-    //     .unwrap();
     let input = WrappedToken::allowanceCall {
         owner: john_address.clone().into(),
         spender: spender_wallet.address().0.into(),
@@ -389,14 +383,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .unwrap();
 
     let allowance_data = hex::decode(allowance_response.trim_start_matches("0x")).unwrap();
-    // let allowance = ERC_20_ALLOWANCE
-    //     .decode_output(&allowance_data)
-    //     .unwrap()
-    //     .first()
-    //     .unwrap()
-    //     .clone()
-    //     .into_uint()
-    //     .unwrap();
 
     let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data, true)
         .unwrap()

@@ -558,10 +558,6 @@ async fn create_bft_bridge(
         BridgeSide::Wrapped => true,
     };
 
-    // let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
-    // let input = bft_bridge_api::CONSTRUCTOR
-    //     .encode_input(contract, &[])
-    //     .unwrap();
     let mut bft_input = BFTBridge::BYTECODE.to_vec();
     let constructor = BFTBridge::constructorCall {}.abi_encode();
     bft_input.extend_from_slice(&constructor);
