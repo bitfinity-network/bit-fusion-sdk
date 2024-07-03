@@ -2,7 +2,13 @@ services:
   bitcoind:
     container_name: bitcoind
     image: lncm/bitcoind:v26.0
-    command: ["-txindex", "-rpcport=18443"]
+    command: -printtoconsole
+      -regtest=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcuser=user
+      -rpcpassword=password
+      -rpcport=18443
     ports:
       - "18443:18443"
       - "18444:18444"
