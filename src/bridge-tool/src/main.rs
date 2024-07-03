@@ -85,6 +85,10 @@ struct DepositIcrcArgs {
     #[arg(long)]
     token: Principal,
 
+    /// ERC20 token address
+    #[arg(long)]
+    erc20_token_address: H160,
+
     /// IC host
     #[arg(long)]
     ic_host: Option<String>,
@@ -306,6 +310,7 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         recipient_address: wallet.address().into(),
         approve_after_mint: None,
         fee_payer: None,
+        erc20_token_address: args.erc20_token_address.into(),
     };
 
     let input = bft_bridge_api::NOTIFY_MINTER

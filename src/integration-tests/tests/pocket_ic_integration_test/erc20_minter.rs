@@ -32,7 +32,6 @@ pub struct ContextWithBridges {
     pub base_token_address: H160,
     pub wrapped_token_address: H160,
     pub fee_charge_address: H160,
-    pub token_id: Id256,
 }
 
 impl ContextWithBridges {
@@ -189,7 +188,6 @@ impl ContextWithBridges {
             base_token_address,
             wrapped_token_address,
             fee_charge_address,
-            token_id,
         }
     }
 
