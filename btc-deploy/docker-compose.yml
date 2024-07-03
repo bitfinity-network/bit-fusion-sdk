@@ -1,29 +1,18 @@
 services:
   bitcoind:
     container_name: bitcoind
-    image: lncm/bitcoind:v26.0
-    command: -printtoconsole
-      -regtest=1
-      -rpcallowip=0.0.0.0/0
-      -rpcbind=0.0.0.0
-      -rpcuser=user
-      -rpcpassword=password
-      -rpcport=18443
+    build:
+      dockerfile: bitcoind.dockerfile
     ports:
       - "18443:18443"
       - "18444:18444"
       - "28332:28332"
       - "28333:28333"
-    volumes:
-      - bitcoin-data:/data/.bitcoin
-      - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 18443"]
+      test: ["CMD-SHELL", "curl --fail http://localhost:18443/"]
       interval: 30s
       timeout: 10s
       retries: 5
-    environment:
-      - PUBLICHOST=localhost
   ord:
     container_name: ord
     build:

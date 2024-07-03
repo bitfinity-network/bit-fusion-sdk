@@ -102,7 +102,7 @@ BTC_ENDPOINT_SLEEP_SECONDS=5
 BTC_ENDPOINT_TIMEOUT_SECONDS=60
 
 while [ "$BTC_ENDPOINT_READY" -ne 0 ]; do
-  curl http://127.0.0.1:18443
+  curl --verbose --user ${ORD_BITCOIN_RPC_USERNAME}:${ORD_BITCOIN_RPC_PASSWORD} --data-binary '{"jsonrpc":"1.0","id":"curltest","method":"getblockchaininfo","params":[]}' -H 'content-type:text/plain;' http://127.0.0.1:18443/
   BTC_ENDPOINT_READY=$?
   echo "BITCOIN READY $BTC_ENDPOINT_READY"
   sleep $BTC_ENDPOINT_SLEEP_SECONDS
