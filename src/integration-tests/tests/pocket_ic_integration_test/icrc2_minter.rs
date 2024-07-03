@@ -1,11 +1,12 @@
 use std::time::Duration;
 
+use alloy_sol_types::SolCall;
+use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
 use eth_signer::Signer;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use bridge_utils::WrappedToken;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::ApproveAfterMint;
@@ -16,7 +17,6 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use alloy_sol_types::SolCall;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {

@@ -5,7 +5,6 @@ members = [
     "src/integration-tests",
     "src/icrc2-minter",
     "src/erc20-minter",
-    "src/solidity-helper",
     "src/btc-bridge",
     "src/rune-bridge",
 ]

@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use alloy_sol_types::sol;
+use bridge_utils::evm_link::{EvmLink, RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use ic_canister_client::IcAgentClient;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_test_utils::{get_agent, Agent, Canister};
 use ic_utils::interfaces::ManagementCanister;
-use bridge_utils::evm_link::{EvmLink, RpcApi, RpcService};
 
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};

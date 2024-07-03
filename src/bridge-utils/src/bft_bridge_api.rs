@@ -1,10 +1,7 @@
-
 use alloy_sol_types::SolCall;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
-use ethers_core::abi::{
-    Constructor, Event, EventParam, ParamType, RawLog, Token,
-};
+use ethers_core::abi::{Constructor, Event, EventParam, ParamType, RawLog, Token};
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};

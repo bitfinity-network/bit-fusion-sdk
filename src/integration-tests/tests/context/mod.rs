@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
-use bridge_utils::{BFTBridge, UUPSProxy};
-use bridge_utils::{FeeCharge, WrappedToken};
+use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;

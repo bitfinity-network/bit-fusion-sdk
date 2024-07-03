@@ -1,12 +1,13 @@
 use std::time::Duration;
 
+use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_utils::evm_bridge::BridgeSide;
+use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
 use erc20_minter::operation::OperationStatus;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use bridge_utils::evm_bridge::BridgeSide;
-use bridge_utils::{BFTBridge, UUPSProxy};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -15,8 +16,6 @@ use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
 use crate::utils::CHAIN_ID;
-
-use alloy_sol_types::{SolCall, SolConstructor};
 
 pub struct ContextWithBridges {
     pub context: PocketIcTestContext,

@@ -2,9 +2,6 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::context::{CanisterType, TestContext};
-use crate::dfx_tests::{DfxTestContext, ADMIN};
-use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 use alloy_sol_types::SolCall;
 use bridge_utils::evm_link::EvmLink;
 use bridge_utils::operation_store::MinterOperationId;
@@ -29,6 +26,10 @@ use rune_bridge::state::RuneBridgeConfig;
 use serde_json::Value;
 use tokio::process::Command;
 use tokio::time::Instant;
+
+use crate::context::{CanisterType, TestContext};
+use crate::dfx_tests::{DfxTestContext, ADMIN};
+use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 const RUNE_NAME: &str = "SUPERMAXRUNENAME";
 const RUNE_DATA_DIR: &str = "target/ord";

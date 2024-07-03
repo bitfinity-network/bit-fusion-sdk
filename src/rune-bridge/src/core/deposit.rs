@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
+use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -15,7 +16,6 @@ use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use bridge_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
 

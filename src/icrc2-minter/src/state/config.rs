@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
+use bridge_utils::evm_bridge::EvmParams;
 use candid::{CandidType, Deserialize, Principal};
 use did::{codec, H160};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use evm_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use bridge_utils::evm_bridge::EvmParams;
 
 use super::Settings;
 use crate::constant::CONFIG_MEMORY_ID;

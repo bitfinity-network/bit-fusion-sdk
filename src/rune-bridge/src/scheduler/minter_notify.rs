@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use bridge_utils::bft_bridge_api::NotifyMinterEventData;
 use candid::{CandidType, Decode, Deserialize};
 use did::H160;
-use bridge_utils::bft_bridge_api::NotifyMinterEventData;
 
 use crate::rune_info::RuneName;
 

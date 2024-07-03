@@ -39,7 +39,6 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-solidity-helper = { path = "../solidity-helper" }
 serde_bytes = { workspace = true }
 
 
@@ -72,7 +71,6 @@ signature-verification-canister-client = { workspace = true }
 rune-bridge = { path = "../rune-bridge" }
 
 # IC deps
-
 [features]
 pocket_ic_integration_test = []
 state_machine_tests = [

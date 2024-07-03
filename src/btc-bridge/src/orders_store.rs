@@ -1,6 +1,6 @@
+use bridge_utils::mint_orders::MintOrders;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
-use bridge_utils::mint_orders::MintOrders;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 

@@ -917,7 +917,6 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "solidity-helper",
  "thiserror",
  "tokio",
 ]
@@ -5900,7 +5899,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "signature-verification-canister-client",
- "solidity-helper",
  "thiserror",
  "tokio",
 ]
@@ -8643,18 +8641,6 @@ dependencies = [
  "phf",
  "thiserror",
  "unicode-xid",
-]
-
-[[package]]
-name = "solidity-helper"
-version = "0.2.0"
-dependencies = [
- "hex",
- "rand",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
 ]
 
 [[package]]

@@ -1,5 +1,4 @@
 use did::U256;
-
 use minter_did::error::Result;
 
 /// This structure contains data of a valid burn operation.

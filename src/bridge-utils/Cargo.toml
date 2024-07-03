@@ -34,7 +34,6 @@ thiserror = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
-solidity-helper = { path = "../solidity-helper" }
 foundry-compilers = { workspace = true }
 
 [dev-dependencies]
@@ -42,5 +41,4 @@ candid = { workspace = true }
 env_logger = { workspace = true }
 ic-exports = { workspace = true }
 serde_json = { workspace = true }
-solidity-helper = { path = "../solidity-helper" }
 tokio = { workspace = true }
