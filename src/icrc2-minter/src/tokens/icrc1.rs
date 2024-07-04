@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
 use evm_canister_client::IcCanisterClient;
-use ic_exports::icrc_types;
 use icrc_client::account::Account;
 use icrc_client::IcrcCanisterClient;
 use minter_did::error::Result;
@@ -41,8 +40,18 @@ pub fn get_cached_token_configuration(ic_token: Principal) -> Option<TokenConfig
 /// Query token info from token canister and store it to cache.
 /// Read the info from cache if query fails.
 pub async fn query_token_info_or_read_from_cache(token: Principal) -> Option<TokenInfo> {
-    let Ok(queried) = query_icrc1_token_info(token).await else {
-        return get_cached_token_configuration(token).map(|config| config.info);
+    let cached = get_cached_token_configuration(token);
+
+    let Ok(queried) = query_icrc1_token_info(
+        token,
+        cached
+            .as_ref()
+            .map(|cached| cached.info.info_set_in_metadata)
+            .unwrap_or(true), // if not in cache; always try to read from metadata first
+    )
+    .await
+    else {
+        return cached.map(|config| config.info);
     };
 
     // If we store token config in cache, update the config with new info.
@@ -66,6 +75,7 @@ pub struct TokenInfo {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
+    pub info_set_in_metadata: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, CandidType)]
@@ -91,15 +101,7 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
             subaccount: None,
         });
 
-    let name = icrc_client.icrc1_name().await?;
-    let symbol = icrc_client.icrc1_symbol().await?;
-    let decimals = icrc_client.icrc1_decimals().await?;
-
-    let info = TokenInfo {
-        name,
-        symbol,
-        decimals,
-    };
+    let info = query_icrc1_token_info(token, true).await?;
 
     Ok(TokenConfiguration {
         principal: token,
@@ -110,10 +112,32 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
 }
 
 /// Requests fee and minting account configuration from an ICRC-1 canister.
-async fn query_icrc1_token_info(token: Principal) -> Result<TokenInfo> {
+///
+/// `has_token_info_in_metadata` is a flag that indicates whether the token info is set in metadata.
+/// If it is, we can use the standard ICRC-1 metadata query to get the token info.
+/// Otherwise, we have to use dedicated queries to get the token info.
+async fn query_icrc1_token_info(
+    token: Principal,
+    has_token_info_in_metadata: bool,
+) -> Result<TokenInfo> {
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
-    let token_metadata = icrc_client.icrc1_metadata().await?;
+    // If the token info is set in metadata, we can use the standard ICRC-1 metadata query.
+    if has_token_info_in_metadata {
+        if let Ok(token_info) = query_icrc1_token_info_from_metadata(&icrc_client).await {
+            return Ok(token_info);
+        }
+    }
+
+    // Otherwise, we have to use dedicated queries to get the token info.
+    query_icrc1_token_info_from_dedicated_queries(&icrc_client).await
+}
+
+/// Requests token info from an ICRC-1 canister using `icrc1_metadata` query.
+async fn query_icrc1_token_info_from_metadata(
+    client: &IcrcCanisterClient<IcCanisterClient>,
+) -> Result<TokenInfo> {
+    let token_metadata = client.icrc1_metadata().await?;
     let name = match get_metadata_value(&token_metadata, ICRC1_METADATA_NAME) {
         Some(icrc_client::Value::Text(name)) => name.clone(),
         _ => {
@@ -139,25 +163,39 @@ async fn query_icrc1_token_info(token: Principal) -> Result<TokenInfo> {
         )),
     }?;
 
-    let name = icrc_client.icrc1_name().await?;
-    let symbol = icrc_client.icrc1_symbol().await?;
-    let decimals = icrc_client.icrc1_decimals().await?;
+    Ok(TokenInfo {
+        name,
+        symbol,
+        decimals,
+        info_set_in_metadata: true,
+    })
+}
+
+/// Requests token info from an ICRC-1 canister using dedicated queries.
+/// This is a fallback in case `icrc1_metadata` query doesn't return the standard ICRC-1 keys.
+///
+/// The fallback queries are: `icrc1_name`, `icrc1_symbol`, `icrc1_decimals`.
+async fn query_icrc1_token_info_from_dedicated_queries(
+    client: &IcrcCanisterClient<IcCanisterClient>,
+) -> Result<TokenInfo> {
+    let name = client.icrc1_name().await?;
+    let symbol = client.icrc1_symbol().await?;
+    let decimals = client.icrc1_decimals().await?;
 
     Ok(TokenInfo {
         name,
         symbol,
         decimals,
+        info_set_in_metadata: false,
     })
 }
 
+/// Get the value of a metadata key from a list of metadata key-value pairs.
 fn get_metadata_value<'a>(
     metadata: &'a [(String, icrc_client::Value)],
     key: &str,
 ) -> Option<&'a icrc_client::Value> {
-    metadata
-        .iter()
-        .find(|(k, _)| k == key)
-        .and_then(|(_, v)| Some(v))
+    metadata.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
 /// Cache the token configuration value in the cache
@@ -196,6 +234,7 @@ mod test {
                 name: "Test Token".to_string(),
                 symbol: "TEST".to_string(),
                 decimals: 18,
+                info_set_in_metadata: true,
             },
         };
 
@@ -208,5 +247,6 @@ mod test {
         assert_eq!(config.principal, cached_config.principal);
         assert_eq!(config.fee, cached_config.fee);
         assert_eq!(config.minting_account, cached_config.minting_account);
+        assert_eq!(config.info, cached_config.info);
     }
 }
