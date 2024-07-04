@@ -19,8 +19,7 @@ services:
     build:
       dockerfile: ord.dockerfile
     depends_on:
-      bitcoind:
-        condition: service_healthy
+      - bitcoind
     ports:
       - "8000:8000"
       - "8001:8001"
