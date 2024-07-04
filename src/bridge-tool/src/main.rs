@@ -82,6 +82,10 @@ struct DepositIcrcArgs {
     #[arg(long)]
     token: Principal,
 
+    /// ERC20 token address
+    #[arg(long)]
+    erc20_token_address: H160,
+
     /// IC host
     #[arg(long)]
     ic_host: Option<String>,
@@ -220,6 +224,10 @@ struct BurnWrappedArgs {
     #[arg(long)]
     token_address: String,
 
+    /// to Token ID.
+    #[arg(long)]
+    to_token_id: String,
+
     /// BTC address to transfer BTC to.
     #[arg(long)]
     address: String,
@@ -299,6 +307,7 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         recipient_address: wallet.address().into(),
         approve_after_mint: None,
         fee_payer: None,
+        erc20_token_address: args.erc20_token_address.into(),
     };
 
     let input = BFTBridge::notifyMinterCall {
@@ -790,6 +799,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     let input = BFTBridge::burnCall {
         amount: amount.into(),
         fromERC20: token.0.into(),
+        toTokenID: args.to_token_id.into()
         recipientID: args.address.into_bytes().into(),
     }
     .abi_encode();

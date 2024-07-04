@@ -39,11 +39,13 @@ contract BftBridgeTest is Test {
     address _alice = vm.addr(_ALICE_KEY);
     address _bob = vm.addr(_BOB_KEY);
 
-    BFTBridge _bridge;
+    BFTBridge _wrappedBridge;
+    BFTBridge _baseBridge;
 
     address newImplementation = address(8);
 
-    address proxy;
+    address wrappedProxy;
+    address baseProxy;
 
     function setUp() public {
         vm.chainId(_CHAIN_ID);
@@ -52,29 +54,50 @@ contract BftBridgeTest is Test {
         // Encode the initialization call
         bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
 
-        BFTBridge impl = new BFTBridge();
+        BFTBridge wrappedImpl = new BFTBridge();
 
-        UUPSProxy proxyContract = new UUPSProxy(address(impl), initializeData);
+        UUPSProxy wrappedProxyContract = new UUPSProxy(address(wrappedImpl), initializeData);
 
-        proxy = address(proxyContract);
+        wrappedProxy = address(wrappedProxyContract);
 
         // Cast the proxy to BFTBridge
-        _bridge = BFTBridge(address(proxy));
+        _wrappedBridge = BFTBridge(address(wrappedProxy));
+
+        // Encode the initialization call
+        bytes memory baseInitializeData = abi.encodeWithSelector(
+            BFTBridge.initialize.selector,
+            _owner,
+            address(0),
+            false
+        );
+
+         BFTBridge baseImpl = new BFTBridge();
+
+        UUPSProxy baseProxyContract = new UUPSProxy(address(baseImpl), initializeData);
+
+        baseProxy = address(baseProxyContract);
+
+
+        // Cast the proxy to BFTBridge
+        _baseBridge = BFTBridge(address(baseProxy));
 
         vm.stopPrank();
     }
 
     function testMinterCanisterAddress() public view {
-        assertEq(_bridge.minterCanisterAddress(), _owner);
+        assertEq(_wrappedBridge.minterCanisterAddress(), _owner);
     }
 
     function testMintERC20FromICRC2Success() public {
         MintOrder memory order = _createDefaultMintOrder();
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
 
-        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), order.amount);
+        assertEq(
+            WrappedToken(order.toERC20).balanceOf(order.recipient),
+            order.amount
+        );
     }
 
     function testMintERC20FromICRC2InvalidChainID() public {
@@ -84,7 +107,7 @@ contract BftBridgeTest is Test {
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
         vm.expectRevert(bytes("Invalid chain ID"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2InvalidRecipient() public {
@@ -93,7 +116,7 @@ contract BftBridgeTest is Test {
 
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
         vm.expectRevert(bytes("Invalid destination address"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2InvalidAmount() public {
@@ -103,21 +126,21 @@ contract BftBridgeTest is Test {
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
         vm.expectRevert(bytes("Invalid order amount"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2UsedNonce() public {
         MintOrder memory order = _createDefaultMintOrder();
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
 
         order.amount = 200;
         order.recipient = _bob;
         encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
         vm.expectRevert(bytes("Invalid nonce"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2InvalidPair() public {
@@ -127,7 +150,7 @@ contract BftBridgeTest is Test {
         bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
 
         vm.expectRevert(bytes("SRC token and DST token must be a valid pair"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2InvalidSignature() public {
@@ -138,26 +161,43 @@ contract BftBridgeTest is Test {
         encodedOrder[0] = bytes1(uint8(42));
 
         vm.expectRevert(bytes("Invalid signature"));
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testMintERC20FromICRC2InvalidOrderLength() public {
-        bytes memory encodedOrder = abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4));
+        bytes memory encodedOrder = abi.encodePacked(
+            uint8(1),
+            uint8(2),
+            uint8(3),
+            uint8(4)
+        );
 
         vm.expectRevert();
-        _bridge.mint(encodedOrder);
+        _wrappedBridge.mint(encodedOrder);
     }
 
     function testGetWrappedToken() public {
-        bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_id);
-        assertEq(wrapped_address, _bridge.getWrappedToken(base_token_id));
+        bytes32 base_token_id = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1))
+        );
+        address wrapped_address = _wrappedBridge.deployERC20(
+            "Token",
+            "TKN",
+            base_token_id
+        );
+        assertEq(wrapped_address, _wrappedBridge.getWrappedToken(base_token_id));
     }
 
     function testGetBaseToken() public {
-        bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_id);
-        assertEq(base_token_id, _bridge.getBaseToken(wrapped_address));
+        bytes32 base_token_id = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1))
+        );
+        address wrapped_address = _wrappedBridge.deployERC20(
+            "Token",
+            "TKN",
+            base_token_id
+        );
+        assertEq(base_token_id, _wrappedBridge.getBaseToken(wrapped_address));
     }
 
     function testListTokenPairs() public {
@@ -169,11 +209,16 @@ contract BftBridgeTest is Test {
 
         address[3] memory wrapped_tokens;
         for (uint256 i = 0; i < 3; i++) {
-            address wrapped_address = _bridge.deployERC20("Token", "TKN", base_token_ids[i]);
+            address wrapped_address = _wrappedBridge.deployERC20(
+                "Token",
+                "TKN",
+                base_token_ids[i]
+            );
             wrapped_tokens[i] = wrapped_address;
         }
 
-        (address[] memory wrapped, bytes32[] memory base) = _bridge.listTokenPairs();
+        (address[] memory wrapped, bytes32[] memory base) = _wrappedBridge
+            .listTokenPairs();
 
         for (uint256 i = 0; i < 3; i++) {
             assertEq(wrapped[i], wrapped_tokens[i]);
@@ -181,20 +226,100 @@ contract BftBridgeTest is Test {
         }
     }
 
+    function testBurnWrappedSideWithDeployedErc20() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+
+        // deploy erc20 so it can be used
+        MintOrder memory order = _createSelfMintOrder();
+        bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
+
+        vm.prank(address(_owner));
+        IERC20(order.toERC20).approve(address(_wrappedBridge), 1000);
+        _wrappedBridge.mint(encodedOrder);
+
+        assertEq(
+            WrappedToken(order.toERC20).balanceOf(address(_owner)),
+            order.amount
+        );
+
+        vm.prank(address(_owner));
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+    }
+
+    function testBurnWrappedSideWithUnregisteredToken() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+
+        address erc20 = address(new WrappedToken("omar", "OMAR", _owner));
+
+        bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        vm.expectRevert(
+            bytes("Invalid from address; not registered in the bridge")
+        );
+        _wrappedBridge.burn(100, erc20, toTokenId, principal);
+    }
+
+    function testBurnBaseSideWithUnregisteredToken() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        address erc20Address = address(erc20);
+
+        vm.prank(address(_owner));
+        erc20.transfer(address(_owner), 100);
+        vm.prank(address(_owner));
+        erc20.approve(address(_baseBridge), 100);
+
+        bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        vm.prank(address(_owner));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+    }
+
+    function testMintBaseSideWithUnregisteredToken() public {
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        address erc20Address = address(erc20);
+
+        vm.prank(address(_owner));
+        erc20.transfer(address(_baseBridge), 1000);
+
+        MintOrder memory order = _createMintOrder(_alice, erc20Address);
+        bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
+
+        _baseBridge.mint(encodedOrder);
+
+        assertEq(
+            erc20.balanceOf(order.recipient),
+            order.amount
+        );
+    }
+
+    function testMintWrappedSideWithUnregisteredToken() public {
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        address erc20Address = address(erc20);
+
+        vm.prank(address(_owner));
+        erc20.transfer(address(_wrappedBridge), 1000);
+
+        MintOrder memory order = _createMintOrder(_alice, erc20Address);
+        bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
+
+        vm.expectRevert(bytes("Invalid token pair"));
+        _wrappedBridge.mint(encodedOrder);
+    }
+
     function testMintCallsAreRejectedWhenPaused() public {
         vm.prank(_owner);
 
-        _bridge.pause();
+        _wrappedBridge.pause();
 
         MintOrder memory mintOrder = _createDefaultMintOrder();
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
+        _wrappedBridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
 
         vm.prank(_owner);
-        _bridge.unpause();
+        _wrappedBridge.unpause();
 
         // mint will be success
-        _bridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
+        _wrappedBridge.mint(_encodeMintOrder(mintOrder, _OWNER_KEY));
     }
 
     function testAddAllowedImplementation() public {
@@ -204,9 +329,9 @@ contract BftBridgeTest is Test {
 
         newImplementation = address(_newImpl);
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation);
 
-        assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
+        assertTrue(_wrappedBridge.allowedImplementations(newImplementation.codehash));
 
         vm.stopPrank();
     }
@@ -216,7 +341,7 @@ contract BftBridgeTest is Test {
 
         vm.expectRevert();
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation);
     }
 
     function testAddAllowedImplementationEmptyAddress() public {
@@ -225,7 +350,7 @@ contract BftBridgeTest is Test {
 
         vm.expectRevert();
 
-        _bridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation);
     }
 
     /// Test that the bridge can be upgraded to a new implementation
@@ -238,16 +363,16 @@ contract BftBridgeTest is Test {
 
         newImplementation = address(_newImpl);
 
-        _bridge.addAllowedImplementation(newImplementation);
-        assertTrue(_bridge.allowedImplementations(newImplementation.codehash));
+        _wrappedBridge.addAllowedImplementation(newImplementation);
+        assertTrue(_wrappedBridge.allowedImplementations(newImplementation.codehash));
 
         // Wrap in ABI for easier testing
-        BFTBridge wrappedProxy = BFTBridge(proxy);
+        BFTBridge proxy = BFTBridge(wrappedProxy);
 
         // pass empty calldata to initialize
         bytes memory data = new bytes(0);
 
-        wrappedProxy.upgradeToAndCall(address(_newImpl), data);
+        proxy.upgradeToAndCall(address(_newImpl), data);
 
         vm.stopPrank();
     }
@@ -258,11 +383,11 @@ contract BftBridgeTest is Test {
         newImplementation = address(_newImpl);
         // Wrap in ABI for easier testing
 
-        BFTBridge wrappedProxy = BFTBridge(proxy);
+        BFTBridge proxy = BFTBridge(wrappedProxy);
         // pass empty calldata to initialize
         bytes memory data = new bytes(0);
         vm.expectRevert();
-        wrappedProxy.upgradeToAndCall(address(_newImpl), data);
+        proxy.upgradeToAndCall(address(_newImpl), data);
 
         vm.stopPrank();
     }
@@ -285,13 +410,15 @@ contract BftBridgeTest is Test {
 
         for (uint256 i = 0; i < entries.length; i += 1) {
             if (
-                entries[i].topics[0]
-                    == keccak256("BurnTokenEvent(address,uint256,address,bytes32,bytes32,bytes32,bytes16,uint8)")
+                entries[i].topics[0] ==
+                keccak256(
+                    "BurnTokenEvent(address,uint256,address,bytes32,bytes32,bytes32,bytes16,uint8)"
+                )
             ) {
                 assertEq(eventFound, false);
                 eventFound = true;
 
-                assertEq(entries[i].emitter, address(_bridge));
+                assertEq(entries[i].emitter, address(_wrappedBridge));
 
                 assertEq(entries[i].topics.length, 1);
 
@@ -304,7 +431,19 @@ contract BftBridgeTest is Test {
                     bytes32 name,
                     bytes16 symbol,
                     uint8 decimals
-                ) = abi.decode(entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8));
+                ) = abi.decode(
+                        entries[i].data,
+                        (
+                            address,
+                            uint256,
+                            address,
+                            bytes32,
+                            bytes32,
+                            bytes32,
+                            bytes16,
+                            uint8
+                        )
+                    );
                 assertEq(expected.sender, sender);
                 assertEq(expected.amount, amount);
                 assertEq(expected.fromERC20, fromERC20);
@@ -319,12 +458,19 @@ contract BftBridgeTest is Test {
         assertEq(eventFound, true);
     }
 
-    function _createDefaultMintOrder() private returns (MintOrder memory order) {
+    function _createDefaultMintOrder()
+        private
+        returns (MintOrder memory order)
+    {
         order.amount = 1000;
-        order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
-        order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
+        order.senderID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3))
+        );
+        order.fromTokenID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4))
+        );
         order.recipient = _alice;
-        order.toERC20 = _bridge.deployERC20("Token", "TKN", order.fromTokenID);
+        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", order.fromTokenID);
         order.nonce = 0;
         order.senderChainID = 0;
         order.recipientChainID = _CHAIN_ID;
@@ -338,7 +484,56 @@ contract BftBridgeTest is Test {
         order.feePayer = address(0);
     }
 
-    function _encodeMintOrder(MintOrder memory order, uint256 privateKey) private pure returns (bytes memory) {
+    function _createSelfMintOrder() private returns (MintOrder memory order) {
+        order.amount = 1000;
+        order.senderID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3))
+        );
+        order.fromTokenID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4))
+        );
+        order.recipient = address(_owner);
+        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", order.fromTokenID);
+        order.nonce = 0;
+        order.senderChainID = 0;
+        order.recipientChainID = _CHAIN_ID;
+        // order.name = _bridge.truncateUTF8("Token");
+        order.name = StringUtils.truncateUTF8("Token");
+        // order.symbol = bytes16(_bridge.truncateUTF8("Token"));
+        order.symbol = bytes16(StringUtils.truncateUTF8("Token"));
+        order.decimals = 18;
+        order.approveSpender = address(0);
+        order.approveAmount = 0;
+        order.feePayer = address(0);
+    }
+
+    function _createMintOrder(address recipient, address toERC20) pure private returns (MintOrder memory order) {
+        order.amount = 1000;
+        order.senderID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3))
+        );
+        order.fromTokenID = _createIdFromPrincipal(
+            abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4))
+        );
+        order.recipient = recipient;
+        order.toERC20 = toERC20;
+        order.nonce = 0;
+        order.senderChainID = 0;
+        order.recipientChainID = _CHAIN_ID;
+        // order.name = _bridge.truncateUTF8("Token");
+        order.name = StringUtils.truncateUTF8("Token");
+        // order.symbol = bytes16(_bridge.truncateUTF8("Token"));
+        order.symbol = bytes16(StringUtils.truncateUTF8("Token"));
+        order.decimals = 18;
+        order.approveSpender = address(0);
+        order.approveAmount = 0;
+        order.feePayer = address(0);
+    }
+
+    function _encodeMintOrder(
+        MintOrder memory order,
+        uint256 privateKey
+    ) private pure returns (bytes memory) {
         // Encoding splitted in two parts to avoid problems with stack overflow.
         bytes memory encodedOrder = abi.encodePacked(
             order.amount,
@@ -362,11 +557,19 @@ contract BftBridgeTest is Test {
         return abi.encodePacked(encodedOrder, r, s, v);
     }
 
-    function _createIdFromPrincipal(bytes memory principal) private pure returns (bytes32) {
-        return bytes32(abi.encodePacked(uint8(0), uint8(principal.length), principal));
+    function _createIdFromPrincipal(
+        bytes memory principal
+    ) private pure returns (bytes32) {
+        return
+            bytes32(
+                abi.encodePacked(uint8(0), uint8(principal.length), principal)
+            );
     }
 
-    function _createIdFromAddress(address addr, uint32 chainID) private pure returns (bytes32) {
+    function _createIdFromAddress(
+        address addr,
+        uint32 chainID
+    ) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(1), chainID, addr));
     }
 }

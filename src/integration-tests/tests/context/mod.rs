@@ -339,11 +339,13 @@ pub trait TestContext {
         Ok(fee_charge_address)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens_raw(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Vec<u8>,
         bridge: &H160,
         amount: u128,
@@ -369,6 +371,7 @@ pub trait TestContext {
         let input = BFTBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.clone().into(),
+            toTokenID: to_token_id.into(),
             recipientID: recipient.into(),
         }
         .abi_encode();
@@ -392,11 +395,13 @@ pub trait TestContext {
         Ok((operation_id, tx_hash))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Id256,
         bridge: &H160,
         amount: u128,
@@ -405,6 +410,7 @@ pub trait TestContext {
             evm_client,
             wallet,
             from_token,
+            to_token_id,
             recipient.0.to_vec(),
             bridge,
             amount,
@@ -564,22 +570,26 @@ pub trait TestContext {
 
         let (_hash, receipt) = self.call_contract(wallet, bft_bridge, input, 0).await?;
 
-        println!("receipt: {:?}", receipt);
         let output = receipt.output.as_ref().unwrap();
 
         let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
             .unwrap()
             ._0;
-
+        println!(
+            "Deployed Wrapped token on block {} with address {token_address}",
+            results.1.block_number
+        );
         Ok(address.into())
     }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
+    #[allow(clippy::too_many_arguments)]
     async fn burn_icrc2(
         &self,
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         bridge: &H160,
+        erc20_token_address: &H160,
         amount: u128,
         fee_payer: Option<H160>,
         approve_after_mint: Option<ApproveAfterMint>,
@@ -597,6 +607,7 @@ pub trait TestContext {
             amount: amount.into(),
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
+            erc20_token_address: erc20_token_address.clone(),
             recipient_address,
             fee_payer,
             approve_after_mint,

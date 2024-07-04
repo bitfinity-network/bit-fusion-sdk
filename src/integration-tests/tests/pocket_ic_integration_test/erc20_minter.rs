@@ -10,7 +10,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
-
+use ic_stable_structures::Storable as _;
 use super::PocketIcTestContext;
 use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
@@ -223,12 +223,22 @@ async fn test_external_bridging() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
+
     let burn_operation_id = ctx
         .context
         .burn_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
@@ -340,6 +350,14 @@ async fn native_token_deposit_increase_and_decrease() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
     // Perform an operation to pay a fee for it.
     let (burn_operation_id, _) = ctx
         .context
@@ -347,6 +365,7 @@ async fn native_token_deposit_increase_and_decrease() {
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
@@ -417,12 +436,22 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
+
     let burn_operation_id = ctx
         .context
         .burn_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
