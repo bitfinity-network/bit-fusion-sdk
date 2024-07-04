@@ -4,6 +4,7 @@ services:
     container_name: bitcoind
     build:
       dockerfile: bitcoind.dockerfile
+      context: .
     ports:
       - "18443:18443"
       - "18444:18444"
