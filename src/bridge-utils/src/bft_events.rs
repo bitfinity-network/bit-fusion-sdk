@@ -184,7 +184,7 @@ impl From<NotifyMinterEvent> for NotifyMinterEventData {
         Self {
             notification_type: event.notificationType,
             tx_sender: event.txSender.into(),
-            user_data: event.userData.to_vec(),
+            user_data: event.userData.0.into(),
         }
     }
 }
