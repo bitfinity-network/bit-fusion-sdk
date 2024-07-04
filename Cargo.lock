@@ -6022,6 +6022,7 @@ dependencies = [
  "ic-canister-client",
  "ic-exports",
  "ic-stable-structures 0.17.0",
+ "ic-task-scheduler",
  "jsonrpc-core",
  "log",
  "minter-did",
