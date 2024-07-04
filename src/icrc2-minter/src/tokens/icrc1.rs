@@ -3,10 +3,16 @@ use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
 use evm_canister_client::IcCanisterClient;
+use ic_exports::icrc_types;
 use icrc_client::account::Account;
 use icrc_client::IcrcCanisterClient;
 use minter_did::error::Result;
+use num_traits::ToPrimitive as _;
 use serde::{Deserialize, Serialize};
+
+const ICRC1_METADATA_DECIMALS: &str = "icrc1:decimals";
+const ICRC1_METADATA_NAME: &str = "icrc1:name";
+const ICRC1_METADATA_SYMBOL: &str = "icrc1:symbol";
 
 thread_local! {
     static TOKEN_CONFIGURATION: RefCell<HashMap<Principal, TokenConfiguration>> = RefCell::new(HashMap::default());
@@ -107,6 +113,32 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
 async fn query_icrc1_token_info(token: Principal) -> Result<TokenInfo> {
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
+    let token_metadata = icrc_client.icrc1_metadata().await?;
+    let name = match get_metadata_value(&token_metadata, ICRC1_METADATA_NAME) {
+        Some(icrc_client::Value::Text(name)) => name.clone(),
+        _ => {
+            return Err(minter_did::error::Error::Internal(
+                "Bad icrc1 metadata".to_string(),
+            ))
+        }
+    };
+    let symbol = match get_metadata_value(&token_metadata, ICRC1_METADATA_SYMBOL) {
+        Some(icrc_client::Value::Text(symbol)) => symbol.clone(),
+        _ => {
+            return Err(minter_did::error::Error::Internal(
+                "Bad icrc1 metadata".to_string(),
+            ))
+        }
+    };
+    let decimals = match get_metadata_value(&token_metadata, ICRC1_METADATA_DECIMALS) {
+        Some(icrc_client::Value::Nat(decimals)) => decimals.0.to_u8().ok_or(
+            minter_did::error::Error::Internal("Bad icrc1 metadata".to_string()),
+        ),
+        _ => Err(minter_did::error::Error::Internal(
+            "Bad icrc1 metadata".to_string(),
+        )),
+    }?;
+
     let name = icrc_client.icrc1_name().await?;
     let symbol = icrc_client.icrc1_symbol().await?;
     let decimals = icrc_client.icrc1_decimals().await?;
@@ -116,6 +148,16 @@ async fn query_icrc1_token_info(token: Principal) -> Result<TokenInfo> {
         symbol,
         decimals,
     })
+}
+
+fn get_metadata_value<'a>(
+    metadata: &'a [(String, icrc_client::Value)],
+    key: &str,
+) -> Option<&'a icrc_client::Value> {
+    metadata
+        .iter()
+        .find(|(k, _)| k == key)
+        .and_then(|(_, v)| Some(v))
 }
 
 /// Cache the token configuration value in the cache
