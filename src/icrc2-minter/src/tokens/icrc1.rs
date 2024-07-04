@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
-use evm_canister_client::IcCanisterClient;
+use evm_canister_client::{CanisterClient, IcCanisterClient};
 use icrc_client::account::Account;
 use icrc_client::IcrcCanisterClient;
 use minter_did::error::Result;
@@ -41,9 +41,10 @@ pub fn get_cached_token_configuration(ic_token: Principal) -> Option<TokenConfig
 /// Read the info from cache if query fails.
 pub async fn query_token_info_or_read_from_cache(token: Principal) -> Option<TokenInfo> {
     let cached = get_cached_token_configuration(token);
+    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     let Ok(queried) = query_icrc1_token_info(
-        token,
+        &icrc_client,
         cached
             .as_ref()
             .map(|cached| cached.info.info_set_in_metadata)
@@ -101,7 +102,7 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
             subaccount: None,
         });
 
-    let info = query_icrc1_token_info(token, true).await?;
+    let info = query_icrc1_token_info(&icrc_client, true).await?;
 
     Ok(TokenConfiguration {
         principal: token,
@@ -116,27 +117,31 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
 /// `has_token_info_in_metadata` is a flag that indicates whether the token info is set in metadata.
 /// If it is, we can use the standard ICRC-1 metadata query to get the token info.
 /// Otherwise, we have to use dedicated queries to get the token info.
-async fn query_icrc1_token_info(
-    token: Principal,
+async fn query_icrc1_token_info<C>(
+    icrc_client: &IcrcCanisterClient<C>,
     has_token_info_in_metadata: bool,
-) -> Result<TokenInfo> {
-    let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
-
+) -> Result<TokenInfo>
+where
+    C: CanisterClient,
+{
     // If the token info is set in metadata, we can use the standard ICRC-1 metadata query.
     if has_token_info_in_metadata {
-        if let Ok(token_info) = query_icrc1_token_info_from_metadata(&icrc_client).await {
+        if let Ok(token_info) = query_icrc1_token_info_from_metadata(icrc_client).await {
             return Ok(token_info);
         }
     }
 
     // Otherwise, we have to use dedicated queries to get the token info.
-    query_icrc1_token_info_from_dedicated_queries(&icrc_client).await
+    query_icrc1_token_info_from_dedicated_queries(icrc_client).await
 }
 
 /// Requests token info from an ICRC-1 canister using `icrc1_metadata` query.
-async fn query_icrc1_token_info_from_metadata(
-    client: &IcrcCanisterClient<IcCanisterClient>,
-) -> Result<TokenInfo> {
+async fn query_icrc1_token_info_from_metadata<C>(
+    client: &IcrcCanisterClient<C>,
+) -> Result<TokenInfo>
+where
+    C: CanisterClient,
+{
     let token_metadata = client.icrc1_metadata().await?;
     let name = match get_metadata_value(&token_metadata, ICRC1_METADATA_NAME) {
         Some(icrc_client::Value::Text(name)) => name.clone(),
@@ -175,9 +180,12 @@ async fn query_icrc1_token_info_from_metadata(
 /// This is a fallback in case `icrc1_metadata` query doesn't return the standard ICRC-1 keys.
 ///
 /// The fallback queries are: `icrc1_name`, `icrc1_symbol`, `icrc1_decimals`.
-async fn query_icrc1_token_info_from_dedicated_queries(
-    client: &IcrcCanisterClient<IcCanisterClient>,
-) -> Result<TokenInfo> {
+async fn query_icrc1_token_info_from_dedicated_queries<C>(
+    client: &IcrcCanisterClient<C>,
+) -> Result<TokenInfo>
+where
+    C: CanisterClient,
+{
     let name = client.icrc1_name().await?;
     let symbol = client.icrc1_symbol().await?;
     let decimals = client.icrc1_decimals().await?;
@@ -210,6 +218,8 @@ fn cache_ic_token_configuration(config: TokenConfiguration) {
 #[cfg(test)]
 mod test {
     use candid::Nat;
+    use evm_canister_client::CanisterClient;
+    use ic_exports::ic_kit::RejectionCode;
     use ic_exports::icrc_types::icrc1::account::Account;
 
     use super::*;
@@ -248,5 +258,148 @@ mod test {
         assert_eq!(config.fee, cached_config.fee);
         assert_eq!(config.minting_account, cached_config.minting_account);
         assert_eq!(config.info, cached_config.info);
+    }
+
+    #[tokio::test]
+    async fn should_get_token_info() {
+        let client = FakeIcrcCanisterClient {
+            name: "Test Token".to_string(),
+            symbol: "TEST".to_string(),
+            decimals: 18,
+            has_metadata: true,
+        };
+        let client = IcrcCanisterClient::new(client);
+
+        // fetch with icrc1 metadata
+        let token_info = query_icrc1_token_info(&client, true).await.unwrap();
+        assert_eq!(token_info.name, "Test Token");
+        assert_eq!(token_info.symbol, "TEST");
+        assert_eq!(token_info.decimals, 18);
+        assert!(token_info.info_set_in_metadata);
+
+        // fetch with dedicated queries
+        let token_info = query_icrc1_token_info(&client, false).await.unwrap();
+        assert_eq!(token_info.name, "Test Token");
+        assert_eq!(token_info.symbol, "TEST");
+        assert_eq!(token_info.decimals, 18);
+        assert!(!token_info.info_set_in_metadata);
+
+        // fetch with icrc1 metadata, but missing metadata
+        let client = FakeIcrcCanisterClient {
+            name: "Test Token".to_string(),
+            symbol: "TEST".to_string(),
+            decimals: 18,
+            has_metadata: false,
+        };
+        let client = IcrcCanisterClient::new(client);
+
+        // fetch with dedicated queries
+        let token_info = query_icrc1_token_info(&client, true).await.unwrap();
+        assert_eq!(token_info.name, "Test Token");
+        assert_eq!(token_info.symbol, "TEST");
+        assert_eq!(token_info.decimals, 18);
+        assert!(!token_info.info_set_in_metadata);
+    }
+
+    #[derive(Debug, Clone)]
+    struct FakeIcrcCanisterClient {
+        name: String,
+        symbol: String,
+        decimals: u8,
+        has_metadata: bool,
+    }
+
+    impl CanisterClient for FakeIcrcCanisterClient {
+        fn query<'life0, 'life1, 'async_trait, T, R>(
+            &'life0 self,
+            method: &'life1 str,
+            _args: T,
+        ) -> core::pin::Pin<
+            Box<
+                dyn core::future::Future<Output = evm_canister_client::CanisterClientResult<R>>
+                    + core::marker::Send
+                    + 'async_trait,
+            >,
+        >
+        where
+            T: candid::utils::ArgumentEncoder + Send + Sync,
+            R: serde::de::DeserializeOwned + CandidType,
+            T: 'async_trait,
+            R: 'async_trait,
+            'life0: 'async_trait,
+            'life1: 'async_trait,
+            Self: 'async_trait,
+        {
+            let method = method.to_string();
+            Box::pin(async move {
+                let response: R = match method.as_str() {
+                    "icrc1_metadata" => {
+                        if !self.has_metadata {
+                            return Err(evm_canister_client::CanisterClientError::CanisterError((
+                                RejectionCode::DestinationInvalid,
+                                "No metadata".to_string(),
+                            )));
+                        }
+
+                        let metadata = vec![
+                            (
+                                ICRC1_METADATA_NAME.to_string(),
+                                icrc_client::Value::Text(self.name.clone()),
+                            ),
+                            (
+                                ICRC1_METADATA_SYMBOL.to_string(),
+                                icrc_client::Value::Text(self.symbol.clone()),
+                            ),
+                            (
+                                ICRC1_METADATA_DECIMALS.to_string(),
+                                icrc_client::Value::Nat(Nat((self.decimals as u64).into())),
+                            ),
+                        ];
+
+                        let json = serde_json::to_value(metadata).unwrap();
+
+                        serde_json::from_value::<R>(json).unwrap()
+                    }
+                    "icrc1_name" => {
+                        let json = serde_json::to_value(self.name.clone()).unwrap();
+                        serde_json::from_value::<R>(json).unwrap()
+                    }
+                    "icrc1_symbol" => {
+                        let json = serde_json::to_value(self.symbol.clone()).unwrap();
+                        serde_json::from_value::<R>(json).unwrap()
+                    }
+                    "icrc1_decimals" => {
+                        let json = serde_json::to_value(self.decimals).unwrap();
+                        serde_json::from_value::<R>(json).unwrap()
+                    }
+                    _ => panic!("Unexpected method: {}", method),
+                };
+
+                Ok(response)
+            })
+        }
+
+        fn update<'life0, 'life1, 'async_trait, T, R>(
+            &'life0 self,
+            _method: &'life1 str,
+            _args: T,
+        ) -> core::pin::Pin<
+            Box<
+                dyn core::future::Future<Output = evm_canister_client::CanisterClientResult<R>>
+                    + core::marker::Send
+                    + 'async_trait,
+            >,
+        >
+        where
+            T: candid::utils::ArgumentEncoder + Send + Sync,
+            R: serde::de::DeserializeOwned + CandidType,
+            T: 'async_trait,
+            R: 'async_trait,
+            'life0: 'async_trait,
+            'life1: 'async_trait,
+            Self: 'async_trait,
+        {
+            unimplemented!()
+        }
     }
 }
