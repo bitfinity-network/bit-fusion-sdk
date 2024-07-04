@@ -55,7 +55,7 @@ jobs:
       output-artifact: artifact-evm
       init-script: |
         ./scripts/build_solidity.sh
-        apt update && apt install -y npm wget curl build-essential libssl-dev pkg-config
+        apt update && apt install -y npm wget curl build-essential libssl-dev pkg-config docker-compose
         git clone https://github.com/ordinals/ord.git /tmp/ord
         cd /tmp/ord/
         git checkout 0.18.5
@@ -66,7 +66,6 @@ jobs:
         wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
         tar -xzf /tmp/bitcoin.tar.gz -C /tmp
         cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
-        curl -fsSL https://get.docker.com | sh -
       artifact-pre-script: |
         # Get external dependencies
         export WASMS_DIR="`pwd`/.artifact"
