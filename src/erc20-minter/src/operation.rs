@@ -1,4 +1,4 @@
-use bridge_utils::bft_bridge_api::BurntEventData;
+use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::operation_store::MinterOperation;
 use candid::{CandidType, Deserialize};

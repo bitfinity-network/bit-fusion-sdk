@@ -1,4 +1,4 @@
-use bridge_utils::bft_bridge_api::BurntEventData;
+use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::operation_store::{MinterOperation, MinterOperationStore};
 use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;

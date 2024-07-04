@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use candid::Principal;
 use did::init::EvmCanisterInitData;
-
 use ic_exports::ic_kit::mock_principals::bob;
 use ic_log::LogSettings;
 

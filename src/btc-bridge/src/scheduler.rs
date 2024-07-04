@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use bridge_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
+use bridge_utils::bft_events::{BridgeEvent, BurntEventData, MintedEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use did::{H160, U256};

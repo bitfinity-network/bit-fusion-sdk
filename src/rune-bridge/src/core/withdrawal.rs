@@ -5,7 +5,7 @@ use std::str::FromStr;
 use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, Network, OutPoint, Transaction, TxOut, Txid};
-use bridge_utils::bft_bridge_api::BurntEventData;
+use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::operation_store::MinterOperationId;
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};

@@ -1,4 +1,4 @@
-use bridge_utils::bft_bridge_api::BurntEventData;
+use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::operation_store::MinterOperation;
 use candid::{CandidType, Nat, Principal};
 use did::{H256, U256};

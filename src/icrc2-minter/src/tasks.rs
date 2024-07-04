@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
-use bridge_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
+use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use bridge_utils::operation_store::MinterOperationId;
@@ -434,7 +434,7 @@ impl BridgeTask {
                     }
                 };
 
-                // Approve tokens only if the burner owns recepient wallet.
+                // Approve tokens only if the burner owns recipient wallet.
                 if notification.tx_sender != icrc_burn.recipient_address {
                     icrc_burn.approve_after_mint = None;
                 }
@@ -535,7 +535,7 @@ impl BridgeTask {
             return Ok(());
         };
 
-        let (signed_mint_order, amount, token_id, is_despoit) = match operation_state {
+        let (signed_mint_order, amount, token_id, is_deposit) = match operation_state {
             OperationState::Deposit(DepositOperationState::MintOrderSigned {
                 signed_mint_order,
                 amount,
@@ -570,7 +570,7 @@ impl BridgeTask {
             ));
         };
 
-        let mut tx = bft_bridge_api::mint_transaction(
+        let mut tx = bft_events::mint_transaction(
             sender.0,
             bridge_contract.0,
             evm_params.nonce.into(),
@@ -594,7 +594,7 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        if is_despoit {
+        if is_deposit {
             operation_store.update(
                 operation_id,
                 OperationState::Deposit(DepositOperationState::MintOrderSent {

@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use bridge_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
+use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
 use bridge_utils::operation_store::MinterOperationId;
 use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
@@ -408,7 +408,7 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        let mut tx = bft_bridge_api::mint_transaction(
+        let mut tx = bft_events::mint_transaction(
             sender.0,
             bft_bridge.0,
             nonce.into(),

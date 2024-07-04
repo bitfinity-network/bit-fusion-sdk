@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bridge_utils::bft_bridge_api::NotifyMinterEventData;
+use bridge_utils::bft_events::NotifyMinterEventData;
 use candid::{CandidType, Decode, Deserialize};
 use did::H160;
 

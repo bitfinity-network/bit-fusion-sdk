@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
-use bridge_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
+use bridge_utils::bft_events::{BridgeEvent, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Decode};
