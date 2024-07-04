@@ -1,5 +1,10 @@
 use std::time::Duration;
 
+use super::PocketIcTestContext;
+use crate::context::bridge_client::BridgeCanisterClient;
+use crate::context::{CanisterType, TestContext};
+use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
+use crate::utils::CHAIN_ID;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
@@ -8,14 +13,9 @@ use erc20_minter::operation::OperationStatus;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
+use ic_stable_structures::Storable as _;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
-use ic_stable_structures::Storable as _;
-use super::PocketIcTestContext;
-use crate::context::bridge_client::BridgeCanisterClient;
-use crate::context::{CanisterType, TestContext};
-use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
-use crate::utils::CHAIN_ID;
 
 pub struct ContextWithBridges {
     pub context: PocketIcTestContext,
@@ -606,7 +606,7 @@ async fn create_bft_bridge(
     let init_data = BFTBridge::initializeCall {
         minterAddress: minter_address.into(),
         feeChargeAddress: fee_charge.into(),
-        _isWrappedSide: is_wrapped,
+        isWrappedSide: is_wrapped,
     }
     .abi_encode();
 

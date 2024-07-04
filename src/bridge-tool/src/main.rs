@@ -510,7 +510,7 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     let init_data = BFTBridge::initializeCall {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
-        _isWrappedSide: args.is_wrapped_side,
+        isWrappedSide: args.is_wrapped_side,
     }
     .abi_encode();
 
@@ -799,7 +799,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     let input = BFTBridge::burnCall {
         amount: amount.into(),
         fromERC20: token.0.into(),
-        toTokenID: args.to_token_id.into()
+        toTokenID: alloy_sol_types::private::FixedBytes::from_slice(args.to_token_id.as_bytes()),
         recipientID: args.address.into_bytes().into(),
     }
     .abi_encode();

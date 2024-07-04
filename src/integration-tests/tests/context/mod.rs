@@ -282,7 +282,8 @@ pub trait TestContext {
         let init_data = BFTBridge::initializeCall {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
-            _isWrappedSide: is_wrapped,
+        
+            isWrappedSide: is_wrapped,
         }
         .abi_encode();
 
@@ -371,7 +372,7 @@ pub trait TestContext {
         let input = BFTBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.clone().into(),
-            toTokenID: to_token_id.into(),
+            toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id),
             recipientID: recipient.into(),
         }
         .abi_encode();
@@ -575,9 +576,10 @@ pub trait TestContext {
         let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
             .unwrap()
             ._0;
+
         println!(
-            "Deployed Wrapped token on block {} with address {token_address}",
-            results.1.block_number
+            "Deployed Wrapped token on block {} with address {address}",
+            receipt.block_number
         );
         Ok(address.into())
     }
