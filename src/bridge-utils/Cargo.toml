@@ -3,9 +3,6 @@ name = "bridge-utils"
 version.workspace = true
 edition.workspace = true
 
-[features]
-test-contracts = []
-
 [dependencies]
 alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }

@@ -8,6 +8,7 @@ edition.workspace = true
 [dependencies]
 alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 clap = { workspace = true }
 did = { workspace = true }
@@ -19,7 +20,6 @@ ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 hex = { workspace = true }
 ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
-bridge-utils = { path = "../bridge-utils", features = ["test-contracts"] }
 minter-did = { workspace = true, features = ["runes"] }
 rand = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
