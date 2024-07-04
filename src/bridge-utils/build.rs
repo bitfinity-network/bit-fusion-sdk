@@ -13,11 +13,12 @@ const SOLC_JOBS: usize = 10;
 
 fn main() -> anyhow::Result<()> {
     const ROOT_DIR: &str = "solidity";
-    const REMAPINGS_FILE: &str = "remappings.txt";
+    const REMAPPINGS_FILE: &str = "remappings.txt";
 
     let root: PathBuf = get_workspace_root_dir()?.join(ROOT_DIR);
     let mut optimizer = Optimizer::default();
     optimizer.enable();
+    optimizer.runs(20_000);
 
     let settings = Settings {
         optimizer,
@@ -26,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     };
     let mut paths = ProjectPathsConfig::dapptools(&root)?;
 
-    let remappings_file = root.join(REMAPINGS_FILE);
+    let remappings_file = root.join(REMAPPINGS_FILE);
 
     if remappings_file.exists() {
         let remappings = parse_remappings_file(&remappings_file)?;
@@ -36,17 +37,17 @@ fn main() -> anyhow::Result<()> {
     let project = ProjectBuilder::<SolcCompiler>::new(Default::default())
         .solc_jobs(SOLC_JOBS)
         .paths(paths)
-        .settings(settings)
         .ephemeral()
+        .settings(settings)
+        .ignore_paths(vec![root.join("test")])
         .build(SolcCompiler::AutoDetect)?;
 
     let output = project.compile()?;
 
-    assert!(!output.has_compiler_errors(), "{}", output.to_string());
-
     // Tell Cargo that if a source file changes, to rerun this build script.
     project.rerun_if_sources_changed();
 
+    assert!(!output.has_compiler_errors(), "{}", output.to_string());
     Ok(())
 }
 
@@ -58,16 +59,8 @@ pub fn get_workspace_root_dir() -> anyhow::Result<PathBuf> {
         .to_path_buf())
 }
 
-/// Parses a remappings file at the given path and returns a vector of remappings.
-///
-/// The remappings file is expected to contain one remapping per line, with
-/// each line
-/// having the format `<from>=<to>`. Empty lines and lines starting with `#`
-/// are ignored.
-///
-/// # Errors
-/// This function will return an error if the file cannot be read or if any of
-/// the remappings in the file are invalid.
+/// Parses a remappings file at the given path and returns a vector of
+/// remappings.
 fn parse_remappings_file(path: &Path) -> anyhow::Result<Vec<remappings::Remapping>> {
     // Read the file contents
     let contents = fs::read_to_string(path)?;
