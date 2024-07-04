@@ -282,7 +282,6 @@ pub trait TestContext {
         let init_data = BFTBridge::initializeCall {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
-        
             isWrappedSide: is_wrapped,
         }
         .abi_encode();
@@ -372,7 +371,7 @@ pub trait TestContext {
         let input = BFTBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.clone().into(),
-            toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id),
+            toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
             recipientID: recipient.into(),
         }
         .abi_encode();
