@@ -1,10 +1,20 @@
 pub mod scheduler;
 pub mod state;
 
-use self::state::State;
+use std::{cell::RefCell, rc::Rc};
+
+use ic_stable_structures::{
+    stable_structures::{DefaultMemoryImpl, Memory},
+    VirtualMemory,
+};
+
+use self::{scheduler::BridgeScheduler, state::State};
+
+pub type Mem = VirtualMemory<DefaultMemoryImpl>;
+pub type RuntimeState = Rc<RefCell<State<Mem>>>;
 
 pub struct BridgeRuntime<Mem: Memory> {
-    state: State<Mem>,
+    state: RuntimeState,
     scheduler: BridgeScheduler<Mem>,
 }
 

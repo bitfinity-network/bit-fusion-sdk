@@ -6,7 +6,7 @@ use crate::signer::SignerStorage;
 
 use self::config::ConfigStorage;
 
-pub struct StateMemory<Mem: Memory> {
+pub struct StateMemory<Mem> {
     pub config_memory: Mem,
     pub signer_memory: Mem,
 }
