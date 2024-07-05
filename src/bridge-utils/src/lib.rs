@@ -6,10 +6,8 @@ pub mod mint_orders;
 pub mod operation_store;
 pub mod query;
 
-use serde::{Deserialize, Serialize};
-
 sol! {
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug)]
     BFTBridge,
     "../../solidity/out/BftBridge.sol/BFTBridge.json"
 }

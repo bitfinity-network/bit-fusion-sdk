@@ -8,8 +8,9 @@ use foundry_compilers::{ProjectBuilder, ProjectPathsConfig};
 
 /// The number of parallel Solidity compiler jobs to use when compiling the
 /// project.
-/// This value is set to 10 to take advantage of modern multi-core CPUs and speed up the compilation process.
 const SOLC_JOBS: usize = 10;
+/// Number of runs to perform when optimizing the contracts.
+const RUNS: usize = 20_000;
 
 fn main() -> anyhow::Result<()> {
     const ROOT_DIR: &str = "solidity";
@@ -18,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     let root: PathBuf = get_workspace_root_dir()?.join(ROOT_DIR);
     let mut optimizer = Optimizer::default();
     optimizer.enable();
-    optimizer.runs(20_000);
+    optimizer.runs(RUNS);
 
     let settings = Settings {
         optimizer,
