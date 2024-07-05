@@ -1,7 +1,7 @@
+use bridge_utils::operation_store::MinterOperationId;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use icrc2_minter::operation::OperationState;
-use minter_contract_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 

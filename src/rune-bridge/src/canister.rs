@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use bitcoin::Address;
+use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -17,7 +18,6 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 
 use crate::core::deposit::RuneDeposit;
 use crate::interface::GetAddressError;

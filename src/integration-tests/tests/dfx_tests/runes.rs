@@ -2,6 +2,10 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
+use alloy_sol_types::SolCall;
+use bridge_utils::evm_link::EvmLink;
+use bridge_utils::operation_store::MinterOperationId;
+use bridge_utils::BFTBridge;
 use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -9,14 +13,10 @@ use did::{BlockNumber, TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
-use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
-use minter_contract_utils::bft_bridge_api;
-use minter_contract_utils::evm_link::EvmLink;
-use minter_contract_utils::operation_store::MinterOperationId;
 use minter_did::id256::Id256;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
@@ -304,12 +304,12 @@ impl RunesContext {
             erc20_address: erc20_address.clone(),
             amounts: None,
         };
-        let input = bft_bridge_api::NOTIFY_MINTER
-            .encode_input(&[
-                Token::Uint(RuneMinterNotification::DEPOSIT_TYPE.into()),
-                Token::Bytes(Encode!(&data).unwrap()),
-            ])
-            .unwrap();
+
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: RuneMinterNotification::DEPOSIT_TYPE,
+            userData: Encode!(&data).unwrap().into(),
+        }
+        .abi_encode();
 
         let transaction = TransactionBuilder {
             from: &self.eth_wallet.address().into(),
