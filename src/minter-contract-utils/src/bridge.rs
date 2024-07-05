@@ -116,16 +116,6 @@ pub trait BftBridge {
         self.context()
             .schedule_operation(id, TaskOptions::default());
 
-        self.context()
-            .create_operation(id, Operation::Deposit(op))?;
-        self.context()
-            .schedule_operation(id, TaskOptions::default());
-
-        self.context()
-            .create_operation(id, Operation::Deposit(op))?;
-        self.context()
-            .schedule_operation(id, TaskOptions::default());
-
         Ok(())
     }
 

@@ -5,49 +5,49 @@ use solidity_helper::error::SolidityHelperError;
 use solidity_helper::{compile_solidity_contracts, SolidityContract};
 
 fn main() -> anyhow::Result<()> {
-    let contracts = match compile_solidity_contracts(None, None) {
-        Ok(c) => c,
-        Err(SolidityHelperError::IoError(err)) if err.kind() == ErrorKind::NotFound => {
-            return Err(anyhow::anyhow!(
-                "`forge` executable not found. Try installing forge with foundry: https://book.getfoundry.sh/getting-started/installation or check if it is present in the PATH"
-            ))
-        }
-        Err(err) => {
-            return Err(anyhow::anyhow!("Failed to compile solidity contracts: {err:?}"))
-        }
-    };
+    // let contracts = match compile_solidity_contracts(None, None) {
+    //     Ok(c) => c,
+    //     Err(SolidityHelperError::IoError(err)) if err.kind() == ErrorKind::NotFound => {
+    //         return Err(anyhow::anyhow!(
+    //             "`forge` executable not found. Try installing forge with foundry: https://book.getfoundry.sh/getting-started/installation or check if it is present in the PATH"
+    //         ))
+    //     }
+    //     Err(err) => {
+    //         return Err(anyhow::anyhow!("Failed to compile solidity contracts: {err:?}"))
+    //     }
+    // };
 
-    set_contract_code(
-        &contracts,
-        "WrappedToken",
-        "BUILD_SMART_CONTRACT_WRAPPED_TOKEN_HEX_CODE",
-    );
-    set_contract_code(
-        &contracts,
-        "BFTBridge",
-        "BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE",
-    );
-    set_contract_code(
-        &contracts,
-        "FeeCharge",
-        "BUILD_SMART_CONTRACT_FEE_CHARGE_HEX_CODE",
-    );
-    set_deployed_contract_code(
-        &contracts,
-        "BFTBridge",
-        "BUILD_SMART_CONTRACT_BFT_BRIDGE_DEPLOYED_HEX_CODE",
-    );
-    set_contract_code(
-        &contracts,
-        "WatermelonToken",
-        "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
-    );
+    // set_contract_code(
+    //     &contracts,
+    //     "WrappedToken",
+    //     "BUILD_SMART_CONTRACT_WRAPPED_TOKEN_HEX_CODE",
+    // );
+    // set_contract_code(
+    //     &contracts,
+    //     "BFTBridge",
+    //     "BUILD_SMART_CONTRACT_BFT_BRIDGE_HEX_CODE",
+    // );
+    // set_contract_code(
+    //     &contracts,
+    //     "FeeCharge",
+    //     "BUILD_SMART_CONTRACT_FEE_CHARGE_HEX_CODE",
+    // );
+    // set_deployed_contract_code(
+    //     &contracts,
+    //     "BFTBridge",
+    //     "BUILD_SMART_CONTRACT_BFT_BRIDGE_DEPLOYED_HEX_CODE",
+    // );
+    // set_contract_code(
+    //     &contracts,
+    //     "WatermelonToken",
+    //     "BUILD_SMART_CONTRACT_TEST_WTM_HEX_CODE",
+    // );
 
-    set_contract_code(
-        &contracts,
-        "UUPSProxy",
-        "BUILD_SMART_CONTRACT_UUPS_PROXY_HEX_CODE",
-    );
+    // set_contract_code(
+    //     &contracts,
+    //     "UUPSProxy",
+    //     "BUILD_SMART_CONTRACT_UUPS_PROXY_HEX_CODE",
+    // );
 
     Ok(())
 }

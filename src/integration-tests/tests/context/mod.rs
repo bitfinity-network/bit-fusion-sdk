@@ -1007,8 +1007,8 @@ pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> 
     InitData {
         owner,
         evm_principal,
-        signing_strategy: SigningStrategy::Local {
-            private_key: wallet.signer().to_bytes().into(),
+        signing_strategy: SigningStrategy::ManagementCanister {
+            key_id: eth_signer::ic_sign::SigningKeyId::PocketIc,
         },
         log_settings: Some(LogSettings {
             enable_console: true,

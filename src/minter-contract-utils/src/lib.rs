@@ -9,4 +9,5 @@ pub mod mint_orders;
 pub mod operation_store;
 pub mod query;
 pub mod runtime;
+pub mod signer;
 pub mod wrapped_token_api;
