@@ -8,13 +8,16 @@ use thiserror::Error;
 use crate::{
     bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventData},
     evm_bridge::EvmParams,
+    evm_link::EvmLink,
 };
 
 type StageId = u64;
 
 pub type BftResult<T> = Result<T, Error>;
 
-pub trait Operation: Sized + CandidType + for<'de> Deserialize<'de> + Clone + 'static {
+pub trait Operation:
+    Sized + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static
+{
     async fn progress(self, ctx: impl OperationContext) -> Result<Self, Error>;
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
@@ -25,6 +28,8 @@ pub trait Operation: Sized + CandidType + for<'de> Deserialize<'de> + Clone + 's
 }
 
 pub trait OperationContext {
+    fn get_evm_link(&self) -> EvmLink;
+    fn get_bridge_contract_address(&self) -> H160;
     fn get_evm_params(&self) -> BftResult<EvmParams>;
     fn get_signer(&self) -> impl TransactionSigner;
 }

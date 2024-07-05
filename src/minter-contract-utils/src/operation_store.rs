@@ -13,6 +13,8 @@ use ic_stable_structures::{
 };
 use serde::Serialize;
 
+use crate::bridge2::Operation;
+
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
 
@@ -120,10 +122,6 @@ impl Default for MinterOperationStoreOptions {
     }
 }
 
-pub trait MinterOperation {
-    fn is_complete(&self) -> bool;
-}
-
 /// A structure to store user-initiated operations in IC stable memory.
 ///
 /// Every operation in the store is attached to a ETH wallet address that initiated the operation.
@@ -134,7 +132,7 @@ pub trait MinterOperation {
 pub struct MinterOperationStore<M, P>
 where
     M: Memory,
-    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: Operation,
 {
     incomplete_operations: CachedStableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
     operations_log: StableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
@@ -145,7 +143,7 @@ where
 impl<M, P> MinterOperationStore<M, P>
 where
     M: Memory,
-    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: Operation,
 {
     /// Creates a new instance of the store.
     pub fn with_memory(
@@ -286,12 +284,21 @@ where
 mod tests {
     use ic_stable_structures::VectorMemory;
 
+    use crate::bridge2::OperationContext;
+
     use super::*;
 
     const COMPLETE: u32 = u32::MAX;
-    impl MinterOperation for u32 {
+    impl Operation for u32 {
         fn is_complete(&self) -> bool {
             *self == COMPLETE
+        }
+
+        async fn progress(
+            self,
+            _ctx: impl OperationContext,
+        ) -> Result<Self, crate::bridge2::Error> {
+            todo!()
         }
     }
 
