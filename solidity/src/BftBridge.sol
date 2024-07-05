@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "forge-std/console.sol";
 
 contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     using RingBuffer for RingBuffer.RingBufferUint32;
@@ -87,15 +88,23 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _disableInitializers();
     }
 
+    function isBridgeWrapped() public view returns (bool) {
+        return _isWrappedSide;
+    }
+
     /// Constructor to initialize minterCanisterAddress and feeChargeContract
     /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) external initializer {
+    function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
+        // print out the arguments
+        console.log("minterAddress: %s", minterAddress);
+        console.log("feeChargeAddress: %s", feeChargeAddress);
+        console.log("isWrappedSide: %s", isWrappedSide);
+
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        __TokenManager_init(_isWrappedSide);
+        TokenManager.__initialize(isWrappedSide);
 
         controllerAccessList[msg.sender] = true;
-
         // Call super initializer
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -127,7 +136,6 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _;
     }
 
-    /// Add a new implementation to the allowed list
     /// Add a new implementation to the allowed list
     function addAllowedImplementation(bytes32 bytecodeHash) external onlyControllers {
         require(!allowedImplementations[bytecodeHash], "Implementation already allowed");

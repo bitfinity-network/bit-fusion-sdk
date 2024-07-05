@@ -55,12 +55,13 @@ contract BftBridgeTest is Test {
         vm.startPrank(_owner);
 
         // Encode the initialization call
-        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+        bytes memory wrappedInitializeData =
+            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
         Options memory opts;
         // Skips all upgrade safety checks
         opts.unsafeSkipAllChecks = true;
 
-        wrappedProxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", initializeData, opts);
+        wrappedProxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", wrappedInitializeData, opts);
 
         // Cast the proxy to BFTBridge
         _wrappedBridge = BFTBridge(address(wrappedProxy));
@@ -177,6 +178,9 @@ contract BftBridgeTest is Test {
     }
 
     function testListTokenPairs() public {
+        // print the isWrapped flag for the bridge
+        console.log("isWrapped: %s", _wrappedBridge.isBridgeWrapped());
+
         bytes32[3] memory base_token_ids = [
             _createIdFromPrincipal(abi.encodePacked(uint8(1))),
             _createIdFromPrincipal(abi.encodePacked(uint8(2))),

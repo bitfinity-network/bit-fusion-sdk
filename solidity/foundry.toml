@@ -8,6 +8,7 @@ build_info = true
 extra_output = ["storageLayout"]
 script = "script"
 force = true
+fs_permissions = [{ access = "read", path = "./out" }]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 

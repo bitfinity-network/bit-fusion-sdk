@@ -6,12 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
+import "forge-std/console.sol";
 abstract contract TokenManager is Initializable {
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
-    bool internal _isWrappedSide;
+    bool public _isWrappedSide;
 
     /// Mapping from `base token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
     mapping(bytes32 => address) internal _baseToWrapped;
@@ -32,7 +32,8 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function __TokenManager_init(bool isWrappedSide) internal onlyInitializing {
+    function __initialize(bool isWrappedSide) internal view onlyInitializing {
+        console.log("Token Manager isWrappedSide: %s", isWrappedSide);
         isWrappedSide = _isWrappedSide;
     }
 
