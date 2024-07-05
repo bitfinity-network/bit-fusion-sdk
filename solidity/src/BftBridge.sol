@@ -41,6 +41,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Allowed implementations hash list
     mapping(bytes32 => bool) public allowedImplementations;
 
+    /// Controller AccessList for adding implementations
+    mapping(address => bool) public controllerAccessList;
+
     struct MintOrderData {
         uint256 amount;
         bytes32 senderID;
@@ -87,10 +90,11 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Constructor to initialize minterCanisterAddress and feeChargeContract
     /// and whether this contract is on the wrapped side
     function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
-        feeChargeContract = IFeeCharge(feeChargeAddress);
         minterCanisterAddress = minterAddress;
-        TokenManager._initialize(isWrappedSide);
+        feeChargeContract = IFeeCharge(feeChargeAddress);
+        __TokenManager__initi(isWrappedSide);
 
+        controllerAccessList[msg.sender] = true;
         // Call super initializer
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -114,12 +118,19 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _unpause();
     }
 
-    /// Add a new implementation to the allowed list
-    function addAllowedImplementation(address newImplementation) external onlyOwner {
-        require(newImplementation != address(0), "Invalid implementation address");
-        require(newImplementation.code.length > 0, "Not a contract");
+    /// Modifier that restricts access to only addresses in the
+    /// `controllerAccessList`.
+    /// This modifier can be used on functions that should only be callable by authorized controllers.
+    modifier onlyControllers() {
+        require(controllerAccessList[msg.sender], "Not a controller");
+        _;
+    }
 
-        allowedImplementations[newImplementation.codehash] = true;
+    /// Add a new implementation to the allowed list
+    function addAllowedImplementation(bytes32 bytecodeHash) external onlyControllers {
+        require(!allowedImplementations[bytecodeHash], "Implementation already allowed");
+
+        allowedImplementations[bytecodeHash] = true;
     }
 
     /// Emit minter notification event with the given `userData`. For details
@@ -127,6 +138,18 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, msg.sender, userData);
+    }
+
+    /// Adds the given `controller` address to the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function addController(address controller) external onlyOwner {
+        controllerAccessList[controller] = true;
+    }
+
+    /// Removes the given `controller` address from the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function removeController(address controller) external onlyOwner {
+        controllerAccessList[controller] = false;
     }
 
     /// Main function to withdraw funds

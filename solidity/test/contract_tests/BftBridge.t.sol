@@ -285,13 +285,13 @@ contract BftBridgeTest is Test {
     }
 
     function testAddAllowedImplementation() public {
-        vm.startPrank(_owner);
+        vm.startPrank(_owner, _owner);
 
         BFTBridge _newImpl = new BFTBridge();
 
         newImplementation = address(_newImpl);
 
-        _wrappedBridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation.codehash);
 
         assertTrue(_wrappedBridge.allowedImplementations(newImplementation.codehash));
 
@@ -303,16 +303,23 @@ contract BftBridgeTest is Test {
 
         vm.expectRevert();
 
-        _wrappedBridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation.codehash);
     }
 
-    function testAddAllowedImplementationEmptyAddress() public {
-        vm.prank(_owner);
-        newImplementation = address(0);
+    function testAddAllowedImplementationByAController() public {
+        vm.startPrank(_owner);
+        BFTBridge _newImpl = new BFTBridge();
 
-        vm.expectRevert();
+        newImplementation = address(_newImpl);
 
-        _wrappedBridge.addAllowedImplementation(newImplementation);
+        address controller = address(55);
+        _wrappedBridge.addController(controller);
+
+        vm.stopPrank();
+
+        vm.prank(controller);
+
+        _wrappedBridge.addAllowedImplementation(newImplementation.codehash);
     }
 
     /// Test that the bridge can be upgraded to a new implementation
@@ -325,7 +332,7 @@ contract BftBridgeTest is Test {
 
         newImplementation = address(_newImpl);
 
-        _wrappedBridge.addAllowedImplementation(newImplementation);
+        _wrappedBridge.addAllowedImplementation(newImplementation.codehash);
         assertTrue(_wrappedBridge.allowedImplementations(newImplementation.codehash));
 
         // Wrap in ABI for easier testing

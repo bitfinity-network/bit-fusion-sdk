@@ -11,7 +11,7 @@ force = true
 evm_version = 'paris'
 optimizer = true
 optimizer_runs = 20_00
-
+fs_permissions = [{ access = "read", path = "./out" }]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [fmt]
