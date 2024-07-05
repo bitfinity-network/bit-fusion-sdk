@@ -48,30 +48,20 @@ task('upgrade-bft', 'Upgrades the BFT contract')
                     }
                 });
             }
-
             validateAddresses(proxyAddress, minterAddress, feeChargeAddress);
-
-
             console.log('Deploying new implementation contract...');
 
             //! Change this to the new implementation contract
             const BftBridgeV2 = await hre.ethers.getContractFactory('BFTBridgeV2');
-
-
-
             /// Make sure you use the proxy contract address to get the
             /// contract instance
             /// and the old implementation contract should be the one that is currently deployed
             const BftBridge = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
-
-
-
             const newImplementationDeployment: DeployImplementationResponse = await hre.upgrades.prepareUpgrade(proxyAddress, BftBridgeV2, {
                 kind: 'uups'
             });
 
             const newImplementationAddress: string = typeof newImplementationDeployment === 'string' ? newImplementationDeployment : await newImplementationDeployment.wait().then((tx) => tx?.contractAddress!);
-
 
             console.log(`New implementation contract deployed at: ${newImplementationAddress}`);
 
@@ -91,7 +81,6 @@ task('upgrade-bft', 'Upgrades the BFT contract')
             }
 
             console.log('New implementation added successfully.');
-
 
             console.log('Retrieving current proxy contract...');
 
