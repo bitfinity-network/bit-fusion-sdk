@@ -16,6 +16,34 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
+    // Additional gas amount for fee charge.
+    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
+    uint256 constant additionalGasFee = 1000;
+
+    // Has a user's transaction nonce been used?
+    mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
+
+    // Blocknumbers for users deposit Ids.
+    mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
+
+    // Last 255 user's burn operations.
+    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
+
+    // Address of feeCharge contract
+    IFeeCharge public feeChargeContract;
+
+    // Operataion ID counter
+    uint32 public operationIDCounter;
+
+    // Address of minter canister
+    address public minterCanisterAddress;
+
+    /// Allowed implementations hash list
+    mapping(bytes32 => bool) public allowedImplementations;
+
+    /// Controller AccessList for adding implementations
+    mapping(address => bool) public controllerAccessList;
+
     struct MintOrderData {
         uint256 amount;
         bytes32 senderID;
@@ -31,31 +59,6 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint256 approveAmount;
         address feePayer;
     }
-
-    // Additional gas amount for fee charge.
-    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
-    uint256 constant additionalGasFee = 1000;
-
-    // Has a user's transaction nonce been used?
-    mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
-
-    // Blocknumbers for users deposit Ids.
-    mapping(address => mapping(uint8 => uint32)) private _userDepositBlocks;
-
-    // Last 255 user's burn operations.
-    mapping(address => RingBuffer.RingBufferUint32) private _lastUserBurns;
-
-    // Address of minter canister
-    address public minterCanisterAddress;
-
-    // Address of feeCharge contract
-    IFeeCharge public feeChargeContract;
-
-    // Operataion ID counter
-    uint32 public operationIDCounter;
-
-    /// Allowed implementations hash list
-    mapping(bytes32 => bool) public allowedImplementations;
 
     // Event for mint operation
     event MintTokenEvent(
@@ -86,11 +89,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     /// Constructor to initialize minterCanisterAddress and feeChargeContract
     /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool _isWrappedSide) public initializer {
+    function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        TokenManager._initialize(_isWrappedSide);
+        __TokenManager__initi(isWrappedSide);
 
+        controllerAccessList[msg.sender] = true;
         // Call super initializer
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -114,12 +118,19 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _unpause();
     }
 
-    /// Add a new implementation to the allowed list
-    function addAllowedImplementation(address newImplementation) external onlyOwner {
-        require(newImplementation != address(0), "Invalid implementation address");
-        require(newImplementation.code.length > 0, "Not a contract");
+    /// Modifier that restricts access to only addresses in the
+    /// `controllerAccessList`.
+    /// This modifier can be used on functions that should only be callable by authorized controllers.
+    modifier onlyControllers() {
+        require(controllerAccessList[msg.sender], "Not a controller");
+        _;
+    }
 
-        allowedImplementations[newImplementation.codehash] = true;
+    /// Add a new implementation to the allowed list
+    function addAllowedImplementation(bytes32 bytecodeHash) external onlyControllers {
+        require(!allowedImplementations[bytecodeHash], "Implementation already allowed");
+
+        allowedImplementations[bytecodeHash] = true;
     }
 
     /// Emit minter notification event with the given `userData`. For details
@@ -127,6 +138,18 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// check the implementation of the corresponding minter.
     function notifyMinter(uint32 notificationType, bytes calldata userData) external {
         emit NotifyMinterEvent(notificationType, msg.sender, userData);
+    }
+
+    /// Adds the given `controller` address to the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function addController(address controller) external onlyOwner {
+        controllerAccessList[controller] = true;
+    }
+
+    /// Removes the given `controller` address from the `controllerAccessList`.
+    /// This function can only be called by the contract owner.
+    function removeController(address controller) external onlyOwner {
+        controllerAccessList[controller] = false;
     }
 
     /// Main function to withdraw funds
@@ -137,34 +160,21 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         _checkMintOrderSignature(encodedOrder);
 
-        // Cases:
-        // 1. `_erc20TokenRegistry` contains the `order.fromTokenID`. So, we are in WrappedToken side.
-        // 2. `_erc20TokenRegistry` does not contain the `order.fromTokenID`. So:
-        //   a. We are in BaseToken side.
-        //   b. We are minting NativeToken.
-        address toToken = _erc20TokenRegistry[order.fromTokenID];
-
-        // If we mint base token we don't have information about token pairs.
-        // So, we need to get it from the order.
-        if (toToken == address(0)) {
-            toToken = order.toERC20;
-        }
-
-        // The toToken should be a valid token address.
-        // This should never fail.
-        require(toToken != address(0), "toToken address should be specified correctly");
-
         // Update token's metadata only if it is a wrapped token
-        if (isWrappedSide) {
-            updateTokenMetadata(toToken, order.name, order.symbol, order.decimals);
+        bool isTokenWrapped = _wrappedToBase[order.toERC20] == order.fromTokenID;
+        // the token must be registered or the side must be base
+        require(isBaseSide() || isTokenWrapped, "Invalid token pair");
+
+        if (isTokenWrapped) {
+            updateTokenMetadata(order.toERC20, order.name, order.symbol, order.decimals);
         }
 
         // Execute the withdrawal
         _isNonceUsed[order.senderID][order.nonce] = true;
-        IERC20(toToken).safeTransfer(order.recipient, order.amount);
+        IERC20(order.toERC20).safeTransfer(order.recipient, order.amount);
 
-        if (order.approveSpender != address(0) && order.approveAmount != 0 && isWrappedSide) {
-            WrappedToken(toToken).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
+        if (order.approveSpender != address(0) && order.approveAmount != 0 && isTokenWrapped) {
+            WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
         if (
@@ -177,7 +187,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         }
 
         // Emit event
-        emit MintTokenEvent(order.amount, order.fromTokenID, order.senderID, toToken, order.recipient, order.nonce);
+        emit MintTokenEvent(
+            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce
+        );
     }
 
     /// Getter function for block numbers
@@ -188,15 +200,22 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes memory recipientID) public whenNotPaused returns (uint32) {
+    function burn(
+        uint256 amount,
+        address fromERC20,
+        bytes32 toTokenID,
+        bytes memory recipientID
+    ) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
+        require(fromERC20 != address(0), "Invalid from address; must not be zero address");
+        // Check if the token is registered on the bridge or the side is base
+        require(
+            isBaseSide() || (_wrappedToBase[fromERC20] != bytes32(0) && _baseToWrapped[toTokenID] != address(0)),
+            "Invalid from address; not registered in the bridge"
+        );
+        require(amount > 0, "Invalid burn amount");
 
         IERC20(fromERC20).safeTransferFrom(msg.sender, address(this), amount);
-
-        bytes32 toTokenID = _baseTokenRegistry[fromERC20];
-
-        require(amount > 0, "Invalid burn amount");
-        require(fromERC20 != address(0), "Invalid from address");
 
         // Update user information about burn operations.
         _lastUserBurns[msg.sender].push(uint32(block.number));
@@ -248,10 +267,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         // Check if withdrawal is happening on the correct chain
         require(block.chainid == recipientChainID, "Invalid chain ID");
 
-        if (_baseTokenRegistry[order.toERC20] != bytes32(0)) {
-            require(
-                _erc20TokenRegistry[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair"
-            );
+        if (_wrappedToBase[order.toERC20] != bytes32(0)) {
+            require(_baseToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair");
         }
     }
 

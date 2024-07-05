@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -18,7 +19,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
 use minter_did::init::InitData;

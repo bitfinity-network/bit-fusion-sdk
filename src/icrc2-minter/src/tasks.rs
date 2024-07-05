@@ -4,6 +4,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::evm_link::address_to_icrc_subaccount;
+use bridge_utils::operation_store::MinterOperationId;
+use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -16,11 +21,6 @@ use ic_task_scheduler::SchedulerError;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::evm_link::address_to_icrc_subaccount;
-use minter_contract_utils::operation_store::MinterOperationId;
-use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::{self, MintOrder};
@@ -265,6 +265,7 @@ impl BridgeTask {
             decimals: token_info.decimals,
             src_token: reason.icrc2_token_principal,
             recipient_address: reason.recipient_address,
+            erc20_token_address: reason.erc20_token_address,
             fee_payer: reason.fee_payer,
             approve_after_mint: reason.approve_after_mint,
         };
@@ -346,7 +347,7 @@ impl BridgeTask {
             sender,
             src_token,
             recipient: burnt_data.recipient_address,
-            dst_token: H160::default(), // will be selected in the contract.
+            dst_token: burnt_data.erc20_token_address,
             nonce,
             sender_chain_id,
             recipient_chain_id,
@@ -434,7 +435,7 @@ impl BridgeTask {
                     }
                 };
 
-                // Approve tokens only if the burner owns recepient wallet.
+                // Approve tokens only if the burner owns recipient wallet.
                 if notification.tx_sender != icrc_burn.recipient_address {
                     icrc_burn.approve_after_mint = None;
                 }
@@ -535,7 +536,7 @@ impl BridgeTask {
             return Ok(());
         };
 
-        let (signed_mint_order, amount, token_id, is_despoit) = match operation_state {
+        let (signed_mint_order, amount, token_id, is_deposit) = match operation_state {
             OperationState::Deposit(DepositOperationState::MintOrderSigned {
                 signed_mint_order,
                 amount,
@@ -570,7 +571,7 @@ impl BridgeTask {
             ));
         };
 
-        let mut tx = bft_bridge_api::mint_transaction(
+        let mut tx = bft_events::mint_transaction(
             sender.0,
             bridge_contract.0,
             evm_params.nonce.into(),
@@ -594,7 +595,7 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        if is_despoit {
+        if is_deposit {
             operation_store.update(
                 operation_id,
                 OperationState::Deposit(DepositOperationState::MintOrderSent {
@@ -700,6 +701,7 @@ impl BridgeTask {
                     amount: burnt_event.amount,
                     src_token: to_token,
                     recipient_address: burnt_event.sender,
+                    erc20_token_address: burnt_event.from_erc20,
                     operation_id: operation_id.nonce(),
                     name,
                     symbol,
@@ -804,6 +806,7 @@ pub struct BurntIcrc2Data {
     pub amount: did::U256,
     pub src_token: Principal,
     pub recipient_address: did::H160,
+    pub erc20_token_address: did::H160,
     pub operation_id: u32,
     pub name: [u8; 32],
     pub symbol: [u8; 16],
