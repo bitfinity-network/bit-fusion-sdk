@@ -8,9 +8,6 @@ import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Upgrades } from "@openzeppelin-foundry-upgrades/Upgrades.sol";
-import { Options } from "@openzeppelin-foundry-upgrades/Options.sol";
 
 contract BftBridgeTest is Test {
     using StringUtils for string;
@@ -55,13 +52,13 @@ contract BftBridgeTest is Test {
         vm.startPrank(_owner);
 
         // Encode the initialization call
-        bytes memory wrappedInitializeData =
-            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
-        Options memory opts;
-        // Skips all upgrade safety checks
-        opts.unsafeSkipAllChecks = true;
+        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
 
-        wrappedProxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", wrappedInitializeData, opts);
+        BFTBridge wrappedImpl = new BFTBridge();
+
+        UUPSProxy wrappedProxyContract = new UUPSProxy(address(wrappedImpl), initializeData);
+
+        wrappedProxy = address(wrappedProxyContract);
 
         // Cast the proxy to BFTBridge
         _wrappedBridge = BFTBridge(address(wrappedProxy));
@@ -69,11 +66,12 @@ contract BftBridgeTest is Test {
         // Encode the initialization call
         bytes memory baseInitializeData =
             abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false);
-        Options memory baseOpts;
-        // Skips all upgrade safety checks
-        baseOpts.unsafeSkipAllChecks = true;
 
-        baseProxy = Upgrades.deployUUPSProxy("BftBridge.sol:BFTBridge", baseInitializeData, baseOpts);
+        BFTBridge baseImpl = new BFTBridge();
+
+        UUPSProxy baseProxyContract = new UUPSProxy(address(baseImpl), baseInitializeData);
+
+        baseProxy = address(baseProxyContract);
 
         // Cast the proxy to BFTBridge
         _baseBridge = BFTBridge(address(baseProxy));

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Principal};
 pub use config::Config;
 use eth_signer::sign_strategy::{
@@ -8,7 +9,6 @@ use eth_signer::sign_strategy::{
 use ic_log::LogSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
-use minter_contract_utils::evm_link::EvmLink;
 use serde::Deserialize;
 
 use self::log::LoggerConfigService;

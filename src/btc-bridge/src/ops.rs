@@ -259,7 +259,7 @@ async fn send_mint_order(
         (evm_info, evm_params)
     };
 
-    let mut tx = minter_contract_utils::bft_bridge_api::mint_transaction(
+    let mut tx = bridge_utils::bft_events::mint_transaction(
         sender.0,
         evm_info.bridge_contract.0,
         evm_params.nonce.into(),

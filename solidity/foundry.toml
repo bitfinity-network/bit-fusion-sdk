@@ -8,9 +8,11 @@ build_info = true
 extra_output = ["storageLayout"]
 script = "script"
 force = true
-fs_permissions = [{ access = "read", path = "./out" }]
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+evm_version = 'paris'
+optimizer = true
+optimizer_runs = 20_00
 
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [fmt]
 line_length = 120
@@ -22,9 +24,3 @@ quote_style = 'double'
 number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
-
-
-[rpc_endpoints]
-mainnet = "https://mainnet.bitfinity.network"
-testnet = "https://testnet.bitfinity.network"
-local = "http://localhost:8545"
