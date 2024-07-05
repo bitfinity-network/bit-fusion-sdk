@@ -1,24 +1,22 @@
-use std::{cell::RefCell, future::Future, marker::PhantomData, pin::Pin, rc::Rc};
+use std::{future::Future, marker::PhantomData, pin::Pin};
 
-use did::H160;
+use candid::CandidType;
 use ic_stable_structures::StableBTreeMap;
 use ic_task_scheduler::{
     scheduler::{Scheduler, TaskScheduler},
     task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus},
     SchedulerError,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{bridge2::BftResult, bridge2::Operation, operation_store::OperationId};
+use crate::{bridge::BftResult, bridge::Operation, operation_store::OperationId};
 
 use super::RuntimeState;
 
-pub type TasksStorage<Mem> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, Mem>;
-pub type BridgeScheduler<Mem> = Scheduler<BridgeTask, TasksStorage<Mem>>;
+pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask<Op>>, Mem>;
+pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;
 
-fn log_task_execution_error<Op>(task: InnerScheduledTask<BridgeTask>)
-where
-    Op: TaskContext + std::clone::Clone,
-{
+fn log_task_execution_error<Op: Operation>(task: InnerScheduledTask<BridgeTask<Op>>) {
     match task.status() {
         TaskStatus::Failed {
             timestamp_secs,
@@ -38,26 +36,34 @@ where
     };
 }
 
-#[derive(Debug, Clone)]
-pub enum BridgeTask {
-    Operation(OperationId),
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+pub enum BridgeTask<Op> {
+    Operation(OperationId, Op),
     Service(ServiceTask),
 }
 
-impl BridgeTask {
+impl<Op: Operation> BridgeTask<Op> {
     async fn execute_inner(
         self,
-        mut ctx: RuntimeState,
+        ctx: RuntimeState<Op>,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> BftResult<()> {
         match self {
-            BridgeTask::Operation(id) => {
-                let operation = ctx.get_operation(id)?;
-                let new_operation = operation.progress().await?;
+            BridgeTask::Operation(id, _) => {
+                let Some(operation) = ctx.borrow().operations.get(id) else {
+                    log::warn!("Operation#{id} not found.");
+                    return Err(crate::bridge::Error::OperationNotFound(id));
+                };
+
+                let new_operation = operation.progress(ctx.clone()).await?;
                 let scheduling_options = new_operation.scheduling_options();
-                ctx.update_operation(id, new_operation)?;
+                ctx.borrow_mut()
+                    .operations
+                    .update(id, new_operation.clone());
+
                 if let Some(options) = scheduling_options {
-                    let scheduled_task = ScheduledTask::with_options(Self::Operation(id), options);
+                    let scheduled_task =
+                        ScheduledTask::with_options(Self::Operation(id, new_operation), options);
                     task_scheduler.append_task(scheduled_task);
                 }
 
@@ -68,17 +74,17 @@ impl BridgeTask {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub enum ServiceTask {
     CollectEvmEvents,
 }
 
-impl Task for BridgeTask {
-    type Ctx = RuntimeState;
+impl<Op: Operation> Task for BridgeTask<Op> {
+    type Ctx = RuntimeState<Op>;
 
     fn execute(
         &self,
-        ctx: RuntimeState,
+        ctx: RuntimeState<Op>,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let self_clone = self.clone();
@@ -89,15 +95,6 @@ impl Task for BridgeTask {
                 .into_scheduler_result()
         })
     }
-}
-
-pub trait TaskContext {
-    type Op: Operation;
-
-    fn get_operation(&self, id: OperationId) -> BftResult<Self::Op>;
-    fn get_operation_id_by_address(&self, address: H160, nonce: u32) -> BftResult<OperationId>;
-    fn create_operation(&mut self, op: Self::Op) -> OperationId;
-    fn update_operation(&mut self, id: OperationId, op: Self::Op) -> BftResult<()>;
 }
 
 trait IntoSchedulerError {

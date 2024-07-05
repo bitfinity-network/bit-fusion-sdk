@@ -13,7 +13,7 @@ use ic_stable_structures::{
 };
 use serde::Serialize;
 
-use crate::bridge2::Operation;
+use crate::bridge::Operation;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
@@ -284,7 +284,7 @@ where
 mod tests {
     use ic_stable_structures::VectorMemory;
 
-    use crate::bridge2::OperationContext;
+    use crate::bridge::OperationContext;
 
     use super::*;
 
@@ -294,10 +294,7 @@ mod tests {
             *self == COMPLETE
         }
 
-        async fn progress(
-            self,
-            _ctx: impl OperationContext,
-        ) -> Result<Self, crate::bridge2::Error> {
+        async fn progress(self, _ctx: impl OperationContext) -> Result<Self, crate::bridge::Error> {
             todo!()
         }
     }
