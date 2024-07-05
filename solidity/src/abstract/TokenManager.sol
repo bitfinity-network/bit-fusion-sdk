@@ -11,7 +11,7 @@ abstract contract TokenManager is Initializable {
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
-    bool internal _isWrappedSide;
+    bool public _isWrappedSide;
 
     /// Mapping from `base token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
     mapping(bytes32 => address) internal _baseToWrapped;
@@ -32,7 +32,7 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function _initialize(bool isWrappedSide) internal initializer {
+    function __TokenManager__initi(bool isWrappedSide) internal initializer onlyInitializing {
         _isWrappedSide = isWrappedSide;
     }
 
@@ -68,13 +68,13 @@ abstract contract TokenManager is Initializable {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch {}
+        } catch { }
     }
 
     /// Returns wrapped token for the given base token
