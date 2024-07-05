@@ -1,7 +1,7 @@
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use icrc2_minter::operation::OperationState;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -21,7 +21,7 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
         wallet_address: &H160,
         offset: Option<u64>,
         count: Option<u64>,
-    ) -> CanisterClientResult<Vec<(MinterOperationId, OperationState)>> {
+    ) -> CanisterClientResult<Vec<(OperationId, OperationState)>> {
         self.client
             .query("get_operations_list", (wallet_address, offset, count))
             .await

@@ -8,7 +8,7 @@ use ic_task_scheduler::{
     SchedulerError,
 };
 
-use crate::{bridge2::BftResult, bridge2::Operation, operation_store::MinterOperationId};
+use crate::{bridge2::BftResult, bridge2::Operation, operation_store::OperationId};
 
 use super::RuntimeState;
 
@@ -40,7 +40,7 @@ where
 
 #[derive(Debug, Clone)]
 pub enum BridgeTask {
-    Operation(MinterOperationId),
+    Operation(OperationId),
     Service(ServiceTask),
 }
 
@@ -94,14 +94,10 @@ impl Task for BridgeTask {
 pub trait TaskContext {
     type Op: Operation;
 
-    fn get_operation(&self, id: MinterOperationId) -> BftResult<Self::Op>;
-    fn get_operation_id_by_address(
-        &self,
-        address: H160,
-        nonce: u32,
-    ) -> BftResult<MinterOperationId>;
-    fn create_operation(&mut self, op: Self::Op) -> MinterOperationId;
-    fn update_operation(&mut self, id: MinterOperationId, op: Self::Op) -> BftResult<()>;
+    fn get_operation(&self, id: OperationId) -> BftResult<Self::Op>;
+    fn get_operation_id_by_address(&self, address: H160, nonce: u32) -> BftResult<OperationId>;
+    fn create_operation(&mut self, op: Self::Op) -> OperationId;
+    fn update_operation(&mut self, id: OperationId, op: Self::Op) -> BftResult<()>;
 }
 
 trait IntoSchedulerError {

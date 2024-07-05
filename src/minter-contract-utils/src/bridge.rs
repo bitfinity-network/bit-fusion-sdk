@@ -12,7 +12,7 @@ use minter_did::{
 use crate::{
     bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventData},
     evm_link::EvmLink,
-    operation_store::{MinterOperation, MinterOperationId},
+    operation_store::{MinterOperation, OperationId},
 };
 
 pub type BftResult<T> = Result<T, Error>;
@@ -25,7 +25,7 @@ pub trait BftBridge {
 
     async fn progress_base_burn(
         &mut self,
-        id: MinterOperationId,
+        id: OperationId,
         op: Self::BaseBurn,
     ) -> Result<(), Error>;
 
@@ -68,7 +68,7 @@ pub trait BftBridge {
         )
     }
 
-    async fn progress(&mut self, id: MinterOperationId) -> BftResult<()> {
+    async fn progress(&mut self, id: OperationId) -> BftResult<()> {
         let operation = self.context().get_operation(id)?;
 
         match operation {
@@ -79,7 +79,7 @@ pub trait BftBridge {
 
     async fn progress_deposit(
         &mut self,
-        id: MinterOperationId,
+        id: OperationId,
         op: DepositOperation<Self::BaseBurn>,
     ) -> BftResult<()> {
         match op {
@@ -91,11 +91,7 @@ pub trait BftBridge {
         }
     }
 
-    async fn progress_base_burnt(
-        &mut self,
-        id: MinterOperationId,
-        op: BaseBurntState,
-    ) -> BftResult<()> {
+    async fn progress_base_burnt(&mut self, id: OperationId, op: BaseBurntState) -> BftResult<()> {
         log::trace!("Signing MintOrder: {:?}", op.order);
 
         let signer = self.context().get_transaction_signer();
@@ -121,7 +117,7 @@ pub trait BftBridge {
 
     async fn progress_mint_order_signed(
         &mut self,
-        id: MinterOperationId,
+        id: OperationId,
         op: MintOrderSignedState,
     ) -> BftResult<()> {
         let ctx = self.context();
@@ -160,14 +156,14 @@ pub trait BftBridge {
 
     async fn progress_mint_sent(
         &mut self,
-        _id: MinterOperationId,
+        _id: OperationId,
         _op: MintOrderSentState,
     ) -> BftResult<()> {
         log::warn!("Deposit operation in MintOrderSentState should not be scheduled to progress by default.");
         Ok(())
     }
 
-    async fn progress_minted(&mut self, _id: MinterOperationId, _op: MintedState) -> BftResult<()> {
+    async fn progress_minted(&mut self, _id: OperationId, _op: MintedState) -> BftResult<()> {
         log::debug!(
             "Deposit operation in MintedState should not be scheduled to progress by default."
         );
@@ -176,7 +172,7 @@ pub trait BftBridge {
 
     async fn progress_withdraw(
         &mut self,
-        id: MinterOperationId,
+        id: OperationId,
         op: WithdrawOperation<Self::BaseMint>,
     ) -> BftResult<()> {
         match op {
@@ -319,7 +315,7 @@ where
 #[derive(Debug)]
 pub enum Error {
     BaseToken { code: u32, msg: String },
-    OperationNotFound(MinterOperationId),
+    OperationNotFound(OperationId),
     UnexpectedOperationState,
     SerializationError(String),
     Signing(String),
@@ -327,7 +323,7 @@ pub enum Error {
 }
 
 pub trait BridgeContext<Op> {
-    fn schedule_operation(&self, id: MinterOperationId, options: TaskOptions);
+    fn schedule_operation(&self, id: OperationId, options: TaskOptions);
 
     fn get_transaction_signer(&self) -> impl TransactionSigner + 'static;
 
@@ -335,12 +331,8 @@ pub trait BridgeContext<Op> {
 
     fn wrapped_evm(&self) -> EvmLink;
 
-    fn get_operation(&self, id: MinterOperationId) -> BftResult<Op>;
-    fn get_operation_id_by_address(
-        &self,
-        address: H160,
-        nonce: u32,
-    ) -> BftResult<MinterOperationId>;
-    fn create_operation(&mut self, op: Op) -> MinterOperationId;
-    fn update_operation(&mut self, id: MinterOperationId, op: Op) -> BftResult<()>;
+    fn get_operation(&self, id: OperationId) -> BftResult<Op>;
+    fn get_operation_id_by_address(&self, address: H160, nonce: u32) -> BftResult<OperationId>;
+    fn create_operation(&mut self, op: Op) -> OperationId;
+    fn update_operation(&mut self, id: OperationId, op: Op) -> BftResult<()>;
 }

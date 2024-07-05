@@ -20,7 +20,7 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use minter_contract_utils::operation_store::{OperationId, OperationStore};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
@@ -106,10 +106,7 @@ impl RuneBridge {
     }
 
     #[query]
-    pub fn get_operations_list(
-        &self,
-        wallet_address: H160,
-    ) -> Vec<(MinterOperationId, OperationState)> {
+    pub fn get_operations_list(&self, wallet_address: H160) -> Vec<(OperationId, OperationState)> {
         get_operations_store().get_for_address(&wallet_address, None, None)
     }
 
@@ -337,7 +334,7 @@ pub(crate) fn get_operations_store() -> RuneOperationStore {
     let operations_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
     let operations_log_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_LOG_MEMORY_ID));
     let operations_map_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MAP_MEMORY_ID));
-    MinterOperationStore::with_memory(
+    OperationStore::with_memory(
         operations_memory,
         operations_log_memory,
         operations_map_memory,

@@ -15,7 +15,7 @@ use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptio
 use ic_task_scheduler::SchedulerError;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};
@@ -36,9 +36,9 @@ mod minter_notify;
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
-    Deposit(MinterOperationId),
+    Deposit(OperationId),
     RemoveMintOrder(MintedEventData),
-    Withdraw(MinterOperationId),
+    Withdraw(OperationId),
 }
 
 impl RuneBridgeTask {
@@ -119,7 +119,7 @@ impl RuneBridgeTask {
         Ok(())
     }
 
-    async fn deposit(deposit_request_id: MinterOperationId) -> Result<(), SchedulerError> {
+    async fn deposit(deposit_request_id: OperationId) -> Result<(), SchedulerError> {
         RuneDeposit::get()
             .process_deposit_request(deposit_request_id)
             .await;

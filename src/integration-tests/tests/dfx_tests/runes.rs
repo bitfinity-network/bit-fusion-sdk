@@ -16,7 +16,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
 use minter_contract_utils::bft_bridge_api;
 use minter_contract_utils::evm_link::EvmLink;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use minter_did::id256::Id256;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
@@ -341,7 +341,7 @@ impl RunesContext {
 
             eprintln!("Checking deposit status. Try #{retry_count}...");
 
-            let response: Vec<(MinterOperationId, OperationState)> = self
+            let response: Vec<(OperationId, OperationState)> = self
                 .inner
                 .rune_bridge_client(ADMIN)
                 .get_operations_list(eth_address)

@@ -2,15 +2,14 @@ use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
 use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::operation_store::{MinterOperation, MinterOperationStore};
+use minter_contract_utils::operation_store::{MinterOperation, OperationStore};
 use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;
 use crate::core::withdrawal::RuneWithdrawalPayload;
 use crate::state::State;
 
-pub type RuneOperationStore =
-    MinterOperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState>;
+pub type RuneOperationStore = OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState>;
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub enum OperationState {

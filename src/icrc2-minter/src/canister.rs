@@ -18,7 +18,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use log::*;
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use minter_contract_utils::operation_store::{OperationId, OperationStore};
 use minter_did::error::{Error, Result};
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
@@ -300,7 +300,7 @@ impl MinterCanister {
         wallet_address: H160,
         offset: Option<usize>,
         count: Option<usize>,
-    ) -> Vec<(MinterOperationId, OperationState)> {
+    ) -> Vec<(OperationId, OperationState)> {
         get_operations_store().get_for_address(&wallet_address, offset, count)
     }
 
@@ -474,10 +474,9 @@ pub fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
 }
 
-pub fn get_operations_store(
-) -> MinterOperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState> {
+pub fn get_operations_store() -> OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState> {
     MEMORY_MANAGER.with(|mm| {
-        MinterOperationStore::with_memory(
+        OperationStore::with_memory(
             mm.get(OPERATIONS_MEMORY_ID),
             mm.get(OPERATIONS_LOG_MEMORY_ID),
             mm.get(OPERATIONS_MAP_MEMORY_ID),

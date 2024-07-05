@@ -11,7 +11,7 @@ use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
 use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use minter_did::id256::Id256;
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
@@ -192,10 +192,7 @@ impl Withdrawal<IcUtxoProvider> {
 }
 
 impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
-    pub async fn withdraw(
-        &mut self,
-        operation_id: MinterOperationId,
-    ) -> Result<Txid, WithdrawError> {
+    pub async fn withdraw(&mut self, operation_id: OperationId) -> Result<Txid, WithdrawError> {
         let Some(operation) = self.operation_store.get(operation_id) else {
             return Err(WithdrawError::InternalError(format!(
                 "Operation not found: {operation_id}"

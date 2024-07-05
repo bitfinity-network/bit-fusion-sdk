@@ -14,7 +14,7 @@ use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
 use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
@@ -29,9 +29,9 @@ use crate::state::State;
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmEvents(BridgeSide),
-    PrepareMintOrder(MinterOperationId),
+    PrepareMintOrder(OperationId),
     RemoveMintOrder(MintedEventData, BridgeSide),
-    SendMintTransaction(MinterOperationId),
+    SendMintTransaction(OperationId),
 }
 
 impl Task for BridgeTask {
@@ -152,7 +152,7 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let Some(operation) = operation_store.get(operation_id) else {
@@ -361,7 +361,7 @@ impl BridgeTask {
 
     async fn send_mint_transaction(
         state: Rc<RefCell<State>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let Some(operation) = operation_store.get(operation_id) else {

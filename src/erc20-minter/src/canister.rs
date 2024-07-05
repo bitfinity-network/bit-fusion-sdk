@@ -13,7 +13,7 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
+use minter_contract_utils::operation_store::{OperationId, OperationStore};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
@@ -158,7 +158,7 @@ impl EvmMinter {
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
-    ) -> Vec<(MinterOperationId, OperationPayload)> {
+    ) -> Vec<(OperationId, OperationPayload)> {
         get_operations_store().get_for_address(&wallet_address, None, None)
     }
 
@@ -251,10 +251,10 @@ pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
 }
 
-pub fn get_operations_store(
-) -> MinterOperationStore<VirtualMemory<DefaultMemoryImpl>, OperationPayload> {
+pub fn get_operations_store() -> OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationPayload>
+{
     MEMORY_MANAGER.with(|mm| {
-        MinterOperationStore::with_memory(
+        OperationStore::with_memory(
             mm.get(OPERATIONS_MEMORY_ID),
             mm.get(OPERATIONS_LOG_MEMORY_ID),
             mm.get(OPERATIONS_MAP_MEMORY_ID),

@@ -19,7 +19,7 @@ use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::evm_link::address_to_icrc_subaccount;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_contract_utils::operation_store::OperationId;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
@@ -80,11 +80,11 @@ impl Drop for CollectLogsLock {
 pub enum BridgeTask {
     InitEvmInfo,
     CollectEvmEvents,
-    BurnIcrc2Tokens(MinterOperationId),
-    PrepareMintOrder(MinterOperationId),
+    BurnIcrc2Tokens(OperationId),
+    PrepareMintOrder(OperationId),
     RemoveMintOrder(MintedEventData),
-    SendMintTransaction(MinterOperationId),
-    MintIcrc2Tokens(MinterOperationId),
+    SendMintTransaction(OperationId),
+    MintIcrc2Tokens(OperationId),
 }
 
 impl Task for BridgeTask {
@@ -207,7 +207,7 @@ impl BridgeTask {
 
     pub async fn burn_icrc2_tokens(
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         log::trace!("Operation {operation_id}: String burn_icrc2_tokens");
 
@@ -296,7 +296,7 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let operation_state = operation_store.get(operation_id);
@@ -526,7 +526,7 @@ impl BridgeTask {
 
     async fn send_mint_transaction(
         state: Rc<RefCell<State>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         log::trace!("Sending mint transaction");
 
@@ -623,7 +623,7 @@ impl BridgeTask {
     }
 
     async fn mint_icrc2(
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
         log::trace!("Minting Icrc2 tokens");
