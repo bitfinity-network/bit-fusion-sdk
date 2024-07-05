@@ -228,7 +228,7 @@ async fn test_external_bridging() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
@@ -252,7 +252,7 @@ async fn test_external_bridging() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let balance = ctx
@@ -355,7 +355,7 @@ async fn native_token_deposit_increase_and_decrease() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 10)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
@@ -378,7 +378,7 @@ async fn native_token_deposit_increase_and_decrease() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
@@ -441,7 +441,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 25)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
@@ -465,7 +465,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 25)
         .await;
 
     let balance = ctx
@@ -507,11 +507,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .unwrap();
 
     // Wait for mint tx finishing and mint order removing
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 10)
+        .await;
 
     // check mint order removed after successful mint
     let signed_order = erc20_minter_client

@@ -16,7 +16,6 @@ mod erc20_minter;
 mod runes;
 
 sol! {
-    #[sol(abi=true)]
     #[derive(Debug)]
     TestWTM,
     "../../solidity/out/TestWTM.sol/WatermelonToken.json"

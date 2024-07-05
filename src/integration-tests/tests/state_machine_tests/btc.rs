@@ -16,6 +16,7 @@ use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
 use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
+use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::sign_strategy::SigningStrategy;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -324,8 +325,8 @@ impl CkBtcSetup {
             ck_btc_ledger: ledger_id.into(),
             network: BitcoinNetwork::Mainnet,
             evm_link: EvmLink::Ic((&context).canisters().evm()),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [2; 32],
+            signing_strategy: SigningStrategy::ManagementCanister {
+                key_id: SigningKeyId::Custom("test_key".into()),
             },
             admin: (&context).admin(),
             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
