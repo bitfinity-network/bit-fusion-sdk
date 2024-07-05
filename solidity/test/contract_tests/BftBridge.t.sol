@@ -178,9 +178,6 @@ contract BftBridgeTest is Test {
     }
 
     function testListTokenPairs() public {
-        // print the isWrapped flag for the bridge
-        console.log("isWrapped: %s", _wrappedBridge.isBridgeWrapped());
-
         bytes32[3] memory base_token_ids = [
             _createIdFromPrincipal(abi.encodePacked(uint8(1))),
             _createIdFromPrincipal(abi.encodePacked(uint8(2))),
