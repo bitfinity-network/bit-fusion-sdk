@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -44,7 +44,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Controller AccessList for adding implementations
     mapping(address => bool) public controllerAccessList;
 
-        struct MintOrderData {
+    struct MintOrderData {
         uint256 amount;
         bytes32 senderID;
         bytes32 fromTokenID;
@@ -202,11 +202,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes32 toTokenID, bytes memory recipientID)
-        public
-        whenNotPaused
-        returns (uint32)
-    {
+    function burn(
+        uint256 amount,
+        address fromERC20,
+        bytes32 toTokenID,
+        bytes memory recipientID
+    ) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         // Check if the token is registered on the bridge or the side is base

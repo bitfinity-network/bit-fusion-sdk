@@ -36,7 +36,7 @@ abstract contract TokenManager is Initializable {
         isWrappedSide = _isWrappedSide;
     }
 
-        /// @notice Checks if the contract is on the base side
+    /// @notice Checks if the contract is on the base side
     /// @return true if the contract is on the base side
     function isBaseSide() internal view returns (bool) {
         return !_isWrappedSide;
@@ -68,13 +68,13 @@ abstract contract TokenManager is Initializable {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch {}
+        } catch { }
     }
 
     /// Returns wrapped token for the given base token
