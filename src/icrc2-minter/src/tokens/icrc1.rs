@@ -40,19 +40,10 @@ pub fn get_cached_token_configuration(ic_token: Principal) -> Option<TokenConfig
 /// Query token info from token canister and store it to cache.
 /// Read the info from cache if query fails.
 pub async fn query_token_info_or_read_from_cache(token: Principal) -> Option<TokenInfo> {
-    let cached = get_cached_token_configuration(token);
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
-    let Ok(queried) = query_icrc1_token_info(
-        &icrc_client,
-        cached
-            .as_ref()
-            .map(|cached| cached.info.info_set_in_metadata)
-            .unwrap_or(true), // if not in cache; always try to read from metadata first
-    )
-    .await
-    else {
-        return cached.map(|config| config.info);
+    let Ok(queried) = query_icrc1_token_info(&icrc_client).await else {
+        return get_cached_token_configuration(token).map(|config| config.info);
     };
 
     // If we store token config in cache, update the config with new info.
@@ -76,7 +67,6 @@ pub struct TokenInfo {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub info_set_in_metadata: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, CandidType)]
@@ -102,7 +92,7 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
             subaccount: None,
         });
 
-    let info = query_icrc1_token_info(&icrc_client, true).await?;
+    let info = query_icrc1_token_info(&icrc_client).await?;
 
     Ok(TokenConfiguration {
         principal: token,
@@ -112,33 +102,8 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
     })
 }
 
-/// Requests fee and minting account configuration from an ICRC-1 canister.
-///
-/// `has_token_info_in_metadata` is a flag that indicates whether the token info is set in metadata.
-/// If it is, we can use the standard ICRC-1 metadata query to get the token info.
-/// Otherwise, we have to use dedicated queries to get the token info.
-async fn query_icrc1_token_info<C>(
-    icrc_client: &IcrcCanisterClient<C>,
-    has_token_info_in_metadata: bool,
-) -> Result<TokenInfo>
-where
-    C: CanisterClient,
-{
-    // If the token info is set in metadata, we can use the standard ICRC-1 metadata query.
-    if has_token_info_in_metadata {
-        if let Ok(token_info) = query_icrc1_token_info_from_metadata(icrc_client).await {
-            return Ok(token_info);
-        }
-    }
-
-    // Otherwise, we have to use dedicated queries to get the token info.
-    query_icrc1_token_info_from_dedicated_queries(icrc_client).await
-}
-
 /// Requests token info from an ICRC-1 canister using `icrc1_metadata` query.
-async fn query_icrc1_token_info_from_metadata<C>(
-    client: &IcrcCanisterClient<C>,
-) -> Result<TokenInfo>
+async fn query_icrc1_token_info<C>(client: &IcrcCanisterClient<C>) -> Result<TokenInfo>
 where
     C: CanisterClient,
 {
@@ -172,29 +137,6 @@ where
         name,
         symbol,
         decimals,
-        info_set_in_metadata: true,
-    })
-}
-
-/// Requests token info from an ICRC-1 canister using dedicated queries.
-/// This is a fallback in case `icrc1_metadata` query doesn't return the standard ICRC-1 keys.
-///
-/// The fallback queries are: `icrc1_name`, `icrc1_symbol`, `icrc1_decimals`.
-async fn query_icrc1_token_info_from_dedicated_queries<C>(
-    client: &IcrcCanisterClient<C>,
-) -> Result<TokenInfo>
-where
-    C: CanisterClient,
-{
-    let name = client.icrc1_name().await?;
-    let symbol = client.icrc1_symbol().await?;
-    let decimals = client.icrc1_decimals().await?;
-
-    Ok(TokenInfo {
-        name,
-        symbol,
-        decimals,
-        info_set_in_metadata: false,
     })
 }
 
@@ -219,7 +161,6 @@ fn cache_ic_token_configuration(config: TokenConfiguration) {
 mod test {
     use candid::Nat;
     use evm_canister_client::CanisterClient;
-    use ic_exports::ic_kit::RejectionCode;
     use ic_exports::icrc_types::icrc1::account::Account;
 
     use super::*;
@@ -244,7 +185,6 @@ mod test {
                 name: "Test Token".to_string(),
                 symbol: "TEST".to_string(),
                 decimals: 18,
-                info_set_in_metadata: true,
             },
         };
 
@@ -266,39 +206,14 @@ mod test {
             name: "Test Token".to_string(),
             symbol: "TEST".to_string(),
             decimals: 18,
-            has_metadata: true,
         };
         let client = IcrcCanisterClient::new(client);
 
         // fetch with icrc1 metadata
-        let token_info = query_icrc1_token_info(&client, true).await.unwrap();
+        let token_info = query_icrc1_token_info(&client).await.unwrap();
         assert_eq!(token_info.name, "Test Token");
         assert_eq!(token_info.symbol, "TEST");
         assert_eq!(token_info.decimals, 18);
-        assert!(token_info.info_set_in_metadata);
-
-        // fetch with dedicated queries
-        let token_info = query_icrc1_token_info(&client, false).await.unwrap();
-        assert_eq!(token_info.name, "Test Token");
-        assert_eq!(token_info.symbol, "TEST");
-        assert_eq!(token_info.decimals, 18);
-        assert!(!token_info.info_set_in_metadata);
-
-        // fetch with icrc1 metadata, but missing metadata
-        let client = FakeIcrcCanisterClient {
-            name: "Test Token".to_string(),
-            symbol: "TEST".to_string(),
-            decimals: 18,
-            has_metadata: false,
-        };
-        let client = IcrcCanisterClient::new(client);
-
-        // fetch with dedicated queries
-        let token_info = query_icrc1_token_info(&client, true).await.unwrap();
-        assert_eq!(token_info.name, "Test Token");
-        assert_eq!(token_info.symbol, "TEST");
-        assert_eq!(token_info.decimals, 18);
-        assert!(!token_info.info_set_in_metadata);
     }
 
     #[derive(Debug, Clone)]
@@ -306,7 +221,6 @@ mod test {
         name: String,
         symbol: String,
         decimals: u8,
-        has_metadata: bool,
     }
 
     impl CanisterClient for FakeIcrcCanisterClient {
@@ -334,13 +248,6 @@ mod test {
             Box::pin(async move {
                 let response: R = match method.as_str() {
                     "icrc1_metadata" => {
-                        if !self.has_metadata {
-                            return Err(evm_canister_client::CanisterClientError::CanisterError((
-                                RejectionCode::DestinationInvalid,
-                                "No metadata".to_string(),
-                            )));
-                        }
-
                         let metadata = vec![
                             (
                                 ICRC1_METADATA_NAME.to_string(),
