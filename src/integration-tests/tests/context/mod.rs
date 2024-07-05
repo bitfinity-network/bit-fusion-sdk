@@ -3,6 +3,8 @@ mod evm_rpc_canister;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
+use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -11,7 +13,6 @@ use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
-use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
@@ -25,12 +26,6 @@ use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
-};
-use minter_contract_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
-use minter_contract_utils::fee_charge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
-use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
 use minter_did::error::Result as McResult;
 use minter_did::id256::Id256;
 use minter_did::init::InitData;
@@ -53,6 +48,8 @@ pub mod bridge_client;
 pub mod erc20_bridge_client;
 pub mod icrc2_bridge_client;
 pub mod rune_bridge_client;
+
+use alloy_sol_types::{SolCall, SolConstructor};
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -273,32 +270,33 @@ pub trait TestContext {
         fee_charge_address: Option<H160>,
         is_wrapped: bool,
     ) -> Result<H160> {
-        let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
-        let input = bft_bridge_api::CONSTRUCTOR
-            .encode_input(contract, &[])
+        let mut bridge_input = BFTBridge::BYTECODE.to_vec();
+        let constructor = BFTBridge::constructorCall {}.abi_encode();
+        bridge_input.extend_from_slice(&constructor);
+
+        let bridge_address = self
+            .create_contract(wallet, bridge_input.clone())
+            .await
             .unwrap();
 
-        let bridge_address = self.create_contract(wallet, input.clone()).await.unwrap();
+        let init_data = BFTBridge::initializeCall {
+            minterAddress: minter_canister_address.into(),
+            feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
+            isWrappedSide: is_wrapped,
+        }
+        .abi_encode();
 
-        let initialize_data = bft_bridge_api::proxy::INITIALISER
-            .encode_input(&[
-                Token::Address(minter_canister_address.0),
-                Token::Address(fee_charge_address.unwrap_or_default().0),
-                Token::Bool(is_wrapped),
-            ])
-            .expect("encode input");
-
-        let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
-            .encode_input(
-                UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
-                &[
-                    Token::Address(bridge_address.0),
-                    Token::Bytes(initialize_data),
-                ],
-            )
-            .unwrap();
+        let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
+        let constructor = UUPSProxy::constructorCall {
+            _implementation: bridge_address.into(),
+            _data: init_data.into(),
+        }
+        .abi_encode();
+        proxy_input.extend_from_slice(&constructor);
 
         let proxy_address = self.create_contract(wallet, proxy_input).await.unwrap();
+
+        println!("proxy_address: {}", proxy_address);
 
         Ok(proxy_address)
     }
@@ -319,63 +317,73 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
-        let contract = FEE_CHARGE_SMART_CONTRACT_CODE.clone();
         let minter_canister_addresses = minter_canister_addresses
             .iter()
-            .map(|addr| Token::Address(addr.0))
+            .map(|addr| addr.clone().into())
             .collect();
-        let input = fee_charge_api::CONSTRUCTOR
-            .encode_input(contract, &[Token::Array(minter_canister_addresses)])
-            .unwrap();
+
+        let mut fee_charge_input = FeeCharge::BYTECODE.to_vec();
+
+        let input = FeeCharge::constructorCall {
+            canChargeFee: minter_canister_addresses,
+        }
+        .abi_encode();
+
+        fee_charge_input.extend_from_slice(&input);
 
         let fee_charge_address = self
-            .create_contract_on_evm(evm, wallet, input.clone())
+            .create_contract_on_evm(evm, wallet, fee_charge_input.clone())
             .await
             .unwrap();
 
         Ok(fee_charge_address)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens_raw(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Vec<u8>,
         bridge: &H160,
         amount: u128,
     ) -> Result<(u32, H256)> {
-        let amount = amount.into();
-        let input = wrapped_token_api::ERC_20_APPROVE
-            .encode_input(&[Token::Address(bridge.0), Token::Uint(amount)])
-            .unwrap();
+        let amount: U256 = amount.into();
+
+        let input = WrappedToken::approveCall {
+            spender: bridge.clone().into(),
+            value: amount.clone().into(),
+        }
+        .abi_encode();
 
         let results = self
-            .call_contract_on_evm(evm_client, wallet, from_token, input, 0)
+            .call_contract_on_evm(evm_client, wallet, &from_token.clone(), input, 0)
             .await?;
         let output = results.1.output.unwrap();
-        assert_eq!(
-            wrapped_token_api::ERC_20_APPROVE
-                .decode_output(&output)
-                .unwrap()[0],
-            Token::Bool(true)
-        );
+        let decoded_output = WrappedToken::approveCall::abi_decode_returns(&output, true).unwrap();
+
+        assert!(decoded_output._0);
 
         println!("Burning src tokens using BftBridge");
-        let input = bft_bridge_api::BURN
-            .encode_input(&[
-                Token::Uint(amount),
-                Token::Address(from_token.0),
-                Token::Bytes(recipient),
-            ])
-            .unwrap();
+
+        let input = BFTBridge::burnCall {
+            amount: amount.into(),
+            fromERC20: from_token.clone().into(),
+            toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
+            recipientID: recipient.into(),
+        }
+        .abi_encode();
 
         let (tx_hash, receipt) = self
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
-        let decoded_output = bft_bridge_api::BURN
-            .decode_output(receipt.output.as_ref().unwrap())
-            .unwrap();
+
+        let decoded_output =
+            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
+                .unwrap();
+
         if receipt.status != Some(U64::one()) {
             return Err(TestError::Generic(format!(
                 "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
@@ -383,15 +391,17 @@ pub trait TestContext {
             )));
         }
 
-        let operation_id = decoded_output[0].clone().into_uint().unwrap().as_u32();
+        let operation_id = decoded_output._0;
         Ok((operation_id, tx_hash))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
+        to_token_id: &[u8],
         recipient: Id256,
         bridge: &H160,
         amount: u128,
@@ -400,6 +410,7 @@ pub trait TestContext {
             evm_client,
             wallet,
             from_token,
+            to_token_id,
             recipient.0.to_vec(),
             bridge,
             amount,
@@ -414,9 +425,10 @@ pub trait TestContext {
         fee_charge: H160,
         user: H160,
     ) -> U256 {
-        let input = NATIVE_TOKEN_BALANCE
-            .encode_input(&[Token::Address(user.0)])
-            .unwrap();
+        let input = FeeCharge::nativeTokenBalanceCall {
+            user: user.clone().into(),
+        }
+        .abi_encode();
         let response = evm_client
             .eth_call(
                 Some(user),
@@ -430,15 +442,15 @@ pub trait TestContext {
             .unwrap()
             .unwrap();
 
-        NATIVE_TOKEN_BALANCE
-            .decode_output(&hex::decode(response.trim_start_matches("0x")).unwrap())
-            .unwrap()
-            .first()
-            .cloned()
-            .unwrap()
-            .into_uint()
-            .unwrap()
-            .into()
+        let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(
+            &hex::decode(response.trim_start_matches("0x")).unwrap(),
+            true,
+        )
+        .unwrap()
+        .balance
+        .into();
+
+        balance
     }
 
     /// Deposit native tokens to BftBridge to pay mint fee.
@@ -450,27 +462,24 @@ pub trait TestContext {
         sender_ids: &[Id256],
         amount: u128,
     ) -> Result<U256> {
-        let sender_ids = sender_ids
-            .iter()
-            .map(|id| Token::FixedBytes(id.0.to_vec()))
-            .collect();
-        let input = NATIVE_TOKEN_DEPOSIT
-            .encode_input(&[Token::Array(sender_ids)])
-            .unwrap();
+        let sender_ids = sender_ids.iter().map(|id| id.0.into()).collect();
+
+        let input = FeeCharge::nativeTokenDepositCall {
+            approvedSenderIDs: sender_ids,
+        }
+        .abi_encode();
 
         let receipt = self
             .call_contract_on_evm(evm_client, user_wallet, &fee_charge, input, amount)
             .await?
             .1;
 
-        let new_balance = NATIVE_TOKEN_DEPOSIT
-            .decode_output(receipt.output.as_ref().unwrap())
-            .unwrap()
-            .first()
-            .cloned()
-            .unwrap()
-            .into_uint()
-            .unwrap();
+        let new_balance = FeeCharge::nativeTokenDepositCall::abi_decode_returns(
+            receipt.output.as_ref().unwrap(),
+            true,
+        )
+        .unwrap()
+        .balance;
 
         Ok(new_balance.into())
     }
@@ -551,32 +560,37 @@ pub trait TestContext {
         bft_bridge: &H160,
         base_token_id: Id256,
     ) -> Result<H160> {
-        let input = bft_bridge_api::DEPLOY_WRAPPED_TOKEN
-            .encode_input(&[
-                Token::String("wrapper".into()),
-                Token::String("WPT".into()),
-                Token::FixedBytes(base_token_id.0.to_vec()),
-            ])
-            .unwrap();
+        let input = BFTBridge::deployERC20Call {
+            name: "Wrapper".into(),
+            symbol: "WPT".into(),
+            baseTokenID: base_token_id.0.into(),
+        }
+        .abi_encode();
+        println!("input: {:?}", input);
 
-        let results = self.call_contract(wallet, bft_bridge, input, 0).await?;
-        let output = results.1.output.unwrap();
+        let (_hash, receipt) = self.call_contract(wallet, bft_bridge, input, 0).await?;
 
-        Ok(bft_bridge_api::DEPLOY_WRAPPED_TOKEN
-            .decode_output(&output)
-            .unwrap()[0]
-            .clone()
-            .into_address()
+        let output = receipt.output.as_ref().unwrap();
+
+        let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
             .unwrap()
-            .into())
+            ._0;
+
+        println!(
+            "Deployed Wrapped token on block {} with address {address}",
+            receipt.block_number
+        );
+        Ok(address.into())
     }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
+    #[allow(clippy::too_many_arguments)]
     async fn burn_icrc2(
         &self,
         caller: &str,
         wallet: &Wallet<'_, SigningKey>,
         bridge: &H160,
+        erc20_token_address: &H160,
         amount: u128,
         fee_payer: Option<H160>,
         approve_after_mint: Option<ApproveAfterMint>,
@@ -594,6 +608,7 @@ pub trait TestContext {
             amount: amount.into(),
             from_subaccount: None,
             icrc2_token_principal: self.canisters().token_1(),
+            erc20_token_address: erc20_token_address.clone(),
             recipient_address,
             fee_payer,
             approve_after_mint,
@@ -601,12 +616,12 @@ pub trait TestContext {
 
         let encoded_reason = Encode!(&reason).unwrap();
 
-        let input = bft_bridge_api::NOTIFY_MINTER
-            .encode_input(&[
-                Token::Uint(Default::default()),
-                Token::Bytes(encoded_reason),
-            ])
-            .unwrap();
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: Default::default(),
+            userData: encoded_reason.into(),
+        }
+        .abi_encode();
+
         let _receipt = self
             .call_contract(wallet, bridge, input, 0)
             .await
@@ -647,9 +662,11 @@ pub trait TestContext {
         bridge: &H160,
         order: SignedMintOrder,
     ) -> Result<TransactionReceipt> {
-        let input = bft_bridge_api::MINT
-            .encode_input(&[Token::Bytes(order.0.to_vec())])
-            .unwrap();
+        let input = BFTBridge::mintCall {
+            encodedOrder: order.0.to_vec().into(),
+        }
+        .abi_encode();
+
         self.call_contract(wallet, bridge, input, 0)
             .await
             .map(|(_, receipt)| receipt)
@@ -675,27 +692,22 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         address: Option<&H160>,
     ) -> Result<u128> {
-        let input = wrapped_token_api::ERC_20_BALANCE
-            .encode_input(&[Token::Address(
-                address
-                    .cloned()
-                    .unwrap_or_else(|| wallet.address().into())
-                    .into(),
-            )])
-            .unwrap();
+        let account = address.cloned().unwrap_or_else(|| wallet.address().into());
+        let input = WrappedToken::balanceOfCall {
+            account: account.into(),
+        }
+        .abi_encode();
+
         let results = self
             .call_contract_on_evm(evm_client, wallet, token, input, 0)
             .await?;
         let output = results.1.output.unwrap();
         println!("output: {:?}", hex::encode(&output));
 
-        Ok(wrapped_token_api::ERC_20_BALANCE
-            .decode_output(&output)
-            .unwrap()[0]
-            .clone()
-            .into_uint()
+        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&output, true)
             .unwrap()
-            .as_u128())
+            ._0;
+        Ok(balance.to())
     }
 
     /// Creates an empty canister with cycles on it's balance.

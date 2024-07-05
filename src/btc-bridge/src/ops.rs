@@ -113,6 +113,10 @@ pub async fn mint_erc20(
     amount: u64,
     nonce: u32,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
+    log::debug!(
+        "Minting {amount} BTC to {eth_address} with nonce {nonce} for token {}",
+        state.borrow().token_address()
+    );
     let fee = state.borrow().ck_btc_ledger_fee();
     let amount_minus_fee = amount
         .checked_sub(fee)
@@ -190,7 +194,7 @@ async fn prepare_mint_order(
             sender,
             src_token,
             recipient: eth_address,
-            dst_token: H160::default(),
+            dst_token: state_ref.token_address().clone(),
             nonce,
             sender_chain_id,
             recipient_chain_id,
@@ -255,7 +259,7 @@ async fn send_mint_order(
         (evm_info, evm_params)
     };
 
-    let mut tx = minter_contract_utils::bft_bridge_api::mint_transaction(
+    let mut tx = bridge_utils::bft_events::mint_transaction(
         sender.0,
         evm_info.bridge_contract.0,
         evm_params.nonce.into(),

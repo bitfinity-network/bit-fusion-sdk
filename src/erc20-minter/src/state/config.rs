@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::fmt;
 
+use bridge_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
 use candid::{CandidType, Principal};
 use did::{codec, H160};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
 use serde::{Deserialize, Serialize};
 
 use super::Settings;

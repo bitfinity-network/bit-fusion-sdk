@@ -9,6 +9,7 @@ default = []
 export-api = []
 
 [dependencies]
+alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
@@ -28,7 +29,7 @@ serde = { workspace = true }
 log = { workspace = true }
 ethers-core = { workspace = true }
 minter-did = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
+bridge-utils = { path = "../bridge-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 

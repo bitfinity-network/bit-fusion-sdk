@@ -1,24 +1,21 @@
 use std::time::Duration;
 
+use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_utils::evm_bridge::BridgeSide;
+use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
 use erc20_minter::operation::OperationStatus;
 use eth_signer::{Signer, Wallet};
-use ethers_core::abi::{Constructor, Param, ParamType, Token};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
-use minter_contract_utils::bft_bridge_api;
-use minter_contract_utils::build_data::test_contracts::TEST_WTM_HEX_CODE;
-use minter_contract_utils::build_data::{
-    BFT_BRIDGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
-};
-use minter_contract_utils::evm_bridge::BridgeSide;
+use ic_stable_structures::Storable as _;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 
 use super::PocketIcTestContext;
 use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
-use crate::pocket_ic_integration_test::ADMIN;
+use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
 use crate::utils::CHAIN_ID;
 
 pub struct ContextWithBridges {
@@ -130,24 +127,19 @@ impl ContextWithBridges {
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
         // Deploy ERC-20 token on external EVM.
-        let data: Constructor = Constructor {
-            inputs: vec![Param {
-                name: "initialSupply".into(),
-                kind: ParamType::Uint(256),
-                internal_type: None,
-            }],
-        };
-
-        let data = data
-            .encode_input(TEST_WTM_HEX_CODE.clone(), &[Token::Uint(u64::MAX.into())])
-            .unwrap();
+        let mut erc20_input = TestWTM::BYTECODE.to_vec();
+        let constructor = TestWTM::constructorCall {
+            initialSupply: U256::from(u64::MAX).into(),
+        }
+        .abi_encode();
+        erc20_input.extend_from_slice(&constructor);
 
         let nonce = base_evm_client
             .account_basic(bob_address.clone())
             .await
             .unwrap()
             .nonce;
-        let tx = ctx.signed_transaction(&bob_wallet, None, nonce, 0, data);
+        let tx = ctx.signed_transaction(&bob_wallet, None, nonce, 0, erc20_input);
         let base_token_address = {
             let hash = base_evm_client
                 .send_raw_transaction(tx)
@@ -232,12 +224,22 @@ async fn test_external_bridging() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
+
     let burn_operation_id = ctx
         .context
         .burn_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
@@ -349,6 +351,14 @@ async fn native_token_deposit_increase_and_decrease() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
     // Perform an operation to pay a fee for it.
     let (burn_operation_id, _) = ctx
         .context
@@ -356,6 +366,7 @@ async fn native_token_deposit_increase_and_decrease() {
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
@@ -426,12 +437,22 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
+    // Advance time to perform two tasks in erc20-minter:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 8)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
+
     let burn_operation_id = ctx
         .context
         .burn_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
+            &to_token_id.to_bytes(),
             alice_id,
             &ctx.base_bft_bridge,
             amount,
@@ -567,10 +588,9 @@ async fn create_bft_bridge(
         BridgeSide::Wrapped => true,
     };
 
-    let contract = BFT_BRIDGE_SMART_CONTRACT_CODE.clone();
-    let input = bft_bridge_api::CONSTRUCTOR
-        .encode_input(contract, &[])
-        .unwrap();
+    let mut bft_input = BFTBridge::BYTECODE.to_vec();
+    let constructor = BFTBridge::constructorCall {}.abi_encode();
+    bft_input.extend_from_slice(&constructor);
 
     let evm = match side {
         BridgeSide::Base => ctx.canisters().external_evm(),
@@ -580,27 +600,24 @@ async fn create_bft_bridge(
     let evm_client = EvmCanisterClient::new(ctx.client(evm, ADMIN));
 
     let bridge_address = ctx
-        .create_contract_on_evm(&evm_client, wallet, input.clone())
+        .create_contract_on_evm(&evm_client, wallet, bft_input.clone())
         .await
         .unwrap();
 
-    let initialize_data = bft_bridge_api::proxy::INITIALISER
-        .encode_input(&[
-            Token::Address(minter_address.0),
-            Token::Address(fee_charge.0),
-            Token::Bool(is_wrapped),
-        ])
-        .expect("encode input");
+    let init_data = BFTBridge::initializeCall {
+        minterAddress: minter_address.into(),
+        feeChargeAddress: fee_charge.into(),
+        isWrappedSide: is_wrapped,
+    }
+    .abi_encode();
 
-    let proxy_input = bft_bridge_api::proxy::CONSTRUCTOR
-        .encode_input(
-            UUPS_PROXY_SMART_CONTRACT_CODE.clone(),
-            &[
-                Token::Address(bridge_address.0),
-                Token::Bytes(initialize_data),
-            ],
-        )
-        .unwrap();
+    let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
+    let constructor = UUPSProxy::constructorCall {
+        _implementation: bridge_address.into(),
+        _data: init_data.into(),
+    }
+    .abi_encode();
+    proxy_input.extend_from_slice(&constructor);
 
     let proxy_address = ctx
         .create_contract_on_evm(&evm_client, wallet, proxy_input)

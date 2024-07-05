@@ -11,11 +11,14 @@ export-api = []
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "ic-canister-client",
+] }
 evm-canister-client = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -30,7 +33,6 @@ ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-did = { workspace = true, features = ["runes"] }
-minter-contract-utils = { path = "../minter-contract-utils" }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
 serde = { workspace = true }
