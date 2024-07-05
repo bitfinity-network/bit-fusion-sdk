@@ -15,6 +15,7 @@ use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::ADMIN;
 use crate::utils::CHAIN_ID;
 
+#[allow(dead_code)]
 pub struct ContextWithBridges {
     pub context: DfxTestContext,
     pub bob_wallet: Wallet<'static, SigningKey>,

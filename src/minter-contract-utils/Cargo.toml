@@ -33,8 +33,9 @@ thiserror = { workspace = true }
 ic-task-scheduler = { workspace = true }
 
 [build-dependencies]
-solidity-helper = { path = "../solidity-helper" }
 anyhow = { workspace = true }
+solidity-helper = { path = "../solidity-helper" }
+
 
 [dev-dependencies]
 candid = { workspace = true }
