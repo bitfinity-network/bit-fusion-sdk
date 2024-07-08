@@ -3,6 +3,10 @@ use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
+use alloy_sol_types::SolCall;
+use bridge_utils::evm_link::EvmLink;
+use bridge_utils::operation_store::MinterOperationId;
+use bridge_utils::BFTBridge;
 use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -10,14 +14,11 @@ use did::{BlockNumber, TransactionReceipt, H160, H256};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
-use ethers_core::abi::Token;
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
-use minter_contract_utils::bft_bridge_api;
-use minter_contract_utils::evm_link::EvmLink;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_did::id256::Id256;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
 use rune_bridge::operation::OperationState;
@@ -41,6 +42,7 @@ struct RunesContext {
     eth_wallet: Wallet<'static, SigningKey>,
     token_contract: H160,
     bft_bridge_contract: H160,
+    rune_id: Id256,
 }
 
 fn get_rune_info(name: &str) -> RuneInfo {
@@ -165,6 +167,7 @@ impl RunesContext {
             inner: context,
             eth_wallet: wallet,
             token_contract: token,
+            rune_id: rune_info.id().into(),
             bft_bridge_contract: bft_bridge,
         }
     }
@@ -307,6 +310,7 @@ impl RunesContext {
     async fn deposit(
         &self,
         eth_address: &H160,
+        erc20_address: &H160,
     ) -> Result<Vec<(RuneName, u128, H256)>, DepositError> {
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
@@ -318,14 +322,15 @@ impl RunesContext {
 
         let data = RuneDepositRequestData {
             dst_address: eth_address.clone(),
+            erc20_address: erc20_address.clone(),
             amounts: None,
         };
-        let input = bft_bridge_api::NOTIFY_MINTER
-            .encode_input(&[
-                Token::Uint(RuneMinterNotification::DEPOSIT_TYPE.into()),
-                Token::Bytes(Encode!(&data).unwrap()),
-            ])
-            .unwrap();
+
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: RuneMinterNotification::DEPOSIT_TYPE,
+            userData: Encode!(&data).unwrap().into(),
+        }
+        .abi_encode();
 
         let transaction = TransactionBuilder {
             from: &self.eth_wallet.address().into(),
@@ -433,6 +438,7 @@ impl RunesContext {
                 &client,
                 &self.eth_wallet,
                 &self.token_contract,
+                self.rune_id.0.as_slice(),
                 withdrawal_address.as_bytes().to_vec(),
                 &self.bft_bridge_contract,
                 amount,
@@ -501,7 +507,7 @@ impl RunesContext {
 
         self.inner.advance_time(Duration::from_secs(5)).await;
 
-        self.deposit(&wallet_address.into())
+        self.deposit(&wallet_address.into(), &self.token_contract)
             .await
             .expect("failed to deposit runes");
 

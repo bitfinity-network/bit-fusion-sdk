@@ -6,6 +6,7 @@ use bitcoin::bip32::DerivationPath;
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
+use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -20,7 +21,6 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use ord_rs::wallet::{ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 
@@ -110,7 +110,7 @@ impl RuneBridge {
         &self,
         wallet_address: H160,
     ) -> Vec<(MinterOperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address)
+        get_operations_store().get_for_address(&wallet_address, None, None)
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {

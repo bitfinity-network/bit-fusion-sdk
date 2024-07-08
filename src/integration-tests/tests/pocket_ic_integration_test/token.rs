@@ -12,7 +12,7 @@ async fn test_transfer_tokens() {
     let amount = Nat::from(100_u64);
     let to = Principal::anonymous().into();
 
-    let tranfer_arg = TransferArg {
+    let transfer_arg = TransferArg {
         from_subaccount: None,
         to,
         fee: None,
@@ -21,7 +21,7 @@ async fn test_transfer_tokens() {
         amount: amount.clone(),
     };
 
-    client.icrc1_transfer(tranfer_arg).await.unwrap().unwrap();
+    client.icrc1_transfer(transfer_arg).await.unwrap().unwrap();
     let balance = client.icrc1_balance_of(to).await.unwrap();
 
     assert_eq!(balance, amount);
