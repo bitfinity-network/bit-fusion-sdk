@@ -1,6 +1,3 @@
-use std::marker::PhantomData;
-use std::rc::Rc;
-
 use ic_metrics::Metrics;
 use minter_contract_utils::bridge_canister::BridgeCanister;
 pub use state::SigningStrategy;
@@ -14,8 +11,6 @@ pub mod operation;
 pub mod state;
 mod tasks;
 pub mod tokens;
-
-type ForceNotSendAndNotSync = PhantomData<Rc<()>>;
 
 pub fn idl() -> String {
     let minter_canister_idl = MinterCanister::idl();

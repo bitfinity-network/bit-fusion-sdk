@@ -1,6 +1,5 @@
 use access_list::AccessList;
 use candid::Principal;
-pub use config::Config;
 pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
@@ -8,8 +7,6 @@ use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
 use crate::constant::ACCESS_LIST_MEMORY_ID;
 
 mod access_list;
-mod config;
-pub mod log;
 
 /// State of a minter canister.
 pub struct State {
