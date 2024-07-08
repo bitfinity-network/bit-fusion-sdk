@@ -451,11 +451,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         ControlFlow::Continue(())
     }
 
-    fn wait_for_inputs(
-        &mut self,
-        request_id: OperationId,
-        bail_status: DepositRequestStatus,
-    ) {
+    fn wait_for_inputs(&mut self, request_id: OperationId, bail_status: DepositRequestStatus) {
         let Some(request) = self.operation_store.get(request_id) else {
             log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
             return;

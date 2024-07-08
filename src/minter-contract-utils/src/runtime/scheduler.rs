@@ -1,17 +1,17 @@
-use std::{future::Future, marker::PhantomData, pin::Pin};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
 
 use candid::CandidType;
 use ic_stable_structures::StableBTreeMap;
-use ic_task_scheduler::{
-    scheduler::{Scheduler, TaskScheduler},
-    task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus},
-    SchedulerError,
-};
+use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
+use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
+use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
-use crate::{bridge::BftResult, bridge::Operation, operation_store::OperationId};
-
 use super::RuntimeState;
+use crate::bridge::{BftResult, Operation};
+use crate::operation_store::OperationId;
 
 pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask<Op>>, Mem>;
 pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;

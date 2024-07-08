@@ -2,10 +2,12 @@ use std::borrow::Cow;
 
 use candid::{CandidType, Principal};
 use did::{codec, H160};
-use ic_stable_structures::{stable_structures::Memory, CellStructure, StableCell, Storable};
+use ic_stable_structures::stable_structures::Memory;
+use ic_stable_structures::{CellStructure, StableCell, Storable};
 use serde::{Deserialize, Serialize};
 
-use crate::{evm_bridge::EvmParams, evm_link::EvmLink};
+use crate::evm_bridge::EvmParams;
+use crate::evm_link::EvmLink;
 
 /// Stores configuration to work with EVM.
 pub struct ConfigStorage<M: Memory>(StableCell<Config, M>);

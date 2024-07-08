@@ -2,9 +2,10 @@ pub mod config;
 
 use ic_stable_structures::stable_structures::Memory;
 
-use crate::{bridge::Operation, operation_store::OperationStore, signer::SignerStorage};
-
 use self::config::ConfigStorage;
+use crate::bridge::Operation;
+use crate::operation_store::OperationStore;
+use crate::signer::SignerStorage;
 
 pub struct StateMemory<Mem> {
     pub config_memory: Mem,

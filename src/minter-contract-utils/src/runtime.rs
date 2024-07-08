@@ -1,18 +1,18 @@
 pub mod scheduler;
 pub mod state;
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_stable_structures::{stable_structures::DefaultMemoryImpl, VirtualMemory};
+use ic_stable_structures::stable_structures::DefaultMemoryImpl;
+use ic_stable_structures::VirtualMemory;
 
-use crate::{
-    bridge::{BftResult, Error, Operation, OperationContext},
-    evm_bridge::EvmParams,
-    evm_link::EvmLink,
-};
-
-use self::{scheduler::BridgeScheduler, state::State};
+use self::scheduler::BridgeScheduler;
+use self::state::State;
+use crate::bridge::{BftResult, Error, Operation, OperationContext};
+use crate::evm_bridge::EvmParams;
+use crate::evm_link::EvmLink;
 
 pub type Mem = VirtualMemory<DefaultMemoryImpl>;
 pub type RuntimeState<Op> = Rc<RefCell<State<Mem, Op>>>;

@@ -5,12 +5,10 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{
-    bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventData},
-    evm_bridge::EvmParams,
-    evm_link::EvmLink,
-    operation_store::OperationId,
-};
+use crate::bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use crate::evm_bridge::EvmParams;
+use crate::evm_link::EvmLink;
+use crate::operation_store::OperationId;
 
 type StageId = u64;
 

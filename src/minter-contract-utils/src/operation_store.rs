@@ -284,9 +284,8 @@ where
 mod tests {
     use ic_stable_structures::VectorMemory;
 
-    use crate::bridge::OperationContext;
-
     use super::*;
+    use crate::bridge::OperationContext;
 
     const COMPLETE: u32 = u32::MAX;
     impl Operation for u32 {
