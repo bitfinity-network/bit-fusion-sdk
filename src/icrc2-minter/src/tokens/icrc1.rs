@@ -160,7 +160,7 @@ fn cache_ic_token_configuration(config: TokenConfiguration) {
 #[cfg(test)]
 mod test {
     use candid::Nat;
-    use evm_canister_client::CanisterClient;
+    use evm_canister_client::{CanisterClient, CanisterClientResult};
     use ic_exports::icrc_types::icrc1::account::Account;
 
     use super::*;
@@ -223,7 +223,7 @@ mod test {
         decimals: u8,
     }
 
-  #[async_trait::async_trait]
+    #[async_trait::async_trait]
     impl CanisterClient for FakeIcrcCanisterClient {
         async fn query<T, R>(&self, method: &str, _args: T) -> CanisterClientResult<R>
         where
@@ -276,5 +276,5 @@ mod test {
         {
             unimplemented!()
         }
-    ```
+    }
 }

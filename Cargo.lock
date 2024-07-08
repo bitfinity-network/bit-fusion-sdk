@@ -5757,7 +5757,6 @@ dependencies = [
  "log",
  "minter-did",
  "mockall 0.12.1",
- "num-bigint 0.4.5",
  "num-traits",
  "rand",
  "serde",
