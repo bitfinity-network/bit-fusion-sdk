@@ -902,6 +902,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-client"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bridge-did",
+ "bridge-utils",
+ "candid",
+ "did",
+ "env_logger",
+ "erc20-minter",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "hex",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-stable-structures 0.17.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "icrc2-minter",
+ "jsonrpc-core",
+ "log",
+ "num-bigint 0.4.5",
+ "num-traits",
+ "once_cell",
+ "rune-bridge",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vergen",
+]
+
+[[package]]
 name = "bridge-did"
 version = "0.2.0"
 dependencies = [

@@ -3,6 +3,9 @@ use ic_storage::IcStorage;
 
 use crate::BridgeCore;
 
+/// Runs inspect checks for the bridge canister API methods. This function should be called from
+/// the canister `#[inspect]` function. In case any of the checks do not pass, the function
+/// will `trap` (panic).
 pub fn bridge_inspect() {
     let core = BridgeCore::get();
     let core = core.borrow();

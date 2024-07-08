@@ -23,6 +23,7 @@ pub struct BridgeConfig {
 }
 
 impl BridgeConfig {
+    /// Creates a new instance of config struct and stores it in the stable memory.
     pub fn init(init_data: &BridgeInitData) -> Self {
         let value = BridgeConfig {
             owner: init_data.owner,
@@ -37,6 +38,7 @@ impl BridgeConfig {
         value
     }
 
+    /// Loads the config from the stable memory.
     pub fn load() -> Self {
         CONFIG_CELL.with(|cell| cell.borrow().get().clone())
     }
@@ -76,6 +78,7 @@ impl BridgeConfig {
         self.clone().store();
     }
 
+    /// Returns the signing strategy.
     pub fn get_signing_strategy(&self) -> &SigningStrategy {
         &self.signing_strategy
     }

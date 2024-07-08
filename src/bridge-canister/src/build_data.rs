@@ -1,3 +1,29 @@
+/// Macro to provide common build data for bridge canister. To use this macro, add the following
+/// method to the canister implementation:
+///
+/// ```ignore
+/// #[query]
+/// fn get_canister_build_data(&self) -> BuildData {
+///     bridge_canister::build_data!()
+/// }
+/// ```
+///
+/// For this code to work, `vergen` crate should be added to the build dependencies, and the
+/// following code should be added to the `build.rs`:
+///
+/// ```ignore
+///
+///     vergen::EmitBuilder::builder()
+///         .all_build()
+///         .all_cargo()
+///         .all_git()
+///         .all_rustc()
+///         .emit()
+///         .expect("Cannot set build environment variables");
+/// ```
+///
+/// The return type of the method is `did::build::BuildData`, so `did` crate is also a required
+/// dependency.
 #[macro_export]
 macro_rules! build_data {
     () => {{

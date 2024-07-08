@@ -17,7 +17,9 @@ use log::{debug, info};
 use crate::log_config::LoggerConfigService;
 use crate::BridgeCore;
 
+/// Common API of all bridge canisters.
 pub trait BridgeCanister: Canister {
+    /// Gets the bridge core state.
     #[state_getter]
     fn core(&self) -> Rc<RefCell<BridgeCore>>;
 
@@ -111,6 +113,12 @@ pub trait BridgeCanister: Canister {
             .map_err(|e| Error::Internal(format!("failed to get minter canister address: {e}")))
     }
 
+    /// Initialize the bridge with the given parameters.
+    ///
+    /// This method should be called only once from the `#[init]` method of the canister.
+    ///
+    /// `_run_scheduler` callback is called in a timer and should start scheduler task execution
+    /// round.
     fn init_bridge(
         &mut self,
         init_data: BridgeInitData,
@@ -132,6 +140,8 @@ pub trait BridgeCanister: Canister {
         log::trace!("Bridge canister initialized: {init_data:?}");
     }
 
+    /// Re-initializes the bridge after upgrade. This method should be called from the `#[post-upgrade]`
+    /// method.
     fn bridge_post_upgrade(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
         self.core().borrow_mut().reload();
 
@@ -144,6 +154,7 @@ pub trait BridgeCanister: Canister {
         debug!("Upgrade completed");
     }
 
+    /// Starts scheduler timer.
     fn start_timers(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
         const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(2);
         ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
@@ -152,6 +163,7 @@ pub trait BridgeCanister: Canister {
         });
     }
 
+    /// Returns IDL of the bridge API.
     fn get_idl() -> Idl {
         generate_idl!()
     }
