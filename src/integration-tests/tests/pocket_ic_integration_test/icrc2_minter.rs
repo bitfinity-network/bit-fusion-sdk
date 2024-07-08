@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
@@ -11,7 +12,6 @@ use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
-use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };

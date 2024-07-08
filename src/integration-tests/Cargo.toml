@@ -9,8 +9,9 @@ edition.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
-bridge-utils = { path = "../bridge-utils"}
+bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }

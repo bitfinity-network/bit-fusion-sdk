@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
@@ -13,7 +14,6 @@ use evm_canister_client::EvmCanisterClient;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
-use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
 use crate::utils::CHAIN_ID;
@@ -392,7 +392,7 @@ async fn native_token_deposit_increase_and_decrease() {
     if let OperationStatus::MintOrderSent { tx_id, .. } = &operations[0].1.status {
         let receipt = ctx
             .context
-            .wait_transaction_receipt(tx_id)
+            .wait_transaction_receipt(&tx_id)
             .await
             .unwrap()
             .unwrap();

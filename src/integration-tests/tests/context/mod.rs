@@ -33,9 +33,6 @@ use icrc_client::IcrcCanisterClient;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
-use crate::context::erc20_bridge_client::Erc20BridgeClient;
-use crate::context::icrc2_bridge_client::Icrc2BridgeClient;
-use crate::context::rune_bridge_client::RuneBridgeClient;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
@@ -43,12 +40,8 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
-pub mod bridge_client;
-pub mod erc20_bridge_client;
-pub mod icrc2_bridge_client;
-pub mod rune_bridge_client;
-
 use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
 
 #[async_trait::async_trait]
