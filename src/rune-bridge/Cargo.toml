@@ -11,6 +11,7 @@ export-api = []
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
+bridge-did = { path = "../bridge-did", features = ["runes"] }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
@@ -29,7 +30,6 @@ ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
-minter-did = { workspace = true, features = ["runes"] }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }

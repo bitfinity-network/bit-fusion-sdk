@@ -9,13 +9,12 @@ export-api = []
 
 [dependencies]
 anyhow = { workspace = true }
+bridge-did = { path = "../bridge-did" }
 ethers-core = { workspace = true }
 did = { workspace = true }
 candid = { workspace = true }
 hex = { workspace = true }
 ic-stable-structures = { workspace = true }
-bridge-did = { path = "../bridge-did" }
-minter-did = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

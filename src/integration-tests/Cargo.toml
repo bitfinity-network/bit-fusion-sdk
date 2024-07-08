@@ -8,6 +8,7 @@ edition.workspace = true
 [dependencies]
 async-trait = { workspace = true }
 bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
+bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
@@ -32,7 +33,6 @@ minter-client = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils", features = [
     "test-contracts",
 ] }
-minter-did = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

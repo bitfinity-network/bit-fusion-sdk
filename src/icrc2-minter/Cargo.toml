@@ -32,7 +32,6 @@ icrc-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils", features = ["export-api"] }
-minter-did = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

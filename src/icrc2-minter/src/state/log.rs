@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
+use bridge_did::error::Error;
 use candid::{Decode, Encode};
 use ic_exports::ic_kit::ic;
 use ic_log::{init_log, LogSettings, LoggerConfig};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, CellStructure, StableCell, Storable, VirtualMemory};
-use minter_did::error::Error;
 
 use crate::constant::LOG_SETTINGS_MEMORY_ID;
 use crate::memory::MEMORY_MANAGER;

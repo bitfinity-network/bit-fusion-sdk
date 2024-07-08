@@ -1,5 +1,8 @@
 use std::time::Duration;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
+use bridge_did::reason::ApproveAfterMint;
 use did::{H160, U256, U64};
 use eth_signer::Signer;
 use ethers_core::abi::Token;
@@ -8,9 +11,6 @@ use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 use ic_metrics::MetricsStorage;
 use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
-use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
 use crate::context::bridge_client::BridgeCanisterClient;

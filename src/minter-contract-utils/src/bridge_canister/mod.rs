@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_did::error::{Error, Result};
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use did::H160;
@@ -12,7 +13,6 @@ use ic_canister::{
 use ic_log::writer::Logs;
 use ic_task_scheduler::task::TaskOptions;
 use log::{debug, info};
-use minter_did::error::{Error, Result};
 
 use crate::bridge_canister::log_config::LoggerConfigService;
 

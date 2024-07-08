@@ -795,6 +795,7 @@ name = "bridge-tool"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-did",
  "candid",
  "clap 4.5.7",
  "did",
@@ -807,7 +808,6 @@ dependencies = [
  "ic-agent",
  "ic-canister-client",
  "minter-contract-utils",
- "minter-did",
  "rand",
  "tokio",
 ]
@@ -823,6 +823,7 @@ name = "btc-bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-did",
  "candid",
  "did",
  "eth-signer",
@@ -841,7 +842,6 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "minter-contract-utils",
- "minter-did",
  "serde",
  "tokio",
 ]
@@ -1861,6 +1861,7 @@ name = "erc20-minter"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-did",
  "candid",
  "did",
  "eth-signer",
@@ -1877,7 +1878,6 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "minter-contract-utils",
- "minter-did",
  "serde",
  "tokio",
 ]
@@ -5504,7 +5504,6 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "minter-contract-utils",
- "minter-did",
  "mockall 0.12.1",
  "rand",
  "serde",
@@ -5605,6 +5604,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-did",
  "btc-bridge",
  "candid",
  "did",
@@ -5640,7 +5640,6 @@ dependencies = [
  "jsonrpc-core",
  "minter-client",
  "minter-contract-utils",
- "minter-did",
  "once_cell",
  "rand",
  "rune-bridge",
@@ -6051,7 +6050,6 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "minter-did",
  "num-bigint 0.4.5",
  "num-traits",
  "once_cell",
@@ -6076,7 +6074,6 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.17.0",
- "ordinals",
  "serde",
  "thiserror",
 ]
@@ -7522,6 +7519,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-did",
  "candid",
  "did",
  "eth-signer",
@@ -7541,7 +7539,6 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "minter-contract-utils",
- "minter-did",
  "ord-rs",
  "ordinals",
  "serde",

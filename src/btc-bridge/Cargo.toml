@@ -10,6 +10,7 @@ export-api = []
 
 [dependencies]
 anyhow = { workspace = true }
+bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 did = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
@@ -28,7 +29,6 @@ jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 ethers-core = { workspace = true }
-minter-did = { workspace = true }
 minter-contract-utils = { path = "../minter-contract-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::error::{Error, Result};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
@@ -9,7 +10,6 @@ use ethers_core::types::TransactionRequest;
 use minter_contract_utils::bft_bridge_api::MINTER_CANISTER_ADDRESS;
 use minter_contract_utils::bridge_canister::BridgeCore;
 use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_DEPLOYED_CODE;
-use minter_did::error::{Error, Result};
 
 use crate::constant::DEFAULT_TX_GAS_LIMIT;
 
@@ -179,14 +179,14 @@ pub async fn check_bft_bridge_contract(
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::id256::Id256;
+    use bridge_did::order::{fit_str_to_array, MintOrder, SignedMintOrder};
     use candid::Principal;
     use did::{codec, H160};
     use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
     use ethers_core::utils::keccak256;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::Storable;
-    use minter_did::id256::Id256;
-    use minter_did::order::{fit_str_to_array, MintOrder, SignedMintOrder};
 
     #[tokio::test]
     async fn signed_mint_order_encoding_roundtrip() {

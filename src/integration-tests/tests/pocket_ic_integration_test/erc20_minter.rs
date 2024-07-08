@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use did::{H160, U256, U64};
 use erc20_minter::operation::OperationStatus;
 use eth_signer::{Signer, Wallet};
@@ -12,8 +14,6 @@ use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 use super::PocketIcTestContext;
 use crate::context::bridge_client::BridgeCanisterClient;

@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::id256::Id256;
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::Log;
@@ -14,7 +15,6 @@ use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{BridgeEvent, BurntEventData, MintedEventData};
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
-use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;

@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use bridge_did::id256::Id256;
+use bridge_did::reason::Icrc2Burn;
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -16,8 +18,6 @@ use minter_contract_utils::build_data::{
     BFT_BRIDGE_SMART_CONTRACT_CODE, FEE_CHARGE_SMART_CONTRACT_CODE, UUPS_PROXY_SMART_CONTRACT_CODE,
 };
 use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
-use minter_did::id256::Id256;
-use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
@@ -298,6 +298,7 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         sender: args.sender,
         amount: args.amount.into(),
         icrc2_token_principal: args.token,
+        erc20_token_address: Default::default(),
         from_subaccount: None,
         recipient_address: wallet.address().into(),
         approve_after_mint: None,

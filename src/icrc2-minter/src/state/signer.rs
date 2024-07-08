@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 
+use bridge_did::error::{Error, Result};
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningStrategy, TransactionSigner, TxSigner,
 };
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
-use minter_did::error::{Error, Result};
 
 use crate::constant::TX_SIGNER_MEMORY_ID;
 use crate::memory::MEMORY_MANAGER;

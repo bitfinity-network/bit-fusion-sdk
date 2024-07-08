@@ -4,6 +4,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_did::error::Error;
+use bridge_did::id256::Id256;
+use bridge_did::order::{self, MintOrder};
+use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -23,10 +27,6 @@ use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::evm_link::address_to_icrc_subaccount;
 use minter_contract_utils::operation_store::MinterOperationId;
 use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
-use minter_did::error::Error;
-use minter_did::id256::Id256;
-use minter_did::order::{self, MintOrder};
-use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_operations_store;

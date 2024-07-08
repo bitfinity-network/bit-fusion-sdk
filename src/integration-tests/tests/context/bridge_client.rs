@@ -1,10 +1,10 @@
+use bridge_did::error::Result as McResult;
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use minter_did::error::Result as McResult;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 #[async_trait::async_trait]
 pub trait BridgeCanisterClient<C: CanisterClient> {

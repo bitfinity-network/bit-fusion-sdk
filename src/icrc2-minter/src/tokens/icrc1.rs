@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use bridge_did::error::Result;
 use candid::{CandidType, Nat, Principal};
 use evm_canister_client::IcCanisterClient;
 use icrc_client::account::Account;
 use icrc_client::IcrcCanisterClient;
-use minter_did::error::Result;
 use serde::{Deserialize, Serialize};
 
 thread_local! {

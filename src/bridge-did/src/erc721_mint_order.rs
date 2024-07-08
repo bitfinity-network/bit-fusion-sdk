@@ -230,11 +230,10 @@ impl<M: Memory> MintOrders<M> {
         sender: Id256,
         src_token: Id256,
         operation_id: u32,
-        order: &ERC721SignedMintOrder,
+        order: ERC721SignedMintOrder,
     ) -> Option<ERC721SignedMintOrder> {
         let key = MintOrderKey { sender, src_token };
-        self.mint_orders_map
-            .insert(&key, &operation_id, order.clone())
+        self.mint_orders_map.insert(&key, &operation_id, order)
     }
 
     /// Returns the signed mint order for the given sender and token, if it exists.
@@ -345,10 +344,10 @@ mod tests {
         let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
         assert!(orders
-            .insert(sender, src_token, operation_id, &order)
+            .insert(sender, src_token, operation_id, order.clone())
             .is_none());
         assert!(orders
-            .insert(sender, src_token, operation_id, &order)
+            .insert(sender, src_token, operation_id, order.clone())
             .is_some());
         assert_eq!(orders.get(sender, src_token, operation_id), Some(order));
     }
@@ -364,7 +363,7 @@ mod tests {
         let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
         assert!(orders
-            .insert(sender, src_token, operation_id, &order)
+            .insert(sender, src_token, operation_id, order)
             .is_none());
         assert!(orders.remove(sender, src_token, operation_id).is_some());
         assert!(orders.get(sender, src_token, operation_id).is_none());
@@ -380,14 +379,22 @@ mod tests {
         let other_src_token = Id256::from(&Principal::management_canister());
         let order = ERC721SignedMintOrder(vec![0; ERC721MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 
-        assert!(orders.insert(sender, src_token, 0, &order).is_none());
-        assert!(orders.insert(sender, src_token, 1, &order).is_none());
+        assert!(orders.insert(sender, src_token, 0, order.clone()).is_none());
+        assert!(orders.insert(sender, src_token, 1, order.clone()).is_none());
 
-        assert!(orders.insert(other_sender, src_token, 2, &order).is_none());
-        assert!(orders.insert(other_sender, src_token, 3, &order).is_none());
+        assert!(orders
+            .insert(other_sender, src_token, 2, order.clone())
+            .is_none());
+        assert!(orders
+            .insert(other_sender, src_token, 3, order.clone())
+            .is_none());
 
-        assert!(orders.insert(sender, other_src_token, 4, &order).is_none());
-        assert!(orders.insert(sender, other_src_token, 5, &order).is_none());
+        assert!(orders
+            .insert(sender, other_src_token, 4, order.clone())
+            .is_none());
+        assert!(orders
+            .insert(sender, other_src_token, 5, order.clone())
+            .is_none());
 
         assert_eq!(
             orders.get_all(sender, src_token),

@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::error::{Error, Result};
+use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
+use bridge_did::order::SignedMintOrder;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -19,9 +22,6 @@ use ic_task_scheduler::task::{InnerScheduledTask, TaskOptions, TaskStatus};
 use log::*;
 use minter_contract_utils::bridge_canister::{BridgeCanister, BridgeCore};
 use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
-use minter_did::error::{Error, Result};
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 use crate::constant::{
     OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,

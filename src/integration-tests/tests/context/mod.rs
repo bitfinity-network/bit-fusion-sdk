@@ -3,6 +3,11 @@ mod evm_rpc_canister;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use bridge_did::error::Result as McResult;
+use bridge_did::id256::Id256;
+use bridge_did::init::BridgeInitData;
+use bridge_did::order::SignedMintOrder;
+use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -31,11 +36,6 @@ use minter_contract_utils::build_data::{
 use minter_contract_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use minter_contract_utils::fee_charge_api::{NATIVE_TOKEN_BALANCE, NATIVE_TOKEN_DEPOSIT};
 use minter_contract_utils::{bft_bridge_api, fee_charge_api, wrapped_token_api};
-use minter_did::error::Result as McResult;
-use minter_did::id256::Id256;
-use minter_did::init::InitData;
-use minter_did::order::SignedMintOrder;
-use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -1001,10 +1001,10 @@ pub fn icrc_canister_default_init_args(
     }
 }
 
-pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> InitData {
+pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> BridgeInitData {
     let mut rng = rand::thread_rng();
     let wallet = Wallet::new(&mut rng);
-    InitData {
+    BridgeInitData {
         owner,
         evm_principal,
         signing_strategy: SigningStrategy::Local {
