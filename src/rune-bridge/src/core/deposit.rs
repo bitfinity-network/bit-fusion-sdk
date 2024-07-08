@@ -7,8 +7,7 @@ use std::time::Duration;
 
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
-use bridge_did::id256::Id256;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -17,7 +16,8 @@ use ic_exports::ic_kit::ic;
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use minter_contract_utils::operation_store::MinterOperationId;
+use minter_did::id256::Id256;
+use minter_did::order::{MintOrder, SignedMintOrder};
 
 use crate::canister::{get_operations_store, get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
@@ -99,6 +99,7 @@ pub enum MintOrderStatus {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct RuneDepositPayload {
     pub dst_address: H160,
+    pub erc20_address: H160,
     pub requested_amounts: Option<HashMap<RuneName, u128>>,
     pub request_ts: u64,
     pub status: DepositRequestStatus,
@@ -167,12 +168,14 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     pub fn create_deposit_request(
         &mut self,
         dst_address: H160,
+        erc20_address: H160,
         amounts: Option<HashMap<RuneName, u128>>,
     ) -> MinterOperationId {
         let id = self.operation_store.new_operation(
             dst_address.clone(),
             OperationState::Deposit(RuneDepositPayload {
                 dst_address: dst_address.clone(),
+                erc20_address,
                 requested_amounts: amounts,
                 request_ts: ic::time(),
                 status: DepositRequestStatus::Scheduled,
@@ -211,7 +214,9 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     }
 
     pub fn complete_mint_request(&mut self, dst_address: H160, order_nonce: u32) {
-        let requests = self.operation_store.get_for_address(&dst_address);
+        let requests = self
+            .operation_store
+            .get_for_address(&dst_address, None, None);
         for (request_id, request) in requests {
             if let OperationState::Deposit(payload) = request {
                 if let DepositRequestStatus::MintOrdersCreated { mut orders } =
@@ -415,7 +420,11 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         }
 
         let mint_order_details = match self
-            .create_mint_orders(&request.dst_address, &rune_info_amounts)
+            .create_mint_orders(
+                &request.dst_address,
+                &request.erc20_address,
+                &rune_info_amounts,
+            )
             .await
         {
             Ok(v) => v,
@@ -672,6 +681,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     async fn create_mint_order(
         &self,
         eth_address: &H160,
+        erc20_address: &H160,
         amount: u128,
         rune_info: RuneInfo,
         nonce: u32,
@@ -692,7 +702,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
                 sender,
                 src_token,
                 recipient: eth_address.clone(),
-                dst_token: H160::default(),
+                dst_token: erc20_address.clone(),
                 nonce,
                 sender_chain_id,
                 recipient_chain_id,
@@ -720,13 +730,14 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     async fn create_mint_orders(
         &self,
         eth_address: &H160,
+        erc20_address: &H160,
         rune_amounts: &[(RuneInfo, u128)],
     ) -> Result<Vec<MintOrderDetails>, DepositError> {
         let mut result = vec![];
         for (rune_info, amount) in rune_amounts {
             let nonce = self.get_nonce();
             let mint_order = self
-                .create_mint_order(eth_address, *amount, *rune_info, nonce)
+                .create_mint_order(eth_address, erc20_address, *amount, *rune_info, nonce)
                 .await?;
             result.push(MintOrderDetails {
                 rune_name: rune_info.name,
@@ -759,7 +770,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             (evm_info, evm_params)
         };
 
-        let mut tx = minter_contract_utils::bft_bridge_api::mint_transaction(
+        let mut tx = bridge_utils::bft_events::mint_transaction(
             sender.0,
             evm_info.bridge_contract.0,
             evm_params.nonce.into(),

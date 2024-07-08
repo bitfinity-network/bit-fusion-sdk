@@ -130,7 +130,7 @@ impl EvmMinter {
         src_token: Id256,
     ) -> Vec<(u32, SignedMintOrder)> {
         get_operations_store()
-            .get_for_address(&wallet_address)
+            .get_for_address(&wallet_address, None, None)
             .into_iter()
             .filter_map(|(operation_id, status)| {
                 status
@@ -159,7 +159,7 @@ impl EvmMinter {
         &self,
         wallet_address: H160,
     ) -> Vec<(MinterOperationId, OperationPayload)> {
-        get_operations_store().get_for_address(&wallet_address)
+        get_operations_store().get_for_address(&wallet_address, None, None)
     }
 
     /// Returns EVM address of the canister.
@@ -265,12 +265,12 @@ pub fn get_operations_store(
 
 #[cfg(test)]
 mod test {
+    use bridge_utils::evm_link::EvmLink;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::inject::{self};
     use ic_exports::ic_kit::MockContext;
-    use minter_contract_utils::evm_link::EvmLink;
 
     use super::*;
     use crate::EvmMinter;

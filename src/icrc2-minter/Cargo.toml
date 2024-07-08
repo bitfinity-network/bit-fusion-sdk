@@ -32,7 +32,7 @@ ic-storage = { workspace = true }
 icrc-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
+bridge-utils = { path = "../bridge-utils" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

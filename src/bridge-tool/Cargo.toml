@@ -6,8 +6,10 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 clap = { workspace = true }
 did = { workspace = true }
@@ -19,8 +21,5 @@ ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 hex = { workspace = true }
 ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
-minter-contract-utils = { path = "../minter-contract-utils", features = [
-    "test-contracts",
-] }
 rand = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }

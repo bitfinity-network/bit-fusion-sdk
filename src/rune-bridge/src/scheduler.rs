@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_utils::bft_events::{BridgeEvent, MintedEventData, NotifyMinterEventData};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -13,9 +16,6 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
-use minter_contract_utils::bft_bridge_api::{BridgeEvent, MintedEventData, NotifyMinterEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::operation_store::MinterOperationId;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};
@@ -156,8 +156,11 @@ impl RuneBridgeTask {
                 if let Some(notification) = RuneMinterNotification::decode(event) {
                     return match notification {
                         RuneMinterNotification::Deposit(payload) => {
-                            let request_id = RuneDeposit::get()
-                                .create_deposit_request(payload.dst_address, payload.amounts);
+                            let request_id = RuneDeposit::get().create_deposit_request(
+                                payload.dst_address,
+                                payload.erc20_address,
+                                payload.amounts,
+                            );
 
                             let deposit_task = RuneBridgeTask::Deposit(request_id);
                             Some(deposit_task.into_scheduled(TaskOptions::new()))
@@ -232,6 +235,7 @@ pub enum RuneMinterNotification {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct RuneDepositRequestData {
     pub dst_address: H160,
+    pub erc20_address: H160,
     pub amounts: Option<HashMap<RuneName, u128>>,
 }
 

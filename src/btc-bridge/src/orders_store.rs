@@ -1,8 +1,8 @@
-use bridge_did::id256::Id256;
-use bridge_did::order::SignedMintOrder;
+use bridge_utils::mint_orders::MintOrders;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
-use minter_contract_utils::mint_orders::MintOrders;
+use minter_did::id256::Id256;
+use minter_did::order::SignedMintOrder;
 
 use crate::memory::{MEMORY_MANAGER, MINT_ORDERS_MEMORY_ID};
 

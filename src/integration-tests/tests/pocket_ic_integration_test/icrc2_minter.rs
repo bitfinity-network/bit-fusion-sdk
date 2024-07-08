@@ -1,16 +1,14 @@
 use std::time::Duration;
 
-use bridge_did::id256::Id256;
-use bridge_did::order::SignedMintOrder;
-use bridge_did::reason::ApproveAfterMint;
+use alloy_sol_types::SolCall;
+use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
 use eth_signer::Signer;
-use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use ic_metrics::MetricsStorage;
-use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
+use minter_did::id256::Id256;
+use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
 use crate::context::bridge_client::BridgeCanisterClient;
@@ -58,6 +56,7 @@ async fn test_icrc2_tokens_roundtrip() {
         JOHN,
         &john_wallet,
         &bft_bridge,
+        &wrapped_token,
         amount as _,
         Some(john_address),
         None,
@@ -89,6 +88,7 @@ async fn test_icrc2_tokens_roundtrip() {
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
+            base_token_id.0.as_slice(),
             (&john()).into(),
             &bft_bridge,
             wrapped_balance,
@@ -150,6 +150,7 @@ async fn test_icrc2_token_canister_stopped() {
         JOHN,
         &john_wallet,
         &bft_bridge,
+        &wrapped_token,
         amount as _,
         Some(john_address.clone()),
         None,
@@ -187,6 +188,7 @@ async fn test_icrc2_token_canister_stopped() {
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
+            base_token_id.0.as_slice(),
             john_principal_id256,
             &bft_bridge,
             wrapped_balance,
@@ -197,9 +199,9 @@ async fn test_icrc2_token_canister_stopped() {
 
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
-    let (_, refund_mint_order) = ctx
-        .client(ctx.canisters().icrc2_minter(), ADMIN)
-        .query::<_, Vec<(u32, SignedMintOrder)>>("list_mint_orders", (john_address, base_token_id))
+    let minter_client = ctx.icrc_minter_client(ADMIN);
+    let (_, refund_mint_order) = minter_client
+        .list_mint_orders(&john_address, &base_token_id, Some(0u64), Some(1024u64))
         .await
         .unwrap()[0];
 
@@ -332,6 +334,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
         JOHN,
         &john_wallet,
         &bft_bridge,
+        &wrapped_token,
         amount as _,
         Some(john_address.clone()),
         Some(ApproveAfterMint {
@@ -361,12 +364,12 @@ async fn test_icrc2_tokens_approve_after_mint() {
     );
     assert_eq!(wrapped_balance as u64, amount);
 
-    let input = ERC_20_ALLOWANCE
-        .encode_input(&[
-            Token::Address(john_address.0),
-            Token::Address(spender_wallet.address()),
-        ])
-        .unwrap();
+    let input = WrappedToken::allowanceCall {
+        owner: john_address.clone().into(),
+        spender: spender_wallet.address().0.into(),
+    }
+    .abi_encode();
+
     let allowance_response = ctx
         .evm_client(ADMIN)
         .eth_call(
@@ -382,14 +385,11 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .unwrap();
 
     let allowance_data = hex::decode(allowance_response.trim_start_matches("0x")).unwrap();
-    let allowance = ERC_20_ALLOWANCE
-        .decode_output(&allowance_data)
-        .unwrap()
-        .first()
-        .unwrap()
-        .clone()
-        .into_uint()
-        .unwrap();
 
-    assert_eq!(allowance, approve_amount.0);
+    let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data, true)
+        .unwrap()
+        ._0
+        .into();
+
+    assert_eq!(allowance, approve_amount);
 }
