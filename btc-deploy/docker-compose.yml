@@ -1,4 +1,3 @@
-version: "3"
 services:
   bitcoind:
     container_name: bitcoind
@@ -21,7 +20,8 @@ services:
       dockerfile: ord.dockerfile
       context: .
     depends_on:
-      - bitcoind
+      bitcoind:
+        condition: service_healthy
     ports:
       - "8000:8000"
       - "8001:8001"
