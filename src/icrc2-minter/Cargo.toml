@@ -12,6 +12,7 @@ export-api = []
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 candid = { workspace = true }
+bridge-canister = { path = "../bridge-canister" }
 bridge-did = { path = "../bridge-did" }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
@@ -31,7 +32,7 @@ ic-storage = { workspace = true }
 icrc-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils", features = ["export-api"] }
+minter-contract-utils = { path = "../minter-contract-utils" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

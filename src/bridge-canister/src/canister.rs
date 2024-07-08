@@ -14,20 +14,8 @@ use ic_log::writer::Logs;
 use ic_task_scheduler::task::TaskOptions;
 use log::{debug, info};
 
-use crate::bridge_canister::log_config::LoggerConfigService;
-
-mod build_data;
-mod config;
-mod core;
-mod inspect;
-mod log_config;
-mod memory;
-mod scheduler;
-mod signer;
-
-pub use core::BridgeCore;
-
-pub use inspect::bridge_inspect;
+use crate::log_config::LoggerConfigService;
+use crate::BridgeCore;
 
 pub trait BridgeCanister: Canister {
     #[state_getter]
@@ -173,20 +161,14 @@ generate_exports!(BridgeCanister);
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    use bridge_did::init::BridgeInitData;
-    use candid::Principal;
-    use did::H160;
     use eth_signer::sign_strategy::SigningStrategy;
     use ethers_core::rand;
-    use ic_canister::{canister_call, init, Canister, PreUpdate};
+    use ic_canister::{canister_call, init};
     use ic_exports::ic_kit::{inject, MockContext};
     use ic_log::LogSettings;
     use ic_storage::IcStorage;
 
-    use crate::bridge_canister::{BridgeCanister, BridgeCore};
+    use super::*;
 
     #[derive(Debug, Canister)]
     struct TestBridge {

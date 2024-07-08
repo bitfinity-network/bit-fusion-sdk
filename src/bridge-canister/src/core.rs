@@ -9,10 +9,10 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
 use ic_exports::ic_kit::ic;
 use ic_storage::IcStorage;
+use minter_contract_utils::evm_bridge::EvmParams;
 
-use crate::bridge_canister::config::BridgeConfig;
-use crate::bridge_canister::signer::SignerStorage;
-use crate::evm_bridge::EvmParams;
+use crate::config::BridgeConfig;
+use crate::signer::SignerStorage;
 
 #[derive(Debug, Clone, Default)]
 pub struct BridgeCore {

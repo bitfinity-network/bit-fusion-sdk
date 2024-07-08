@@ -5,7 +5,6 @@ edition.workspace = true
 
 [features]
 test-contracts = []
-export-api = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -19,12 +18,9 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 jsonrpc-core = { workspace = true }
-ic-storage = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-exports = { workspace = true }
-ic-metrics = { workspace = true }
-ic-task-scheduler = { workspace = true }
 ic-log = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
@@ -33,7 +29,6 @@ ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
     "http-outcall",
 ] }
-evm-canister-client = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 log = { workspace = true }
 
@@ -41,7 +36,6 @@ log = { workspace = true }
 [build-dependencies]
 solidity-helper = { path = "../solidity-helper" }
 anyhow = { workspace = true }
-vergen = { workspace = true }
 
 [dev-dependencies]
 candid = { workspace = true }

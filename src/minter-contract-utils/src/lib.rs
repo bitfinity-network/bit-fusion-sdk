@@ -1,5 +1,4 @@
 pub mod bft_bridge_api;
-pub mod bridge_canister;
 pub mod build_data;
 pub mod evm_bridge;
 pub mod evm_link;

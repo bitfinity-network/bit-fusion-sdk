@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_canister::BridgeCore;
 use bridge_did::error::Error;
 use bridge_did::id256::Id256;
 use bridge_did::order::{self, MintOrder};
@@ -22,7 +23,6 @@ use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
 use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
-use minter_contract_utils::bridge_canister::BridgeCore;
 use minter_contract_utils::evm_bridge::EvmParams;
 use minter_contract_utils::evm_link::address_to_icrc_subaccount;
 use minter_contract_utils::operation_store::MinterOperationId;

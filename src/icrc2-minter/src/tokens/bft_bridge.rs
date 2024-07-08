@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::BridgeCore;
 use bridge_did::error::{Error, Result};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -8,7 +9,6 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::abi::Token;
 use ethers_core::types::TransactionRequest;
 use minter_contract_utils::bft_bridge_api::MINTER_CANISTER_ADDRESS;
-use minter_contract_utils::bridge_canister::BridgeCore;
 use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_DEPLOYED_CODE;
 
 use crate::constant::DEFAULT_TX_GAS_LIMIT;

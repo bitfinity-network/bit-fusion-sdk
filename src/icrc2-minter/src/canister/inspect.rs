@@ -1,9 +1,9 @@
+use bridge_canister::bridge_inspect;
 use bridge_did::error::Result;
 use candid::Principal;
 use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::{api, inspect_message};
 use ic_exports::ic_kit::ic;
-use minter_contract_utils::bridge_canister::bridge_inspect;
 
 use crate::MinterCanister;
 

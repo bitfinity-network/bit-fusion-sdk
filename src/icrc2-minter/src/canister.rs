@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::{BridgeCanister, BridgeCore};
 use bridge_did::error::{Error, Result};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
@@ -20,7 +21,6 @@ use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, TaskOptions, TaskStatus};
 use log::*;
-use minter_contract_utils::bridge_canister::{BridgeCanister, BridgeCore};
 use minter_contract_utils::operation_store::{MinterOperationId, MinterOperationStore};
 
 use crate::constant::{
@@ -178,7 +178,7 @@ impl MinterCanister {
     /// Returns the build data of the canister
     #[query]
     fn get_canister_build_data(&self) -> BuildData {
-        minter_contract_utils::build_data!()
+        bridge_canister::build_data!()
     }
 
     /// Returns candid IDL.
@@ -189,7 +189,7 @@ impl MinterCanister {
 }
 
 impl Metrics for MinterCanister {
-    fn metrics(&self) -> Rc<RefCell<ic_metrics::MetricsStorage>> {
+    fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()
     }

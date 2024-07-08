@@ -8,7 +8,7 @@ use eth_signer::sign_strategy::{
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 
-use crate::bridge_canister::memory::{MEMORY_MANAGER, TX_SIGNER_MEMORY_ID};
+use crate::memory::{MEMORY_MANAGER, TX_SIGNER_MEMORY_ID};
 
 /// A component that provides the access to the signer
 #[derive(Default, Clone)]

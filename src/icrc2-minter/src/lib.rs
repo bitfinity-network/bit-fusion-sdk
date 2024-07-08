@@ -1,5 +1,5 @@
+use bridge_canister::BridgeCanister;
 use ic_metrics::Metrics;
-use minter_contract_utils::bridge_canister::BridgeCanister;
 pub use state::SigningStrategy;
 
 pub use crate::canister::MinterCanister;

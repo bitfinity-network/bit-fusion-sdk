@@ -772,6 +772,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-canister"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "bridge-did",
+ "candid",
+ "did",
+ "env_logger",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "hex",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-stable-structures 0.17.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "jsonrpc-core",
+ "log",
+ "minter-contract-utils",
+ "num-bigint 0.4.5",
+ "num-traits",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vergen",
+]
+
+[[package]]
 name = "bridge-did"
 version = "0.2.0"
 dependencies = [
@@ -5485,6 +5518,7 @@ version = "0.2.0"
 dependencies = [
  "async-recursion",
  "async-trait",
+ "bridge-canister",
  "bridge-did",
  "candid",
  "did",
@@ -6038,16 +6072,12 @@ dependencies = [
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
- "evm-canister-client",
  "hex",
  "ic-canister",
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.17.0",
  "ic-stable-structures 0.17.0",
- "ic-storage",
- "ic-task-scheduler",
  "jsonrpc-core",
  "log",
  "num-bigint 0.4.5",
@@ -6058,7 +6088,6 @@ dependencies = [
  "solidity-helper",
  "thiserror",
  "tokio",
- "vergen",
 ]
 
 [[package]]

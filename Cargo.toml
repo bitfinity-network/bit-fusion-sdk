@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "src/bridge-canister",
     "src/bridge-did",
     "src/bridge-tool",
     "src/minter-contract-utils",

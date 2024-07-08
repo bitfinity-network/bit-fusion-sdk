@@ -9,9 +9,9 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
+use minter_contract_utils::evm_bridge::EvmParams;
 
-use crate::bridge_canister::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
-use crate::evm_bridge::EvmParams;
+use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 
 #[derive(Debug, Clone, Deserialize, CandidType, PartialEq, Eq, serde::Serialize)]
 pub struct BridgeConfig {
