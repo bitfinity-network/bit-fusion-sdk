@@ -223,90 +223,58 @@ mod test {
         decimals: u8,
     }
 
+  #[async_trait::async_trait]
     impl CanisterClient for FakeIcrcCanisterClient {
-        fn query<'life0, 'life1, 'async_trait, T, R>(
-            &'life0 self,
-            method: &'life1 str,
-            _args: T,
-        ) -> core::pin::Pin<
-            Box<
-                dyn core::future::Future<Output = evm_canister_client::CanisterClientResult<R>>
-                    + core::marker::Send
-                    + 'async_trait,
-            >,
-        >
+        async fn query<T, R>(&self, method: &str, _args: T) -> CanisterClientResult<R>
         where
             T: candid::utils::ArgumentEncoder + Send + Sync,
             R: serde::de::DeserializeOwned + CandidType,
-            T: 'async_trait,
-            R: 'async_trait,
-            'life0: 'async_trait,
-            'life1: 'async_trait,
-            Self: 'async_trait,
         {
-            let method = method.to_string();
-            Box::pin(async move {
-                let response: R = match method.as_str() {
-                    "icrc1_metadata" => {
-                        let metadata = vec![
-                            (
-                                ICRC1_METADATA_NAME.to_string(),
-                                icrc_client::Value::Text(self.name.clone()),
-                            ),
-                            (
-                                ICRC1_METADATA_SYMBOL.to_string(),
-                                icrc_client::Value::Text(self.symbol.clone()),
-                            ),
-                            (
-                                ICRC1_METADATA_DECIMALS.to_string(),
-                                icrc_client::Value::Nat(Nat((self.decimals as u64).into())),
-                            ),
-                        ];
+            let response: R = match method {
+                "icrc1_metadata" => {
+                    let metadata = vec![
+                        (
+                            ICRC1_METADATA_NAME.to_string(),
+                            icrc_client::Value::Text(self.name.clone()),
+                        ),
+                        (
+                            ICRC1_METADATA_SYMBOL.to_string(),
+                            icrc_client::Value::Text(self.symbol.clone()),
+                        ),
+                        (
+                            ICRC1_METADATA_DECIMALS.to_string(),
+                            icrc_client::Value::Nat(Nat((self.decimals as u64).into())),
+                        ),
+                    ];
 
-                        let json = serde_json::to_value(metadata).unwrap();
+                    let json = serde_json::to_value(metadata).unwrap();
 
-                        serde_json::from_value::<R>(json).unwrap()
-                    }
-                    "icrc1_name" => {
-                        let json = serde_json::to_value(self.name.clone()).unwrap();
-                        serde_json::from_value::<R>(json).unwrap()
-                    }
-                    "icrc1_symbol" => {
-                        let json = serde_json::to_value(self.symbol.clone()).unwrap();
-                        serde_json::from_value::<R>(json).unwrap()
-                    }
-                    "icrc1_decimals" => {
-                        let json = serde_json::to_value(self.decimals).unwrap();
-                        serde_json::from_value::<R>(json).unwrap()
-                    }
-                    _ => panic!("Unexpected method: {}", method),
-                };
+                    serde_json::from_value::<R>(json).unwrap()
+                }
+                "icrc1_name" => {
+                    let json = serde_json::to_value(self.name.clone()).unwrap();
+                    serde_json::from_value::<R>(json).unwrap()
+                }
+                "icrc1_symbol" => {
+                    let json = serde_json::to_value(self.symbol.clone()).unwrap();
+                    serde_json::from_value::<R>(json).unwrap()
+                }
+                "icrc1_decimals" => {
+                    let json = serde_json::to_value(self.decimals).unwrap();
+                    serde_json::from_value::<R>(json).unwrap()
+                }
+                _ => panic!("Unexpected method: {}", method),
+            };
 
-                Ok(response)
-            })
+            Ok(response)
         }
 
-        fn update<'life0, 'life1, 'async_trait, T, R>(
-            &'life0 self,
-            _method: &'life1 str,
-            _args: T,
-        ) -> core::pin::Pin<
-            Box<
-                dyn core::future::Future<Output = evm_canister_client::CanisterClientResult<R>>
-                    + core::marker::Send
-                    + 'async_trait,
-            >,
-        >
+        async fn update<T, R>(&self, _method: &str, _args: T) -> CanisterClientResult<R>
         where
             T: candid::utils::ArgumentEncoder + Send + Sync,
             R: serde::de::DeserializeOwned + CandidType,
-            T: 'async_trait,
-            R: 'async_trait,
-            'life0: 'async_trait,
-            'life1: 'async_trait,
-            Self: 'async_trait,
         {
             unimplemented!()
         }
-    }
+    ```
 }
