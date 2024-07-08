@@ -29,7 +29,6 @@ jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 ethers-core = { workspace = true }
-minter-did = { workspace = true }
 bridge-utils = { path = "../bridge-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }

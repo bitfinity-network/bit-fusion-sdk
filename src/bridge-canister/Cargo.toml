@@ -10,6 +10,7 @@ export-api = []
 [dependencies]
 anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
@@ -28,7 +29,6 @@ ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
-minter-contract-utils = { path = "../minter-contract-utils" }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }

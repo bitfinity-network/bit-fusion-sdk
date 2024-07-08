@@ -4,6 +4,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_canister::BridgeCore;
+use bridge_did::error::Error;
+use bridge_did::id256::Id256;
+use bridge_did::order::{self, MintOrder};
+use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
@@ -22,10 +27,6 @@ use ic_task_scheduler::SchedulerError;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
-use minter_did::error::Error;
-use minter_did::id256::Id256;
-use minter_did::order::{self, MintOrder};
-use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_operations_store;

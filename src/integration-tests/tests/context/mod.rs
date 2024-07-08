@@ -3,6 +3,10 @@ mod evm_rpc_canister;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use bridge_did::error::Result as McResult;
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
+use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
@@ -26,11 +30,6 @@ use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use minter_did::error::Result as McResult;
-use minter_did::id256::Id256;
-use minter_did::init::InitData;
-use minter_did::order::SignedMintOrder;
-use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -50,6 +49,7 @@ pub mod icrc2_bridge_client;
 pub mod rune_bridge_client;
 
 use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_did::init::BridgeInitData;
 
 #[async_trait::async_trait]
 pub trait TestContext {

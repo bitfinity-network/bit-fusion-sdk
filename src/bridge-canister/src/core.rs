@@ -3,13 +3,13 @@ use std::rc::Rc;
 
 use bridge_did::error::Result;
 use bridge_did::init::BridgeInitData;
+use bridge_utils::evm_bridge::EvmParams;
 use candid::Principal;
 use eth_signer::sign_strategy::TransactionSigner;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
 use ic_exports::ic_kit::ic;
 use ic_storage::IcStorage;
-use minter_contract_utils::evm_bridge::EvmParams;
 
 use crate::config::BridgeConfig;
 use crate::signer::SignerStorage;

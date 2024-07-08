@@ -52,7 +52,6 @@ ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", pac
 jsonrpc-core = "18.0"
 log = "0.4"
 minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.26.x" }
-minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.26.x" }
 mockall = "0.12"
 num-bigint = "0.4"
 num-traits = "0.2"

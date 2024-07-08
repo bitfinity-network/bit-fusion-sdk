@@ -1,30 +1,28 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::{BridgeCanister, BridgeCore};
+use bridge_did::error::{Error, Result};
+use bridge_did::id256::Id256;
+use bridge_did::init::BridgeInitData;
+use bridge_did::order::SignedMintOrder;
 use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
 use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
-use ic_log::writer::Logs;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableBTreeMap, VirtualMemory};
-use ic_task_scheduler::retry::BackoffPolicy;
+use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
+use ic_task_scheduler::task::{InnerScheduledTask, TaskOptions, TaskStatus};
 use log::*;
-use minter_did::error::{Error, Result};
-use minter_did::id256::Id256;
-use minter_did::init::InitData;
-use minter_did::order::SignedMintOrder;
 
-use crate::build_data::canister_build_data;
 use crate::constant::{
     OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
     PENDING_TASKS_MEMORY_ID,

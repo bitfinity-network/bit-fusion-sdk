@@ -126,7 +126,7 @@ pub trait BridgeCanister: Canister {
                 .expect("Failed to configure logger.");
         }
 
-        #[cfg(target_arch = "wasm")]
+        #[cfg(target_arch = "wasm32")]
         self.start_timers(_run_scheduler);
 
         log::trace!("Bridge canister initialized: {init_data:?}");

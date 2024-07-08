@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use bridge_did::init::BridgeInitData;
+use bridge_utils::evm_bridge::EvmParams;
 use candid::{CandidType, Deserialize, Principal};
 use did::{codec, H160};
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -9,7 +10,6 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use minter_contract_utils::evm_bridge::EvmParams;
 
 use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
 

@@ -3,6 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::MintOrder;
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
 use bridge_utils::operation_store::MinterOperationId;
@@ -16,8 +18,6 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_did::id256::Id256;
-use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};

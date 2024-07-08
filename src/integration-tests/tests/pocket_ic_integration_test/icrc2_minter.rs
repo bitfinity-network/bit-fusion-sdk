@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_did::id256::Id256;
+use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
 use eth_signer::Signer;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use minter_did::id256::Id256;
-use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
 use crate::context::bridge_client::BridgeCanisterClient;
@@ -270,6 +270,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
     minter_client
         .set_logger_filter("info".to_string())
         .await
+        .unwrap()
         .unwrap();
 
     // Advance state to avoid canister rate limit.
@@ -282,6 +283,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
     minter_client
         .set_logger_filter("debug".to_string())
         .await
+        .unwrap()
         .unwrap();
 }
 
