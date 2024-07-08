@@ -6,6 +6,7 @@ use ethers_core::abi::Token;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use ic_metrics::MetricsStorage;
 use minter_contract_utils::wrapped_token_api::ERC_20_ALLOWANCE;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
@@ -241,7 +242,7 @@ async fn test_icrc2_token_canister_stopped() {
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
     let mut admin_client = ctx.icrc_minter_client(ADMIN);
-    admin_client.set_owner(alice()).await.unwrap().unwrap();
+    admin_client.set_owner(alice()).await.unwrap();
 
     // Now Alice is owner, so admin can't update owner anymore.
     let err = admin_client.set_owner(alice()).await.unwrap_err();
@@ -255,7 +256,7 @@ async fn set_owner_access() {
 
     // Now Alice is owner, so she can update owner.
     let mut alice_client = ctx.icrc_minter_client(ALICE);
-    alice_client.set_owner(alice()).await.unwrap().unwrap();
+    alice_client.set_owner(alice()).await.unwrap();
 }
 
 #[tokio::test]
@@ -264,11 +265,10 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
     let minter_client = ctx.icrc_minter_client(ADMIN);
 
-    assert!(minter_client
+    minter_client
         .set_logger_filter("info".to_string())
         .await
-        .unwrap()
-        .is_ok());
+        .unwrap();
 
     // Advance state to avoid canister rate limit.
     for _ in 0..100 {
@@ -277,11 +277,10 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
     // upgrade canister
     ctx.upgrade_minter_canister().await.unwrap();
-    assert!(minter_client
+    minter_client
         .set_logger_filter("debug".to_string())
         .await
-        .unwrap()
-        .is_ok());
+        .unwrap();
 }
 
 #[tokio::test]

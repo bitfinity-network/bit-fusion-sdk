@@ -7,11 +7,11 @@ use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ethers_core::abi::Token;
 use ethers_core::types::TransactionRequest;
 use minter_contract_utils::bft_bridge_api::MINTER_CANISTER_ADDRESS;
+use minter_contract_utils::bridge_canister::BridgeCore;
 use minter_contract_utils::build_data::BFT_BRIDGE_SMART_CONTRACT_DEPLOYED_CODE;
 use minter_did::error::{Error, Result};
 
 use crate::constant::DEFAULT_TX_GAS_LIMIT;
-use crate::state::State;
 
 /// This structure contains data of a valid burn operation.
 ///
@@ -118,7 +118,7 @@ impl<Src, Dst> ValidBurn<Src, Dst> {
 pub async fn check_bft_bridge_contract(
     evm: &EthJsonRpcClient<impl Client>,
     bft_address: H160,
-    state: Rc<RefCell<State>>,
+    core: Rc<RefCell<BridgeCore>>,
 ) -> Result<()> {
     // Check Bft Bridge code
     let code = evm
@@ -134,7 +134,7 @@ pub async fn check_bft_bridge_contract(
     }
 
     // Check owner
-    let signer = &state.borrow().signer.get_transaction_signer();
+    let signer = &core.borrow().get_transaction_signer();
     let minter_address = signer
         .get_address()
         .await

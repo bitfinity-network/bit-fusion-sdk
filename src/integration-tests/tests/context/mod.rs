@@ -982,7 +982,7 @@ pub fn icrc_canister_default_init_args(
         token_symbol: "TKN".to_string(),
         metadata: vec![(
             "icrc1:name".to_string(),
-            MetadataValue::Text(token_name.to_string()),
+            MetadataValue::Text("some random value".into()),
         )],
         archive_options: ArchiveOptions {
             trigger_threshold: 10,

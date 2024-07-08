@@ -193,8 +193,8 @@ impl BridgeTask {
             .unwrap_or_default()
             .1;
 
-        let sender_chain_id = burn_evm_params.chain_id as u32;
-        let recipient_chain_id = mint_evm_params.chain_id as u32;
+        let sender_chain_id = burn_evm_params.chain_id;
+        let recipient_chain_id = mint_evm_params.chain_id;
 
         let sender = Id256::from_evm_address(&burn_event.sender, sender_chain_id);
         let src_token = Id256::from_evm_address(&burn_event.from_erc20, sender_chain_id);

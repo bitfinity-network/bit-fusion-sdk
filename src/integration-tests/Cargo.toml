@@ -59,6 +59,7 @@ futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 ic-agent = { workspace = true }
 ic-utils = { workspace = true }
+ic-metrics = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 erc20-minter = { path = "../erc20-minter" }

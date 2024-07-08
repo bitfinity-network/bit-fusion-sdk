@@ -41,7 +41,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     ///
     /// This method should be called only by current owner,
     /// else `Error::NotAuthorised` will be returned.
-    async fn set_owner(&mut self, owner: Principal) -> CanisterClientResult<McResult<()>> {
+    async fn set_owner(&mut self, owner: Principal) -> CanisterClientResult<()> {
         self.client().update("set_owner", (owner,)).await
     }
 
@@ -54,7 +54,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     ///
     /// This method should be called only by current owner,
     /// else `Error::NotAuthorised` will be returned.
-    async fn set_evm_principal(&mut self, evm: Principal) -> CanisterClientResult<McResult<()>> {
+    async fn set_evm_principal(&mut self, evm: Principal) -> CanisterClientResult<()> {
         self.client().update("set_evm_principal", (evm,)).await
     }
 

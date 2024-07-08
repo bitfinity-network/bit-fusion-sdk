@@ -5,6 +5,15 @@ use solidity_helper::error::SolidityHelperError;
 use solidity_helper::{BuiltSolidityContracts, SolidityBuilder, SolidityContract};
 
 fn main() -> anyhow::Result<()> {
+    // Generate the build environment variables
+    vergen::EmitBuilder::builder()
+        .all_build()
+        .all_cargo()
+        .all_git()
+        .all_rustc()
+        .emit()
+        .expect("Cannot set build environment variables");
+
     let solidity_builder = SolidityBuilder::new().expect("failed to setup solidity builder");
 
     let BuiltSolidityContracts { contracts, .. } = match solidity_builder.build_updated_contracts() {
