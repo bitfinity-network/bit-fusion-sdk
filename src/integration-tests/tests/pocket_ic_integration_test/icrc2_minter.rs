@@ -84,7 +84,7 @@ async fn test_icrc2_tokens_roundtrip() {
     assert_eq!(wrapped_balance as u64, amount);
 
     let _operation_id = ctx
-        .burn_erc_20_tokens(
+        .burn_wrapped_erc_20_tokens(
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
@@ -184,7 +184,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     let john_principal_id256 = Id256::from(&john());
     let _operation_id = ctx
-        .burn_erc_20_tokens(
+        .burn_wrapped_erc_20_tokens(
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,

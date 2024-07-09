@@ -421,6 +421,7 @@ impl RunesContext {
                 withdrawal_address.as_bytes().to_vec(),
                 &self.bft_bridge_contract,
                 amount,
+                true,
             )
             .await
             .expect("failed to burn wrapped token");

@@ -235,7 +235,7 @@ async fn test_external_bridging() {
 
     let burn_operation_id = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
@@ -362,7 +362,7 @@ async fn native_token_deposit_increase_and_decrease() {
     // Perform an operation to pay a fee for it.
     let (burn_operation_id, _) = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
@@ -448,7 +448,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     let burn_operation_id = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,

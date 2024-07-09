@@ -1091,6 +1091,7 @@ impl CkBtcSetup {
                 recipient,
                 &self.bft_bridge,
                 amount as u128,
+                true,
             )
             .await
             .expect("failed to burn");

@@ -342,22 +342,26 @@ pub trait TestContext {
         recipient: Vec<u8>,
         bridge: &H160,
         amount: u128,
+        wrapped: bool,
     ) -> Result<(u32, H256)> {
         let amount: U256 = amount.into();
 
-        let input = WrappedToken::approveCall {
-            spender: bridge.clone().into(),
-            value: amount.clone().into(),
+        if !wrapped {
+            let input = WrappedToken::approveCall {
+                spender: bridge.clone().into(),
+                value: amount.clone().into(),
+            }
+            .abi_encode();
+
+            let results = self
+                .call_contract_on_evm(evm_client, wallet, &from_token.clone(), input, 0)
+                .await?;
+            let output = results.1.output.unwrap();
+            let decoded_output =
+                WrappedToken::approveCall::abi_decode_returns(&output, true).unwrap();
+
+            assert!(decoded_output._0);
         }
-        .abi_encode();
-
-        let results = self
-            .call_contract_on_evm(evm_client, wallet, &from_token.clone(), input, 0)
-            .await?;
-        let output = results.1.output.unwrap();
-        let decoded_output = WrappedToken::approveCall::abi_decode_returns(&output, true).unwrap();
-
-        assert!(decoded_output._0);
 
         println!("Burning src tokens using BftBridge");
 
@@ -389,7 +393,7 @@ pub trait TestContext {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn burn_erc_20_tokens(
+    async fn burn_wrapped_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
@@ -407,6 +411,31 @@ pub trait TestContext {
             recipient.0.to_vec(),
             bridge,
             amount,
+            true,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn burn_base_erc_20_tokens(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+        from_token: &H160,
+        to_token_id: &[u8],
+        recipient: Id256,
+        bridge: &H160,
+        amount: u128,
+    ) -> Result<(u32, H256)> {
+        self.burn_erc_20_tokens_raw(
+            evm_client,
+            wallet,
+            from_token,
+            to_token_id,
+            recipient.0.to_vec(),
+            bridge,
+            amount,
+            false,
         )
         .await
     }
