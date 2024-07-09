@@ -203,8 +203,11 @@ impl BtcTask {
 }
 
 impl Task for BtcTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         match self {

@@ -7,7 +7,7 @@ use candid::{CandidType, Deserialize};
 use ordinals::{Rune, RuneId};
 use serde::{Deserializer, Serialize};
 
-#[derive(Debug, Copy, Clone, CandidType, Deserialize)]
+#[derive(Debug, Copy, Clone, CandidType, Serialize, Deserialize)]
 pub struct RuneInfo {
     pub name: RuneName,
     pub decimals: u8,

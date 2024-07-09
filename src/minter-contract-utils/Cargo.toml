@@ -10,7 +10,7 @@ test-contracts = []
 anyhow = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
-eth-signer = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
 ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
     "http-outcall",

@@ -2,8 +2,9 @@ use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
 use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::operation_store::{MinterOperation, OperationStore};
-use serde::Deserialize;
+use minter_contract_utils::bridge::{self, Operation, OperationContext};
+use minter_contract_utils::operation_store::OperationStore;
+use serde::{Deserialize, Serialize};
 
 use crate::core::deposit::RuneDepositPayload;
 use crate::core::withdrawal::RuneWithdrawalPayload;
@@ -11,7 +12,7 @@ use crate::state::State;
 
 pub type RuneOperationStore = OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState>;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum OperationState {
     Deposit(RuneDepositPayload),
     Withdrawal(RuneWithdrawalPayload),
@@ -23,11 +24,15 @@ impl OperationState {
     }
 }
 
-impl MinterOperation for OperationState {
+impl Operation for OperationState {
     fn is_complete(&self) -> bool {
         match self {
             OperationState::Deposit(v) => v.is_complete(),
             OperationState::Withdrawal(v) => v.is_complete(),
         }
+    }
+
+    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+        todo!()
     }
 }

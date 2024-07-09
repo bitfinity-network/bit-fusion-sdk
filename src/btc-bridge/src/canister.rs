@@ -49,7 +49,7 @@ impl BtcBridge {
                     .borrow_mut()
                     .append_task(Self::collect_evm_events_task());
 
-                let task_execution_result = get_scheduler().borrow_mut().run();
+                let task_execution_result = get_scheduler().borrow_mut().run(());
 
                 if let Err(err) = task_execution_result {
                     log::error!("task execution failed: {err}",);

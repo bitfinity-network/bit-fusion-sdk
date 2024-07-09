@@ -88,8 +88,11 @@ pub enum BridgeTask {
 }
 
 impl Task for BridgeTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         let state = crate::canister::get_state();

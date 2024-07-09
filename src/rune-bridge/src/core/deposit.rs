@@ -18,6 +18,7 @@ use ic_task_scheduler::task::TaskOptions;
 use minter_contract_utils::operation_store::OperationId;
 use minter_did::id256::Id256;
 use minter_did::order::{MintOrder, SignedMintOrder};
+use serde::Serialize;
 
 use crate::canister::{get_operations_store, get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
@@ -31,7 +32,7 @@ use crate::state::State;
 
 static NONCE: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum DepositRequestStatus {
     /// Deposit request received but is not yet executed.
     Scheduled,
@@ -73,14 +74,14 @@ pub enum DepositRequestStatus {
     },
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct MintOrderDetails {
     rune_name: RuneName,
     amount: u128,
     status: MintOrderStatus,
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum MintOrderStatus {
     Created {
         mint_order: SignedMintOrder,
@@ -96,7 +97,7 @@ pub enum MintOrderStatus {
     },
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct RuneDepositPayload {
     pub dst_address: H160,
     pub erc20_address: H160,

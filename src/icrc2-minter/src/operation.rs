@@ -2,26 +2,30 @@ use candid::{CandidType, Nat, Principal};
 use did::{H256, U256};
 use icrc_client::account::Account;
 use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::operation_store::MinterOperation;
+use minter_contract_utils::bridge::{self, Operation, OperationContext};
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 use minter_did::reason::Icrc2Burn;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::tasks::BurntIcrc2Data;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum OperationState {
     Deposit(DepositOperationState),
     Withdrawal(WithdrawalOperationState),
 }
 
-impl MinterOperation for OperationState {
+impl Operation for OperationState {
     fn is_complete(&self) -> bool {
         match self {
             OperationState::Deposit(v) => v.is_complete(),
             OperationState::Withdrawal(v) => v.is_complete(),
         }
+    }
+
+    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+        todo!()
     }
 }
 
@@ -62,7 +66,7 @@ impl OperationState {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum DepositOperationState {
     Scheduled(Icrc2Burn),
     Icrc2Burned(BurntIcrc2Data),
@@ -90,7 +94,7 @@ impl DepositOperationState {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum WithdrawalOperationState {
     Scheduled(BurntEventData),
     RefundScheduled(BurntIcrc2Data),

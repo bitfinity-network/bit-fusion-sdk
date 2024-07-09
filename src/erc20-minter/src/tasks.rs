@@ -35,8 +35,11 @@ pub enum BridgeTask {
 }
 
 impl Task for BridgeTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         log::trace!("Running ERC-20 task: {:?}", self);

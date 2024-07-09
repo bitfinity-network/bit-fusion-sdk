@@ -16,7 +16,7 @@ use minter_did::id256::Id256;
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::RuneId;
-use serde::Deserializer;
+use serde::{Deserializer, Serialize};
 
 use crate::canister::get_operations_store;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
@@ -26,7 +26,7 @@ use crate::operation::{OperationState, RuneOperationStore};
 use crate::rune_info::RuneInfo;
 use crate::state::State;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct RuneWithdrawalPayload {
     rune_info: RuneInfo,
     amount: u128,
@@ -122,7 +122,7 @@ impl RuneWithdrawalPayload {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum WithdrawalStatus {
     InvalidRequest(String),
     Scheduled,
@@ -160,6 +160,19 @@ impl<'de> Deserialize<'de> for DidTransaction {
             Transaction::consensus_decode(&mut &bytes[..]).map_err(serde::de::Error::custom)?;
 
         Ok(Self(tx))
+    }
+}
+
+impl Serialize for DidTransaction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Error;
+
+        let mut bytes = vec![];
+        self.0.consensus_encode(&mut bytes).map_err(Error::custom)?;
+        serializer.serialize_bytes(&bytes)
     }
 }
 

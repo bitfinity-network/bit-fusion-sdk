@@ -1,3 +1,5 @@
+#![allow(async_fn_in_trait)]
+
 use candid::CandidType;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -9,8 +11,6 @@ use crate::bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventDa
 use crate::evm_bridge::EvmParams;
 use crate::evm_link::EvmLink;
 use crate::operation_store::OperationId;
-
-type StageId = u64;
 
 pub type BftResult<T> = Result<T, Error>;
 
@@ -39,17 +39,17 @@ pub trait EventHandler {
     async fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,
-    ) -> Option<StageAction<Self::Stage>>;
+    ) -> Option<OperationAction<Self::Stage>>;
 
     async fn on_wrapped_token_burnt(
         &self,
         event: BurntEventData,
-    ) -> Option<StageAction<Self::Stage>>;
+    ) -> Option<OperationAction<Self::Stage>>;
 
     async fn on_minter_notification(
         &self,
         event: NotifyMinterEventData,
-    ) -> Option<StageAction<Self::Stage>>;
+    ) -> Option<OperationAction<Self::Stage>>;
 }
 
 #[derive(Debug, Error)]
@@ -70,27 +70,11 @@ pub enum Error {
     OperationNotFound(OperationId),
 }
 
-pub enum StageAction<Stage> {
+pub enum OperationAction<Stage> {
     Create(Stage),
     Update {
         address: H160,
         nonce: u32,
         update_to: Stage,
     },
-}
-
-enum UserOperations {
-    PredefinedSteps,
-
-    // Custom
-    IcrcBurn,
-    IcrcMint,
-}
-
-// in the lib
-enum PredefinedSteps {
-    OrderSign,
-    OrderSinged,
-    OrderSent,
-    WrappedBurnt,
 }

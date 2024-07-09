@@ -1,15 +1,26 @@
 use candid::{CandidType, Deserialize};
 use did::{H256, U256};
 use minter_contract_utils::bft_bridge_api::BurntEventData;
+use minter_contract_utils::bridge::{self, Operation, OperationContext};
 use minter_contract_utils::evm_bridge::BridgeSide;
-use minter_contract_utils::operation_store::MinterOperation;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
+use serde::Serialize;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct OperationPayload {
     pub side: BridgeSide,
     pub status: OperationStatus,
+}
+
+impl Operation for OperationPayload {
+    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+        todo!()
+    }
+
+    fn is_complete(&self) -> bool {
+        matches!(self.status, OperationStatus::Minted { .. })
+    }
 }
 
 impl OperationPayload {
@@ -39,7 +50,7 @@ impl OperationPayload {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum OperationStatus {
     Scheduled(BurntEventData),
     MintOrderSigned {
@@ -58,10 +69,4 @@ pub enum OperationStatus {
         amount: U256,
         tx_id: H256,
     },
-}
-
-impl MinterOperation for OperationPayload {
-    fn is_complete(&self) -> bool {
-        matches!(self.status, OperationStatus::Minted { .. })
-    }
 }

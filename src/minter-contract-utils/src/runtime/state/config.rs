@@ -63,7 +63,7 @@ impl<M: Memory> ConfigStorage<M> {
     fn update(&mut self, f: impl FnOnce(&mut Config)) {
         let mut config = self.0.get().clone();
         f(&mut config);
-        self.0.set(config);
+        self.0.set(config).expect("failed to update config");
     }
 }
 
