@@ -103,7 +103,7 @@ if [ "$IC_NETWORK" = "local" ]; then
   if [ -z "$ICRC2_MINTER_ID" ]; then
     deploy_icrc2_minter "local" "install" "$WRAPPED_EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
   fi
-  MINTER_ADDRESS=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
+  MINTER_ADDRESS=$(dfx canister call icrc2-minter get_bridge_canister_evm_address)
   echo "Minter Address: $MINTER_ADDRESS"
   MINTER_ADDRESS=${MINTER_ADDRESS#*\"}
   MINTER_ADDRESS=${MINTER_ADDRESS%\"*}

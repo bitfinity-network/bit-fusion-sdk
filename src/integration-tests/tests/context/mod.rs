@@ -170,10 +170,10 @@ pub trait TestContext {
     }
 
     /// Returns minter canister EVM address.
-    async fn get_icrc_minter_canister_evm_address(&self, caller: &str) -> Result<H160> {
+    async fn get_icrc_bridge_canister_evm_address(&self, caller: &str) -> Result<H160> {
         let client = self.client(self.canisters().icrc2_minter(), caller);
         Ok(client
-            .update::<_, McResult<H160>>("get_minter_canister_evm_address", ())
+            .update::<_, McResult<H160>>("get_bridge_canister_evm_address", ())
             .await??)
     }
 
@@ -230,7 +230,7 @@ pub trait TestContext {
 
     /// Crates BFTBridge contract in EVMc and registered it in minter canister
     async fn initialize_bft_bridge(&self, caller: &str, fee_charge_address: H160) -> Result<H160> {
-        let minter_canister_address = self.get_icrc_minter_canister_evm_address(caller).await?;
+        let minter_canister_address = self.get_icrc_bridge_canister_evm_address(caller).await?;
 
         let client = self.evm_client(self.admin_name());
         client

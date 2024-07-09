@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_minter_canister_evm_address() {
+    async fn test_get_bridge_canister_evm_address() {
         let mut canister = init_canister().await;
         inject::get_context().update_id(owner());
 
