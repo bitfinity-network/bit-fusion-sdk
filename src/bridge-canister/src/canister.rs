@@ -105,7 +105,7 @@ pub trait BridgeCanister: Canister {
     /// Returns evm_address of the minter canister.
     #[allow(async_fn_in_trait)]
     #[update(trait = true)]
-    async fn get_minter_canister_evm_address(&mut self) -> Result<H160> {
+    async fn get_bridge_canister_evm_address(&mut self) -> Result<H160> {
         let signer = self.core().borrow().get_transaction_signer();
         signer
             .get_address()
