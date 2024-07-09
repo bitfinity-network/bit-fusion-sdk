@@ -111,7 +111,7 @@ where
     let name = match get_metadata_value(&token_metadata, ICRC1_METADATA_NAME) {
         Some(icrc_client::Value::Text(name)) => name.clone(),
         _ => {
-            return Err(minter_did::error::Error::Internal(
+            return Err(bridge_did::error::Error::Internal(
                 "Bad icrc1 metadata".to_string(),
             ))
         }
@@ -119,16 +119,16 @@ where
     let symbol = match get_metadata_value(&token_metadata, ICRC1_METADATA_SYMBOL) {
         Some(icrc_client::Value::Text(symbol)) => symbol.clone(),
         _ => {
-            return Err(minter_did::error::Error::Internal(
+            return Err(bridge_did::error::Error::Internal(
                 "Bad icrc1 metadata".to_string(),
             ))
         }
     };
     let decimals = match get_metadata_value(&token_metadata, ICRC1_METADATA_DECIMALS) {
         Some(icrc_client::Value::Nat(decimals)) => decimals.0.to_u8().ok_or(
-            minter_did::error::Error::Internal("Bad icrc1 metadata".to_string()),
+            bridge_did::error::Error::Internal("Bad icrc1 metadata".to_string()),
         ),
-        _ => Err(minter_did::error::Error::Internal(
+        _ => Err(bridge_did::error::Error::Internal(
             "Bad icrc1 metadata".to_string(),
         )),
     }?;
