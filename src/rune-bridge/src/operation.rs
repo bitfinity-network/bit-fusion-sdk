@@ -1,9 +1,9 @@
+use bridge_utils::bft_events::BurntEventData;
+use bridge_utils::bridge::{self, Operation, OperationContext};
+use bridge_utils::operation_store::OperationStore;
 use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
-use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::bridge::{self, Operation, OperationContext};
-use minter_contract_utils::operation_store::OperationStore;
 use serde::{Deserialize, Serialize};
 
 use crate::core::deposit::RuneDepositPayload;

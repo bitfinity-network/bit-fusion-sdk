@@ -1,8 +1,8 @@
+use bridge_utils::bft_events::BurntEventData;
+use bridge_utils::bridge::{self, Operation, OperationContext};
+use bridge_utils::evm_bridge::BridgeSide;
 use candid::{CandidType, Deserialize};
 use did::{H256, U256};
-use minter_contract_utils::bft_bridge_api::BurntEventData;
-use minter_contract_utils::bridge::{self, Operation, OperationContext};
-use minter_contract_utils::evm_bridge::BridgeSide;
 use minter_did::id256::Id256;
 use minter_did::order::SignedMintOrder;
 use serde::Serialize;

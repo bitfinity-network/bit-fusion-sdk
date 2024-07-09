@@ -4,6 +4,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::evm_link::address_to_icrc_subaccount;
+use bridge_utils::operation_store::OperationId;
+use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use candid::{CandidType, Decode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -16,11 +21,6 @@ use ic_task_scheduler::SchedulerError;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
-use minter_contract_utils::evm_bridge::EvmParams;
-use minter_contract_utils::evm_link::address_to_icrc_subaccount;
-use minter_contract_utils::operation_store::OperationId;
-use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::error::Error;
 use minter_did::id256::Id256;
 use minter_did::order::{self, MintOrder};
@@ -438,7 +438,7 @@ impl BridgeTask {
                     }
                 };
 
-                // Approve tokens only if the burner owns recepient wallet.
+                // Approve tokens only if the burner owns recipient wallet.
                 if notification.tx_sender != icrc_burn.recipient_address {
                     icrc_burn.approve_after_mint = None;
                 }
@@ -539,7 +539,7 @@ impl BridgeTask {
             return Ok(());
         };
 
-        let (signed_mint_order, amount, token_id, is_despoit) = match operation_state {
+        let (signed_mint_order, amount, token_id, is_deposit) = match operation_state {
             OperationState::Deposit(DepositOperationState::MintOrderSigned {
                 signed_mint_order,
                 amount,
@@ -574,7 +574,7 @@ impl BridgeTask {
             ));
         };
 
-        let mut tx = bft_bridge_api::mint_transaction(
+        let mut tx = bft_events::mint_transaction(
             sender.0,
             bridge_contract.0,
             evm_params.nonce.into(),
@@ -598,7 +598,7 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        if is_despoit {
+        if is_deposit {
             operation_store.update(
                 operation_id,
                 OperationState::Deposit(DepositOperationState::MintOrderSent {

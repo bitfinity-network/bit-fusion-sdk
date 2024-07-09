@@ -1,7 +1,7 @@
+use bridge_utils::operation_store::OperationId;
 use did::H160;
 use erc20_minter::operation::OperationPayload;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use minter_contract_utils::operation_store::OperationId;
 
 use crate::context::bridge_client::BridgeCanisterClient;
 

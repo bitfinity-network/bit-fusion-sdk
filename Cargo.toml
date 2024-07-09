@@ -1,11 +1,10 @@
 [workspace]
 members = [
     "src/bridge-tool",
-    "src/minter-contract-utils",
+    "src/bridge-utils",
     "src/integration-tests",
     "src/icrc2-minter",
     "src/erc20-minter",
-    "src/solidity-helper",
     "src/btc-bridge",
     "src/rune-bridge",
 ]
@@ -16,6 +15,7 @@ version = "0.2.0"
 edition = "2021"
 
 [workspace.dependencies]
+alloy-sol-types = "0.7"
 anyhow = "1.0"
 async-recursion = "1.0.4"
 async-trait = "0.1"
@@ -30,6 +30,7 @@ ethereum-types = "0.14"
 ethers-core = "2.0"
 evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "canister_sdk_v18" }
 icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", branch = "canister_sdk_v18" }
+foundry-compilers = { version = "0.9", features = ["svm-solc"] }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 ic-agent = "0.34"

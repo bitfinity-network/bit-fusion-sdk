@@ -3,6 +3,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
+use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
+use bridge_utils::operation_store::OperationId;
+use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::{BlockNumber, Log};
@@ -12,10 +16,6 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_contract_utils::bft_bridge_api::{self, BridgeEvent, MintedEventData};
-use minter_contract_utils::evm_bridge::{BridgeSide, EvmParams};
-use minter_contract_utils::operation_store::OperationId;
-use minter_contract_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use minter_did::id256::Id256;
 use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
@@ -411,7 +411,7 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        let mut tx = bft_bridge_api::mint_transaction(
+        let mut tx = bft_events::mint_transaction(
             sender.0,
             bft_bridge.0,
             nonce.into(),

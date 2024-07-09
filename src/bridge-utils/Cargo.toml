@@ -1,12 +1,10 @@
 [package]
-name = "minter-contract-utils"
+name = "bridge-utils"
 version.workspace = true
 edition.workspace = true
 
-[features]
-test-contracts = []
-
 [dependencies]
+alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
 candid = { workspace = true }
 did = { workspace = true }
@@ -34,13 +32,11 @@ ic-task-scheduler = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
-solidity-helper = { path = "../solidity-helper" }
-
+foundry-compilers = { workspace = true }
 
 [dev-dependencies]
 candid = { workspace = true }
 env_logger = { workspace = true }
 ic-exports = { workspace = true }
 serde_json = { workspace = true }
-solidity-helper = { path = "../solidity-helper" }
 tokio = { workspace = true }

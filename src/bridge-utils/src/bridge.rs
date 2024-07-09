@@ -7,7 +7,7 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::bft_bridge_api::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use crate::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use crate::evm_bridge::EvmParams;
 use crate::evm_link::EvmLink;
 use crate::operation_store::OperationId;
