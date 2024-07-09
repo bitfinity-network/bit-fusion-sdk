@@ -212,7 +212,6 @@ impl MinterCanister {
 
 impl Metrics for MinterCanister {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
-        use ic_storage::IcStorage;
         MetricsStorage::get()
     }
 }
