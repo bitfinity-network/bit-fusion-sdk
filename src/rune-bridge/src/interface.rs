@@ -116,15 +116,6 @@ pub struct OutputResponse {
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct CreateEdictTxArgs {
-    pub from_address: String,
-    pub destination: String,
-    pub rune_name: String,
-    pub amount: u128,
-    pub change_address: Option<String>,
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct DepositStateResponse {
     pub current_ts: u64,
     pub deposits: Vec<RuneDepositPayload>,
