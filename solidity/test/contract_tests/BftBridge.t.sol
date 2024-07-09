@@ -196,6 +196,36 @@ contract BftBridgeTest is Test {
         }
     }
 
+    function testBurnWrappedSideWithoutApprove() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+
+        // deploy erc20 so it can be used
+        MintOrder memory order = _createSelfMintOrder();
+        bytes memory encodedOrder = _encodeMintOrder(order, _OWNER_KEY);
+
+        _wrappedBridge.mint(encodedOrder);
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
+
+        vm.prank(address(_owner));
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+    }
+
+    function testBurnBaseSideWithoutApproveShouldFail() public {
+        bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
+
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        address erc20Address = address(erc20);
+
+        vm.prank(address(_owner));
+        erc20.transfer(address(_owner), 100);
+
+        bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        vm.prank(address(_owner));
+        vm.expectRevert(bytes("Insufficient allowance"));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+    }
+
     function testBurnWrappedSideWithDeployedErc20() public {
         bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
 
