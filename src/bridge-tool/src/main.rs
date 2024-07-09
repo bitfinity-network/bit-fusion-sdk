@@ -2,6 +2,8 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_did::id256::Id256;
+use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
@@ -13,8 +15,6 @@ use ethereum_types::H160;
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use minter_did::id256::Id256;
-use minter_did::reason::Icrc2Burn;
 use tokio::time::Instant;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this

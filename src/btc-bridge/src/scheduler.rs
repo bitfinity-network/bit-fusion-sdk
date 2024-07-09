@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::id256::Id256;
 use bridge_utils::bft_events::{BridgeEvent, BurntEventData, MintedEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
@@ -14,7 +15,6 @@ use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_did::id256::Id256;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_state;

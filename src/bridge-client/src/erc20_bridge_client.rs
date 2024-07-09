@@ -3,7 +3,7 @@ use did::H160;
 use erc20_minter::operation::OperationPayload;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 
-use crate::context::bridge_client::BridgeCanisterClient;
+use crate::bridge_client::BridgeCanisterClient;
 
 pub struct Erc20BridgeClient<C> {
     client: C,
