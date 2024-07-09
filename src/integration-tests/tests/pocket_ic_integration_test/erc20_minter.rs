@@ -392,7 +392,7 @@ async fn native_token_deposit_increase_and_decrease() {
     if let OperationStatus::MintOrderSent { tx_id, .. } = &operations[0].1.status {
         let receipt = ctx
             .context
-            .wait_transaction_receipt(&tx_id)
+            .wait_transaction_receipt(tx_id)
             .await
             .unwrap()
             .unwrap();

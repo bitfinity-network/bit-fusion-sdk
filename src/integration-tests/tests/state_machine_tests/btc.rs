@@ -50,7 +50,6 @@ use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
 use ic_stable_structures::Storable;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use minter_contract_utils::evm_link::EvmLink;
 
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;

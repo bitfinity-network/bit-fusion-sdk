@@ -378,7 +378,7 @@ mod tests {
         let mut canister = init_canister().await;
         inject::get_context().update_id(owner());
 
-        let evm_address = canister_call!(canister.get_minter_canister_evm_address(), Result<H160>)
+        let evm_address = canister_call!(canister.get_bridge_canister_evm_address(), Result<H160>)
             .await
             .unwrap();
 
