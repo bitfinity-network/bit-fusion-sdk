@@ -12,6 +12,8 @@ export-api = []
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 candid = { workspace = true }
+bridge-canister = { path = "../bridge-canister" }
+bridge-did = { path = "../bridge-did" }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethers-core = { workspace = true }
@@ -31,7 +33,6 @@ icrc-client = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 bridge-utils = { path = "../bridge-utils" }
-minter-did = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

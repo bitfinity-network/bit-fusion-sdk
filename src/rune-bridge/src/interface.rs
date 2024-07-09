@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
-use minter_did::order::SignedMintOrder;
 use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
 
