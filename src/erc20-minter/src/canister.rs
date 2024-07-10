@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::operation_store::{OperationId, OperationStore};
 use candid::Principal;
@@ -14,8 +16,6 @@ use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 use crate::memory::{
     MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
@@ -191,9 +191,9 @@ impl EvmMinter {
         get_state().borrow().config.get_bft_bridge_contract(side)
     }
 
-    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+    fn check_anonymous_principal(principal: Principal) -> bridge_did::error::Result<()> {
         if principal == Principal::anonymous() {
-            return Err(minter_did::error::Error::AnonymousPrincipal);
+            return Err(bridge_did::error::Error::AnonymousPrincipal);
         }
 
         Ok(())

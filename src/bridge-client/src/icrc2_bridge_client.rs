@@ -1,11 +1,11 @@
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use bridge_utils::operation_store::OperationId;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use icrc2_minter::operation::OperationState;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
-use crate::context::bridge_client::BridgeCanisterClient;
+use crate::bridge_client::BridgeCanisterClient;
 
 pub struct Icrc2BridgeClient<C> {
     client: C,

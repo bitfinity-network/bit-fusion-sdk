@@ -1,11 +1,11 @@
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
+use bridge_did::reason::Icrc2Burn;
 use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::bridge::{self, Operation, OperationContext};
 use candid::{CandidType, Nat, Principal};
 use did::{H256, U256};
 use icrc_client::account::Account;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
-use minter_did::reason::Icrc2Burn;
 use serde::{Deserialize, Serialize};
 
 use crate::tasks::BurntIcrc2Data;

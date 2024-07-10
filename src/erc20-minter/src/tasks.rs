@@ -3,6 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::MintOrder;
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
 use bridge_utils::operation_store::OperationId;
@@ -16,8 +18,6 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
 use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
-use minter_did::id256::Id256;
-use minter_did::order::MintOrder;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_operations_store, get_state};
@@ -196,8 +196,8 @@ impl BridgeTask {
             .unwrap_or_default()
             .1;
 
-        let sender_chain_id = burn_evm_params.chain_id as u32;
-        let recipient_chain_id = mint_evm_params.chain_id as u32;
+        let sender_chain_id = burn_evm_params.chain_id;
+        let recipient_chain_id = mint_evm_params.chain_id;
 
         let sender = Id256::from_evm_address(&burn_event.sender, sender_chain_id);
         let src_token = Id256::from_evm_address(&burn_event.from_erc20, sender_chain_id);

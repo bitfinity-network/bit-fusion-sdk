@@ -874,11 +874,101 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-canister"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "bridge-did",
+ "bridge-utils",
+ "candid",
+ "did",
+ "env_logger",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "hex",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-stable-structures 0.18.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "jsonrpc-core",
+ "log",
+ "num-bigint 0.4.5",
+ "num-traits",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vergen",
+]
+
+[[package]]
+name = "bridge-client"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bridge-did",
+ "bridge-utils",
+ "candid",
+ "did",
+ "env_logger",
+ "erc20-minter",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethers-core",
+ "hex",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-stable-structures 0.18.0",
+ "ic-storage",
+ "ic-task-scheduler",
+ "icrc2-minter",
+ "jsonrpc-core",
+ "log",
+ "num-bigint 0.4.5",
+ "num-traits",
+ "once_cell",
+ "rune-bridge",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "vergen",
+]
+
+[[package]]
+name = "bridge-did"
+version = "0.2.0"
+dependencies = [
+ "candid",
+ "did",
+ "eth-signer",
+ "ethers-core",
+ "ic-canister-client",
+ "ic-exports",
+ "ic-log",
+ "ic-stable-structures 0.18.0",
+ "ordinals",
+ "rand",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "bridge-tool"
 version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
  "anyhow",
+ "bridge-did",
  "bridge-utils",
  "candid",
  "clap 4.5.7",
@@ -891,7 +981,6 @@ dependencies = [
  "hex",
  "ic-agent",
  "ic-canister-client",
- "minter-did",
  "rand",
  "tokio",
 ]
@@ -902,23 +991,24 @@ version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
  "anyhow",
+ "bridge-did",
  "candid",
  "did",
  "env_logger",
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
- "evm-canister-client",
  "foundry-compilers",
  "hex",
+ "ic-canister",
  "ic-canister-client",
  "ic-exports",
+ "ic-log",
  "ic-stable-structures 0.18.0",
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
  "minter-did",
- "num-bigint 0.4.5",
  "num-traits",
  "once_cell",
  "serde",
@@ -938,6 +1028,7 @@ name = "btc-bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-did",
  "bridge-utils",
  "candid",
  "did",
@@ -956,7 +1047,6 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "minter-did",
  "serde",
  "tokio",
 ]
@@ -2009,6 +2099,7 @@ version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
  "anyhow",
+ "bridge-did",
  "bridge-utils",
  "candid",
  "did",
@@ -2025,7 +2116,6 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "minter-did",
  "serde",
  "tokio",
 ]
@@ -5743,6 +5833,8 @@ version = "0.2.0"
 dependencies = [
  "async-recursion",
  "async-trait",
+ "bridge-canister",
+ "bridge-did",
  "bridge-utils",
  "candid",
  "did",
@@ -5761,10 +5853,11 @@ dependencies = [
  "icrc-client",
  "jsonrpc-core",
  "log",
- "minter-did",
  "mockall 0.12.1",
+ "num-traits",
  "rand",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "vergen",
@@ -5863,6 +5956,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-client",
+ "bridge-did",
  "bridge-utils",
  "btc-bridge",
  "candid",
@@ -5889,6 +5984,7 @@ dependencies = [
  "ic-icrc1-ledger",
  "ic-log",
  "ic-management-canister-types",
+ "ic-metrics 0.18.0",
  "ic-stable-structures 0.18.0",
  "ic-state-machine-tests",
  "ic-test-utils",
@@ -5897,7 +5993,6 @@ dependencies = [
  "icrc2-minter",
  "jsonrpc-core",
  "minter-client",
- "minter-did",
  "once_cell",
  "rand",
  "rune-bridge",
@@ -6360,7 +6455,6 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.18.0",
- "ordinals",
  "serde",
  "thiserror",
 ]
@@ -7875,6 +7969,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-did",
  "bridge-utils",
  "candid",
  "did",
@@ -7894,7 +7989,6 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "minter-did",
  "ord-rs",
  "ordinals",
  "serde",
