@@ -40,6 +40,7 @@ on:
 
 env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+  GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
   GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
@@ -130,6 +131,11 @@ jobs:
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
 
+      env:
+        EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+        GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
+        GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+
       artifact-pre-script: |
         export WASMS_DIR="`pwd`/.artifact"
         ./scripts/build_solidity.sh
@@ -137,7 +143,7 @@ jobs:
         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
         ./scripts/build.sh
 
-        export GH_API_TOKEN=${GH_PKG_TOKEN}
+        export GH_API_TOKEN=${{ GH_PKG_TOKEN }}
         ./scripts/get_dependencies.sh
 
       test-script: |
