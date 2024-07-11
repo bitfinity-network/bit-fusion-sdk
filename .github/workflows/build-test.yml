@@ -42,6 +42,8 @@ env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
   GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
   GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+  # required by the get_dependencies.sh script
+  GH_API_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
 
@@ -129,13 +131,6 @@ jobs:
       output-artifact: artifact-evm
       enable-target-cache: true
       disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
-
-      env:
-        EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
-        GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
-        GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
-        # required by the get_dependencies.sh script
-        GH_API_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
       init-script: |
         ./scripts/build_solidity.sh
