@@ -82,7 +82,7 @@ jobs:
           export RUST_BACKTRACE="full"
           cargo install ic-wasm
           sudo apt update
-          sudo apt install gcc-multilib
+          sudo apt install gcc-multilib libunwind-dev
 
       - name: rustfmt
         run: |
