@@ -43,132 +43,106 @@ env:
 
 jobs:
 
-  build-test:
-    runs-on: 4x150g-runner
-    name: Build and Test
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-          targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          cache: false
-
-      - name: Install dfx
-        uses: dfinity/setup-dfx@main
-
-      - name: Install Protobuf compiler
-        uses: arduino/setup-protoc@v3
-
-      - name: Configure Rust Cache
-        uses: Swatinem/rust-cache@v2
-        if: ${{ (github.event.pull_request.base.ref != 'main') && (github.ref_name != 'main') }}
-        with:
-          shared-key: ${{ github.repository }}
-          save-if: ${{ github.ref_type != 'tag' }}
-
-      - name: setup environment
-        run: |
-          export RUST_BACKTRACE="full"
-          cargo install ic-wasm
-          cargo install icx-proxy
-          sudo apt update
-          sudo apt install gcc-multilib libunwind-dev
-
-      - name: rustfmt
-        run: |
-          cargo fmt --all --check
-
-      - name: clippy
-        run: |
-          cargo clippy --all-features --all-targets -- -D warnings
-
-      - name: build
-        run: |
-          export WASMS_DIR="`pwd`/.artifact"
-          ./scripts/build_solidity.sh
-
-          export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
-          ./scripts/build.sh
-
-          export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
-          ./scripts/get_dependencies.sh
-
-      - name: test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests.sh
-
-      - name: 32bits test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests_i686.sh
-
-      - name: dfx test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/dfx_tests.sh --github-ci --docker
-
-      # - name: "Uploading artifact: artifact-evm"
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     if-no-files-found: error
-      #     retention-days: 1
-      #     name: artifact-evm
-      #     path: .artifact/*
-
   # build-test:
-  #   name: "Build and Test"
-  #   uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@main
-  #   with:
-  #     runs-on: 4x150g-runner
-  #     container-image: ghcr.io/bitfinity-network/ic-dev-base:rust1.77-dfx0.19
-  #     git-fetch-depth: "0"
-  #     skip-test: ${{ github.ref_type == 'tag' }}
-  #     audit-allow-warnings: true
-  #     cargo-clippy-extra-args: "-- -D warnings"
-  #     output-artifact: artifact-evm
-  #     init-script: |
-  #       ./scripts/build_solidity.sh
-  #       apt update && apt install -y npm wget curl build-essential libssl-dev pkg-config docker-compose
-  #       git clone https://github.com/ordinals/ord.git /tmp/ord
-  #       cd /tmp/ord/
-  #       git checkout 0.18.5
-  #       cargo build --release
-  #       cp target/release/ord /usr/bin/ord
-  #       cd -
-  #       cp btc-deploy/mkcert/* /etc/ssl/
-  #       wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
-  #       tar -xzf /tmp/bitcoin.tar.gz -C /tmp
-  #       cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
-  #       curl -fsSL https://get.docker.com | sh -
-  #     artifact-pre-script: |
-  #       # Get external dependencies
-  #       export WASMS_DIR="`pwd`/.artifact"
-  #       export GH_API_TOKEN=$SECRET1
-  #       ./scripts/get_dependencies.sh
+  #   runs-on: 4x150g-runner
+  #   name: Build and Test
 
-  #       # Build dependencies
-  #       export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
-  #       ./scripts/build.sh
-  #     test-script: |
-  #       export WASMS_DIR="`pwd`/.artifact"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
 
-  #       ./scripts/tests/dfx_tests.sh --github-ci --docker
-  #       ./scripts/tests/tests_i686.sh
-  #       ./scripts/tests/tests.sh
-  #     enable-target-cache: true
-  #     disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
-  #   secrets:
-  #     gh_token: ${{ secrets.GH_PKG_TOKEN }}
-  #     gh_login: ${{ secrets.GH_PKG_LOGIN }}
-  #     env_secret1: ${{ secrets.GH_PKG_TOKEN }}
+  #     - name: Install rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         components: clippy, rustfmt
+  #         targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
+
+  #     - name: Install Foundry
+  #       uses: foundry-rs/foundry-toolchain@v1
+  #       with:
+  #         cache: false
+
+  #     - name: Install dfx
+  #       uses: dfinity/setup-dfx@main
+
+  #     - name: Install Protobuf compiler
+  #       uses: arduino/setup-protoc@v3
+
+  #     - name: Configure Rust Cache
+  #       uses: Swatinem/rust-cache@v2
+  #       if: ${{ (github.event.pull_request.base.ref != 'main') && (github.ref_name != 'main') }}
+  #       with:
+  #         shared-key: ${{ github.repository }}
+  #         save-if: ${{ github.ref_type != 'tag' }}
+
+  #     - name: setup environment
+  #       run: |
+  #         export RUST_BACKTRACE="full"
+  #         cargo install ic-wasm
+  #         cargo install icx-proxy
+  #         sudo apt update
+  #         sudo apt install gcc-multilib libunwind-dev
+
+  #     - name: rustfmt
+  #       run: |
+  #         cargo fmt --all --check
+
+  #     - name: clippy
+  #       run: |
+  #         cargo clippy --all-features --all-targets -- -D warnings
+
+  #     - name: build
+  #       run: |
+  #         export WASMS_DIR="`pwd`/.artifact"
+  #         ./scripts/build_solidity.sh
+
+  #         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
+  #         ./scripts/build.sh
+
+  #         export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
+  #         ./scripts/get_dependencies.sh
+
+  #     - name: test
+  #       if: ${{ !inputs.skip-test }}
+  #       run: |
+  #         ./scripts/tests/tests.sh
+
+  #     - name: 32bits test
+  #       if: ${{ !inputs.skip-test }}
+  #       run: |
+  #         ./scripts/tests/tests_i686.sh
+
+  #     - name: dfx test
+  #       if: ${{ !inputs.skip-test }}
+  #       run: |
+  #         ./scripts/tests/dfx_tests.sh --github-ci --docker
+
+  build-test:
+    name: "Build and Test"
+    uses: bitfinity-network/ci-wf/.github/workflows/build-n-test.yml@no_container
+    with:
+      runs-on: 4x150g-runner
+      skip-test: ${{ github.ref_type == 'tag' }}
+      audit-allow-warnings: true
+      output-artifact: artifact-evm
+      enable-target-cache: true
+      disable-cache: ${{ github.event.pull_request.base.ref == 'main' || github.ref_name == 'main' }}
+
+      artifact-pre-script: |
+        export WASMS_DIR="`pwd`/.artifact"
+        ./scripts/build_solidity.sh
+
+        export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
+        ./scripts/build.sh
+
+        export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
+        ./scripts/get_dependencies.sh
+
+      test-script: |
+        export WASMS_DIR="`pwd`/.artifact"
+
+        ./scripts/tests/tests.sh
+        ./scripts/tests/tests_i686.sh
+        ./scripts/tests/dfx_tests.sh --github-ci --docker
+
