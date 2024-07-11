@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
@@ -13,12 +16,10 @@ usage() {
 }
 
 setup_docker() {
-    set -e
     PREV_PATH=$(pwd)
     cd btc-deploy/
     docker compose up -d --build || docker-compose up -d --build
     cd $PREV_PATH
-    set +e
 }
 
 stop_docker() {

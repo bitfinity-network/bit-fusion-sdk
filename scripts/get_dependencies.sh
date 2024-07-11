@@ -2,6 +2,9 @@
 # Getting external dependencies for this project
 # This script works for local development and from from CI
 
+set -e
+set -x
+
 script_dir=$(dirname $0)
 wasm_dir_default=$(realpath "${script_dir}/../.artifact")
 

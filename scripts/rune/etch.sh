@@ -13,6 +13,7 @@
 # * ord wallet with SUPERMAXRUNENAME balance ready to be used
 
 set -e
+set -x
 
 ORD_DATA=$PWD/target/ord
 rm -rf $ORD_DATA
