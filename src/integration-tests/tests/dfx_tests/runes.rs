@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_did::id256::Id256;
 use bridge_utils::evm_link::EvmLink;
 use bridge_utils::operation_store::MinterOperationId;
 use bridge_utils::BFTBridge;
@@ -18,7 +19,6 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
-use minter_did::id256::Id256;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
 use rune_bridge::operation::OperationState;

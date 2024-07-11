@@ -12,7 +12,7 @@ pub enum TestError {
     Evm(#[from] EvmError),
 
     #[error(transparent)]
-    MinterCanister(#[from] minter_did::error::Error),
+    MinterCanister(#[from] bridge_did::error::Error),
 
     #[error(transparent)]
     Candid(#[from] candid::Error),
