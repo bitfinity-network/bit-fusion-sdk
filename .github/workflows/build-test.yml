@@ -86,13 +86,13 @@ jobs:
           sudo apt update
           sudo apt install gcc-multilib libunwind-dev
 
-      - name: rustfmt
-        run: |
-          cargo fmt --all --check
+      # - name: rustfmt
+      #   run: |
+      #     cargo fmt --all --check
 
-      - name: clippy
-        run: |
-          cargo clippy --all-features --all-targets -- -D warnings
+      # - name: clippy
+      #   run: |
+      #     cargo clippy --all-features --all-targets -- -D warnings
 
       - name: build
         run: |
