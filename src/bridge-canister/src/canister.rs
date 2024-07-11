@@ -11,6 +11,7 @@ use ic_canister::{
     generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
 };
 use ic_log::writer::Logs;
+use ic_log::LogSettings;
 use ic_task_scheduler::task::TaskOptions;
 use log::{debug, info};
 
@@ -44,6 +45,11 @@ pub trait BridgeCanister: Canister {
         debug!("updated logger filter to {filter}");
 
         Ok(())
+    }
+
+    #[query(trait = true)]
+    fn get_logger_settings(&self) -> LogSettings {
+        LoggerConfigService.current_settings()
     }
 
     /// Returns principal of canister owner.
@@ -142,14 +148,15 @@ pub trait BridgeCanister: Canister {
 
     /// Re-initializes the bridge after upgrade. This method should be called from the `#[post-upgrade]`
     /// method.
-    fn bridge_post_upgrade(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
+    fn bridge_post_upgrade(&mut self, _run_scheduler: impl Fn(TaskOptions) + 'static) {
         self.core().borrow_mut().reload();
 
         if let Err(err) = LoggerConfigService.reload() {
             ic_exports::ic_cdk::println!("Error configuring the logger. Err: {err:?}")
         }
 
-        self.start_timers(run_scheduler);
+        #[cfg(target_arch = "wasm32")]
+        self.start_timers(_run_scheduler);
 
         debug!("Upgrade completed");
     }
@@ -172,9 +179,9 @@ pub trait BridgeCanister: Canister {
 generate_exports!(BridgeCanister);
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use eth_signer::sign_strategy::SigningStrategy;
-    use ethers_core::rand;
     use ic_canister::{canister_call, init};
     use ic_exports::ic_kit::{inject, MockContext};
     use ic_log::LogSettings;
@@ -213,7 +220,7 @@ mod tests {
     async fn init_canister() -> TestBridge {
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::anonymous(),
+            evm_principal: bob(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -231,6 +238,101 @@ mod tests {
 
         canister_call!(canister.init(init_data), ()).await.unwrap();
         canister
+    }
+
+    #[tokio::test]
+    async fn init_sets_config() {
+        let owner = owner();
+        let evm_principal = bob();
+        let signing_strategy = SigningStrategy::Local {
+            private_key: [42; 32],
+        };
+        let log_settings = LogSettings {
+            enable_console: true,
+            in_memory_records: Some(10),
+            log_filter: Some("error".into()),
+        };
+
+        let canister = init_with_data(BridgeInitData {
+            owner,
+            evm_principal,
+            signing_strategy: signing_strategy.clone(),
+            log_settings: Some(log_settings.clone()),
+        })
+        .await;
+
+        let stored_owner = canister_call!(canister.get_owner(), Principal)
+            .await
+            .unwrap();
+        assert_eq!(stored_owner, owner);
+
+        let stored_evm_principal = canister_call!(canister.get_evm_principal(), Principal)
+            .await
+            .unwrap();
+        assert_eq!(stored_evm_principal, evm_principal);
+
+        let stored_signing_strategy = canister
+            .core()
+            .borrow()
+            .config
+            .get_signing_strategy()
+            .clone();
+        assert_eq!(stored_signing_strategy, signing_strategy);
+
+        let stored_log_settings = canister_call!(canister.get_logger_settings(), LogSettings)
+            .await
+            .unwrap();
+        assert_eq!(
+            stored_log_settings.enable_console,
+            log_settings.enable_console
+        );
+        assert_eq!(
+            stored_log_settings.in_memory_records,
+            log_settings.in_memory_records
+        );
+        assert_eq!(stored_log_settings.log_filter, log_settings.log_filter);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Evm principal cannot be an anonymous")]
+    async fn init_rejects_anonymous_evm() {
+        let init_data = BridgeInitData {
+            owner: owner(),
+            evm_principal: Principal::anonymous(),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1u8; 32],
+            },
+            log_settings: None,
+        };
+        let _ = init_with_data(init_data).await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Evm principal cannot be management canister")]
+    async fn init_rejects_management_evm() {
+        let init_data = BridgeInitData {
+            owner: owner(),
+            evm_principal: Principal::management_canister(),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1u8; 32],
+            },
+            log_settings: None,
+        };
+        let _ = init_with_data(init_data).await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Owner cannot be an anonymous")]
+    async fn init_rejects_anonymous_owner() {
+        let init_data = BridgeInitData {
+            owner: Principal::anonymous(),
+            evm_principal: bob(),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1u8; 32],
+            },
+            log_settings: None,
+        };
+        let _ = init_with_data(init_data).await;
     }
 
     #[tokio::test]
@@ -265,20 +367,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "Owner cannot be an anonymous")]
-    async fn disallow_anonymous_owner_in_init() {
-        let init_data = BridgeInitData {
-            owner: Principal::anonymous(),
-            evm_principal: Principal::anonymous(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
-            },
-            log_settings: None,
-        };
-        let _ = init_with_data(init_data).await;
-    }
-
-    #[tokio::test]
     async fn set_evm_principal_works() {
         let mut canister = init_canister().await;
 
@@ -286,10 +374,10 @@ mod tests {
         let _ = canister_call!(canister.set_evm_principal(bob()), ()).await;
 
         // check if state updated
-        let stored_owner = canister_call!(canister.get_evm_principal(), Principal)
+        let stored_evm = canister_call!(canister.get_evm_principal(), Principal)
             .await
             .unwrap();
-        assert_eq!(stored_owner, bob());
+        assert_eq!(stored_evm, bob());
     }
 
     #[tokio::test]
@@ -300,10 +388,30 @@ mod tests {
         let _ = canister_call!(canister.set_evm_principal(bob()), ()).await;
     }
 
-    // This test work fine if executed alone but could fail if executed with all other tests
-    // due to the global nature of the global logger in Rust.
-    // In fact, if the Rust log is already set, a second attempt to set it causes a panic
-    #[ignore]
+    #[tokio::test]
+    async fn set_bft_bridge_works() {
+        let mut canister = init_canister().await;
+
+        inject::get_context().update_id(owner());
+        let address = H160::from_slice(&[42; 20]);
+        let _ = canister_call!(canister.set_bft_bridge_contract(address.clone()), ()).await;
+
+        // check if state updated
+        let stored_bft = canister_call!(canister.get_bft_bridge_contract(), Option<H160>)
+            .await
+            .unwrap();
+        assert_eq!(stored_bft, Some(address));
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
+    async fn set_bft_bridge_rejected_for_non_owner() {
+        let mut canister = init_canister().await;
+
+        let address = H160::from_slice(&[42; 20]);
+        let _ = canister_call!(canister.set_bft_bridge_contract(address), ()).await;
+    }
+
     #[tokio::test]
     async fn test_set_logger_filter() {
         let init_data = BridgeInitData {
@@ -319,50 +427,15 @@ mod tests {
             }),
         };
         let mut canister = init_with_data(init_data).await;
-
-        {
-            let info_message = format!("message-{}", rand::random::<u64>());
-            let error_message = format!("message-{}", rand::random::<u64>());
-
-            log::info!("{info_message}");
-            log::error!("{error_message}");
-
-            // Only the error message should be present
-            let log_records = ic_log::take_memory_records(128, 0);
-            assert!(!log_records
-                .logs
-                .iter()
-                .any(|log| log.log.contains(&info_message)));
-            assert!(log_records
-                .logs
-                .iter()
-                .any(|log| log.log.contains(&error_message)));
-        }
-        // Set new logger filter
-
         inject::get_context().update_id(owner());
         let new_filter = "info";
         let res = canister_call!(canister.set_logger_filter(new_filter.to_string()), ()).await;
         assert!(res.is_ok());
 
-        {
-            let info_message = format!("message-{}", rand::random::<u64>());
-            let error_message = format!("message-{}", rand::random::<u64>());
-
-            log::info!("{info_message}");
-            log::error!("{error_message}");
-
-            // All log messages should be present
-            let log_records = ic_log::take_memory_records(128, 0);
-            assert!(log_records
-                .logs
-                .iter()
-                .any(|log| log.log.contains(&info_message)));
-            assert!(log_records
-                .logs
-                .iter()
-                .any(|log| log.log.contains(&error_message)));
-        }
+        let updated_settings = canister_call!(canister.get_logger_settings(), LogSettings)
+            .await
+            .unwrap();
+        assert_eq!(updated_settings.log_filter, Some(new_filter.into()));
     }
 
     #[tokio::test]
@@ -384,5 +457,13 @@ mod tests {
 
         assert!(evm_address.is_ok());
         assert_ne!(evm_address.unwrap(), H160::default());
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
+    async fn ic_logs_is_rejected_for_non_owner() {
+        let mut canister = init_canister().await;
+
+        let _ = canister_call!(canister.ic_logs(1000, 0), ()).await;
     }
 }

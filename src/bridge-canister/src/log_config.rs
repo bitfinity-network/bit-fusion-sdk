@@ -53,8 +53,7 @@ impl LoggerConfigService {
 
         // get settings and init log
         let log_settings = LOG_SETTINGS.with(|cell| cell.borrow().get().0.clone());
-        let logger_config = init_log(&log_settings)
-            .map_err(|e| Error::Internal(format!("Logger init error: {e}")))?;
+        let logger_config = Self::init_log(&log_settings)?;
         LOGGER_CONFIG.with(|config| config.borrow_mut().replace(logger_config));
 
         // Print this out without using log in case the given parameters prevent logs to be printed.
@@ -63,6 +62,21 @@ impl LoggerConfigService {
         ));
 
         Ok(())
+    }
+
+    fn init_log(_log_settings: &LogSettings) -> Result<LoggerConfig, Error> {
+        cfg_if::cfg_if! {
+            if #[cfg(test)] {
+                let (_, config) = ic_log::Builder::default().build();
+                Ok(config)
+            } else {
+                init_log(_log_settings).map_err(|e| Error::Internal(format!("Logger init error: {e}")))
+            }
+        }
+    }
+
+    pub fn current_settings(&self) -> LogSettings {
+        LOG_SETTINGS.with(|cell| cell.borrow().get().0.clone())
     }
 
     /// Reload the logger configuration
