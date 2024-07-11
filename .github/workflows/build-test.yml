@@ -40,17 +40,15 @@ on:
 
 env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
+  gh_token: ${{ secrets.GH_PKG_TOKEN }}
+  gh_login: ${{ secrets.GH_PKG_LOGIN }}
+  env_secret1: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
 
   build-test:
     runs-on: 4x150g-runner
     name: Build and Test
-
-    secrets:
-      gh_token: ${{ secrets.GH_PKG_TOKEN }}
-      gh_login: ${{ secrets.GH_PKG_LOGIN }}
-      env_secret1: ${{ secrets.GH_PKG_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
