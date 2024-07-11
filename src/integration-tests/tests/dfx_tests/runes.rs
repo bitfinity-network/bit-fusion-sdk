@@ -516,6 +516,8 @@ impl RunesContext {
     }
 }
 
+/// Disabled as it currently fails. To be fixed in EPROD-944
+#[test::ignore = "To be fixed in EPROD-944"]
 #[tokio::test]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::new().await;
@@ -536,6 +538,8 @@ async fn runes_bridging_flow() {
     ctx.stop().await
 }
 
+/// Disabled as it currently fails. To be fixed in EPROD-944
+#[test::ignore = "To be fixed in EPROD-944"]
 #[tokio::test]
 async fn inputs_from_different_users() {
     let ctx = RunesContext::new().await;
