@@ -67,6 +67,9 @@ jobs:
       - name: Install dfx
         uses: dfinity/setup-dfx@main
 
+      - name: Install Protobuf compiler
+        uses: arduino/setup-protoc@v3
+
       - name: Configure Rust Cache
         uses: Swatinem/rust-cache@v2
         if: ${{ (github.event.pull_request.base.ref != 'main') && (github.ref_name != 'main') }}
