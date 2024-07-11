@@ -83,6 +83,7 @@ jobs:
         run: |
           export RUST_BACKTRACE="full"
           cargo install ic-wasm
+          cargo install icx-proxy
           sudo apt update
           sudo apt install gcc-multilib libunwind-dev
 
@@ -102,7 +103,7 @@ jobs:
           export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
           ./scripts/build.sh
 
-          export GH_API_TOKEN=$SECRET1
+          export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           ./scripts/get_dependencies.sh
 
       # - name: test
