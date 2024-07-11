@@ -315,7 +315,7 @@ mod test {
 
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::anonymous(),
+            evm_principal: Principal::from_slice(&[2; 20]),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -337,7 +337,7 @@ mod test {
         let stored_evm = canister_call!(canister.get_evm_principal(), Principal)
             .await
             .unwrap();
-        assert_eq!(stored_evm, Principal::anonymous());
+        assert_eq!(stored_evm, Principal::from_slice(&[2; 20]));
     }
 
     #[tokio::test]
