@@ -62,7 +62,7 @@ download_file() {
     local url="$1"
     local output_path="$2"
     echo "Downloading $url to $output_path"
-    curl --fail -o "$output_path" "$url"
+    curl --create-dirs --fail -o "$output_path" "$url"
 }
 
 get_icrc1_binaries() {
