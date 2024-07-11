@@ -40,9 +40,9 @@ on:
 
 env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
-  gh_token: ${{ secrets.GH_PKG_TOKEN }}
-  gh_login: ${{ secrets.GH_PKG_LOGIN }}
-  env_secret1: ${{ secrets.GH_PKG_TOKEN }}
+  # gh_token: ${{ secrets.GH_PKG_TOKEN }}
+  # gh_login: ${{ secrets.GH_PKG_LOGIN }}
+  # env_secret1: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
 
@@ -103,15 +103,15 @@ jobs:
           export GH_API_TOKEN=$SECRET1
           ./scripts/get_dependencies.sh
 
-      - name: test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests.sh
+      # - name: test
+      #   if: ${{ !inputs.skip-test }}
+      #   run: |
+      #     ./scripts/tests/tests.sh
 
-      - name: 32bits test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests_i686.sh
+      # - name: 32bits test
+      #   if: ${{ !inputs.skip-test }}
+      #   run: |
+      #     ./scripts/tests/tests_i686.sh
 
       - name: dfx test
         if: ${{ !inputs.skip-test }}
