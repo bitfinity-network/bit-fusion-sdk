@@ -462,8 +462,7 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
     async fn ic_logs_is_rejected_for_non_owner() {
-        let mut canister = init_canister().await;
-
+        let canister = init_canister().await;
         let _ = canister_call!(canister.ic_logs(1000, 0), ()).await;
     }
 }
