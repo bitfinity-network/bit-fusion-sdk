@@ -136,7 +136,7 @@ jobs:
         GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
         GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
-      artifact-pre-script: |
+      init-script: |
         export WASMS_DIR="`pwd`/.artifact"
         ./scripts/build_solidity.sh
 
