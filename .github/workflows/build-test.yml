@@ -96,7 +96,6 @@ jobs:
 
   #     - name: build
   #       run: |
-  #         export WASMS_DIR="`pwd`/.artifact"
   #         ./scripts/build_solidity.sh
 
   #         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
@@ -135,11 +134,10 @@ jobs:
         EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
         GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
         GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
-        # used by the get_dependencies.sh script
+        # required by the get_dependencies.sh script
         GH_API_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
       init-script: |
-        export WASMS_DIR="`pwd`/.artifact"
         ./scripts/build_solidity.sh
 
         export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
@@ -148,8 +146,6 @@ jobs:
         ./scripts/get_dependencies.sh
 
       test-script: |
-        export WASMS_DIR="`pwd`/.artifact"
-
         ./scripts/tests/tests.sh
         ./scripts/tests/tests_i686.sh
         ./scripts/tests/dfx_tests.sh --github-ci --docker
