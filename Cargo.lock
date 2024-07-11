@@ -1797,8 +1797,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -2138,8 +2138,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "async-trait",
  "candid",
@@ -2189,8 +2189,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "anyhow",
  "candid",
@@ -2254,8 +2254,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "candid",
  "did",
@@ -5756,8 +5756,8 @@ dependencies = [
 
 [[package]]
 name = "icrc-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6420,8 +6420,8 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "candid",
  "did",
@@ -6438,8 +6438,8 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "candid",
  "did",
@@ -8593,8 +8593,8 @@ dependencies = [
 
 [[package]]
 name = "signature-verification-canister-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.28.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=EPROD-865-make-optional-fields-in-mintorder-struct-optional#d697732bb9e2aaea92a70513ff3b326a97fcaf80"
 dependencies = [
  "candid",
  "did",
