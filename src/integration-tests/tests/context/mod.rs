@@ -1038,8 +1038,6 @@ pub fn icrc_canister_default_init_args(
 }
 
 pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> BridgeInitData {
-    let mut rng = rand::thread_rng();
-    let wallet = Wallet::new(&mut rng);
     BridgeInitData {
         owner,
         evm_principal,
