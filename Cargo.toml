@@ -1,5 +1,8 @@
 [workspace]
 members = [
+    "src/bridge-canister",
+    "src/bridge-client",
+    "src/bridge-did",
     "src/bridge-tool",
     "src/bridge-utils",
     "src/integration-tests",
@@ -49,8 +52,7 @@ ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk",
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.17.x" }
 jsonrpc-core = "18.0"
 log = "0.4"
-minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.27.x" }
-minter-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-did", tag = "v0.27.x" }
+minter-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "minter-client", tag = "v0.26.x" }
 mockall = "0.12"
 num-bigint = "0.4"
 num-traits = "0.2"

@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storable};
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 pub struct MintOrders<M: Memory> {
     mint_orders_map: StableMultimap<MintOrderKey, u32, SignedMintOrder, M>,
@@ -101,12 +101,12 @@ impl Storable for MintOrderKey {
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::id256::Id256;
+    use bridge_did::order::{MintOrder, SignedMintOrder};
     use candid::Principal;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::stable_structures::DefaultMemoryImpl;
     use ic_stable_structures::{default_ic_memory_manager, MemoryId, Storable, VirtualMemory};
-    use minter_did::id256::Id256;
-    use minter_did::order::{MintOrder, SignedMintOrder};
 
     use super::{MintOrderKey, MintOrders};
 

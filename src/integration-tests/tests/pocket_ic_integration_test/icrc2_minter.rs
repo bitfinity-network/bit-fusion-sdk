@@ -1,17 +1,17 @@
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_client::BridgeCanisterClient;
+use bridge_did::id256::Id256;
+use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
 use eth_signer::Signer;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
-use minter_did::id256::Id256;
-use minter_did::reason::ApproveAfterMint;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
-use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
@@ -244,7 +244,7 @@ async fn test_icrc2_token_canister_stopped() {
 async fn set_owner_access() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
     let mut admin_client = ctx.icrc_minter_client(ADMIN);
-    admin_client.set_owner(alice()).await.unwrap().unwrap();
+    admin_client.set_owner(alice()).await.unwrap();
 
     // Now Alice is owner, so admin can't update owner anymore.
     let err = admin_client.set_owner(alice()).await.unwrap_err();
@@ -258,7 +258,7 @@ async fn set_owner_access() {
 
     // Now Alice is owner, so she can update owner.
     let mut alice_client = ctx.icrc_minter_client(ALICE);
-    alice_client.set_owner(alice()).await.unwrap().unwrap();
+    alice_client.set_owner(alice()).await.unwrap();
 }
 
 #[tokio::test]
@@ -267,11 +267,11 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
     let minter_client = ctx.icrc_minter_client(ADMIN);
 
-    assert!(minter_client
+    minter_client
         .set_logger_filter("info".to_string())
         .await
         .unwrap()
-        .is_ok());
+        .unwrap();
 
     // Advance state to avoid canister rate limit.
     for _ in 0..100 {
@@ -280,11 +280,11 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
     // upgrade canister
     ctx.upgrade_minter_canister().await.unwrap();
-    assert!(minter_client
+    minter_client
         .set_logger_filter("debug".to_string())
         .await
         .unwrap()
-        .is_ok());
+        .unwrap();
 }
 
 #[tokio::test]

@@ -2,10 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use bitcoin::bip32::DerivationPath;
-use bitcoin::consensus::Encodable;
-use bitcoin::hashes::sha256d::Hash;
-use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
+use bitcoin::Address;
 use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::H160;
@@ -21,13 +18,9 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
-use ord_rs::wallet::{ScriptType, TxInputInfo};
-use ord_rs::OrdTransactionBuilder;
 
 use crate::core::deposit::RuneDeposit;
-use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
-use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::interface::{CreateEdictTxArgs, GetAddressError, WithdrawError};
+use crate::interface::GetAddressError;
 use crate::memory::{
     MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
     PENDING_TASKS_MEMORY_ID,
@@ -188,94 +181,6 @@ impl RuneBridge {
             .expect("failed to get rune amounts");
 
         rune_info_amounts
-    }
-
-    #[update]
-    pub async fn create_edict_tx(&self, args: CreateEdictTxArgs) -> Vec<u8> {
-        let from_addr = Address::from_str(&args.from_address)
-            .expect("failed to parse from address")
-            .assume_checked();
-        let to_addr = Address::from_str(&args.destination)
-            .expect("failed to parse destination address")
-            .assume_checked();
-        let change_addr = args
-            .change_address
-            .map(|addr| {
-                Address::from_str(&addr)
-                    .expect("failed to parse change address")
-                    .assume_checked()
-            })
-            .unwrap_or_else(|| from_addr.clone());
-
-        let state = get_state();
-        let index_provider = OrdIndexProvider::new(state.borrow().indexer_url());
-        let runes_list = index_provider
-            .get_rune_list()
-            .await
-            .expect("failed to get rune list");
-        let rune_id = runes_list
-            .into_iter()
-            .find(|(_, spaced_rune, _)| args.rune_name == spaced_rune.to_string())
-            .unwrap_or_else(|| panic!("rune {} is not in the list of runes", args.rune_name))
-            .0;
-
-        let utxo_provider = IcUtxoProvider::new(state.borrow().ic_btc_network());
-        let input_utxos = utxo_provider
-            .get_utxos(&from_addr)
-            .await
-            .expect("failed to get input utxos");
-        let inputs = input_utxos
-            .utxos
-            .iter()
-            .map(|utxo| TxInputInfo {
-                outpoint: OutPoint {
-                    txid: Txid::from_raw_hash(*Hash::from_bytes_ref(
-                        &utxo.outpoint.txid.clone().try_into().expect("invalid txid"),
-                    )),
-                    vout: utxo.outpoint.vout,
-                },
-                tx_out: TxOut {
-                    value: Amount::from_sat(utxo.value),
-                    script_pubkey: from_addr.script_pubkey(),
-                },
-                derivation_path: DerivationPath::default(),
-            })
-            .collect();
-
-        let fee_rate = utxo_provider
-            .get_fee_rate()
-            .await
-            .expect("failed to get fee rate");
-
-        let args = ord_rs::wallet::CreateEdictTxArgs {
-            rune: rune_id,
-            inputs,
-            destination: to_addr,
-            change_address: change_addr.clone(),
-            rune_change_address: change_addr,
-            amount: args.amount,
-            fee_rate,
-        };
-
-        let builder = OrdTransactionBuilder::new(
-            state.borrow().public_key(),
-            ScriptType::P2WSH,
-            state.borrow().wallet(),
-        );
-        let unsigned_tx = builder
-            .create_edict_transaction(&args)
-            .map_err(|err| {
-                log::warn!("Failed to create withdraw transaction: {err:?}");
-                WithdrawError::TransactionCreation
-            })
-            .expect("failed to create transaction");
-
-        let mut bytes = vec![];
-        unsigned_tx
-            .consensus_encode(&mut bytes)
-            .expect("failed to encode transaction");
-
-        bytes
     }
 
     pub fn idl() -> Idl {

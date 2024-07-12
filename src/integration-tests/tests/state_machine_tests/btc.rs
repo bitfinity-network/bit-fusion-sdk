@@ -9,6 +9,7 @@ use std::time::Duration;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
+use bridge_did::id256::Id256;
 use bridge_utils::evm_link::EvmLink;
 use btc_bridge::canister::eth_address_to_subaccount;
 use btc_bridge::ck_btc_interface::PendingUtxo;
@@ -50,7 +51,6 @@ use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
 use ic_stable_structures::Storable;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use minter_did::id256::Id256;
 
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;
