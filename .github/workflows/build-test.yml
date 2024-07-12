@@ -40,8 +40,6 @@ on:
 
 env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
-  GH_PKG_LOGIN: ${{ secrets.GH_PKG_LOGIN }}
-  GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
 
 jobs:
 
