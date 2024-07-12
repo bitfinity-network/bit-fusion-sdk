@@ -845,7 +845,10 @@ pub trait TestContext {
             }
             CanisterType::Icrc2Minter => {
                 println!("Installing default Minter canister...");
-                let evm_canister = self.canisters().get_or_anonymous(CanisterType::Evm);
+                let evm_canister = self
+                    .canisters()
+                    .get(CanisterType::Evm)
+                    .unwrap_or_else(|| Principal::from_slice(&[1; 20]));
                 let init_data = minter_canister_init_data(self.admin(), evm_canister);
                 self.install_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
                     .await
