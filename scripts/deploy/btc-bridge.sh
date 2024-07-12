@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 source "$(dirname "$0")/deploy_functions.sh"
 
 IC_NETWORK="local"
@@ -103,9 +106,7 @@ if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$I
   exit 1
 fi
 
-set -e
 deploy_btc_bridge "$IC_NETWORK" "$INSTALL_MODE" "$BITCOIN_NETWORK" "$OWNER" "$EVM_PRINCIPAL" "$CKBTC_MINTER" "$CKBTC_LEDGER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
-set +e
 
 if [ "$IC_NETWORK" == "local" ]; then
   start_icx "$EVM_PRINCIPAL"

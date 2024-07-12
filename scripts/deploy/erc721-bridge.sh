@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 source "$(dirname "$0")/deploy_functions.sh"
 
 CREATE_BFT_BRIDGE_TOOL="cargo run -q -p bridge-tool --"
@@ -68,8 +71,6 @@ if [ -z "$WALLET" ]; then
   echo "ETH wallet address: $WALLET"
 fi
 
-set -e
 BRIDGE_ADDRESS=$(deploy_erc721_bridge "$EVM_PRINCIPAL" "$MINTER_ADDRESS" "$WALLET")
-set +e
 
 echo "ERC721 bridge ETH address: $BRIDGE_ADDRESS"

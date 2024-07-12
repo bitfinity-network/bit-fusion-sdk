@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 source "$(dirname "$0")/deploy_functions.sh"
 
 IC_NETWORK="local"
@@ -161,9 +164,7 @@ if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$I
   exit 1
 fi
 
-set -e
 deploy_erc20_minter "$IC_NETWORK" "$INSTALL_MODE" "$LOCAL_EVM_LINK" "$WRAPPED_EVM_PRINCIPAL" "$BASE_BRIDGE_CONTRACT" "$WRAPPED_BRIDGE_CONTRACT" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
-set +e
 
 if [ "$IC_NETWORK" == "local" ]; then
   start_icx "$WRAPPED_EVM_PRINCIPAL"

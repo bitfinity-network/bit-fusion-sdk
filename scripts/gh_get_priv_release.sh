@@ -3,6 +3,8 @@
 
 # Check dependencies.
 set -e
+set -x
+
 type curl grep sed tr >&2
 
 # Validate settings.
