@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use alloy_sol_types::SolCall;
-use alloy_sol_types::SolConstructor;
+use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_did::id256::Id256;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
