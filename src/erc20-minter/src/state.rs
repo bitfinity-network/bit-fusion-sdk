@@ -1,5 +1,6 @@
 use std::fmt;
 
+use bridge_canister::memory::memory_by_id;
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Principal};
 pub use config::Config;
@@ -12,7 +13,7 @@ use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 use serde::Deserialize;
 
 use self::log::LoggerConfigService;
-use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
+use crate::memory::SIGNER_MEMORY_ID;
 
 mod config;
 mod log;
@@ -29,11 +30,8 @@ impl Default for State {
     fn default() -> Self {
         let default_signer =
             TxSigner::ManagementCanister(ManagementCanisterSigner::new(SigningKeyId::Test, vec![]));
-        let signer = SignerStorage::new(
-            MEMORY_MANAGER.with(|mm| mm.get(SIGNER_MEMORY_ID)),
-            default_signer,
-        )
-        .expect("failed to initialize transaction signer");
+        let signer = SignerStorage::new(memory_by_id(SIGNER_MEMORY_ID), default_signer)
+            .expect("failed to initialize transaction signer");
 
         let logger = LoggerConfigService::default();
 

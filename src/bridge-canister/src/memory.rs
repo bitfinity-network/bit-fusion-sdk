@@ -1,10 +1,21 @@
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{IcMemoryManager, MemoryId};
+use ic_stable_structures::{IcMemoryManager, MemoryId, VirtualMemory};
 
-pub const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(140);
-pub const TX_SIGNER_MEMORY_ID: MemoryId = MemoryId::new(141);
-pub const LOG_SETTINGS_MEMORY_ID: MemoryId = MemoryId::new(142);
+pub const SIGNER_MEMORY_ID: MemoryId = MemoryId::new(0);
+pub const CONFIG_MEMORY_ID: MemoryId = MemoryId::new(1);
+pub const OPERATIONS_ID_COUNTER_MEMORY_ID: MemoryId = MemoryId::new(2);
+pub const OPERATIONS_MEMORY_ID: MemoryId = MemoryId::new(3);
+pub const OPERATIONS_LOG_MEMORY_ID: MemoryId = MemoryId::new(4);
+pub const OPERATIONS_MAP_MEMORY_ID: MemoryId = MemoryId::new(5);
+pub const PENDING_TASKS_MEMORY_ID: MemoryId = MemoryId::new(6);
+pub const LOG_SETTINGS_MEMORY_ID: MemoryId = MemoryId::new(7);
+
+pub type StableMemory = VirtualMemory<DefaultMemoryImpl>;
 
 thread_local! {
     pub static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
+}
+
+pub fn memory_by_id(id: MemoryId) -> StableMemory {
+    MEMORY_MANAGER.with(|mm| mm.get(id))
 }

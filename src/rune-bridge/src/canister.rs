@@ -3,7 +3,9 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use bitcoin::Address;
-use bridge_utils::operation_store::{OperationId, OperationStore};
+use bridge_canister::memory::memory_by_id;
+use bridge_canister::operation_store::{OperationStore, OperationsMemory};
+use bridge_did::op_id::OperationId;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -22,8 +24,8 @@ use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, Ta
 use crate::core::deposit::RuneDeposit;
 use crate::interface::GetAddressError;
 use crate::memory::{
-    MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID,
+    MEMORY_MANAGER, OPERATIONS_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID,
+    OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
 };
 use crate::operation::{OperationState, RuneOperationStore};
 use crate::rune_info::RuneInfo;
@@ -236,13 +238,12 @@ pub(crate) fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
 }
 
 pub(crate) fn get_operations_store() -> RuneOperationStore {
-    let operations_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MEMORY_ID));
-    let operations_log_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_LOG_MEMORY_ID));
-    let operations_map_memory = MEMORY_MANAGER.with(|mm| mm.get(OPERATIONS_MAP_MEMORY_ID));
-    OperationStore::with_memory(
-        operations_memory,
-        operations_log_memory,
-        operations_map_memory,
-        None,
-    )
+    let mem = OperationsMemory {
+        id_counter: memory_by_id(OPERATIONS_COUNTER_MEMORY_ID),
+        incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
+        operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
+        operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
+    };
+
+    OperationStore::with_memory(mem, None)
 }

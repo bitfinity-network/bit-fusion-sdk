@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::error::{BftResult, Error};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -180,9 +181,9 @@ impl BtcBridge {
         BtcTask::CollectEvmEvents.into_scheduled(options)
     }
 
-    fn check_anonymous_principal(principal: Principal) -> bridge_did::error::Result<()> {
+    fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
         if principal == Principal::anonymous() {
-            return Err(bridge_did::error::Error::AnonymousPrincipal);
+            return Err(Error::AnonymousPrincipal);
         }
 
         Ok(())

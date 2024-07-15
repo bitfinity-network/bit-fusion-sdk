@@ -4,23 +4,29 @@ pub mod state;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::error::{BftResult, Error};
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{IcMemoryManager, MemoryId, StableBTreeMap, VirtualMemory};
+use ic_stable_structures::StableBTreeMap;
+use ic_storage::IcStorage;
 
 use self::scheduler::BridgeScheduler;
-use self::state::{State, StateMemory};
-use crate::bridge::{BftResult, Error, Operation, OperationContext};
-use crate::evm_bridge::EvmParams;
-use crate::evm_link::EvmLink;
+use self::state::config::ConfigStorage;
+use self::state::{SharedConfig, State};
+use crate::bridge::{Operation, OperationContext};
+use crate::memory::{
+    memory_by_id, StableMemory, CONFIG_MEMORY_ID, OPERATIONS_ID_COUNTER_MEMORY_ID,
+    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
+    PENDING_TASKS_MEMORY_ID,
+};
+use crate::operation_store::OperationsMemory;
 
-pub type Mem = VirtualMemory<DefaultMemoryImpl>;
-pub type RuntimeState<Op> = Rc<RefCell<State<Mem, Op>>>;
-pub type SharedConfig = state::SharedConfig<Mem>;
+pub type RuntimeState<Op> = Rc<RefCell<State<Op>>>;
 
 pub struct BridgeRuntime<Op: Operation> {
     state: RuntimeState<Op>,
-    scheduler: BridgeScheduler<Mem, Op>,
+    scheduler: BridgeScheduler<StableMemory, Op>,
 }
 
 impl<Op: Operation> BridgeRuntime<Op> {
@@ -32,7 +38,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         }
     }
 
-    pub fn update_state(&mut self, f: impl FnOnce(&mut State<Mem, Op>)) {
+    pub fn update_state(&mut self, f: impl FnOnce(&mut State<Op>)) {
         let mut state = self.state.borrow_mut();
         f(&mut state);
     }
@@ -60,35 +66,28 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
     }
 
     fn get_evm_params(&self) -> BftResult<EvmParams> {
-        self.borrow()
-            .config
-            .borrow()
-            .get_evm_params()
-            .ok_or_else(|| Error::Initialization("evm params not initialized".into()))
+        self.borrow().config.borrow().get_evm_params()
     }
 
-    fn get_signer(&self) -> impl TransactionSigner {
-        self.borrow().signer.get_transaction_signer()
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.borrow().config.borrow().get_signer()
     }
 }
 
-pub const SIGNER_MEMORY_ID: MemoryId = MemoryId::new(0);
-pub const OPERATIONS_MEMORY_ID: MemoryId = MemoryId::new(1);
-pub const OPERATIONS_LOG_MEMORY_ID: MemoryId = MemoryId::new(2);
-pub const OPERATIONS_MAP_MEMORY_ID: MemoryId = MemoryId::new(3);
-pub const PENDING_TASKS_MEMORY_ID: MemoryId = MemoryId::new(4);
+impl IcStorage for ConfigStorage {
+    fn get() -> SharedConfig {
+        CONFIG_STORAGE.with(|cell| cell.clone())
+    }
+}
 
 thread_local! {
-    pub static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
+    pub static CONFIG_STORAGE: SharedConfig =
+        Rc::new(RefCell::new(ConfigStorage::default(memory_by_id(CONFIG_MEMORY_ID))));
 }
 
-pub fn memory_by_id(id: MemoryId) -> Mem {
-    MEMORY_MANAGER.with(|mm| mm.get(id))
-}
-
-fn state_memory() -> StateMemory<Mem> {
-    StateMemory {
-        signer_memory: memory_by_id(SIGNER_MEMORY_ID),
+fn operation_storage_memory() -> OperationsMemory<StableMemory> {
+    OperationsMemory {
+        id_counter: memory_by_id(OPERATIONS_ID_COUNTER_MEMORY_ID),
         incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
         operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
         operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
@@ -96,6 +95,6 @@ fn state_memory() -> StateMemory<Mem> {
 }
 
 fn default_state<Op: Operation>(config: SharedConfig) -> RuntimeState<Op> {
-    let state = State::default(state_memory(), config);
+    let state = State::default(operation_storage_memory(), config);
     Rc::new(RefCell::new(state))
 }

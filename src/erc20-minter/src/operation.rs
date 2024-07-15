@@ -1,7 +1,8 @@
+use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::bft_events::BurntEventData;
-use bridge_utils::bridge::{self, Operation, OperationContext};
 use bridge_utils::evm_bridge::BridgeSide;
 use candid::{CandidType, Deserialize};
 use did::{H256, U256};
@@ -14,7 +15,7 @@ pub struct OperationPayload {
 }
 
 impl Operation for OperationPayload {
-    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+    async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
         todo!()
     }
 

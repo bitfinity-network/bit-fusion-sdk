@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::operation_store::{OperationStore, OperationsMemory};
+use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
-use bridge_utils::operation_store::{OperationId, OperationStore};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -18,8 +21,8 @@ use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
 use crate::memory::{
-    MEMORY_MANAGER, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID,
+    OPERATIONS_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
 };
 use crate::operation::OperationPayload;
 use crate::state::{Settings, State};
@@ -191,9 +194,9 @@ impl EvmMinter {
         get_state().borrow().config.get_bft_bridge_contract(side)
     }
 
-    fn check_anonymous_principal(principal: Principal) -> bridge_did::error::Result<()> {
+    fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
         if principal == Principal::anonymous() {
-            return Err(bridge_did::error::Error::AnonymousPrincipal);
+            return Err(Error::AnonymousPrincipal);
         }
 
         Ok(())
@@ -238,7 +241,7 @@ thread_local! {
 
     pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
         let pending_tasks =
-            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
+            TasksStorage::new(memory_by_id(PENDING_TASKS_MEMORY_ID));
             PersistentScheduler::new(pending_tasks)
     }));
 }
@@ -251,16 +254,15 @@ pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
     SCHEDULER.with(|scheduler| scheduler.clone())
 }
 
-pub fn get_operations_store() -> OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationPayload>
-{
-    MEMORY_MANAGER.with(|mm| {
-        OperationStore::with_memory(
-            mm.get(OPERATIONS_MEMORY_ID),
-            mm.get(OPERATIONS_LOG_MEMORY_ID),
-            mm.get(OPERATIONS_MAP_MEMORY_ID),
-            None,
-        )
-    })
+pub fn get_operations_store() -> OperationStore<StableMemory, OperationPayload> {
+    let mem = OperationsMemory {
+        id_counter: memory_by_id(OPERATIONS_COUNTER_MEMORY_ID),
+        incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
+        operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
+        operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
+    };
+
+    OperationStore::with_memory(mem, None)
 }
 
 #[cfg(test)]

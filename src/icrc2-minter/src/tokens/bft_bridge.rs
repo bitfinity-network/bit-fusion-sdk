@@ -1,4 +1,4 @@
-use bridge_did::error::Result;
+use bridge_did::error::BftResult;
 use did::U256;
 
 /// This structure contains data of a valid burn operation.
@@ -42,9 +42,9 @@ impl<Src, Dst> ValidBurn<Src, Dst> {
     }
 
     /// Try to convert `sender` and `src_token` fields to `NewSrc` type.
-    pub fn try_map_src<NewSrc, F>(self, mut f: F) -> Result<ValidBurn<NewSrc, Dst>>
+    pub fn try_map_src<NewSrc, F>(self, mut f: F) -> BftResult<ValidBurn<NewSrc, Dst>>
     where
-        F: FnMut(Src) -> Result<NewSrc>,
+        F: FnMut(Src) -> BftResult<NewSrc>,
     {
         Ok(ValidBurn {
             amount: self.amount,
@@ -82,9 +82,9 @@ impl<Src, Dst> ValidBurn<Src, Dst> {
     }
 
     /// Try to convert `recipient` and `dst_token` fields to `NewDst` type.
-    pub fn try_map_dst<NewDst, F>(self, mut f: F) -> Result<ValidBurn<Src, NewDst>>
+    pub fn try_map_dst<NewDst, F>(self, mut f: F) -> BftResult<ValidBurn<Src, NewDst>>
     where
-        F: FnMut(Dst) -> Result<NewDst>,
+        F: FnMut(Dst) -> BftResult<NewDst>,
     {
         Ok(ValidBurn {
             amount: self.amount,

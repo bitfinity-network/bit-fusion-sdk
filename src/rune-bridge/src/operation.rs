@@ -1,6 +1,7 @@
+use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_canister::operation_store::OperationStore;
+use bridge_did::error::BftResult;
 use bridge_utils::bft_events::BurntEventData;
-use bridge_utils::bridge::{self, Operation, OperationContext};
-use bridge_utils::operation_store::OperationStore;
 use candid::CandidType;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::VirtualMemory;
@@ -32,7 +33,7 @@ impl Operation for OperationState {
         }
     }
 
-    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+    async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
         todo!()
     }
 }

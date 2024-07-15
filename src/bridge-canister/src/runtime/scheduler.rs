@@ -1,6 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::error::{BftResult, Error};
+use bridge_did::op_id::OperationId;
 use candid::CandidType;
 use ic_stable_structures::StableBTreeMap;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
@@ -9,8 +11,7 @@ use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
-use crate::bridge::{BftResult, Operation};
-use crate::operation_store::OperationId;
+use crate::bridge::Operation;
 
 pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask<Op>>, Mem>;
 pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;
@@ -51,7 +52,7 @@ impl<Op: Operation> BridgeTask<Op> {
             BridgeTask::Operation(id, _) => {
                 let Some(operation) = ctx.borrow().operations.get(id) else {
                     log::warn!("Operation#{id} not found.");
-                    return Err(crate::bridge::Error::OperationNotFound(id));
+                    return Err(Error::OperationNotFound(id));
                 };
 
                 let new_operation = operation.progress(ctx.clone()).await?;

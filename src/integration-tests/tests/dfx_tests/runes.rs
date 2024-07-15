@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_utils::evm_link::EvmLink;
-use bridge_utils::operation_store::OperationId;
 use bridge_utils::BFTBridge;
 use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};

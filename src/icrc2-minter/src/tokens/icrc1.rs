@@ -1,13 +1,16 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use bridge_did::error::Result;
 use candid::{CandidType, Nat, Principal};
-use evm_canister_client::{CanisterClient, IcCanisterClient};
+use evm_canister_client::{CanisterClient, CanisterClientError, IcCanisterClient};
+use ic_exports::ic_kit::RejectionCode;
 use icrc_client::account::Account;
+use icrc_client::transfer::TransferError;
+use icrc_client::transfer_from::TransferFromError;
 use icrc_client::IcrcCanisterClient;
 use num_traits::ToPrimitive as _;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 const ICRC1_METADATA_DECIMALS: &str = "icrc1:decimals";
 const ICRC1_METADATA_NAME: &str = "icrc1:name";
@@ -18,7 +21,9 @@ thread_local! {
 }
 
 /// Get ICRC1 token configuration from cache if cached, otherwise fetch it and store it into the cache.
-pub async fn get_token_configuration(ic_token: Principal) -> Result<TokenConfiguration> {
+pub async fn get_token_configuration(
+    ic_token: Principal,
+) -> Result<TokenConfiguration, IcrcCanisterError> {
     if let Some(config) = TOKEN_CONFIGURATION
         .with(|token_configuration| token_configuration.borrow().get(&ic_token).cloned())
     {
@@ -56,7 +61,9 @@ pub async fn query_token_info_or_read_from_cache(token: Principal) -> Option<Tok
 }
 
 /// Get ICRC1 token configuration from token canister and store it to cache.
-pub async fn refresh_token_configuration(ic_token: Principal) -> Result<TokenConfiguration> {
+pub async fn refresh_token_configuration(
+    ic_token: Principal,
+) -> Result<TokenConfiguration, IcrcCanisterError> {
     let config = query_icrc1_configuration(ic_token).await?;
     cache_ic_token_configuration(config.clone());
     Ok(config)
@@ -78,7 +85,9 @@ pub struct TokenConfiguration {
 }
 
 /// Requests fee and minting account configuration from an ICRC-1 canister.
-async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguration> {
+async fn query_icrc1_configuration(
+    token: Principal,
+) -> Result<TokenConfiguration, IcrcCanisterError> {
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     // ICRC-1 standard metadata doesn't include a minting account, so we have to do two requests
@@ -103,34 +112,27 @@ async fn query_icrc1_configuration(token: Principal) -> Result<TokenConfiguratio
 }
 
 /// Requests token info from an ICRC-1 canister using `icrc1_metadata` query.
-async fn query_icrc1_token_info<C>(client: &IcrcCanisterClient<C>) -> Result<TokenInfo>
+async fn query_icrc1_token_info<C>(
+    client: &IcrcCanisterClient<C>,
+) -> Result<TokenInfo, IcrcCanisterError>
 where
     C: CanisterClient,
 {
     let token_metadata = client.icrc1_metadata().await?;
     let name = match get_metadata_value(&token_metadata, ICRC1_METADATA_NAME) {
         Some(icrc_client::Value::Text(name)) => name.clone(),
-        _ => {
-            return Err(bridge_did::error::Error::Internal(
-                "Bad icrc1 metadata".to_string(),
-            ))
-        }
+        _ => return Err(IcrcCanisterError::Generic("Bad icrc1 metadata".to_string())),
     };
     let symbol = match get_metadata_value(&token_metadata, ICRC1_METADATA_SYMBOL) {
         Some(icrc_client::Value::Text(symbol)) => symbol.clone(),
-        _ => {
-            return Err(bridge_did::error::Error::Internal(
-                "Bad icrc1 metadata".to_string(),
-            ))
-        }
+        _ => return Err(IcrcCanisterError::Generic("Bad icrc1 metadata".to_string())),
     };
     let decimals = match get_metadata_value(&token_metadata, ICRC1_METADATA_DECIMALS) {
-        Some(icrc_client::Value::Nat(decimals)) => decimals.0.to_u8().ok_or(
-            bridge_did::error::Error::Internal("Bad icrc1 metadata".to_string()),
-        ),
-        _ => Err(bridge_did::error::Error::Internal(
-            "Bad icrc1 metadata".to_string(),
-        )),
+        Some(icrc_client::Value::Nat(decimals)) => decimals
+            .0
+            .to_u8()
+            .ok_or(IcrcCanisterError::Generic("Bad icrc1 metadata".to_string())),
+        _ => Err(IcrcCanisterError::Generic("Bad icrc1 metadata".to_string())),
     }?;
 
     Ok(TokenInfo {
@@ -276,5 +278,45 @@ mod test {
         {
             unimplemented!()
         }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum IcrcCanisterError {
+    #[error("failed to transfer ICRC token: {0}")]
+    TransferFailed(TransferError),
+
+    #[error("failed to transfer from ICRC token: {0:?}")]
+    TransferFromFailed(TransferFromError),
+
+    #[error("failed to call ICRC canister: {0:?} with message: {1}")]
+    CanisterError(RejectionCode, String),
+
+    #[error("candid failure: {0}")]
+    CandidFailed(candid::Error),
+
+    #[error("candid failure: {0}")]
+    Generic(String),
+}
+
+impl From<CanisterClientError> for IcrcCanisterError {
+    fn from(value: CanisterClientError) -> Self {
+        match value {
+            CanisterClientError::CanisterError(e) => Self::CanisterError(e.0, e.1),
+            CanisterClientError::CandidError(e) => Self::CandidFailed(e),
+            e => Self::Generic(e.to_string()),
+        }
+    }
+}
+
+impl From<TransferError> for IcrcCanisterError {
+    fn from(value: TransferError) -> Self {
+        Self::TransferFailed(value)
+    }
+}
+
+impl From<TransferFromError> for IcrcCanisterError {
+    fn from(value: TransferFromError) -> Self {
+        Self::TransferFromFailed(value)
     }
 }

@@ -2,32 +2,35 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use bridge_did::error::{Error, Result};
+use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
+use bridge_utils::evm_link::EvmLink;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
 };
+use ic_exports::ic_kit::ic;
 use ic_log::writer::Logs;
 use ic_task_scheduler::task::TaskOptions;
 use log::{debug, info};
 
+use crate::inspect;
 use crate::log_config::LoggerConfigService;
-use crate::BridgeCore;
+use crate::runtime::state::config::ConfigStorage;
 
 /// Common API of all bridge canisters.
 pub trait BridgeCanister: Canister {
     /// Gets the bridge core state.
     #[state_getter]
-    fn core(&self) -> Rc<RefCell<BridgeCore>>;
+    fn config(&self) -> Rc<RefCell<ConfigStorage>>;
 
     /// Gets the logs
     /// - `count` is the number of logs to return
     #[query(trait = true)]
-    fn ic_logs(&self, count: usize, offset: usize) -> Result<Logs> {
-        self.core().borrow().inspect_ic_logs();
+    fn ic_logs(&self, count: usize, offset: usize) -> BftResult<Logs> {
+        inspect::inspect_ic_logs(self.config());
         Ok(ic_log::take_memory_records(count, offset))
     }
 
@@ -37,8 +40,8 @@ pub trait BridgeCanister: Canister {
     /// - info
     /// - debug,crate1::mod1=error,crate1::mod2,crate2=debug
     #[update(trait = true)]
-    fn set_logger_filter(&mut self, filter: String) -> Result<()> {
-        self.core().borrow().inspect_set_logger_filter();
+    fn set_logger_filter(&mut self, filter: String) -> BftResult<()> {
+        inspect::inspect_set_logger_filter(self.config());
         LoggerConfigService.set_logger_filter(&filter)?;
 
         debug!("updated logger filter to {filter}");
@@ -49,7 +52,7 @@ pub trait BridgeCanister: Canister {
     /// Returns principal of canister owner.
     #[query(trait = true)]
     fn get_owner(&self) -> Principal {
-        self.core().borrow().config.get_owner()
+        self.config().borrow().get_owner()
     }
 
     /// Sets a new principal for canister owner.
@@ -58,7 +61,7 @@ pub trait BridgeCanister: Canister {
     /// else `Error::NotAuthorised` will be returned.
     #[update(trait = true)]
     fn set_owner(&mut self, owner: Principal) {
-        let core = self.core();
+        let core = self.config();
         core.borrow_mut().set_owner(owner);
 
         info!("Bridge canister owner changed to {owner}");
@@ -67,7 +70,11 @@ pub trait BridgeCanister: Canister {
     /// Returns principal of EVM canister with which the minter canister works.
     #[query(trait = true)]
     fn get_evm_principal(&self) -> Principal {
-        self.core().borrow().config.get_evm_principal()
+        let link = self.config().borrow().get_evm_link();
+        match link {
+            EvmLink::Ic(principal) => principal,
+            _ => ic::trap("expected evm canister link in config"),
+        }
     }
 
     /// Sets principal of EVM canister with which the minter canister works.
@@ -76,9 +83,9 @@ pub trait BridgeCanister: Canister {
     /// else `Error::NotAuthorised` will be returned.
     #[update(trait = true)]
     fn set_evm_principal(&mut self, evm: Principal) {
-        let core = self.core();
-        core.borrow().inspect_set_evm_principal();
-        core.borrow_mut().config.set_evm_principal(evm);
+        let core = self.config();
+        inspect::inspect_set_evm_principal(self.config());
+        core.borrow_mut().set_evm_link(EvmLink::Ic(evm));
 
         info!("Bridge canister EVM principal changed to {evm}");
     }
@@ -87,17 +94,15 @@ pub trait BridgeCanister: Canister {
     /// If contract isn't initialized yet - returns None.
     #[query(trait = true)]
     fn get_bft_bridge_contract(&mut self) -> Option<H160> {
-        self.core().borrow().config.get_bft_bridge_contract()
+        self.config().borrow().get_bft_bridge_contract()
     }
 
     /// Set BFT bridge contract address.
     #[update(trait = true)]
     fn set_bft_bridge_contract(&mut self, address: H160) {
-        let core = self.core();
-        core.borrow().inspect_set_bft_bridge_contract();
-        core.borrow_mut()
-            .config
-            .set_bft_bridge_contract(Some(address.clone()));
+        let core = self.config();
+        inspect::inspect_set_bft_bridge_contract(self.config());
+        core.borrow_mut().set_bft_bridge_contract(address.clone());
 
         info!("Bridge canister BFT bridge contract address changed to {address}");
     }
@@ -105,12 +110,11 @@ pub trait BridgeCanister: Canister {
     /// Returns evm_address of the minter canister.
     #[allow(async_fn_in_trait)]
     #[update(trait = true)]
-    async fn get_bridge_canister_evm_address(&mut self) -> Result<H160> {
-        let signer = self.core().borrow().get_transaction_signer();
-        signer
-            .get_address()
-            .await
-            .map_err(|e| Error::Internal(format!("failed to get minter canister address: {e}")))
+    async fn get_bridge_canister_evm_address(&mut self) -> BftResult<H160> {
+        let signer = self.config().borrow().get_signer()?;
+        signer.get_address().await.map_err(|e| {
+            Error::Initialization(format!("failed to get minter canister address: {e}"))
+        })
     }
 
     /// Initialize the bridge with the given parameters.
@@ -124,7 +128,9 @@ pub trait BridgeCanister: Canister {
         init_data: BridgeInitData,
         _run_scheduler: impl Fn(TaskOptions) + 'static,
     ) {
-        self.core().borrow_mut().init(&init_data);
+        inspect::inspect_new_owner_is_valid(init_data.owner);
+
+        self.config().borrow_mut().init(&init_data);
 
         if let Some(log_settings) = &init_data.log_settings {
             // Since this code is only run on initialization, we want to fail canister setup if
@@ -143,8 +149,6 @@ pub trait BridgeCanister: Canister {
     /// Re-initializes the bridge after upgrade. This method should be called from the `#[post-upgrade]`
     /// method.
     fn bridge_post_upgrade(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
-        self.core().borrow_mut().reload();
-
         if let Err(err) = LoggerConfigService.reload() {
             ic_exports::ic_cdk::println!("Error configuring the logger. Err: {err:?}")
         }
@@ -196,10 +200,11 @@ mod tests {
     }
 
     impl BridgeCanister for TestBridge {
-        fn core(&self) -> Rc<RefCell<BridgeCore>> {
-            BridgeCore::get()
+        fn config(&self) -> Rc<RefCell<ConfigStorage>> {
+            ConfigStorage::get()
         }
     }
+
     impl PreUpdate for TestBridge {}
 
     fn owner() -> Principal {
@@ -378,9 +383,10 @@ mod tests {
         let mut canister = init_canister().await;
         inject::get_context().update_id(owner());
 
-        let evm_address = canister_call!(canister.get_bridge_canister_evm_address(), Result<H160>)
-            .await
-            .unwrap();
+        let evm_address =
+            canister_call!(canister.get_bridge_canister_evm_address(), BftResult<H160>)
+                .await
+                .unwrap();
 
         assert!(evm_address.is_ok());
         assert_ne!(evm_address.unwrap(), H160::default());

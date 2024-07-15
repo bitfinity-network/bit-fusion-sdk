@@ -1,8 +1,9 @@
+use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::bft_events::BurntEventData;
-use bridge_utils::bridge::{self, Operation, OperationContext};
 use candid::{CandidType, Nat, Principal};
 use did::{H256, U256};
 use icrc_client::account::Account;
@@ -24,7 +25,7 @@ impl Operation for OperationState {
         }
     }
 
-    async fn progress(self, _ctx: impl OperationContext) -> Result<Self, bridge::Error> {
+    async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
         todo!()
     }
 }

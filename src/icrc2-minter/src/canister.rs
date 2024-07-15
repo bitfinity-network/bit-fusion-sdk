@@ -1,12 +1,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::{BridgeCanister, BridgeCore};
-use bridge_did::error::{Error, Result};
+use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::operation_store::{OperationStore, OperationsMemory};
+use bridge_canister::runtime::state::config::ConfigStorage;
+use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::BridgeCanister;
+use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
-use bridge_utils::operation_store::{OperationId, OperationStore};
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -24,8 +28,8 @@ use ic_task_scheduler::task::{InnerScheduledTask, TaskOptions, TaskStatus};
 use log::*;
 
 use crate::constant::{
-    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID,
+    OPERATIONS_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
 };
 use crate::memory::MEMORY_MANAGER;
 use crate::operation::OperationState;
@@ -46,8 +50,8 @@ impl PreUpdate for MinterCanister {
 }
 
 impl BridgeCanister for MinterCanister {
-    fn core(&self) -> Rc<RefCell<BridgeCore>> {
-        BridgeCore::get()
+    fn config(&self) -> SharedConfig {
+        ConfigStorage::get()
     }
 }
 
@@ -122,7 +126,7 @@ impl MinterCanister {
 
     /// Adds the provided principal to the whitelist.
     #[update]
-    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
         let state = get_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
@@ -136,7 +140,7 @@ impl MinterCanister {
 
     /// Remove a icrc2 principal token from the access list
     #[update]
-    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> Result<()> {
+    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
         let state = get_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
@@ -157,7 +161,7 @@ impl MinterCanister {
     fn access_control_inspect_message_check(
         owner: Principal,
         icrc2_principal: Principal,
-    ) -> Result<()> {
+    ) -> BftResult<()> {
         inspect_check_is_owner(owner)?;
         check_anonymous_principal(icrc2_principal)?;
 
@@ -217,18 +221,18 @@ impl Metrics for MinterCanister {
 }
 
 /// inspect function to check whether provided principal is owner
-fn inspect_check_is_owner(principal: Principal) -> Result<()> {
-    let owner = BridgeCore::get().borrow().config.get_owner();
+fn inspect_check_is_owner(principal: Principal) -> BftResult<()> {
+    let owner = ConfigStorage::get().borrow().get_owner();
 
     if owner != principal {
-        return Err(Error::NotAuthorized);
+        return Err(Error::AccessDenied);
     }
 
     Ok(())
 }
 
 /// inspect function to check whether the provided principal is anonymous
-fn check_anonymous_principal(principal: Principal) -> Result<()> {
+fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
     if principal == Principal::anonymous() {
         return Err(Error::AnonymousPrincipal);
     }
@@ -278,15 +282,15 @@ pub fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
 }
 
-pub fn get_operations_store() -> OperationStore<VirtualMemory<DefaultMemoryImpl>, OperationState> {
-    MEMORY_MANAGER.with(|mm| {
-        OperationStore::with_memory(
-            mm.get(OPERATIONS_MEMORY_ID),
-            mm.get(OPERATIONS_LOG_MEMORY_ID),
-            mm.get(OPERATIONS_MAP_MEMORY_ID),
-            None,
-        )
-    })
+pub fn get_operations_store() -> OperationStore<StableMemory, OperationState> {
+    let mem = OperationsMemory {
+        id_counter: memory_by_id(OPERATIONS_COUNTER_MEMORY_ID),
+        incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
+        operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
+        operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
+    };
+
+    OperationStore::with_memory(mem, None)
 }
 
 #[cfg(test)]

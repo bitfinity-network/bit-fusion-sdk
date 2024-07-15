@@ -1,71 +1,21 @@
 //! Abstract stable storage for user-initiated operations in bridge canisters. It can be used
 //! to track an operation status and retrieve all operations for a given user ETH wallet.
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
 
+use std::borrow::Cow;
+
+use bridge_did::op_id::OperationId;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
-use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
+use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
-    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, IcMemoryManager, MemoryId,
-    StableBTreeMap, StableCell, Storable, VirtualMemory,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, StableBTreeMap, StableCell,
+    Storable,
 };
-use serde::Serialize;
 
 use crate::bridge::Operation;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
-
-pub const OPERATION_ID_MEMORY_ID: MemoryId = MemoryId::new(253);
-thread_local! {
-    static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
-    static OPERATION_ID_COUNTER: RefCell<StableCell<u64, VirtualMemory<DefaultMemoryImpl>>> =
-        RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(OPERATION_ID_MEMORY_ID)), 0)
-            .expect("failed to initialize operation id cell"));
-}
-
-/// Unique ID of an operation.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, CandidType, Deserialize, Serialize, Hash,
-)]
-pub struct OperationId(u64);
-
-impl OperationId {
-    fn next() -> Self {
-        let id = OPERATION_ID_COUNTER.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let id = *cell.get();
-            cell.set(id + 1).expect("failed to update nonce counter");
-            id
-        });
-        Self(id)
-    }
-
-    /// Returns a unique `nonce` value for given operation ID.
-    pub fn nonce(&self) -> u32 {
-        (self.0 % u32::MAX as u64) as u32
-    }
-}
-
-impl Storable for OperationId {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        self.0.to_bytes()
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Self(u64::from_bytes(bytes))
-    }
-
-    const BOUND: Bound = <u64 as Storable>::BOUND;
-}
-
-impl Display for OperationId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 struct OperationStoreEntry<P>
@@ -122,6 +72,14 @@ impl Default for OperationStoreOptions {
     }
 }
 
+/// Memory objects to store operations.
+pub struct OperationsMemory<Mem> {
+    pub id_counter: Mem,
+    pub incomplete_operations: Mem,
+    pub operations_log: Mem,
+    pub operations_map: Mem,
+}
+
 /// A structure to store user-initiated operations in IC stable memory.
 ///
 /// Every operation in the store is attached to a ETH wallet address that initiated the operation.
@@ -134,6 +92,7 @@ where
     M: Memory,
     P: Operation,
 {
+    operation_id_counter: StableCell<OperationId, M>,
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
@@ -147,27 +106,38 @@ where
 {
     /// Creates a new instance of the store.
     pub fn with_memory(
-        curr_operations_memory: M,
-        operations_log_memory: M,
-        map_memory: M,
+        memory: OperationsMemory<M>,
         options: Option<OperationStoreOptions>,
     ) -> Self {
         let options = options.unwrap_or_default();
         Self {
+            operation_id_counter: StableCell::new(memory.id_counter, OperationId::default())
+                .expect("failed to initialize operation id counter"),
             incomplete_operations: CachedStableBTreeMap::new(
-                curr_operations_memory,
+                memory.incomplete_operations,
                 options.cache_size,
             ),
-            operations_log: StableBTreeMap::new(operations_log_memory),
-            address_operation_map: StableBTreeMap::new(map_memory),
+            operations_log: StableBTreeMap::new(memory.operations_log),
+            address_operation_map: StableBTreeMap::new(memory.operations_map),
             max_operation_log_size: options.max_operations_count,
         }
+    }
+
+    /// Returns next OperationId.
+    fn next_operation_id(&mut self) -> OperationId {
+        let current = *self.operation_id_counter.get();
+
+        self.operation_id_counter
+            .set(current.next())
+            .expect("failed to update operation id counter");
+
+        current
     }
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
     pub fn new_operation(&mut self, dst_address: H160, payload: P) -> OperationId {
-        let id = OperationId::next();
+        let id = self.next_operation_id();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
@@ -282,6 +252,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::error::BftResult;
     use ic_stable_structures::VectorMemory;
 
     use super::*;
@@ -293,16 +264,20 @@ mod tests {
             *self == COMPLETE
         }
 
-        async fn progress(self, _ctx: impl OperationContext) -> Result<Self, crate::bridge::Error> {
+        async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
             todo!()
         }
     }
 
     fn test_store(max_operations: u64) -> OperationStore<VectorMemory, u32> {
+        let memory = OperationsMemory {
+            id_counter: VectorMemory::default(),
+            incomplete_operations: VectorMemory::default(),
+            operations_log: VectorMemory::default(),
+            operations_map: VectorMemory::default(),
+        };
         OperationStore::with_memory(
-            VectorMemory::default(),
-            VectorMemory::default(),
-            VectorMemory::default(),
+            memory,
             Some(OperationStoreOptions {
                 max_operations_count: max_operations,
                 cache_size: DEFAULT_CACHE_SIZE,
@@ -312,34 +287,6 @@ mod tests {
 
     fn eth_address(seed: u8) -> H160 {
         H160::from([seed; H160::BYTE_SIZE])
-    }
-
-    #[test]
-    fn nonce_should_increment_with_id() {
-        const CHECKS_NUM: usize = 100;
-        let id1 = OperationId::next();
-        for _ in 0..CHECKS_NUM {
-            let id2 = OperationId::next();
-            assert_ne!(id1, id2);
-            assert_ne!(id1.nonce(), id2.nonce());
-        }
-    }
-
-    #[test]
-    fn nonce_should_not_overflow() {
-        OPERATION_ID_COUNTER.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let id = u32::MAX as u64 * 3 - 3;
-            cell.set(id).unwrap();
-        });
-
-        const CHECKS_NUM: usize = 100;
-        let id1 = OperationId::next();
-        for _ in 0..CHECKS_NUM {
-            let id2 = OperationId::next();
-            assert_ne!(id1, id2);
-            assert_ne!(id1.nonce(), id2.nonce());
-        }
     }
 
     #[test]

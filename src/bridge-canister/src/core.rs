@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_did::error::Result;
+use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
 use bridge_utils::evm_bridge::EvmParams;
 use candid::Principal;
@@ -13,6 +13,8 @@ use ic_storage::IcStorage;
 
 use crate::config::BridgeConfig;
 use crate::signer::SignerStorage;
+
+pub type SharedCore = Rc<RefCell<BridgeCore>>;
 
 /// State of the bridge canister.
 ///
@@ -134,11 +136,11 @@ impl BridgeCore {
 }
 
 impl IcStorage for BridgeCore {
-    fn get() -> Rc<RefCell<Self>> {
+    fn get() -> SharedCore {
         CORE.with(|cell| cell.clone())
     }
 }
 
 thread_local! {
-    pub static CORE: Rc<RefCell<BridgeCore>> = Rc::default();
+    pub static CORE: SharedCore = Rc::default();
 }

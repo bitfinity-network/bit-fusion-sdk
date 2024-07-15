@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use alloy_sol_types::SolConstructor;
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_utils::evm_bridge::BridgeSide;
 use did::{H160, H256, U256, U64};
@@ -193,10 +194,7 @@ async fn create_bft_bridge(ctx: &DfxTestContext, side: BridgeSide, fee_charge: H
     let minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
 
     let hash = minter_client
-        .update::<_, bridge_did::error::Result<H256>>(
-            "init_bft_bridge_contract",
-            (side, fee_charge),
-        )
+        .update::<_, BftResult<H256>>("init_bft_bridge_contract", (side, fee_charge))
         .await
         .unwrap()
         .unwrap();

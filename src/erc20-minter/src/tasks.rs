@@ -4,10 +4,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::MintOrder;
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
-use bridge_utils::operation_store::OperationId;
 use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;

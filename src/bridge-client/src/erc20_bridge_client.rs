@@ -1,4 +1,4 @@
-use bridge_utils::operation_store::OperationId;
+use bridge_did::op_id::OperationId;
 use did::H160;
 use erc20_minter::operation::OperationPayload;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
