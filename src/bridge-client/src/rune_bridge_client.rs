@@ -3,7 +3,7 @@ use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use rune_bridge::operation::OperationState;
 
-use crate::context::bridge_client::BridgeCanisterClient;
+use crate::bridge_client::BridgeCanisterClient;
 
 pub struct RuneBridgeClient<C> {
     client: C,

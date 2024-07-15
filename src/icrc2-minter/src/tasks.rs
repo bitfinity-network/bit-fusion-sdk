@@ -4,6 +4,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_canister::BridgeCore;
+use bridge_did::error::Error;
+use bridge_did::id256::Id256;
+use bridge_did::order::{self, MintOrder};
+use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
@@ -14,6 +19,7 @@ use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::types::Log;
 use ic_exports::ic_kit::{ic, RejectionCode};
+use ic_storage::IcStorage;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, Task, TaskOptions};
@@ -21,16 +27,11 @@ use ic_task_scheduler::SchedulerError;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use jsonrpc_core::Id;
-use minter_did::error::Error;
-use minter_did::id256::Id256;
-use minter_did::order::{self, MintOrder};
-use minter_did::reason::{ApproveAfterMint, Icrc2Burn};
 use serde::{Deserialize, Serialize};
 
 use crate::canister::get_operations_store;
 use crate::constant::IC_CHAIN_ID;
 use crate::operation::{DepositOperationState, OperationState, WithdrawalOperationState};
-use crate::state::State;
 use crate::tokens::icrc2::Success;
 use crate::tokens::{icrc1, icrc2};
 
@@ -78,7 +79,6 @@ impl Drop for CollectLogsLock {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BridgeTask {
-    InitEvmInfo,
     CollectEvmEvents,
     BurnIcrc2Tokens(MinterOperationId),
     PrepareMintOrder(MinterOperationId),
@@ -92,22 +92,21 @@ impl Task for BridgeTask {
         &self,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
-        let state = crate::canister::get_state();
+        let core = BridgeCore::get();
         match self {
-            BridgeTask::InitEvmInfo => Box::pin(Self::init_evm_info(state)),
-            BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(state, scheduler)),
+            BridgeTask::CollectEvmEvents => Box::pin(Self::collect_evm_events(core, scheduler)),
             BridgeTask::BurnIcrc2Tokens(operation_id) => {
                 Box::pin(Self::burn_icrc2_tokens(scheduler, *operation_id))
             }
             BridgeTask::PrepareMintOrder(operation_id) => {
-                Box::pin(Self::prepare_mint_order(state, scheduler, *operation_id))
+                Box::pin(Self::prepare_mint_order(core, scheduler, *operation_id))
             }
             BridgeTask::RemoveMintOrder(data) => {
                 let data = data.clone();
                 Box::pin(async move { Self::remove_mint_order(data) })
             }
             BridgeTask::SendMintTransaction(operation_id) => {
-                Box::pin(Self::send_mint_transaction(state, *operation_id))
+                Box::pin(Self::send_mint_transaction(core, *operation_id))
             }
             BridgeTask::MintIcrc2Tokens(operation_id) => {
                 Box::pin(Self::mint_icrc2(*operation_id, scheduler))
@@ -121,12 +120,12 @@ impl BridgeTask {
         ScheduledTask::with_options(self, options)
     }
 
-    pub async fn init_evm_info(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
+    pub async fn init_evm_info(core: Rc<RefCell<BridgeCore>>) -> Result<EvmParams, SchedulerError> {
         log::trace!("evm info initialization started");
 
-        let client = state.borrow().config.get_evm_client();
+        let client = core.borrow().config.get_evm_client();
         let address = {
-            let signer = state.borrow().signer.get_transaction_signer();
+            let signer = core.borrow().get_transaction_signer();
             signer.get_address().await.into_scheduler_result()?
         };
 
@@ -134,18 +133,16 @@ impl BridgeTask {
             .await
             .into_scheduler_result()?;
 
-        state
-            .borrow_mut()
-            .config
-            .update_evm_params(|p| *p = evm_params);
+        core.borrow_mut()
+            .update_evm_params(|p| *p = evm_params.clone());
 
         log::trace!("evm parameters initialized");
 
-        Ok(())
+        Ok(evm_params)
     }
 
     async fn collect_evm_events(
-        state: Rc<RefCell<State>>,
+        core: Rc<RefCell<BridgeCore>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Result<(), SchedulerError> {
         // We need to get a local variable for the lock here to make sure it's not dropped immediately.
@@ -156,14 +153,17 @@ impl BridgeTask {
 
         log::trace!("collecting evm events");
 
-        let client = state.borrow().config.get_evm_client();
-        let Some(params) = state.borrow().config.get_evm_params() else {
-            log::warn!("no evm parameters set, unable to collect events");
-            return Err(SchedulerError::TaskExecutionFailed(
-                "no evm parameters set".into(),
-            ));
+        let client = core.borrow().get_evm_client();
+        let evm_params = core.borrow().get_evm_params();
+        let params = match evm_params {
+            Some(params) => params,
+            None => {
+                log::info!("No evm parameters set, trying to initialize evm info");
+                Self::init_evm_info(core.clone()).await?
+            }
         };
-        let Some(bridge_contract) = state.borrow().config.get_bft_bridge_contract() else {
+
+        let Some(bridge_contract) = core.borrow().config.get_bft_bridge_contract() else {
             log::warn!("no bft bridge contract set, unable to collect events");
             return Err(SchedulerError::TaskExecutionFailed(
                 "no bft bridge contract set".into(),
@@ -184,9 +184,7 @@ impl BridgeTask {
 
         log::debug!("Got evm logs between blocks {} and {last_request_block} (last chain block is {last_chain_block}: {logs:?}", params.next_block);
 
-        state
-            .borrow_mut()
-            .config
+        core.borrow_mut()
             .update_evm_params(|params| params.next_block = last_request_block + 1);
 
         log::trace!("appending logs to tasks: {logs:?}");
@@ -194,7 +192,7 @@ impl BridgeTask {
         scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
 
         // Update EVM params
-        Self::update_evm_params(state.clone()).await?;
+        Self::update_evm_params(core.clone()).await?;
 
         // This line is not necessary as the lock variable will not be dropped anyway only at the
         // end of the function or on any early return from the function. But I couldn't find
@@ -294,7 +292,7 @@ impl BridgeTask {
     }
 
     async fn prepare_mint_order(
-        state: Rc<RefCell<State>>,
+        core: Rc<RefCell<BridgeCore>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
@@ -318,7 +316,7 @@ impl BridgeTask {
 
         log::trace!("preparing mint order. Is deposit: {is_deposit}: {burnt_data:?}");
 
-        let Some(evm_params) = state.borrow().config.get_evm_params() else {
+        let Some(evm_params) = core.borrow().get_evm_params() else {
             log::warn!("no evm parameters set, unable to prepare mint order");
             return Err(SchedulerError::TaskExecutionFailed(
                 "no evm parameters set".into(),
@@ -326,7 +324,7 @@ impl BridgeTask {
         };
 
         let sender_chain_id = IC_CHAIN_ID;
-        let recipient_chain_id = evm_params.chain_id as u32;
+        let recipient_chain_id = evm_params.chain_id;
 
         let sender = Id256::from(&burnt_data.sender);
         let src_token = Id256::from(&burnt_data.src_token);
@@ -361,7 +359,7 @@ impl BridgeTask {
 
         log::debug!("PREPARED MINT ORDER: {:?}", mint_order);
 
-        let signer = state.borrow().signer.get_transaction_signer();
+        let signer = core.borrow().get_transaction_signer();
         let signed_mint_order = mint_order
             .encode_and_sign(&signer)
             .await
@@ -389,7 +387,7 @@ impl BridgeTask {
 
         if should_send_mint_tx {
             // Update EVM params before sending the transaction.
-            Self::update_evm_params(state.clone()).await?;
+            Self::update_evm_params(core.clone()).await?;
 
             let options = TaskOptions::default();
             scheduler
@@ -525,7 +523,7 @@ impl BridgeTask {
     }
 
     async fn send_mint_transaction(
-        state: Rc<RefCell<State>>,
+        core: Rc<RefCell<BridgeCore>>,
         operation_id: MinterOperationId,
     ) -> Result<(), SchedulerError> {
         log::trace!("Sending mint transaction");
@@ -556,15 +554,15 @@ impl BridgeTask {
             }
         };
 
-        let signer = state.borrow().signer.get_transaction_signer();
+        let signer = core.borrow().get_transaction_signer();
         let sender = signer.get_address().await.into_scheduler_result()?;
-        let Some(bridge_contract) = state.borrow().config.get_bft_bridge_contract() else {
+        let Some(bridge_contract) = core.borrow().config.get_bft_bridge_contract() else {
             log::warn!("Bridge contract is not set");
             return Err(SchedulerError::TaskExecutionFailed(
                 "Bridge contract is not set".into(),
             ));
         };
-        let Some(evm_params) = state.borrow().config.get_evm_params() else {
+        let Some(evm_params) = core.borrow().get_evm_params() else {
             log::warn!("No evm parameters set");
             return Err(SchedulerError::TaskExecutionFailed(
                 "No evm parameters set".into(),
@@ -589,7 +587,7 @@ impl BridgeTask {
         tx.v = signature.v.0;
         tx.hash = tx.hash();
 
-        let client = state.borrow().config.get_evm_client();
+        let client = core.borrow().config.get_evm_client();
         let tx_id = client
             .send_raw_transaction(tx)
             .await
@@ -733,10 +731,10 @@ impl BridgeTask {
         }
     }
 
-    pub async fn update_evm_params(state: Rc<RefCell<State>>) -> Result<(), SchedulerError> {
-        let client = state.borrow().config.get_evm_client();
+    pub async fn update_evm_params(core: Rc<RefCell<BridgeCore>>) -> Result<(), SchedulerError> {
+        let client = core.borrow().config.get_evm_client();
 
-        let Some(initial_params) = state.borrow().config.get_evm_params() else {
+        let Some(initial_params) = core.borrow().get_evm_params() else {
             log::warn!("no evm parameters set, unable to update");
             return Err(SchedulerError::TaskExecutionFailed(
                 "no evm parameters set".into(),
@@ -744,7 +742,7 @@ impl BridgeTask {
         };
 
         let address = {
-            let signer = state.borrow().signer.get_transaction_signer();
+            let signer = core.borrow().get_transaction_signer();
             signer.get_address().await.into_scheduler_result()?
         };
 
@@ -775,7 +773,7 @@ impl BridgeTask {
             ..initial_params
         };
 
-        state.borrow_mut().config.update_evm_params(|p| *p = params);
+        core.borrow_mut().update_evm_params(|p| *p = params);
         log::trace!("evm params updated");
 
         Ok(())

@@ -12,9 +12,9 @@ impl<M: Memory> AccessList<M> {
             access_list: StableBTreeMap::new(m),
         }
     }
-    pub fn add(&mut self, principal: Principal) -> minter_did::error::Result<()> {
+    pub fn add(&mut self, principal: Principal) -> bridge_did::error::Result<()> {
         if principal == Principal::anonymous() {
-            return Err(minter_did::error::Error::AnonymousPrincipal);
+            return Err(bridge_did::error::Error::AnonymousPrincipal);
         }
 
         self.access_list.insert(principal, ());
@@ -22,7 +22,7 @@ impl<M: Memory> AccessList<M> {
         Ok(())
     }
 
-    pub fn batch_add(&mut self, principals: &[Principal]) -> minter_did::error::Result<()> {
+    pub fn batch_add(&mut self, principals: &[Principal]) -> bridge_did::error::Result<()> {
         for principal in principals {
             self.add(*principal)?;
         }

@@ -11,6 +11,7 @@ export-api = []
 [dependencies]
 alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
+bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 did = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
@@ -28,7 +29,6 @@ jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 ethers-core = { workspace = true }
-minter-did = { workspace = true }
 bridge-utils = { path = "../bridge-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }

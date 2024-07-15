@@ -1,3 +1,4 @@
+use bridge_did::error::{Error, Result};
 use evm_canister_client::IcCanisterClient;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
@@ -5,7 +6,6 @@ use icrc_client::account::{Account, Subaccount};
 use icrc_client::transfer::{TransferArg, TransferError};
 use icrc_client::transfer_from::{TransferFromArgs, TransferFromError};
 use icrc_client::IcrcCanisterClient;
-use minter_did::error::{Error, Result};
 use serde::Deserialize;
 
 use super::icrc1::{self, get_token_configuration};

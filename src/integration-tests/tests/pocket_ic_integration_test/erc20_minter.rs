@@ -1,6 +1,9 @@
 use std::time::Duration;
 
 use alloy_sol_types::{SolCall, SolConstructor};
+use bridge_client::BridgeCanisterClient;
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
@@ -9,11 +12,8 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_stable_structures::Storable as _;
-use minter_did::id256::Id256;
-use minter_did::order::SignedMintOrder;
 
 use super::PocketIcTestContext;
-use crate::context::bridge_client::BridgeCanisterClient;
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
 use crate::utils::CHAIN_ID;
@@ -228,14 +228,14 @@ async fn test_external_bridging() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
     let burn_operation_id = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
@@ -252,7 +252,7 @@ async fn test_external_bridging() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let balance = ctx
@@ -355,14 +355,14 @@ async fn native_token_deposit_increase_and_decrease() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 10)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
     // Perform an operation to pay a fee for it.
     let (burn_operation_id, _) = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
@@ -378,7 +378,7 @@ async fn native_token_deposit_increase_and_decrease() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
@@ -441,14 +441,14 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 25)
         .await;
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
     let burn_operation_id = ctx
         .context
-        .burn_erc_20_tokens(
+        .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
             &ctx.base_token_address,
@@ -465,7 +465,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 8)
+        .advance_by_times(Duration::from_secs(2), 25)
         .await;
 
     let balance = ctx
@@ -507,11 +507,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .unwrap();
 
     // Wait for mint tx finishing and mint order removing
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
-    ctx.context.advance_time(Duration::from_secs(2)).await;
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 10)
+        .await;
 
     // check mint order removed after successful mint
     let signed_order = erc20_minter_client

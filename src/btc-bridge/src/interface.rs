@@ -1,8 +1,8 @@
+use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
-use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
 use crate::ck_btc_interface::{PendingUtxo, UpdateBalanceError};

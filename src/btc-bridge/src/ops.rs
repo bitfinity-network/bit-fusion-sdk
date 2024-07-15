@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_did::id256::Id256;
+use bridge_did::order::{MintOrder, SignedMintOrder};
 use candid::{Nat, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -11,8 +13,6 @@ use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
-use minter_did::id256::Id256;
-use minter_did::order::{MintOrder, SignedMintOrder};
 
 use crate::canister::{eth_address_to_subaccount, get_scheduler};
 use crate::ck_btc_interface::{

@@ -2,6 +2,7 @@
 source "$(dirname "$0")/deploy/deploy_functions.sh"
 
 set -e
+set -x
 
 start_icx() {
     killall icx-proxy
@@ -105,7 +106,7 @@ ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ET
 FEE_CHARGE_DEPLOY_TX_NONCE=0
 FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
-res=$(dfx canister call icrc2-minter get_minter_canister_evm_address)
+res=$(dfx canister call icrc2-minter get_bridge_canister_evm_address)
 res=${res#*\"}
 ICRC2_MINTER_ECDSA_ADDRESS=${res%\"*}
 

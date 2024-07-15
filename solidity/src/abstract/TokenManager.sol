@@ -11,7 +11,7 @@ abstract contract TokenManager is Initializable {
     using SafeERC20 for IERC20;
 
     // Indicates whether this contract is on the wrapped side
-    bool public _isWrappedSide;
+    bool public isWrappedSide;
 
     /// Mapping from `base token id` (can be anything, also ERC20 address) to Wrapped tokens ERC20 address
     mapping(bytes32 => address) internal _baseToWrapped;
@@ -32,19 +32,19 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function __TokenManager__initi(bool isWrappedSide) internal initializer onlyInitializing {
-        _isWrappedSide = isWrappedSide;
+    function __TokenManager__initi(bool _isWrappedSide) internal initializer onlyInitializing {
+        isWrappedSide = _isWrappedSide;
     }
 
     /// @notice Checks if the contract is on the base side
     /// @return true if the contract is on the base side
     function isBaseSide() internal view returns (bool) {
-        return !_isWrappedSide;
+        return !isWrappedSide;
     }
 
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
     function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
-        require(_isWrappedSide, "Only for wrapped side");
+        require(isWrappedSide, "Only for wrapped side");
         require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token
@@ -68,13 +68,13 @@ abstract contract TokenManager is Initializable {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch { }
+        } catch {}
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch { }
+        } catch {}
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch { }
+        } catch {}
     }
 
     /// Returns wrapped token for the given base token

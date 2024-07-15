@@ -9,7 +9,9 @@ edition.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
-bridge-utils = { path = "../bridge-utils"}
+bridge-client = { path = "../bridge-client" }
+bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
@@ -34,7 +36,6 @@ ic-stable-structures = { workspace = true }
 icrc2-minter = { path = "../icrc2-minter" }
 jsonrpc-core = { workspace = true }
 minter-client = { workspace = true }
-minter-did = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
@@ -64,6 +65,7 @@ futures = { workspace = true, features = ["executor"] }
 ic-test-utils = { workspace = true }
 ic-agent = { workspace = true }
 ic-utils = { workspace = true }
+ic-metrics = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 erc20-minter = { path = "../erc20-minter" }

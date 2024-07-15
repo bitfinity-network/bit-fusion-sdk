@@ -46,14 +46,14 @@ pub struct EvmInfo {
 /// Parameters to query from EVM.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmParams {
-    pub chain_id: u64,
+    pub chain_id: u32,
     pub next_block: u64,
     pub nonce: u64,
     pub gas_price: U256,
 }
 
 impl EvmParams {
-    pub fn new(chain_id: u64, next_block: u64, nonce: u64, gas_price: U256) -> Self {
+    pub fn new(chain_id: u32, next_block: u64, nonce: u64, gas_price: U256) -> Self {
         Self {
             chain_id,
             next_block,
@@ -104,7 +104,7 @@ impl EvmParams {
         };
 
         Ok(Self {
-            chain_id: chain_id.0.as_u64(),
+            chain_id: chain_id.0.as_u32(),
             next_block: next_block.0.as_u64(),
             nonce: nonce.0.as_u64(),
             gas_price,

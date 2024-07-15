@@ -1,8 +1,6 @@
-FROM ubuntu:22.04
+FROM node:lts-slim
 
-RUN apt update \
-  && apt install -y npm nodejs \
-  && npm install -g local-ssl-proxy
+RUN npm install -g local-ssl-proxy
 
 COPY ./mkcert /cert
 

@@ -1,0 +1,47 @@
+[package]
+name = "bridge-canister"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["export-api"]
+export-api = []
+
+[dependencies]
+anyhow = { workspace = true }
+bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
+candid = { workspace = true }
+did = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "ic-canister-client",
+    "http-outcall",
+] }
+ethers-core = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
+hex = { workspace = true }
+ic-canister = { workspace = true }
+ic-canister-client = { workspace = true }
+ic-exports = { workspace = true }
+ic-log = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-storage = { workspace = true }
+ic-task-scheduler = { workspace = true }
+jsonrpc-core = { workspace = true }
+log = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+vergen = { workspace = true }
+
+[dev-dependencies]
+candid = { workspace = true }
+env_logger = { workspace = true }
+ic-exports = { workspace = true }
+tokio = { workspace = true }

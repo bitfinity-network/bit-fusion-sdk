@@ -92,7 +92,7 @@ async fn load_wasm_bytecode_or_panic(wasm_name: &str) -> Vec<u8> {
 }
 
 pub async fn get_path_to_file(file_name: &str) -> PathBuf {
-    if let Ok(dir_path) = std::env::var("WASMS_DIR") {
+    if let Ok(dir_path) = std::env::var("WASM_DIR") {
         let file_path = Path::new(&dir_path).join(file_name);
         if check_file_exists(&file_path).await {
             return file_path;
@@ -115,7 +115,7 @@ pub async fn get_path_to_file(file_name: &str) -> PathBuf {
     }
 
     panic!(
-        "File {file_name} was not found in dirs provided by ENV variables WASMS_DIR or DFX_WASMS_DIR or in the '.artifact' folder"
+        "File {file_name} was not found in dirs provided by ENV variables WASM_DIR or DFX_WASMS_DIR or in the '.artifact' folder"
     );
 }
 

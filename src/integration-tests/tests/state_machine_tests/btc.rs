@@ -9,6 +9,7 @@ use std::time::Duration;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
+use bridge_did::id256::Id256;
 use bridge_utils::evm_link::EvmLink;
 use btc_bridge::canister::eth_address_to_subaccount;
 use btc_bridge::ck_btc_interface::PendingUtxo;
@@ -16,6 +17,7 @@ use btc_bridge::interface::{Erc20MintError, Erc20MintStatus};
 use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
+use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::sign_strategy::SigningStrategy;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -49,7 +51,6 @@ use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
 use ic_log::LogSettings;
 use ic_stable_structures::Storable;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
-use minter_did::id256::Id256;
 
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;
@@ -324,8 +325,8 @@ impl CkBtcSetup {
             ck_btc_ledger: ledger_id.into(),
             network: BitcoinNetwork::Mainnet,
             evm_link: EvmLink::Ic((&context).canisters().evm()),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [2; 32],
+            signing_strategy: SigningStrategy::ManagementCanister {
+                key_id: SigningKeyId::Custom("test_key".into()),
             },
             admin: (&context).admin(),
             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
@@ -1091,6 +1092,7 @@ impl CkBtcSetup {
                 recipient,
                 &self.bft_bridge,
                 amount as u128,
+                true,
             )
             .await
             .expect("failed to burn");

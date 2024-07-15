@@ -1,6 +1,6 @@
+use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
-use minter_did::order::SignedMintOrder;
 use serde::Deserialize;
 
 use crate::rune_info::RuneName;

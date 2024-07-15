@@ -1,5 +1,5 @@
+use bridge_did::error::Result;
 use did::U256;
-use minter_did::error::Result;
 
 /// This structure contains data of a valid burn operation.
 ///
@@ -104,14 +104,14 @@ impl<Src, Dst> ValidBurn<Src, Dst> {
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::id256::Id256;
+    use bridge_did::order::{fit_str_to_array, MintOrder, SignedMintOrder};
     use candid::Principal;
     use did::{codec, H160};
     use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
     use ethers_core::utils::keccak256;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::Storable;
-    use minter_did::id256::Id256;
-    use minter_did::order::{fit_str_to_array, MintOrder, SignedMintOrder};
 
     #[tokio::test]
     async fn signed_mint_order_encoding_roundtrip() {

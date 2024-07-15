@@ -17,6 +17,7 @@
 #
 
 set -e
+set -x
 
 if [ -z "$(which ord)" ]; then
   echo "ord is missing; please install ord with: curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s"

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
-use minter_did::order::SignedMintOrder;
 use ordinals::{Pile, SpacedRune};
 use serde::Deserialize;
 
@@ -113,15 +113,6 @@ pub struct OutputResponse {
     #[serde(default)]
     pub runes: Vec<(SpacedRune, Pile)>,
     pub spent: bool,
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct CreateEdictTxArgs {
-    pub from_address: String,
-    pub destination: String,
-    pub rune_name: String,
-    pub amount: u128,
-    pub change_address: Option<String>,
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize)]

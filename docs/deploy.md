@@ -111,7 +111,7 @@ If deploying on local
 
 ```sh
 # setup bitcoind
-cd btc-deploy/ && docker-compose up --build -d && cd -
+cd btc-deploy/ && docker compose up --build -d && cd -
 # deploy btc bridge
 ./scripts/deploy/btc-bridge.sh -m <create|install|reinstall|update> -e <evm-principal>
 ```
@@ -246,7 +246,7 @@ If deploying on local
 
 ```sh
 # setup bitcoind
-cd btc-deploy/ && docker-compose up --build -d && cd -
+cd btc-deploy/ && docker compose up --build -d && cd -
 # deploy rune bridge
 ./scripts/deploy/rune-bridge.sh -m <create|install|reinstall|update>
 ```

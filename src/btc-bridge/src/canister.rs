@@ -180,9 +180,9 @@ impl BtcBridge {
         BtcTask::CollectEvmEvents.into_scheduled(options)
     }
 
-    fn check_anonymous_principal(principal: Principal) -> minter_did::error::Result<()> {
+    fn check_anonymous_principal(principal: Principal) -> bridge_did::error::Result<()> {
         if principal == Principal::anonymous() {
-            return Err(minter_did::error::Error::AnonymousPrincipal);
+            return Err(bridge_did::error::Error::AnonymousPrincipal);
         }
 
         Ok(())
