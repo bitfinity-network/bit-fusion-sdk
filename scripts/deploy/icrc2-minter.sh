@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 source "$(dirname "$0")/deploy_functions.sh"
 
 IC_NETWORK="local"
@@ -69,9 +72,7 @@ elif [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "
   exit 1
 fi
 
-set -e
 deploy_icrc2_minter "$IC_NETWORK" "$INSTALL_MODE" "$EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
-set +e
 
 if [ "$IC_NETWORK" = "local" ]; then
   start_icx "$EVM_PRINCIPAL"
