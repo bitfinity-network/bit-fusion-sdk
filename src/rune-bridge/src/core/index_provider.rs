@@ -87,7 +87,7 @@ impl RuneIndexProvider for OrdIndexProvider {
             .runes
             .iter()
             .filter_map(
-                |(spaced_rune, pile)| match RuneName::from_str(&spaced_rune) {
+                |(spaced_rune, pile)| match RuneName::from_str(spaced_rune) {
                     Ok(rune_name) => Some((rune_name, pile.amount)),
                     Err(err) => {
                         log::warn!("Failed to parse rune name from the indexer response: {err:?}");
