@@ -42,7 +42,6 @@ env:
   EVM_DEPLOYER: ${{ secrets.EVM_DEPLOYER }}
 
 jobs:
-
   build-test:
     runs-on: 4x150g-runner
     name: Build and Test
@@ -83,6 +82,8 @@ jobs:
           cargo install icx-proxy
           sudo apt update
           sudo apt install gcc-multilib libunwind-dev
+          curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
+          ln -s $HOME/bin/ord /usr/bin/ord
 
       - name: rustfmt
         run: |
