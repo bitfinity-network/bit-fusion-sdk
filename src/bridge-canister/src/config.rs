@@ -59,12 +59,6 @@ impl BridgeConfig {
         self.evm_principal
     }
 
-    /// Sets principal of EVM canister with which the minter canister works.
-    pub fn set_evm_principal(&mut self, evm: Principal) {
-        self.evm_principal = evm;
-        self.clone().store();
-    }
-
     /// Returns parameters of EVM canister with which the minter canister works.
     pub(crate) fn get_evm_params(&self) -> Option<EvmParams> {
         self.evm_params.clone()

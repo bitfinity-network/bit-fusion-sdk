@@ -50,14 +50,6 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
         self.client().query("get_evm_principal", ()).await
     }
 
-    /// Sets principal of EVM canister with which the minter canister works.
-    ///
-    /// This method should be called only by current owner,
-    /// else `Error::NotAuthorised` will be returned.
-    async fn set_evm_principal(&mut self, evm: Principal) -> CanisterClientResult<()> {
-        self.client().update("set_evm_principal", (evm,)).await
-    }
-
     /// Returns the address of the BFT bridge contract in EVM canister.
     async fn get_bft_bridge_contract(&self) -> CanisterClientResult<McResult<Option<H160>>> {
         self.client().update("get_bft_bridge_contract", ()).await
