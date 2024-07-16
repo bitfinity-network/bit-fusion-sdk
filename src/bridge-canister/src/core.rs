@@ -33,6 +33,7 @@ impl BridgeCore {
     /// * If the canister cannot initialize the transaction signer with the given parameters.
     pub fn init(&mut self, init_data: &BridgeInitData) {
         self.inspect_new_owner_is_valid(init_data.owner);
+        self.inspect_new_evm_is_valid(init_data.evm_principal);
         self.config = BridgeConfig::init(init_data);
         self.init_signer(0)
             .expect("Failed to initialize transaction signer.");
@@ -93,6 +94,16 @@ impl BridgeCore {
     fn inspect_new_owner_is_valid(&self, new_owner: Principal) {
         if new_owner == Principal::anonymous() {
             ic::trap("Owner cannot be an anonymous");
+        }
+    }
+
+    fn inspect_new_evm_is_valid(&self, new_evm: Principal) {
+        if new_evm == Principal::anonymous() {
+            ic::trap("Evm principal cannot be an anonymous");
+        }
+
+        if new_evm == Principal::management_canister() {
+            ic::trap("Evm principal cannot be management canister");
         }
     }
 

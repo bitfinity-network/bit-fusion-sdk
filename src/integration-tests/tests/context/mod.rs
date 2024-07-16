@@ -64,6 +64,9 @@ pub trait TestContext {
     /// Principal to use for canisters initialization.
     fn admin_name(&self) -> &str;
 
+    /// Signing key to use for management canister signing.
+    fn sign_key(&self) -> SigningKeyId;
+
     /// Returns the base EVM LINK
     fn base_evm_link(&self) -> EvmLink {
         EvmLink::Ic(self.canisters().external_evm())
@@ -892,8 +895,12 @@ pub trait TestContext {
                     "Installing default ICRC2 minter canister with Principal {}",
                     self.canisters().icrc2_minter()
                 );
-                let evm_canister = self.canisters().get_or_anonymous(CanisterType::Evm);
-                let init_data = minter_canister_init_data(self.admin(), evm_canister);
+                let evm_canister = self
+                    .canisters()
+                    .get(CanisterType::Evm)
+                    .unwrap_or_else(|| Principal::from_slice(&[1; 20]));
+                let init_data =
+                    minter_canister_init_data(self.admin(), evm_canister, self.sign_key());
                 self.install_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
                     .await
                     .unwrap();
@@ -948,7 +955,7 @@ pub trait TestContext {
                     base_evm_link: self.base_evm_link(),
                     wrapped_evm_link: EvmLink::Ic(evm_canister),
                     signing_strategy: SigningStrategy::ManagementCanister {
-                        key_id: SigningKeyId::PocketIc,
+                        key_id: self.sign_key(),
                     },
                     log_settings: Some(LogSettings {
                         enable_console: true,
@@ -1018,7 +1025,8 @@ pub trait TestContext {
 
     async fn reinstall_minter_canister(&self) -> Result<()> {
         eprintln!("reinstalling Minter canister");
-        let init_data = minter_canister_init_data(self.admin(), self.canisters().evm());
+        let init_data =
+            minter_canister_init_data(self.admin(), self.canisters().evm(), self.sign_key());
 
         let wasm = get_icrc2_minter_canister_bytecode().await;
         self.reinstall_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
@@ -1066,13 +1074,15 @@ pub fn icrc_canister_default_init_args(
     }
 }
 
-pub fn minter_canister_init_data(owner: Principal, evm_principal: Principal) -> BridgeInitData {
+pub fn minter_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> BridgeInitData {
     BridgeInitData {
         owner,
         evm_principal,
-        signing_strategy: SigningStrategy::ManagementCanister {
-            key_id: SigningKeyId::PocketIc,
-        },
+        signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogSettings {
             enable_console: true,
             in_memory_records: None,

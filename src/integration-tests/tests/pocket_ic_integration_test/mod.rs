@@ -9,6 +9,7 @@ use alloy_sol_types::sol;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H160, H256};
+use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
@@ -192,6 +193,10 @@ impl TestContext for PocketIcTestContext {
             (Account::from(john()), Nat::from(ICRC1_INITIAL_BALANCE)),
             (Account::from(alice()), Nat::from(ICRC1_INITIAL_BALANCE)),
         ]
+    }
+
+    fn sign_key(&self) -> SigningKeyId {
+        SigningKeyId::PocketIc
     }
 }
 

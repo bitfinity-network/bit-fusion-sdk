@@ -4,6 +4,7 @@ use alloy_sol_types::sol;
 use bridge_utils::evm_link::{EvmLink, RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
+use eth_signer::ic_sign::SigningKeyId;
 use ic_canister_client::IcAgentClient;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_test_utils::{get_agent, Agent, Canister};
@@ -186,5 +187,9 @@ impl TestContext for DfxTestContext {
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
         todo!()
+    }
+
+    fn sign_key(&self) -> SigningKeyId {
+        SigningKeyId::Dfx
     }
 }
