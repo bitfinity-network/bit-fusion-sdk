@@ -172,16 +172,15 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         erc20_address: H160,
         amounts: Option<HashMap<RuneName, u128>>,
     ) -> OperationId {
-        let id = self.operation_store.new_operation(
-            dst_address.clone(),
-            OperationState::Deposit(RuneDepositPayload {
+        let id = self
+            .operation_store
+            .new_operation(OperationState::Deposit(RuneDepositPayload {
                 dst_address: dst_address.clone(),
                 erc20_address,
                 requested_amounts: amounts,
                 request_ts: ic::time(),
                 status: DepositRequestStatus::Scheduled,
-            }),
-        );
+            }));
 
         log::trace!(
             "New deposit operation requested for address {}. Operation id: {id}.",

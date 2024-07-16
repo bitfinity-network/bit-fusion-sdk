@@ -420,8 +420,8 @@ impl BridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding MintIcrc2 task");
-                let operation_id = get_operations_store()
-                    .new_operation(burnt.sender.clone(), OperationState::new_withdrawal(burnt));
+                let operation_id =
+                    get_operations_store().new_operation(OperationState::new_withdrawal(burnt));
                 let mint_icrc2_task = BridgeTask::MintIcrc2Tokens(operation_id);
                 return Some(mint_icrc2_task.into_scheduled(options));
             }
@@ -445,10 +445,8 @@ impl BridgeTask {
                     icrc_burn.approve_after_mint = None;
                 }
 
-                let operation_id = get_operations_store().new_operation(
-                    icrc_burn.recipient_address.clone(),
-                    OperationState::new_deposit(icrc_burn),
-                );
+                let operation_id =
+                    get_operations_store().new_operation(OperationState::new_deposit(icrc_burn));
                 let icrc_burn_task = BridgeTask::BurnIcrc2Tokens(operation_id);
                 return Some(icrc_burn_task.into_scheduled(options));
             }

@@ -140,10 +140,8 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let operation_id = get_operations_store().new_operation(
-                    burnt.sender.clone(),
-                    OperationState::new_withdrawal(burnt, &state.borrow()),
-                );
+                let operation_id = get_operations_store()
+                    .new_operation(OperationState::new_withdrawal(burnt, &state.borrow()));
                 let mint_order_task = RuneBridgeTask::Withdraw(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }

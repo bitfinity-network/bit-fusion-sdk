@@ -36,4 +36,8 @@ impl Operation for OperationState {
     async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
         todo!()
     }
+
+    fn dst_address(&self) -> did::H160 {
+        todo!()
+    }
 }

@@ -412,11 +412,11 @@ mod test {
         let owner_other = eth_address(3);
 
         for _ in 0..COUNT {
-            op_store.new_operation(owner.clone(), op_state.clone());
+            op_store.new_operation(op_state.clone());
         }
 
         for _ in 0..COUNT_OTHER {
-            op_store.new_operation(owner_other.clone(), op_state_other.clone());
+            op_store.new_operation(op_state_other.clone());
         }
 
         // get orders for the first token

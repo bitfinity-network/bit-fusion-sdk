@@ -14,12 +14,33 @@ pub trait Operation:
     Sized + CandidType + Serialize + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static
 {
     async fn progress(self, ctx: impl OperationContext) -> BftResult<Self>;
+    fn is_complete(&self) -> bool;
+    fn dst_address(&self) -> H160;
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
         Some(TaskOptions::default())
     }
 
-    fn is_complete(&self) -> bool;
+    async fn on_wrapped_token_minted(
+        _ctx: impl OperationContext,
+        _event: MintedEventData,
+    ) -> Option<OperationAction<Self>> {
+        None
+    }
+
+    async fn on_wrapped_token_burnt(
+        _ctx: impl OperationContext,
+        _event: BurntEventData,
+    ) -> Option<OperationAction<Self>> {
+        None
+    }
+
+    async fn on_minter_notification(
+        _ctx: impl OperationContext,
+        _event: NotifyMinterEventData,
+    ) -> Option<OperationAction<Self>> {
+        None
+    }
 }
 
 pub trait OperationContext {
@@ -29,30 +50,7 @@ pub trait OperationContext {
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
 }
 
-pub trait EventHandler {
-    type Stage;
-
-    async fn on_wrapped_token_minted(
-        &self,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self::Stage>>;
-
-    async fn on_wrapped_token_burnt(
-        &self,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self::Stage>>;
-
-    async fn on_minter_notification(
-        &self,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self::Stage>>;
-}
-
-pub enum OperationAction<Stage> {
-    Create(Stage),
-    Update {
-        address: H160,
-        nonce: u32,
-        update_to: Stage,
-    },
+pub enum OperationAction<Op> {
+    Create(Op),
+    Update { nonce: u32, update_to: Op },
 }

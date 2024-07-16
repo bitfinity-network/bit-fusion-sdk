@@ -26,6 +26,9 @@ pub enum Error {
     #[error("unexpected anonymous principal")]
     AnonymousPrincipal,
 
+    #[error("EVM request failed: {0}")]
+    EvmRequestFailed(String),
+
     #[error("generic error: code=={code}, message=`{msg}`")]
     Custom { code: u32, msg: String },
 }

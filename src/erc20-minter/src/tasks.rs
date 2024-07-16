@@ -270,10 +270,8 @@ impl BridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let operation_id = get_operations_store().new_operation(
-                    burnt.sender.clone(),
-                    OperationPayload::new(sender_side.other(), burnt),
-                );
+                let operation_id = get_operations_store()
+                    .new_operation(OperationPayload::new(sender_side.other(), burnt));
                 let mint_order_task = BridgeTask::PrepareMintOrder(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }

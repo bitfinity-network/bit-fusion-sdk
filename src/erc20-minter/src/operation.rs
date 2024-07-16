@@ -22,6 +22,10 @@ impl Operation for OperationPayload {
     fn is_complete(&self) -> bool {
         matches!(self.status, OperationStatus::Minted { .. })
     }
+
+    fn dst_address(&self) -> did::H160 {
+        todo!()
+    }
 }
 
 impl OperationPayload {

@@ -136,8 +136,9 @@ where
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation(&mut self, dst_address: H160, payload: P) -> OperationId {
+    pub fn new_operation(&mut self, payload: P) -> OperationId {
         let id = self.next_operation_id();
+        let dst_address = payload.dst_address();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
@@ -254,6 +255,7 @@ where
 mod tests {
     use bridge_did::error::BftResult;
     use ic_stable_structures::VectorMemory;
+    use num_traits::ToBytes;
 
     use super::*;
     use crate::bridge::OperationContext;
@@ -266,6 +268,12 @@ mod tests {
 
         async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
             todo!()
+        }
+
+        fn dst_address(&self) -> H160 {
+            let mut buf = [0; 20];
+            buf[0..4].copy_from_slice(&self.to_be_bytes());
+            H160::from_slice(&buf)
         }
     }
 
@@ -296,8 +304,8 @@ mod tests {
 
         let mut store = test_store(LIMIT);
 
-        for i in 0..COUNT {
-            store.new_operation(eth_address(i as u8), COMPLETE);
+        for _ in 0..COUNT {
+            store.new_operation(COMPLETE);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -327,7 +335,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(eth_address(0), COMPLETE);
+            store.new_operation(COMPLETE);
         }
 
         assert_eq!(store.operations_log.len(), COUNT);
@@ -364,7 +372,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(eth_address(1), COMPLETE);
+            store.new_operation(COMPLETE);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -384,7 +392,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            let id = store.new_operation(eth_address(1), 1);
+            let id = store.new_operation(1);
             store.update(id, 2);
         }
 
@@ -406,8 +414,8 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         let mut ids = vec![];
-        for i in 0..COUNT {
-            ids.push(store.new_operation(eth_address(i as u8), 1));
+        for _ in 0..COUNT {
+            ids.push(store.new_operation(1));
         }
 
         for id in ids {

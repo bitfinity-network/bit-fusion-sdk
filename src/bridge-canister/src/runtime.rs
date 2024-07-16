@@ -10,8 +10,10 @@ use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_stable_structures::StableBTreeMap;
 use ic_storage::IcStorage;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::ScheduledTask;
 
-use self::scheduler::BridgeScheduler;
+use self::scheduler::{BridgeScheduler, ServiceTask};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
@@ -44,6 +46,12 @@ impl<Op: Operation> BridgeRuntime<Op> {
     }
 
     pub fn run(&mut self) {
+        if !self.state.borrow().collecting_logs {
+            let task = scheduler::BridgeTask::Service(ServiceTask::CollectEvmLogs);
+            let collect_logs = ScheduledTask::new(task);
+            self.scheduler.append_task(collect_logs);
+        }
+
         let task_execution_result = self.scheduler.run(self.state.clone());
 
         if let Err(err) = task_execution_result {
