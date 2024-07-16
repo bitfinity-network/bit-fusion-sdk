@@ -876,6 +876,7 @@ dependencies = [
  "bridge-did",
  "bridge-utils",
  "candid",
+ "cfg-if 1.0.0",
  "did 0.27.0",
  "env_logger",
  "eth-signer 0.27.0",
@@ -898,7 +899,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
- "vergen",
 ]
 
 [[package]]

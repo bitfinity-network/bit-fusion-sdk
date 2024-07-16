@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
 use candid::{encode_args, CandidType, Decode, Nat, Principal};
+use eth_signer::ic_sign::SigningKeyId;
 use ic_base_types::{CanisterId, PrincipalId};
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use ic_exports::ic_kit::mock_principals::{alice, bob};
@@ -64,6 +65,10 @@ impl<'a> TestContext for &'a StateMachineContext {
 
     fn admin_name(&self) -> &str {
         "admin"
+    }
+
+    fn sign_key(&self) -> SigningKeyId {
+        todo!()
     }
 
     async fn advance_time(&self, time: Duration) {
