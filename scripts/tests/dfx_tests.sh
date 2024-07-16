@@ -6,6 +6,8 @@ set -x
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
+ORD_DATA=$PWD/target/ord
+ORDW="ord -r --data-dir $ORD_DATA --index-runes wallet --server-url http://localhost:8000"
 
 usage() {
   echo "Usage: $0 [options]"
@@ -96,6 +98,9 @@ echo "Wallet Principal: $wallet_principal"
 dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
+
+# etch inscription
+$ORDW batch --fee-rate 10 --batch ./scripts/tests/runes/rune.yaml || true
 
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
