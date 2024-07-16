@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
-use ordinals::{Pile, SpacedRune};
+use ordinals::Pile;
 use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;
@@ -111,7 +111,7 @@ pub struct RuneIdDid {
 pub struct OutputResponse {
     pub address: String,
     #[serde(default)]
-    pub runes: Vec<(SpacedRune, Pile)>,
+    pub runes: HashMap<String, Pile>,
     pub spent: bool,
 }
 

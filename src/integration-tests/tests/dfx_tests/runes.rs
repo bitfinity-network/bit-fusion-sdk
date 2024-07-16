@@ -196,7 +196,10 @@ impl RunesContext {
             ])
             .await;
 
-        eprintln!("{output}");
+        eprintln!(
+            "ord send --fee-rate 10 {btc_address} {}:{RUNE_NAME}: {output}",
+            amount as f64 / 100.0
+        );
 
         self.mint_blocks(1).await;
     }
@@ -212,7 +215,10 @@ impl RunesContext {
             ])
             .await;
 
-        eprintln!("{output}");
+        eprintln!(
+            "ord send --fe-rate 10 {btc_address} {} btc: {output}",
+            amount as f32 / 100_000_000.0
+        );
 
         self.mint_blocks(1).await;
     }
@@ -279,7 +285,7 @@ impl RunesContext {
             Ok(out) => panic!("'ord' exited with status code {}", out.status),
         };
 
-        eprintln!("{}", result);
+        eprintln!("mint-blocks output: {}", result);
 
         // Allow dfx and ord catch up with the new block
         self.inner.advance_time(Duration::from_secs(5)).await;
@@ -352,7 +358,10 @@ impl RunesContext {
             .unwrap()
             .unwrap();
         self.wait_for_tx_success(&tx_id).await;
-        eprintln!("Deposit notification sent by tx: {}", hex::encode(tx_id.0));
+        eprintln!(
+            "Deposit notification sent by tx: 0x{}",
+            hex::encode(tx_id.0)
+        );
 
         const MAX_RETRIES: u32 = 5;
         let mut retry_count = 0;
@@ -502,6 +511,7 @@ impl RunesContext {
 
         let wallet_address = wallet.address();
         let address = self.get_deposit_address(&wallet_address.into()).await;
+        println!("Wallet address: {wallet_address}; deposit_address {address}");
 
         self.send_runes(&address, rune_amount).await;
         self.send_btc(&address, 490000).await;
@@ -517,9 +527,8 @@ impl RunesContext {
     }
 }
 
-/// Disabled as it currently fails. To be fixed in EPROD-944
-#[ignore = "To be fixed in EPROD-944"]
 #[tokio::test]
+#[serial_test::serial]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::new().await;
     // Mint one block in case there are some pending transactions
@@ -539,9 +548,8 @@ async fn runes_bridging_flow() {
     ctx.stop().await
 }
 
-/// Disabled as it currently fails. To be fixed in EPROD-944
-#[ignore = "To be fixed in EPROD-944"]
 #[tokio::test]
+#[serial_test::serial]
 async fn inputs_from_different_users() {
     let ctx = RunesContext::new().await;
     // Mint one block in case there are some pending transactions

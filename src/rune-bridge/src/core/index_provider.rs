@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -70,6 +71,7 @@ impl OrdIndexProvider {
 
     pub async fn get_tx_outputs(&self, utxo: &Utxo) -> Result<OutputResponse, DepositError> {
         let outpoint = format_outpoint(&utxo.outpoint);
+        log::trace!("get tx output: {}/output/{outpoint}", self.indexer_url());
         self.http_request(&format!("output/{outpoint}")).await
     }
 }
@@ -84,7 +86,15 @@ impl RuneIndexProvider for OrdIndexProvider {
         let amounts = response
             .runes
             .iter()
-            .map(|(spaced_rune, pile)| (spaced_rune.rune.into(), pile.amount))
+            .filter_map(
+                |(spaced_rune, pile)| match RuneName::from_str(&spaced_rune) {
+                    Ok(rune_name) => Some((rune_name, pile.amount)),
+                    Err(err) => {
+                        log::warn!("Failed to parse rune name from the indexer response: {err:?}");
+                        None
+                    }
+                },
+            )
             .collect();
 
         log::trace!(

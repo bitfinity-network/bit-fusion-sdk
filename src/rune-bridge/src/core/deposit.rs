@@ -456,6 +456,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         request_id: MinterOperationId,
         bail_status: DepositRequestStatus,
     ) {
+        log::debug!("waiting for inputs for request {request_id}; bail status {bail_status:?}");
         let Some(request) = self.operation_store.get(request_id) else {
             log::error!("Deposit request {request_id} was unexpectedly removed from the store.");
             return;
@@ -467,6 +468,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         };
 
         if self.is_request_timed_out(&payload) {
+            log::error!("request timed out");
             self.update_request_status(request_id, payload, bail_status);
         } else {
             let block_height =
@@ -845,7 +847,15 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         let mut used_utxos = vec![];
 
         for utxo in utxos {
-            let tx_rune_amounts = self.index_provider.get_rune_amounts(utxo).await?;
+            log::info!("Get rune amounts for: {:?}", utxo);
+            let tx_rune_amounts = match self.index_provider.get_rune_amounts(utxo).await {
+                Ok(v) => v,
+                Err(err) => {
+                    log::error!("Failed to get rune amounts for utxo: {err:?}");
+                    continue;
+                }
+            };
+
             if !tx_rune_amounts.is_empty() {
                 used_utxos.push(utxo.clone());
                 for (rune_name, amount) in tx_rune_amounts {
