@@ -122,11 +122,6 @@ impl BridgeCore {
         self.inspect_caller_is_owner()
     }
 
-    /// Inspect check for `set_evm_principal` API method.
-    pub fn inspect_set_evm_principal(&self) {
-        self.inspect_caller_is_owner()
-    }
-
     /// Inspect check for `set_bft_bridge_contract` API method.
     pub fn inspect_set_bft_bridge_contract(&self) {
         self.inspect_caller_is_owner()
