@@ -178,22 +178,6 @@ impl EvmMinter {
         }
     }
 
-    /// Sets the BFT bridge contract address.
-    #[update]
-    pub async fn set_bft_bridge_contract(&mut self, address: H160, side: BridgeSide) {
-        get_state()
-            .borrow_mut()
-            .config
-            .set_bft_bridge_contract(side, address);
-    }
-
-    /// Returns bridge contract address for EVM.
-    /// If contract isn't initialized yet - returns None.
-    #[query]
-    pub fn get_bft_bridge_contract(&mut self, side: BridgeSide) -> Option<H160> {
-        get_state().borrow().config.get_bft_bridge_contract(side)
-    }
-
     fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
         if principal == Principal::anonymous() {
             return Err(Error::AnonymousPrincipal);

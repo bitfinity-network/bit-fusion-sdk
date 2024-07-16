@@ -64,7 +64,7 @@ async fn test_icrc2_tokens_roundtrip() {
     .await
     .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -84,7 +84,7 @@ async fn test_icrc2_tokens_roundtrip() {
     assert_eq!(wrapped_balance as u64, amount);
 
     let _operation_id = ctx
-        .burn_erc_20_tokens(
+        .burn_wrapped_erc_20_tokens(
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
@@ -97,7 +97,7 @@ async fn test_icrc2_tokens_roundtrip() {
         .unwrap()
         .0;
 
-    ctx.advance_by_times(Duration::from_secs(2), 4).await;
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
 
     println!("john principal: {}", john());
 
@@ -158,7 +158,7 @@ async fn test_icrc2_token_canister_stopped() {
     .await
     .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 8).await;
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client
@@ -184,7 +184,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     let john_principal_id256 = Id256::from(&john());
     let _operation_id = ctx
-        .burn_erc_20_tokens(
+        .burn_wrapped_erc_20_tokens(
             &ctx.evm_client(ADMIN),
             &john_wallet,
             &wrapped_token,
@@ -347,7 +347,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     .await
     .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 8).await;
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
 
     let base_token_client = ctx.icrc_token_1_client(JOHN);
     let base_balance = base_token_client

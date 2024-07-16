@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -x
+
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
@@ -26,7 +29,7 @@ stop_docker() {
     cd $PREV_PATH
 }
 
-WITH_DOCKER="0"
+DOCKER="0"
 GITHUB_CI="0"
 
 ARGS=$(getopt -o h --long docker,github-ci,help -- "$@")
@@ -63,15 +66,12 @@ if [ "$GITHUB_CI" -gt 0 ]; then
     dfxvm default 0.18.0
 fi
 
-
 killall -9 icx-proxy || true
 dfx stop
 
-if [ "$WITH_DOCKER" -gt 0 ]; then
+if [ "$DOCKER" -gt 0 ]; then
     setup_docker
 fi
-
-set -e
 
 start_icx() {
     killall icx-proxy
@@ -84,10 +84,12 @@ start_icx() {
 
 rm -f "$LOGFILE"
 
-set +e
 dfx start --background --clean --enable-bitcoin 2> "$LOGFILE"
 start_icx
 
+dfx identity new --storage-mode=plaintext --force max
+dfx identity new --storage-mode=plaintext --force alice
+dfx identity new --storage-mode=plaintext --force alex
 dfx identity use max
 wallet_principal=$(dfx identity get-wallet)
 echo "Wallet Principal: $wallet_principal"
@@ -95,12 +97,15 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
 
-cargo test -p integration-tests --features dfx_tests $1
+cargo test -p integration-tests --features dfx_tests $@
+TEST_RESULT=$?
 
 killall -9 icx-proxy || true
 
 dfx stop
 
-if [ "$WITH_DOCKER" -gt 0 ]; then
+if [ "$DOCKER" -gt 0 ]; then
     stop_docker
 fi
+
+exit $TEST_RESULT

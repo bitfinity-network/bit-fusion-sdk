@@ -1,10 +1,13 @@
 use std::time::Duration;
 
+use alloy_sol_types::SolCall;
 use alloy_sol_types::SolConstructor;
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_utils::evm_bridge::BridgeSide;
-use did::{H160, H256, U256, U64};
+use bridge_utils::{BFTBridge, UUPSProxy};
+use did::H256;
+use did::{H160, U256, U64};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
@@ -92,13 +95,21 @@ impl ContextWithBridges {
         ctx.advance_time(Duration::from_secs(2)).await;
 
         // Deploy the BFTBridge contract on the external EVM.
-        let base_bft_bridge =
-            create_bft_bridge(&ctx, BridgeSide::Base, expected_fee_charge_address.into()).await;
+        let base_bft_bridge = create_bft_bridge(
+            &ctx,
+            &bob_wallet,
+            BridgeSide::Base,
+            expected_fee_charge_address.into(),
+            erc20_minter_address.clone(),
+        )
+        .await;
         println!("Base BFT Bridge: {}", base_bft_bridge);
         let wrapped_bft_bridge = create_bft_bridge(
             &ctx,
+            &bob_wallet,
             BridgeSide::Wrapped,
             expected_fee_charge_address.into(),
+            erc20_minter_address.clone(),
         )
         .await;
         println!("Wrapped BFT Bridge: {}", wrapped_bft_bridge);
@@ -190,16 +201,29 @@ async fn test_should_setup_with_evm_rpc_canister() {
     let _ = ContextWithBridges::new().await;
 }
 
-async fn create_bft_bridge(ctx: &DfxTestContext, side: BridgeSide, fee_charge: H160) -> H160 {
+async fn create_bft_bridge(
+    ctx: &DfxTestContext,
+    wallet: &Wallet<'static, SigningKey>,
+    side: BridgeSide,
+    fee_charge: H160,
+    minter_address: H160,
+) -> H160 {
     let minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
 
-    let hash = minter_client
-        .update::<_, BftResult<H256>>("init_bft_bridge_contract", (side, fee_charge))
+    let _hash = minter_client
+        .update::<_, BftResult<H256>>("init_bft_bridge_contract", (side, fee_charge.clone()))
         .await
         .unwrap()
         .unwrap();
 
-    println!("init_bft_bridge_contract {side} hash: {:?}", hash);
+    let is_wrapped = match side {
+        BridgeSide::Base => false,
+        BridgeSide::Wrapped => true,
+    };
+
+    let mut bft_input = BFTBridge::BYTECODE.to_vec();
+    let constructor = BFTBridge::constructorCall {}.abi_encode();
+    bft_input.extend_from_slice(&constructor);
 
     let evm = match side {
         BridgeSide::Base => ctx.canisters().external_evm(),
@@ -208,10 +232,35 @@ async fn create_bft_bridge(ctx: &DfxTestContext, side: BridgeSide, fee_charge: H
 
     let evm_client = EvmCanisterClient::new(ctx.client(evm, ADMIN));
 
-    ctx.wait_transaction_receipt_on_evm(&evm_client, &hash)
+    let bridge_address = ctx
+        .create_contract_on_evm(&evm_client, wallet, bft_input.clone())
         .await
-        .unwrap()
-        .unwrap()
-        .contract_address
-        .expect("contract address")
+        .unwrap();
+
+    let init_data = BFTBridge::initializeCall {
+        minterAddress: minter_address.into(),
+        feeChargeAddress: fee_charge.into(),
+        isWrappedSide: is_wrapped,
+    }
+    .abi_encode();
+
+    let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
+    let constructor = UUPSProxy::constructorCall {
+        _implementation: bridge_address.into(),
+        _data: init_data.into(),
+    }
+    .abi_encode();
+    proxy_input.extend_from_slice(&constructor);
+
+    let proxy_address = ctx
+        .create_contract_on_evm(&evm_client, wallet, proxy_input)
+        .await
+        .unwrap();
+
+    minter_client
+        .update::<_, ()>("set_bft_bridge_contract", (proxy_address.clone(), side))
+        .await
+        .unwrap();
+
+    proxy_address
 }

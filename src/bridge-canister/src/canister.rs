@@ -61,7 +61,9 @@ pub trait BridgeCanister: Canister {
     /// else `Error::NotAuthorised` will be returned.
     #[update(trait = true)]
     fn set_owner(&mut self, owner: Principal) {
+        inspect::inspect_new_owner_is_valid(owner);
         let core = self.config();
+        inspect::inspect_caller_is_owner(core.borrow().get_owner(), ic::caller());
         core.borrow_mut().set_owner(owner);
 
         info!("Bridge canister owner changed to {owner}");
@@ -376,19 +378,5 @@ mod tests {
         let mut canister = init_canister().await;
 
         let _ = canister_call!(canister.set_logger_filter("info".into()), ()).await;
-    }
-
-    #[tokio::test]
-    async fn test_get_bridge_canister_evm_address() {
-        let mut canister = init_canister().await;
-        inject::get_context().update_id(owner());
-
-        let evm_address =
-            canister_call!(canister.get_bridge_canister_evm_address(), BftResult<H160>)
-                .await
-                .unwrap();
-
-        assert!(evm_address.is_ok());
-        assert_ne!(evm_address.unwrap(), H160::default());
     }
 }

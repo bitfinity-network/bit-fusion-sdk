@@ -1804,7 +1804,7 @@ dependencies = [
 [[package]]
 name = "did"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -2146,7 +2146,7 @@ dependencies = [
 [[package]]
 name = "eth-signer"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "async-trait",
  "candid",
@@ -2197,7 +2197,7 @@ dependencies = [
 [[package]]
 name = "ethereum-json-rpc-client"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "anyhow",
  "candid",
@@ -2262,7 +2262,7 @@ dependencies = [
 [[package]]
 name = "evm-canister-client"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "candid",
  "did",
@@ -3207,7 +3207,7 @@ dependencies = [
 [[package]]
 name = "ic-canister"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -3216,7 +3216,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-client"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "async-trait",
  "candid",
@@ -3252,7 +3252,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-macros"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -3692,7 +3692,7 @@ dependencies = [
 [[package]]
 name = "ic-crypto-getrandom-for-wasm"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "getrandom",
 ]
@@ -4509,7 +4509,7 @@ dependencies = [
 [[package]]
 name = "ic-exports"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "flate2",
@@ -4711,7 +4711,7 @@ dependencies = [
 [[package]]
 name = "ic-kit"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "futures",
@@ -4779,7 +4779,7 @@ dependencies = [
 [[package]]
 name = "ic-log"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4882,7 +4882,7 @@ dependencies = [
 [[package]]
 name = "ic-metrics"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "ic-canister",
@@ -5111,7 +5111,7 @@ dependencies = [
 [[package]]
 name = "ic-stable-structures"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "ic-stable-structures 0.6.5",
@@ -5259,7 +5259,7 @@ dependencies = [
 [[package]]
 name = "ic-storage"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "ic-exports",
@@ -5271,7 +5271,7 @@ dependencies = [
 [[package]]
 name = "ic-storage-derive"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "quote",
  "syn 2.0.68",
@@ -5328,7 +5328,7 @@ dependencies = [
 [[package]]
 name = "ic-task-scheduler"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "bincode",
  "candid",
@@ -5481,7 +5481,7 @@ dependencies = [
 [[package]]
 name = "ic-test-utils"
 version = "0.18.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?branch=scheduler_with_context#d9982f248f075a298a25bf36f9b16dd69903c020"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.18.x#e01274b8e77c6377ff1ca91f1b80b56f51822d6c"
 dependencies = [
  "candid",
  "dirs",
@@ -5764,7 +5764,7 @@ dependencies = [
 [[package]]
 name = "icrc-client"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -6428,7 +6428,7 @@ dependencies = [
 [[package]]
 name = "minter-client"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "candid",
  "did",
@@ -6446,7 +6446,7 @@ dependencies = [
 [[package]]
 name = "minter-did"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "candid",
  "did",
@@ -8603,7 +8603,7 @@ dependencies = [
 [[package]]
 name = "signature-verification-canister-client"
 version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?branch=canister_sdk_v18#8905307e8a581b312213faa9c54f3df1ffc7a44c"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x-dev#8e98582671733f881055e87c74c65c4e9cb525c6"
 dependencies = [
  "candid",
  "did",

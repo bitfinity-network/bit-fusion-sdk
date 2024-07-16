@@ -2,6 +2,7 @@
 source "$(dirname "$0")/deploy/deploy_functions.sh"
 
 set -e
+set -x
 
 start_icx() {
     killall icx-proxy
