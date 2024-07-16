@@ -515,6 +515,16 @@ impl RunesContext {
         let balance_after = self.wrapped_balance(wallet).await;
         assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
     }
+
+    async fn get_rune_balances(&self, wallet: &Wallet<'_, SigningKey>) -> Vec<(RuneInfo, u128)> {
+        let btc_address = self.get_deposit_address(&wallet.address().into()).await;
+
+        self.inner
+            .rune_bridge_client("admin")
+            .get_rune_balances(&btc_address)
+            .await
+            .unwrap()
+    }
 }
 
 /// Disabled as it currently fails. To be fixed in EPROD-944
@@ -569,4 +579,17 @@ async fn inputs_from_different_users() {
     assert_eq!(ctx.wrapped_balance(&ctx.eth_wallet).await, 50);
 
     ctx.stop().await
+}
+
+#[tokio::test]
+async fn test_should_get_runes_balance() {
+    let ctx = RunesContext::new().await;
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let rune_balance = ctx.ord_rune_balance().await;
+    ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
+
+    let balances = ctx.get_rune_balances(&ctx.eth_wallet).await;
+    assert_eq!(balances.len(), 1);
+    assert_eq!(balances[0].1, rune_balance);
 }

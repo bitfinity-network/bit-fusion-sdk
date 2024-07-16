@@ -177,6 +177,25 @@ impl RuneBridge {
         get_state().borrow_mut().configure_bft(config);
     }
 
+    #[update]
+    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
+        let address = Address::from_str(&btc_address)
+            .expect("invalid address")
+            .assume_checked();
+
+        let deposit = RuneDeposit::get();
+        let utxos = deposit
+            .get_deposit_utxos(&address)
+            .await
+            .expect("failed to get utxos");
+        let (rune_info_amounts, _) = deposit
+            .get_mint_amounts(&utxos.utxos, &None)
+            .await
+            .expect("failed to get rune amounts");
+
+        rune_info_amounts
+    }
+
     #[cfg(target_family = "wasm")]
     fn collect_evm_events_task() -> ScheduledTask<RuneBridgeTask> {
         const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
@@ -214,25 +233,6 @@ impl RuneBridge {
             });
 
         RuneBridgeTask::RefreshRuneList.into_scheduled(options)
-    }
-
-    #[update]
-    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
-        let address = Address::from_str(&btc_address)
-            .expect("invalid address")
-            .assume_checked();
-
-        let deposit = RuneDeposit::get();
-        let utxos = deposit
-            .get_deposit_utxos(&address)
-            .await
-            .expect("failed to get utxos");
-        let (rune_info_amounts, _) = deposit
-            .get_mint_amounts(&utxos.utxos, &None)
-            .await
-            .expect("failed to get rune amounts");
-
-        rune_info_amounts
     }
 
     pub fn idl() -> Idl {
