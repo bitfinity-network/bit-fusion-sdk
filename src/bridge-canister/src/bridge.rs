@@ -1,6 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 use bridge_did::error::BftResult;
+use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
@@ -13,9 +14,11 @@ use serde::{Deserialize, Serialize};
 pub trait Operation:
     Sized + CandidType + Serialize + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static
 {
-    async fn progress(self, ctx: impl OperationContext) -> BftResult<Self>;
+    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self>;
     fn is_complete(&self) -> bool;
-    fn dst_address(&self) -> H160;
+
+    /// Address of EVM wallet to/from which operation will move tokens.
+    fn evm_address(&self) -> H160;
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
         Some(TaskOptions::default())

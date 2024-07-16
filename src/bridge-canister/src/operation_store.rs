@@ -138,7 +138,7 @@ where
     /// and stores it.
     pub fn new_operation(&mut self, payload: P) -> OperationId {
         let id = self.next_operation_id();
-        let dst_address = payload.dst_address();
+        let dst_address = payload.evm_address();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
@@ -270,7 +270,7 @@ mod tests {
             todo!()
         }
 
-        fn dst_address(&self) -> H160 {
+        fn evm_address(&self) -> H160 {
             let mut buf = [0; 20];
             buf[0..4].copy_from_slice(&self.to_be_bytes());
             H160::from_slice(&buf)

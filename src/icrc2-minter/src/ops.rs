@@ -1,162 +1,119 @@
 use bridge_canister::{
-    bridge::{EventHandler, Operation, OperationAction, OperationContext},
+    bridge::{Operation, OperationAction, OperationContext},
     runtime::state::SharedConfig,
 };
-use bridge_did::{error::BftResult, op_id::OperationId};
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_did::{
+    error::{BftResult, Error},
+    op_id::OperationId,
+    order::{self, MintOrder, SignedMintOrder},
+    reason::{ApproveAfterMint, Icrc2Burn},
+};
+use bridge_utils::{
+    bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData},
+    evm_link::address_to_icrc_subaccount,
+};
+use candid::{CandidType, Nat, Principal};
+use did::{H160, H256};
+use icrc_client::account::Account;
 use serde::{Deserialize, Serialize};
 
-pub struct IcrcEventHandler {}
+use crate::{tokens::{icrc1, icrc2}};
 
-impl EventHandler for IcrcEventHandler {
-    type Stage = IcrcBridgeOp;
-
-    async fn on_wrapped_token_minted(
-        &self,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self::Stage>> {
-        todo!()
-    }
-
-    async fn on_wrapped_token_burnt(
-        &self,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self::Stage>> {
-        todo!()
-    }
-
-    async fn on_minter_notification(
-        &self,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self::Stage>> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum IcrcBridgeOp {
-    BurnIcrc2Tokens(OperationId),
-    PrepareMintOrder(OperationId),
-    RemoveMintOrder(MintedEventData),
-    SendMintTransaction(OperationId),
-    MintIcrc2Tokens(OperationId),
+    // Deposit operations:
+    BurnIcrc2Tokens(Icrc2Burn),
+    SignMintOrder(MintOrder),
+    SendMintTransaction {
+        dst_address: H160,
+        order: SignedMintOrder,
+    },
+    ConfirmMint {
+        dst_address: H160,
+        order: SignedMintOrder,
+        tx_hash: H256,
+    },
+    WrappedTokenMintConfirmed(MintedEventData),
+
+    // Withdraw operations:
+    MintIcrcTokens(BurntEventData),
+    IcrcMintConfirmed {
+        src_address: H160,
+        icrc_tx_id: Nat,
+    },
 }
 
 impl Operation for IcrcBridgeOp {
-    async fn progress(self, ctx: impl OperationContext) -> BftResult<Self> {
-        let config = ConfigStorage::get();
+    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
         match self {
-            IcrcBridgeOp::CollectEvmEvents => Box::pin(Self::collect_evm_events(core, scheduler)),
-            IcrcBridgeOp::BurnIcrc2Tokens(operation_id) => {
-                Box::pin(Self::burn_icrc2_tokens(scheduler, *operation_id))
+            IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
+                Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
             }
-            IcrcBridgeOp::PrepareMintOrder(operation_id) => {
-                Box::pin(Self::prepare_mint_order(core, scheduler, *operation_id))
+            IcrcBridgeOp::SignMintOrder(order) => Self::sign_mint_order(ctx, order).await,
+            IcrcBridgeOp::SendMintTransaction { order, .. } => Self::send_mint_tx(ctx, order).await,
+            IcrcBridgeOp::ConfirmMint { .. } => {
+                log::warn!("ConfirmMint task should progress only on the Minted EVM event");
+                return Err(Error::FailToProgress(
+                    "ConfirmMint task should progress only on the Minted EVM event".into(),
+                ));
             }
-            IcrcBridgeOp::RemoveMintOrder(data) => {
-                let data = data.clone();
-                Box::pin(async move { Self::remove_mint_order(data) })
+            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => {
+                log::warn!("WrappedTokenMintConfirmed task should not progress");
+                return Err(Error::FailToProgress(
+                    "WrappedTokenMintConfirmed task should not progress".into(),
+                ));
             }
-            IcrcBridgeOp::SendMintTransaction(operation_id) => {
-                Box::pin(Self::send_mint_transaction(core, *operation_id))
-            }
-            IcrcBridgeOp::MintIcrc2Tokens(operation_id) => {
-                Box::pin(Self::mint_icrc2(*operation_id, scheduler))
+            IcrcBridgeOp::MintIcrcTokens(event) => Self::mint_icrc_tokens(ctx, event).await,
+            IcrcBridgeOp::IcrcMintConfirmed { .. } => {
+                log::warn!("IcrcMintConfirmed task should not progress");
+                return Err(Error::FailToProgress(
+                    "IcrcMintConfirmed task should not progress".into(),
+                ));
             }
         }
     }
 
     fn is_complete(&self) -> bool {
-        todo!()
+        match self {
+            IcrcBridgeOp::BurnIcrc2Tokens(_) => false,
+            IcrcBridgeOp::SignMintOrder(_) => false,
+            IcrcBridgeOp::SendMintTransaction { .. } => false,
+            IcrcBridgeOp::ConfirmMint { .. } => false,
+            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => true,
+            IcrcBridgeOp::MintIcrcTokens(_) => false,
+            IcrcBridgeOp::IcrcMintConfirmed { .. } => true,
+        }
+    }
+
+    fn evm_address(&self) -> H160 {
+        match self {
+            IcrcBridgeOp::BurnIcrc2Tokens(burn) => &burn.recipient_address,
+            IcrcBridgeOp::SignMintOrder(order) => &order.recipient,
+            IcrcBridgeOp::SendMintTransaction { dst_address, .. } => dst_address,
+            IcrcBridgeOp::ConfirmMint { dst_address, .. } => dst_address,
+            IcrcBridgeOp::WrappedTokenMintConfirmed(event) => &event.recipient,
+            IcrcBridgeOp::MintIcrcTokens(event) => &event.sender,
+            IcrcBridgeOp::IcrcMintConfirmed { src_address, .. } => src_address,
+        }
+        .clone()
+    }
+
+    async fn on_wrapped_token_burnt(
+        _ctx: impl OperationContext,
+        event: BurntEventData,
+    ) -> Option<OperationAction<Self>> {
+        Some(OperationAction::Create(Self::MintIcrcTokens(event)))
+    }
+
+    async fn on_minter_notification(
+            _ctx: impl OperationContext,
+            _event: NotifyMinterEventData,
+        ) -> Option<OperationAction<Self>> {
+        
     }
 }
 
 impl IcrcBridgeOp {
-    pub async fn init_evm_info(config: SharedConfig) -> Result<EvmParams, SchedulerError> {
-        log::trace!("evm info initialization started");
-
-        let client = config.borrow().get_evm_link().get_json_rpc_client();
-        let address = {
-            let signer = config.borrow().get_signer().into_scheduler_result()?;
-            signer.get_address().await.into_scheduler_result()?
-        };
-
-        let evm_params = EvmParams::query(client, address)
-            .await
-            .into_scheduler_result()?;
-
-        config
-            .borrow_mut()
-            .update_evm_params(|p| *p = evm_params.clone());
-
-        log::trace!("evm parameters initialized");
-
-        Ok(evm_params)
-    }
-
-    async fn collect_evm_events(
-        config: SharedConfig,
-        scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-    ) -> Result<(), SchedulerError> {
-        // We need to get a local variable for the lock here to make sure it's not dropped immediately.
-        let Some(lock) = CollectLogsLock::take() else {
-            log::trace!("Another collect evm events task is in progress. Skipping.");
-            return Ok(());
-        };
-
-        log::trace!("collecting evm events");
-
-        let client = config.borrow().get_evm_link().get_json_rpc_client();
-        let evm_params = config.borrow().get_evm_params();
-        let params = match evm_params {
-            Ok(params) => params,
-            Err(_) => {
-                log::info!("No evm parameters set, trying to initialize evm info");
-                Self::init_evm_info(config.clone()).await?
-            }
-        };
-
-        let Some(bridge_contract) = config.borrow().get_bft_bridge_contract() else {
-            log::warn!("no bft bridge contract set, unable to collect events");
-            return Err(SchedulerError::TaskExecutionFailed(
-                "no bft bridge contract set".into(),
-            ));
-        };
-
-        let last_chain_block = client.get_block_number().await.into_scheduler_result()?;
-        let last_request_block = last_chain_block.min(params.next_block + MAX_LOG_REQUEST_COUNT);
-
-        let logs = BridgeEvent::collect_logs(
-            &client,
-            params.next_block,
-            last_request_block,
-            bridge_contract.0,
-        )
-        .await
-        .into_scheduler_result()?;
-
-        log::debug!("Got evm logs between blocks {} and {last_request_block} (last chain block is {last_chain_block}: {logs:?}", params.next_block);
-
-        config
-            .borrow_mut()
-            .update_evm_params(|params| params.next_block = last_request_block + 1);
-
-        log::trace!("appending logs to tasks: {logs:?}");
-
-        scheduler.append_tasks(logs.into_iter().filter_map(Self::task_by_log).collect());
-
-        // Update EVM params
-        Self::update_evm_params(config.clone()).await?;
-
-        // This line is not necessary as the lock variable will not be dropped anyway only at the
-        // end of the function or on any early return from the function. But I couldn't find
-        // explicit guarantees by the language for this behaviour, so let's make sure it's not dropped
-        // until now.
-        drop(lock);
-
-        Ok(())
-    }
-
     pub async fn burn_icrc2_tokens(
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
         operation_id: OperationId,
@@ -237,7 +194,7 @@ impl IcrcBridgeOp {
             .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite);
 
         let task_id = scheduler
-            .append_task(IcrcBridgeOp::PrepareMintOrder(operation_id).into_scheduled(options));
+            .append_task(IcrcBridgeOp::CreateMintOrder(operation_id).into_scheduled(options));
 
         log::trace!(
             "Operation {operation_id}: PrepareMintOrder task {task_id} is added to the scheduler"
@@ -671,7 +628,7 @@ impl IcrcBridgeOp {
                     )),
                 );
 
-                let task = Self::PrepareMintOrder(operation_id);
+                let task = Self::CreateMintOrder(operation_id);
                 let options = TaskOptions::default()
                     .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
                     .with_backoff_policy(BackoffPolicy::Exponential {
@@ -734,4 +691,124 @@ impl IcrcBridgeOp {
 
         Ok(())
     }
+
+    async fn burn_icrc_tokens(
+        ctx: impl OperationContext,
+        burn_info: Icrc2Burn,
+        nonce: 
+    ) -> BftResult<IcrcBridgeOp> {
+        log::trace!("burning icrc tokens due to: {burn_info:?}");
+
+        let caller_account = Account {
+            owner: burn_info.sender,
+            subaccount: burn_info.from_subaccount,
+        };
+
+        let token_info =
+            icrc1::query_token_info_or_read_from_cache(burn_info.icrc2_token_principal)
+                .await
+                .ok_or(Error::Custom {
+                    code: ErrorCodes::IcrcMetadataRequestFailed,
+                    msg: "failed to query Icrc token metadata".into(),
+                })?;
+
+        log::trace!("got token info: {token_info:?}");
+
+        let name = order::fit_str_to_array(&token_info.name);
+        let symbol = order::fit_str_to_array(&token_info.symbol);
+
+        let spender_subaccount = address_to_icrc_subaccount(&burn_info.recipient_address.0);
+        icrc2::burn(
+            burn_info.icrc2_token_principal,
+            caller_account,
+            Some(spender_subaccount),
+            (&burn_info.amount).into(),
+            true,
+        )
+        .await
+        .map_err(|e| Error::Custom {
+            code: ErrorCodes::IcrcBurnFailed as _,
+            msg: format!("failed to burn ICRC token: {e}"),
+        })?;
+
+        log::trace!("transferred icrc tokens to the bridge account");
+
+        let nonce = operation_id.nonce();
+        let burn_data = BurntIcrc2Data {
+            sender: reason.sender,
+            amount: reason.amount,
+            operation_id: nonce,
+            name,
+            symbol,
+            decimals: token_info.decimals,
+            src_token: reason.icrc2_token_principal,
+            recipient_address: reason.recipient_address,
+            erc20_token_address: reason.erc20_token_address,
+            fee_payer: reason.fee_payer,
+            approve_after_mint: reason.approve_after_mint,
+        };
+
+        log::trace!(
+            "Operation {operation_id}: storing new operation status Icrc2Burned({burn_data:?})"
+        );
+
+        operation_store.update(
+            operation_id,
+            OperationState::Deposit(DepositOperationState::Icrc2Burned(burn_data)),
+        );
+
+        let options = TaskOptions::default()
+            .with_backoff_policy(BackoffPolicy::Fixed { secs: 4 })
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite);
+
+        let task_id = scheduler
+            .append_task(IcrcBridgeOp::CreateMintOrder(operation_id).into_scheduled(options));
+
+        log::trace!(
+            "Operation {operation_id}: PrepareMintOrder task {task_id} is added to the scheduler"
+        );
+
+        Ok(())
+    }
+
+    async fn sign_mint_order(
+        ctx: impl OperationContext,
+        order: MintOrder,
+    ) -> BftResult<IcrcBridgeOp> {
+        todo!()
+    }
+
+    async fn send_mint_tx(
+        ctx: impl OperationContext,
+        order: SignedMintOrder,
+    ) -> BftResult<IcrcBridgeOp> {
+        todo!()
+    }
+
+    async fn mint_icrc_tokens(
+        ctx: impl OperationContext,
+        event: BurntEventData,
+    ) -> BftResult<IcrcBridgeOp> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+pub struct BurntIcrc2Data {
+    pub sender: Principal,
+    pub amount: did::U256,
+    pub src_token: Principal,
+    pub recipient_address: did::H160,
+    pub erc20_token_address: did::H160,
+    pub operation_id: u32,
+    pub name: [u8; 32],
+    pub symbol: [u8; 16],
+    pub decimals: u8,
+    pub fee_payer: Option<H160>,
+    pub approve_after_mint: Option<ApproveAfterMint>,
+}
+
+pub enum ErrorCodes {
+    IcrcMetadataRequestFailed = 0,
+    IcrcBurnFailed = 1,
 }

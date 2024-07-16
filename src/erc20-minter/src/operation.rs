@@ -23,7 +23,7 @@ impl Operation for OperationPayload {
         matches!(self.status, OperationStatus::Minted { .. })
     }
 
-    fn dst_address(&self) -> did::H160 {
+    fn evm_address(&self) -> did::H160 {
         todo!()
     }
 }

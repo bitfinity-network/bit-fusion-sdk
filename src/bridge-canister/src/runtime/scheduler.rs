@@ -57,7 +57,7 @@ impl<Op: Operation> BridgeTask<Op> {
                     return Err(Error::OperationNotFound(id));
                 };
 
-                let new_operation = operation.progress(ctx.clone()).await?;
+                let new_operation = operation.progress(id, ctx.clone()).await?;
                 let scheduling_options = new_operation.scheduling_options();
                 ctx.borrow_mut()
                     .operations
@@ -185,13 +185,13 @@ impl ServiceTask {
                     let Some((operation_id, _)) = ctx
                         .borrow()
                         .operations
-                        .get_for_address(&update_to.dst_address(), None, None)
+                        .get_for_address(&update_to.evm_address(), None, None)
                         .into_iter()
                         .find(|(operation_id, _)| operation_id.nonce() == nonce)
                     else {
                         log::warn!(
                             "operation with dst_address = {} and nonce {} not found",
-                            update_to.dst_address(),
+                            update_to.evm_address(),
                             nonce
                         );
                         return Err(Error::OperationNotFound(OperationId::new(nonce as _)));

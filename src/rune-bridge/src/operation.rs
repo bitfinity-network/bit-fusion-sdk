@@ -37,7 +37,7 @@ impl Operation for OperationState {
         todo!()
     }
 
-    fn dst_address(&self) -> did::H160 {
+    fn evm_address(&self) -> did::H160 {
         todo!()
     }
 }
