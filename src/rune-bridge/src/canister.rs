@@ -53,6 +53,8 @@ impl RuneBridge {
 
             const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
             const USED_UTXOS_REMOVE_INTERVAL: Duration = Duration::from_secs(60 * 60 * 24); // once a day
+            const GET_FEE_RATE_INTERVAL: Duration = Duration::from_secs(60 * 60); // once an hour
+            const REFRESH_RUNE_LIST_INTERVAL: Duration = Duration::from_secs(60 * 60); // once an hour
 
             ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
                 get_scheduler()
@@ -70,6 +72,30 @@ impl RuneBridge {
                 ic_exports::ic_cdk::spawn(
                     crate::task::RemoveUsedUtxosTask::from(get_state()).run(),
                 );
+            });
+
+            ic_exports::ic_cdk_timers::set_timer_interval(GET_FEE_RATE_INTERVAL, || {
+                get_scheduler()
+                    .borrow_mut()
+                    .append_task(Self::get_fee_rate_task());
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
+            });
+
+            ic_exports::ic_cdk_timers::set_timer_interval(REFRESH_RUNE_LIST_INTERVAL, || {
+                get_scheduler()
+                    .borrow_mut()
+                    .append_task(Self::refresh_rune_list_task());
+
+                let task_execution_result = get_scheduler().borrow_mut().run();
+
+                if let Err(err) = task_execution_result {
+                    log::error!("task execution failed: {err}",);
+                }
             });
         }
     }
@@ -151,19 +177,6 @@ impl RuneBridge {
         get_state().borrow_mut().configure_bft(config);
     }
 
-    #[cfg(target_family = "wasm")]
-    fn collect_evm_events_task() -> ScheduledTask<RuneBridgeTask> {
-        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
-
-        let options = TaskOptions::default()
-            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
-            .with_backoff_policy(BackoffPolicy::Fixed {
-                secs: EVM_EVENTS_COLLECTING_DELAY,
-            });
-
-        RuneBridgeTask::CollectEvmEvents.into_scheduled(options)
-    }
-
     #[update]
     pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
         let address = Address::from_str(&btc_address)
@@ -181,6 +194,45 @@ impl RuneBridge {
             .expect("failed to get rune amounts");
 
         rune_info_amounts
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn collect_evm_events_task() -> ScheduledTask<RuneBridgeTask> {
+        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: EVM_EVENTS_COLLECTING_DELAY,
+            });
+
+        RuneBridgeTask::CollectEvmEvents.into_scheduled(options)
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn get_fee_rate_task() -> ScheduledTask<RuneBridgeTask> {
+        const GET_FEE_RATE_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: GET_FEE_RATE_DELAY,
+            });
+
+        RuneBridgeTask::GetFeeRate.into_scheduled(options)
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn refresh_rune_list_task() -> ScheduledTask<RuneBridgeTask> {
+        const REFRESH_RUNE_LIST_DELAY: u32 = 1;
+
+        let options = TaskOptions::default()
+            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
+            .with_backoff_policy(BackoffPolicy::Fixed {
+                secs: REFRESH_RUNE_LIST_DELAY,
+            });
+
+        RuneBridgeTask::RefreshRuneList.into_scheduled(options)
     }
 
     pub fn idl() -> Idl {

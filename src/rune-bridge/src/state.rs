@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PrivateKey, PublicKey};
+use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_utils::evm_bridge::{EvmInfo, EvmParams};
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Deserialize, Principal};
@@ -17,7 +17,7 @@ use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
-use ordinals::RuneId;
+use ordinals::{RuneId, SpacedRune};
 
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
@@ -38,6 +38,10 @@ pub struct State {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    /// Existing runes.
+    rune_list: Vec<(RuneId, SpacedRune, u8)>,
+    /// Current fee rate for btc network.
+    fee_rate: FeeRate,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +73,8 @@ impl Default for State {
             master_key: None,
             ledger: Default::default(),
             runes: Default::default(),
+            rune_list: Default::default(),
+            fee_rate: FeeRate::ZERO,
         }
     }
 }
@@ -266,6 +272,26 @@ impl State {
     /// Returns EVM parameters.
     pub fn get_evm_params(&self) -> &Option<EvmParams> {
         &self.evm_params
+    }
+
+    /// Returns the list of existing runes.
+    pub fn get_rune_list(&self) -> &Vec<(RuneId, SpacedRune, u8)> {
+        &self.rune_list
+    }
+
+    /// Updates the list of existing runes.
+    pub fn set_rune_list(&mut self, rune_list: Vec<(RuneId, SpacedRune, u8)>) {
+        self.rune_list = rune_list;
+    }
+
+    /// Returns the fee rate used by the canister.
+    pub fn get_fee_rate(&self) -> FeeRate {
+        self.fee_rate
+    }
+
+    /// Sets the fee rate used by the canister.
+    pub fn set_fee_rate(&mut self, fee_rate: FeeRate) {
+        self.fee_rate = fee_rate;
     }
 
     /// Updates EVM parameters with the given closure.
