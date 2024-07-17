@@ -84,6 +84,9 @@ jobs:
           sudo apt install gcc-multilib libunwind-dev
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
           sudo ln -s $HOME/bin/ord /usr/bin/ord
+          wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
+          tar -xzf /tmp/bitcoin.tar.gz -C /tmp
+          cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
 
       - name: rustfmt
         run: |
