@@ -358,20 +358,15 @@ mod tests {
         assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.address_operation_map.len(), LIMIT);
 
-        // for i in 0..(COUNT - LIMIT) {
-        //     assert!(store
-        //         .get_for_address(&eth_address(i as u8), None, None)
-        //         .is_empty());
-        // }
+        for i in 0..(COUNT - LIMIT) {
+            assert!(store
+                .get_for_address(&eth_address(i as u8), None)
+                .is_empty());
+        }
 
-        // for i in (COUNT - LIMIT)..COUNT {
-        //     assert_eq!(
-        //         store
-        //             .get_for_address(&eth_address(i as u8), None, None)
-        //             .len(),
-        //         1,
-        //     );
-        // }
+        for i in (COUNT - LIMIT)..COUNT {
+            assert_eq!(store.get_for_address(&eth_address(i as u8), None).len(), 1,);
+        }
     }
 
     #[test]

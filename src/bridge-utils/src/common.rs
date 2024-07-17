@@ -16,9 +16,3 @@ impl Pagination {
         Self { offset, count }
     }
 }
-
-impl From<(usize, usize)> for Pagination {
-    fn from((offset, count): (usize, usize)) -> Self {
-        Self::new(offset, count)
-    }
-}
