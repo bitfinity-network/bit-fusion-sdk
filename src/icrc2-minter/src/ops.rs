@@ -1,30 +1,24 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
-use bridge_did::{
-    error::{BftResult, Error},
-    id256::Id256,
-    op_id::OperationId,
-    order::{self, MintOrder, SignedMintOrder},
-    reason::Icrc2Burn,
-};
-use bridge_utils::{
-    bft_events::{self, BurntEventData, MintedEventData, NotifyMinterEventData},
-    evm_link::address_to_icrc_subaccount,
-};
+use bridge_did::error::{BftResult, Error};
+use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
+use bridge_did::order::{self, MintOrder, SignedMintOrder};
+use bridge_did::reason::Icrc2Burn;
+use bridge_utils::bft_events::{self, BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
 use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
-use ic_task_scheduler::{retry::BackoffPolicy, task::TaskOptions};
-use icrc_client::{account::Account, transfer::TransferError};
+use ic_task_scheduler::retry::BackoffPolicy;
+use ic_task_scheduler::task::TaskOptions;
+use icrc_client::account::Account;
+use icrc_client::transfer::TransferError;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    constant::IC_CHAIN_ID,
-    tokens::{
-        icrc1::{self, IcrcCanisterError},
-        icrc2::{self, Success},
-    },
-};
+use crate::constant::IC_CHAIN_ID;
+use crate::tokens::icrc1::{self, IcrcCanisterError};
+use crate::tokens::icrc2::{self, Success};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum IcrcBridgeOp {
