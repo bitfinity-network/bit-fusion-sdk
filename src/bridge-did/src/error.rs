@@ -1,4 +1,5 @@
 use candid::CandidType;
+use eth_signer::sign_strategy::TransactionSignerError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -34,4 +35,10 @@ pub enum Error {
 
     #[error("generic error: code=={code}, message=`{msg}`")]
     Custom { code: u32, msg: String },
+}
+
+impl From<TransactionSignerError> for Error {
+    fn from(value: TransactionSignerError) -> Self {
+        Self::Signing(value.to_string())
+    }
 }

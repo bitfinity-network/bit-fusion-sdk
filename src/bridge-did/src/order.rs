@@ -15,7 +15,7 @@ use crate::id256::Id256;
 
 /// Data which should be signed and provided to the `BftBridge.mint()` call
 /// to perform mint.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CandidType)]
 pub struct MintOrder {
     /// Amount of tokens to mint.
     pub amount: U256,

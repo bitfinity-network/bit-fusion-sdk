@@ -266,7 +266,7 @@ mod tests {
             *self == COMPLETE
         }
 
-        async fn progress(self, _ctx: impl OperationContext) -> BftResult<Self> {
+        async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
             todo!()
         }
 
