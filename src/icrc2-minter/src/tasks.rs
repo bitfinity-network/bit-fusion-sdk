@@ -464,7 +464,7 @@ impl BridgeTask {
         let mut operation_store = get_operations_store();
         let nonce = minted_event.nonce;
         let Some((operation_id, operation_state)) = operation_store
-            .get_for_address(&minted_event.recipient, None, None)
+            .get_for_address(&minted_event.recipient, None)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {
