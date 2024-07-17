@@ -47,9 +47,17 @@ impl<Op: Operation> BridgeRuntime<Op> {
 
     pub fn run(&mut self) {
         if !self.state.borrow().collecting_logs {
+            self.state.borrow_mut().collecting_logs = true;
             let task = scheduler::BridgeTask::Service(ServiceTask::CollectEvmLogs);
             let collect_logs = ScheduledTask::new(task);
             self.scheduler.append_task(collect_logs);
+        }
+
+        if !self.state.borrow().refreshing_evm_params {
+            self.state.borrow_mut().refreshing_evm_params = true;
+            let task = scheduler::BridgeTask::Service(ServiceTask::RefreshEvmParams);
+            let refresh_evm_params = ScheduledTask::new(task);
+            self.scheduler.append_task(refresh_evm_params);
         }
 
         let task_execution_result = self.scheduler.run(self.state.clone());
@@ -57,6 +65,10 @@ impl<Op: Operation> BridgeRuntime<Op> {
         if let Err(err) = task_execution_result {
             log::error!("task execution failed: {err}",);
         }
+    }
+
+    pub fn state(&self) -> &RuntimeState<Op> {
+        &self.state
     }
 }
 

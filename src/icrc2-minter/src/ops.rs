@@ -29,11 +29,13 @@ pub enum IcrcBridgeOp {
         is_refund: bool,
     },
     SendMintTransaction {
+        src_token: Id256,
         dst_address: H160,
         order: SignedMintOrder,
         is_refund: bool,
     },
     ConfirmMint {
+        src_token: Id256,
         dst_address: H160,
         order: SignedMintOrder,
         tx_hash: Option<H256>,
@@ -49,6 +51,20 @@ pub enum IcrcBridgeOp {
     },
 }
 
+impl IcrcBridgeOp {
+    pub fn get_signed_mint_order(&self, token: &Id256) -> Option<SignedMintOrder> {
+        match self {
+            Self::SendMintTransaction {
+                order, src_token, ..
+            } if src_token == token => Some(*order),
+            Self::ConfirmMint {
+                order, src_token, ..
+            } if src_token == token => Some(*order),
+            _ => None,
+        }
+    }
+}
+
 impl Operation for IcrcBridgeOp {
     async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
         match self {
@@ -60,9 +76,10 @@ impl Operation for IcrcBridgeOp {
             }
             IcrcBridgeOp::SendMintTransaction {
                 order,
+                src_token,
                 dst_address,
                 is_refund,
-            } => Self::send_mint_tx(ctx, order, dst_address, is_refund).await,
+            } => Self::send_mint_tx(ctx, order, src_token, dst_address, is_refund).await,
             IcrcBridgeOp::ConfirmMint { .. } => {
                 log::warn!("ConfirmMint task should progress only on the Minted EVM event");
                 Err(Error::FailToProgress(
@@ -261,12 +278,14 @@ impl IcrcBridgeOp {
         let should_send_by_canister = order.fee_payer != H160::zero();
         let next_op = if should_send_by_canister {
             Self::SendMintTransaction {
+                src_token: order.src_token,
                 dst_address: order.recipient,
                 order: signed_mint_order,
                 is_refund,
             }
         } else {
             Self::ConfirmMint {
+                src_token: order.src_token,
                 dst_address: order.recipient,
                 order: signed_mint_order,
                 tx_hash: None,
@@ -280,6 +299,7 @@ impl IcrcBridgeOp {
     async fn send_mint_tx(
         ctx: impl OperationContext,
         order: SignedMintOrder,
+        src_token: Id256,
         dst_address: H160,
         is_refund: bool,
     ) -> BftResult<IcrcBridgeOp> {
@@ -310,6 +330,7 @@ impl IcrcBridgeOp {
             .map_err(|e| Error::EvmRequestFailed(format!("failed to send mint tx to EVM: {e}")))?;
 
         Ok(Self::ConfirmMint {
+            src_token,
             dst_address,
             order,
             tx_hash: Some(tx_hash.into()),

@@ -13,7 +13,6 @@ use ic_canister::{
 };
 use ic_exports::ic_kit::ic;
 use ic_log::writer::Logs;
-use ic_task_scheduler::task::TaskOptions;
 use log::{debug, info};
 
 use crate::inspect;
@@ -125,11 +124,7 @@ pub trait BridgeCanister: Canister {
     ///
     /// `_run_scheduler` callback is called in a timer and should start scheduler task execution
     /// round.
-    fn init_bridge(
-        &mut self,
-        init_data: BridgeInitData,
-        _run_scheduler: impl Fn(TaskOptions) + 'static,
-    ) {
+    fn init_bridge(&mut self, init_data: BridgeInitData, _run_scheduler: impl Fn() + 'static) {
         inspect::inspect_new_owner_is_valid(init_data.owner);
 
         self.config().borrow_mut().init(&init_data);
@@ -150,7 +145,7 @@ pub trait BridgeCanister: Canister {
 
     /// Re-initializes the bridge after upgrade. This method should be called from the `#[post-upgrade]`
     /// method.
-    fn bridge_post_upgrade(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
+    fn bridge_post_upgrade(&mut self, run_scheduler: impl Fn() + 'static) {
         if let Err(err) = LoggerConfigService.reload() {
             ic_exports::ic_cdk::println!("Error configuring the logger. Err: {err:?}")
         }
@@ -161,11 +156,10 @@ pub trait BridgeCanister: Canister {
     }
 
     /// Starts scheduler timer.
-    fn start_timers(&mut self, run_scheduler: impl Fn(TaskOptions) + 'static) {
+    fn start_timers(&mut self, run_scheduler: impl Fn() + 'static) {
         const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(2);
         ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
-            let options = TaskOptions::default();
-            run_scheduler(options);
+            run_scheduler();
         });
     }
 
@@ -197,7 +191,7 @@ mod tests {
     impl TestBridge {
         #[init]
         fn init(&mut self, init_data: BridgeInitData) {
-            self.init_bridge(init_data, |_| {});
+            self.init_bridge(init_data, || {});
         }
     }
 

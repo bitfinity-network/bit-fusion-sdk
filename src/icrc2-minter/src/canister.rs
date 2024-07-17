@@ -1,10 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::memory::{memory_by_id, StableMemory};
-use bridge_canister::operation_store::{OperationStore, OperationsMemory};
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
@@ -20,23 +19,14 @@ use ic_canister::{
 use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
 use ic_metrics::{Metrics, MetricsStorage};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableBTreeMap, VirtualMemory};
 use ic_storage::IcStorage;
-use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{InnerScheduledTask, TaskOptions, TaskStatus};
-use log::*;
 
-use crate::constant::{
-    OPERATIONS_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
-    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
-};
-use crate::memory::MEMORY_MANAGER;
-use crate::operation::OperationState;
-use crate::state::State;
-use crate::tasks::BridgeTask;
+use crate::ops::IcrcBridgeOp;
+use crate::state::IcrcState;
 
 mod inspect;
+
+type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
@@ -60,9 +50,6 @@ impl MinterCanister {
     #[init]
     pub fn init(&mut self, init_data: BridgeInitData) {
         self.init_bridge(init_data, Self::run_scheduler);
-        get_scheduler()
-            .borrow_mut()
-            .on_completion_callback(log_task_execution_error);
     }
 
     #[post_upgrade]
@@ -70,17 +57,9 @@ impl MinterCanister {
         self.bridge_post_upgrade(Self::run_scheduler);
     }
 
-    fn run_scheduler(log_task_options: TaskOptions) {
-        let scheduler = get_scheduler();
-        scheduler
-            .borrow_mut()
-            .append_task(BridgeTask::CollectEvmEvents.into_scheduled(log_task_options));
-
-        let task_execution_result = scheduler.borrow_mut().run(());
-
-        if let Err(err) = task_execution_result {
-            error!("Failed to run tasks: {err:?}",);
-        }
+    fn run_scheduler() {
+        let runtime = get_runtime();
+        runtime.borrow_mut().run();
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
@@ -120,14 +99,17 @@ impl MinterCanister {
         wallet_address: H160,
         offset: Option<usize>,
         count: Option<usize>,
-    ) -> Vec<(OperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address, offset, count)
+    ) -> Vec<(OperationId, IcrcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_for_address(&wallet_address, offset, count)
     }
 
     /// Adds the provided principal to the whitelist.
     #[update]
     pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
-        let state = get_state();
+        let state = get_icrc_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
 
@@ -141,7 +123,7 @@ impl MinterCanister {
     /// Remove a icrc2 principal token from the access list
     #[update]
     pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
-        let state = get_state();
+        let state = get_icrc_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
 
@@ -155,7 +137,7 @@ impl MinterCanister {
     /// Returns the list of all principals in the whitelist.
     #[query]
     fn get_whitelist(&self) -> Vec<Principal> {
-        get_state().borrow().access_list.get_all_principals()
+        get_icrc_state().borrow().access_list.get_all_principals()
     }
 
     fn access_control_inspect_message_check(
@@ -200,13 +182,15 @@ impl MinterCanister {
         offset: Option<usize>,
         count: Option<usize>,
     ) -> Vec<(u32, SignedMintOrder)> {
-        get_operations_store()
+        get_runtime_state()
+            .borrow()
+            .operations
             .get_for_address(&wallet_address, None, None)
             .into_iter()
-            .filter_map(|(operation_id, status)| {
-                status
-                    .get_signed_mint_order(Some(src_token))
-                    .map(|mint_order| (operation_id.nonce(), *mint_order))
+            .filter_map(|(operation_id, operation)| {
+                operation
+                    .get_signed_mint_order(&src_token)
+                    .map(|mint_order| (operation_id.nonce(), mint_order))
             })
             .skip(offset.unwrap_or_default())
             .take(count.unwrap_or(usize::MAX))
@@ -240,69 +224,35 @@ fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
     Ok(())
 }
 
-type TasksStorage =
-    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
-type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
-
-fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
-    match task.status() {
-        TaskStatus::Failed {
-            timestamp_secs,
-            error,
-        } => {
-            log::error!(
-                "task #{} execution failed: {error} at {timestamp_secs}",
-                task.id()
-            )
-        }
-        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
-            log::error!("task #{} panicked at {timestamp_secs}", task.id())
-        }
-        status_change => {
-            log::trace!("task #{} status changed: {status_change:?}", task.id())
-        }
-    };
-}
-
 thread_local! {
-    pub static STATE: Rc<RefCell<State>> = Rc::default();
+    pub static RUNTIME: SharedRuntime =
+        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
-        let pending_tasks =
-            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
-            PersistentScheduler::new(pending_tasks)
-    }));
+    pub static ICRC_STATE: Rc<RefCell<IcrcState>> = Rc::default();
+
+
 }
 
-pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
-    SCHEDULER.with(|scheduler| scheduler.clone())
+pub fn get_runtime() -> SharedRuntime {
+    RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_state() -> Rc<RefCell<State>> {
-    STATE.with(|state| state.clone())
+pub fn get_runtime_state() -> RuntimeState<IcrcBridgeOp> {
+    get_runtime().borrow().state().clone()
 }
 
-pub fn get_operations_store() -> OperationStore<StableMemory, OperationState> {
-    let mem = OperationsMemory {
-        id_counter: memory_by_id(OPERATIONS_COUNTER_MEMORY_ID),
-        incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
-        operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
-        operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
-    };
-
-    OperationStore::with_memory(mem, None)
+pub fn get_icrc_state() -> Rc<RefCell<IcrcState>> {
+    ICRC_STATE.with(|s| s.clone())
 }
 
 #[cfg(test)]
 mod test {
     use candid::Principal;
-    use did::U256;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::{inject, MockContext};
 
     use super::*;
-    use crate::operation::DepositOperationState;
     use crate::MinterCanister;
 
     fn owner() -> Principal {
@@ -385,20 +335,22 @@ mod test {
         let token_id = eth_address(0);
         let token_id_id256 = Id256::from_evm_address(&token_id, 5);
 
-        let op_state = OperationState::Deposit(DepositOperationState::MintOrderSigned {
-            token_id: token_id_id256,
-            amount: U256::one(),
-            signed_mint_order: Box::new(SignedMintOrder([0; 334])),
-        });
+        let op_state = IcrcBridgeOp::SendMintTransaction {
+            src_token: token_id_id256,
+            dst_address: eth_address(0),
+            order: SignedMintOrder([0; 334]),
+            is_refund: false,
+        };
 
         let token_id_other = eth_address(1);
         let token_id_other_id256 = Id256::from_evm_address(&token_id_other, 5);
 
-        let op_state_other = OperationState::Deposit(DepositOperationState::MintOrderSigned {
-            token_id: token_id_other_id256,
-            amount: U256::one(),
-            signed_mint_order: Box::new(SignedMintOrder([0; 334])),
-        });
+        let op_state_other = IcrcBridgeOp::SendMintTransaction {
+            src_token: token_id_other_id256,
+            dst_address: eth_address(0),
+            order: SignedMintOrder([0; 334]),
+            is_refund: false,
+        };
 
         const COUNT: usize = 42;
         const COUNT_OTHER: usize = 10;
@@ -406,17 +358,22 @@ mod test {
         let canister = init_canister().await;
 
         inject::get_context().update_id(owner());
-        let mut op_store = get_operations_store();
 
         let owner = eth_address(2);
         let owner_other = eth_address(3);
 
         for _ in 0..COUNT {
-            op_store.new_operation(op_state.clone());
+            get_runtime_state()
+                .borrow_mut()
+                .operations
+                .new_operation(op_state.clone());
         }
 
         for _ in 0..COUNT_OTHER {
-            op_store.new_operation(op_state_other.clone());
+            get_runtime_state()
+                .borrow_mut()
+                .operations
+                .new_operation(op_state_other.clone());
         }
 
         // get orders for the first token

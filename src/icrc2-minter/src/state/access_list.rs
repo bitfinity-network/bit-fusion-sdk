@@ -49,11 +49,11 @@ impl<M: Memory> AccessList<M> {
 
 #[cfg(test)]
 mod tests {
+    use bridge_canister::memory::MEMORY_MANAGER;
     use ic_exports::ic_kit::MockContext;
 
     use super::*;
     use crate::constant::ACCESS_LIST_MEMORY_ID;
-    use crate::memory::MEMORY_MANAGER;
 
     #[test]
     fn test_access_list() {

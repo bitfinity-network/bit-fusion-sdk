@@ -14,6 +14,7 @@ pub struct State<Op: Operation> {
     pub config: SharedConfig,
     pub operations: OperationStore<StableMemory, Op>,
     pub collecting_logs: bool,
+    pub refreshing_evm_params: bool,
 }
 
 impl<Op: Operation> State<Op> {
@@ -22,6 +23,7 @@ impl<Op: Operation> State<Op> {
             config,
             operations: OperationStore::with_memory(memory, None),
             collecting_logs: false,
+            refreshing_evm_params: false,
         }
     }
 }

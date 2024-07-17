@@ -4,11 +4,16 @@ use std::pin::Pin;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BridgeEvent;
+use bridge_utils::evm_bridge::EvmParams;
+use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use candid::CandidType;
+use did::U256;
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_stable_structures::StableBTreeMap;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
 use ic_task_scheduler::SchedulerError;
+use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
@@ -79,6 +84,7 @@ impl<Op: Operation> BridgeTask<Op> {
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub enum ServiceTask {
     CollectEvmLogs,
+    RefreshEvmParams,
 }
 
 impl ServiceTask {
@@ -90,7 +96,22 @@ impl ServiceTask {
         task_scheduler: DynScheduler<Op>,
     ) -> BftResult<()> {
         match self {
-            ServiceTask::CollectEvmLogs => ServiceTask::collect_evm_logs(ctx, task_scheduler).await,
+            ServiceTask::CollectEvmLogs => {
+                let log_collection_result =
+                    ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await;
+
+                ctx.borrow_mut().collecting_logs = false;
+
+                log_collection_result
+            }
+            ServiceTask::RefreshEvmParams => {
+                let evm_params_refreshing_result =
+                    ServiceTask::refresh_evm_params(ctx.clone()).await;
+
+                ctx.borrow_mut().refreshing_evm_params = false;
+
+                evm_params_refreshing_result
+            }
         }
     }
 
@@ -212,6 +233,51 @@ impl ServiceTask {
                 task_scheduler.append_task(task);
             }
         }
+
+        Ok(())
+    }
+
+    async fn refresh_evm_params<Op: Operation>(state: RuntimeState<Op>) -> BftResult<()> {
+        log::trace!("updating evm params");
+
+        let config = state.borrow().config.clone();
+        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let initial_params = config.borrow().get_evm_params()?;
+        let address = {
+            let signer = config.borrow().get_signer()?;
+            signer.get_address().await?
+        };
+
+        // Update the EvmParams
+        log::trace!("updating evm params");
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query nonce: {e}")))?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
+
+        let params = EvmParams {
+            nonce: nonce.0.as_u64(),
+            gas_price,
+            ..initial_params
+        };
+
+        config.borrow_mut().update_evm_params(|p| *p = params);
+
+        log::trace!("evm params updated");
 
         Ok(())
     }
