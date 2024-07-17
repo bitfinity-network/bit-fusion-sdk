@@ -255,15 +255,35 @@ where
 mod tests {
     use bridge_did::error::BftResult;
     use ic_stable_structures::VectorMemory;
-    use num_traits::ToBytes;
+    use serde::Serialize;
 
     use super::*;
     use crate::bridge::OperationContext;
 
+    #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType)]
+    struct TestOp {
+        pub addr: u32,
+        pub stage: u32,
+    }
+
     const COMPLETE: u32 = u32::MAX;
-    impl Operation for u32 {
+
+    impl TestOp {
+        pub fn new(addr: u32, stage: u32) -> Self {
+            Self { addr, stage }
+        }
+
+        pub fn complete(addr: u32) -> Self {
+            Self {
+                addr,
+                stage: COMPLETE,
+            }
+        }
+    }
+
+    impl Operation for TestOp {
         fn is_complete(&self) -> bool {
-            *self == COMPLETE
+            self.stage == COMPLETE
         }
 
         async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
@@ -271,13 +291,11 @@ mod tests {
         }
 
         fn evm_address(&self) -> H160 {
-            let mut buf = [0; 20];
-            buf[0..4].copy_from_slice(&self.to_be_bytes());
-            H160::from_slice(&buf)
+            eth_address(self.addr as _)
         }
     }
 
-    fn test_store(max_operations: u64) -> OperationStore<VectorMemory, u32> {
+    fn test_store(max_operations: u64) -> OperationStore<VectorMemory, TestOp> {
         let memory = OperationsMemory {
             id_counter: VectorMemory::default(),
             incomplete_operations: VectorMemory::default(),
@@ -304,8 +322,8 @@ mod tests {
 
         let mut store = test_store(LIMIT);
 
-        for _ in 0..COUNT {
-            store.new_operation(COMPLETE);
+        for i in 0..COUNT {
+            store.new_operation(TestOp::complete(i as _));
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -335,7 +353,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(COMPLETE);
+            store.new_operation(TestOp::complete(0));
         }
 
         assert_eq!(store.operations_log.len(), COUNT);
@@ -372,14 +390,14 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(COMPLETE);
+            store.new_operation(TestOp::complete(42));
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.address_operation_map.len(), 1);
 
         assert_eq!(
-            store.get_for_address(&eth_address(1), None, None).len(),
+            store.get_for_address(&eth_address(42), None, None).len(),
             LIMIT as usize
         );
     }
@@ -391,9 +409,9 @@ mod tests {
 
         let mut store = test_store(LIMIT);
 
-        for _ in 0..COUNT {
-            let id = store.new_operation(1);
-            store.update(id, 2);
+        for i in 0..COUNT {
+            let id = store.new_operation(TestOp::new(42, i as _));
+            store.update(id, TestOp::new(42, (i + 1) as _));
         }
 
         assert_eq!(store.operations_log.len(), 0);
@@ -401,7 +419,7 @@ mod tests {
         assert_eq!(store.address_operation_map.len(), 1);
 
         assert_eq!(
-            store.get_for_address(&eth_address(1), None, None).len(),
+            store.get_for_address(&eth_address(42), None, None).len(),
             COUNT as usize
         );
     }
@@ -414,13 +432,13 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         let mut ids = vec![];
-        for _ in 0..COUNT {
-            ids.push(store.new_operation(1));
+        for i in 0..COUNT {
+            ids.push(store.new_operation(TestOp::new(i as _, 1)));
         }
 
         for id in ids {
             let count_before = store.incomplete_operations.len();
-            store.update(id, COMPLETE);
+            store.update(id, TestOp::complete(id.nonce()));
             let count_after = store.incomplete_operations.len();
             assert_eq!(count_after, count_before - 1);
         }

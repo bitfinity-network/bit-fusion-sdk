@@ -335,9 +335,12 @@ mod test {
         let token_id = eth_address(0);
         let token_id_id256 = Id256::from_evm_address(&token_id, 5);
 
+        let owner_addr = eth_address(2);
+        let owner_other_addr = eth_address(3);
+
         let op_state = IcrcBridgeOp::SendMintTransaction {
             src_token: token_id_id256,
-            dst_address: eth_address(0),
+            dst_address: owner_addr.clone(),
             order: SignedMintOrder([0; 334]),
             is_refund: false,
         };
@@ -347,7 +350,7 @@ mod test {
 
         let op_state_other = IcrcBridgeOp::SendMintTransaction {
             src_token: token_id_other_id256,
-            dst_address: eth_address(0),
+            dst_address: owner_other_addr.clone(),
             order: SignedMintOrder([0; 334]),
             is_refund: false,
         };
@@ -358,9 +361,6 @@ mod test {
         let canister = init_canister().await;
 
         inject::get_context().update_id(owner());
-
-        let owner = eth_address(2);
-        let owner_other = eth_address(3);
 
         for _ in 0..COUNT {
             get_runtime_state()
@@ -378,7 +378,7 @@ mod test {
 
         // get orders for the first token
         let orders = canister_call!(
-            canister.list_mint_orders(owner.clone(), token_id_id256, None, Some(COUNT)),
+            canister.list_mint_orders(owner_addr.clone(), token_id_id256, None, Some(COUNT)),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -388,7 +388,7 @@ mod test {
 
         // get with offset
         let orders = canister_call!(
-            canister.list_mint_orders(owner.clone(), token_id_id256, Some(10), Some(20)),
+            canister.list_mint_orders(owner_addr.clone(), token_id_id256, Some(10), Some(20)),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -397,7 +397,12 @@ mod test {
 
         // get with offset to the end
         let orders = canister_call!(
-            canister.list_mint_orders(owner.clone(), token_id_id256, Some(COUNT - 5), Some(100)),
+            canister.list_mint_orders(
+                owner_addr.clone(),
+                token_id_id256,
+                Some(COUNT - 5),
+                Some(100)
+            ),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -406,7 +411,7 @@ mod test {
 
         // get orders with no limit
         let orders = canister_call!(
-            canister.list_mint_orders(owner.clone(), token_id_id256, None, None),
+            canister.list_mint_orders(owner_addr.clone(), token_id_id256, None, None),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -415,7 +420,7 @@ mod test {
 
         // get orders with offset but no limit
         let orders = canister_call!(
-            canister.list_mint_orders(owner.clone(), token_id_id256, Some(10), None),
+            canister.list_mint_orders(owner_addr.clone(), token_id_id256, Some(10), None),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -424,7 +429,7 @@ mod test {
 
         // get orders for the second token but `owner`
         let orders = canister_call!(
-            canister.list_mint_orders(owner, token_id_other_id256, None, None),
+            canister.list_mint_orders(owner_addr, token_id_other_id256, None, None),
             Vec<(u32, SignedMintOrder)>
         )
         .await
@@ -433,7 +438,7 @@ mod test {
 
         // get orders for the second token
         let orders = canister_call!(
-            canister.list_mint_orders(owner_other.clone(), token_id_other_id256, None, None),
+            canister.list_mint_orders(owner_other_addr.clone(), token_id_other_id256, None, None),
             Vec<(u32, SignedMintOrder)>
         )
         .await
