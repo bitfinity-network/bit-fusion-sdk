@@ -96,12 +96,14 @@ impl ConfigStorage {
     }
 
     /// Updates signing strategy.
-    /// Allowed only for owner.
     pub fn set_signing_strategy(&mut self, strategy: SigningStrategy) {
         self.update(|config| config.signing_strategy = strategy);
     }
 
-    // pub fn check_owner()
+    /// Returns signing strategy.
+    pub fn get_signing_strategy(&self) -> SigningStrategy {
+        self.0.get().signing_strategy.clone()
+    }
 
     fn update(&mut self, f: impl FnOnce(&mut Config)) {
         let mut config = self.0.get().clone();
