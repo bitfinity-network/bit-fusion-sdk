@@ -150,7 +150,7 @@ sleep 10
 
 # setup wallet
 WALLET_TEST="admin"
-WALLET_TEST_ADDRESS=$(create_or_reuse_wallet $WALLET_TEST)
+export WALLET_TEST_ADDRESS=$(create_or_reuse_wallet $WALLET_TEST)
 echo "$WALLET_TEST address: $WALLET_TEST_ADDRESS"
 
 # Ensure we have some BTC to spend

@@ -263,6 +263,8 @@ impl RunesContext {
     async fn mint_blocks(&self, count: u32) {
         // Await all previous operations to synchronize for ord and dfx
         self.inner.advance_time(Duration::from_secs(1)).await;
+        let wallet_test_address =
+            std::env::var("WALLET_TEST_ADDRESS").expect("WALLET_TEST_ADDRESS is not set");
 
         let pwd = std::env::var("PWD").expect("PWD is not set");
         let output = Self::bitcoin_cli([
@@ -270,7 +272,7 @@ impl RunesContext {
             "-rpcwallet=admin",
             "generatetoaddress",
             &count.to_string(),
-            "bcrt1q7xzw9nzmsvwnvfrx6vaq5npkssqdylczjk8cts",
+            &wallet_test_address,
         ])
         .await;
 
@@ -363,7 +365,7 @@ impl RunesContext {
             hex::encode(tx_id.0)
         );
 
-        const MAX_RETRIES: u32 = 5;
+        const MAX_RETRIES: u32 = 10;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
             self.inner.advance_time(Duration::from_secs(2)).await;
