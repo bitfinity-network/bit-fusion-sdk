@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use bitcoin::Address;
+use bridge_utils::common::Pagination;
 use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::H160;
@@ -102,8 +103,9 @@ impl RuneBridge {
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        pagination: Option<Pagination>,
     ) -> Vec<(MinterOperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address, None, None)
+        get_operations_store().get_for_address(&wallet_address, pagination)
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
