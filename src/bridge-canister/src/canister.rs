@@ -94,9 +94,9 @@ pub trait BridgeCanister: Canister {
     /// Set BFT bridge contract address.
     #[update(trait = true)]
     fn set_bft_bridge_contract(&mut self, address: H160) {
-        let core = self.config();
+        let config = self.config();
         inspect::inspect_set_bft_bridge_contract(self.config());
-        core.borrow_mut().set_bft_bridge_contract(address.clone());
+        config.borrow_mut().set_bft_bridge_contract(address.clone());
 
         info!("Bridge canister BFT bridge contract address changed to {address}");
     }
@@ -277,7 +277,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "Evm principal cannot be an anonymous")]
+    #[should_panic(expected = "unexpected anonymous evm principal")]
     async fn init_rejects_anonymous_evm() {
         let init_data = BridgeInitData {
             owner: owner(),
@@ -291,7 +291,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "Evm principal cannot be management canister")]
+    #[should_panic(expected = "unexpected management canister as evm principal")]
     async fn init_rejects_management_evm() {
         let init_data = BridgeInitData {
             owner: owner(),

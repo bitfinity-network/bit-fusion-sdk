@@ -5,7 +5,9 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
+use bridge_utils::query::{
+    self, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+};
 use candid::CandidType;
 use did::U256;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -234,6 +236,7 @@ impl ServiceTask {
             }
         }
 
+        log::debug!("EVM logs collected");
         Ok(())
     }
 
@@ -242,7 +245,10 @@ impl ServiceTask {
 
         let config = state.borrow().config.clone();
         let client = config.borrow().get_evm_link().get_json_rpc_client();
-        let initial_params = config.borrow().get_evm_params()?;
+        if config.borrow().get_evm_params().is_err() {
+            Self::init_evm_params(state.clone()).await?;
+        };
+
         let address = {
             let signer = config.borrow().get_signer()?;
             signer.get_address().await?
@@ -269,17 +275,56 @@ impl ServiceTask {
             .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
 
-        let params = EvmParams {
-            nonce: nonce.0.as_u64(),
-            gas_price,
-            ..initial_params
-        };
+        config.borrow_mut().update_evm_params(|p| {
+            p.nonce = nonce.0.as_u64();
+            p.gas_price = gas_price;
+        });
 
-        config.borrow_mut().update_evm_params(|p| *p = params);
-
-        log::trace!("evm params updated");
+        log::trace!("evm params updated: {:?}", config.borrow().get_evm_params());
 
         Ok(())
+    }
+
+    async fn init_evm_params<Op: Operation>(state: RuntimeState<Op>) -> BftResult<EvmParams> {
+        log::trace!("initializing evm params");
+
+        let config = state.borrow().config.clone();
+
+        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::GasPrice,
+                QueryType::ChainID,
+                QueryType::LatestBlock,
+            ],
+        )
+        .await
+        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
+
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
+        let chain_id: U256 = responses
+            .get_value_by_id(Id::Str(CHAINID_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query chain id: {e}")))?;
+        let latest_block: U256 = responses
+            .get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query latest block: {e}")))?;
+
+        let params = EvmParams {
+            nonce: 0,
+            gas_price,
+            chain_id: chain_id.0.as_u32(),
+            next_block: latest_block.0.as_u64(),
+        };
+
+        config
+            .borrow_mut()
+            .update_evm_params(|p| *p = params.clone());
+
+        log::trace!("evm params initialized: {params:?}");
+        Ok(params)
     }
 }
 

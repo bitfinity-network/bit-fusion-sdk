@@ -149,6 +149,7 @@ impl Operation for IcrcBridgeOp {
         _ctx: impl OperationContext,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
+        log::trace!("wrapped token burnt");
         Some(OperationAction::Create(Self::MintIcrcTokens(event)))
     }
 
@@ -156,6 +157,7 @@ impl Operation for IcrcBridgeOp {
         _ctx: impl OperationContext,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
+        log::trace!("wrapped token minted");
         Some(OperationAction::Update {
             nonce: event.nonce,
             update_to: IcrcBridgeOp::WrappedTokenMintConfirmed(event),
@@ -166,6 +168,10 @@ impl Operation for IcrcBridgeOp {
         _ctx: impl OperationContext,
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
+        log::trace!(
+            "got minter notification with type: {}",
+            event.notification_type
+        );
         let mut icrc_burn = match Decode!(&event.user_data, Icrc2Burn) {
             Ok(icrc_burn) => icrc_burn,
             Err(e) => {

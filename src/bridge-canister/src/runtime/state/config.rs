@@ -26,6 +26,16 @@ impl ConfigStorage {
 
     /// Creates a new instance of config struct and stores it in the stable memory.
     pub fn init(&mut self, init_data: &BridgeInitData) {
+        if init_data.evm_principal == Principal::anonymous() {
+            log::error!("unexpected anonymous evm principal");
+            panic!("unexpected anonymous evm principal");
+        }
+
+        if init_data.evm_principal == Principal::management_canister() {
+            log::error!("unexpected management canister as evm principal");
+            panic!("unexpected management canister as evm principal");
+        }
+
         let evm_link = EvmLink::Ic(init_data.evm_principal);
         let new_config = Config {
             owner: init_data.owner,

@@ -299,6 +299,7 @@ pub enum IcrcCanisterError {
     Generic(String),
 }
 
+#[allow(unreachable_patterns)] // because in wasm the `e => ...` pattern is impossible.
 impl From<CanisterClientError> for IcrcCanisterError {
     fn from(value: CanisterClientError) -> Self {
         match value {
