@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -20,21 +20,20 @@ const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
 const MAX_RESPONSE_BYTES: u64 = 10_000;
 
 pub struct OrdIndexProvider {
-    indexer_url: String,
+    indexer_urls: HashSet<String>,
 }
 
 impl OrdIndexProvider {
-    pub fn new(indexer_url: String) -> Self {
-        Self { indexer_url }
+    pub fn new(indexer_urls: HashSet<String>) -> Self {
+        Self { indexer_urls }
     }
 
-    fn indexer_url(&self) -> &str {
-        &self.indexer_url
-    }
-
-    async fn http_request<R: DeserializeOwned>(&self, uri: &str) -> Result<R, DepositError> {
-        let indexer_url = self.indexer_url();
-        let url = format!("{indexer_url}/{uri}");
+    async fn http_request<R: DeserializeOwned>(
+        &self,
+        url: &str,
+        uri: &str,
+    ) -> Result<R, DepositError> {
+        let url = format!("{url}/{uri}");
 
         log::trace!("Sending indexer request to: {url}");
 
@@ -68,9 +67,55 @@ impl OrdIndexProvider {
         })
     }
 
-    pub async fn get_tx_outputs(&self, utxo: &Utxo) -> Result<OutputResponse, DepositError> {
-        let outpoint = format_outpoint(&utxo.outpoint);
-        self.http_request(&format!("output/{outpoint}")).await
+    /// Get consensus response from the indexer.
+    ///
+    /// All indexers must return the same response for the same input, other
+    /// the function will return an error.
+    async fn get_consensus_response<T>(&self, uri: &str) -> Result<T, DepositError>
+    where
+        T: Clone + DeserializeOwned + PartialEq,
+    {
+        let mut first_response: Option<T> = None;
+        let mut failed_urls = Vec::with_capacity(self.indexer_urls.len());
+        let mut inconsistent_urls = Vec::new();
+
+        for url in &self.indexer_urls {
+            match self.http_request::<T>(url, uri).await {
+                Ok(response) => match &first_response {
+                    None => first_response = Some(response),
+                    Some(first) => {
+                        if &response != first {
+                            inconsistent_urls.push(url);
+                        }
+                    }
+                },
+                Err(e) => {
+                    log::warn!("Failed to get response from indexer {}: {:?}", url, e);
+                    failed_urls.push(url);
+                }
+            }
+        }
+
+        match first_response {
+            None => Err(DepositError::Unavailable(format!(
+                "All indexers failed to respond. Failed URLs: {:?}",
+                failed_urls
+            ))),
+            Some(response) => {
+                if inconsistent_urls.is_empty() {
+                    Ok(response)
+                } else {
+                    log::error!(
+                        "Inconsistent responses from indexers. Inconsistent URLs: {:?}",
+                        inconsistent_urls
+                    );
+                    Err(DepositError::Unavailable(format!(
+                    "Indexer responses are not consistent. Inconsistent URLs: {:?}, Please wait for a while and try again",
+                    inconsistent_urls
+                )))
+                }
+            }
+        }
     }
 }
 
@@ -80,7 +125,10 @@ impl RuneIndexProvider for OrdIndexProvider {
             "Requesting rune balances for utxo {}:",
             format_outpoint(&utxo.outpoint)
         );
-        let response = self.get_tx_outputs(utxo).await?;
+
+        let uri = format_outpoint(&utxo.outpoint);
+        let response = self.get_consensus_response::<OutputResponse>(&uri).await?;
+
         let amounts = response
             .runes
             .iter()
@@ -97,13 +145,13 @@ impl RuneIndexProvider for OrdIndexProvider {
     }
 
     async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, DepositError> {
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
         struct RuneInfo {
             spaced_rune: SpacedRune,
             divisibility: u8,
         }
 
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
         struct RunesResponse {
             entries: Vec<(RuneId, RuneInfo)>,
         }
@@ -111,7 +159,9 @@ impl RuneIndexProvider for OrdIndexProvider {
         // todo: AFAIK this endpoint will return first 50 entries. Need to figure out how to use
         // pagination with this api.
         // https://infinityswap.atlassian.net/browse/EPROD-854
-        let response: RunesResponse = self.http_request("runes").await?;
+        let response = self
+            .get_consensus_response::<RunesResponse>("runes")
+            .await?;
 
         Ok(response
             .entries

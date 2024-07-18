@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
@@ -81,7 +81,8 @@ pub struct RuneBridgeConfig {
     pub admin: Principal,
     pub log_settings: LogSettings,
     pub min_confirmations: u32,
-    pub indexer_url: String,
+    pub no_of_indexers: u32,
+    pub indexer_urls: HashSet<String>,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
 }
@@ -97,7 +98,8 @@ impl Default for RuneBridgeConfig {
             admin: Principal::management_canister(),
             log_settings: LogSettings::default(),
             min_confirmations: 12,
-            indexer_url: String::new(),
+            no_of_indexers: 3,
+            indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
         }
@@ -106,15 +108,23 @@ impl Default for RuneBridgeConfig {
 
 impl RuneBridgeConfig {
     fn validate(&self) -> Result<(), String> {
-        if self.indexer_url.is_empty() {
+        if self.indexer_urls.is_empty() {
             return Err("Indexer url is empty".to_string());
         }
 
-        if !self.indexer_url.starts_with("https") {
+        if self.indexer_urls.len() != self.no_of_indexers as usize {
             return Err(format!(
-                "Indexer url must specify https url, but give value is: {}",
-                self.indexer_url
+                "Indexer url must specify {} urls",
+                self.no_of_indexers
             ));
+        }
+
+        if self
+            .indexer_urls
+            .iter()
+            .any(|url| !url.starts_with("https"))
+        {
+            return Err("Indexer url must specify https url".to_string());
         }
 
         Ok(())
@@ -217,12 +227,8 @@ impl State {
     }
 
     /// Url of the `ord` indexer this canister rely on.
-    pub fn indexer_url(&self) -> String {
-        self.config
-            .indexer_url
-            .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.indexer_url)
-            .to_string()
+    pub fn indexer_urls(&self) -> HashSet<String> {
+        self.config.indexer_urls.clone()
     }
 
     /// Utxo ledger.
@@ -292,6 +298,15 @@ impl State {
             panic!("Invalid configuration: {err}");
         }
 
+        // Stripping the trailing slash from the indexer url.
+        let indexer_urls = config
+            .indexer_urls
+            .iter()
+            .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
+            .collect();
+
+        self.config.indexer_urls = indexer_urls;
+
         let signer = config
             .signing_strategy
             .clone()
@@ -337,7 +352,7 @@ mod tests {
     #[test]
     fn indexer_url_stripping() {
         let config = RuneBridgeConfig {
-            indexer_url: "https://url.com".to_string(),
+            indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
             ..Default::default()
         };
         let state = State {
@@ -345,10 +360,13 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(state.indexer_url(), "https://url.com".to_string());
+        assert_eq!(
+            state.indexer_urls(),
+            HashSet::from_iter(vec![String::from("https://url.com")])
+        );
 
         let config = RuneBridgeConfig {
-            indexer_url: "https://url.com/".to_string(),
+            indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
             ..Default::default()
         };
         let state = State {
@@ -356,6 +374,9 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(state.indexer_url(), "https://url.com".to_string());
+        assert_eq!(
+            state.indexer_urls(),
+            HashSet::from_iter(vec![String::from("https://url.com")])
+        );
     }
 }
