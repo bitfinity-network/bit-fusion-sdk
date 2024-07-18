@@ -114,8 +114,9 @@ impl RuneBridgeConfig {
 
         if self.indexer_urls.len() != self.no_of_indexers as usize {
             return Err(format!(
-                "Indexer url must specify {} urls",
-                self.no_of_indexers
+                "Number of indexers ({}) required does not match number of indexer urls ({})",
+                self.no_of_indexers,
+                self.indexer_urls.len()
             ));
         }
 
@@ -293,19 +294,16 @@ impl State {
 
     /// Validates the given configuration and sets it to the state. Panics in case the configuration
     /// is invalid.
-    pub fn configure(&mut self, config: RuneBridgeConfig) {
+    pub fn configure(&mut self, mut config: RuneBridgeConfig) {
         if let Err(err) = config.validate() {
             panic!("Invalid configuration: {err}");
         }
 
-        // Stripping the trailing slash from the indexer url.
-        let indexer_urls = config
+        config.indexer_urls = config
             .indexer_urls
             .iter()
             .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
             .collect();
-
-        self.config.indexer_urls = indexer_urls;
 
         let signer = config
             .signing_strategy
@@ -350,29 +348,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn indexer_url_stripping() {
+    fn test_validate_empty_indexer_urls() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::new(),
+            no_of_indexers: 1,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_mismatched_number_of_indexers() {
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
+            no_of_indexers: 2,
             ..Default::default()
         };
-        let state = State {
-            config,
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_non_https_url() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::from_iter(vec!["http://url.com".to_string()]),
+            no_of_indexers: 1,
             ..Default::default()
         };
+        assert!(config.validate().is_err());
+    }
 
-        assert_eq!(
-            state.indexer_urls(),
-            HashSet::from_iter(vec![String::from("https://url.com")])
-        );
+    #[test]
+    fn test_validate_success() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
+            no_of_indexers: 1,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
 
+    #[test]
+    fn test_configure_with_trailing_slash() {
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
+            no_of_indexers: 1,
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1; 32],
+            },
             ..Default::default()
         };
-        let state = State {
-            config,
-            ..Default::default()
-        };
+        let mut state = State::default();
+        state.configure(config);
 
         assert_eq!(
             state.indexer_urls(),
