@@ -368,7 +368,7 @@ impl RunesContext {
         const MAX_RETRIES: u32 = 10;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
-            self.inner.advance_time(Duration::from_secs(2)).await;
+            self.inner.advance_time(Duration::from_secs(30)).await;
             retry_count += 1;
 
             eprintln!("Checking deposit status. Try #{retry_count}...");
