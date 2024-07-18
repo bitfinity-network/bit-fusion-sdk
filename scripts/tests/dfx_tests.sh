@@ -182,6 +182,7 @@ $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 10 $WALLET_TEST_ADDRESS
 
 sleep 5
 $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 1 $WALLET_TEST_ADDRESS
+sleep 30
 
 # run tests
 cargo test -p integration-tests --features dfx_tests $@
