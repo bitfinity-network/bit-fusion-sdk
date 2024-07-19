@@ -4,11 +4,10 @@ use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{self, MintOrder, SignedMintOrder};
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::bft_events::{self, BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
 use did::{H160, H256, U256};
-use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
@@ -309,37 +308,13 @@ impl IcrcBridgeOp {
         dst_address: H160,
         is_refund: bool,
     ) -> BftResult<IcrcBridgeOp> {
-        let signer = ctx.get_signer()?;
-        let sender = signer.get_address().await?;
-        let bridge_contract = ctx.get_bridge_contract_address()?;
-        let evm_params = ctx.get_evm_params()?;
-
-        let mut tx = bft_events::mint_transaction(
-            sender.0,
-            bridge_contract.0,
-            evm_params.nonce.into(),
-            evm_params.gas_price.clone().into(),
-            &order.0,
-            evm_params.chain_id as _,
-        );
-
-        let signature = signer.sign_transaction(&(&tx).into()).await?;
-        tx.r = signature.r.0;
-        tx.s = signature.s.0;
-        tx.v = signature.v.0;
-        tx.hash = tx.hash();
-
-        let client = ctx.get_evm_link().get_json_rpc_client();
-        let tx_hash = client
-            .send_raw_transaction(tx)
-            .await
-            .map_err(|e| Error::EvmRequestFailed(format!("failed to send mint tx to EVM: {e}")))?;
+        let tx_hash = ctx.send_mint_transaction(&order).await?;
 
         Ok(Self::ConfirmMint {
             src_token,
             dst_address,
             order,
-            tx_hash: Some(tx_hash.into()),
+            tx_hash: Some(tx_hash),
             is_refund,
         })
     }
