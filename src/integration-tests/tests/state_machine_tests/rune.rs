@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use candid::Principal;
@@ -46,7 +47,8 @@ impl RunesSetup {
             admin: (&context).admin(),
             log_settings: Default::default(),
             min_confirmations: 1,
-            indexer_url: "https://indexer".to_string(),
+            no_of_indexers: 1,
+            indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
             deposit_fee: 0,
             mempool_timeout: Duration::from_secs(60),
         };
