@@ -19,6 +19,7 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
 
+use super::index_provider::IcHttpClient;
 use crate::canister::{get_operations_store, get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
@@ -126,7 +127,7 @@ impl RuneDepositPayload {
 
 pub(crate) struct RuneDeposit<
     UTXO: UtxoProvider = IcUtxoProvider,
-    INDEX: RuneIndexProvider = OrdIndexProvider,
+    INDEX: RuneIndexProvider = OrdIndexProvider<IcHttpClient>,
 > {
     state: Rc<RefCell<State>>,
     scheduler: Rc<RefCell<PersistentScheduler>>,
@@ -137,7 +138,7 @@ pub(crate) struct RuneDeposit<
     operation_store: RuneOperationStore,
 }
 
-impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
+impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     pub fn new(state: Rc<RefCell<State>>, scheduler: Rc<RefCell<PersistentScheduler>>) -> Self {
         let state_ref = state.borrow();
 
@@ -154,7 +155,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
             network,
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
-            index_provider: OrdIndexProvider::new(indexer_url),
+            index_provider: OrdIndexProvider::new(IcHttpClient::from(indexer_url)),
             operation_store: get_operations_store(),
         }
     }

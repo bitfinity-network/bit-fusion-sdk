@@ -33,11 +33,9 @@ pub async fn btc_to_erc20(
             for utxo in minted_utxos {
                 let eth_address = eth_address.clone();
                 let res = match utxo {
-                    UtxoStatus::Minted {
-                        minted_amount,
-                        utxo,
-                        ..
-                    } => mint_erc20(&state, eth_address, minted_amount, utxo.height).await,
+                    UtxoStatus::Minted { minted_amount, .. } => {
+                        mint_erc20(&state, eth_address, minted_amount).await
+                    }
                     UtxoStatus::ValueTooSmall(_) => Err(Erc20MintError::ValueTooSmall),
                     UtxoStatus::Tainted(utxo) => Err(Erc20MintError::Tainted(utxo)),
                     UtxoStatus::Checked(_) => Err(Erc20MintError::CkBtcMinter(
@@ -111,8 +109,11 @@ pub async fn mint_erc20(
     state: &RefCell<State>,
     eth_address: H160,
     amount: u64,
-    nonce: u32,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
+    let nonce = state
+        .borrow()
+        .mint_orders()
+        .next_nonce(&Id256::from_evm_address(&eth_address, 0));
     log::debug!(
         "Minting {amount} BTC to {eth_address} with nonce {nonce} for token {}",
         state.borrow().token_address()
