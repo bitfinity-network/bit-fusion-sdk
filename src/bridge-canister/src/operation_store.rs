@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 
 use bridge_did::op_id::OperationId;
+use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
 use ic_stable_structures::stable_structures::Memory;
@@ -181,18 +182,21 @@ where
     pub fn get_for_address(
         &self,
         dst_address: &H160,
-        offset: Option<usize>,
-        count: Option<usize>,
+        pagination: Option<Pagination>,
     ) -> Vec<(OperationId, P)> {
         log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
+
+        let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
+        let count = pagination.map(|p| p.count).unwrap_or(usize::MAX);
+
         self.address_operation_map
             .get(dst_address)
             .unwrap_or_default()
             .0
             .into_iter()
             .filter_map(|id| self.get_with_id(id))
-            .skip(offset.unwrap_or(0))
-            .take(count.unwrap_or(usize::MAX))
+            .skip(offset)
+            .take(count)
             .collect()
     }
 
@@ -331,17 +335,12 @@ mod tests {
 
         for i in 0..(COUNT - LIMIT) {
             assert!(store
-                .get_for_address(&eth_address(i as u8), None, None)
+                .get_for_address(&eth_address(i as u8), None)
                 .is_empty());
         }
 
         for i in (COUNT - LIMIT)..COUNT {
-            assert_eq!(
-                store
-                    .get_for_address(&eth_address(i as u8), None, None)
-                    .len(),
-                1,
-            );
+            assert_eq!(store.get_for_address(&eth_address(i as u8), None).len(), 1,);
         }
     }
 
@@ -359,27 +358,19 @@ mod tests {
         assert_eq!(store.operations_log.len(), COUNT);
 
         // No offset, with count
-        let page = store.get_for_address(&eth_address(0), None, Some(10));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 10)));
         assert_eq!(page.len(), 10);
         // No offset with count > total
-        let page = store.get_for_address(&eth_address(0), None, Some(120));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 120)));
         assert_eq!(page.len() as u64, COUNT);
 
         // Offset with count
-        let page = store.get_for_address(&eth_address(0), Some(20), Some(15));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(20, 15)));
         assert_eq!(page.len(), 15);
 
         // Offset with count beyond total
-        let page = store.get_for_address(&eth_address(0), Some(100), Some(10));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(100, 10)));
         assert!(page.is_empty());
-
-        // Offset without count
-        let page = store.get_for_address(&eth_address(0), Some(20), None);
-        assert_eq!(page.len(), COUNT as usize - 20usize);
-
-        // No offset, no count
-        let page = store.get_for_address(&eth_address(0), None, None);
-        assert_eq!(page.len(), COUNT as usize);
     }
 
     #[test]
@@ -397,7 +388,9 @@ mod tests {
         assert_eq!(store.address_operation_map.len(), 1);
 
         assert_eq!(
-            store.get_for_address(&eth_address(42), None, None).len(),
+            store
+                .get_for_address(&eth_address(42), Some(Pagination::new(0, 10)))
+                .len(),
             LIMIT as usize
         );
     }
@@ -419,7 +412,9 @@ mod tests {
         assert_eq!(store.address_operation_map.len(), 1);
 
         assert_eq!(
-            store.get_for_address(&eth_address(42), None, None).len(),
+            store
+                .get_for_address(&eth_address(42), Some(Pagination::new(0, COUNT as usize)))
+                .len(),
             COUNT as usize
         );
     }

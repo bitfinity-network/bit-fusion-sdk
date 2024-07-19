@@ -208,7 +208,7 @@ impl ServiceTask {
                     let Some((operation_id, _)) = ctx
                         .borrow()
                         .operations
-                        .get_for_address(&update_to.evm_address(), None, None)
+                        .get_for_address(&update_to.evm_address(), None)
                         .into_iter()
                         .find(|(operation_id, _)| operation_id.nonce() == nonce)
                     else {

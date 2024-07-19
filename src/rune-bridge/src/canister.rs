@@ -6,6 +6,7 @@ use bitcoin::Address;
 use bridge_canister::memory::memory_by_id;
 use bridge_canister::operation_store::{OperationStore, OperationsMemory};
 use bridge_did::op_id::OperationId;
+use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -101,8 +102,12 @@ impl RuneBridge {
     }
 
     #[query]
-    pub fn get_operations_list(&self, wallet_address: H160) -> Vec<(OperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address, None, None)
+    pub fn get_operations_list(
+        &self,
+        wallet_address: H160,
+        pagination: Option<Pagination>,
+    ) -> Vec<(OperationId, OperationState)> {
+        get_operations_store().get_for_address(&wallet_address, pagination)
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {

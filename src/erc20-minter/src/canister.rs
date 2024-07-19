@@ -7,6 +7,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
+use bridge_utils::common::Pagination;
 use bridge_utils::evm_bridge::BridgeSide;
 use candid::Principal;
 use did::H160;
@@ -131,9 +132,10 @@ impl EvmMinter {
         &self,
         wallet_address: H160,
         src_token: Id256,
+        pagination: Option<Pagination>,
     ) -> Vec<(u32, SignedMintOrder)> {
         get_operations_store()
-            .get_for_address(&wallet_address, None, None)
+            .get_for_address(&wallet_address, pagination)
             .into_iter()
             .filter_map(|(operation_id, status)| {
                 status
@@ -150,8 +152,9 @@ impl EvmMinter {
         wallet_address: H160,
         src_token: Id256,
         operation_id: u32,
+        pagination: Option<Pagination>,
     ) -> Option<SignedMintOrder> {
-        self.list_mint_orders(wallet_address, src_token)
+        self.list_mint_orders(wallet_address, src_token, pagination)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
@@ -161,8 +164,9 @@ impl EvmMinter {
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        pagination: Option<Pagination>,
     ) -> Vec<(OperationId, OperationPayload)> {
-        get_operations_store().get_for_address(&wallet_address, None, None)
+        get_operations_store().get_for_address(&wallet_address, pagination)
     }
 
     /// Returns EVM address of the canister.
