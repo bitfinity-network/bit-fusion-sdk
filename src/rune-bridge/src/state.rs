@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -29,6 +30,9 @@ type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
 const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Minimum number of indexers required to start the bridge.
+const MIN_INDEXERS: u8 = 2;
 
 pub struct State {
     pub(crate) config: RuneBridgeConfig,
@@ -98,7 +102,7 @@ impl Default for RuneBridgeConfig {
             admin: Principal::management_canister(),
             log_settings: LogSettings::default(),
             min_confirmations: 12,
-            no_of_indexers: 3,
+            no_of_indexers: MIN_INDEXERS,
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
@@ -333,7 +337,23 @@ impl State {
         });
     }
 
-    pub fn set_no_of_indexers(&mut self, no_of_indexers: u8) {
+    pub fn configure_indexers(&mut self, no_of_indexers: u8, indexer_urls: HashSet<String>) {
+        if no_of_indexers < MIN_INDEXERS {
+            panic!("number of indexers must be at least {}", MIN_INDEXERS)
+        }
+
+        if no_of_indexers < indexer_urls.len() as u8 {
+            panic!(
+                "number of indexers must be at least {}",
+                indexer_urls.len() as u8,
+            );
+        }
+
+        self.config.indexer_urls = indexer_urls
+            .iter()
+            .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
+            .collect();
+
         self.config.no_of_indexers = no_of_indexers;
     }
 
@@ -408,5 +428,78 @@ mod tests {
             state.indexer_urls(),
             HashSet::from_iter(vec![String::from("https://url.com")])
         );
+    }
+
+    #[test]
+    fn test_configure_indexers_valid() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com",
+            "http://indexer2.com",
+            "http://indexer3.com",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls.clone());
+
+        assert_eq!(state.config.no_of_indexers, 3);
+        assert_eq!(state.config.indexer_urls, indexer_urls);
+    }
+
+    #[test]
+    fn test_configure_indexers_strip_trailing_slash() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com/",
+            "http://indexer2.com",
+            "http://indexer3.com/",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls);
+
+        assert_eq!(
+            state.config.indexer_urls,
+            HashSet::from([
+                "http://indexer1.com".to_string(),
+                "http://indexer2.com".to_string(),
+                "http://indexer3.com".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "number of indexers must be at least")]
+    fn test_configure_indexers_too_few_indexers() {
+        let mut state = State::default();
+        let indexer_urls: HashSet<String> = HashSet::new();
+
+        state.configure_indexers(MIN_INDEXERS - 1, indexer_urls);
+    }
+
+    #[test]
+    #[should_panic(expected = "number of indexers must be at least")]
+    fn test_configure_indexers_fewer_than_urls() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com",
+            "http://indexer2.com",
+            "http://indexer3.com",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(2, indexer_urls);
+    }
+
+    #[test]
+    fn test_configure_indexers_more_than_urls() {
+        let mut state = State::default();
+        let urls = vec!["http://indexer1.com", "http://indexer2.com"];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls.clone());
+
+        assert_eq!(state.config.no_of_indexers, 3);
+        assert_eq!(state.config.indexer_urls, indexer_urls);
     }
 }
