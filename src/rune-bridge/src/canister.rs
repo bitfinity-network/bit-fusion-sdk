@@ -185,6 +185,14 @@ impl RuneBridge {
         rune_info_amounts
     }
 
+    #[update]
+    pub fn admin_set_no_of_indexers(&self, no_of_indexer_urls: u8) {
+        get_state().borrow().check_admin(ic::caller());
+        get_state()
+            .borrow_mut()
+            .set_no_of_indexers(no_of_indexer_urls);
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }

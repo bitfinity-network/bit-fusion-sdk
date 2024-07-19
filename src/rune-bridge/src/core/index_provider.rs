@@ -26,23 +26,20 @@ const MAX_RESPONSE_BYTES: u64 = 10_000;
 pub trait HttpClient {
     fn http_request<R: DeserializeOwned>(
         &self,
+        url: &str,
         uri: &str,
     ) -> impl Future<Output = Result<R, DepositError>>;
 }
 
 /// HTTP client implementation for the Internet Computer canisters.
-pub struct IcHttpClient {
-        indexer_urls: HashSet<String>,
-        }
-
-impl From<String> for IcHttpClient {
-    fn from(indexer_url: String) -> Self {
-        Self { indexer_url }
-    }
-}
+pub struct IcHttpClient {}
 
 impl HttpClient for IcHttpClient {
-    async fn http_request<R: DeserializeOwned>(&self,        url: &str, uri: &str) -> Result<R, DepositError> {
+    async fn http_request<R: DeserializeOwned>(
+        &self,
+        url: &str,
+        uri: &str,
+    ) -> Result<R, DepositError> {
         let url = format!("{url}/{uri}");
 
         log::trace!("Sending indexer request to: {url}");
@@ -78,13 +75,13 @@ impl HttpClient for IcHttpClient {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct RuneInfo {
     spaced_rune: SpacedRune,
     divisibility: u8,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct RunesResponse {
     entries: Vec<(RuneId, RuneInfo)>,
     next: Option<u64>,
@@ -93,24 +90,21 @@ struct RunesResponse {
 /// Implementation of the `RuneIndexProvider` trait that uses the `HttpClient` to make requests to
 pub struct OrdIndexProvider<C: HttpClient> {
     client: C,
+    indexer_urls: HashSet<String>,
 }
 
 impl<C> OrdIndexProvider<C>
 where
     C: HttpClient,
 {
-    pub fn new(client: C) -> Self {
-        Self { client }
+    pub fn new(client: C, indexer_urls: HashSet<String>) -> Self {
+        Self {
+            client,
+            indexer_urls,
+        }
     }
 
-    pub async fn get_tx_outputs(&self, utxo: &Utxo) -> Result<OutputResponse, DepositError> {
-        let outpoint = format_outpoint(&utxo.outpoint);
-        self.client
-            .http_request(&format!("output/{outpoint}"))
-            .await
-    }
-
-        /// Get consensus response from the indexer.
+    /// Get consensus response from the indexer.
     ///
     /// All indexers must return the same response for the same input, other
     /// the function will return an error.
@@ -119,11 +113,13 @@ where
         T: Clone + DeserializeOwned + PartialEq,
     {
         let mut first_response: Option<T> = None;
+
         let mut failed_urls = Vec::with_capacity(self.indexer_urls.len());
+
         let mut inconsistent_urls = Vec::new();
 
         for url in &self.indexer_urls {
-            match self.http_request::<T>(url, uri).await {
+            match self.client.http_request::<T>(url, uri).await {
                 Ok(response) => match &first_response {
                     None => first_response = Some(response),
                     Some(first) => {
@@ -196,7 +192,7 @@ where
 
         loop {
             let uri = format!("runes/{page}");
-            let response: RunesResponse = self.client.http_request(&uri).await?;
+            let response: RunesResponse = self.get_consensus_response(&uri).await?;
             entries.extend(response.entries);
 
             if let Some(next) = response.next {
@@ -288,7 +284,10 @@ mod tests {
         );
 
         let client = MockHttpClient { runes };
-        let provider = OrdIndexProvider::new(client);
+        let provider = OrdIndexProvider::new(
+            client,
+            HashSet::from_iter(vec!["http://localhost:8080".into()]),
+        );
 
         let runes = provider.get_rune_list().await.unwrap();
         assert_eq!(runes.len(), 3);
@@ -303,7 +302,11 @@ mod tests {
     }
 
     impl HttpClient for MockHttpClient {
-        async fn http_request<R: DeserializeOwned>(&self, uri: &str) -> Result<R, DepositError> {
+        async fn http_request<R: DeserializeOwned>(
+            &self,
+            _url: &str,
+            uri: &str,
+        ) -> Result<R, DepositError> {
             let page = uri
                 .strip_prefix("runes/")
                 .and_then(|page| page.parse::<u64>().ok())

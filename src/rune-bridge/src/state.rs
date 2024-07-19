@@ -81,7 +81,7 @@ pub struct RuneBridgeConfig {
     pub admin: Principal,
     pub log_settings: LogSettings,
     pub min_confirmations: u32,
-    pub no_of_indexers: u32,
+    pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
@@ -331,6 +331,10 @@ impl State {
             chain_code: ChainCode::try_from(chain_code).expect("invalid chain code slice"),
             key_id: self.ecdsa_key_id(),
         });
+    }
+
+    pub fn set_no_of_indexers(&mut self, no_of_indexers: u8) {
+        self.config.no_of_indexers = no_of_indexers;
     }
 
     /// Configures the link to BFT bridge contract.
