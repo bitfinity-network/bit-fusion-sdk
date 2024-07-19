@@ -17,7 +17,6 @@ use did::H160;
 use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
-use ic_exports::ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 use ic_exports::ic_kit::ic;
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
@@ -150,18 +149,6 @@ impl MinterCanister {
         Ok(())
     }
 
-    /// Requirements for Http outcalls, used to ignore small differences in the data obtained
-    /// by different nodes of the IC subnet to reach a consensus, more info:
-    /// https://internetcomputer.org/docs/current/developer-docs/integrations/http_requests/http_requests-how-it-works#transformation-function
-    #[query]
-    fn transform(&self, raw: TransformArgs) -> HttpResponse {
-        HttpResponse {
-            status: raw.response.status,
-            headers: raw.response.headers,
-            body: raw.response.body,
-        }
-    }
-
     /// Returns the build data of the canister
     #[query]
     fn get_canister_build_data(&self) -> BuildData {
@@ -230,8 +217,6 @@ thread_local! {
         Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
     pub static ICRC_STATE: Rc<RefCell<IcrcState>> = Rc::default();
-
-
 }
 
 pub fn get_runtime() -> SharedRuntime {
