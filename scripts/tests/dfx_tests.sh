@@ -160,7 +160,7 @@ echo "Generated 101 blocks for $WALLET_TEST"
 # create inscriptions
 WALLET_ORD="ord"
 $ORDW create
-sleep 3
+sleep 10
 
 ORD_ADDRESS=$($ORDW receive | jq -r .addresses[0])
 if [ -z "$ORD_ADDRESS" ]; then
