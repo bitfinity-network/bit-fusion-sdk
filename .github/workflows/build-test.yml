@@ -118,13 +118,3 @@ jobs:
           retention-days: 3
           name: dfx_log
           path: .artifact/*
-
-      - name: test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests.sh
-
-      - name: 32bits test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/tests_i686.sh

@@ -190,7 +190,7 @@ set +e
 cargo test -p integration-tests --features dfx_tests runes_bridging_flow
 TEST_RESULT=$?
 mkdir -p .artifact/
-cp $LOGFILE .artifact/$LOGFILE
+cp $LOGFILE .artifact/dfx.log
 set -e
 
 killall -9 icx-proxy || true
