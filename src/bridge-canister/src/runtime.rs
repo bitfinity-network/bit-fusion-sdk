@@ -26,7 +26,6 @@ use crate::operation_store::OperationsMemory;
 
 pub type RuntimeState<Op> = Rc<RefCell<State<Op>>>;
 
-
 /// Bridge Runtime.
 /// Stores a state, schedules tasks and executes them.
 pub struct BridgeRuntime<Op: Operation> {

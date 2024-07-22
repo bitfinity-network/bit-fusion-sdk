@@ -1008,7 +1008,6 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "minter-did",
  "num-traits",
  "once_cell",
  "serde",

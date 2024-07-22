@@ -26,7 +26,6 @@ ethereum-json-rpc-client = { workspace = true, features = [
 ] }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 log = { workspace = true }
-minter-did = { workspace = true }
 ic-task-scheduler = { workspace = true }
 thiserror = { workspace = true }
 num-traits = { workspace = true }

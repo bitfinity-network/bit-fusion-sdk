@@ -5,7 +5,6 @@ pub mod evm_bridge;
 pub mod evm_link;
 pub mod mint_orders;
 pub mod query;
-pub mod signer;
 
 sol! {
     #[derive(Debug)]

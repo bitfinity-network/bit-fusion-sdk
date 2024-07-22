@@ -10,11 +10,12 @@ use candid::CandidType;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_task_scheduler::task::TaskOptions;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 /// Defines an operation that can be executed by the bridge.
 pub trait Operation:
-    Sized + CandidType + Serialize + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static
+    Sized + CandidType + Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
     /// Execute the operation, and move it to next stage.
     async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self>;

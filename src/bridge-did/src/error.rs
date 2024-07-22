@@ -25,7 +25,7 @@ pub enum Error {
     OperationNotFound(OperationId),
 
     #[error("operation failed to progress: {0}")]
-    FailToProgress(String),
+    FailedToProgress(String),
 
     #[error("unexpected anonymous principal")]
     AnonymousPrincipal,

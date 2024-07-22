@@ -81,13 +81,13 @@ impl Operation for IcrcBridgeOp {
             } => Self::send_mint_tx(ctx, order, src_token, dst_address, is_refund).await,
             IcrcBridgeOp::ConfirmMint { .. } => {
                 log::warn!("ConfirmMint task should progress only on the Minted EVM event");
-                Err(Error::FailToProgress(
+                Err(Error::FailedToProgress(
                     "ConfirmMint task should progress only on the Minted EVM event".into(),
                 ))
             }
             IcrcBridgeOp::WrappedTokenMintConfirmed(_) => {
                 log::warn!("WrappedTokenMintConfirmed task should not progress");
-                Err(Error::FailToProgress(
+                Err(Error::FailedToProgress(
                     "WrappedTokenMintConfirmed task should not progress".into(),
                 ))
             }
@@ -96,7 +96,7 @@ impl Operation for IcrcBridgeOp {
             }
             IcrcBridgeOp::IcrcMintConfirmed { .. } => {
                 log::warn!("IcrcMintConfirmed task should not progress");
-                Err(Error::FailToProgress(
+                Err(Error::FailedToProgress(
                     "IcrcMintConfirmed task should not progress".into(),
                 ))
             }
