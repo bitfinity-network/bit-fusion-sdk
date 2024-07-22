@@ -186,8 +186,11 @@ sleep 30
 ord -r --data-dir $ORD_DATA --index-runes runes
 
 # run tests
+set +e
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
+cat "$LOGFILE"
+set -e
 
 killall -9 icx-proxy || true
 

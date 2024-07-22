@@ -79,7 +79,7 @@ jobs:
         run: |
           export RUST_BACKTRACE="full"
           cargo install ic-wasm
-          cargo install icx-proxy
+          cargo install icx-proxy --version 0.10.1
           sudo apt update
           sudo apt install gcc-multilib libunwind-dev
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
