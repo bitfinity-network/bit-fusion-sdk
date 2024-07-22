@@ -372,7 +372,7 @@ impl RunesContext {
             hex::encode(tx_id.0)
         );
 
-        const MAX_RETRIES: u32 = 10;
+        const MAX_RETRIES: u32 = 60;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
             self.inner.advance_time(Duration::from_secs(2)).await;
