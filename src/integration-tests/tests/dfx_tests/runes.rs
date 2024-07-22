@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::io::ErrorKind;
 use std::str::FromStr;
@@ -95,7 +96,8 @@ impl RunesContext {
                 log_filter: Some("trace".to_string()),
             },
             min_confirmations: 1,
-            indexer_url: "https://localhost:8001".to_string(),
+            no_of_indexers: 1,
+            indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
         };

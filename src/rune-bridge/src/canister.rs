@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -185,6 +186,14 @@ impl RuneBridge {
             .expect("failed to get rune amounts");
 
         rune_info_amounts
+    }
+
+    #[update]
+    pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
+        get_state().borrow().check_admin(ic::caller());
+        get_state()
+            .borrow_mut()
+            .configure_indexers(no_of_indexer_urls, indexer_urls);
     }
 
     pub fn idl() -> Idl {
