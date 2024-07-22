@@ -93,7 +93,7 @@ where
     M: Memory,
     P: Operation,
 {
-    operation_id_counter: StableCell<OperationId, M>,
+    operation_id_counter: StableCell<u64, M>,
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
@@ -112,7 +112,7 @@ where
     ) -> Self {
         let options = options.unwrap_or_default();
         Self {
-            operation_id_counter: StableCell::new(memory.id_counter, OperationId::default())
+            operation_id_counter: StableCell::new(memory.id_counter, 0)
                 .expect("failed to initialize operation id counter"),
             incomplete_operations: CachedStableBTreeMap::new(
                 memory.incomplete_operations,
@@ -129,17 +129,17 @@ where
         let current = *self.operation_id_counter.get();
 
         self.operation_id_counter
-            .set(current.next())
+            .set(current + 1)
             .expect("failed to update operation id counter");
 
-        current
+        OperationId::new(current)
     }
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
     pub fn new_operation(&mut self, payload: P) -> OperationId {
         let id = self.next_operation_id();
-        let dst_address = payload.evm_address();
+        let dst_address = payload.evm_wallet_address();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
@@ -294,8 +294,29 @@ mod tests {
             todo!()
         }
 
-        fn evm_address(&self) -> H160 {
+        fn evm_wallet_address(&self) -> H160 {
             eth_address(self.addr as _)
+        }
+
+        async fn on_wrapped_token_minted(
+            _ctx: impl OperationContext,
+            _event: bridge_utils::bft_events::MintedEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
+        }
+
+        async fn on_wrapped_token_burnt(
+            _ctx: impl OperationContext,
+            _event: bridge_utils::bft_events::BurntEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
+        }
+
+        async fn on_minter_notification(
+            _ctx: impl OperationContext,
+            _event: bridge_utils::bft_events::NotifyMinterEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
         }
     }
 

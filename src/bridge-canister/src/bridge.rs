@@ -24,7 +24,7 @@ pub trait Operation:
     fn is_complete(&self) -> bool;
 
     /// Address of EVM wallet to/from which operation will move tokens.
-    fn evm_address(&self) -> H160;
+    fn evm_wallet_address(&self) -> H160;
 
     /// Describes how the operation execution should be scheduled.
     fn scheduling_options(&self) -> Option<TaskOptions> {
@@ -35,25 +35,19 @@ pub trait Operation:
     async fn on_wrapped_token_minted(
         _ctx: impl OperationContext,
         _event: MintedEventData,
-    ) -> Option<OperationAction<Self>> {
-        None
-    }
+    ) -> Option<OperationAction<Self>>;
 
     /// Action to perform when a WrappedToken is burnt.
     async fn on_wrapped_token_burnt(
         _ctx: impl OperationContext,
         _event: BurntEventData,
-    ) -> Option<OperationAction<Self>> {
-        None
-    }
+    ) -> Option<OperationAction<Self>>;
 
     /// Action to perform on notification from BftBridge contract.
     async fn on_minter_notification(
         _ctx: impl OperationContext,
         _event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>> {
-        None
-    }
+    ) -> Option<OperationAction<Self>>;
 }
 
 /// Context for an operation execution.

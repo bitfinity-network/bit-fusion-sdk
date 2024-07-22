@@ -220,13 +220,13 @@ impl ServiceTask {
                     let Some((operation_id, _)) = ctx
                         .borrow()
                         .operations
-                        .get_for_address(&update_to.evm_address(), None)
+                        .get_for_address(&update_to.evm_wallet_address(), None)
                         .into_iter()
                         .find(|(operation_id, _)| operation_id.nonce() == nonce)
                     else {
                         log::warn!(
                             "operation with dst_address = {} and nonce {} not found",
-                            update_to.evm_address(),
+                            update_to.evm_wallet_address(),
                             nonce
                         );
                         return Err(Error::OperationNotFound(OperationId::new(nonce as _)));

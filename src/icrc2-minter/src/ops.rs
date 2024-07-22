@@ -79,27 +79,18 @@ impl Operation for IcrcBridgeOp {
                 dst_address,
                 is_refund,
             } => Self::send_mint_tx(ctx, order, src_token, dst_address, is_refund).await,
-            IcrcBridgeOp::ConfirmMint { .. } => {
-                log::warn!("ConfirmMint task should progress only on the Minted EVM event");
-                Err(Error::FailedToProgress(
-                    "ConfirmMint task should progress only on the Minted EVM event".into(),
-                ))
-            }
-            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => {
-                log::warn!("WrappedTokenMintConfirmed task should not progress");
-                Err(Error::FailedToProgress(
-                    "WrappedTokenMintConfirmed task should not progress".into(),
-                ))
-            }
+            IcrcBridgeOp::ConfirmMint { .. } => Err(Error::FailedToProgress(
+                "ConfirmMint task should progress only on the Minted EVM event".into(),
+            )),
+            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => Err(Error::FailedToProgress(
+                "WrappedTokenMintConfirmed task should not progress".into(),
+            )),
             IcrcBridgeOp::MintIcrcTokens(event) => {
                 Self::mint_icrc_tokens(ctx, event, id.nonce()).await
             }
-            IcrcBridgeOp::IcrcMintConfirmed { .. } => {
-                log::warn!("IcrcMintConfirmed task should not progress");
-                Err(Error::FailedToProgress(
-                    "IcrcMintConfirmed task should not progress".into(),
-                ))
-            }
+            IcrcBridgeOp::IcrcMintConfirmed { .. } => Err(Error::FailedToProgress(
+                "IcrcMintConfirmed task should not progress".into(),
+            )),
         }
     }
 
@@ -115,7 +106,7 @@ impl Operation for IcrcBridgeOp {
         }
     }
 
-    fn evm_address(&self) -> H160 {
+    fn evm_wallet_address(&self) -> H160 {
         match self {
             IcrcBridgeOp::BurnIcrc2Tokens(burn) => &burn.recipient_address,
             IcrcBridgeOp::SignMintOrder { order, .. } => &order.recipient,

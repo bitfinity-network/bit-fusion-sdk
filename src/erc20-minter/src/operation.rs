@@ -24,7 +24,28 @@ impl Operation for OperationPayload {
         matches!(self.status, OperationStatus::Minted { .. })
     }
 
-    fn evm_address(&self) -> did::H160 {
+    fn evm_wallet_address(&self) -> did::H160 {
+        todo!()
+    }
+
+    async fn on_wrapped_token_minted(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::MintedEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_wrapped_token_burnt(
+        _ctx: impl OperationContext,
+        _event: BurntEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_minter_notification(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::NotifyMinterEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         todo!()
     }
 }

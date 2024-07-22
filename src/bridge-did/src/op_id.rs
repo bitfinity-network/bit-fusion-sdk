@@ -28,11 +28,6 @@ impl OperationId {
         Self(id)
     }
 
-    /// Returns next OperationId.
-    pub fn next(&self) -> Self {
-        Self(self.0 + 1)
-    }
-
     /// Returns a unique `nonce` value for given operation ID.
     pub fn nonce(&self) -> u32 {
         (self.0 % u32::MAX as u64) as u32
