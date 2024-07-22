@@ -187,8 +187,9 @@ ord -r --data-dir $ORD_DATA --index-runes runes
 
 # run tests
 set +e
-cargo test -p integration-tests --features dfx_tests $@
+cargo test -p integration-tests --features dfx_tests runes_bridging_flow
 TEST_RESULT=$?
+cat "$LOGFILE" | grep "ERROR"
 set -e
 
 killall -9 icx-proxy || true
