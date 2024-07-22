@@ -25,6 +25,10 @@ pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTa
 pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;
 pub type DynScheduler<Op> = Box<dyn TaskScheduler<BridgeTask<Op>>>;
 
+/// Logs errors that occur during task execution.
+///
+/// This function is intended to be used as the `on_error` callback for
+/// `ic_task_scheduler::Scheduler`.
 pub fn log_task_execution_error<Op: Operation>(task: InnerScheduledTask<BridgeTask<Op>>) {
     match task.status() {
         TaskStatus::Failed {
@@ -45,9 +49,13 @@ pub fn log_task_execution_error<Op: Operation>(task: InnerScheduledTask<BridgeTa
     };
 }
 
+/// Task type used by `BridgeRuntime`.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub enum BridgeTask<Op> {
+    /// Bridge operations defined by user.
     Operation(OperationId, Op),
+
+    /// Bridge operations defined by the runtime itself.
     Service(ServiceTask),
 }
 
@@ -83,9 +91,13 @@ impl<Op: Operation> BridgeTask<Op> {
     }
 }
 
+/// Service tasks, done by the `BridgeRuntime` by default.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub enum ServiceTask {
+    /// Task to query logs from EVM.
     CollectEvmLogs,
+
+    /// Task to refresh EVM parameters.
     RefreshEvmParams,
 }
 
@@ -341,21 +353,7 @@ impl<Op: Operation> Task for BridgeTask<Op> {
             self_clone
                 .execute_inner(ctx, task_scheduler)
                 .await
-                .into_scheduler_result()
+                .map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
         })
-    }
-}
-
-trait IntoSchedulerError {
-    type Success;
-
-    fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError>;
-}
-
-impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
-    type Success = T;
-
-    fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError> {
-        self.map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
     }
 }

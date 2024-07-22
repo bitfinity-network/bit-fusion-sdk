@@ -13,9 +13,11 @@ pub const LOG_SETTINGS_MEMORY_ID: MemoryId = MemoryId::new(7);
 pub type StableMemory = VirtualMemory<DefaultMemoryImpl>;
 
 thread_local! {
+    /// Memory manager.
     pub static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
 }
 
+/// Get memory by id.
 pub fn memory_by_id(id: MemoryId) -> StableMemory {
     MEMORY_MANAGER.with(|mm| mm.get(id))
 }

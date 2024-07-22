@@ -12,19 +12,25 @@ use eth_signer::sign_strategy::TransactionSigner;
 use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
 
+/// Defines an operation that can be executed by the bridge.
 pub trait Operation:
     Sized + CandidType + Serialize + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static
 {
+    /// Execute the operation, and move it to next stage.
     async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self>;
+
+    /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
 
     /// Address of EVM wallet to/from which operation will move tokens.
     fn evm_address(&self) -> H160;
 
+    /// Describes how the operation execution should be scheduled.
     fn scheduling_options(&self) -> Option<TaskOptions> {
         Some(TaskOptions::default())
     }
 
+    /// Action to perform when a WrappedToken is minted.
     async fn on_wrapped_token_minted(
         _ctx: impl OperationContext,
         _event: MintedEventData,
@@ -32,6 +38,7 @@ pub trait Operation:
         None
     }
 
+    /// Action to perform when a WrappedToken is burnt.
     async fn on_wrapped_token_burnt(
         _ctx: impl OperationContext,
         _event: BurntEventData,
@@ -39,6 +46,7 @@ pub trait Operation:
         None
     }
 
+    /// Action to perform on notification from BftBridge contract.
     async fn on_minter_notification(
         _ctx: impl OperationContext,
         _event: NotifyMinterEventData,
@@ -47,12 +55,21 @@ pub trait Operation:
     }
 }
 
+/// Context for an operation execution.
 pub trait OperationContext {
+    /// Get link to the EVM with wrapped tokens.
     fn get_evm_link(&self) -> EvmLink;
+
+    /// Get address of the BftBridge contract.
     fn get_bridge_contract_address(&self) -> BftResult<H160>;
+
+    /// Get EVM parameters.
     fn get_evm_params(&self) -> BftResult<EvmParams>;
+
+    /// Get signer for transactions, orders, etc...
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
 
+    /// Send mint transaction with the given `order` to EVM.
     async fn send_mint_transaction(&self, order: &SignedMintOrder) -> BftResult<H256> {
         let signer = self.get_signer()?;
         let sender = signer.get_address().await?;
@@ -84,6 +101,7 @@ pub trait OperationContext {
     }
 }
 
+/// Action to create or update an operation.
 pub enum OperationAction<Op> {
     Create(Op),
     Update { nonce: u32, update_to: Op },

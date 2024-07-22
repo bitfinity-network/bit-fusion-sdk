@@ -26,12 +26,16 @@ use crate::operation_store::OperationsMemory;
 
 pub type RuntimeState<Op> = Rc<RefCell<State<Op>>>;
 
+
+/// Bridge Runtime.
+/// Stores a state, schedules tasks and executes them.
 pub struct BridgeRuntime<Op: Operation> {
     state: RuntimeState<Op>,
     scheduler: BridgeScheduler<StableMemory, Op>,
 }
 
 impl<Op: Operation> BridgeRuntime<Op> {
+    /// Load the state from the stable memory, or initialize it with default values.
     pub fn default(config: SharedConfig) -> Self {
         let tasks_storage = StableBTreeMap::new(memory_by_id(PENDING_TASKS_MEMORY_ID));
         Self {
@@ -40,11 +44,13 @@ impl<Op: Operation> BridgeRuntime<Op> {
         }
     }
 
+    /// Updates the state.
     pub fn update_state(&mut self, f: impl FnOnce(&mut State<Op>)) {
         let mut state = self.state.borrow_mut();
         f(&mut state);
     }
 
+    /// Run the scheduled tasks.
     pub fn run(&mut self) {
         if !self.state.borrow().collecting_logs {
             self.state.borrow_mut().collecting_logs = true;
@@ -67,6 +73,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         }
     }
 
+    /// Get the state.
     pub fn state(&self) -> &RuntimeState<Op> {
         &self.state
     }

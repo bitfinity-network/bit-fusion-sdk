@@ -10,6 +10,7 @@ use crate::operation_store::{OperationStore, OperationsMemory};
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
 
+/// Bridge Runtime state.
 pub struct State<Op: Operation> {
     pub config: SharedConfig,
     pub operations: OperationStore<StableMemory, Op>,
@@ -18,6 +19,7 @@ pub struct State<Op: Operation> {
 }
 
 impl<Op: Operation> State<Op> {
+    /// Load the state from the stable memory, or initialize it with default values.
     pub fn default(memory: OperationsMemory<StableMemory>, config: SharedConfig) -> Self {
         Self {
             config,
