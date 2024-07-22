@@ -6,7 +6,7 @@ set -x
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
-ORD_DATA=$PWD/target/ord
+ORD_DATA=$PWD/src/integration-tests/target/ord
 ORDW="ord -r --data-dir $ORD_DATA --index-runes wallet --server-url http://localhost:8000"
 # Get bitcoin-cli
 BITCOIN=$(command -v bitcoin-cli || command -v bitcoin-core.cli)
@@ -168,7 +168,6 @@ if [ -z "$ORD_ADDRESS" ]; then
     exit 1
 fi
 echo "ORD address: $ORD_ADDRESS"
-
 
 $BITCOIN -rpcwallet=$WALLET_TEST sendtoaddress $ORD_ADDRESS 10 &> /dev/null
 $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 1 $WALLET_TEST_ADDRESS &> /dev/null
