@@ -189,7 +189,6 @@ ord -r --data-dir $ORD_DATA --index-runes runes
 set +e
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
-cat "$LOGFILE"
 set -e
 
 killall -9 icx-proxy || true
