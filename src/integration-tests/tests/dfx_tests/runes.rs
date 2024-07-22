@@ -60,6 +60,11 @@ fn get_rune_info(name: &str) -> RuneInfo {
         )
     }
 
+    println!(
+        "Ord runes list: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
     let json =
         serde_json::from_slice::<Value>(&output.stdout).expect("failed to parse ord runes list");
     let id_str = json["runes"][name]["id"].as_str().expect("invalid rune id");

@@ -183,6 +183,8 @@ sleep 5
 $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 1 $WALLET_TEST_ADDRESS
 sleep 30
 
+ord -r --data-dir $ORD_DATA --index-runes runes
+
 # run tests
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
