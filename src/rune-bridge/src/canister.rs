@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use bitcoin::Address;
+use bridge_utils::common::Pagination;
 use bridge_utils::operation_store::{MinterOperationId, MinterOperationStore};
 use candid::Principal;
 use did::H160;
@@ -102,8 +104,9 @@ impl RuneBridge {
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        pagination: Option<Pagination>,
     ) -> Vec<(MinterOperationId, OperationState)> {
-        get_operations_store().get_for_address(&wallet_address, None, None)
+        get_operations_store().get_for_address(&wallet_address, pagination)
     }
 
     fn init_evm_info_task() -> ScheduledTask<RuneBridgeTask> {
@@ -181,6 +184,14 @@ impl RuneBridge {
             .expect("failed to get rune amounts");
 
         rune_info_amounts
+    }
+
+    #[update]
+    pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
+        get_state().borrow().check_admin(ic::caller());
+        get_state()
+            .borrow_mut()
+            .configure_indexers(no_of_indexer_urls, indexer_urls);
     }
 
     pub fn idl() -> Idl {

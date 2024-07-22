@@ -107,7 +107,7 @@ pub struct RuneIdDid {
     pub txid: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct OutputResponse {
     pub address: String,
     #[serde(default)]

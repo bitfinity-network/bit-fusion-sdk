@@ -1,5 +1,6 @@
 use alloy_sol_types::sol;
 pub mod bft_events;
+pub mod common;
 pub mod evm_bridge;
 pub mod evm_link;
 pub mod mint_orders;

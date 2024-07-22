@@ -76,19 +76,6 @@ pub trait BridgeCanister: Canister {
         self.core().borrow().config.get_evm_principal()
     }
 
-    /// Sets principal of EVM canister with which the minter canister works.
-    ///
-    /// This method should be called only by current owner,
-    /// else `Error::NotAuthorised` will be returned.
-    #[update(trait = true)]
-    fn set_evm_principal(&mut self, evm: Principal) {
-        let core = self.core();
-        core.borrow().inspect_set_evm_principal();
-        core.borrow_mut().config.set_evm_principal(evm);
-
-        info!("Bridge canister EVM principal changed to {evm}");
-    }
-
     /// Returns bridge contract address for EVM.
     /// If contract isn't initialized yet - returns None.
     #[query(trait = true)]
@@ -364,28 +351,6 @@ mod tests {
         inject::get_context().update_id(owner());
 
         let _ = canister_call!(canister.set_owner(Principal::anonymous()), ()).await;
-    }
-
-    #[tokio::test]
-    async fn set_evm_principal_works() {
-        let mut canister = init_canister().await;
-
-        inject::get_context().update_id(owner());
-        let _ = canister_call!(canister.set_evm_principal(bob()), ()).await;
-
-        // check if state updated
-        let stored_evm = canister_call!(canister.get_evm_principal(), Principal)
-            .await
-            .unwrap();
-        assert_eq!(stored_evm, bob());
-    }
-
-    #[tokio::test]
-    #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
-    async fn set_evm_principal_rejected_for_non_owner() {
-        let mut canister = init_canister().await;
-
-        let _ = canister_call!(canister.set_evm_principal(bob()), ()).await;
     }
 
     #[tokio::test]

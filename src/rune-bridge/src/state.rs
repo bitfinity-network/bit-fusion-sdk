@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use core::panic;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
@@ -29,6 +30,9 @@ type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
 const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Minimum number of indexers required to start the bridge.
+const MIN_INDEXERS: u8 = 2;
 
 pub struct State {
     pub(crate) config: RuneBridgeConfig,
@@ -81,7 +85,8 @@ pub struct RuneBridgeConfig {
     pub admin: Principal,
     pub log_settings: LogSettings,
     pub min_confirmations: u32,
-    pub indexer_url: String,
+    pub no_of_indexers: u8,
+    pub indexer_urls: HashSet<String>,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
 }
@@ -97,7 +102,8 @@ impl Default for RuneBridgeConfig {
             admin: Principal::management_canister(),
             log_settings: LogSettings::default(),
             min_confirmations: 12,
-            indexer_url: String::new(),
+            no_of_indexers: MIN_INDEXERS,
+            indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
         }
@@ -106,15 +112,24 @@ impl Default for RuneBridgeConfig {
 
 impl RuneBridgeConfig {
     fn validate(&self) -> Result<(), String> {
-        if self.indexer_url.is_empty() {
+        if self.indexer_urls.is_empty() {
             return Err("Indexer url is empty".to_string());
         }
 
-        if !self.indexer_url.starts_with("https") {
+        if self.indexer_urls.len() != self.no_of_indexers as usize {
             return Err(format!(
-                "Indexer url must specify https url, but give value is: {}",
-                self.indexer_url
+                "Number of indexers ({}) required does not match number of indexer urls ({})",
+                self.no_of_indexers,
+                self.indexer_urls.len()
             ));
+        }
+
+        if self
+            .indexer_urls
+            .iter()
+            .any(|url| !url.starts_with("https"))
+        {
+            return Err("Indexer url must specify https url".to_string());
         }
 
         Ok(())
@@ -217,12 +232,8 @@ impl State {
     }
 
     /// Url of the `ord` indexer this canister rely on.
-    pub fn indexer_url(&self) -> String {
-        self.config
-            .indexer_url
-            .strip_suffix('/')
-            .unwrap_or_else(|| &self.config.indexer_url)
-            .to_string()
+    pub fn indexer_urls(&self) -> HashSet<String> {
+        self.config.indexer_urls.clone()
     }
 
     /// Utxo ledger.
@@ -287,10 +298,16 @@ impl State {
 
     /// Validates the given configuration and sets it to the state. Panics in case the configuration
     /// is invalid.
-    pub fn configure(&mut self, config: RuneBridgeConfig) {
+    pub fn configure(&mut self, mut config: RuneBridgeConfig) {
         if let Err(err) = config.validate() {
             panic!("Invalid configuration: {err}");
         }
+
+        config.indexer_urls = config
+            .indexer_urls
+            .iter()
+            .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
+            .collect();
 
         let signer = config
             .signing_strategy
@@ -320,6 +337,26 @@ impl State {
         });
     }
 
+    pub fn configure_indexers(&mut self, no_of_indexers: u8, indexer_urls: HashSet<String>) {
+        if no_of_indexers < MIN_INDEXERS {
+            panic!("number of indexers must be at least {}", MIN_INDEXERS)
+        }
+
+        if no_of_indexers < indexer_urls.len() as u8 {
+            panic!(
+                "number of indexers must be at least {}",
+                indexer_urls.len() as u8,
+            );
+        }
+
+        self.config.indexer_urls = indexer_urls
+            .iter()
+            .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
+            .collect();
+
+        self.config.no_of_indexers = no_of_indexers;
+    }
+
     /// Configures the link to BFT bridge contract.
     pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
         self.bft_config = bft_config;
@@ -335,27 +372,134 @@ mod tests {
     use super::*;
 
     #[test]
-    fn indexer_url_stripping() {
+    fn test_validate_empty_indexer_urls() {
         let config = RuneBridgeConfig {
-            indexer_url: "https://url.com".to_string(),
+            indexer_urls: HashSet::new(),
+            no_of_indexers: 1,
             ..Default::default()
         };
-        let state = State {
-            config,
-            ..Default::default()
-        };
+        assert!(config.validate().is_err());
+    }
 
-        assert_eq!(state.indexer_url(), "https://url.com".to_string());
-
+    #[test]
+    fn test_validate_mismatched_number_of_indexers() {
         let config = RuneBridgeConfig {
-            indexer_url: "https://url.com/".to_string(),
+            indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
+            no_of_indexers: 2,
             ..Default::default()
         };
-        let state = State {
-            config,
-            ..Default::default()
-        };
+        assert!(config.validate().is_err());
+    }
 
-        assert_eq!(state.indexer_url(), "https://url.com".to_string());
+    #[test]
+    fn test_validate_non_https_url() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::from_iter(vec!["http://url.com".to_string()]),
+            no_of_indexers: 1,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_success() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
+            no_of_indexers: 1,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_configure_with_trailing_slash() {
+        let config = RuneBridgeConfig {
+            indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
+            no_of_indexers: 1,
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1; 32],
+            },
+            ..Default::default()
+        };
+        let mut state = State::default();
+        state.configure(config);
+
+        assert_eq!(
+            state.indexer_urls(),
+            HashSet::from_iter(vec![String::from("https://url.com")])
+        );
+    }
+
+    #[test]
+    fn test_configure_indexers_valid() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com",
+            "http://indexer2.com",
+            "http://indexer3.com",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls.clone());
+
+        assert_eq!(state.config.no_of_indexers, 3);
+        assert_eq!(state.config.indexer_urls, indexer_urls);
+    }
+
+    #[test]
+    fn test_configure_indexers_strip_trailing_slash() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com/",
+            "http://indexer2.com",
+            "http://indexer3.com/",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls);
+
+        assert_eq!(
+            state.config.indexer_urls,
+            HashSet::from([
+                "http://indexer1.com".to_string(),
+                "http://indexer2.com".to_string(),
+                "http://indexer3.com".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "number of indexers must be at least")]
+    fn test_configure_indexers_too_few_indexers() {
+        let mut state = State::default();
+        let indexer_urls: HashSet<String> = HashSet::new();
+
+        state.configure_indexers(MIN_INDEXERS - 1, indexer_urls);
+    }
+
+    #[test]
+    #[should_panic(expected = "number of indexers must be at least")]
+    fn test_configure_indexers_fewer_than_urls() {
+        let mut state = State::default();
+        let urls = vec![
+            "http://indexer1.com",
+            "http://indexer2.com",
+            "http://indexer3.com",
+        ];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(2, indexer_urls);
+    }
+
+    #[test]
+    fn test_configure_indexers_more_than_urls() {
+        let mut state = State::default();
+        let urls = vec!["http://indexer1.com", "http://indexer2.com"];
+        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+
+        state.configure_indexers(3, indexer_urls.clone());
+
+        assert_eq!(state.config.no_of_indexers, 3);
+        assert_eq!(state.config.indexer_urls, indexer_urls);
     }
 }

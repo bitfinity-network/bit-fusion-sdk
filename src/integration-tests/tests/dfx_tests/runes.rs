@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::io::ErrorKind;
 use std::str::FromStr;
@@ -95,7 +96,8 @@ impl RunesContext {
                 log_filter: Some("trace".to_string()),
             },
             min_confirmations: 1,
-            indexer_url: "https://localhost:8001".to_string(),
+            no_of_indexers: 1,
+            indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
         };
@@ -368,7 +370,7 @@ impl RunesContext {
         const MAX_RETRIES: u32 = 10;
         let mut retry_count = 0;
         while retry_count < MAX_RETRIES {
-            self.inner.advance_time(Duration::from_secs(30)).await;
+            self.inner.advance_time(Duration::from_secs(2)).await;
             retry_count += 1;
 
             eprintln!("Checking deposit status. Try #{retry_count}...");

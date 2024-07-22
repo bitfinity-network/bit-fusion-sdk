@@ -19,6 +19,7 @@ use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
 
+use super::index_provider::IcHttpClient;
 use crate::canister::{get_operations_store, get_scheduler, get_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
@@ -126,7 +127,7 @@ impl RuneDepositPayload {
 
 pub(crate) struct RuneDeposit<
     UTXO: UtxoProvider = IcUtxoProvider,
-    INDEX: RuneIndexProvider = OrdIndexProvider,
+    INDEX: RuneIndexProvider = OrdIndexProvider<IcHttpClient>,
 > {
     state: Rc<RefCell<State>>,
     scheduler: Rc<RefCell<PersistentScheduler>>,
@@ -137,13 +138,13 @@ pub(crate) struct RuneDeposit<
     operation_store: RuneOperationStore,
 }
 
-impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
+impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     pub fn new(state: Rc<RefCell<State>>, scheduler: Rc<RefCell<PersistentScheduler>>) -> Self {
         let state_ref = state.borrow();
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
-        let indexer_url = state_ref.indexer_url();
+        let indexer_urls = state_ref.indexer_urls();
         let signer = state_ref.btc_signer();
 
         drop(state_ref);
@@ -154,7 +155,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider> {
             network,
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
-            index_provider: OrdIndexProvider::new(indexer_url),
+            index_provider: OrdIndexProvider::new(IcHttpClient {}, indexer_urls),
             operation_store: get_operations_store(),
         }
     }
@@ -214,9 +215,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     }
 
     pub fn complete_mint_request(&mut self, dst_address: H160, order_nonce: u32) {
-        let requests = self
-            .operation_store
-            .get_for_address(&dst_address, None, None);
+        let requests = self.operation_store.get_for_address(&dst_address, None);
         for (request_id, request) in requests {
             if let OperationState::Deposit(payload) = request {
                 if let DepositRequestStatus::MintOrdersCreated { mut orders } =

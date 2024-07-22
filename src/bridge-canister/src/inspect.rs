@@ -15,7 +15,6 @@ pub fn bridge_inspect() {
         "set_logger_filter" => core.inspect_set_logger_filter(),
         "ic_logs" => core.inspect_ic_logs(),
         "set_owner" => core.inspect_set_owner(),
-        "set_evm_principal" => core.inspect_set_evm_principal(),
         "set_bft_bridge_contract" => core.inspect_set_bft_bridge_contract(),
         _ => {}
     }
