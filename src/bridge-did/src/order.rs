@@ -8,14 +8,14 @@ use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::utils::keccak256;
 use ic_stable_structures::{Bound, Storable};
 use serde::de::Visitor;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use crate::error::{BftResult, Error};
 use crate::id256::Id256;
 
 /// Data which should be signed and provided to the `BftBridge.mint()` call
 /// to perform mint.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CandidType)]
 pub struct MintOrder {
     /// Amount of tokens to mint.
     pub amount: U256,
@@ -92,7 +92,7 @@ impl MintOrder {
     pub async fn encode_and_sign(
         &self,
         signer: &impl TransactionSigner,
-    ) -> Result<SignedMintOrder> {
+    ) -> BftResult<SignedMintOrder> {
         let mut buf = [0; Self::SIGNED_ENCODED_DATA_SIZE];
 
         buf[..32].copy_from_slice(&self.amount.to_big_endian());
@@ -116,7 +116,7 @@ impl MintOrder {
         let signature = signer
             .sign_digest(digest)
             .await
-            .map_err(|e| Error::Internal(format!("failed to sign MintOrder: {e}")))?;
+            .map_err(|e| Error::Signing(format!("failed to sign MintOrder: {e}")))?;
 
         // Add signature to the data.
         let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
@@ -227,6 +227,15 @@ impl<'de> Deserialize<'de> for SignedMintOrder {
         D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_bytes(SignedMintOrderVisitor)
+    }
+}
+
+impl Serialize for SignedMintOrder {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(&self.0)
     }
 }
 

@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_utils::evm_link::EvmLink;
-use bridge_utils::operation_store::MinterOperationId;
 use bridge_utils::BFTBridge;
 use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
@@ -364,7 +364,7 @@ impl RunesContext {
 
             eprintln!("Checking deposit status. Try #{retry_count}...");
 
-            let response: Vec<(MinterOperationId, OperationState)> = self
+            let response: Vec<(OperationId, OperationState)> = self
                 .inner
                 .rune_bridge_client(ADMIN)
                 .get_operations_list(eth_address)

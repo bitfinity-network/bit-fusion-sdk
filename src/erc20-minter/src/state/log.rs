@@ -1,11 +1,12 @@
 use std::borrow::Cow;
 
+use bridge_canister::memory::memory_by_id;
 use candid::{Decode, Encode};
 use ic_log::{init_log, LogSettings, LoggerConfig};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{Bound, CellStructure, StableCell, Storable, VirtualMemory};
 
-use crate::memory::{LOGGER_SETTINGS_MEMORY_ID, MEMORY_MANAGER};
+use crate::memory::LOGGER_SETTINGS_MEMORY_ID;
 
 #[derive(Debug, Default, Clone)]
 pub struct StorableLogSettings(pub LogSettings);
@@ -33,7 +34,7 @@ impl Default for LoggerConfigService {
         let settings = LogSettings::default();
         Self {
             settings: StableCell::new(
-                MEMORY_MANAGER.with(|mm| mm.get(LOGGER_SETTINGS_MEMORY_ID)),
+                memory_by_id(LOGGER_SETTINGS_MEMORY_ID),
                 StorableLogSettings(settings),
             )
             .expect("failed to init default logger settings"),

@@ -12,6 +12,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
+bridge-canister = { path = "../bridge-canister" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }

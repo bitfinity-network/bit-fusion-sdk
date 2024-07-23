@@ -1,15 +1,53 @@
+use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::bft_events::BurntEventData;
 use bridge_utils::evm_bridge::BridgeSide;
-use bridge_utils::operation_store::MinterOperation;
 use candid::{CandidType, Deserialize};
 use did::{H256, U256};
+use serde::Serialize;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct OperationPayload {
     pub side: BridgeSide,
     pub status: OperationStatus,
+}
+
+impl Operation for OperationPayload {
+    async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
+        todo!()
+    }
+
+    fn is_complete(&self) -> bool {
+        matches!(self.status, OperationStatus::Minted { .. })
+    }
+
+    fn evm_wallet_address(&self) -> did::H160 {
+        todo!()
+    }
+
+    async fn on_wrapped_token_minted(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::MintedEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_wrapped_token_burnt(
+        _ctx: impl OperationContext,
+        _event: BurntEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_minter_notification(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::NotifyMinterEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
 }
 
 impl OperationPayload {
@@ -39,7 +77,7 @@ impl OperationPayload {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum OperationStatus {
     Scheduled(BurntEventData),
     MintOrderSigned {
@@ -58,10 +96,4 @@ pub enum OperationStatus {
         amount: U256,
         tx_id: H256,
     },
-}
-
-impl MinterOperation for OperationPayload {
-    fn is_complete(&self) -> bool {
-        matches!(self.status, OperationStatus::Minted { .. })
-    }
 }

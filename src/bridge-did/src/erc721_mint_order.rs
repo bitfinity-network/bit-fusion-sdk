@@ -10,7 +10,7 @@ use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storab
 use serde::de::Visitor;
 use serde::Deserialize;
 
-use crate::error::{Error, Result};
+use crate::error::{BftResult, Error};
 use crate::id256::Id256;
 
 #[derive(Debug, CandidType, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -115,7 +115,7 @@ impl ERC721MintOrder {
     pub async fn encode_and_sign(
         &self,
         signer: &impl TransactionSigner,
-    ) -> Result<ERC721SignedMintOrder> {
+    ) -> BftResult<ERC721SignedMintOrder> {
         let data = self.token_uri.as_bytes();
         let mut buf = vec![0; Self::SIGNED_ENCODED_DATA_SIZE + data.len()];
         let data_size = data.len();
@@ -140,7 +140,7 @@ impl ERC721MintOrder {
         let signature = signer
             .sign_digest(digest)
             .await
-            .map_err(|e| Error::Internal(format!("failed to sign MintOrder: {e}")))?;
+            .map_err(|e| Error::Signing(format!("failed to sign MintOrder: {e}")))?;
 
         // Add signature to the data.
         let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();

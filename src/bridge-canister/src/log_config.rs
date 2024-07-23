@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-use bridge_did::error::Error;
+use bridge_did::error::{BftResult, Error};
 use candid::{Decode, Encode};
 use ic_exports::ic_kit::ic;
 use ic_log::{init_log, LogSettings, LoggerConfig};
@@ -39,9 +39,9 @@ pub struct LoggerConfigService;
 
 impl LoggerConfigService {
     /// Initialize a new LoggerConfigService. Must be called just once
-    pub fn init(&mut self, log_settings: LogSettings) -> Result<(), Error> {
+    pub fn init(&mut self, log_settings: LogSettings) -> BftResult<()> {
         if LOGGER_CONFIG.with(|logger_config| logger_config.borrow().is_some()) {
-            return Err(Error::Internal(
+            return Err(Error::Initialization(
                 "LoggerConfig already initialized".to_string(),
             ));
         }
@@ -49,7 +49,7 @@ impl LoggerConfigService {
 
         LOG_SETTINGS
             .with(|cell| cell.borrow_mut().set(StorableLogSettings(log_settings)))
-            .map_err(|_| Error::Internal("Storage error".to_string()))?;
+            .map_err(|_| Error::Initialization("log settings storage error".to_string()))?;
 
         // get settings and init log
         let log_settings = LOG_SETTINGS.with(|cell| cell.borrow().get().0.clone());
@@ -70,7 +70,7 @@ impl LoggerConfigService {
                 let (_, config) = ic_log::Builder::default().build();
                 Ok(config)
             } else {
-                init_log(_log_settings).map_err(|e| Error::Internal(format!("Logger init error: {e}")))
+                init_log(_log_settings).map_err(|e| Error::Initialization(format!("Logger init error: {e}")))
             }
         }
     }
@@ -80,35 +80,37 @@ impl LoggerConfigService {
     }
 
     /// Reload the logger configuration
-    pub fn reload(&mut self) -> Result<(), Error> {
+    pub fn reload(&mut self) -> BftResult<()> {
         if LOGGER_CONFIG.with(|logger_config| logger_config.borrow().is_some()) {
-            return Err(Error::Internal(
-                "LoggerConfig already initialized".to_string(),
+            return Err(Error::Initialization(
+                "LoggerConfig already initialized".into(),
             ));
         }
 
         // get settings and init log
         let log_settings = LOG_SETTINGS.with(|cell| cell.borrow().get().0.clone());
         let logger_config = init_log(&log_settings)
-            .map_err(|e| Error::Internal(format!("Logger init error: {e}")))?;
+            .map_err(|e| Error::Initialization(format!("logger init error: {e}")))?;
         LOGGER_CONFIG.with(|config| config.borrow_mut().replace(logger_config));
 
         Ok(())
     }
 
     /// Changes the logger filter at runtime
-    pub fn set_logger_filter(&mut self, filter: &str) -> Result<(), Error> {
+    pub fn set_logger_filter(&mut self, filter: &str) -> BftResult<()> {
         self.update_log_settings(filter)?;
         LOGGER_CONFIG.with(|config| match *config.borrow_mut() {
             Some(ref logger_config) => {
                 logger_config.update_filters(filter);
                 Ok(())
             }
-            None => Err(Error::Internal("LoggerConfig not initialized".to_string())),
+            None => Err(Error::Initialization(
+                "LoggerConfig not initialized".to_string(),
+            )),
         })
     }
 
-    fn update_log_settings(&mut self, filter: &str) -> Result<(), Error> {
+    fn update_log_settings(&mut self, filter: &str) -> BftResult<()> {
         LOG_SETTINGS
             .with(|cell| {
                 let mut cell = cell.borrow_mut();
@@ -116,6 +118,6 @@ impl LoggerConfigService {
                 log_settings.0.log_filter = Some(filter.to_string());
                 cell.set(log_settings)
             })
-            .map_err(|_| Error::Internal("Storage error".to_string()))
+            .map_err(|_| Error::Initialization("logger settings storage error".to_string()))
     }
 }

@@ -6,8 +6,8 @@ use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, Network, OutPoint, Transaction, TxOut, Txid};
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BurntEventData;
-use bridge_utils::operation_store::MinterOperationId;
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
 use did::H160;
@@ -16,7 +16,7 @@ use ic_exports::ic_kit::ic;
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::RuneId;
-use serde::Deserializer;
+use serde::{Deserializer, Serialize};
 
 use crate::canister::get_operations_store;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
@@ -26,7 +26,7 @@ use crate::operation::{OperationState, RuneOperationStore};
 use crate::rune_info::RuneInfo;
 use crate::state::State;
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub struct RuneWithdrawalPayload {
     rune_info: RuneInfo,
     amount: u128,
@@ -122,7 +122,7 @@ impl RuneWithdrawalPayload {
     }
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum WithdrawalStatus {
     InvalidRequest(String),
     Scheduled,
@@ -163,6 +163,19 @@ impl<'de> Deserialize<'de> for DidTransaction {
     }
 }
 
+impl Serialize for DidTransaction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Error;
+
+        let mut bytes = vec![];
+        self.0.consensus_encode(&mut bytes).map_err(Error::custom)?;
+        serializer.serialize_bytes(&bytes)
+    }
+}
+
 pub(crate) struct Withdrawal<UTXO: UtxoProvider> {
     state: Rc<RefCell<State>>,
     utxo_provider: UTXO,
@@ -192,10 +205,7 @@ impl Withdrawal<IcUtxoProvider> {
 }
 
 impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
-    pub async fn withdraw(
-        &mut self,
-        operation_id: MinterOperationId,
-    ) -> Result<Txid, WithdrawError> {
+    pub async fn withdraw(&mut self, operation_id: OperationId) -> Result<Txid, WithdrawError> {
         let Some(operation) = self.operation_store.get(operation_id) else {
             return Err(WithdrawError::InternalError(format!(
                 "Operation not found: {operation_id}"

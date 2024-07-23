@@ -1,3 +1,4 @@
+use bridge_did::error::{BftResult, Error};
 use candid::Principal;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{BTreeMapStructure, StableBTreeMap};
@@ -12,9 +13,9 @@ impl<M: Memory> AccessList<M> {
             access_list: StableBTreeMap::new(m),
         }
     }
-    pub fn add(&mut self, principal: Principal) -> bridge_did::error::Result<()> {
+    pub fn add(&mut self, principal: Principal) -> BftResult<()> {
         if principal == Principal::anonymous() {
-            return Err(bridge_did::error::Error::AnonymousPrincipal);
+            return Err(Error::AnonymousPrincipal);
         }
 
         self.access_list.insert(principal, ());
@@ -22,7 +23,7 @@ impl<M: Memory> AccessList<M> {
         Ok(())
     }
 
-    pub fn batch_add(&mut self, principals: &[Principal]) -> bridge_did::error::Result<()> {
+    pub fn batch_add(&mut self, principals: &[Principal]) -> BftResult<()> {
         for principal in principals {
             self.add(*principal)?;
         }
@@ -48,11 +49,11 @@ impl<M: Memory> AccessList<M> {
 
 #[cfg(test)]
 mod tests {
+    use bridge_canister::memory::MEMORY_MANAGER;
     use ic_exports::ic_kit::MockContext;
 
     use super::*;
     use crate::constant::ACCESS_LIST_MEMORY_ID;
-    use crate::memory::MEMORY_MANAGER;
 
     #[test]
     fn test_access_list() {

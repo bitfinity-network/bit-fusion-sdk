@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::{BridgeEvent, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -36,9 +36,9 @@ mod minter_notify;
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
-    Deposit(MinterOperationId),
+    Deposit(OperationId),
     RemoveMintOrder(MintedEventData),
-    Withdraw(MinterOperationId),
+    Withdraw(OperationId),
 }
 
 impl RuneBridgeTask {
@@ -119,7 +119,7 @@ impl RuneBridgeTask {
         Ok(())
     }
 
-    async fn deposit(deposit_request_id: MinterOperationId) -> Result<(), SchedulerError> {
+    async fn deposit(deposit_request_id: OperationId) -> Result<(), SchedulerError> {
         RuneDeposit::get()
             .process_deposit_request(deposit_request_id)
             .await;
@@ -140,10 +140,8 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let operation_id = get_operations_store().new_operation(
-                    burnt.sender.clone(),
-                    OperationState::new_withdrawal(burnt, &state.borrow()),
-                );
+                let operation_id = get_operations_store()
+                    .new_operation(OperationState::new_withdrawal(burnt, &state.borrow()));
                 let mint_order_task = RuneBridgeTask::Withdraw(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
@@ -182,8 +180,11 @@ impl RuneBridgeTask {
 }
 
 impl Task for RuneBridgeTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         match self {

@@ -3,7 +3,7 @@ mod evm_rpc_canister;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use bridge_did::error::Result as McResult;
+use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};

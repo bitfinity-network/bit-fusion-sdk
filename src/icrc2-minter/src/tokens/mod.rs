@@ -1,6 +1,5 @@
 use did::H256;
 
-pub mod bft_bridge;
 pub mod icrc1;
 pub mod icrc2;
 

@@ -8,16 +8,15 @@
 //! for common bridge APIs.
 //!
 //! [`build_data`] macro can be used to provide canister build data in the common format.
+
+pub mod bridge;
 mod build_data;
 mod canister;
-mod config;
-mod core;
-mod inspect;
+pub mod inspect;
 mod log_config;
-mod memory;
-mod signer;
-
-pub use core::BridgeCore;
+pub mod memory;
+pub mod operation_store;
+pub mod runtime;
 
 pub use canister::BridgeCanister;
 pub use inspect::bridge_inspect;

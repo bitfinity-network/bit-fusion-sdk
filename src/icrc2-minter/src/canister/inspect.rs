@@ -1,5 +1,5 @@
 use bridge_canister::bridge_inspect;
-use bridge_did::error::Result;
+use bridge_did::error::BftResult;
 use candid::Principal;
 use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::{api, inspect_message};
@@ -19,7 +19,7 @@ async fn inspect_message() {
     }
 }
 
-async fn inspect_method(method: &str) -> Result<()> {
+async fn inspect_method(method: &str) -> BftResult<()> {
     match method {
         "add_to_whitelist" | "remove_from_whitelist" => {
             let (principal,) = api::call::arg_data::<(Principal,)>(Default::default());
