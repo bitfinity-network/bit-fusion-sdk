@@ -81,12 +81,9 @@ jobs:
           cargo install ic-wasm
           cargo install icx-proxy --version 0.10.1
           sudo apt update
-          sudo apt install gcc-multilib libunwind-dev
+          sudo apt install -y gcc-multilib libunwind-dev ca-certificates
           sudo mkdir -p /usr/local/share/ca-certificates/
-          sudo cp btc-deploy/mkcert/rootCA.pem /usr/local/share/ca-certificates/
-          sudo cp btc-deploy/mkcert/*-key.pem /etc/ssl/private/
-          sudo cp btc-deploy/mkcert/*.pem /etc/ssl/certs/
-          sudo cp btc-deploy/mkcert/*.pem /etc/ssl/
+          sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
           sudo update-ca-certificates
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
           sudo ln -s $HOME/bin/ord /usr/bin/ord
