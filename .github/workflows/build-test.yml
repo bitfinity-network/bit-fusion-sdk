@@ -82,9 +82,9 @@ jobs:
           cargo install icx-proxy --version 0.10.1
           sudo apt update
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates
-          sudo mkdir -p /usr/local/share/ca-certificates/
-          sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
-          sudo update-ca-certificates
+          mkdir -p $HOME/.local/share/ca-certificates/
+          cp btc-deploy/mkcert/* $HOME/.local/share/ca-certificates/
+          update-ca-certificates --fresh --certsdir $HOME/.local/share/ca-certificates
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
           sudo ln -s $HOME/bin/ord /usr/bin/ord
           wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
