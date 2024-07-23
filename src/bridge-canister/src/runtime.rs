@@ -51,24 +51,18 @@ impl<Op: Operation> BridgeRuntime<Op> {
 
     /// Run the scheduled tasks.
     pub fn run(&mut self) {
-        if let Some(collect_log_lock) = self.state.borrow_mut().collecting_logs.try_lock() {
+        let mut state = self.state.borrow_mut();
+
+        if state.collecting_logs.try_lock().is_some() {
             let task = scheduler::BridgeTask::Service(ServiceTask::CollectEvmLogs);
             let collect_logs = ScheduledTask::new(task);
             self.scheduler.append_task(collect_logs);
-
-            // Drop the lock
-            drop(collect_log_lock);
         }
 
-        if let Some(refresh_evm_params_lock) =
-            self.state.borrow_mut().refreshing_evm_params.try_lock()
-        {
+        if state.refreshing_evm_params.try_lock().is_some() {
             let task = scheduler::BridgeTask::Service(ServiceTask::RefreshEvmParams);
             let refresh_evm_params = ScheduledTask::new(task);
             self.scheduler.append_task(refresh_evm_params);
-
-            // Drop the lock
-            drop(refresh_evm_params_lock);
         }
 
         let task_execution_result = self.scheduler.run(self.state.clone());

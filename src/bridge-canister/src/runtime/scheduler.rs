@@ -130,7 +130,7 @@ impl ServiceTask {
             .get_evm_link()
             .get_json_rpc_client();
         let Ok(evm_params) = ctx.borrow().config.borrow().get_evm_params() else {
-            log::info!("evm parameters are not initilized");
+            log::info!("evm parameters are not initialized");
             return Err(Error::Initialization(
                 "evm params should be initialized before evm logs collecting".into(),
             ));
