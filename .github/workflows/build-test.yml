@@ -84,7 +84,7 @@ jobs:
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates
           mkdir -p $HOME/.local/share/ca-certificates/
           cp btc-deploy/mkcert/* $HOME/.local/share/ca-certificates/
-          update-ca-certificates --fresh --certsdir $HOME/.local/share/ca-certificates
+          update-ca-certificates --fresh --certsdir $HOME/.local/share/ca-certificates --verbose
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
           sudo ln -s $HOME/bin/ord /usr/bin/ord
           wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
