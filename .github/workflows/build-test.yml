@@ -86,6 +86,7 @@ jobs:
           sudo cp btc-deploy/mkcert/rootCA.pem /usr/local/share/ca-certificates/
           sudo cp btc-deploy/mkcert/*-key.pem /etc/ssl/private/
           sudo cp btc-deploy/mkcert/*.pem /etc/ssl/certs/
+          sudo cp btc-deploy/mkcert/*.pem /etc/ssl/
           sudo update-ca-certificates
           curl --proto '=https' --tlsv1.2 -fsLS https://ordinals.com/install.sh | bash -s
           sudo ln -s $HOME/bin/ord /usr/bin/ord
