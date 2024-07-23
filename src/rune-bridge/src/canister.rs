@@ -97,7 +97,6 @@ impl RuneBridge {
         self.set_timers();
     }
 
-
     /// Returns the bitcoin address that a user has to use to deposit runes to be received on the given Ethereum address.
     #[query]
     pub fn get_deposit_address(&self, eth_address: H160) -> Result<String, GetAddressError> {
