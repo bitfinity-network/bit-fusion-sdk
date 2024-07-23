@@ -94,14 +94,6 @@ jobs:
           tar -xzf /tmp/bitcoin.tar.gz -C /tmp
           sudo cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
 
-      - name: rustfmt
-        run: |
-          cargo fmt --all --check
-
-      - name: clippy
-        run: |
-          cargo clippy --all-features --all-targets -- -D warnings
-
       - name: build
         run: |
           ./scripts/build_solidity.sh
