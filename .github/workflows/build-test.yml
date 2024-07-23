@@ -85,7 +85,6 @@ jobs:
           mkdir -p $HOME/.local/share/ca-certificates/
           cp btc-deploy/mkcert/* $HOME/.local/share/ca-certificates/
           sudo cp btc-deploy/mkcert/* /usr/share/ca-certificates/
-          sudo cp btc-deploy/mkcert/* /etc/ssl/certs/
           update-ca-certificates --fresh --certsdir $HOME/.local/share/ca-certificates --verbose
           sudo update-ca-certificates --fresh --verbose
           ls -l /etc/ssl/certs
