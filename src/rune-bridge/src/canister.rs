@@ -189,9 +189,6 @@ impl RuneBridge {
         rune_info_amounts
     }
 
-    /// This was implemented for testing purposes.
-    /// It is not used in the production code.
-    /// To be removed. See: EPROD-935
     #[update]
     pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
         get_state().borrow().check_admin(ic::caller());
