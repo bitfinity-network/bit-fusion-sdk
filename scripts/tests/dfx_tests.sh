@@ -123,7 +123,7 @@ done
 
 # set dfxvm to use the correct version
 if [ "$GITHUB_CI" -gt 0 ]; then
-    dfxvm default 0.18.0
+    dfxvm default 0.19.0
 fi
 
 killall -9 icx-proxy || true
