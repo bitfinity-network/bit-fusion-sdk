@@ -47,7 +47,7 @@ impl BridgeCanister for MinterCanister {
 
 impl MinterCanister {
     /// Initialize the canister with given data.
-    #[init]
+    // #[init]
     pub fn init(&mut self, init_data: BridgeInitData) {
         self.init_bridge(init_data, Self::run_scheduler);
     }

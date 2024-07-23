@@ -111,21 +111,9 @@ impl ServiceTask {
     ) -> BftResult<()> {
         match self {
             ServiceTask::CollectEvmLogs => {
-                let log_collection_result =
-                    ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await;
-
-                ctx.borrow_mut().collecting_logs = false;
-
-                log_collection_result
+                ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await
             }
-            ServiceTask::RefreshEvmParams => {
-                let evm_params_refreshing_result =
-                    ServiceTask::refresh_evm_params(ctx.clone()).await;
-
-                ctx.borrow_mut().refreshing_evm_params = false;
-
-                evm_params_refreshing_result
-            }
+            ServiceTask::RefreshEvmParams => ServiceTask::refresh_evm_params(ctx.clone()).await,
         }
     }
 

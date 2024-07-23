@@ -1,7 +1,10 @@
 pub mod config;
+mod task_lock;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use task_lock::TaskLock;
 
 use self::config::ConfigStorage;
 use crate::bridge::Operation;
@@ -14,8 +17,8 @@ pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
 pub struct State<Op: Operation> {
     pub config: SharedConfig,
     pub operations: OperationStore<StableMemory, Op>,
-    pub collecting_logs: bool,
-    pub refreshing_evm_params: bool,
+    pub collecting_logs: TaskLock,
+    pub refreshing_evm_params: TaskLock,
 }
 
 impl<Op: Operation> State<Op> {
@@ -24,8 +27,8 @@ impl<Op: Operation> State<Op> {
         Self {
             config,
             operations: OperationStore::with_memory(memory, None),
-            collecting_logs: false,
-            refreshing_evm_params: false,
+            collecting_logs: TaskLock::default(),
+            refreshing_evm_params: TaskLock::default(),
         }
     }
 }
