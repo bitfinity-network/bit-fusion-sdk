@@ -586,26 +586,28 @@ pub trait TestContext {
         bft_bridge: &H160,
         base_token_id: Id256,
     ) -> Result<H160> {
-        let input = BFTBridge::deployERC20Call {
-            name: "Wrapper".into(),
-            symbol: "WPT".into(),
-            baseTokenID: base_token_id.0.into(),
-        }
-        .abi_encode();
+        // let input = BFTBridge::deployERC20Call {
+        //     name: "Wrapper".into(),
+        //     symbol: "WPT".into(),
+        //     baseTokenID: base_token_id.0.into(),
+        // }
+        // .abi_encode();
 
-        let (_hash, receipt) = self.call_contract(wallet, bft_bridge, input, 0).await?;
+        // let (_hash, receipt) = self.call_contract(wallet, bft_bridge, input, 0).await?;
 
-        let output = receipt.output.as_ref().unwrap();
+        // let output = receipt.output.as_ref().unwrap();
 
-        let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
-            .unwrap()
-            ._0;
+        // let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
+        //     .unwrap()
+        //     ._0;
 
-        println!(
-            "Deployed Wrapped token on block {} with address {address}",
-            receipt.block_number
-        );
-        Ok(address.into())
+        // println!(
+        //     "Deployed Wrapped token on block {} with address {address}",
+        //     receipt.block_number
+        // );
+        // Ok(address.into())
+
+        panic!()
     }
 
     /// Burns ICRC-2 token 1 and creates according mint order.
@@ -1361,4 +1363,12 @@ impl CanisterType {
             CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
         }
     }
+}
+
+#[test]
+fn lol() {
+    let address = H160::from_slice(&[
+        182, 71, 11, 185, 67, 76, 220, 190, 107, 208, 177, 22, 47, 221, 166, 181, 6, 243, 252, 43,
+    ]);
+    println!("{:?}", address);
 }

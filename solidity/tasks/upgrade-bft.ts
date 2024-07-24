@@ -21,9 +21,9 @@ interface UpgradeBftParams {
    */
 task('upgrade-bft', 'Upgrades the BFT contract')
     .addParam('proxyAddress', 'The address of the BFT proxy contract')
-    .addParam('isWrappedSide', 'Whether the token is wrapped or not')
-    .addParam('minterAddress', 'The address of the minter')
-    .addParam('feeChargeAddress', 'The address of the fee charge address')
+    .addOptionalParam('isWrappedSide', 'Whether the token is wrapped or not')
+    .addOptionalParam('minterAddress', 'The address of the minter')
+    .addOptionalParam('feeChargeAddress', 'The address of the fee charge address')
     .setAction(async (
         { proxyAddress, isWrappedSide, minterAddress, feeChargeAddress }: UpgradeBftParams,
         hre: HardhatRuntimeEnvironment
@@ -48,7 +48,8 @@ task('upgrade-bft', 'Upgrades the BFT contract')
                     }
                 });
             }
-            validateAddresses(proxyAddress, minterAddress, feeChargeAddress);
+
+            validateAddresses(proxyAddress);
             console.log('Deploying new implementation contract...');
 
             //! Change this to the new implementation contract
@@ -57,6 +58,14 @@ task('upgrade-bft', 'Upgrades the BFT contract')
             /// contract instance
             /// and the old implementation contract should be the one that is currently deployed
             const BftBridge = await hre.ethers.getContractAt('BFTBridge', proxyAddress);
+
+            const oldImpl = await hre.ethers.getContractFactory('BFTBridge');
+
+            // Force import proxyAddress
+            await hre.upgrades.forceImport(proxyAddress, oldImpl, {
+                kind: "uups"
+            });
+
             const newImplementationDeployment: DeployImplementationResponse = await hre.upgrades.prepareUpgrade(proxyAddress, BftBridgeV2, {
                 kind: 'uups'
             });
@@ -106,3 +115,5 @@ task('upgrade-bft', 'Upgrades the BFT contract')
             throw error;
         }
     });
+
+

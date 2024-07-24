@@ -15,7 +15,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /// Make sure you add the reference contracts to the `import` statement above.
 /// @custom:oz-upgrades-from src/BftBridge.sol:BFTBridge
-contract BFTBridgeV2 is BFTBridge {
+contract NewBftBridge is BFTBridge {
     // Hello World
     function helloWorld(string memory name) public pure returns (string memory) {
         return string(abi.encodePacked("Hello, ", name, "!"));

@@ -20,7 +20,7 @@ abstract contract TokenManager is Initializable {
     mapping(address => bytes32) internal _wrappedToBase;
 
     /// List of wrapped tokens.
-    address[] private _wrappedTokenList;
+    address[] internal _wrappedTokenList;
 
     /// Event for new wrapped token creation
     event WrappedTokenDeployedEvent(string name, string symbol, bytes32 baseTokenID, address wrappedERC20);
@@ -42,22 +42,22 @@ abstract contract TokenManager is Initializable {
         return !isWrappedSide;
     }
 
-    /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
-    function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
-        require(isWrappedSide, "Only for wrapped side");
-        require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
+    // /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
+    // function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public virtual returns (address) {
+    //     require(isWrappedSide, "Only for wrapped side");
+    //     require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
-        // Create the new token
-        WrappedToken wrappedERC20 = new WrappedToken(name, symbol, address(this));
+    //     // Create the new token
+    //     WrappedToken wrappedERC20 = new WrappedToken(name, symbol, 0, address(this));
 
-        _baseToWrapped[baseTokenID] = address(wrappedERC20);
-        _wrappedToBase[address(wrappedERC20)] = baseTokenID;
-        _wrappedTokenList.push(address(wrappedERC20));
+    //     _baseToWrapped[baseTokenID] = address(wrappedERC20);
+    //     _wrappedToBase[address(wrappedERC20)] = baseTokenID;
+    //     _wrappedTokenList.push(address(wrappedERC20));
 
-        emit WrappedTokenDeployedEvent(name, symbol, baseTokenID, address(wrappedERC20));
+    //     emit WrappedTokenDeployedEvent(name, symbol, baseTokenID, address(wrappedERC20));
 
-        return address(wrappedERC20);
-    }
+    //     return address(wrappedERC20);
+    // }
 
     /// Update token's metadata
     function updateTokenMetadata(address token, bytes32 name, bytes16 symbol, uint8 decimals) internal {
@@ -68,13 +68,13 @@ abstract contract TokenManager is Initializable {
     function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch {}
+        } catch { }
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch {}
+        } catch { }
     }
 
     /// Returns wrapped token for the given base token
