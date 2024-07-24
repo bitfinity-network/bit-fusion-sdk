@@ -18,6 +18,7 @@ use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
+use super::state::{State, TaskLock};
 use super::RuntimeState;
 use crate::bridge::{Operation, OperationAction};
 
@@ -111,9 +112,25 @@ impl ServiceTask {
     ) -> BftResult<()> {
         match self {
             ServiceTask::CollectEvmLogs => {
+                let _lock = TaskLock::new(
+                    ctx.clone(),
+                    Some(Box::new(|state: &mut State<Op>| {
+                        state.collecting_logs_ts = None
+                    })),
+                );
+
                 ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await
             }
-            ServiceTask::RefreshEvmParams => ServiceTask::refresh_evm_params(ctx.clone()).await,
+            ServiceTask::RefreshEvmParams => {
+                let _lock = TaskLock::new(
+                    ctx.clone(),
+                    Some(Box::new(|state: &mut State<Op>| {
+                        state.refreshing_evm_params_ts = None
+                    })),
+                );
+
+                ServiceTask::refresh_evm_params(ctx.clone()).await
+            }
         }
     }
 

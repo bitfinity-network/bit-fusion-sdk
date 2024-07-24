@@ -8,6 +8,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
+use ic_exports::ic_kit::ic;
 use ic_stable_structures::StableBTreeMap;
 use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::TaskScheduler;
@@ -51,15 +52,17 @@ impl<Op: Operation> BridgeRuntime<Op> {
 
     /// Run the scheduled tasks.
     pub fn run(&mut self) {
-        let mut state = self.state.borrow_mut();
+        if self.state.borrow().should_collect_evm_logs() {
+            self.state.borrow_mut().collecting_logs_ts = Some(ic::time());
 
-        if state.collecting_logs.try_lock().is_some() {
             let task = scheduler::BridgeTask::Service(ServiceTask::CollectEvmLogs);
             let collect_logs = ScheduledTask::new(task);
             self.scheduler.append_task(collect_logs);
         }
 
-        if state.refreshing_evm_params.try_lock().is_some() {
+        if self.state.borrow().should_refresh_evm_params() {
+            self.state.borrow_mut().refreshing_evm_params_ts = Some(ic::time());
+
             let task = scheduler::BridgeTask::Service(ServiceTask::RefreshEvmParams);
             let refresh_evm_params = ScheduledTask::new(task);
             self.scheduler.append_task(refresh_evm_params);
@@ -120,7 +123,7 @@ fn operation_storage_memory() -> OperationsMemory<StableMemory> {
     }
 }
 
-fn default_state<Op: Operation>(config: SharedConfig) -> RuntimeState<Op> {
+pub(crate) fn default_state<Op: Operation>(config: SharedConfig) -> RuntimeState<Op> {
     let state = State::default(operation_storage_memory(), config);
     Rc::new(RefCell::new(state))
 }
