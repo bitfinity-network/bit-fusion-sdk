@@ -85,11 +85,6 @@ jobs:
           mkdir -p /usr/local/share/ca-certificates/
           sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
           sudo update-ca-certificates --fresh --verbose
-          curl --proto '=https' --tlsv1.2 -fsLS https://raw.githubusercontent.com/ordinals/ord/master/install.sh | bash -s
-          sudo ln -s $HOME/bin/ord /usr/bin/ord
-          wget -O /tmp/bitcoin.tar.gz https://bitcoin.org/bin/bitcoin-core-27.0/bitcoin-27.0-x86_64-linux-gnu.tar.gz
-          tar -xzf /tmp/bitcoin.tar.gz -C /tmp
-          sudo cp /tmp/bitcoin-27.0/bin/bitcoin-cli /usr/bin/bitcoin-cli
 
       - name: rustfmt
         run: |

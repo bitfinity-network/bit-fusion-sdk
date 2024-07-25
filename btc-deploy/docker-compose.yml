@@ -21,6 +21,8 @@ services:
     build:
       dockerfile: ord.dockerfile
       context: .
+    volumes:
+      - ${PWD}/../src/integration-tests/target/ord:/data
     depends_on:
       bitcoind:
         condition: service_healthy

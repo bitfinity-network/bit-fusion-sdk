@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::ffi::OsStr;
 use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
@@ -35,7 +34,7 @@ use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 const RUNE_NAME: &str = "SUPERMAXRUNENAME";
-const RUNE_DATA_DIR: &str = "target/ord";
+const RUNE_DATA_DIR: &str = "/data";
 const RUNE_SERVER_URL: &str = "http://localhost:8000";
 
 struct RunesContext {
@@ -47,8 +46,18 @@ struct RunesContext {
 }
 
 fn get_rune_info(name: &str) -> RuneInfo {
-    let output = std::process::Command::new("ord")
-        .args(["-r", "--data-dir", RUNE_DATA_DIR, "--index-runes", "runes"])
+    let output = std::process::Command::new("docker")
+        .args([
+            "exec",
+            "ord",
+            "ord",
+            "-r",
+            "--bitcoin-rpc-url=http://bitcoind:18443",
+            "--data-dir",
+            RUNE_DATA_DIR,
+            "--index-runes",
+            "runes",
+        ])
         .output()
         .expect("failed to run 'ord' cli tool");
     if !output.status.success() {
@@ -231,7 +240,7 @@ impl RunesContext {
     }
 
     async fn run_ord(&self, args: &[&str]) -> String {
-        let output = Command::new("ord")
+        let output = Command::new("docker")
             .envs([
                 ("ORD_BITCOIN_RPC_USERNAME", "ic-btc-integration"),
                 (
@@ -240,7 +249,11 @@ impl RunesContext {
                 ),
             ])
             .args([
+                "exec",
+                "ord",
+                "ord",
                 "-r",
+                "--bitcoin-rpc-url=http://bitcoind:18443",
                 "--data-dir",
                 RUNE_DATA_DIR,
                 "--index-runes",
@@ -273,13 +286,12 @@ impl RunesContext {
         let wallet_test_address =
             std::env::var("WALLET_TEST_ADDRESS").expect("WALLET_TEST_ADDRESS is not set");
 
-        let pwd = std::env::var("PWD").expect("PWD is not set");
-        let output = Self::bitcoin_cli([
-            &format!("-conf={pwd}/btc-deploy/bitcoin.conf"),
-            "-rpcwallet=admin",
-            "generatetoaddress",
-            &count.to_string(),
-            &wallet_test_address,
+        let output = Self::bitcoin_cli(vec![
+            "-conf=/data/.bitcoin/bitcoin.conf".to_string(),
+            "-rpcwallet=admin".to_string(),
+            "generatetoaddress".to_string(),
+            count.to_string(),
+            wallet_test_address,
         ])
         .await;
 
@@ -287,11 +299,8 @@ impl RunesContext {
             Ok(out) if out.status.success() => {
                 String::from_utf8(out.stdout).expect("invalid bitcoin-cli output")
             }
-            Err(err) if err.kind() == ErrorKind::NotFound => {
-                panic!("neither `bitcoin-cli` or `bitcoin-core.cli` cli tool not found in PATH")
-            }
-            Err(err) => panic!("'ord' execution failed: {err:?}"),
-            Ok(out) => panic!("'ord' exited with status code {}", out.status),
+            Err(err) => panic!("'bitcoin-cli' execution failed: {err:?}"),
+            Ok(out) => panic!("'bitcoin-cli' exited with status code {}", out.status),
         };
 
         eprintln!("mint-blocks output: {}", result);
@@ -301,25 +310,24 @@ impl RunesContext {
     }
 
     /// Tries to run `bitcoin-cli` or `bitcoin-core.cli` with the provided arguments.
-    async fn bitcoin_cli<I, S>(args: I) -> Result<std::process::Output, std::io::Error>
-    where
-        I: IntoIterator<Item = S> + Clone,
-        S: AsRef<OsStr>,
-    {
-        const CLI_NAMES: &[&str] = &["bitcoin-cli", "bitcoin-core.cli"];
+    async fn bitcoin_cli(args: Vec<String>) -> Result<std::process::Output, std::io::Error> {
+        let mut exec_args = vec![
+            "exec".to_string(),
+            "bitcoind".to_string(),
+            "bitcoin-cli".to_string(),
+        ];
+        exec_args.extend(args);
 
-        for cli_name in CLI_NAMES {
-            match Command::new(cli_name).args(args.clone()).output().await {
-                Ok(output) => return Ok(output),
-                Err(err) if err.kind() == ErrorKind::NotFound => continue,
-                Err(err) => return Err(err),
-            }
+        println!("Running: bitcoin-cli {}", exec_args.join(" "));
+
+        match Command::new("docker")
+            .args(exec_args.into_iter())
+            .output()
+            .await
+        {
+            Ok(output) => return Ok(output),
+            Err(err) => return Err(err),
         }
-
-        Err(std::io::Error::new(
-            ErrorKind::NotFound,
-            format!("No bitcoin cli found in {:?}", CLI_NAMES),
-        ))
     }
 
     async fn deposit(

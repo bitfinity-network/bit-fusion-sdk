@@ -6,11 +6,12 @@ set -x
 export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
 export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
-ORD_DATA=$PWD/src/integration-tests/target/ord
-ORDW="ord -r --data-dir $ORD_DATA --index-runes wallet --server-url http://localhost:8000"
-# Get bitcoin-cli
-BITCOIN=$(command -v bitcoin-cli || command -v bitcoin-core.cli)
-BITCOIN="$BITCOIN -conf=$PWD/btc-deploy/bitcoin.conf"
+# ord data dir to mount in docker
+ORD_DATA_DIR=$PWD/src/integration-tests/target/ord
+# ord command
+ORDW="docker exec ord ord -r --bitcoin-rpc-url=http://bitcoind:18443 --data-dir /data --index-runes wallet --server-url http://localhost:8000"
+# bitcoin-cli command
+BITCOIN="docker exec bitcoind bitcoin-cli -conf=/data/.bitcoin/bitcoin.conf"
 
 usage() {
   echo "Usage: $0 [options]"
@@ -22,9 +23,8 @@ usage() {
 
 setup_docker() {
     PREV_PATH=$(pwd)
-    rm -rf $ORD_DATA/
     cd btc-deploy/
-    rm -rf bitcoin-data/
+    rm -rf bitcoin-data/*
     mkdir -p bitcoin-data/
     docker compose up -d --build --force-recreate
     cd $PREV_PATH
@@ -182,19 +182,17 @@ $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 1 $WALLET_TEST_ADDRESS &> /de
 echo "Sent 10 BTC to ord wallet address $ORD_ADDRESS"
 sleep 5
 
-$ORDW batch --fee-rate 10 --batch ./scripts/tests/runes/rune.yaml &
+$ORDW batch --fee-rate 10 --batch /app/rune/batch.yaml &
 sleep 1
 $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 10 $WALLET_TEST_ADDRESS
 
 sleep 5
 $BITCOIN -rpcwallet=$WALLET_TEST generatetoaddress 1 $WALLET_TEST_ADDRESS
-sleep 30
-
-ord -r --data-dir $ORD_DATA --index-runes runes
+sleep 5
 
 # run tests
 set +e
-cargo test -p integration-tests --features dfx_tests
+cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
 mkdir -p .logs/
 cp $LOGFILE .logs/dfx.log
