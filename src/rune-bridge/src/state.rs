@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
 use bitcoin::{Network, PrivateKey, PublicKey};
+use bridge_canister::memory::LOG_SETTINGS_MEMORY_ID;
 use bridge_utils::evm_bridge::{EvmInfo, EvmParams};
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Deserialize, Principal};
@@ -13,9 +14,11 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
-use ic_log::{init_log, LogSettings};
+use ic_log::canister::LogState;
+use ic_log::did::LogCanisterSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
+use ic_storage::IcStorage;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
 use ordinals::RuneId;
@@ -83,7 +86,7 @@ pub struct RuneBridgeConfig {
     pub evm_link: EvmLink,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
-    pub log_settings: LogSettings,
+    pub log_settings: LogCanisterSettings,
     pub min_confirmations: u32,
     pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
@@ -100,7 +103,7 @@ impl Default for RuneBridgeConfig {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
-            log_settings: LogSettings::default(),
+            log_settings: LogCanisterSettings::default(),
             min_confirmations: 12,
             no_of_indexers: MIN_INDEXERS,
             indexer_urls: HashSet::default(),
@@ -318,7 +321,16 @@ impl State {
             .expect("failed to init signer in stable memory");
         self.signer = stable;
 
-        init_log(&config.log_settings).expect("failed to init logger");
+        MEMORY_MANAGER.with(|mm| {
+            LogState::get()
+                .borrow_mut()
+                .init(
+                    config.admin,
+                    mm.get(LOG_SETTINGS_MEMORY_ID),
+                    config.log_settings.clone(),
+                )
+                .expect("Failed to configure logger.");
+        });
 
         self.config = config;
     }
@@ -369,6 +381,8 @@ impl State {
 
 #[cfg(test)]
 mod tests {
+    use ic_exports::ic_kit::MockContext;
+
     use super::*;
 
     #[test]
@@ -413,6 +427,7 @@ mod tests {
 
     #[test]
     fn test_configure_with_trailing_slash() {
+        MockContext::new().inject();
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
             no_of_indexers: 1,

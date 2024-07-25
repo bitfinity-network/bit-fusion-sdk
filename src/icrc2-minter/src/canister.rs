@@ -18,6 +18,7 @@ use ic_canister::{
     generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
 };
 use ic_exports::ic_kit::ic;
+use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
@@ -183,6 +184,12 @@ impl MinterCanister {
             .skip(offset)
             .take(count)
             .collect()
+    }
+}
+
+impl LogCanister for MinterCanister {
+    fn log_state(&self) -> Rc<RefCell<LogState>> {
+        LogState::get()
     }
 }
 

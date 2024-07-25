@@ -280,6 +280,8 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
     // upgrade canister
     ctx.upgrade_minter_canister().await.unwrap();
+    let settings = minter_client.get_logger_settings().await.unwrap();
+    println!("LOGGER SETTINGS: {settings:?}");
     minter_client
         .set_logger_filter("debug".to_string())
         .await

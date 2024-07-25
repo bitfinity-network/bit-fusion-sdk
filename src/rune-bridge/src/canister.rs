@@ -17,8 +17,10 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 };
 use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
+use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
+use ic_storage::IcStorage;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
@@ -230,6 +232,12 @@ impl Metrics for RuneBridge {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()
+    }
+}
+
+impl LogCanister for RuneBridge {
+    fn log_state(&self) -> Rc<RefCell<LogState>> {
+        LogState::get()
     }
 }
 
