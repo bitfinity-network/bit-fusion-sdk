@@ -126,6 +126,13 @@ if [ "$GITHUB_CI" -gt 0 ]; then
     dfxvm default 0.19.0
 fi
 
+# check bad dfx version
+DFX_VERSION=$(dfx --version | awk '{print $2}')
+if [ "$DFX_VERSION" = "0.18.0" ]; then
+    echo "dfx version 0.18.0 doesn't work with bitcoin integration. Please upgrade to 0.19.0"
+    exit 1
+fi
+
 killall -9 icx-proxy || true
 dfx stop
 
@@ -187,10 +194,10 @@ ord -r --data-dir $ORD_DATA --index-runes runes
 
 # run tests
 set +e
-cargo test -p integration-tests --features dfx_tests runes_bridging_flow
+cargo test -p integration-tests --features dfx_tests
 TEST_RESULT=$?
-mkdir -p .artifact/
-cp $LOGFILE .artifact/dfx.log
+mkdir -p .logs/
+cp $LOGFILE .logs/dfx.log
 set -e
 
 killall -9 icx-proxy || true
@@ -201,4 +208,4 @@ if [ "$DOCKER" -gt 0 ]; then
     stop_docker
 fi
 
-exit 0
+exit 0 # TODO: set TEST_RESULT and remove log upload
