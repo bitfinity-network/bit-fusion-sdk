@@ -162,7 +162,6 @@ mod tests {
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, init};
     use ic_exports::ic_kit::{inject, MockContext};
-    use ic_log::did::{LogCanisterSettings, Pagination};
     use ic_storage::IcStorage;
 
     use super::*;
