@@ -1,4 +1,5 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -65,7 +66,7 @@ impl IcrcBridgeOp {
 }
 
 impl Operation for IcrcBridgeOp {
-    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await

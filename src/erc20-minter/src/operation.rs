@@ -1,4 +1,5 @@
 use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -16,7 +17,7 @@ pub struct OperationPayload {
 }
 
 impl Operation for OperationPayload {
-    async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
         todo!()
     }
 
