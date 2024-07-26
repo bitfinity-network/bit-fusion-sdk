@@ -8,7 +8,9 @@ edition.workspace = true
 [dependencies]
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
+bip39 = { workspace = true }
 bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
+bitcoincore-rpc = { workspace = true }
 bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
@@ -37,7 +39,10 @@ icrc2-minter = { path = "../icrc2-minter" }
 jsonrpc-core = { workspace = true }
 minter-client = { workspace = true }
 once_cell = { workspace = true }
+ord-rs = { workspace = true, features = ["rune"] }
+ordinals = { workspace = true }
 rand = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
@@ -88,4 +93,4 @@ state_machine_tests = [
     "ic-management-canister-types",
     "ic-state-machine-tests",
 ]
-dfx_tests = []
+dfx_tests = ["bitcoin"]

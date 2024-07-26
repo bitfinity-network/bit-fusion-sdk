@@ -4,6 +4,8 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bitcoin::key::Secp256k1;
+use bitcoin::{Address, Amount, PrivateKey, PublicKey};
 use bridge_did::id256::Id256;
 use bridge_utils::evm_link::EvmLink;
 use bridge_utils::operation_store::MinterOperationId;
@@ -19,6 +21,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
+use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
 use rune_bridge::operation::OperationState;
@@ -31,11 +34,17 @@ use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::{DfxTestContext, ADMIN};
+use crate::utils::btc_rpc_client::BitcoinRpcClient;
+use crate::utils::etching::Etcher;
+use crate::utils::ord_client::OrdClient;
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 const RUNE_NAME: &str = "SUPERMAXRUNENAME";
 const RUNE_DATA_DIR: &str = "/data";
 const RUNE_SERVER_URL: &str = "http://localhost:8000";
+
+const BTC_WALLET_ADMIN: &str = "admin";
+const BTC_WALLET_ORD: &str = "ord";
 
 struct RunesContext {
     inner: DfxTestContext,
@@ -45,49 +54,17 @@ struct RunesContext {
     rune_id: Id256,
 }
 
-fn get_rune_info(name: &str) -> RuneInfo {
-    let output = std::process::Command::new("docker")
-        .args([
-            "exec",
-            "ord",
-            "ord",
-            "-r",
-            "--bitcoin-rpc-url=http://bitcoind:18443",
-            "--data-dir",
-            RUNE_DATA_DIR,
-            "--index-runes",
-            "runes",
-        ])
-        .output()
-        .expect("failed to run 'ord' cli tool");
-    if !output.status.success() {
-        panic!(
-            "'ord' list runes command exited with status {}: {} {}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        )
-    }
-
-    println!(
-        "Ord runes list: {}",
-        String::from_utf8_lossy(&output.stdout)
-    );
-
-    let json =
-        serde_json::from_slice::<Value>(&output.stdout).expect("failed to parse ord runes list");
-    let id_str = json["runes"][name]["id"].as_str().expect("invalid rune id");
-    let id_parts = id_str.split(':').collect::<Vec<_>>();
-    RuneInfo {
-        name: RuneName::from_str(name).unwrap_or_else(|_| panic!("invalid rune name: {name}")),
-        decimals: 8,
-        block: u64::from_str(id_parts[0]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
-        tx: u32::from_str(id_parts[1]).unwrap_or_else(|_| panic!("invalid rune id: {id_str}")),
-    }
+async fn get_rune_info(rune_id: &RuneId) -> RuneInfo {
+    OrdClient::dfx_test_client()
+        .get_rune_info(rune_id)
+        .await
+        .expect("failed to get rune info")
 }
 
 impl RunesContext {
     async fn new() -> Self {
+        let rune_id = dfx_rune_setup().await.expect("failed to setup runes");
+
         let context = DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
         context
             .evm_client(ADMIN)
@@ -149,7 +126,7 @@ impl RunesContext {
             .await
             .unwrap();
 
-        let rune_info = get_rune_info(RUNE_NAME);
+        let rune_info = get_rune_info(&rune_id).await;
         let token = context
             .create_wrapped_token(&wallet, &bft_bridge, rune_info.id().into())
             .await
@@ -280,54 +257,22 @@ impl RunesContext {
         String::from_utf8(result).expect("Ord returned not valid utf8 string")
     }
 
-    async fn mint_blocks(&self, count: u32) {
+    async fn mint_blocks(&self, count: u64) {
         // Await all previous operations to synchronize for ord and dfx
         self.inner.advance_time(Duration::from_secs(1)).await;
         let wallet_test_address =
             std::env::var("WALLET_TEST_ADDRESS").expect("WALLET_TEST_ADDRESS is not set");
 
-        let output = Self::bitcoin_cli(vec![
-            "-conf=/data/.bitcoin/bitcoin.conf".to_string(),
-            "-rpcwallet=admin".to_string(),
-            "generatetoaddress".to_string(),
-            count.to_string(),
-            wallet_test_address,
-        ])
-        .await;
+        let wallet_test_address = Address::from_str(&wallet_test_address)
+            .expect("invalid WALLET_TEST_ADDRESS env variable")
+            .assume_checked();
 
-        let result = match output {
-            Ok(out) if out.status.success() => {
-                String::from_utf8(out.stdout).expect("invalid bitcoin-cli output")
-            }
-            Err(err) => panic!("'bitcoin-cli' execution failed: {err:?}"),
-            Ok(out) => panic!("'bitcoin-cli' exited with status code {}", out.status),
-        };
-
-        eprintln!("mint-blocks output: {}", result);
+        BitcoinRpcClient::dfx_test_client(BTC_WALLET_ADMIN)
+            .generate_to_address(&wallet_test_address, count)
+            .expect("failed to generate blocks");
 
         // Allow dfx and ord catch up with the new block
         self.inner.advance_time(Duration::from_secs(5)).await;
-    }
-
-    /// Tries to run `bitcoin-cli` or `bitcoin-core.cli` with the provided arguments.
-    async fn bitcoin_cli(args: Vec<String>) -> Result<std::process::Output, std::io::Error> {
-        let mut exec_args = vec![
-            "exec".to_string(),
-            "bitcoind".to_string(),
-            "bitcoin-cli".to_string(),
-        ];
-        exec_args.extend(args);
-
-        println!("Running: bitcoin-cli {}", exec_args.join(" "));
-
-        match Command::new("docker")
-            .args(exec_args.into_iter())
-            .output()
-            .await
-        {
-            Ok(output) => return Ok(output),
-            Err(err) => return Err(err),
-        }
     }
 
     async fn deposit(
@@ -542,6 +487,69 @@ impl RunesContext {
         let balance_after = self.wrapped_balance(wallet).await;
         assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
     }
+}
+
+struct BtcWallet {
+    private_key: PrivateKey,
+    public_key: PublicKey,
+    address: Address,
+}
+
+fn generate_btc_wallet() -> BtcWallet {
+    use rand::Rng as _;
+    let entropy = rand::thread_rng().gen::<[u8; 16]>();
+    let mnemonic = bip39::Mnemonic::from_entropy(&entropy).unwrap();
+
+    let seed = mnemonic.to_seed("");
+
+    let private_key =
+        bitcoin::PrivateKey::from_slice(&seed[..32], bitcoin::Network::Regtest).unwrap();
+    let public_key = private_key.public_key(&Secp256k1::new());
+
+    let address = Address::p2wpkh(&public_key, bitcoin::Network::Regtest).unwrap();
+
+    BtcWallet {
+        private_key,
+        public_key,
+        address,
+    }
+}
+
+async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
+    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client("admin");
+    let admin_address = admin_btc_rpc_client.get_new_address()?;
+
+    admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
+
+    // create ord wallet
+    let ord_wallet = generate_btc_wallet();
+
+    admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10).to_sat())?;
+    admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
+
+    // etch
+    let etcher = Etcher::new(
+        &admin_btc_rpc_client,
+        &ord_wallet.private_key,
+        &ord_wallet.address,
+    );
+    let etching = Etching {
+        rune: Some(Rune::from_str("SUPERMAXRUNENAME").unwrap()),
+        divisibility: Some(2),
+        premine: Some(10_000),
+        spacers: None,
+        symbol: Some('$'),
+        terms: Some(Terms {
+            amount: Some(2000),
+            cap: Some(500),
+            height: (None, None),
+            offset: (None, None),
+        }),
+        turbo: true,
+    };
+    let rune_id = etcher.etch(etching).await?;
+
+    Ok(rune_id)
 }
 
 #[tokio::test]
