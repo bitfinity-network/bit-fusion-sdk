@@ -157,7 +157,6 @@ impl LogCanister for BridgeCanisterExport {
 }
 
 #[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, init};
