@@ -65,7 +65,7 @@ impl UtxoProvider for IcUtxoProvider {
 
         let middle_percentile = if response.is_empty() {
             match self.network {
-                BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
+                BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE * 1000,
                 _ => {
                     log::error!("Empty response for fee rate request");
                     return Err(WithdrawError::FeeRateRequest);

@@ -6963,7 +6963,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 [[package]]
 name = "ord-rs"
 version = "0.1.6"
-source = "git+https://github.com/bitfinity-network/ord-rs?branch=EPROD-944-add-runestone-to-reveal#2dd01b74badd30c911008ae2155ed5c697206e99"
+source = "git+https://github.com/bitfinity-network/ord-rs?branch=EPROD-944-add-runestone-to-reveal#2429f8bb20d4ad3fa4d53bba24c0b08aa9e60139"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",

@@ -263,6 +263,8 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             })),
         );
 
+        log::trace!("Sending withdrawal transaction: {tx:?}");
+
         self.utxo_provider.send_tx(&tx).await?;
 
         {

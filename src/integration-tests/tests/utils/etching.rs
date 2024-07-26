@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bitcoin::bip32::DerivationPath;
 use bitcoin::{Address, Amount, FeeRate, PrivateKey, PublicKey, Txid};
@@ -40,23 +40,18 @@ impl<'a> Etcher<'a> {
     }
 
     /// Etch a rune on the blockchain
-    pub async fn etch(
-        &self,
-        commit_utxo: Utxo,
-        edict_utxo: Utxo,
-        etching: Etching,
-    ) -> anyhow::Result<RuneId> {
+    pub async fn etch(&self, commit_utxo: Utxo, etching: Etching) -> anyhow::Result<RuneId> {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let public_key = self.private_key.public_key(&secp);
 
         // etch runestone
         let reveal_txid = self
-            .etch_runestone(etching, commit_utxo, self.private_key.clone(), public_key)
+            .etch_runestone(etching, commit_utxo, *self.private_key, public_key)
             .await?;
         println!("Reveal transaction sent: {}", reveal_txid);
 
         // advance the chain
-        self.client.generate_to_address(&self.address, 2)?;
+        self.client.generate_to_address(self.address, 2)?;
         tokio::time::sleep(Duration::from_secs(5)).await;
 
         // get reveal tx
@@ -69,18 +64,7 @@ impl<'a> Etcher<'a> {
         println!("Rune etched: {:?}", rune_id);
 
         // advance the chain
-        self.client.generate_to_address(&self.address, 5)?;
-        println!("Advanced by 5 blocks; waiting 10 seconds");
-        tokio::time::sleep(Duration::from_secs(10)).await;
-
-        // edict
-        let txid = self
-            .edict_rune(edict_utxo, self.private_key.clone(), public_key, rune_id)
-            .await?;
-        println!("Edict Transaction sent: {}", txid);
-
-        // advance the chain
-        self.client.generate_to_address(&self.address, 5)?;
+        self.client.generate_to_address(self.address, 5)?;
         println!("Advanced by 5 blocks; waiting 10 seconds");
         tokio::time::sleep(Duration::from_secs(10)).await;
 
@@ -99,8 +83,9 @@ impl<'a> Etcher<'a> {
 
         let mut dummy_inscription = Nft::new(
             Some("text/plain;charset=utf-8".as_bytes().to_vec()),
-            Some("SUPERMAXRUNENAME".as_bytes().to_vec()),
+            Some(etching.rune.unwrap().to_string().as_bytes().to_vec()),
         );
+        dummy_inscription.pointer = Some(vec![]);
         dummy_inscription.rune = Some(
             etching
                 .rune
@@ -133,6 +118,22 @@ impl<'a> Etcher<'a> {
 
         // send tx
         let commit_txid = self.client.send_transaction(&signed_commit_tx)?;
+
+        // ! let's wait for 6 confirmations - ord won't index under 6 confirmations
+        let start = Instant::now();
+        loop {
+            self.client.generate_to_address(self.address, 1)?;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let confirmations = self.client.get_transaction_confirmations(&commit_txid)?;
+            println!("commit transaction confirmations: {}", confirmations);
+            if confirmations >= 6 {
+                break;
+            }
+            if start.elapsed() > Duration::from_secs(60) {
+                anyhow::bail!("commit transaction not confirmed after 60 seconds");
+            }
+        }
+
         // make reveal
         let reveal_transaction = builder
             .build_reveal_transaction(RevealTransactionArgs {
@@ -145,6 +146,7 @@ impl<'a> Etcher<'a> {
                 redeem_script: commit_tx.redeem_script,
                 runestone: Some(Runestone {
                     etching: Some(etching),
+                    pointer: Some(1),
                     ..Default::default()
                 }),
             })
@@ -157,35 +159,43 @@ impl<'a> Etcher<'a> {
         Ok(reveal_txid)
     }
 
-    async fn edict_rune(
+    pub async fn edict_rune(
         &self,
-        utxo: Utxo,
-        private_key: PrivateKey,
-        public_key: PublicKey,
+        utxos: Vec<Utxo>,
         rune_id: RuneId,
+        destination: Address,
+        amount: u128,
     ) -> anyhow::Result<Txid> {
-        let wallet = Wallet::new_with_signer(LocalSigner::new(private_key));
-        let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let wallet = Wallet::new_with_signer(LocalSigner::new(*self.private_key));
+        let builder = OrdTransactionBuilder::new(
+            self.private_key.public_key(&secp),
+            ScriptType::P2WSH,
+            wallet,
+        );
 
-        let inputs = vec![TxInputInfo {
-            outpoint: bitcoin::OutPoint {
-                txid: utxo.id,
-                vout: utxo.index,
-            },
-            tx_out: bitcoin::TxOut {
-                value: utxo.amount,
-                script_pubkey: self.address.script_pubkey(),
-            },
-            derivation_path: DerivationPath::default(),
-        }];
+        let inputs = utxos
+            .into_iter()
+            .map(|utxo| TxInputInfo {
+                outpoint: bitcoin::OutPoint {
+                    txid: utxo.id,
+                    vout: utxo.index,
+                },
+                tx_out: bitcoin::TxOut {
+                    value: utxo.amount,
+                    script_pubkey: self.address.script_pubkey(),
+                },
+                derivation_path: DerivationPath::default(),
+            })
+            .collect::<Vec<_>>();
 
         let unsigned_tx = builder.create_edict_transaction(&CreateEdictTxArgs {
             rune: rune_id,
             inputs: inputs.clone(),
-            destination: self.address.clone(),
+            destination,
             change_address: self.address.clone(),
             rune_change_address: self.address.clone(),
-            amount: utxo.amount.to_sat() as u128,
+            amount,
             fee_rate: FeeRate::from_sat_per_vb(10).unwrap(),
         })?;
 

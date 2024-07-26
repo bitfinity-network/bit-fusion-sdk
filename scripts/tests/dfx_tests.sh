@@ -3,8 +3,6 @@
 set -e
 set -x
 
-export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
-export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
 
 usage() {
@@ -119,8 +117,7 @@ killall -9 icx-proxy || true
 dfx stop
 
 if [ "$DOCKER" -gt 0 ]; then
-    echo "won't stop"
-    # stop_docker
+    stop_docker
 fi
 
-exit 0 # TODO: set TEST_RESULT and remove log upload
+exit $TEST_RESULT

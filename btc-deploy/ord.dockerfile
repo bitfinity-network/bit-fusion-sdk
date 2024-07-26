@@ -2,7 +2,6 @@ FROM ubuntu:22.04
 
 WORKDIR /app
 COPY ord.sh .
-COPY rune ./rune
 COPY mkcert .
 RUN apt update && apt install -y curl
 RUN curl -sL https://deb.nodesource.com/setup_22.x | bash

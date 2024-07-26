@@ -1,11 +1,10 @@
 use std::collections::HashSet;
-use std::io::ErrorKind;
 use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bitcoin::key::Secp256k1;
-use bitcoin::{Address, Amount, PrivateKey, PublicKey};
+use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_did::id256::Id256;
 use bridge_utils::evm_link::EvmLink;
 use bridge_utils::operation_store::MinterOperationId;
@@ -21,6 +20,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_log::LogSettings;
+use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
@@ -28,8 +28,6 @@ use rune_bridge::operation::OperationState;
 use rune_bridge::rune_info::{RuneInfo, RuneName};
 use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
-use serde_json::Value;
-use tokio::process::Command;
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
@@ -39,18 +37,17 @@ use crate::utils::etching::Etcher;
 use crate::utils::ord_client::OrdClient;
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
-const RUNE_NAME: &str = "SUPERMAXRUNENAME";
-const RUNE_DATA_DIR: &str = "/data";
-const RUNE_SERVER_URL: &str = "http://localhost:8000";
-
-const BTC_WALLET_ADMIN: &str = "admin";
-
 struct RunesContext {
     inner: DfxTestContext,
     eth_wallet: Wallet<'static, SigningKey>,
     token_contract: H160,
     bft_bridge_contract: H160,
-    rune_id: Id256,
+    rune_id256: Id256,
+    rune_id: RuneId,
+    rune_name: String,
+    admin_btc_address: Address,
+    admin_btc_rpc_client: BitcoinRpcClient,
+    ord_btc_wallet: BtcWallet,
 }
 
 async fn get_rune_info(rune_id: &RuneId) -> RuneInfo {
@@ -62,8 +59,14 @@ async fn get_rune_info(rune_id: &RuneId) -> RuneInfo {
 
 impl RunesContext {
     async fn new() -> Self {
-        let rune_id = dfx_rune_setup().await.expect("failed to setup runes");
-        println!("Etched rune id: {rune_id}");
+        let RuneSetup {
+            rune_id,
+            admin_address,
+            admin_btc_rpc_client,
+            ord_wallet,
+            rune_name,
+        } = dfx_rune_setup().await.expect("failed to setup runes");
+        println!("Etched rune id: {rune_id}",);
 
         let context = DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
         context
@@ -157,11 +160,16 @@ impl RunesContext {
         context.advance_time(Duration::from_secs(2)).await;
 
         Self {
-            inner: context,
-            eth_wallet: wallet,
-            token_contract: token,
-            rune_id: rune_info.id().into(),
+            admin_btc_address: admin_address,
+            admin_btc_rpc_client,
             bft_bridge_contract: bft_bridge,
+            eth_wallet: wallet,
+            inner: context,
+            ord_btc_wallet: ord_wallet,
+            rune_id,
+            rune_id256: rune_info.id().into(),
+            rune_name,
+            token_contract: token,
         }
     }
 
@@ -179,96 +187,92 @@ impl RunesContext {
     }
 
     async fn send_runes(&self, btc_address: &str, amount: u128) {
-        let output = self
-            .run_ord(&[
-                "send",
-                "--fee-rate",
-                "10",
-                btc_address,
-                &format!("{}:{RUNE_NAME}", amount as f64 / 100.0),
-            ])
-            .await;
+        let btc_address = Address::from_str(btc_address)
+            .expect("failed to parse btc address")
+            .assume_checked();
 
-        eprintln!(
-            "ord send --fee-rate 10 {btc_address} {}:{RUNE_NAME}: {output}",
-            amount as f64 / 100.0
+        let etcher = Etcher::new(
+            &self.admin_btc_rpc_client,
+            &self.ord_btc_wallet.private_key,
+            &self.ord_btc_wallet.address,
         );
 
-        self.mint_blocks(1).await;
-    }
+        // find the utxo
+        let balance = OrdClient::dfx_test_client()
+            .get_balances(&self.rune_name)
+            .await
+            .expect("failed to get rune balances");
 
-    async fn send_btc(&self, btc_address: &str, amount: u64) {
-        let output = self
-            .run_ord(&[
-                "send",
-                "--fee-rate",
-                "10",
-                btc_address,
-                &format!("{} btc", amount as f32 / 100_000_000.0),
-            ])
-            .await;
+        let mut utxo = None;
+        for outpoint in balance.keys() {
+            let outpoint_info = OrdClient::dfx_test_client()
+                .get_outpoint(outpoint)
+                .await
+                .expect("failed to get outpoint owner");
 
-        eprintln!(
-            "ord send --fe-rate 10 {btc_address} {} btc: {output}",
-            amount as f32 / 100_000_000.0
-        );
+            let tokens = outpoint.split(':').collect::<Vec<_>>();
+            let txid = Txid::from_str(tokens[0]).expect("failed to parse txid");
+            let index = tokens[1].parse::<u32>().expect("failed to parse index");
 
-        self.mint_blocks(1).await;
-    }
+            if outpoint_info.address == self.ord_btc_wallet.address {
+                utxo = Some(Utxo {
+                    index,
+                    id: txid,
+                    amount: outpoint_info.value,
+                });
+                break;
+            }
+        }
 
-    async fn run_ord(&self, args: &[&str]) -> String {
-        let output = Command::new("docker")
-            .envs([
-                ("ORD_BITCOIN_RPC_USERNAME", "ic-btc-integration"),
-                (
-                    "ORD_BITCOIN_RPC_PASSWORD",
-                    "QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E=",
-                ),
-            ])
-            .args([
-                "exec",
-                "ord",
-                "ord",
-                "-r",
-                "--bitcoin-rpc-url=http://bitcoind:18443",
-                "--data-dir",
-                RUNE_DATA_DIR,
-                "--index-runes",
-                "wallet",
-                "--server-url",
-                RUNE_SERVER_URL,
-            ])
-            .args(args)
-            .output()
-            .await;
-
-        let result = match output {
-            Ok(res) if res.status.success() => res.stdout,
-            Err(err) if err.kind() == ErrorKind::NotFound => panic!("`ord` cli tool not found"),
-            Err(err) => panic!("'ord' execution failed: {err:?}"),
-            Ok(res) => panic!(
-                "'ord' exited with status code {}: {} {}",
-                res.status,
-                String::from_utf8_lossy(&res.stdout),
-                String::from_utf8_lossy(&res.stderr),
-            ),
+        let Some(utxo) = utxo else {
+            panic!("No utxo found for the ord wallet");
         };
 
-        String::from_utf8(result).expect("Ord returned not valid utf8 string")
+        // get funding utxo
+        let edict_fund_tx = self
+            .admin_btc_rpc_client
+            .send_to_address(&self.ord_btc_wallet.address, Amount::from_int_btc(1))
+            .expect("failed to send btc");
+        self.admin_btc_rpc_client
+            .generate_to_address(&self.admin_btc_address, 1)
+            .expect("failed to generate blocks");
+
+        let edict_funds_utxo = self
+            .admin_btc_rpc_client
+            .get_tx_out_by_owner(&edict_fund_tx, &self.ord_btc_wallet.address)
+            .expect("failed to get utxo");
+
+        etcher
+            .edict_rune(
+                vec![utxo, edict_funds_utxo],
+                self.rune_id,
+                btc_address.clone(),
+                amount,
+            )
+            .await
+            .expect("failed to send runes");
+
+        self.mint_blocks(6).await;
+        println!("{amount} Runes sent to {btc_address}");
+    }
+
+    async fn send_btc(&self, btc_address: &str, amount: Amount) {
+        let btc_address = Address::from_str(btc_address)
+            .expect("failed to parse btc address")
+            .assume_checked();
+        self.admin_btc_rpc_client
+            .send_to_address(&btc_address, amount)
+            .expect("failed to send btc");
+
+        self.mint_blocks(1).await;
     }
 
     async fn mint_blocks(&self, count: u64) {
         // Await all previous operations to synchronize for ord and dfx
         self.inner.advance_time(Duration::from_secs(1)).await;
-        let wallet_test_address =
-            std::env::var("WALLET_TEST_ADDRESS").expect("WALLET_TEST_ADDRESS is not set");
 
-        let wallet_test_address = Address::from_str(&wallet_test_address)
-            .expect("invalid WALLET_TEST_ADDRESS env variable")
-            .assume_checked();
-
-        BitcoinRpcClient::dfx_test_client(BTC_WALLET_ADMIN)
-            .generate_to_address(&wallet_test_address, count)
+        self.admin_btc_rpc_client
+            .generate_to_address(&self.admin_btc_address, count)
             .expect("failed to generate blocks");
 
         // Allow dfx and ord catch up with the new block
@@ -402,14 +406,14 @@ impl RunesContext {
     }
 
     async fn withdraw(&self, amount: u128) {
-        let withdrawal_address = self.get_withdrawal_address().await;
+        let withdrawal_address = self.ord_btc_wallet.address.to_string();
         let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,
                 &self.eth_wallet,
                 &self.token_contract,
-                self.rune_id.0.as_slice(),
+                self.rune_id256.0.as_slice(),
                 withdrawal_address.as_bytes().to_vec(),
                 &self.bft_bridge_contract,
                 amount,
@@ -419,23 +423,8 @@ impl RunesContext {
             .expect("failed to burn wrapped token");
 
         self.inner.advance_time(Duration::from_secs(15)).await;
-        self.mint_blocks(1).await;
+        self.mint_blocks(6).await;
         self.inner.advance_time(Duration::from_secs(5)).await;
-
-        // Ord indexer doesn't catch the new balance for some reason after the first block, so
-        // we mint one more time to make sure indexer is up to date.
-        self.mint_blocks(1).await;
-        self.inner.advance_time(Duration::from_secs(5)).await;
-    }
-
-    async fn get_withdrawal_address(&self) -> String {
-        let json = serde_json::from_str::<Value>(&self.run_ord(&["receive"]).await)
-            .expect("failed to parse ord balance response");
-
-        json["addresses"][0]
-            .as_str()
-            .expect("invalid address value")
-            .to_string()
     }
 
     async fn wrapped_balance(&self, wallet: &Wallet<'_, SigningKey>) -> u128 {
@@ -446,26 +435,23 @@ impl RunesContext {
     }
 
     async fn ord_rune_balance(&self) -> u128 {
-        let json = serde_json::from_str::<Value>(&self.run_ord(&["balance"]).await)
-            .expect("failed to parse ord balance response");
+        let balance = OrdClient::dfx_test_client()
+            .get_balances(&self.rune_name)
+            .await
+            .expect("failed to get rune balances");
+        let mut amount = 0;
+        for (outpoint, balance) in balance {
+            let owner = OrdClient::dfx_test_client()
+                .get_outpoint(&outpoint)
+                .await
+                .expect("failed to get outpoint owner")
+                .address;
+            if owner == self.ord_btc_wallet.address {
+                amount += balance as u128;
+            }
+        }
 
-        (json["runes"][RUNE_NAME]
-            .as_str()
-            .unwrap_or_else(|| {
-                panic!(
-                    "invalid balance value: {}. Full json: {json}",
-                    json["runes"][RUNE_NAME]
-                )
-            })
-            .parse::<f64>()
-            .unwrap_or_else(|_| {
-                panic!(
-                    "invalid balance value: {}. Full json: {json}",
-                    json["runes"][RUNE_NAME]
-                )
-            })
-            * 100.0)
-            .round() as u128
+        amount
     }
 
     async fn deposit_runes_to(&self, rune_amount: u128, wallet: &Wallet<'_, SigningKey>) {
@@ -476,7 +462,7 @@ impl RunesContext {
         println!("Wallet address: {wallet_address}; deposit_address {address}");
 
         self.send_runes(&address, rune_amount).await;
-        self.send_btc(&address, 490000).await;
+        self.send_btc(&address, Amount::from_int_btc(1)).await;
 
         self.inner.advance_time(Duration::from_secs(5)).await;
 
@@ -486,12 +472,16 @@ impl RunesContext {
 
         let balance_after = self.wrapped_balance(wallet).await;
         assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
+
+        self.inner.advance_time(Duration::from_secs(5)).await;
+        self.admin_btc_rpc_client
+            .generate_to_address(&self.admin_btc_address, 6)
+            .expect("failed to generate blocks");
     }
 }
 
 struct BtcWallet {
     private_key: PrivateKey,
-    public_key: PublicKey,
     address: Address,
 }
 
@@ -510,13 +500,31 @@ fn generate_btc_wallet() -> BtcWallet {
 
     BtcWallet {
         private_key,
-        public_key,
         address,
     }
 }
 
-async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
-    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(BTC_WALLET_ADMIN);
+struct RuneSetup {
+    admin_btc_rpc_client: BitcoinRpcClient,
+    admin_address: Address,
+    ord_wallet: BtcWallet,
+    rune_id: RuneId,
+    rune_name: String,
+}
+
+fn generate_rune_name() -> String {
+    use rand::Rng as _;
+    let mut rng = rand::thread_rng();
+    let mut name = String::new();
+    for _ in 0..16 {
+        name.push(rng.gen_range(b'A'..=b'Z') as char);
+    }
+    name
+}
+
+async fn dfx_rune_setup() -> anyhow::Result<RuneSetup> {
+    let rune_name = generate_rune_name();
+    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&rune_name);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
     admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
@@ -527,14 +535,9 @@ async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
     let commit_fund_tx =
         admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
     admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
-    let edict_fund_tx =
-        admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
-    admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
     let commit_utxo =
         admin_btc_rpc_client.get_tx_out_by_owner(&commit_fund_tx, &ord_wallet.address)?;
-    let edict_utxo =
-        admin_btc_rpc_client.get_tx_out_by_owner(&edict_fund_tx, &ord_wallet.address)?;
 
     // etch
     let etcher = Etcher::new(
@@ -543,22 +546,28 @@ async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
         &ord_wallet.address,
     );
     let etching = Etching {
-        rune: Some(Rune::from_str("SUPERMAXRUNENAME").unwrap()),
+        rune: Some(Rune::from_str(&rune_name).unwrap()),
         divisibility: Some(2),
-        premine: Some(10_000),
+        premine: Some(1_000_000),
         spacers: None,
         symbol: Some('$'),
         terms: Some(Terms {
-            amount: Some(2000),
+            amount: Some(200_000),
             cap: Some(500),
             height: (None, None),
             offset: (None, None),
         }),
         turbo: true,
     };
-    let rune_id = etcher.etch(commit_utxo, edict_utxo, etching).await?;
+    let rune_id = etcher.etch(commit_utxo, etching).await?;
 
-    Ok(rune_id)
+    Ok(RuneSetup {
+        admin_btc_rpc_client,
+        admin_address,
+        rune_id,
+        ord_wallet,
+        rune_name,
+    })
 }
 
 #[tokio::test]
@@ -572,12 +581,16 @@ async fn runes_bridging_flow() {
 
     ctx.withdraw(30).await;
 
+    ctx.admin_btc_rpc_client
+        .generate_to_address(&ctx.admin_btc_address, 6)
+        .expect("failed to generate blocks");
+
     let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
     assert_eq!(updated_balance, 70);
 
     let updated_ord_balance = ctx.ord_rune_balance().await;
 
-    assert_eq!(updated_ord_balance, ord_balance - 70);
+    assert_eq!(updated_ord_balance, ord_balance - 100 + 30);
 
     ctx.stop().await
 }

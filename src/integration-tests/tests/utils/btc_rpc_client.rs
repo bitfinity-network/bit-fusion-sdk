@@ -74,7 +74,7 @@ impl BitcoinRpcClient {
             if let Some(address) = &tx_out.script_pub_key.address {
                 if address == owner {
                     return Ok(Utxo {
-                        id: txid.clone(),
+                        id: *txid,
                         index: vout,
                         amount: tx_out.value,
                     });
@@ -96,6 +96,12 @@ impl BitcoinRpcClient {
         let tx = self.client.get_raw_transaction(txid, None)?;
 
         Ok(tx)
+    }
+
+    pub fn get_transaction_confirmations(&self, txid: &Txid) -> anyhow::Result<u32> {
+        let tx = self.client.get_raw_transaction_info(txid, None)?;
+
+        Ok(tx.confirmations.unwrap_or(0))
     }
 
     pub fn get_transaction_block_info(&self, txid: &Txid) -> anyhow::Result<TxBlockInfo> {

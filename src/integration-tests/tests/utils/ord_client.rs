@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::str::FromStr as _;
 
+use bitcoin::{Address, Amount};
 use ordinals::RuneId;
 use reqwest::{Client, StatusCode};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
@@ -21,7 +23,12 @@ impl OrdClient {
     pub async fn get_rune_info(&self, id: &RuneId) -> anyhow::Result<RuneInfo> {
         let url = format!("{}/rune/{}", self.url, id);
 
-        let response = self.client.get(&url).send().await?;
+        let response = self
+            .client
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
 
         if response.status() == StatusCode::NOT_FOUND {
             anyhow::bail!("rune not found");
@@ -36,6 +43,45 @@ impl OrdClient {
             tx: id.tx,
         })
     }
+
+    pub async fn get_balances(&self, rune_name: &str) -> anyhow::Result<HashMap<String, u64>> {
+        let url = format!("{}/runes/balances", self.url);
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+
+        let mut response = response.json::<BalancesResponse>().await?;
+        let balances = response
+            .runes
+            .remove(rune_name)
+            .ok_or(anyhow::anyhow!("rune not found in response: {}", rune_name))?;
+
+        Ok(balances.balance)
+    }
+
+    pub async fn get_outpoint(&self, outpoint: &str) -> anyhow::Result<Outpoint> {
+        let url = format!("{}/output/{}", self.url, outpoint);
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+
+        let response = response.json::<OutpointResponse>().await?;
+
+        let address = Address::from_str(&response.address)
+            .map_err(|_| anyhow::anyhow!("invalid address"))?
+            .assume_checked();
+        let value = Amount::from_sat(response.value);
+
+        Ok(Outpoint { address, value })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,4 +94,27 @@ struct Entry {
     block: u64,
     divisibility: u8,
     spaced_rune: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BalancesResponse {
+    #[serde(flatten)]
+    runes: HashMap<String, Balances>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Balances {
+    #[serde(flatten)]
+    balance: HashMap<String, u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OutpointResponse {
+    pub address: String,
+    pub value: u64,
+}
+
+pub struct Outpoint {
+    pub address: Address,
+    pub value: Amount,
 }
