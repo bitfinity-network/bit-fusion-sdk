@@ -44,7 +44,6 @@ const RUNE_DATA_DIR: &str = "/data";
 const RUNE_SERVER_URL: &str = "http://localhost:8000";
 
 const BTC_WALLET_ADMIN: &str = "admin";
-const BTC_WALLET_ORD: &str = "ord";
 
 struct RunesContext {
     inner: DfxTestContext,
@@ -64,6 +63,7 @@ async fn get_rune_info(rune_id: &RuneId) -> RuneInfo {
 impl RunesContext {
     async fn new() -> Self {
         let rune_id = dfx_rune_setup().await.expect("failed to setup runes");
+        println!("Etched rune id: {rune_id}");
 
         let context = DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
         context
@@ -516,7 +516,7 @@ fn generate_btc_wallet() -> BtcWallet {
 }
 
 async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
-    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client("admin");
+    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(BTC_WALLET_ADMIN);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
     admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
@@ -524,8 +524,17 @@ async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
     // create ord wallet
     let ord_wallet = generate_btc_wallet();
 
-    admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10).to_sat())?;
+    let commit_fund_tx =
+        admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
     admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
+    let edict_fund_tx =
+        admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
+    admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
+
+    let commit_utxo =
+        admin_btc_rpc_client.get_tx_out_by_owner(&commit_fund_tx, &ord_wallet.address)?;
+    let edict_utxo =
+        admin_btc_rpc_client.get_tx_out_by_owner(&edict_fund_tx, &ord_wallet.address)?;
 
     // etch
     let etcher = Etcher::new(
@@ -547,7 +556,7 @@ async fn dfx_rune_setup() -> anyhow::Result<RuneId> {
         }),
         turbo: true,
     };
-    let rune_id = etcher.etch(etching).await?;
+    let rune_id = etcher.etch(commit_utxo, edict_utxo, etching).await?;
 
     Ok(rune_id)
 }

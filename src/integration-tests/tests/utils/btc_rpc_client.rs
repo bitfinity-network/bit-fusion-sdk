@@ -1,10 +1,16 @@
 use bitcoin::{Address, Amount, BlockHash, Transaction, Txid};
-use bitcoincore_rpc::json::{ListUnspentResultEntry, WalletTxInfo};
 use bitcoincore_rpc::{Auth, Client, RpcApi as _};
+use ord_rs::Utxo;
 
 /// Bitcoin rpc client
 pub struct BitcoinRpcClient {
     client: Client,
+}
+
+pub struct TxBlockInfo {
+    pub blockhash: BlockHash,
+    pub tx_index: u32,
+    pub height: u64,
 }
 
 impl BitcoinRpcClient {
@@ -48,27 +54,36 @@ impl BitcoinRpcClient {
     }
 
     /// Send bitcoin from client wallet to the provided address
-    pub fn send_to_address(&self, to: &Address, sats: u64) -> anyhow::Result<Txid> {
-        let txid = self.client.send_to_address(
-            to,
-            Amount::from_sat(sats),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )?;
+    pub fn send_to_address(&self, to: &Address, amt: Amount) -> anyhow::Result<Txid> {
+        let txid = self
+            .client
+            .send_to_address(to, amt, None, None, None, None, None, None)?;
 
         Ok(txid)
     }
 
-    pub fn list_utxos(&self, address: &Address) -> anyhow::Result<Vec<ListUnspentResultEntry>> {
-        let utxos = self
-            .client
-            .list_unspent(None, None, Some(&[address]), None, None)?;
+    pub fn get_tx_out_by_owner(&self, txid: &Txid, owner: &Address) -> anyhow::Result<Utxo> {
+        let mut vout = 0;
+        loop {
+            println!("collecting tx outs for txid: {}, vout: {}", txid, vout);
+            let tx_outs = self.client.get_tx_out(txid, vout, None)?;
+            if tx_outs.is_none() {
+                break;
+            }
+            let tx_out = tx_outs.unwrap();
+            if let Some(address) = &tx_out.script_pub_key.address {
+                if address == owner {
+                    return Ok(Utxo {
+                        id: txid.clone(),
+                        index: vout,
+                        amount: tx_out.value,
+                    });
+                }
+            }
+            vout += 1;
+        }
 
-        Ok(utxos)
+        anyhow::bail!("No tx out found for owner");
     }
 
     pub fn send_transaction(&self, tx: &Transaction) -> anyhow::Result<Txid> {
@@ -77,9 +92,26 @@ impl BitcoinRpcClient {
         Ok(txid)
     }
 
-    pub fn get_transaction(&self, txid: &Txid) -> anyhow::Result<WalletTxInfo> {
-        let tx = self.client.get_transaction(txid, None)?;
+    pub fn get_transaction(&self, txid: &Txid) -> anyhow::Result<Transaction> {
+        let tx = self.client.get_raw_transaction(txid, None)?;
 
-        Ok(tx.info)
+        Ok(tx)
+    }
+
+    pub fn get_transaction_block_info(&self, txid: &Txid) -> anyhow::Result<TxBlockInfo> {
+        let tx = self.client.get_raw_transaction_info(txid, None)?;
+        let blockhash = tx.blockhash.ok_or(anyhow::anyhow!("tx not in block"))?;
+
+        let block = self.client.get_block_info(&blockhash)?;
+
+        Ok(TxBlockInfo {
+            blockhash,
+            tx_index: block
+                .tx
+                .iter()
+                .position(|tx| tx == txid)
+                .ok_or(anyhow::anyhow!("tx not found in block"))? as u32,
+            height: block.height as u64,
+        })
     }
 }

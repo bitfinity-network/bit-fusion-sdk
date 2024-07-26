@@ -1,7 +1,7 @@
 use std::str::FromStr as _;
 
 use ordinals::RuneId;
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
 use serde::Deserialize;
 
@@ -22,6 +22,11 @@ impl OrdClient {
         let url = format!("{}/rune/{}", self.url, id);
 
         let response = self.client.get(&url).send().await?;
+
+        if response.status() == StatusCode::NOT_FOUND {
+            anyhow::bail!("rune not found");
+        }
+
         let response = response.json::<RuneResponse>().await?;
 
         Ok(RuneInfo {

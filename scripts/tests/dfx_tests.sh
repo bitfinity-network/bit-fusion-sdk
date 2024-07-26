@@ -119,7 +119,8 @@ killall -9 icx-proxy || true
 dfx stop
 
 if [ "$DOCKER" -gt 0 ]; then
-    stop_docker
+    echo "won't stop"
+    # stop_docker
 fi
 
 exit 0 # TODO: set TEST_RESULT and remove log upload
