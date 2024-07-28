@@ -173,6 +173,10 @@ struct CreateTokenArgs {
     #[arg(long)]
     token_name: String,
 
+    /// Decimal places of the token.
+    #[arg(long, default_value = "18")]
+    token_decimals: u8,
+
     /// ID of the source token.
     ///
     /// ID can be in one of the following forms:
@@ -628,6 +632,7 @@ async fn create_token(args: CreateTokenArgs) {
     let input = BFTBridge::deployERC20Call {
         name: args.token_name.clone(),
         symbol: args.token_name,
+        decimals: args.token_decimals,
         baseTokenID: token_id.0.into(),
     }
     .abi_encode();
