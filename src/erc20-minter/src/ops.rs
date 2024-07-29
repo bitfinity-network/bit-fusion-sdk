@@ -1,137 +1,95 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{self, MintOrder, SignedMintOrder};
-use bridge_did::reason::Erc2Burn;
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
-use bridge_utils::evm_link::address_to_Erc_subaccount;
 use candid::{CandidType, Decode, Nat};
-use did::{H160, H256, U256};
-use ic_exports::ic_kit::RejectionCode;
+use did::{H160, H256};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
-use Erc_client::account::Account;
-use Erc_client::transfer::TransferError;
-
-use crate::constant::IC_CHAIN_ID;
-use crate::tokens::Erc1::{self, ErcCanisterError};
-use crate::tokens::Erc2::{self, Success};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Erc20BridgeOp {
     // Deposit operations:
-    BurnErcTokens(ErcBurn),
-    SignMintOrder {
+    SignWrappedMintOrder {
         order: MintOrder,
-        is_refund: bool,
     },
-    SendMintTransaction {
-        src_token: Id256,
-        dst_address: H160,
+    SendWrappedMintTransaction {
         order: SignedMintOrder,
-        is_refund: bool,
     },
-    ConfirmMint {
-        src_token: Id256,
-        dst_address: H160,
+    ConfirmWrappedMint {
         order: SignedMintOrder,
         tx_hash: Option<H256>,
-        is_refund: bool,
     },
     WrappedTokenMintConfirmed(MintedEventData),
 
     // Withdraw operations:
-    MintErcTokens(BurntEventData),
-    ErcMintConfirmed {
-        src_address: H160,
-        Erc_tx_id: Nat,
+    SignBaseMintOrder {
+        order: MintOrder,
     },
-}
-
-impl Erc20BridgeOp {
-    pub fn get_signed_mint_order(&self, token: &Id256) -> Option<SignedMintOrder> {
-        match self {
-            Self::SendMintTransaction {
-                order, src_token, ..
-            } if src_token == token => Some(*order),
-            Self::ConfirmMint {
-                order, src_token, ..
-            } if src_token == token => Some(*order),
-            _ => None,
-        }
-    }
+    SendBaseMintTransaction {
+        order: SignedMintOrder,
+    },
+    ConfirmBaseMint {
+        order: SignedMintOrder,
+        tx_hash: Option<H256>,
+    },
+    BaseTokenMintConfirmed(MintedEventData),
 }
 
 impl Operation for Erc20BridgeOp {
-    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
-            Erc20BridgeOp::BurnErcTokens(burn_info) => {
-                Self::burn_Erc_tokens(ctx, burn_info, id.nonce()).await
-            }
-            Erc20BridgeOp::SignMintOrder { order, is_refund } => {
-                Self::sign_mint_order(ctx, order, is_refund).await
-            }
-            Erc20BridgeOp::SendMintTransaction {
-                order,
-                src_token,
-                dst_address,
-                is_refund,
-            } => Self::send_mint_tx(ctx, order, src_token, dst_address, is_refund).await,
-            Erc20BridgeOp::ConfirmMint { .. } => Err(Error::FailedToProgress(
-                "ConfirmMint task should progress only on the Minted EVM event".into(),
-            )),
-            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => Err(Error::FailedToProgress(
-                "WrappedTokenMintConfirmed task should not progress".into(),
-            )),
-            Erc20BridgeOp::MintErcTokens(event) => {
-                Self::mint_Erc_tokens(ctx, event, id.nonce()).await
-            }
-            Erc20BridgeOp::ErcMintConfirmed { .. } => Err(Error::FailedToProgress(
-                "ErcMintConfirmed task should not progress".into(),
-            )),
+            Erc20BridgeOp::SignWrappedMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendWrappedMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmWrappedMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => todo!(),
+            Erc20BridgeOp::SignBaseMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendBaseMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmBaseMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::BaseTokenMintConfirmed(_) => todo!(),
         }
     }
 
     fn is_complete(&self) -> bool {
         match self {
-            Erc20BridgeOp::BurnErcTokens(_) => false,
-            Erc20BridgeOp::SignMintOrder { .. } => false,
-            Erc20BridgeOp::SendMintTransaction { .. } => false,
-            Erc20BridgeOp::ConfirmMint { .. } => false,
-            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => true,
-            Erc20BridgeOp::MintErcTokens(_) => false,
-            Erc20BridgeOp::ErcMintConfirmed { .. } => true,
+            Erc20BridgeOp::SignWrappedMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendWrappedMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmWrappedMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => todo!(),
+            Erc20BridgeOp::SignBaseMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendBaseMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmBaseMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::BaseTokenMintConfirmed(_) => todo!(),
         }
     }
 
     fn evm_wallet_address(&self) -> H160 {
         match self {
-            Erc20BridgeOp::BurnErcTokens(burn) => &burn.recipient_address,
-            Erc20BridgeOp::SignMintOrder { order, .. } => &order.recipient,
-            Erc20BridgeOp::SendMintTransaction { dst_address, .. } => dst_address,
-            Erc20BridgeOp::ConfirmMint { dst_address, .. } => dst_address,
-            Erc20BridgeOp::WrappedTokenMintConfirmed(event) => &event.recipient,
-            Erc20BridgeOp::MintErcTokens(event) => &event.sender,
-            Erc20BridgeOp::ErcMintConfirmed { src_address, .. } => src_address,
+            Erc20BridgeOp::SignWrappedMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendWrappedMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmWrappedMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => todo!(),
+            Erc20BridgeOp::SignBaseMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendBaseMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmBaseMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::BaseTokenMintConfirmed(_) => todo!(),
         }
-        .clone()
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
         match self {
-            Erc20BridgeOp::ConfirmMint { .. } => None,
-            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => None,
-            Erc20BridgeOp::ErcMintConfirmed { .. } => None,
-            _ => Some(
-                TaskOptions::new()
-                    .with_max_retries_policy(3)
-                    .with_backoff_policy(BackoffPolicy::Exponential {
-                        secs: 2,
-                        multiplier: 4,
-                    }),
-            ),
+            Erc20BridgeOp::SignWrappedMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendWrappedMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmWrappedMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => todo!(),
+            Erc20BridgeOp::SignBaseMintOrder { order } => todo!(),
+            Erc20BridgeOp::SendBaseMintTransaction { order } => todo!(),
+            Erc20BridgeOp::ConfirmBaseMint { order, tx_hash } => todo!(),
+            Erc20BridgeOp::BaseTokenMintConfirmed(_) => todo!(),
         }
     }
 
