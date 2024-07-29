@@ -1,6 +1,6 @@
 use candid::{CandidType, Principal};
 use eth_signer::sign_strategy::SigningStrategy;
-use ic_log::LogSettings;
+use ic_log::did::LogCanisterSettings;
 use serde::Deserialize;
 
 /// Minter canister initialization data.
@@ -17,5 +17,5 @@ pub struct BridgeInitData {
 
     /// Log settings
     #[serde(default)]
-    pub log_settings: Option<LogSettings>,
+    pub log_settings: Option<LogCanisterSettings>,
 }

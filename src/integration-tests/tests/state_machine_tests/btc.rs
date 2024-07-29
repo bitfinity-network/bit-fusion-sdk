@@ -48,7 +48,7 @@ use ic_exports::icrc_types::icrc3::transactions::{
     GetTransactionsRequest, GetTransactionsResponse,
 };
 use ic_icrc1_ledger::{InitArgsBuilder as LedgerInitArgsBuilder, LedgerArgument};
-use ic_log::LogSettings;
+use ic_log::did::LogCanisterSettings;
 use ic_stable_structures::Storable;
 use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResult};
 
@@ -330,10 +330,11 @@ impl CkBtcSetup {
             },
             admin: (&context).admin(),
             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
-            log_settings: LogSettings {
-                enable_console: true,
+            log_settings: LogCanisterSettings {
+                enable_console: Some(true),
                 in_memory_records: None,
                 log_filter: Some("trace".to_string()),
+                ..Default::default()
             },
         };
 

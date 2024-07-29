@@ -4,7 +4,6 @@ use std::time::Duration;
 use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
-use ic_log::LogSettings;
 
 pub mod btc;
 pub mod error;
@@ -29,11 +28,12 @@ pub fn new_evm_init_data(
     signature_verification_principal: Principal,
     principal: Option<Principal>,
 ) -> EvmCanisterInitData {
+    #[allow(deprecated)]
     EvmCanisterInitData {
         signature_verification_principal,
         min_gas_price: 10_u64.into(),
         chain_id: CHAIN_ID,
-        log_settings: Some(LogSettings {
+        log_settings: Some(ic_log::LogSettings {
             enable_console: true,
             in_memory_records: None,
             log_filter: Some("info".to_string()),

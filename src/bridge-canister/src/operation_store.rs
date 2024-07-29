@@ -263,6 +263,7 @@ mod tests {
 
     use super::*;
     use crate::bridge::OperationContext;
+    use crate::runtime::RuntimeState;
 
     #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType)]
     struct TestOp {
@@ -290,7 +291,7 @@ mod tests {
             self.stage == COMPLETE
         }
 
-        async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
+        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
             todo!()
         }
 

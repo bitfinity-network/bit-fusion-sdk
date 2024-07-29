@@ -11,6 +11,7 @@ use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::{build::BuildData, H160};
 use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
+use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
@@ -83,6 +84,12 @@ impl Metrics for EvmMinter {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()
+    }
+}
+
+impl LogCanister for EvmMinter {
+    fn log_state(&self) -> Rc<RefCell<LogState>> {
+        LogState::get()
     }
 }
 

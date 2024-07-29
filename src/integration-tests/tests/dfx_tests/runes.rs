@@ -19,7 +19,6 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_log::LogSettings;
 use rune_bridge::core::deposit::DepositRequestStatus;
 use rune_bridge::interface::{DepositError, GetAddressError};
 use rune_bridge::operation::OperationState;
@@ -90,10 +89,11 @@ impl RunesContext {
                 key_id: SigningKeyId::Dfx,
             },
             admin: context.admin(),
-            log_settings: LogSettings {
-                enable_console: true,
+            log_settings: LogCanisterSettings {
+                enable_console: Some(true),
                 in_memory_records: None,
                 log_filter: Some("trace".to_string()),
+                ..Default::default()
             },
             min_confirmations: 1,
             no_of_indexers: 1,
