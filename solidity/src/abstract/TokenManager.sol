@@ -43,12 +43,12 @@ abstract contract TokenManager is Initializable {
     }
 
     /// Creates a new ERC20 compatible token contract as a wrapper for the given `externalToken`.
-    function deployERC20(string memory name, string memory symbol, bytes32 baseTokenID) public returns (address) {
+    function deployERC20(string memory name, string memory symbol, uint8 decimals, bytes32 baseTokenID) public returns (address) {
         require(isWrappedSide, "Only for wrapped side");
         require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
         // Create the new token
-        WrappedToken wrappedERC20 = new WrappedToken(name, symbol, address(this));
+        WrappedToken wrappedERC20 = new WrappedToken(name, symbol, decimals, address(this));
 
         _baseToWrapped[baseTokenID] = address(wrappedERC20);
         _wrappedToBase[address(wrappedERC20)] = baseTokenID;

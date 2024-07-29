@@ -589,6 +589,7 @@ pub trait TestContext {
         let input = BFTBridge::deployERC20Call {
             name: "Wrapper".into(),
             symbol: "WPT".into(),
+            decimals: 18,
             baseTokenID: base_token_id.0.into(),
         }
         .abi_encode();
