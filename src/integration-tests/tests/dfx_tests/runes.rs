@@ -33,8 +33,8 @@ use tokio::time::Instant;
 use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
-use crate::utils::etching::Etcher;
 use crate::utils::ord_client::OrdClient;
+use crate::utils::rune_helper::RuneHelper;
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 struct RunesContext {
@@ -191,7 +191,7 @@ impl RunesContext {
             .expect("failed to parse btc address")
             .assume_checked();
 
-        let etcher = Etcher::new(
+        let etcher = RuneHelper::new(
             &self.admin_btc_rpc_client,
             &self.ord_btc_wallet.private_key,
             &self.ord_btc_wallet.address,
@@ -239,7 +239,7 @@ impl RunesContext {
 
         let edict_funds_utxo = self
             .admin_btc_rpc_client
-            .get_tx_out_by_owner(&edict_fund_tx, &self.ord_btc_wallet.address)
+            .get_utxo_by_address(&edict_fund_tx, &self.ord_btc_wallet.address)
             .expect("failed to get utxo");
 
         etcher
@@ -446,6 +446,7 @@ impl RunesContext {
                 .await
                 .expect("failed to get outpoint owner")
                 .address;
+            println!("found outpoint {outpoint} with balance {balance} owned by {owner}");
             if owner == self.ord_btc_wallet.address {
                 amount += balance as u128;
             }
@@ -522,6 +523,7 @@ fn generate_rune_name() -> String {
     name
 }
 
+/// Setup a new rune for DFX tests
 async fn dfx_rune_setup() -> anyhow::Result<RuneSetup> {
     let rune_name = generate_rune_name();
     let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&rune_name);
@@ -537,10 +539,10 @@ async fn dfx_rune_setup() -> anyhow::Result<RuneSetup> {
     admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
     let commit_utxo =
-        admin_btc_rpc_client.get_tx_out_by_owner(&commit_fund_tx, &ord_wallet.address)?;
+        admin_btc_rpc_client.get_utxo_by_address(&commit_fund_tx, &ord_wallet.address)?;
 
     // etch
-    let etcher = Etcher::new(
+    let etcher = RuneHelper::new(
         &admin_btc_rpc_client,
         &ord_wallet.private_key,
         &ord_wallet.address,
@@ -587,6 +589,15 @@ async fn runes_bridging_flow() {
 
     let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
     assert_eq!(updated_balance, 70);
+
+    // wait
+    ctx.inner.advance_time(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    // advance
+    ctx.admin_btc_rpc_client
+        .generate_to_address(&ctx.admin_btc_address, 2)
+        .expect("failed to generate blocks");
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let updated_ord_balance = ctx.ord_rune_balance().await;
 

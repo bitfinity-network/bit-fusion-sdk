@@ -7,12 +7,21 @@ use reqwest::{Client, StatusCode};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
 use serde::Deserialize;
 
+/// Ord service client
 pub struct OrdClient {
     client: Client,
     url: String,
 }
 
+#[derive(Debug)]
+/// Outpoint info
+pub struct Outpoint {
+    pub address: Address,
+    pub value: Amount,
+}
+
 impl OrdClient {
+    #[cfg(feature = "dfx_tests")]
     pub fn dfx_test_client() -> OrdClient {
         Self {
             client: Client::new(),
@@ -20,6 +29,7 @@ impl OrdClient {
         }
     }
 
+    /// Get rune info by id
     pub async fn get_rune_info(&self, id: &RuneId) -> anyhow::Result<RuneInfo> {
         let url = format!("{}/rune/{}", self.url, id);
 
@@ -44,6 +54,7 @@ impl OrdClient {
         })
     }
 
+    /// Get balances for a rune
     pub async fn get_balances(&self, rune_name: &str) -> anyhow::Result<HashMap<String, u64>> {
         let url = format!("{}/runes/balances", self.url);
 
@@ -63,6 +74,7 @@ impl OrdClient {
         Ok(balances.balance)
     }
 
+    /// Get outpoint info by id
     pub async fn get_outpoint(&self, outpoint: &str) -> anyhow::Result<Outpoint> {
         let url = format!("{}/output/{}", self.url, outpoint);
 
@@ -110,11 +122,6 @@ struct Balances {
 
 #[derive(Debug, Deserialize)]
 struct OutpointResponse {
-    pub address: String,
-    pub value: u64,
-}
-
-pub struct Outpoint {
-    pub address: Address,
-    pub value: Amount,
+    address: String,
+    value: u64,
 }

@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 use super::btc_rpc_client::BitcoinRpcClient;
 
-pub struct Etcher<'a> {
+pub struct RuneHelper<'a> {
     client: &'a BitcoinRpcClient,
     private_key: &'a PrivateKey,
     address: &'a Address,
@@ -26,7 +26,7 @@ pub struct Terms {
     pub amount: u64,
 }
 
-impl<'a> Etcher<'a> {
+impl<'a> RuneHelper<'a> {
     pub fn new(
         client: &'a BitcoinRpcClient,
         private_key: &'a PrivateKey,
@@ -46,7 +46,7 @@ impl<'a> Etcher<'a> {
 
         // etch runestone
         let reveal_txid = self
-            .etch_runestone(etching, commit_utxo, *self.private_key, public_key)
+            .inscribe_runestone(etching, commit_utxo, *self.private_key, public_key)
             .await?;
         println!("Reveal transaction sent: {}", reveal_txid);
 
@@ -71,7 +71,8 @@ impl<'a> Etcher<'a> {
         Ok(rune_id)
     }
 
-    async fn etch_runestone(
+    /// Inscribe runestone
+    async fn inscribe_runestone(
         &self,
         etching: Etching,
         utxo: Utxo,
@@ -123,7 +124,7 @@ impl<'a> Etcher<'a> {
         let start = Instant::now();
         loop {
             self.client.generate_to_address(self.address, 1)?;
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let confirmations = self.client.get_transaction_confirmations(&commit_txid)?;
             println!("commit transaction confirmations: {}", confirmations);
             if confirmations >= 6 {
@@ -159,6 +160,7 @@ impl<'a> Etcher<'a> {
         Ok(reveal_txid)
     }
 
+    /// Transfer a rune to another address
     pub async fn edict_rune(
         &self,
         utxos: Vec<Utxo>,

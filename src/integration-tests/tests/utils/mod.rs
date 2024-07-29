@@ -9,8 +9,8 @@ use ic_log::LogSettings;
 pub mod btc;
 pub mod btc_rpc_client;
 pub mod error;
-pub mod etching;
 pub mod ord_client;
+pub mod rune_helper;
 
 pub mod wasm;
 

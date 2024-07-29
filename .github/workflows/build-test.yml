@@ -117,11 +117,3 @@ jobs:
         if: ${{ !inputs.skip-test }}
         run: |
           ./scripts/tests/dfx_tests.sh --github-ci --docker
-
-      - name: "Upload logfile"
-        uses: actions/upload-artifact@v3
-        with:
-          if-no-files-found: error
-          retention-days: 3
-          name: dfx_log
-          path: .logs/*

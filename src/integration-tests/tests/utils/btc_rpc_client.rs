@@ -15,6 +15,7 @@ pub struct TxBlockInfo {
 
 impl BitcoinRpcClient {
     /// Initialize a new BitcoinRpcClient for DFX tests
+    #[cfg(feature = "dfx_tests")]
     pub fn dfx_test_client(wallet_name: &str) -> Self {
         let client = Client::new(
             &format!("http://localhost:18443/wallet/{wallet_name}"),
@@ -62,7 +63,8 @@ impl BitcoinRpcClient {
         Ok(txid)
     }
 
-    pub fn get_tx_out_by_owner(&self, txid: &Txid, owner: &Address) -> anyhow::Result<Utxo> {
+    /// Get utxo owned by the provided address in the transaction
+    pub fn get_utxo_by_address(&self, txid: &Txid, owner: &Address) -> anyhow::Result<Utxo> {
         let mut vout = 0;
         loop {
             println!("collecting tx outs for txid: {}, vout: {}", txid, vout);
@@ -86,24 +88,28 @@ impl BitcoinRpcClient {
         anyhow::bail!("No tx out found for owner");
     }
 
+    /// Send a signed transaction to the network
     pub fn send_transaction(&self, tx: &Transaction) -> anyhow::Result<Txid> {
         let txid = self.client.send_raw_transaction(tx)?;
 
         Ok(txid)
     }
 
+    /// Get a transaction by its txid
     pub fn get_transaction(&self, txid: &Txid) -> anyhow::Result<Transaction> {
         let tx = self.client.get_raw_transaction(txid, None)?;
 
         Ok(tx)
     }
 
+    /// Get the number of confirmations for a transaction
     pub fn get_transaction_confirmations(&self, txid: &Txid) -> anyhow::Result<u32> {
         let tx = self.client.get_raw_transaction_info(txid, None)?;
 
-        Ok(tx.confirmations.unwrap_or(0))
+        Ok(tx.confirmations.unwrap_or_default())
     }
 
+    /// Get block info for a transaction
     pub fn get_transaction_block_info(&self, txid: &Txid) -> anyhow::Result<TxBlockInfo> {
         let tx = self.client.get_raw_transaction_info(txid, None)?;
         let blockhash = tx.blockhash.ok_or(anyhow::anyhow!("tx not in block"))?;
