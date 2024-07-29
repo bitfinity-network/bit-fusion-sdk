@@ -26,7 +26,7 @@ use crate::state::IcrcState;
 
 mod inspect;
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
@@ -60,34 +60,6 @@ impl MinterCanister {
     fn run_scheduler() {
         let runtime = get_runtime();
         runtime.borrow_mut().run();
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    /// Offset, if set, defines the starting index of the page,
-    /// Count, if set, defines the number of elements in the page.
-    #[query]
-    pub fn list_mint_orders(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        Self::token_mint_orders(wallet_address, src_token, pagination)
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
-    #[query]
-    pub fn get_mint_order(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        operation_id: u32,
-        pagination: Option<Pagination>,
-    ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, src_token, pagination)
-            .into_iter()
-            .find(|(nonce, _)| *nonce == operation_id)
-            .map(|(_, mint_order)| mint_order)
     }
 
     #[query]

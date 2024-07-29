@@ -115,7 +115,8 @@ impl ConfigStorage {
         self.0.get().signing_strategy.clone()
     }
 
-    fn update(&mut self, f: impl FnOnce(&mut Config)) {
+    /// Updates config data.
+    pub fn update(&mut self, f: impl FnOnce(&mut Config)) {
         let mut config = self.0.get().clone();
         f(&mut config);
         self.0.set(config).expect("failed to update config");
