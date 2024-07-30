@@ -1,12 +1,13 @@
 use std::time::Duration;
 
-use bridge_canister::memory::memory_by_id;
+use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::Timestamp;
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Principal};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_kit::ic;
+use ic_stable_structures::{CellStructure, StableCell};
 use serde::Deserialize;
 
 use crate::memory::BASE_EVM_CONFIG_MEMORY_ID;

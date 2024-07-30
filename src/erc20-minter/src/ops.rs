@@ -7,10 +7,12 @@ use bridge_did::order::{self, MintOrder, SignedMintOrder};
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::BridgeSide;
 use candid::{CandidType, Decode, Nat};
-use did::{H160, H256};
+use did::{H160, H256, U256};
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
+
+use crate::canister::get_base_evm_state;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOp {
@@ -52,41 +54,92 @@ impl Operation for Erc20BridgeOp {
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match (self.side, self.stage) {
+        match (self.side, &self.stage) {
             (BridgeSide::Base, Erc20OpStage::SignMintOrder(order)) => {
                 order.sender.to_evm_address().expect("evm address").1
             }
             (BridgeSide::Base, Erc20OpStage::SendMintTransaction(order)) => {
-                order.sender().to_evm_address().expect("evm address").1
+                order
+                    .get_sender_id()
+                    .to_evm_address()
+                    .expect("evm address")
+                    .1
             }
-            (BridgeSide::Base, Erc20OpStage::ConfirmMint { order, tx_hash }) => todo!(),
-            (BridgeSide::Base, Erc20OpStage::TokenMintConfirmed(_)) => todo!(),
-            (BridgeSide::Wrapped, Erc20OpStage::SignMintOrder(_)) => todo!(),
-            (BridgeSide::Wrapped, Erc20OpStage::SendMintTransaction(_)) => todo!(),
-            (BridgeSide::Wrapped, Erc20OpStage::ConfirmMint { order, tx_hash }) => todo!(),
-            (BridgeSide::Wrapped, Erc20OpStage::TokenMintConfirmed(_)) => todo!(),
+            (BridgeSide::Base, Erc20OpStage::ConfirmMint { order, .. }) => {
+                order
+                    .get_sender_id()
+                    .to_evm_address()
+                    .expect("evm address")
+                    .1
+            }
+            (BridgeSide::Base, Erc20OpStage::TokenMintConfirmed(event)) => {
+                Id256::from_slice(&event.sender_id)
+                    .and_then(|id| id.to_evm_address().ok())
+                    .expect("evm address")
+                    .1
+            }
+            (BridgeSide::Wrapped, Erc20OpStage::SignMintOrder(order)) => order.recipient.clone(),
+            (BridgeSide::Wrapped, Erc20OpStage::SendMintTransaction(order)) => {
+                order.get_recipient()
+            }
+            (BridgeSide::Wrapped, Erc20OpStage::ConfirmMint { order, .. }) => order.get_recipient(),
+            (BridgeSide::Wrapped, Erc20OpStage::TokenMintConfirmed(event)) => {
+                event.recipient.clone()
+            }
         }
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
-        match self {
-            Erc20BridgeOp::SignWrappedMintOrder { order } => todo!(),
-            Erc20BridgeOp::SendWrappedMintTransaction { order } => todo!(),
-            Erc20BridgeOp::ConfirmWrappedMint { order, tx_hash } => todo!(),
-            Erc20BridgeOp::WrappedTokenMintConfirmed(_) => todo!(),
-            Erc20BridgeOp::SignBaseMintOrder { order } => todo!(),
-            Erc20BridgeOp::SendBaseMintTransaction { order } => todo!(),
-            Erc20BridgeOp::ConfirmBaseMint { order, tx_hash } => todo!(),
-            Erc20BridgeOp::BaseTokenMintConfirmed(_) => todo!(),
-        }
+        None
     }
 
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
+        ctx: impl OperationContext,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt");
-        Some(OperationAction::Create(Self::MintErcTokens(event)))
+        let wrapped_evm_params = ctx.get_evm_params().expect(
+            "on_wrapped_token_burnt should not be called if wrapped evm params are not initialized",
+        );
+        let base_evm_params = get_base_evm_state()
+            .borrow()
+            .config
+            .get_evm_params()
+            .expect(
+            "on_wrapped_token_burnt should not be called if base evm params are not initialized",
+        );
+        let sender = Id256::from_evm_address(&event.sender, wrapped_evm_params.chain_id);
+        let src_token = Id256::from_evm_address(&event.from_erc20, wrapped_evm_params.chain_id);
+        let recipient = Id256::from_slice(&event.recipient_id)?
+            .to_evm_address()
+            .ok()?
+            .1;
+        let dst_token = Id256::from_slice(&event.to_token)?.to_evm_address().ok()?.1;
+        let nonce = get_base_evm_state().borrow_mut().next_nonce();
+
+        let order = MintOrder {
+            amount: event.amount,
+            sender,
+            src_token,
+            recipient,
+            dst_token,
+            nonce,
+            sender_chain_id: wrapped_evm_params.chain_id,
+            recipient_chain_id: base_evm_params.chain_id,
+            name: to_array(&event.name),
+            symbol: to_array(&event.symbol),
+            decimals: event.decimals,
+            approve_spender: H160::default(),
+            approve_amount: U256::default(),
+            fee_payer: event.sender,
+        };
+
+        let operation = Self {
+            side: BridgeSide::Base,
+            stage: Erc20OpStage::SignMintOrder(order),
+        };
+        let action = OperationAction::Create(operation);
+        Some(action)
     }
 
     async fn on_wrapped_token_minted(
@@ -211,4 +264,8 @@ pub enum ErrorCodes {
     ErcMetadataRequestFailed = 0,
     ErcBurnFailed = 1,
     ErcMintFailed = 2,
+}
+
+fn to_array<const N: usize>(data: &[u8]) -> Result<[u8; N], SchedulerError> {
+    data.try_into().into_scheduler_result()
 }
