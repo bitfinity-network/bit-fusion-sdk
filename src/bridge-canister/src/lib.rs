@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Implementation of the common functions for BFT bridge canisters. The main entry point is
 //! [`BridgeCanister`] trait that should be implemented by a canister to include common APIs and
 //! functions.
