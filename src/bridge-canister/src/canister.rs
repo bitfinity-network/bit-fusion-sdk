@@ -12,47 +12,19 @@ use ic_canister::{
     generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
 };
 use ic_exports::ic_kit::ic;
-use ic_log::writer::Logs;
-use ic_log::LogSettings;
+use ic_log::canister::{LogCanister, LogState};
+use ic_storage::IcStorage;
 use log::{debug, info};
 
 use crate::inspect;
-use crate::log_config::LoggerConfigService;
+use crate::memory::{memory_by_id, LOG_SETTINGS_MEMORY_ID};
 use crate::runtime::state::config::ConfigStorage;
 
 /// Common API of all bridge canisters.
-pub trait BridgeCanister: Canister {
+pub trait BridgeCanister: Canister + LogCanister {
     /// Gets the bridge core state.
     #[state_getter]
     fn config(&self) -> Rc<RefCell<ConfigStorage>>;
-
-    /// Gets the logs
-    /// - `count` is the number of logs to return
-    #[query(trait = true)]
-    fn ic_logs(&self, count: usize, offset: usize) -> BftResult<Logs> {
-        inspect::inspect_ic_logs(self.config());
-        Ok(ic_log::take_memory_records(count, offset))
-    }
-
-    /// Updates the runtime configuration of the logger with a new filter in the same form as the `RUST_LOG`
-    /// environment variable.
-    /// Example of valid filters:
-    /// - info
-    /// - debug,crate1::mod1=error,crate1::mod2,crate2=debug
-    #[update(trait = true)]
-    fn set_logger_filter(&mut self, filter: String) -> BftResult<()> {
-        inspect::inspect_set_logger_filter(self.config());
-        LoggerConfigService.set_logger_filter(&filter)?;
-
-        debug!("updated logger filter to {filter}");
-
-        Ok(())
-    }
-
-    #[query(trait = true)]
-    fn get_logger_settings(&self) -> LogSettings {
-        LoggerConfigService.current_settings()
-    }
 
     /// Returns principal of canister owner.
     #[query(trait = true)]
@@ -125,9 +97,14 @@ pub trait BridgeCanister: Canister {
         if let Some(log_settings) = &init_data.log_settings {
             // Since this code is only run on initialization, we want to fail canister setup if
             // the specified parameters are invalid, so we panic in that case.
-            LoggerConfigService
-                .init(log_settings.clone())
-                .expect("Failed to configure logger.");
+            self.log_state()
+                .borrow_mut()
+                .init(
+                    init_data.owner,
+                    memory_by_id(LOG_SETTINGS_MEMORY_ID),
+                    log_settings.clone(),
+                )
+                .expect("failed to configure logger");
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -139,7 +116,11 @@ pub trait BridgeCanister: Canister {
     /// Re-initializes the bridge after upgrade. This method should be called from the `#[post-upgrade]`
     /// method.
     fn bridge_post_upgrade(&mut self, _run_scheduler: impl Fn() + 'static) {
-        if let Err(err) = LoggerConfigService.reload() {
+        if let Err(err) = self
+            .log_state()
+            .borrow_mut()
+            .reload(memory_by_id(LOG_SETTINGS_MEMORY_ID))
+        {
             ic_exports::ic_cdk::println!("Error configuring the logger. Err: {err:?}")
         }
 
@@ -159,19 +140,27 @@ pub trait BridgeCanister: Canister {
 
     /// Returns IDL of the bridge API.
     fn get_idl() -> Idl {
-        generate_idl!()
+        let mut idl = generate_idl!();
+        let logger_idl = <Self as LogCanister>::get_idl();
+        idl.merge(&logger_idl);
+
+        idl
     }
 }
 
-generate_exports!(BridgeCanister);
+generate_exports!(BridgeCanister, BridgeCanisterExport);
+
+impl LogCanister for BridgeCanisterExport {
+    fn log_state(&self) -> Rc<RefCell<LogState>> {
+        LogState::get()
+    }
+}
 
 #[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, init};
     use ic_exports::ic_kit::{inject, MockContext};
-    use ic_log::LogSettings;
     use ic_storage::IcStorage;
 
     use super::*;
@@ -196,6 +185,12 @@ mod tests {
     }
 
     impl PreUpdate for TestBridge {}
+
+    impl LogCanister for TestBridge {
+        fn log_state(&self) -> Rc<RefCell<LogState>> {
+            LogState::get()
+        }
+    }
 
     fn owner() -> Principal {
         Principal::from_slice(&[1; 20])
@@ -226,54 +221,6 @@ mod tests {
 
         canister_call!(canister.init(init_data), ()).await.unwrap();
         canister
-    }
-
-    #[tokio::test]
-    async fn init_sets_config() {
-        let owner = owner();
-        let evm_principal = bob();
-        let signing_strategy = SigningStrategy::Local {
-            private_key: [42; 32],
-        };
-        let log_settings = LogSettings {
-            enable_console: true,
-            in_memory_records: Some(10),
-            log_filter: Some("error".into()),
-        };
-
-        let canister = init_with_data(BridgeInitData {
-            owner,
-            evm_principal,
-            signing_strategy: signing_strategy.clone(),
-            log_settings: Some(log_settings.clone()),
-        })
-        .await;
-
-        let stored_owner = canister_call!(canister.get_owner(), Principal)
-            .await
-            .unwrap();
-        assert_eq!(stored_owner, owner);
-
-        let stored_evm_principal = canister_call!(canister.get_evm_principal(), Principal)
-            .await
-            .unwrap();
-        assert_eq!(stored_evm_principal, evm_principal);
-
-        let stored_signing_strategy = canister.config().borrow().get_signing_strategy().clone();
-        assert_eq!(stored_signing_strategy, signing_strategy);
-
-        let stored_log_settings = canister_call!(canister.get_logger_settings(), LogSettings)
-            .await
-            .unwrap();
-        assert_eq!(
-            stored_log_settings.enable_console,
-            log_settings.enable_console
-        );
-        assert_eq!(
-            stored_log_settings.in_memory_records,
-            log_settings.in_memory_records
-        );
-        assert_eq!(stored_log_settings.log_filter, log_settings.log_filter);
     }
 
     #[tokio::test]
@@ -371,46 +318,5 @@ mod tests {
 
         let address = H160::from_slice(&[42; 20]);
         let _ = canister_call!(canister.set_bft_bridge_contract(address), ()).await;
-    }
-
-    #[tokio::test]
-    async fn test_set_logger_filter() {
-        let init_data = BridgeInitData {
-            owner: owner(),
-            evm_principal: bob(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [1u8; 32],
-            },
-            log_settings: Some(LogSettings {
-                enable_console: false,
-                in_memory_records: Some(1000),
-                log_filter: Some("error".into()),
-            }),
-        };
-        let mut canister = init_with_data(init_data).await;
-        inject::get_context().update_id(owner());
-        let new_filter = "info";
-        let res = canister_call!(canister.set_logger_filter(new_filter.to_string()), ()).await;
-        assert!(res.is_ok());
-
-        let updated_settings = canister_call!(canister.get_logger_settings(), LogSettings)
-            .await
-            .unwrap();
-        assert_eq!(updated_settings.log_filter, Some(new_filter.into()));
-    }
-
-    #[tokio::test]
-    #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
-    async fn set_log_filter_is_rejected_for_non_owner() {
-        let mut canister = init_canister().await;
-
-        let _ = canister_call!(canister.set_logger_filter("info".into()), ()).await;
-    }
-
-    #[tokio::test]
-    #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
-    async fn ic_logs_is_rejected_for_non_owner() {
-        let canister = init_canister().await;
-        let _ = canister_call!(canister.ic_logs(1000, 0), ()).await;
     }
 }

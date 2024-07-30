@@ -28,7 +28,6 @@ use ic_exports::icrc_types::icrc1_ledger::{
     ArchiveOptions, FeatureFlags, InitArgs, LedgerArgument,
 };
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
-use ic_log::LogSettings;
 use icrc2_minter::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
 use tokio::time::Instant;
@@ -44,6 +43,7 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
+use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -958,10 +958,11 @@ pub trait TestContext {
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: self.sign_key(),
                     },
-                    log_settings: Some(LogSettings {
-                        enable_console: true,
+                    log_settings: Some(LogCanisterSettings {
+                        enable_console: Some(true),
                         in_memory_records: None,
                         log_filter: Some("trace".to_string()),
+                        ..Default::default()
                     }),
                 };
                 self.install_canister(self.canisters().ck_erc20_minter(), wasm, (init_data,))
@@ -1084,10 +1085,11 @@ pub fn minter_canister_init_data(
         owner,
         evm_principal,
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
-        log_settings: Some(LogSettings {
-            enable_console: true,
+        log_settings: Some(LogCanisterSettings {
+            enable_console: Some(true),
             in_memory_records: None,
             log_filter: Some("trace".to_string()),
+            ..Default::default()
         }),
     }
 }
@@ -1097,11 +1099,12 @@ pub fn evm_canister_init_data(
     owner: Principal,
     transaction_processing_interval: Option<Duration>,
 ) -> EvmCanisterInitData {
+    #[allow(deprecated)]
     EvmCanisterInitData {
         signature_verification_principal,
         min_gas_price: 10_u64.into(),
         chain_id: CHAIN_ID,
-        log_settings: Some(LogSettings {
+        log_settings: Some(ic_log::LogSettings {
             enable_console: true,
             in_memory_records: None,
             log_filter: Some("debug".to_string()),
