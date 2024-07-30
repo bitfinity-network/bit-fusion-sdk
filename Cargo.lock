@@ -1046,6 +1046,7 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
+ "num-traits",
  "serde",
  "tokio",
 ]

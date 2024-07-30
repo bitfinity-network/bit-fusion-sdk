@@ -17,21 +17,22 @@ did = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
 ] }
+eth-signer = { workspace = true, features = ["ic_sign"] }
+ethers-core = { workspace = true }
 futures = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-ckbtc-minter = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
+ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
-serde = { workspace = true }
 log = { workspace = true }
-ethers-core = { workspace = true }
-ic-log = { workspace = true }
-eth-signer = { workspace = true, features = ["ic_sign"] }
+num-traits = { workspace = true }
+serde = { workspace = true }
 
 
 [dev-dependencies]

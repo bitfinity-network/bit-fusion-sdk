@@ -2,6 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::id256::Id256;
+use bridge_did::order::SignedMintOrder;
+use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -18,8 +21,8 @@ use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
-use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
+use crate::orders_store::MintOrdersStore;
 use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
 use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
 use crate::{
@@ -82,19 +85,22 @@ impl BtcBridge {
         self.set_timers();
     }
 
-    /// Converts Bitcoins into ERC20 wrapper token in EVM.
+    /// Converts Bitcoins into ERC20 wrapped tokens in the EVM.
     ///
     /// # Arguments
     ///
-    /// * `eth_address` - EVM Etherium address of the receiver of the wrapper tokens
+    /// - `eth_address` - EVM Ethereum address of the receiver of the wrapper tokens
     ///
     /// # Details
     ///
     /// Before this method is called, the Bitcoins to be bridged are to be transferred to a
-    /// certain address. This address is received from `ckBTC` canister by calling `get_btc_address`
-    /// query method. Account given as an argument to this method can be calculated as:
-    /// * `owner` is BtcBridge canister principal
-    /// * `subaccount` is right-zero-padded Etherium address of the caller
+    /// certain address. This address is received from the `ckBTC` minter canister by calling `get_btc_address`
+    /// update method. (See: <https://dashboard.internetcomputer.org/canister/mqygn-kiaaa-aaaar-qaadq-cai#get_btc_address>)
+    ///
+    ///  Account given as an argument to this method can be calculated as:
+    ///
+    /// - `owner` is BtcBridge canister principal
+    /// - `subaccount` is right-zero-padded Ethereum address of the caller
     ///
     /// Here is a sample Rust code:
     ///
@@ -117,11 +123,34 @@ impl BtcBridge {
     /// and send it to the EVM. After the EVM transaction is confirmed, the minted wrapped tokens
     /// will appear at the given `eth_address`.
     #[update]
-    pub async fn btc_to_erc20(
+    pub async fn btc_to_erc20(&self, eth_address: H160) {
+        crate::ops::schedule_mint(eth_address)
+    }
+
+    /// Returns `(nonce, mint_order)` pairs for the given sender id.
+    /// Offset, if set, defines the starting index of the page,
+    /// Count, if set, defines the number of elements in the page.
+    #[query]
+    pub fn list_mint_orders(
         &self,
-        eth_address: H160,
-    ) -> Vec<Result<Erc20MintStatus, Erc20MintError>> {
-        crate::ops::btc_to_erc20(get_state(), eth_address).await
+        wallet_address: H160,
+        pagination: Option<Pagination>,
+    ) -> Vec<(u32, SignedMintOrder)> {
+        Self::token_mint_orders(wallet_address, pagination)
+    }
+
+    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
+    #[query]
+    pub fn get_mint_order(
+        &self,
+        wallet_address: H160,
+        operation_id: u32,
+        pagination: Option<Pagination>,
+    ) -> Option<SignedMintOrder> {
+        Self::token_mint_orders(wallet_address, pagination)
+            .into_iter()
+            .find(|(nonce, _)| *nonce == operation_id)
+            .map(|(_, mint_order)| mint_order)
     }
 
     fn init_evm_info_task() -> ScheduledTask<BtcTask> {
@@ -187,6 +216,28 @@ impl BtcBridge {
         }
 
         Ok(())
+    }
+
+    /// Get mint orders for the given wallet address and token;
+    /// if `offset` and `count` are provided, returns a page of mint orders.
+    fn token_mint_orders(
+        wallet_address: H160,
+        pagination: Option<Pagination>,
+    ) -> Vec<(u32, SignedMintOrder)> {
+        let state = get_state();
+        let wallet_address = {
+            let chain_id = state.borrow().btc_chain_id();
+            Id256::from_evm_address(&wallet_address, chain_id)
+        };
+        let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
+        let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
+
+        MintOrdersStore::default()
+            .get_for_address(wallet_address)
+            .into_iter()
+            .skip(offset)
+            .take(count)
+            .collect()
     }
 
     pub fn idl() -> Idl {
