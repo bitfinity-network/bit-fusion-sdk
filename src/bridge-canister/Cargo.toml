@@ -24,7 +24,7 @@ hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-exports = { workspace = true }
-ic-log = { workspace = true }
+ic-log = { workspace = true, features = ["canister"] }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }

@@ -30,7 +30,7 @@ jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
 ethers-core = { workspace = true }
-ic-log = { workspace = true }
+ic-log = { workspace = true, features = ["canister"] }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 
 
