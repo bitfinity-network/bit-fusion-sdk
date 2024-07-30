@@ -362,9 +362,8 @@ mod tests {
     use did::{H160, U256};
     use eth_signer::sign_strategy::SigningStrategy;
 
-    use crate::id256::Id256;
-
     use super::MintOrder;
+    use crate::id256::Id256;
 
     #[tokio::test]
     async fn signed_mint_order_getters() {
