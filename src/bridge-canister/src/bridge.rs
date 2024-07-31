@@ -101,5 +101,6 @@ pub trait OperationContext {
 /// Action to create or update an operation.
 pub enum OperationAction<Op> {
     Create(Op),
+    CreateWithId(OperationId, Op),
     Update { nonce: u32, update_to: Op },
 }

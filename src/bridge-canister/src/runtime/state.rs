@@ -62,7 +62,7 @@ mod tests {
 
     use super::*;
     use crate::memory::memory_by_id;
-    use crate::runtime::default_state;
+    use crate::runtime::{default_state, RuntimeState};
 
     #[derive(Clone, Deserialize, Debug, Serialize, CandidType)]
     pub struct TestOp;
@@ -71,7 +71,7 @@ mod tests {
         async fn progress(
             self,
             _: bridge_did::op_id::OperationId,
-            _: impl crate::bridge::OperationContext,
+            _: RuntimeState<Self>,
         ) -> bridge_did::error::BftResult<Self> {
             unimplemented!()
         }

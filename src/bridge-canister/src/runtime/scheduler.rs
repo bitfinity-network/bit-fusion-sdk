@@ -221,6 +221,12 @@ impl ServiceTask {
                     let new_op_id = ctx.borrow_mut().operations.new_operation(op.clone());
                     op.scheduling_options().zip(Some((new_op_id, op)))
                 }
+                Some(OperationAction::CreateWithId(id, op)) => {
+                    ctx.borrow_mut()
+                        .operations
+                        .new_operation_with_id(id, op.clone());
+                    op.scheduling_options().zip(Some((id, op)))
+                }
                 Some(OperationAction::Update { nonce, update_to }) => {
                     let Some((operation_id, _)) = ctx
                         .borrow()

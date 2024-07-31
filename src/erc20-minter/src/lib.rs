@@ -1,9 +1,7 @@
 pub mod canister;
 pub mod memory;
-pub mod operation;
 pub mod ops;
 pub mod state;
-pub mod tasks;
 
 use ic_metrics::Metrics;
 

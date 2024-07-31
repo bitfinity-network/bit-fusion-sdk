@@ -16,7 +16,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
 use crate::ops::Erc20BridgeOp;
-use crate::state::{BaseEvmSettings, BaseEvmState};
+use crate::state::{BaseEvmSettings, BaseEvmState, SharedEvmState};
 
 pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
 
@@ -37,7 +37,7 @@ impl BridgeCanister for EvmMinter {
 impl EvmMinter {
     #[init]
     pub fn init(&mut self, bridge_settings: BridgeInitData, base_evm_settings: BaseEvmSettings) {
-        get_base_evm_state().borrow_mut().reset(base_evm_settings);
+        get_base_evm_state().0.borrow_mut().reset(base_evm_settings);
         self.init_bridge(bridge_settings, Self::run_scheduler);
     }
 
@@ -97,7 +97,7 @@ thread_local! {
     pub static RUNTIME: SharedRuntime =
         Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static BASE_EVM_STATE: Rc<RefCell<BaseEvmState>> = Rc::default();
+    pub static BASE_EVM_STATE: SharedEvmState = SharedEvmState::default();
 }
 
 pub fn get_runtime() -> SharedRuntime {
@@ -108,6 +108,6 @@ pub fn get_runtime_state() -> RuntimeState<Erc20BridgeOp> {
     get_runtime().borrow().state().clone()
 }
 
-pub fn get_base_evm_state() -> Rc<RefCell<BaseEvmState>> {
+pub fn get_base_evm_state() -> SharedEvmState {
     BASE_EVM_STATE.with(|s| s.clone())
 }
