@@ -1,8 +1,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::state::config::ConfigStorage;
+use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
+use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::init::BridgeInitData;
 use candid::Principal;
+use did::build::BuildData;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
@@ -17,17 +23,18 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_stable_structures::CellStructure;
 use ic_storage::IcStorage;
 use ic_task_scheduler::retry::BackoffPolicy;
-use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
 use crate::interface::{Erc20MintError, Erc20MintStatus};
-use crate::memory::{MEMORY_MANAGER, PENDING_TASKS_MEMORY_ID};
-use crate::scheduler::{BtcTask, PersistentScheduler, TasksStorage};
-use crate::state::{BftBridgeConfig, BtcBridgeConfig, State};
+use crate::ops::BtcBridgeOp;
+use crate::scheduler::BtcTask;
+use crate::state::{BftBridgeConfig, State};
 use crate::{
     EVM_INFO_INITIALIZATION_RETRIES, EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC,
     EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
 };
+
+type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOp>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -36,6 +43,12 @@ pub struct BtcBridge {
 }
 
 impl PreUpdate for BtcBridge {}
+
+impl BridgeCanister for BtcBridge {
+    fn config(&self) -> SharedConfig {
+        ConfigStorage::get()
+    }
+}
 
 impl BtcBridge {
     fn set_timers(&mut self) {
@@ -62,26 +75,18 @@ impl BtcBridge {
     }
 
     #[init]
-    pub fn init(&mut self, config: BtcBridgeConfig) {
-        let admin = config.admin;
-
-        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
-
-        get_state().borrow_mut().configure(config);
-
-        {
-            let scheduler = get_scheduler();
-            let mut borrowed_scheduler = scheduler.borrow_mut();
-            borrowed_scheduler.on_completion_callback(log_task_execution_error);
-            borrowed_scheduler.append_task(Self::init_evm_info_task());
-        }
-
-        self.set_timers();
+    pub fn init(&mut self, init_data: BridgeInitData) {
+        self.init_bridge(init_data, Self::run_scheduler);
     }
 
     #[post_upgrade]
     pub fn post_upgrade(&mut self) {
         self.set_timers();
+    }
+
+    fn run_scheduler() {
+        let runtime = get_runtime();
+        runtime.borrow_mut().run();
     }
 
     /// Converts Bitcoins into ERC20 wrapper token in EVM.
@@ -170,6 +175,12 @@ impl BtcBridge {
         get_state().borrow_mut().configure_bft(config);
     }
 
+    /// Returns the build data of the canister
+    #[query]
+    fn get_canister_build_data(&self) -> BuildData {
+        bridge_canister::build_data!()
+    }
+
     #[cfg(target_family = "wasm")]
     fn collect_evm_events_task() -> ScheduledTask<BtcTask> {
         const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
@@ -237,29 +248,35 @@ fn log_task_execution_error(task: InnerScheduledTask<BtcTask>) {
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
 
-    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
-        let pending_tasks =
-            TasksStorage::new(MEMORY_MANAGER.with(|mm| mm.get(PENDING_TASKS_MEMORY_ID)));
-            PersistentScheduler::new(pending_tasks)
-    }));
+    pub static RUNTIME: SharedRuntime =
+        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 }
 
 pub fn get_state() -> Rc<RefCell<State>> {
     STATE.with(|state| state.clone())
 }
 
-pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
-    SCHEDULER.with(|scheduler| scheduler.clone())
+pub fn get_runtime() -> SharedRuntime {
+    RUNTIME.with(|r| r.clone())
+}
+
+pub fn get_runtime_state() -> RuntimeState<BtcBridgeOp> {
+    get_runtime().borrow().state().clone()
 }
 
 #[cfg(test)]
 mod test {
     use candid::Principal;
+    use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::MockContext;
 
     use super::*;
     use crate::BtcBridge;
+
+    fn owner() -> Principal {
+        Principal::from_slice(&[1; 20])
+    }
 
     #[tokio::test]
     #[should_panic = "admin principal is anonymous"]
@@ -269,9 +286,13 @@ mod test {
         let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
         let mut canister = BtcBridge::from_principal(mock_canister_id);
 
-        let init_data = BtcBridgeConfig {
-            admin: Principal::anonymous(),
-            ..Default::default()
+        let init_data = BridgeInitData {
+            owner: owner(),
+            evm_principal: Principal::from_slice(&[2; 20]),
+            signing_strategy: SigningStrategy::Local {
+                private_key: [1u8; 32],
+            },
+            log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
     }

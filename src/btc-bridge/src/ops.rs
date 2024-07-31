@@ -1,9 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use candid::{Nat, Principal};
+use candid::{CandidType, Nat, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::virtual_canister_call;
@@ -13,8 +16,9 @@ use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 use ic_stable_structures::CellStructure;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
+use serde::{Deserialize, Serialize};
 
-use crate::canister::{eth_address_to_subaccount, get_scheduler};
+use crate::canister::eth_address_to_subaccount;
 use crate::ck_btc_interface::{
     RetrieveBtcArgs, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceArgs, UpdateBalanceError,
     UtxoStatus,
@@ -22,6 +26,77 @@ use crate::ck_btc_interface::{
 use crate::interface::{Erc20MintError, Erc20MintStatus};
 use crate::scheduler::BtcTask;
 use crate::state::State;
+
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
+pub enum BtcBridgeOp {
+    CollectCkBtcBalance(H160),
+    TransferCkBtc(H160, u64),
+    MintErc20(H160),
+    ConfirmMint(H160),
+    //Erc20ToBtc(H160),
+}
+
+impl Operation for BtcBridgeOp {
+    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
+        match self {
+            Self::CollectCkBtcBalance(eth_address) => {
+                todo!()
+            }
+            Self::TransferCkBtc(eth_address, amount) => {
+                todo!()
+            }
+            Self::MintErc20(eth_address) => {
+                todo!()
+            }
+            Self::ConfirmMint(_) => Err(Error::FailedToProgress(
+                "ConfirmMint task should not progress".into(),
+            )),
+        }
+    }
+
+    fn is_complete(&self) -> bool {
+        match self {
+            Self::CollectCkBtcBalance(_) => false,
+            Self::TransferCkBtc(_, _) => false,
+            Self::MintErc20(_) => false,
+            Self::ConfirmMint(_) => true,
+        }
+    }
+
+    fn evm_wallet_address(&self) -> H160 {
+        match self {
+            Self::CollectCkBtcBalance(eth_address) => eth_address.clone(),
+            Self::TransferCkBtc(eth_address, _) => eth_address.clone(),
+            Self::MintErc20(eth_address) => eth_address.clone(),
+            Self::ConfirmMint(eth_address) => eth_address.clone(),
+        }
+    }
+
+    fn scheduling_options(&self) -> Option<TaskOptions> {
+        todo!()
+    }
+
+    async fn on_wrapped_token_minted(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::MintedEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_wrapped_token_burnt(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::BurntEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+
+    async fn on_minter_notification(
+        _ctx: impl OperationContext,
+        _event: bridge_utils::bft_events::NotifyMinterEventData,
+    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
+        todo!()
+    }
+}
 
 pub async fn btc_to_erc20(
     state: Rc<RefCell<State>>,
