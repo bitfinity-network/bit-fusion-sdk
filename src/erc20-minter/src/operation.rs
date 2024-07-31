@@ -1,4 +1,4 @@
-use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_canister::bridge::Operation;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
@@ -30,21 +30,21 @@ impl Operation for OperationPayload {
     }
 
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         _event: bridge_utils::bft_events::MintedEventData,
     ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         todo!()
     }
 
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         _event: BurntEventData,
     ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         todo!()
     }
 
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         _event: bridge_utils::bft_events::NotifyMinterEventData,
     ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         todo!()

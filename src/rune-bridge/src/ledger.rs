@@ -229,7 +229,7 @@ mod tests {
     use ic_exports::ic_kit::MockContext;
 
     use super::*;
-    use crate::canister::get_state;
+    use crate::canister::get_rune_state;
     use crate::key::get_derivation_path_ic;
 
     #[test]
@@ -319,7 +319,7 @@ mod tests {
             height: 0,
         };
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -348,7 +348,7 @@ mod tests {
             height: 0,
         };
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -393,7 +393,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -444,7 +444,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -498,7 +498,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
