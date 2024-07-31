@@ -11,7 +11,7 @@ contract WrappedTokenTest is Test {
     WrappedToken _token;
 
     function setUp() public {
-        _token = new WrappedToken("Token", "TKN", _owner);
+        _token = new WrappedToken("Token", "TKN", 18, _owner);
     }
 
     function testTransferFromOnwer() public {
@@ -153,4 +153,12 @@ contract WrappedTokenTest is Test {
         vm.expectRevert("Unauthorised Access");
         _token.setMetaData(bytes32(bytes("New token")), bytes16(bytes("New symbol")), 42);
     }
+
+    function testConstructorMetadataSuccess() public {
+        WrappedToken token = new WrappedToken("FromAnotherSpace", "UFO", 15, _owner);
+        assertEq(token.name(), "FromAnotherSpace");
+        assertEq(token.symbol(), "UFO");
+        assertEq(token.decimals(), 15);
+    }
+
 }

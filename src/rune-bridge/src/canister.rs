@@ -61,6 +61,7 @@ impl RuneBridge {
         runtime.borrow_mut().run();
     }
 
+    /// Returns the bitcoin address that a user has to use to deposit runes to be received on the given Ethereum address.
     #[query]
     pub fn get_deposit_address(&self, eth_address: H160) -> Result<String, GetAddressError> {
         crate::key::get_transit_address(&get_rune_state(), &eth_address).map(|v| v.to_string())

@@ -18,6 +18,7 @@ use ic_task_scheduler::SchedulerError;
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
+use super::state::{State, TaskLock};
 use super::RuntimeState;
 use crate::bridge::{Operation, OperationAction};
 
@@ -111,20 +112,24 @@ impl ServiceTask {
     ) -> BftResult<()> {
         match self {
             ServiceTask::CollectEvmLogs => {
-                let log_collection_result =
-                    ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await;
+                let _lock = TaskLock::new(
+                    ctx.clone(),
+                    Some(Box::new(|state: &mut State<Op>| {
+                        state.collecting_logs_ts = None
+                    })),
+                );
 
-                ctx.borrow_mut().collecting_logs = false;
-
-                log_collection_result
+                ServiceTask::collect_evm_logs(ctx.clone(), task_scheduler).await
             }
             ServiceTask::RefreshEvmParams => {
-                let evm_params_refreshing_result =
-                    ServiceTask::refresh_evm_params(ctx.clone()).await;
+                let _lock = TaskLock::new(
+                    ctx.clone(),
+                    Some(Box::new(|state: &mut State<Op>| {
+                        state.refreshing_evm_params_ts = None
+                    })),
+                );
 
-                ctx.borrow_mut().refreshing_evm_params = false;
-
-                evm_params_refreshing_result
+                ServiceTask::refresh_evm_params(ctx.clone()).await
             }
         }
     }
@@ -142,7 +147,7 @@ impl ServiceTask {
             .get_evm_link()
             .get_json_rpc_client();
         let Ok(evm_params) = ctx.borrow().config.borrow().get_evm_params() else {
-            log::info!("evm parameters are not initilized");
+            log::info!("evm parameters are not initialized");
             return Err(Error::Initialization(
                 "evm params should be initialized before evm logs collecting".into(),
             ));
