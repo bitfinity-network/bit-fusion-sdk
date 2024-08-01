@@ -5969,6 +5969,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-canister",
  "bridge-client",
  "bridge-did",
  "bridge-utils",

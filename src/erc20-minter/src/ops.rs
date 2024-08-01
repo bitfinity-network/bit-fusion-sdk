@@ -159,6 +159,16 @@ impl Operation for Erc20BridgeOp {
 }
 
 impl Erc20OpStage {
+    /// Returns signed mint order if the stage contains it.
+    pub fn get_signed_mint_order(&self) -> Option<&SignedMintOrder> {
+        match self {
+            Erc20OpStage::SignMintOrder(_) => None,
+            Erc20OpStage::SendMintTransaction(order) => Some(order),
+            Erc20OpStage::ConfirmMint { order, .. } => Some(order),
+            Erc20OpStage::TokenMintConfirmed(_) => None,
+        }
+    }
+
     async fn progress(self, ctx: impl OperationContext) -> BftResult<Self> {
         match self {
             Erc20OpStage::SignMintOrder(order) => Self::sign_mint_order(ctx, order).await,
@@ -173,6 +183,8 @@ impl Erc20OpStage {
     }
 
     async fn sign_mint_order(ctx: impl OperationContext, order: MintOrder) -> BftResult<Self> {
+        log::trace!("signing mint order: {order:?}");
+
         let signer = ctx.get_signer()?;
         let signed_mint_order = order.encode_and_sign(&signer).await?;
 
@@ -190,6 +202,8 @@ impl Erc20OpStage {
     }
 
     async fn send_mint_tx(ctx: impl OperationContext, order: SignedMintOrder) -> BftResult<Self> {
+        log::trace!("sending mint transaction");
+
         let tx_hash = ctx.send_mint_transaction(&order).await?;
 
         Ok(Self::ConfirmMint {

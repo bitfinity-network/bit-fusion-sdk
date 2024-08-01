@@ -80,8 +80,22 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     }
 
     /// Returns principal of EVM canister with which the minter canister works.
+    async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BftResult<H160>> {
+        self.client()
+            .update("get_bridge_canister_evm_address", ())
+            .await
+    }
+
+    /// Returns principal of EVM canister with which the minter canister works.
     async fn get_evm_principal(&self) -> CanisterClientResult<Principal> {
         self.client().query("get_evm_principal", ()).await
+    }
+
+    /// Sets bft bridge contract address.
+    async fn set_bft_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {
+        self.client()
+            .update("set_bft_bridge_contract", (address,))
+            .await
     }
 
     /// Returns the address of the BFT bridge contract in EVM canister.
@@ -97,18 +111,6 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     ) -> CanisterClientResult<Vec<(u32, SignedMintOrder)>> {
         self.client()
             .query("list_mint_orders", (sender, src_token))
-            .await
-    }
-
-    /// Returns mint order for the given parameters.
-    async fn get_mint_order(
-        &self,
-        sender: &H160,
-        src_token: &Id256,
-        operation_id: u32,
-    ) -> CanisterClientResult<Option<SignedMintOrder>> {
-        self.client()
-            .query("get_mint_order", (sender, src_token, operation_id))
             .await
     }
 

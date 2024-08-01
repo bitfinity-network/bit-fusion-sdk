@@ -67,6 +67,8 @@ impl<Op: Operation> BridgeTask<Op> {
                     return Err(Error::OperationNotFound(id));
                 };
 
+                log::warn!("Starting Operation#{id}.");
+
                 let new_operation = operation.progress(id, ctx.clone()).await?;
                 let scheduling_options = new_operation.scheduling_options();
                 ctx.borrow_mut()

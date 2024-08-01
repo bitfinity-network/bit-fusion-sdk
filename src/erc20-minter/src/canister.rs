@@ -5,7 +5,7 @@ use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
-use bridge_canister::BridgeCanister;
+use bridge_canister::{inspect, BridgeCanister};
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
@@ -17,7 +17,7 @@ use candid::Principal;
 use did::build::BuildData;
 use did::H160;
 use drop_guard::guard;
-use ic_canister::{generate_idl, init, post_upgrade, query, Canister, Idl, PreUpdate};
+use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -68,10 +68,19 @@ impl EvmMinter {
         get_runtime().borrow_mut().run();
     }
 
+    #[update]
+    fn set_base_bft_bridge_contract(&mut self, address: H160) {
+        let config = get_runtime_state().borrow().config.clone();
+        inspect::inspect_set_bft_bridge_contract(config);
+        get_base_evm_config()
+            .borrow_mut()
+            .set_bft_bridge_contract(address.clone());
+
+        log::info!("Bridge canister base EVM BFT bridge contract address changed to {address}");
+    }
+
     #[query]
     /// Returns the list of operations for the given wallet address.
-    /// Offset, if set, defines the starting index of the page,
-    /// Count, if set, defines the number of elements in the page.
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
