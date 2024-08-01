@@ -1,25 +1,29 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{self, MintOrder, SignedMintOrder};
+use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
-use bridge_utils::evm_bridge::BridgeSide;
-use candid::{CandidType, Decode, Nat};
+use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
+use candid::CandidType;
 use did::{H160, H256, U256};
-use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
 
-use crate::canister::get_base_evm_state;
+use crate::canister::{get_base_evm_config, get_base_evm_state};
 
+/// Erc20 bridge operation.
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOp {
-    side: BridgeSide,
-    stage: Erc20OpStage,
+    /// Side of the bridge to perfrom the operation.
+    pub side: BridgeSide,
+
+    /// Stage of the operation.
+    pub stage: Erc20OpStage,
 }
 
+/// Erc20 bridge operation stages.
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Erc20OpStage {
     SignMintOrder(MintOrder),
@@ -32,7 +36,7 @@ pub enum Erc20OpStage {
 }
 
 impl Operation for Erc20BridgeOp {
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
+    async fn progress(self, _id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         let next_stage = match self.side {
             BridgeSide::Base => self.stage.progress(get_base_evm_state()).await?,
             BridgeSide::Wrapped => self.stage.progress(ctx).await?,
@@ -100,42 +104,23 @@ impl Operation for Erc20BridgeOp {
         ctx: impl OperationContext,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token burnt");
+        log::trace!("wrapped token burnt. Preparing mint order for other side...");
+
+        // Panic here to make the runtime re-process the events when EVM params will be initialized.
         let wrapped_evm_params = ctx.get_evm_params().expect(
             "on_wrapped_token_burnt should not be called if wrapped evm params are not initialized",
         );
-        let base_evm_params = get_base_evm_state()
-            .0
-            .borrow()
-            .config
-            .get_evm_params()
-            .expect(
+        let base_evm_params = get_base_evm_config().borrow().get_evm_params().expect(
             "on_wrapped_token_burnt should not be called if base evm params are not initialized",
         );
-        let sender = Id256::from_evm_address(&event.sender, wrapped_evm_params.chain_id);
-        let src_token = Id256::from_evm_address(&event.from_erc20, wrapped_evm_params.chain_id);
-        let recipient = Id256::from_slice(&event.recipient_id)?
-            .to_evm_address()
-            .ok()?
-            .1;
-        let dst_token = Id256::from_slice(&event.to_token)?.to_evm_address().ok()?.1;
+
         let nonce = get_base_evm_state().0.borrow_mut().next_nonce();
 
-        let order = MintOrder {
-            amount: event.amount,
-            sender,
-            src_token,
-            recipient,
-            dst_token,
-            nonce,
-            sender_chain_id: wrapped_evm_params.chain_id,
-            recipient_chain_id: base_evm_params.chain_id,
-            name: to_array(&event.name)?,
-            symbol: to_array(&event.symbol)?,
-            decimals: event.decimals,
-            approve_spender: H160::default(),
-            approve_amount: U256::default(),
-            fee_payer: event.sender,
+        let Some(order) =
+            mint_order_from_burnt_event(event.clone(), wrapped_evm_params, base_evm_params, nonce)
+        else {
+            log::warn!("failed to create a mint order for event: {event:?}");
+            return None;
         };
 
         let operation = Self {
@@ -150,7 +135,8 @@ impl Operation for Erc20BridgeOp {
         _ctx: impl OperationContext,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token minted");
+        log::trace!("wrapped token minted. Updating operation to the complete state...");
+
         let nonce = event.nonce;
         let operation = Self {
             side: BridgeSide::Wrapped,
@@ -167,6 +153,7 @@ impl Operation for Erc20BridgeOp {
         _ctx: impl OperationContext,
         _event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
+        log::info!("got unexpected mint notification event");
         None
     }
 }
@@ -175,9 +162,13 @@ impl Erc20OpStage {
     async fn progress(self, ctx: impl OperationContext) -> BftResult<Self> {
         match self {
             Erc20OpStage::SignMintOrder(order) => Self::sign_mint_order(ctx, order).await,
-            Erc20OpStage::SendMintTransaction(_) => todo!(),
-            Erc20OpStage::ConfirmMint { order, tx_hash } => todo!(),
-            Erc20OpStage::TokenMintConfirmed(_) => todo!(),
+            Erc20OpStage::SendMintTransaction(order) => Self::send_mint_tx(ctx, order).await,
+            Erc20OpStage::ConfirmMint { .. } => Err(bridge_did::error::Error::FailedToProgress(
+                "Erc20OpStage::ConfirmMint should progress by the event".into(),
+            )),
+            Erc20OpStage::TokenMintConfirmed(_) => Err(bridge_did::error::Error::FailedToProgress(
+                "Erc20OpStage::TokenMintConfirmed should not progress".into(),
+            )),
         }
     }
 
@@ -216,4 +207,39 @@ fn to_array<const N: usize>(data: &[u8]) -> Option<[u8; N]> {
             None
         }
     }
+}
+
+/// Creates mint order based on burnt event.
+pub fn mint_order_from_burnt_event(
+    event: BurntEventData,
+    burn_side_evm_params: EvmParams,
+    mint_side_evm_params: EvmParams,
+    nonce: u32,
+) -> Option<MintOrder> {
+    let sender = Id256::from_evm_address(&event.sender, burn_side_evm_params.chain_id);
+    let src_token = Id256::from_evm_address(&event.from_erc20, burn_side_evm_params.chain_id);
+    let recipient = Id256::from_slice(&event.recipient_id)?
+        .to_evm_address()
+        .ok()?
+        .1;
+    let dst_token = Id256::from_slice(&event.to_token)?.to_evm_address().ok()?.1;
+
+    let order = MintOrder {
+        amount: event.amount,
+        sender,
+        src_token,
+        recipient,
+        dst_token,
+        nonce,
+        sender_chain_id: burn_side_evm_params.chain_id,
+        recipient_chain_id: mint_side_evm_params.chain_id,
+        name: to_array(&event.name)?,
+        symbol: to_array(&event.symbol)?,
+        decimals: event.decimals,
+        approve_spender: H160::default(),
+        approve_amount: U256::default(),
+        fee_payer: event.sender,
+    };
+
+    Some(order)
 }

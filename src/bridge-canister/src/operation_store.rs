@@ -180,6 +180,18 @@ where
             .map(|entry| (operation_id, entry.payload))
     }
 
+    /// Returns operation for the given address with the given nonce, if present.
+    pub fn get_for_address_nonce(
+        &self,
+        dst_address: &H160,
+        nonce: u32,
+    ) -> Option<(OperationId, P)> {
+        self.get_for_address(dst_address, None)
+            .iter()
+            .find(|(op_id, _)| op_id.nonce() == nonce)
+            .cloned()
+    }
+
     /// Retrieves all operations for the given ETH wallet address,
     /// starting from `offset` returning a max of `count` items
     /// If `offset` is `None`, it starts from the beginning.

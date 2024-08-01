@@ -200,10 +200,15 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
     let minter_client = ctx.icrc_minter_client(ADMIN);
-    let (_, refund_mint_order) = minter_client
-        .list_mint_orders(&john_address, &base_token_id, Some(0u64), Some(1024u64))
+    let refund_mint_order = dbg!(minter_client
+        .get_operations_list(&john_address, None)
         .await
-        .unwrap()[0];
+        .unwrap())
+    .last()
+    .unwrap()
+    .1
+    .get_signed_mint_order(&dbg!(base_token_id))
+    .expect("mint order prepared");
 
     let receipt = ctx
         .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)

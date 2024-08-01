@@ -10,6 +10,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Principal};
+use drop_guard::guard;
 use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{CellStructure, StableCell};
@@ -21,7 +22,7 @@ pub const BASE_EVM_DATA_REFRESH_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Parameters of the Base EVM.
 pub struct BaseEvmState {
-    pub config: ConfigStorage,
+    pub config: Rc<RefCell<ConfigStorage>>,
     pub nonce: StableCell<u32, StableMemory>,
     pub collecting_logs_ts: Option<Timestamp>,
     pub refreshing_evm_params_ts: Option<Timestamp>,
@@ -29,8 +30,9 @@ pub struct BaseEvmState {
 
 impl Default for BaseEvmState {
     fn default() -> Self {
+        let config = ConfigStorage::default(memory_by_id(BASE_EVM_CONFIG_MEMORY_ID));
         Self {
-            config: ConfigStorage::default(memory_by_id(BASE_EVM_CONFIG_MEMORY_ID)),
+            config: Rc::new(RefCell::new(config)),
             nonce: StableCell::new(memory_by_id(NONCE_COUNTER_MEMORY_ID), 0)
                 .expect("failed to initialize nonce counter"),
             collecting_logs_ts: None,
@@ -42,7 +44,7 @@ impl Default for BaseEvmState {
 impl BaseEvmState {
     /// Reset the state using the given settings.
     pub fn reset(&mut self, settings: BaseEvmSettings) {
-        self.config.update(|config| {
+        self.config.borrow_mut().update(|config| {
             config.owner = Principal::anonymous();
             config.evm_link = settings.evm_link;
             config.signing_strategy = settings.signing_strategy;
@@ -81,25 +83,36 @@ impl BaseEvmState {
 #[derive(Default, Clone)]
 pub struct SharedEvmState(pub Rc<RefCell<BaseEvmState>>);
 
+impl SharedEvmState {
+    pub async fn refresh_base_evm_params(self) {
+        let _lock = guard(self.0.clone(), |s| s.borrow_mut().collecting_logs_ts = None);
+        let config = self.0.borrow().config.clone();
+        if let Err(e) = ConfigStorage::refresh_evm_params(config).await {
+            log::warn!("failed to refresh base EVM params: {e}");
+        };
+    }
+}
+
 impl OperationContext for SharedEvmState {
     fn get_evm_link(&self) -> EvmLink {
-        self.0.borrow().config.get_evm_link()
+        self.0.borrow().config.borrow().get_evm_link()
     }
 
     fn get_bridge_contract_address(&self) -> BftResult<did::H160> {
         self.0
             .borrow()
             .config
+            .borrow()
             .get_bft_bridge_contract()
             .ok_or_else(|| Error::Initialization("base bft bridge contract not initialized".into()))
     }
 
     fn get_evm_params(&self) -> BftResult<EvmParams> {
-        self.0.borrow().config.get_evm_params()
+        self.0.borrow().config.borrow().get_evm_params()
     }
 
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
-        self.0.borrow().config.get_signer()
+        self.0.borrow().config.borrow().get_signer()
     }
 }
 
