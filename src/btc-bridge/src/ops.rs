@@ -10,12 +10,14 @@ use candid::{CandidType, Nat, Principal};
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::virtual_canister_call;
-use ic_exports::ic_kit::ic;
+use ic_exports::ic_kit::{ic, RejectionCode};
 use ic_exports::icrc_types::icrc1::account::Account as IcrcAccount;
 use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 use ic_stable_structures::CellStructure;
+use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::TaskOptions;
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::eth_address_to_subaccount;
@@ -98,53 +100,102 @@ impl Operation for BtcBridgeOp {
     }
 }
 
+/// Schedule a mint task for the given Ethereum address.
+pub fn schedule_mint(eth_address: H160) {
+    let scheduler = get_scheduler();
+    let scheduler = scheduler.borrow_mut();
+    let task = BtcTask::MintErc20(eth_address);
+    let options = TaskOptions::new()
+        .with_max_retries_policy(10)
+        .with_backoff_policy(BackoffPolicy::Fixed { secs: 5 });
+    scheduler.append_task(task.into_scheduled(options));
+}
+
+/// Request update balance for the given Ethereum address and create mint orders for the found UTXOs.
 pub async fn btc_to_erc20(
     state: Rc<RefCell<State>>,
     eth_address: H160,
-) -> Vec<Result<Erc20MintStatus, Erc20MintError>> {
+) -> Result<Erc20MintStatus, Erc20MintError> {
     match request_update_balance(&state, &eth_address).await {
         Ok(minted_utxos) => {
-            let mut results = vec![];
-            for utxo in minted_utxos {
-                let eth_address = eth_address.clone();
-                let res = match utxo {
-                    UtxoStatus::Minted { minted_amount, .. } => {
-                        mint_erc20(&state, eth_address, minted_amount).await
-                    }
-                    UtxoStatus::ValueTooSmall(_) => Err(Erc20MintError::ValueTooSmall),
-                    UtxoStatus::Tainted(utxo) => Err(Erc20MintError::Tainted(utxo)),
-                    UtxoStatus::Checked(_) => Err(Erc20MintError::CkBtcMinter(
-                        UpdateBalanceError::TemporarilyUnavailable(
-                            "KYT check passed, but mint failed. Try again later.".to_string(),
-                        ),
-                    )),
-                };
-
-                results.push(res);
+            if minted_utxos.is_empty() {
+                log::debug!("No new utxos found for {eth_address}");
             }
-
-            results
+            for utxo in minted_utxos {
+                match utxo {
+                    UtxoStatus::Minted { minted_amount, .. } => {
+                        log::debug!("Minted {minted_amount} BTC for {eth_address}");
+                    }
+                    UtxoStatus::ValueTooSmall(value) => {
+                        log::debug!("Value too small for {eth_address}: {value:?}");
+                        return Err(Erc20MintError::ValueTooSmall);
+                    }
+                    UtxoStatus::Tainted(utxo) => {
+                        log::debug!("Tainted UTXO for {eth_address}: {utxo:?}");
+                        return Err(Erc20MintError::Tainted(utxo));
+                    }
+                    UtxoStatus::Checked(_) => {
+                        return Err(Erc20MintError::CkBtcMinter(
+                            UpdateBalanceError::TemporarilyUnavailable(
+                                "KYT check passed, but mint failed. Try again later.".to_string(),
+                            ),
+                        ))
+                    }
+                }
+            }
         }
         Err(UpdateBalanceError::NoNewUtxos {
-            current_confirmations: None,
-            ..
-        }) => vec![Err(Erc20MintError::NothingToMint)],
-        Err(UpdateBalanceError::NoNewUtxos {
-            current_confirmations: Some(curr_confirmations),
+            current_confirmations: Some(current_confirmations),
             required_confirmations,
-            pending_utxos,
+            ..
         }) => {
-            schedule_mint(eth_address);
-            vec![Ok(Erc20MintStatus::Scheduled {
-                current_confirmations: curr_confirmations,
-                required_confirmations,
-                pending_utxos,
-            })]
+            log::debug!("No new utxos found for {eth_address} with {current_confirmations} confirmations, waiting for {required_confirmations} confirmations");
         }
-        Err(err) => vec![Err(Erc20MintError::CkBtcMinter(err))],
+        Err(UpdateBalanceError::NoNewUtxos { .. }) => {
+            log::debug!("No new utxos found for {eth_address}");
+        }
+        Err(err) => return Err(Erc20MintError::CkBtcMinter(err)),
     }
+
+    // Get current ckBTC balance
+    let ckbtc_amount = match request_current_ckbtc_balance(&state, &eth_address).await {
+        Ok(amount) => amount,
+        Err((rejection_code, message)) => {
+            log::error!("Failed to get current ckBTC balance: {rejection_code:?} {message}");
+            return Err(Erc20MintError::CkBtcLedgerBalance(rejection_code, message));
+        }
+    };
+
+    log::debug!("Current ckBTC balance for {eth_address}: {ckbtc_amount}");
+
+    if ckbtc_amount == 0 {
+        return Err(Erc20MintError::NothingToMint);
+    }
+
+    mint_erc20(&state, eth_address, ckbtc_amount).await
 }
 
+/// Request the current ckBTC balance for the given ckBTC subaccount.
+async fn request_current_ckbtc_balance(
+    state: &RefCell<State>,
+    eth_address: &H160,
+) -> Result<u64, (RejectionCode, String)> {
+    let ledger = state.borrow().ck_btc_ledger();
+
+    let account = IcrcAccount {
+        owner: ic::id(),
+        subaccount: Some(eth_address_to_subaccount(eth_address).0),
+    };
+
+    virtual_canister_call!(ledger, "icrc1_balance_of", (account,), Nat)
+        .await
+        .map(|amount| amount.0.to_u64().unwrap_or_default())
+}
+
+/// Send an update request to ckBTC minter to check for new UTXOs and mint them as ckBTC tokens.
+/// The function returns the mint status for each found UTXO.
+///
+/// For more details, see [update_balance](https://internetcomputer.org/docs/current/references/ckbtc-reference#update_balanceowner-opt-principal-subaccount-opt-blob).
 async fn request_update_balance(
     state: &RefCell<State>,
     eth_address: &H160,
@@ -172,23 +223,20 @@ async fn request_update_balance(
     })
 }
 
-fn schedule_mint(eth_address: H160) {
-    let scheduler = get_scheduler();
-    let scheduler = scheduler.borrow_mut();
-    let task = BtcTask::MintErc20(eth_address);
-    let options = TaskOptions::new();
-    scheduler.append_task(task.into_scheduled(options));
-}
-
+/// Mint ERC20 tokens for the given amount of ckBTC to the owner of the mint order.
 pub async fn mint_erc20(
     state: &RefCell<State>,
     eth_address: H160,
     amount: u64,
 ) -> Result<Erc20MintStatus, Erc20MintError> {
-    let nonce = state
-        .borrow()
-        .mint_orders()
-        .next_nonce(&Id256::from_evm_address(&eth_address, 0));
+    let nonce = {
+        let state_ref = state.borrow();
+        state_ref.mint_orders().next_nonce(&Id256::from_evm_address(
+            &eth_address,
+            state_ref.btc_chain_id(),
+        ))
+    };
+
     log::debug!(
         "Minting {amount} BTC to {eth_address} with nonce {nonce} for token {}",
         state.borrow().token_address()
@@ -219,6 +267,7 @@ pub async fn mint_erc20(
     })
 }
 
+/// Transfer ckBTC from the deposit address to the canister's wallet.
 async fn transfer_ckbtc_from_subaccount(
     state: &RefCell<State>,
     eth_address: &H160,
@@ -245,7 +294,10 @@ async fn transfer_ckbtc_from_subaccount(
 
     virtual_canister_call!(ledger, "icrc1_transfer", (args,), Result<Nat, TransferError>)
         .await
-        .unwrap_or(Err(TransferError::TemporarilyUnavailable))
+        .unwrap_or_else(|e| {
+            log::error!("icrc1_transfer failed: {e:?}");
+            Err(TransferError::TemporarilyUnavailable)
+        })
 }
 
 async fn prepare_mint_order(
