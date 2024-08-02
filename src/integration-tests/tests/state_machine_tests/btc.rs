@@ -13,7 +13,7 @@ use bridge_did::id256::Id256;
 use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_utils::evm_link::EvmLink;
 use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
+use btc_bridge::state::{BtcConfig, WrappedTokenConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::H160;
 use eth_signer::ic_sign::SigningKeyId;
@@ -319,7 +319,7 @@ impl CkBtcSetup {
 
         let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
 
-        let config = BtcBridgeConfig {
+        let config = BtcConfig {
             ck_btc_minter: minter_id.into(),
             ck_btc_ledger: ledger_id.into(),
             network: BitcoinNetwork::Mainnet,
@@ -378,7 +378,7 @@ impl CkBtcSetup {
         let mut token_symbol = [0; 16];
         token_symbol[0..3].copy_from_slice(b"WPT");
 
-        let bft_config = BftBridgeConfig {
+        let bft_config = WrappedTokenConfig {
             erc20_chain_id: chain_id as u32,
             bridge_address: bft_bridge.clone(),
             token_address: token.clone(),

@@ -38,3 +38,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+
+
+[build-dependencies]
+vergen = { workspace = true }

@@ -1050,6 +1050,7 @@ dependencies = [
  "num-traits",
  "serde",
  "tokio",
+ "vergen",
 ]
 
 [[package]]
