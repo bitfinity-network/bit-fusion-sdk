@@ -227,7 +227,9 @@ impl Task for BtcTask {
 
                     log::info!("ERC20 mint result from scheduler: {result:?}");
 
-                    Ok(())
+                    result
+                        .map(|_| ())
+                        .map_err(|err| SchedulerError::TaskExecutionFailed(format!("{err:?}")))
                 })
             }
             BtcTask::MintBtc(BurntEventData {
