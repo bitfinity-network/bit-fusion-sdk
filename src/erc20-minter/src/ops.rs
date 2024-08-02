@@ -97,7 +97,12 @@ impl Operation for Erc20BridgeOp {
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
-        None
+        match self.stage {
+            Erc20OpStage::SignMintOrder(_) => Some(TaskOptions::default()),
+            Erc20OpStage::SendMintTransaction(_) => Some(TaskOptions::default()),
+            Erc20OpStage::ConfirmMint { .. } => None,
+            Erc20OpStage::TokenMintConfirmed(_) => None,
+        }
     }
 
     async fn on_wrapped_token_burnt(

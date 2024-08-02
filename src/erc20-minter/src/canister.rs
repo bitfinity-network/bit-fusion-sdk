@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::bridge::OperationContext;
+use bridge_canister::bridge::{Operation, OperationContext};
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -22,6 +22,8 @@ use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::ScheduledTask;
 
 use crate::ops::{self, Erc20BridgeOp, Erc20OpStage};
 use crate::state::{BaseEvmSettings, SharedEvmState};
@@ -184,7 +186,11 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
             get_runtime_state()
                 .borrow_mut()
                 .operations
-                .new_operation_with_id(op_id, operation);
+                .new_operation_with_id(op_id, operation.clone());
+
+            get_runtime()
+                .borrow_mut()
+                .schedule_operation(op_id, operation);
         }
         BridgeEvent::Minted(event) => {
             log::trace!("base token minted");
