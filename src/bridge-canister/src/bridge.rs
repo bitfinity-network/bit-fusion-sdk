@@ -137,6 +137,7 @@ pub enum OperationAction<Op> {
     Update { nonce: u32, update_to: Op },
 }
 
+#[derive(Debug)]
 pub struct CollectedEvents {
     pub events: Vec<BridgeEvent>,
     pub last_block_nubmer: u64,

@@ -4,7 +4,6 @@ use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_canister::bridge::Operation;
 use bridge_client::{BridgeCanisterClient, Erc20BridgeClient};
 use bridge_did::id256::Id256;
-use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
@@ -244,8 +243,7 @@ async fn test_external_bridging() {
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
-    let burn_operation_id = ctx
-        .context
+    ctx.context
         .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
@@ -277,20 +275,17 @@ async fn test_external_bridging() {
     ctx.context
         .advance_by_times(Duration::from_secs(2), 4)
         .await;
-    // Check mint order removed
-    let erc20_minter_client = ctx
-        .context
-        .client(ctx.context.canisters().ck_erc20_minter(), ADMIN);
-    let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
-    let signed_order = erc20_minter_client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (&ctx.bob_address, base_token_id, burn_operation_id),
-        )
-        .await
-        .unwrap();
 
-    assert!(signed_order.is_none());
+    // Check mint operation complete
+    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
+    let operation = erc20_minter_client
+        .get_operations_list(&alice_address, None)
+        .await
+        .unwrap()
+        .last()
+        .cloned()
+        .unwrap();
+    assert!(operation.1.is_complete());
 }
 
 #[tokio::test]
@@ -393,12 +388,15 @@ async fn native_token_deposit_increase_and_decrease() {
 
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
 
-    let operations = erc20_minter_client
-        .get_operations_list(&ctx.bob_address, None)
+    let mint_op = erc20_minter_client
+        .get_operations_list(&alice_address, None)
         .await
+        .unwrap()
+        .last()
+        .cloned()
         .unwrap();
 
-    if let Erc20OpStage::ConfirmMint { tx_hash, .. } = &operations[0].1.stage {
+    if let Erc20OpStage::ConfirmMint { tx_hash, .. } = mint_op.1.stage {
         let receipt = ctx
             .context
             .wait_transaction_receipt(tx_hash.as_ref().unwrap())
@@ -413,7 +411,7 @@ async fn native_token_deposit_increase_and_decrease() {
     }
 
     let operation = erc20_minter_client
-        .get_operations_list(&ctx.bob_address, None)
+        .get_operations_list(&alice_address, None)
         .await
         .unwrap()
         .last()
@@ -500,7 +498,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // Check mint order is not removed
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
     let operation = erc20_minter_client
-        .get_operations_list(&ctx.bob_address, None)
+        .get_operations_list(&alice_address, None)
         .await
         .unwrap()
         .last()
@@ -519,7 +517,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // check the operation is complete after the successful mint
     let operation = erc20_minter_client
-        .get_operations_list(&ctx.bob_address, None)
+        .get_operations_list(&alice_address, None)
         .await
         .unwrap()
         .last()

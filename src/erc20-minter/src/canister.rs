@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::bridge::{Operation, OperationContext};
+use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -22,8 +22,6 @@ use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
-use ic_task_scheduler::scheduler::TaskScheduler;
-use ic_task_scheduler::task::ScheduledTask;
 
 use crate::ops::{self, Erc20BridgeOp, Erc20OpStage};
 use crate::state::{BaseEvmSettings, SharedEvmState};
@@ -139,6 +137,8 @@ async fn process_base_evm_logs() {
             return;
         }
     };
+
+    log::debug!("collected base evm events: {collected:?}");
 
     get_base_evm_config()
         .borrow_mut()
