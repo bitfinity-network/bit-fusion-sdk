@@ -5,6 +5,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::common::Pagination;
@@ -17,7 +18,6 @@ use ic_canister::{
 };
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_cdk;
-use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -93,19 +93,21 @@ impl BtcBridge {
     }
 
     #[update]
-    pub fn admin_configure_btc(&self, config: BtcConfig) {
-        if !Self::is_admin() {
-            ic_cdk::trap("only owner can configure BFT bridge");
-        }
+    pub fn admin_configure_btc(&self, config: BtcConfig) -> BftResult<()> {
+        Self::inspect_caller_is_owner()?;
+
         get_state().borrow_mut().configure_btc(config);
+
+        Ok(())
     }
 
     #[update]
-    pub fn admin_configure_bft_bridge(&self, config: WrappedTokenConfig) {
-        if !Self::is_admin() {
-            ic_cdk::trap("only owner can configure BFT bridge");
-        }
+    pub fn admin_configure_wrapped_token(&self, config: WrappedTokenConfig) -> BftResult<()> {
+        Self::inspect_caller_is_owner()?;
+
         get_state().borrow_mut().configure_wrapped_token(config);
+
+        Ok(())
     }
 
     /// Returns the build data of the canister
@@ -141,8 +143,14 @@ impl BtcBridge {
         generate_idl!()
     }
 
-    pub fn is_admin() -> bool {
-        ic::caller() == get_runtime_state().borrow().config.borrow().get_owner()
+    pub fn inspect_caller_is_owner() -> BftResult<()> {
+        let owner = ConfigStorage::get().borrow().get_owner();
+
+        if ic_cdk::caller() == owner {
+            Ok(())
+        } else {
+            Err(bridge_did::error::Error::AccessDenied)
+        }
     }
 }
 
@@ -199,10 +207,9 @@ mod test {
         Principal::from_slice(&[1; 20])
     }
 
-    #[tokio::test]
-    #[should_panic = "admin principal is anonymous"]
-    async fn disallow_anonymous_owner_in_init() {
+    async fn init_canister() -> BtcBridge {
         MockContext::new().inject();
+
         const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
         let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
         let mut canister = BtcBridge::from_principal(mock_canister_id);
@@ -216,5 +223,21 @@ mod test {
             log_settings: None,
         };
         canister_call!(canister.init(init_data), ()).await.unwrap();
+        canister
+    }
+
+    #[tokio::test]
+    async fn correct_initialization() {
+        let canister = init_canister().await;
+
+        let stored_owner = canister_call!(canister.get_owner(), Principal)
+            .await
+            .unwrap();
+        assert_eq!(stored_owner, owner());
+
+        let stored_evm = canister_call!(canister.get_evm_principal(), Principal)
+            .await
+            .unwrap();
+        assert_eq!(stored_evm, Principal::from_slice(&[2; 20]));
     }
 }

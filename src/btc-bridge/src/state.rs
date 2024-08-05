@@ -4,7 +4,7 @@ use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::memory::{BTC_CONFIG_MEMORY_ID, WRAPPED_TOKEN_CONFIG_MEMORY_ID};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
@@ -28,7 +28,7 @@ impl Default for State {
     }
 }
 
-#[derive(Debug, CandidType, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, CandidType, Deserialize)]
 pub struct BtcConfig {
     pub ck_btc_minter: Principal,
     pub ck_btc_ledger: Principal,
@@ -124,7 +124,7 @@ impl Storable for BtcConfig {
     }
 }
 
-#[derive(Default, Debug, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, CandidType, Deserialize)]
 pub struct WrappedTokenConfig {
     pub token_address: H160,
     pub token_name: [u8; 32],
@@ -228,5 +228,56 @@ impl State {
     {
         let config = self.wrapped_token_config.get();
         f(config)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_should_encode_decode_btc_config() {
+        let config = BtcConfig {
+            ck_btc_minter: Principal::from_slice(&[1; 29]),
+            ck_btc_ledger: Principal::from_slice(&[2; 29]),
+            network: BitcoinNetwork::Mainnet,
+            ck_btc_ledger_fee: 10,
+        };
+
+        let bytes = config.to_bytes();
+        let decoded = BtcConfig::from_bytes(bytes.clone());
+
+        assert_eq!(config, decoded);
+    }
+
+    #[test]
+    fn test_should_encode_decode_btc_config_shorter_principal() {
+        let config = BtcConfig {
+            ck_btc_minter: Principal::from_text("aaaaa-aa").unwrap(),
+            ck_btc_ledger: Principal::from_text("aaaaa-aa").unwrap(),
+            network: BitcoinNetwork::Mainnet,
+            ck_btc_ledger_fee: 10,
+        };
+
+        let bytes = config.to_bytes();
+        let decoded = BtcConfig::from_bytes(bytes.clone());
+
+        assert_eq!(config, decoded);
+    }
+
+    #[test]
+    fn test_should_encode_decode_wrapped_token_config() {
+        let config = WrappedTokenConfig {
+            token_address: H160::from_slice(&[1; 20]),
+            token_name: [1; 32],
+            token_symbol: [1; 16],
+            decimals: 18,
+        };
+
+        let bytes = config.to_bytes();
+        let decoded = WrappedTokenConfig::from_bytes(bytes.clone());
+
+        assert_eq!(config, decoded);
     }
 }

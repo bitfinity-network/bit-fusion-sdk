@@ -60,12 +60,14 @@ impl Operation for BtcBridgeOp {
     async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
         match self {
             Self::UpdateCkBtcBalance { eth_address } => {
+                log::debug!("UpdateCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_minter = get_state().borrow().ck_btc_minter();
                 Self::update_ckbtc_balance(ckbtc_minter, &eth_address).await?;
 
                 Ok(Self::CollectCkBtcBalance { eth_address })
             }
             Self::CollectCkBtcBalance { eth_address } => {
+                log::debug!("CollectCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_ledger = get_state().borrow().ck_btc_ledger();
                 let ckbtc_balance = Self::collect_ckbtc_balance(ckbtc_ledger, &eth_address).await?;
 
@@ -78,6 +80,7 @@ impl Operation for BtcBridgeOp {
                 eth_address,
                 amount,
             } => {
+                log::debug!("TransferCkBtc: Eth address {eth_address}, amount {amount}");
                 let (ckbtc_ledger, ckbtc_fee) = {
                     let state = get_state();
                     let state_ref = state.borrow();
@@ -97,6 +100,7 @@ impl Operation for BtcBridgeOp {
                 eth_address,
                 amount,
             } => {
+                log::debug!("MintErc20: Eth address {eth_address}, amount {amount}");
                 let mint_order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
                 Ok(Self::ConfirmErc20Mint {
@@ -111,6 +115,7 @@ impl Operation for BtcBridgeOp {
                 "ConfirmMint task should not progress".into(),
             )),
             Self::WithdrawBtc(event) => {
+                log::debug!("WithdrawBtc: Eth address {}", event.sender);
                 Self::withdraw_btc(&event).await?;
 
                 Ok(Self::BtcWithdrawConfirmed {
@@ -156,13 +161,20 @@ impl Operation for BtcBridgeOp {
                     .with_max_retries_policy(10)
                     .with_backoff_policy(BackoffPolicy::Fixed { secs: 5 }),
             ),
-            Self::BtcWithdrawConfirmed { .. }
-            | Self::CollectCkBtcBalance { .. }
-            | Self::ConfirmErc20Mint { .. }
-            | Self::Erc20MintConfirmed(_)
+            Self::CollectCkBtcBalance { .. }
             | Self::MintErc20 { .. }
             | Self::TransferCkBtc { .. }
-            | Self::WithdrawBtc(_) => None,
+            | Self::WithdrawBtc(_) => Some(
+                TaskOptions::new()
+                    .with_max_retries_policy(3)
+                    .with_backoff_policy(BackoffPolicy::Exponential {
+                        secs: 2,
+                        multiplier: 4,
+                    }),
+            ),
+            Self::BtcWithdrawConfirmed { .. }
+            | Self::ConfirmErc20Mint { .. }
+            | Self::Erc20MintConfirmed(_) => None,
         }
     }
 
@@ -285,6 +297,7 @@ impl BtcBridgeOp {
             owner: ic::id(),
             subaccount: Some(eth_address_to_subaccount(eth_address).0),
         };
+        log::debug!("Collecting ckBTC balance for {eth_address}");
         // Get current ckBTC balance
         let ckbtc_amount = match CkBtcLedgerClient::from(ckbtc_ledger)
             .icrc1_balance_of(icrc_account)

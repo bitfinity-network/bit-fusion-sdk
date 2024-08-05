@@ -20,13 +20,7 @@ async fn inspect_message() {
 
 async fn inspect_method(method: &str) -> BftResult<()> {
     match method {
-        method if method.starts_with("admin_") => {
-            if BtcBridge::is_admin() {
-                Ok(())
-            } else {
-                Err(bridge_did::error::Error::AccessDenied)
-            }
-        }
+        method if method.starts_with("admin_") => BtcBridge::inspect_caller_is_owner(),
         _ => Ok(()),
     }
 }

@@ -381,16 +381,21 @@ pub trait TestContext {
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
 
-        let decoded_output =
-            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
-                .unwrap();
+        println!("Burn transaction hash: {tx_hash}; receipt {receipt:?}",);
 
         if receipt.status != Some(U64::one()) {
+            let decoded_output =
+                BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
+                    .unwrap();
             return Err(TestError::Generic(format!(
                 "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
                 String::from_utf8_lossy(receipt.output.as_ref().unwrap())
             )));
         }
+
+        let decoded_output =
+            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
+                .unwrap();
 
         let operation_id = decoded_output._0;
         Ok((operation_id, tx_hash))
