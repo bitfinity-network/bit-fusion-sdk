@@ -2,6 +2,7 @@ use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_kit::RejectionCode;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use serde::Deserialize;
 
@@ -46,7 +47,9 @@ pub enum Erc20MintError {
     /// Error while connecting to ckBTC.
     CkBtcMinter(UpdateBalanceError),
     /// Error transferring ckBTC tokens with ledger.
-    CkBtcLedger(TransferError),
+    CkBtcLedgerTransfer(TransferError),
+    /// Error while checking the ledger balance.
+    CkBtcLedgerBalance(RejectionCode, String),
     /// Error while signing the mint order.
     Sign(String),
     /// Error connecting to the EVM.
@@ -59,6 +62,6 @@ pub enum Erc20MintError {
 
 impl From<TransferError> for Erc20MintError {
     fn from(value: TransferError) -> Self {
-        Self::CkBtcLedger(value)
+        Self::CkBtcLedgerTransfer(value)
     }
 }

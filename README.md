@@ -1,5 +1,7 @@
 # BitFusion SDK
 
+An open-source framework designed to enable the creation of decentralized bridges between EVM networks and Bitcoin, Bitcoin Runes, and other EVM networks, leveraging threshold cryptography and a network of on-chain Bitcoin nodes.
+
 ## Warning
 
 This code is still in the early stages of development and is not intended for production use. Use at your own risk.
