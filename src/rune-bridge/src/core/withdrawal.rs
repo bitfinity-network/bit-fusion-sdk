@@ -238,7 +238,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             }
         }
 
-        Ok(tx.into())
+        Ok(tx)
     }
 
     pub async fn send_transaction(&self, tx: Transaction) -> Result<(), WithdrawError> {

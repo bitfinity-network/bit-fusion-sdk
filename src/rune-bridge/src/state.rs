@@ -27,6 +27,7 @@ const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
 /// Minimum number of indexers required to start the bridge.
 const MIN_INDEXERS: u8 = 2;
 
+#[derive(Default)]
 pub struct RuneState {
     pub(crate) config: RuneBridgeConfig,
     pub(crate) master_key: Option<MasterKey>,
@@ -39,17 +40,6 @@ pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
     pub key_id: EcdsaKeyId,
-}
-
-impl Default for RuneState {
-    fn default() -> Self {
-        Self {
-            config: Default::default(),
-            master_key: None,
-            ledger: Default::default(),
-            runes: Default::default(),
-        }
-    }
 }
 
 #[derive(Debug, CandidType, Deserialize)]

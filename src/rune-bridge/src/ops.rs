@@ -172,7 +172,7 @@ impl Operation for RuneBridgeOp {
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         if let Some(notification) = RuneMinterNotification::decode(event.clone()) {
-            return match notification {
+            match notification {
                 RuneMinterNotification::Deposit(payload) => {
                     Some(OperationAction::Create(Self::AwaitInputs {
                         dst_address: payload.dst_address,
@@ -180,7 +180,7 @@ impl Operation for RuneBridgeOp {
                         requested_amounts: payload.amounts,
                     }))
                 }
-            };
+            }
         } else {
             log::warn!("Invalid minter notification: {event:?}");
             None
