@@ -182,7 +182,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
                 && address(feeChargeContract) != address(0)
         ) {
             uint256 additionalGasConsumed = initGasLeft - gasleft();
-            uint256 additionalGasFeeConsumed = (additionalGasConsumed * 120) / 100; // Add 15% buffer
+            uint256 additionalGasFeeConsumed = (additionalGasConsumed * 115) / 100; // Add 15% buffer
             uint256 fee = additionalGasFeeConsumed * tx.gasprice;
 
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
