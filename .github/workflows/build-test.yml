@@ -104,6 +104,7 @@ jobs:
       - name: test
         if: ${{ !inputs.skip-test }}
         run: |
+          cargo clean
           export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
           ./scripts/build.sh
 
