@@ -8,10 +8,6 @@ export PROTOC_INCLUDE=${PWD}/proto
 
 INTEGRATION_TESTS_TO_RUN=$1
 
-# build first, otherwise ci will fail due to link issue
-./scripts/build.sh
-./scripts/get_dependencies.sh
-
 # Add unit tests for all the packages
 cargo test
 
