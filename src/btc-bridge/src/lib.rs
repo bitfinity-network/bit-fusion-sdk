@@ -1,6 +1,5 @@
 pub mod canister;
 pub mod ckbtc_client;
-pub mod inspect;
 pub mod interface;
 pub mod memory;
 pub mod ops;
