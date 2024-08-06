@@ -39,9 +39,13 @@ pub enum BtcBridgeOp {
         eth_address: H160,
         amount: u64,
     },
-    MintErc20 {
+    CreateMintOrder {
         eth_address: H160,
         amount: u64,
+    },
+    MintErc20 {
+        eth_address: H160,
+        order: SignedMintOrder,
     },
     ConfirmErc20Mint {
         order: SignedMintOrder,
@@ -91,22 +95,28 @@ impl Operation for BtcBridgeOp {
                     Self::transfer_ckbtc_to_bridge(ckbtc_ledger, &eth_address, amount, ckbtc_fee)
                         .await?;
 
-                Ok(Self::MintErc20 {
+                Ok(Self::CreateMintOrder {
                     eth_address,
                     amount: amount_minus_fee,
                 })
             }
-            Self::MintErc20 {
+            Self::CreateMintOrder {
                 eth_address,
                 amount,
             } => {
-                log::debug!("MintErc20: Eth address {eth_address}, amount {amount}");
+                log::debug!("CreateMintOrder: Eth address {eth_address}, amount {amount}");
                 let mint_order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
-                Ok(Self::ConfirmErc20Mint {
+                Ok(Self::MintErc20 {
                     order: mint_order,
                     eth_address,
                 })
+            }
+            Self::MintErc20 { eth_address, order } => {
+                log::debug!("MintErc20: Eth address {eth_address}");
+                ctx.send_mint_transaction(&order).await?;
+
+                Ok(Self::ConfirmErc20Mint { order, eth_address })
             }
             Self::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
                 "ConfirmErc20Mint task should progress only on the Minted EVM event".into(),
@@ -133,6 +143,7 @@ impl Operation for BtcBridgeOp {
             Self::UpdateCkBtcBalance { .. } => false,
             Self::CollectCkBtcBalance { .. } => false,
             Self::TransferCkBtc { .. } => false,
+            Self::CreateMintOrder { .. } => false,
             Self::MintErc20 { .. } => false,
             Self::ConfirmErc20Mint { .. } => false,
             Self::Erc20MintConfirmed { .. } => true,
@@ -145,6 +156,7 @@ impl Operation for BtcBridgeOp {
         match self {
             Self::BtcWithdrawConfirmed { eth_address } => eth_address.clone(),
             Self::CollectCkBtcBalance { eth_address } => eth_address.clone(),
+            Self::CreateMintOrder { eth_address, .. } => eth_address.clone(),
             Self::ConfirmErc20Mint { eth_address, .. } => eth_address.clone(),
             Self::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
             Self::MintErc20 { eth_address, .. } => eth_address.clone(),
@@ -163,6 +175,7 @@ impl Operation for BtcBridgeOp {
             ),
             Self::CollectCkBtcBalance { .. }
             | Self::MintErc20 { .. }
+            | Self::CreateMintOrder { .. }
             | Self::TransferCkBtc { .. }
             | Self::WithdrawBtc(_) => Some(
                 TaskOptions::new()
@@ -228,6 +241,7 @@ impl BtcBridgeOp {
     pub fn get_signed_mint_order(&self) -> Option<SignedMintOrder> {
         match self {
             Self::ConfirmErc20Mint { order, .. } => Some(*order),
+            Self::MintErc20 { order, .. } => Some(*order),
             _ => None,
         }
     }
@@ -370,7 +384,6 @@ impl BtcBridgeOp {
 
         let mint_order =
             Self::prepare_mint_order(&ctx, &state, eth_address.clone(), amount, nonce).await?;
-        ctx.send_mint_transaction(&mint_order).await?;
 
         Ok(mint_order)
     }

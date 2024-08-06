@@ -1146,7 +1146,7 @@ impl CkBtcSetup {
             .is_ok());
 
         self.advance_blocks(16);
-        for _ in 0..30 {
+        for _ in 0..60 {
             (&self.context)
                 .advance_time(Duration::from_millis(500))
                 .await;
