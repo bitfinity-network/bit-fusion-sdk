@@ -254,8 +254,7 @@ async fn test_external_bridging() {
             amount,
         )
         .await
-        .unwrap()
-        .0;
+        .unwrap();
 
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
