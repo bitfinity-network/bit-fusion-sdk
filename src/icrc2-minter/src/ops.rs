@@ -1,4 +1,5 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -65,7 +66,7 @@ impl IcrcBridgeOp {
 }
 
 impl Operation for IcrcBridgeOp {
-    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
@@ -136,7 +137,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt");
@@ -144,7 +145,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token minted");
@@ -155,7 +156,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!(

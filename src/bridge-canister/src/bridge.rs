@@ -13,12 +13,14 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::runtime::RuntimeState;
+
 /// Defines an operation that can be executed by the bridge.
 pub trait Operation:
     Sized + CandidType + Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
     /// Execute the operation, and move it to next stage.
-    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self>;
+    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self>;
 
     /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
@@ -33,20 +35,20 @@ pub trait Operation:
 
     /// Action to perform when a WrappedToken is minted.
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
-        _event: MintedEventData,
+        ctx: RuntimeState<Self>,
+        event: MintedEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform when a WrappedToken is burnt.
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
-        _event: BurntEventData,
+        ctx: RuntimeState<Self>,
+        event: BurntEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform on notification from BftBridge contract.
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
-        _event: NotifyMinterEventData,
+        ctx: RuntimeState<Self>,
+        event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>>;
 }
 

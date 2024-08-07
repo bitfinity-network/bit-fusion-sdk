@@ -62,7 +62,7 @@ mod tests {
 
     use super::*;
     use crate::memory::memory_by_id;
-    use crate::runtime::default_state;
+    use crate::runtime::{default_state, RuntimeState};
 
     #[derive(Clone, Deserialize, Debug, Serialize, CandidType)]
     pub struct TestOp;
@@ -71,7 +71,7 @@ mod tests {
         async fn progress(
             self,
             _: bridge_did::op_id::OperationId,
-            _: impl crate::bridge::OperationContext,
+            _: RuntimeState<Self>,
         ) -> bridge_did::error::BftResult<Self> {
             unimplemented!()
         }
@@ -85,21 +85,21 @@ mod tests {
         }
 
         async fn on_wrapped_token_minted(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::MintedEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
         }
 
         async fn on_wrapped_token_burnt(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::BurntEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
         }
 
         async fn on_minter_notification(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::NotifyMinterEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
