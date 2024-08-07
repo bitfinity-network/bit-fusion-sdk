@@ -42,3 +42,17 @@ pub struct ApproveAfterMint {
     /// Amount to approve.
     pub approve_amount: U256,
 }
+
+/// Information to perform burn operation for BTC and create a mint order.
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+pub struct BtcDeposit {
+    /// Recipient of the minted tokens.
+    pub recipient: H160,
+    /// Address from which fee should be charged for mint transaction
+    /// performed by minter canister.
+    /// If None, mint transaction will not be sent and user can send it by himself.
+    pub fee_payer: Option<H160>,
+    /// If user want's mint operation to approve minted tokens,
+    /// he can use this field.
+    pub approve_after_mint: Option<ApproveAfterMint>,
+}
