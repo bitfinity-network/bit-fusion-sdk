@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -18,7 +18,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     // Additional gas amount for fee charge.
     // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
-    uint256 constant additionalGasFee = 1000;
+    uint256 constant additionalGasFee = 100_000;
 
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
@@ -181,8 +181,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             order.feePayer != address(0) && msg.sender == minterCanisterAddress
                 && address(feeChargeContract) != address(0)
         ) {
-            uint256 gasFee = initGasLeft - gasleft() + additionalGasFee;
-            uint256 fee = gasFee * tx.gasprice;
+            uint256 additionalGasConsumed = initGasLeft + 21_000 + (additionalGasFee * 2) - gasleft();
+            uint256 fee = additionalGasConsumed * tx.gasprice;
+
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
         }
 
@@ -200,11 +201,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Burn ERC 20 tokens there to make possible perform a mint on other side of the bridge.
     /// Caller should approve transfer in the given `from_erc20` token for the bridge contract.
     /// Returns operation ID if operation is succesfull.
-    function burn(uint256 amount, address fromERC20, bytes32 toTokenID, bytes memory recipientID)
-        public
-        whenNotPaused
-        returns (uint32)
-    {
+    function burn(
+        uint256 amount,
+        address fromERC20,
+        bytes32 toTokenID,
+        bytes memory recipientID
+    ) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         // Check if the token is registered on the bridge or the side is base
