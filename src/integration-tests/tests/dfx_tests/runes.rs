@@ -139,8 +139,6 @@ impl RunesContext {
             .await
             .unwrap();
 
-        let chain_id = context.evm_client(ADMIN).eth_chain_id().await.unwrap();
-
         let mut token_name = [0; 32];
         token_name[0..7].copy_from_slice(b"wrapper");
         let mut token_symbol = [0; 16];
