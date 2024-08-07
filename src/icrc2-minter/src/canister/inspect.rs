@@ -1,12 +1,17 @@
+#[cfg(target_family = "wasm")]
 use bridge_canister::bridge_inspect;
 use bridge_did::error::BftResult;
 use candid::Principal;
+#[cfg(target_family = "wasm")]
 use ic_exports::ic_cdk;
-use ic_exports::ic_cdk::{api, inspect_message};
+use ic_exports::ic_cdk::api;
+#[cfg(target_family = "wasm")]
+use ic_exports::ic_cdk::inspect_message;
 use ic_exports::ic_kit::ic;
 
 use crate::MinterCanister;
 
+#[cfg(target_family = "wasm")]
 #[inspect_message]
 async fn inspect_message() {
     bridge_inspect();
@@ -19,6 +24,7 @@ async fn inspect_message() {
     }
 }
 
+#[allow(dead_code)]
 async fn inspect_method(method: &str) -> BftResult<()> {
     match method {
         "add_to_whitelist" | "remove_from_whitelist" => {
