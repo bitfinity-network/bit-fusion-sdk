@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/BftBridge.sol";
 import "src/interfaces/IFeeCharge.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -26,5 +26,5 @@ contract BFTBridgeV2 is BFTBridge {
         _disableInitializers();
     }
 
-    function __BridgeV2_init() public reinitializer(2) {} // Reinitialize with version 2 or higher.
+    function __BridgeV2_init() public reinitializer(2) { } // Reinitialize with version 2 or higher.
 }

@@ -30,7 +30,7 @@ contract ChargeFeeTest is Test {
         aliceSenderIDs[1] = _aliceSender2;
         vm.deal(_alice, _aliceInitBalance);
         vm.prank(_alice);
-        _feeCharge.nativeTokenDeposit{value: _aliceInitDeposit}(aliceSenderIDs);
+        _feeCharge.nativeTokenDeposit{ value: _aliceInitDeposit }(aliceSenderIDs);
     }
 
     function testDeposit() public view {
