@@ -5,10 +5,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_utils::BFTBridge;
-use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
@@ -115,9 +115,9 @@ impl RunesContext {
 
         let wallet = context.new_wallet(u128::MAX).await.unwrap();
 
-        let btc_bridge_eth_address: Option<H160> = context
-            .client(bridge, ADMIN)
-            .update("get_evm_address", ())
+        let btc_bridge_eth_address = context
+            .rune_bridge_client(ADMIN)
+            .get_bridge_canister_evm_address()
             .await
             .unwrap();
 
@@ -146,18 +146,9 @@ impl RunesContext {
         let mut token_symbol = [0; 16];
         token_symbol[0..3].copy_from_slice(b"WPT");
 
-        let bft_config = BftBridgeConfig {
-            erc20_chain_id: chain_id as u32,
-            bridge_address: bft_bridge.clone(),
-            token_address: token.clone(),
-            token_name,
-            token_symbol,
-            decimals: 0,
-        };
-
         let _: () = context
-            .client(bridge, ADMIN)
-            .update("admin_configure_bft_bridge", (bft_config,))
+            .rune_bridge_client(ADMIN)
+            .set_bft_bridge_contract(bft_bridge.clone())
             .await
             .unwrap();
 
@@ -518,7 +509,6 @@ impl RunesContext {
 }
 
 /// Disabled as it currently fails. To be fixed in EPROD-944
-#[ignore = "To be fixed in EPROD-944"]
 #[tokio::test]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::new().await;
