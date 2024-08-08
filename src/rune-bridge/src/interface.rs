@@ -71,6 +71,9 @@ pub enum DepositError {
     NotScheduled,
     NothingToDeposit,
     NoRunesToDeposit,
+    UtxosNotConfirmed,
+    NoDstTokenAddress,
+    UtxoAlreadyUsed,
     InvalidAmounts {
         requested: HashMap<RuneName, u128>,
         actual: HashMap<RuneName, u128>,
@@ -98,6 +101,7 @@ pub enum WithdrawError {
     TransactionSending,
     FeeRateRequest,
     ChangeAddress,
+    InvalidRequest(String),
     InternalError(String),
 }
 

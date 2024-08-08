@@ -23,7 +23,7 @@ use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::Withdrawal;
 use crate::operation::OperationState;
 use crate::rune_info::RuneName;
-use crate::state::State;
+use crate::state::RuneState;
 
 pub type TasksStorage =
     StableBTreeMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -126,7 +126,7 @@ impl RuneBridgeTask {
         Ok(())
     }
 
-    fn task_by_log(log: Log, state: &RefCell<State>) -> Option<ScheduledTask<RuneBridgeTask>> {
+    fn task_by_log(log: Log, state: &RefCell<RuneState>) -> Option<ScheduledTask<RuneBridgeTask>> {
         log::trace!("creating task from the log: {log:?}");
 
         const TASK_RETRY_DELAY_SECS: u32 = 5;
@@ -226,38 +226,5 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
 
     fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError> {
         self.map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
-    }
-}
-
-pub enum RuneMinterNotification {
-    Deposit(RuneDepositRequestData),
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct RuneDepositRequestData {
-    pub dst_address: H160,
-    pub erc20_address: H160,
-    pub amounts: Option<HashMap<RuneName, u128>>,
-}
-
-impl RuneMinterNotification {
-    pub const DEPOSIT_TYPE: u32 = 1;
-}
-
-impl RuneMinterNotification {
-    fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
-        match event_data.notification_type {
-            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
-                Ok(payload) => Some(Self::Deposit(payload)),
-                Err(err) => {
-                    log::warn!("Failed to decode deposit request event data: {err:?}");
-                    None
-                }
-            },
-            t => {
-                log::warn!("Unknown minter notify event type: {t}");
-                None
-            }
-        }
     }
 }

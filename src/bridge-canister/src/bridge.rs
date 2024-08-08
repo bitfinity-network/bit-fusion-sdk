@@ -37,20 +37,20 @@ pub trait Operation:
 
     /// Action to perform when a WrappedToken is minted.
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
-        _event: MintedEventData,
+        ctx: RuntimeState<Self>,
+        event: MintedEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform when a WrappedToken is burnt.
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
-        _event: BurntEventData,
+        ctx: RuntimeState<Self>,
+        event: BurntEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform on notification from BftBridge contract.
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
-        _event: NotifyMinterEventData,
+        ctx: RuntimeState<Self>,
+        event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>>;
 }
 

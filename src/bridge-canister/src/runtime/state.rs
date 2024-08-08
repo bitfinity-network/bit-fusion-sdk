@@ -86,21 +86,21 @@ mod tests {
         }
 
         async fn on_wrapped_token_minted(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::MintedEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
         }
 
         async fn on_wrapped_token_burnt(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::BurntEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
         }
 
         async fn on_minter_notification(
-            _ctx: impl crate::bridge::OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::NotifyMinterEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()

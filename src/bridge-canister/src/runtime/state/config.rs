@@ -149,6 +149,15 @@ impl ConfigStorage {
         self.0.get().owner
     }
 
+    /// Checks if the caller is owner.
+    pub fn check_owner(&self, caller: Principal) -> BftResult<()> {
+        if caller != self.get_owner() {
+            return Err(Error::AccessDenied);
+        }
+
+        Ok(())
+    }
+
     /// Returns parameters of EVM canister with which the minter canister works.
     pub fn get_evm_params(&self) -> BftResult<EvmParams> {
         self.0.get().evm_params.clone().ok_or_else(|| {

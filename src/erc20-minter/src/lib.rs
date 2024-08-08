@@ -1,4 +1,5 @@
 pub mod canister;
+pub mod inspect;
 pub mod memory;
 pub mod ops;
 pub mod state;

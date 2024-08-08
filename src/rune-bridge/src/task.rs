@@ -10,18 +10,18 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 use ic_exports::ic_kit::RejectionCode;
 
 use crate::ledger::UtxoKey;
-use crate::state::State;
+use crate::state::RuneState;
 
 const AVG_BLOCK_TIME: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
 /// Task to remove used UTXOs from the ledger.
 /// It also remark as available to be spent those utxos which haven't been spent for some reason.
 pub struct RemoveUsedUtxosTask {
-    state: Rc<RefCell<State>>,
+    state: Rc<RefCell<RuneState>>,
 }
 
-impl From<Rc<RefCell<State>>> for RemoveUsedUtxosTask {
-    fn from(state: Rc<RefCell<State>>) -> Self {
+impl From<Rc<RefCell<RuneState>>> for RemoveUsedUtxosTask {
+    fn from(state: Rc<RefCell<RuneState>>) -> Self {
         Self { state }
     }
 }

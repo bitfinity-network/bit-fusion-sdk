@@ -4,19 +4,14 @@ pub mod interface;
 pub mod key;
 pub mod ledger;
 pub mod memory;
-pub mod operation;
+pub mod ops;
 pub mod rune_info;
-pub mod scheduler;
 pub mod state;
 pub mod task;
 
 use ic_metrics::Metrics;
 
 pub use crate::canister::RuneBridge;
-
-const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
-const EVM_INFO_INITIALIZATION_RETRY_DELAY_SEC: u32 = 2;
-const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
 
 const MAINNET_CHAIN_ID: u32 = 0;
 const TESTNET_CHAIN_ID: u32 = 1;

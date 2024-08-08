@@ -106,7 +106,7 @@ impl Operation for Erc20BridgeOp {
     }
 
     async fn on_wrapped_token_burnt(
-        ctx: impl OperationContext,
+        ctx: RuntimeState<Self>,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt. Preparing mint order for other side...");
@@ -137,7 +137,7 @@ impl Operation for Erc20BridgeOp {
     }
 
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token minted. Updating operation to the complete state...");
@@ -155,7 +155,7 @@ impl Operation for Erc20BridgeOp {
     }
 
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         _event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         log::info!("got unexpected mint notification event");
