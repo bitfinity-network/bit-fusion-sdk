@@ -9,6 +9,7 @@ use bridge_utils::evm_link::EvmLink;
 use candid::CandidType;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ethers_core::types::BlockNumber;
 use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -87,10 +88,80 @@ pub trait OperationContext {
         tx.hash = tx.hash();
 
         let client = self.get_evm_link().get_json_rpc_client();
+
+        let bridge_canister_address = tx.from;
+        let balance_before_mint = client
+            .get_balance(bridge_canister_address, BlockNumber::Latest)
+            .await
+            .unwrap();
+
         let tx_hash = client
-            .send_raw_transaction(tx)
+            .send_raw_transaction(tx.clone())
             .await
             .map_err(|e| Error::EvmRequestFailed(format!("failed to send mint tx to EVM: {e}")))?;
+
+        loop {
+            let tx_receipt_result = client.get_receipt_by_hash(tx_hash).await;
+            if let Ok(receipt) = tx_receipt_result {
+                let gas_used = receipt.gas_used;
+                log::info!("MINT_TX_GAS_USED: {gas_used:?}");
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let balance_after_mint = client
+                    .get_balance(bridge_canister_address, BlockNumber::Latest)
+                    .await
+                    .unwrap();
+
+                let change = if balance_after_mint >= balance_before_mint {
+                    log::info!("MINT_TX_BALANCE_INCREASED");
+                    balance_after_mint - balance_before_mint
+                } else {
+                    log::info!("MINT_TX_BALANCE_DECREASED");
+                    balance_before_mint - balance_after_mint
+                };
+
+                log::info!("MINT_TX_GAS_PRICE: {:?}", tx.gas_price);
+
+                let gas_change = change / tx.gas_price.unwrap();
+                log::info!("MINT_TX_GAS_CHANGE: {gas_change:?}");
+
+                break;
+            }
+        }
 
         Ok(tx_hash.into())
     }
