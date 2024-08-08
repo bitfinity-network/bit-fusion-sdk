@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
-use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
@@ -441,7 +440,7 @@ async fn icrc2_token_bridge(
         JOHN,
         &john_wallet,
         bft_bridge,
-        &wrapped_token,
+        wrapped_token,
         amount as _,
         Some(john_address),
         None,
@@ -455,7 +454,6 @@ async fn icrc2_token_bridge(
 #[tokio::test]
 async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip() {
     let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
-    let minter_client = ctx.icrc_minter_client(ADMIN);
     let evm_client = ctx.evm_client(ADMIN);
 
     let minter_address = ctx
