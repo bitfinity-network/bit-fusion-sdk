@@ -103,6 +103,18 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
         self.client().update("get_bft_bridge_contract", ()).await
     }
 
+    async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BftResult<H160>> {
+        self.client()
+            .update("get_bridge_canister_evm_address", ())
+            .await
+    }
+
+    async fn set_bft_bridge_contract(&self, address: H160) -> CanisterClientResult<()> {
+        self.client()
+            .update("set_bft_bridge_contract", (address,))
+            .await
+    }
+
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
     async fn list_mint_orders(
         &self,

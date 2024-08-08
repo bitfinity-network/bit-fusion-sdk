@@ -279,7 +279,6 @@ mod tests {
     use serde::Serialize;
 
     use super::*;
-    use crate::bridge::OperationContext;
     use crate::runtime::RuntimeState;
 
     #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType)]
@@ -317,21 +316,21 @@ mod tests {
         }
 
         async fn on_wrapped_token_minted(
-            _ctx: impl OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::MintedEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None
         }
 
         async fn on_wrapped_token_burnt(
-            _ctx: impl OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::BurntEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None
         }
 
         async fn on_minter_notification(
-            _ctx: impl OperationContext,
+            _ctx: RuntimeState<Self>,
             _event: bridge_utils::bft_events::NotifyMinterEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None

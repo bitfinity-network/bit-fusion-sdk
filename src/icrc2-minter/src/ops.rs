@@ -127,7 +127,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt");
@@ -135,7 +135,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token minted");
@@ -146,7 +146,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
+        _ctx: RuntimeState<Self>,
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!(
