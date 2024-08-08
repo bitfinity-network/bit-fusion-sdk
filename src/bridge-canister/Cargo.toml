@@ -36,6 +36,7 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+drop_guard = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }

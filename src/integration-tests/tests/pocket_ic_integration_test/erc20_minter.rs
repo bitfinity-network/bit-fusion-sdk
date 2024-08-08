@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use alloy_sol_types::{SolCall, SolConstructor};
-use bridge_client::BridgeCanisterClient;
+use bridge_canister::bridge::Operation;
+use bridge_client::{BridgeCanisterClient, Erc20BridgeClient};
 use bridge_did::id256::Id256;
-use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
-use erc20_minter::operation::OperationStatus;
+use erc20_minter::ops::Erc20OpStage;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
@@ -71,9 +71,10 @@ impl ContextWithBridges {
         ctx.advance_time(Duration::from_secs(2)).await;
 
         // get evm minter canister address
-        let erc20_minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
+        let erc20_minter_client =
+            Erc20BridgeClient::new(ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN));
         let erc20_minter_address = erc20_minter_client
-            .update::<_, Option<H160>>("get_evm_address", ())
+            .get_bridge_canister_evm_address()
             .await
             .unwrap()
             .unwrap();
@@ -101,6 +102,11 @@ impl ContextWithBridges {
             erc20_minter_address.clone(),
         )
         .await;
+        erc20_minter_client
+            .set_base_bft_bridge_contract(&base_bft_bridge)
+            .await
+            .unwrap();
+
         let wrapped_bft_bridge = create_bft_bridge(
             &ctx,
             &bob_wallet,
@@ -109,6 +115,10 @@ impl ContextWithBridges {
             erc20_minter_address.clone(),
         )
         .await;
+        erc20_minter_client
+            .set_bft_bridge_contract(&wrapped_bft_bridge)
+            .await
+            .unwrap();
 
         // Deploy FeeCharge contracts.
         let fee_charge_address = ctx
@@ -233,8 +243,7 @@ async fn test_external_bridging() {
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
-    let burn_operation_id = ctx
-        .context
+    ctx.context
         .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
@@ -245,8 +254,7 @@ async fn test_external_bridging() {
             amount,
         )
         .await
-        .unwrap()
-        .0;
+        .unwrap();
 
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
@@ -266,20 +274,17 @@ async fn test_external_bridging() {
     ctx.context
         .advance_by_times(Duration::from_secs(2), 4)
         .await;
-    // Check mint order removed
-    let erc20_minter_client = ctx
-        .context
-        .client(ctx.context.canisters().ck_erc20_minter(), ADMIN);
-    let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
-    let signed_order = erc20_minter_client
-        .update::<_, Option<SignedMintOrder>>(
-            "get_mint_order",
-            (&ctx.bob_address, base_token_id, burn_operation_id),
-        )
-        .await
-        .unwrap();
 
-    assert!(signed_order.is_none());
+    // Check mint operation complete
+    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
+    let operation = erc20_minter_client
+        .get_operations_list(&alice_address, None)
+        .await
+        .unwrap()
+        .last()
+        .cloned()
+        .unwrap();
+    assert!(operation.1.is_complete());
 }
 
 #[tokio::test]
@@ -360,8 +365,7 @@ async fn native_token_deposit_increase_and_decrease() {
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
     // Perform an operation to pay a fee for it.
-    let (burn_operation_id, _) = ctx
-        .context
+    ctx.context
         .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
@@ -382,17 +386,19 @@ async fn native_token_deposit_increase_and_decrease() {
         .await;
 
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
-    let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
 
-    let operations = erc20_minter_client
-        .get_operations_list(&ctx.bob_address)
+    let mint_op = erc20_minter_client
+        .get_operations_list(&alice_address, None)
         .await
+        .unwrap()
+        .last()
+        .cloned()
         .unwrap();
 
-    if let OperationStatus::MintOrderSent { tx_id, .. } = &operations[0].1.status {
+    if let Erc20OpStage::ConfirmMint { tx_hash, .. } = mint_op.1.stage {
         let receipt = ctx
             .context
-            .wait_transaction_receipt(tx_id)
+            .wait_transaction_receipt(tx_hash.as_ref().unwrap())
             .await
             .unwrap()
             .unwrap();
@@ -403,11 +409,14 @@ async fn native_token_deposit_increase_and_decrease() {
         eprintln!("TX status: {:?}", receipt.status);
     }
 
-    let signed_order = erc20_minter_client
-        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
+    let operation = erc20_minter_client
+        .get_operations_list(&alice_address, None)
         .await
+        .unwrap()
+        .last()
+        .cloned()
         .unwrap();
-    assert!(signed_order.is_none());
+    assert!(operation.1.is_complete());
 
     // Check fee charged
     let native_balance_after_mint = ctx
@@ -446,8 +455,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
-    let burn_operation_id = ctx
-        .context
+    ctx.context
         .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
@@ -458,8 +466,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             amount,
         )
         .await
-        .unwrap()
-        .0;
+        .unwrap();
 
     // Advance time to perform two tasks in erc20-minter:
     // 1. Minted event collection
@@ -489,34 +496,33 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // Check mint order is not removed
     let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
-    let base_token_id = Id256::from_evm_address(&ctx.base_token_address, CHAIN_ID as _);
-    let signed_order = erc20_minter_client
-        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
+    let operation = erc20_minter_client
+        .get_operations_list(&alice_address, None)
         .await
+        .unwrap()
+        .last()
+        .cloned()
         .unwrap();
-
-    assert!(signed_order.is_some());
+    let signed_order = operation.1.stage.get_signed_mint_order().unwrap();
 
     ctx.context
-        .mint_erc_20_with_order(
-            &ctx.bob_wallet,
-            &ctx.wrapped_bft_bridge,
-            signed_order.unwrap(),
-        )
+        .mint_erc_20_with_order(&ctx.bob_wallet, &ctx.wrapped_bft_bridge, *signed_order)
         .await
         .unwrap();
 
-    // Wait for mint tx finishing and mint order removing
     ctx.context
         .advance_by_times(Duration::from_secs(2), 10)
         .await;
 
-    // check mint order removed after successful mint
-    let signed_order = erc20_minter_client
-        .get_mint_order(&ctx.bob_address, &base_token_id, burn_operation_id)
+    // check the operation is complete after the successful mint
+    let operation = erc20_minter_client
+        .get_operations_list(&alice_address, None)
         .await
+        .unwrap()
+        .last()
+        .cloned()
         .unwrap();
-    assert!(signed_order.is_none());
+    assert!(operation.1.is_complete());
 
     // Check bridge canister balance not changed after user's transaction.
     let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client
@@ -579,8 +585,6 @@ async fn create_bft_bridge(
     fee_charge: H160,
     minter_address: H160,
 ) -> H160 {
-    let minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
-
     let is_wrapped = match side {
         BridgeSide::Base => false,
         BridgeSide::Wrapped => true,
@@ -617,15 +621,7 @@ async fn create_bft_bridge(
     .abi_encode();
     proxy_input.extend_from_slice(&constructor);
 
-    let proxy_address = ctx
-        .create_contract_on_evm(&evm_client, wallet, proxy_input)
+    ctx.create_contract_on_evm(&evm_client, wallet, proxy_input)
         .await
-        .unwrap();
-
-    minter_client
-        .update::<_, ()>("set_bft_bridge_contract", (proxy_address.clone(), side))
-        .await
-        .unwrap();
-
-    proxy_address
+        .unwrap()
 }

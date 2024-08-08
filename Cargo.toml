@@ -76,7 +76,7 @@ vergen = { version = "8.3", default-features = false, features = [
     "gitcl",
     "rustc",
 ] }
-
+drop_guard = "0.3"
 
 # state machine tests deps
 ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }

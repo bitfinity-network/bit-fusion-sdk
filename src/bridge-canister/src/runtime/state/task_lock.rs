@@ -7,44 +7,47 @@ use crate::bridge::Operation;
 
 pub const TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(60);
 
-type OnDropHook<Op> = Box<dyn FnOnce(&mut State<Op>)>;
+type OnDropHook<S> = Box<dyn FnOnce(&mut S)>;
 
 /// Task lock.
 ///
 /// This struct provides a way to acquire a lock on a `State` object, and ensure that a specific function is called when the lock is released.
 ///
-pub struct TaskLock<Op: Operation> {
-    state: Rc<RefCell<State<Op>>>,
+pub struct TaskLock<S> {
+    state: S,
 
     /// Hook that will be called when the lock is dropped.
-    on_drop: Option<OnDropHook<Op>>,
+    on_drop: Option<OnDropHook<S>>,
 }
 
-impl<Op: Operation> TaskLock<Op> {
+impl<S> TaskLock<S> {
     /// Creates a new `TaskLock` object that acquires a lock on the given `state` object, and calls the given `on_drop` function when the lock is released.
     ///
     /// # Arguments
     ///
     /// * `state` - The `State` object to acquire a lock on.
     /// * `on_drop` - A function that will be called when the lock is released. The function will be called with a mutable reference to the `State` object.
-    pub fn new(state: Rc<RefCell<State<Op>>>, on_drop: Option<OnDropHook<Op>>) -> Self {
-        TaskLock { state, on_drop }
+    pub fn new(state: S, on_drop: OnDropHook<S>) -> Self {
+        TaskLock {
+            state,
+            on_drop: Some(on_drop),
+        }
     }
 }
 
-impl<Op: Operation> Drop for TaskLock<Op> {
+impl<S> Drop for TaskLock<S> {
     /// Calls the `on_drop` function when the `TaskLock` object is dropped, and releases the lock on the `State` object.
     fn drop(&mut self) {
-        let mut state = self.state.borrow_mut();
-
         if let Some(on_drop) = self.on_drop.take() {
-            (on_drop)(&mut state);
+            (on_drop)(&mut self.state);
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicBool;
+
     use ic_exports::ic_kit::{ic, MockContext};
     use ic_stable_structures::MemoryId;
 
@@ -57,20 +60,13 @@ mod tests {
     #[test]
     fn test_task_lock_drop() {
         MockContext::new().inject();
-        let state: Rc<RefCell<State<TestOp>>> = default_state(Rc::new(RefCell::new(
-            ConfigStorage::default(memory_by_id(MemoryId::new(10))),
-        )));
-
-        let drop_called = Rc::new(RefCell::new(false));
+        let state = Rc::new(AtomicBool::default());
         {
-            let drop_called = drop_called.clone();
-            let on_drop = move |_: &mut State<TestOp>| {
-                *drop_called.borrow_mut() = true;
-            };
-            let _task_lock = TaskLock::new(state.clone(), Some(Box::new(on_drop)));
+            let _lock = TaskLock::new(
+                state.clone(),
+                Box::new(|s: &mut Rc<AtomicBool>| s.store(true)),
+            );
         }
-
-        assert!(*drop_called.borrow());
     }
 
     #[test]

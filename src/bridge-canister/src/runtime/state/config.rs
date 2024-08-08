@@ -1,13 +1,19 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
+use bridge_utils::query::{
+    self, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+};
 use candid::{CandidType, Principal};
-use did::{codec, H160};
+use did::{codec, H160, U256};
 use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
 use ic_stable_structures::{CellStructure, StableCell, Storable};
+use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::memory::StableMemory;
@@ -48,6 +54,91 @@ impl ConfigStorage {
         self.update(|stored| *stored = new_config);
     }
 
+    /// Query EVM params using the EvmLink in the config data.
+    pub async fn init_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
+        log::trace!("initializing evm params");
+
+        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::GasPrice,
+                QueryType::ChainID,
+                QueryType::LatestBlock,
+            ],
+        )
+        .await
+        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
+
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
+        let chain_id: U256 = responses
+            .get_value_by_id(Id::Str(CHAINID_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query chain id: {e}")))?;
+        let latest_block: U256 = responses
+            .get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query latest block: {e}")))?;
+
+        let params = EvmParams {
+            nonce: 0,
+            gas_price,
+            chain_id: chain_id.0.as_u32(),
+            next_block: latest_block.0.as_u64(),
+        };
+
+        config
+            .borrow_mut()
+            .update_evm_params(|p| *p = params.clone());
+
+        log::trace!("evm params initialized: {params:?}");
+
+        Ok(())
+    }
+
+    /// Updates evm params in the given config, using the EvmLink from there.
+    pub async fn refresh_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
+        log::trace!("updating evm params");
+
+        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        if config.borrow().get_evm_params().is_err() {
+            ConfigStorage::init_evm_params(config.clone()).await?;
+        };
+
+        let address = {
+            let signer = config.borrow().get_signer()?;
+            signer.get_address().await?
+        };
+
+        let responses = query::batch_query(
+            &client,
+            &[
+                QueryType::Nonce {
+                    address: address.into(),
+                },
+                QueryType::GasPrice,
+            ],
+        )
+        .await
+        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
+
+        let nonce: U256 = responses
+            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query nonce: {e}")))?;
+        let gas_price: U256 = responses
+            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
+
+        config.borrow_mut().update_evm_params(|p| {
+            p.nonce = nonce.0.as_u64();
+            p.gas_price = gas_price;
+        });
+
+        log::trace!("evm params updated: {:?}", config.borrow().get_evm_params());
+
+        Ok(())
+    }
+
     /// Sets owner principal.
     pub fn set_owner(&mut self, new_owner: Principal) {
         self.update(|config| config.owner = new_owner);
@@ -56,6 +147,15 @@ impl ConfigStorage {
     /// Returns owner principal.
     pub fn get_owner(&self) -> Principal {
         self.0.get().owner
+    }
+
+    /// Checks if the caller is owner.
+    pub fn check_owner(&self, caller: Principal) -> BftResult<()> {
+        if caller != self.get_owner() {
+            return Err(Error::AccessDenied);
+        }
+
+        Ok(())
     }
 
     /// Returns parameters of EVM canister with which the minter canister works.
@@ -115,7 +215,8 @@ impl ConfigStorage {
         self.0.get().signing_strategy.clone()
     }
 
-    fn update(&mut self, f: impl FnOnce(&mut Config)) {
+    /// Updates config data.
+    pub fn update(&mut self, f: impl FnOnce(&mut Config)) {
         let mut config = self.0.get().clone();
         f(&mut config);
         self.0.set(config).expect("failed to update config");

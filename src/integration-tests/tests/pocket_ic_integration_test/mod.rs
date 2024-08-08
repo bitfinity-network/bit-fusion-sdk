@@ -1,4 +1,4 @@
-// pub mod erc20_minter; // todo fix on ERC-20 re-implementation
+pub mod erc20_minter;
 pub mod icrc2_minter;
 mod token;
 

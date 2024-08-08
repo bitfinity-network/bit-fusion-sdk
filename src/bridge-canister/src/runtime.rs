@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -14,7 +15,7 @@ use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
 
-use self::scheduler::{BridgeScheduler, ServiceTask};
+use self::scheduler::{BridgeScheduler, BridgeTask, ServiceTask};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
@@ -48,6 +49,14 @@ impl<Op: Operation> BridgeRuntime<Op> {
     pub fn update_state(&mut self, f: impl FnOnce(&mut State<Op>)) {
         let mut state = self.state.borrow_mut();
         f(&mut state);
+    }
+
+    /// Provides access to tasks sheduler.
+    pub fn schedule_operation(&mut self, id: OperationId, operation: Op) {
+        let options = operation.scheduling_options().unwrap_or_default();
+        let scheduled_task =
+            ScheduledTask::with_options(BridgeTask::Operation(id, operation), options);
+        self.scheduler.append_task(scheduled_task);
     }
 
     /// Run the scheduled tasks.

@@ -1,8 +1,9 @@
 pub mod canister;
+#[cfg(feature = "export-api")]
+pub mod inspect;
 pub mod memory;
-pub mod operation;
+pub mod ops;
 pub mod state;
-pub mod tasks;
 
 use ic_metrics::Metrics;
 

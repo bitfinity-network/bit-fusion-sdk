@@ -1,6 +1,7 @@
 use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;
+use bridge_did::error::{BftResult, Error};
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
@@ -17,6 +18,38 @@ pub enum BridgeEvent {
 }
 
 impl BridgeEvent {
+    pub async fn collect(
+        evm_client: &EthJsonRpcClient<impl Client>,
+        from_block: u64,
+        to_block: u64,
+        bridge_contract: H160,
+    ) -> BftResult<Vec<Self>> {
+        let logs_result =
+            Self::collect_logs(evm_client, from_block, to_block, bridge_contract).await;
+
+        let logs = match logs_result {
+            Ok(l) => l,
+            Err(e) => {
+                log::warn!("failed to collect evm logs: {e}");
+                return Err(Error::EvmRequestFailed(e.to_string()));
+            }
+        };
+
+        log::debug!("Got evm logs between blocks {from_block} and {to_block}: {logs:?}",);
+
+        let events = logs
+            .into_iter()
+            .filter_map(|log| match BridgeEvent::from_log(log) {
+                Ok(l) => Some(l),
+                Err(e) => {
+                    log::warn!("failed to decode log into event: {e}");
+                    None
+                }
+            })
+            .collect();
+        Ok(events)
+    }
+
     pub async fn collect_logs(
         evm_client: &EthJsonRpcClient<impl Client>,
         mut from_block: u64,

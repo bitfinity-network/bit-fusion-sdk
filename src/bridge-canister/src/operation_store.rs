@@ -139,6 +139,13 @@ where
     /// and stores it.
     pub fn new_operation(&mut self, payload: P) -> OperationId {
         let id = self.next_operation_id();
+        self.new_operation_with_id(id, payload);
+        id
+    }
+
+    /// Initializes a new operation with the given payload for the given ETH wallet address
+    /// and stores it.
+    pub fn new_operation_with_id(&mut self, id: OperationId, payload: P) {
         let dst_address = payload.evm_wallet_address();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
@@ -159,8 +166,6 @@ where
             .unwrap_or_default();
         ids.0.push(id);
         self.address_operation_map.insert(dst_address, ids);
-
-        id
     }
 
     /// Retrieves an operation by its ID.
@@ -173,6 +178,18 @@ where
             .get(&operation_id)
             .or_else(|| self.operations_log.get(&operation_id))
             .map(|entry| (operation_id, entry.payload))
+    }
+
+    /// Returns operation for the given address with the given nonce, if present.
+    pub fn get_for_address_nonce(
+        &self,
+        dst_address: &H160,
+        nonce: u32,
+    ) -> Option<(OperationId, P)> {
+        self.get_for_address(dst_address, None)
+            .iter()
+            .find(|(op_id, _)| op_id.nonce() == nonce)
+            .cloned()
     }
 
     /// Retrieves all operations for the given ETH wallet address,

@@ -1,6 +1,5 @@
-use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::SignedMintOrder;
+use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use icrc2_minter::ops::IcrcBridgeOp;
@@ -16,29 +15,14 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
         Self { client }
     }
 
+    /// Returns list of operatinst for the given parameters.
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,
-        offset: Option<u64>,
-        count: Option<u64>,
+        pagination: Option<Pagination>,
     ) -> CanisterClientResult<Vec<(OperationId, IcrcBridgeOp)>> {
         self.client
-            .query("get_operations_list", (wallet_address, offset, count))
-            .await
-    }
-
-    pub async fn list_mint_orders(
-        &self,
-        wallet_address: &H160,
-        src_token: &Id256,
-        offset: Option<u64>,
-        count: Option<u64>,
-    ) -> CanisterClientResult<Vec<(u32, SignedMintOrder)>> {
-        self.client
-            .query(
-                "list_mint_orders",
-                (wallet_address, src_token, offset, count),
-            )
+            .query("get_operations_list", (wallet_address, pagination))
             .await
     }
 }

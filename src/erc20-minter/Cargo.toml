@@ -33,6 +33,10 @@ ethers-core = { workspace = true }
 bridge-utils = { path = "../bridge-utils" }
 ic-log = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
+drop_guard = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+
+[build-dependencies]
+vergen = { workspace = true }
