@@ -18,7 +18,9 @@ use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER, USED_UTXOS_REGISTRY_MEMORY
 
 /// Data structure to keep track of utxos owned by the canister.
 pub struct UtxoLedger {
+    /// contains a list of utxos on the main canister account (which get there as a change from withdrawal transactions)
     utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
+    /// contains a list of utxos that are on user's deposit address.
     used_utxos_registry: StableBTreeMap<UtxoKey, UsedUtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
 }
 
@@ -229,7 +231,7 @@ mod tests {
     use ic_exports::ic_kit::MockContext;
 
     use super::*;
-    use crate::canister::get_state;
+    use crate::canister::get_rune_state;
     use crate::key::get_derivation_path_ic;
 
     #[test]
@@ -319,7 +321,7 @@ mod tests {
             height: 0,
         };
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -348,7 +350,7 @@ mod tests {
             height: 0,
         };
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -393,7 +395,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -444,7 +446,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()
@@ -498,7 +500,7 @@ mod tests {
             },
         ];
 
-        let state = get_state();
+        let state = get_rune_state();
         state
             .borrow_mut()
             .ledger_mut()

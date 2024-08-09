@@ -1,46 +1,40 @@
 use std::fmt;
 
+use bridge_canister::memory::{memory_by_id, LOG_SETTINGS_MEMORY_ID, MEMORY_MANAGER};
 use bridge_utils::evm_link::EvmLink;
 use candid::{CandidType, Principal};
 pub use config::Config;
 use eth_signer::sign_strategy::{
     ManagementCanisterSigner, SigningKeyId, SigningStrategy, TxSigner,
 };
-use ic_log::LogSettings;
+use ic_log::canister::LogState;
+use ic_log::did::LogCanisterSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
+use ic_storage::IcStorage;
 use serde::Deserialize;
 
-use self::log::LoggerConfigService;
-use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
+use crate::memory::SIGNER_MEMORY_ID;
 
 mod config;
-mod log;
 
 type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 pub struct State {
     pub config: Config,
     pub signer: SignerStorage,
-    pub logger: LoggerConfigService,
 }
 
 impl Default for State {
     fn default() -> Self {
         let default_signer =
             TxSigner::ManagementCanister(ManagementCanisterSigner::new(SigningKeyId::Test, vec![]));
-        let signer = SignerStorage::new(
-            MEMORY_MANAGER.with(|mm| mm.get(SIGNER_MEMORY_ID)),
-            default_signer,
-        )
-        .expect("failed to initialize transaction signer");
-
-        let logger = LoggerConfigService::default();
+        let signer = SignerStorage::new(memory_by_id(SIGNER_MEMORY_ID), default_signer)
+            .expect("failed to initialize transaction signer");
 
         Self {
             config: Default::default(),
             signer,
-            logger,
         }
     }
 }
@@ -63,7 +57,12 @@ impl State {
             .expect("failed to make signer according to settings");
 
         if let Some(log_settings) = &settings.log_settings {
-            self.logger.init(log_settings.clone());
+            MEMORY_MANAGER.with(|mm| {
+                LogState::get()
+                    .borrow_mut()
+                    .init(admin, mm.get(LOG_SETTINGS_MEMORY_ID), log_settings.clone())
+                    .expect("Failed to configure logger.");
+            });
         }
 
         self.config.init(admin, settings);
@@ -80,5 +79,5 @@ pub struct Settings {
 
     /// Log settings
     #[serde(default)]
-    pub log_settings: Option<LogSettings>,
+    pub log_settings: Option<LogCanisterSettings>,
 }

@@ -1,4 +1,3 @@
-use bridge_did::error::{Error, Result};
 use evm_canister_client::IcCanisterClient;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
@@ -8,7 +7,7 @@ use icrc_client::transfer_from::{TransferFromArgs, TransferFromError};
 use icrc_client::IcrcCanisterClient;
 use serde::Deserialize;
 
-use super::icrc1::{self, get_token_configuration};
+use super::icrc1::{self, get_token_configuration, IcrcCanisterError};
 
 #[derive(Debug, Deserialize, CandidType, Clone)]
 pub struct Success {
@@ -36,15 +35,14 @@ pub async fn mint(
     recipient: Principal,
     amount: Nat,
     repeat_on_bad_fee: bool,
-) -> Result<Success> {
+) -> Result<Success, IcrcCanisterError> {
     let fee = get_token_configuration(token).await?.fee;
 
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     if amount < fee {
-        return Err(Error::InvalidBurnOperation(format!(
-            "{} tokens is not enough to pay transfer fee {}",
-            amount, fee
+        return Err(IcrcCanisterError::Generic(format!(
+            "amount should be greater than fee. Expected fee is {fee}"
         )));
     }
 
@@ -52,8 +50,8 @@ pub async fn mint(
     let effective_amount = amount.clone() - fee.clone();
 
     if effective_amount == 0_u64 {
-        return Err(Error::InvalidBurnOperation(
-            "the effective amount to be transferred is 0".to_string(),
+        return Err(IcrcCanisterError::Generic(
+            "effective amount is zero".into(),
         ));
     }
 
@@ -76,7 +74,7 @@ pub async fn mint(
     }
 
     Ok(Success {
-        tx_id: transfer_result.map_err(Error::Icrc2TransferError)?,
+        tx_id: transfer_result?,
         amount: effective_amount,
     })
 }
@@ -89,13 +87,13 @@ pub async fn burn(
     spender_subaccount: Option<Subaccount>,
     amount: Nat,
     repeat_on_bad_fee: bool,
-) -> Result<Success> {
+) -> Result<Success, IcrcCanisterError> {
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
     let minter_canister_account = Account::from(ic::id());
 
     if amount == 0_u64 {
-        return Err(Error::InvalidBurnOperation(
+        return Err(IcrcCanisterError::Generic(
             "the amount to be transferred is 0".to_string(),
         ));
     }
@@ -120,7 +118,7 @@ pub async fn burn(
     }
 
     Ok(Success {
-        tx_id: transfer_result.map_err(Error::Icrc2TransferFromError)?,
+        tx_id: transfer_result?,
         amount,
     })
 }

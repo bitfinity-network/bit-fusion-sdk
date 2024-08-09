@@ -1,10 +1,12 @@
-use bridge_did::error::Result as McResult;
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
+use ic_log::did::{LogCanisterError, LogCanisterSettings, LoggerPermission, Pagination};
+use ic_log::writer::Logs;
 
 #[async_trait::async_trait]
 pub trait BridgeCanisterClient<C: CanisterClient> {
@@ -18,7 +20,10 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     /// - debug,crate1::mod1=error,crate1::mod2,crate2=debug
     ///
     /// This method is only for canister owner.
-    async fn set_logger_filter(&self, filter: String) -> CanisterClientResult<McResult<()>> {
+    async fn set_logger_filter(
+        &self,
+        filter: String,
+    ) -> CanisterClientResult<Result<(), LogCanisterError>> {
         self.client().update("set_logger_filter", (filter,)).await
     }
 
@@ -28,8 +33,37 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     /// - `count` is the number of logs to return
     ///
     /// This method is only for canister owner.
-    async fn ic_logs(&self, count: usize) -> CanisterClientResult<McResult<Vec<String>>> {
-        self.client().update("ic_logs", (count,)).await
+    async fn ic_logs(&self, pagination: Pagination) -> CanisterClientResult<Logs> {
+        self.client().query("ic_logs", (pagination,)).await
+    }
+
+    async fn set_logger_in_memory_records(&self, max_log_count: usize) -> CanisterClientResult<()> {
+        self.client()
+            .update("set_logger_in_memory_records", (max_log_count,))
+            .await
+    }
+
+    async fn get_logger_settings(&self) -> CanisterClientResult<LogCanisterSettings> {
+        self.client().query("get_logger_settings", ()).await
+    }
+
+    async fn add_logger_permission(
+        &self,
+        to: Principal,
+        permission: LoggerPermission,
+    ) -> CanisterClientResult<()> {
+        self.client()
+            .update("add_logger_permission", (to, permission))
+            .await
+    }
+    async fn remove_logger_permission(
+        &self,
+        from: Principal,
+        permission: LoggerPermission,
+    ) -> CanisterClientResult<()> {
+        self.client()
+            .update("remove_logger_permission", (from, permission))
+            .await
     }
 
     /// Returns principal of canister owner.
@@ -51,8 +85,20 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     }
 
     /// Returns the address of the BFT bridge contract in EVM canister.
-    async fn get_bft_bridge_contract(&self) -> CanisterClientResult<McResult<Option<H160>>> {
+    async fn get_bft_bridge_contract(&self) -> CanisterClientResult<BftResult<Option<H160>>> {
         self.client().update("get_bft_bridge_contract", ()).await
+    }
+
+    async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BftResult<H160>> {
+        self.client()
+            .update("get_bridge_canister_evm_address", ())
+            .await
+    }
+
+    async fn set_bft_bridge_contract(&self, address: H160) -> CanisterClientResult<()> {
+        self.client()
+            .update("set_bft_bridge_contract", (address,))
+            .await
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
@@ -84,7 +130,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     }
 
     /// Adds the given principal to the whitelist.
-    async fn add_to_whitelist(&self, principal: Principal) -> CanisterClientResult<McResult<()>> {
+    async fn add_to_whitelist(&self, principal: Principal) -> CanisterClientResult<BftResult<()>> {
         self.client().update("add_to_whitelist", (principal,)).await
     }
 
@@ -92,7 +138,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     async fn remove_from_whitelist(
         &self,
         principal: Principal,
-    ) -> CanisterClientResult<McResult<()>> {
+    ) -> CanisterClientResult<BftResult<()>> {
         self.client()
             .update("remove_from_whitelist", (principal,))
             .await

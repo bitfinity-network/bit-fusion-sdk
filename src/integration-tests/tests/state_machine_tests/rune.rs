@@ -6,6 +6,7 @@ use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_kit::mock_principals::bob;
 use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
 use rune_bridge::interface::GetAddressError;
@@ -40,7 +41,7 @@ impl RunesSetup {
         let bridge = (&context).create_canister().await.unwrap();
         let init_args = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
-            evm_link: Default::default(),
+            evm_principal: bob(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Custom(KEY_ID.to_string()),
             },

@@ -4,10 +4,10 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use bridge_did::id256::Id256;
+use bridge_did::op_id::OperationId;
 use bridge_did::order::MintOrder;
 use bridge_utils::bft_events::{self, BridgeEvent, MintedEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
-use bridge_utils::operation_store::MinterOperationId;
 use bridge_utils::query::{self, Query, QueryType, GAS_PRICE_ID, NONCE_ID};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -29,14 +29,17 @@ use crate::state::State;
 pub enum BridgeTask {
     InitEvmState(BridgeSide),
     CollectEvmEvents(BridgeSide),
-    PrepareMintOrder(MinterOperationId),
+    PrepareMintOrder(OperationId),
     RemoveMintOrder(MintedEventData, BridgeSide),
-    SendMintTransaction(MinterOperationId),
+    SendMintTransaction(OperationId),
 }
 
 impl Task for BridgeTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         log::trace!("Running ERC-20 task: {:?}", self);
@@ -152,7 +155,7 @@ impl BridgeTask {
     async fn prepare_mint_order(
         state: Rc<RefCell<State>>,
         scheduler: Box<dyn 'static + TaskScheduler<Self>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let Some(operation) = operation_store.get(operation_id) else {
@@ -267,10 +270,8 @@ impl BridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let operation_id = get_operations_store().new_operation(
-                    burnt.sender.clone(),
-                    OperationPayload::new(sender_side.other(), burnt),
-                );
+                let operation_id = get_operations_store()
+                    .new_operation(OperationPayload::new(sender_side.other(), burnt));
                 let mint_order_task = BridgeTask::PrepareMintOrder(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
@@ -361,7 +362,7 @@ impl BridgeTask {
 
     async fn send_mint_transaction(
         state: Rc<RefCell<State>>,
-        operation_id: MinterOperationId,
+        operation_id: OperationId,
     ) -> Result<(), SchedulerError> {
         let mut operation_store = get_operations_store();
         let Some(operation) = operation_store.get(operation_id) else {

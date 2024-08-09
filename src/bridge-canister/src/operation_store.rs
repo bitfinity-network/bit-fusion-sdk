@@ -1,71 +1,22 @@
 //! Abstract stable storage for user-initiated operations in bridge canisters. It can be used
 //! to track an operation status and retrieve all operations for a given user ETH wallet.
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
 
+use std::borrow::Cow;
+
+use bridge_did::op_id::OperationId;
+use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
-use ic_stable_structures::stable_structures::{DefaultMemoryImpl, Memory};
+use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
-    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, IcMemoryManager, MemoryId,
-    StableBTreeMap, StableCell, Storable, VirtualMemory,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, StableBTreeMap, StableCell,
+    Storable,
 };
-use serde::Serialize;
 
-use crate::common::Pagination;
+use crate::bridge::Operation;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
-
-pub const OPERATION_ID_MEMORY_ID: MemoryId = MemoryId::new(253);
-thread_local! {
-    static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
-    static OPERATION_ID_COUNTER: RefCell<StableCell<u64, VirtualMemory<DefaultMemoryImpl>>> =
-        RefCell::new(StableCell::new(MEMORY_MANAGER.with(|mm| mm.get(OPERATION_ID_MEMORY_ID)), 0)
-            .expect("failed to initialize operation id cell"));
-}
-
-/// Unique ID of an operation.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, CandidType, Deserialize, Serialize, Hash,
-)]
-pub struct MinterOperationId(u64);
-
-impl MinterOperationId {
-    fn next() -> Self {
-        let id = OPERATION_ID_COUNTER.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let id = *cell.get();
-            cell.set(id + 1).expect("failed to update nonce counter");
-            id
-        });
-        Self(id)
-    }
-
-    /// Returns a unique `nonce` value for given operation ID.
-    pub fn nonce(&self) -> u32 {
-        (self.0 % u32::MAX as u64) as u32
-    }
-}
-
-impl Storable for MinterOperationId {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        self.0.to_bytes()
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Self(u64::from_bytes(bytes))
-    }
-
-    const BOUND: Bound = <u64 as Storable>::BOUND;
-}
-
-impl Display for MinterOperationId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 struct OperationStoreEntry<P>
@@ -92,7 +43,7 @@ where
 }
 
 #[derive(Default, Debug, Clone, CandidType, Deserialize)]
-struct OperationIdList(Vec<MinterOperationId>);
+struct OperationIdList(Vec<OperationId>);
 
 impl Storable for OperationIdList {
     fn to_bytes(&self) -> Cow<[u8]> {
@@ -106,14 +57,14 @@ impl Storable for OperationIdList {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-/// Parameters of the [`MinterOperationStore`].
+/// Parameters of the [`OperationStore`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct MinterOperationStoreOptions {
+pub struct OperationStoreOptions {
     max_operations_count: u64,
     cache_size: u32,
 }
 
-impl Default for MinterOperationStoreOptions {
+impl Default for OperationStoreOptions {
     fn default() -> Self {
         Self {
             max_operations_count: DEFAULT_MAX_REQUEST_COUNT,
@@ -122,8 +73,12 @@ impl Default for MinterOperationStoreOptions {
     }
 }
 
-pub trait MinterOperation {
-    fn is_complete(&self) -> bool;
+/// Memory objects to store operations.
+pub struct OperationsMemory<Mem> {
+    pub id_counter: Mem,
+    pub incomplete_operations: Mem,
+    pub operations_log: Mem,
+    pub operations_map: Mem,
 }
 
 /// A structure to store user-initiated operations in IC stable memory.
@@ -133,45 +88,58 @@ pub trait MinterOperation {
 ///
 /// It stores a limited number of latest operations and their information, dropping old operations.
 /// The maximum number of operations stored can be configured with `options`.
-pub struct MinterOperationStore<M, P>
+pub struct OperationStore<M, P>
 where
     M: Memory,
-    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: Operation,
 {
-    incomplete_operations: CachedStableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
-    operations_log: StableBTreeMap<MinterOperationId, OperationStoreEntry<P>, M>,
+    operation_id_counter: StableCell<u64, M>,
+    incomplete_operations: CachedStableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
+    operations_log: StableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
     max_operation_log_size: u64,
 }
 
-impl<M, P> MinterOperationStore<M, P>
+impl<M, P> OperationStore<M, P>
 where
     M: Memory,
-    P: MinterOperation + CandidType + for<'de> Deserialize<'de> + Clone + Send + Sync + 'static,
+    P: Operation,
 {
     /// Creates a new instance of the store.
     pub fn with_memory(
-        curr_operations_memory: M,
-        operations_log_memory: M,
-        map_memory: M,
-        options: Option<MinterOperationStoreOptions>,
+        memory: OperationsMemory<M>,
+        options: Option<OperationStoreOptions>,
     ) -> Self {
         let options = options.unwrap_or_default();
         Self {
+            operation_id_counter: StableCell::new(memory.id_counter, 0)
+                .expect("failed to initialize operation id counter"),
             incomplete_operations: CachedStableBTreeMap::new(
-                curr_operations_memory,
+                memory.incomplete_operations,
                 options.cache_size,
             ),
-            operations_log: StableBTreeMap::new(operations_log_memory),
-            address_operation_map: StableBTreeMap::new(map_memory),
+            operations_log: StableBTreeMap::new(memory.operations_log),
+            address_operation_map: StableBTreeMap::new(memory.operations_map),
             max_operation_log_size: options.max_operations_count,
         }
     }
 
+    /// Returns next OperationId.
+    fn next_operation_id(&mut self) -> OperationId {
+        let current = *self.operation_id_counter.get();
+
+        self.operation_id_counter
+            .set(current + 1)
+            .expect("failed to update operation id counter");
+
+        OperationId::new(current)
+    }
+
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation(&mut self, dst_address: H160, payload: P) -> MinterOperationId {
-        let id = MinterOperationId::next();
+    pub fn new_operation(&mut self, payload: P) -> OperationId {
+        let id = self.next_operation_id();
+        let dst_address = payload.evm_wallet_address();
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
@@ -196,11 +164,11 @@ where
     }
 
     /// Retrieves an operation by its ID.
-    pub fn get(&self, operation_id: MinterOperationId) -> Option<P> {
+    pub fn get(&self, operation_id: OperationId) -> Option<P> {
         self.get_with_id(operation_id).map(|(_, p)| p)
     }
 
-    fn get_with_id(&self, operation_id: MinterOperationId) -> Option<(MinterOperationId, P)> {
+    fn get_with_id(&self, operation_id: OperationId) -> Option<(OperationId, P)> {
         self.incomplete_operations
             .get(&operation_id)
             .or_else(|| self.operations_log.get(&operation_id))
@@ -215,7 +183,7 @@ where
         &self,
         dst_address: &H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(MinterOperationId, P)> {
+    ) -> Vec<(OperationId, P)> {
         log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
 
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
@@ -234,7 +202,7 @@ where
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
     /// is found, nothing is done (except an error message in the log).
-    pub fn update(&mut self, operation_id: MinterOperationId, payload: P) {
+    pub fn update(&mut self, operation_id: OperationId, payload: P) {
         let Some(mut entry) = self.incomplete_operations.get(&operation_id) else {
             log::error!("Cannot update operation {operation_id} status: not found");
             return;
@@ -249,7 +217,7 @@ where
         }
     }
 
-    fn move_to_log(&mut self, operation_id: MinterOperationId, entry: OperationStoreEntry<P>) {
+    fn move_to_log(&mut self, operation_id: OperationId, entry: OperationStoreEntry<P>) {
         self.incomplete_operations.remove(&operation_id);
         self.operations_log.insert(operation_id, entry);
 
@@ -289,23 +257,79 @@ where
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::error::BftResult;
     use ic_stable_structures::VectorMemory;
+    use serde::Serialize;
 
     use super::*;
+    use crate::runtime::RuntimeState;
+
+    #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType)]
+    struct TestOp {
+        pub addr: u32,
+        pub stage: u32,
+    }
 
     const COMPLETE: u32 = u32::MAX;
-    impl MinterOperation for u32 {
-        fn is_complete(&self) -> bool {
-            *self == COMPLETE
+
+    impl TestOp {
+        pub fn new(addr: u32, stage: u32) -> Self {
+            Self { addr, stage }
+        }
+
+        pub fn complete(addr: u32) -> Self {
+            Self {
+                addr,
+                stage: COMPLETE,
+            }
         }
     }
 
-    fn test_store(max_operations: u64) -> MinterOperationStore<VectorMemory, u32> {
-        MinterOperationStore::with_memory(
-            VectorMemory::default(),
-            VectorMemory::default(),
-            VectorMemory::default(),
-            Some(MinterOperationStoreOptions {
+    impl Operation for TestOp {
+        fn is_complete(&self) -> bool {
+            self.stage == COMPLETE
+        }
+
+        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
+            todo!()
+        }
+
+        fn evm_wallet_address(&self) -> H160 {
+            eth_address(self.addr as _)
+        }
+
+        async fn on_wrapped_token_minted(
+            _ctx: RuntimeState<Self>,
+            _event: bridge_utils::bft_events::MintedEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
+        }
+
+        async fn on_wrapped_token_burnt(
+            _ctx: RuntimeState<Self>,
+            _event: bridge_utils::bft_events::BurntEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
+        }
+
+        async fn on_minter_notification(
+            _ctx: RuntimeState<Self>,
+            _event: bridge_utils::bft_events::NotifyMinterEventData,
+        ) -> Option<crate::bridge::OperationAction<Self>> {
+            None
+        }
+    }
+
+    fn test_store(max_operations: u64) -> OperationStore<VectorMemory, TestOp> {
+        let memory = OperationsMemory {
+            id_counter: VectorMemory::default(),
+            incomplete_operations: VectorMemory::default(),
+            operations_log: VectorMemory::default(),
+            operations_map: VectorMemory::default(),
+        };
+        OperationStore::with_memory(
+            memory,
+            Some(OperationStoreOptions {
                 max_operations_count: max_operations,
                 cache_size: DEFAULT_CACHE_SIZE,
             }),
@@ -317,34 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn nonce_should_increment_with_id() {
-        const CHECKS_NUM: usize = 100;
-        let id1 = MinterOperationId::next();
-        for _ in 0..CHECKS_NUM {
-            let id2 = MinterOperationId::next();
-            assert_ne!(id1, id2);
-            assert_ne!(id1.nonce(), id2.nonce());
-        }
-    }
-
-    #[test]
-    fn nonce_should_not_overflow() {
-        OPERATION_ID_COUNTER.with(|cell| {
-            let mut cell = cell.borrow_mut();
-            let id = u32::MAX as u64 * 3 - 3;
-            cell.set(id).unwrap();
-        });
-
-        const CHECKS_NUM: usize = 100;
-        let id1 = MinterOperationId::next();
-        for _ in 0..CHECKS_NUM {
-            let id2 = MinterOperationId::next();
-            assert_ne!(id1, id2);
-            assert_ne!(id1.nonce(), id2.nonce());
-        }
-    }
-
-    #[test]
     fn operations_log_limit() {
         const LIMIT: u64 = 10;
         const COUNT: u64 = 42;
@@ -352,7 +348,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            store.new_operation(eth_address(i as u8), COMPLETE);
+            store.new_operation(TestOp::complete(i as _));
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -377,7 +373,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(eth_address(0), COMPLETE);
+            store.new_operation(TestOp::complete(0));
         }
 
         assert_eq!(store.operations_log.len(), COUNT);
@@ -406,7 +402,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(eth_address(1), COMPLETE);
+            store.new_operation(TestOp::complete(42));
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -414,7 +410,7 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(1), Some(Pagination::new(0, 10)))
+                .get_for_address(&eth_address(42), Some(Pagination::new(0, 10)))
                 .len(),
             LIMIT as usize
         );
@@ -427,9 +423,9 @@ mod tests {
 
         let mut store = test_store(LIMIT);
 
-        for _ in 0..COUNT {
-            let id = store.new_operation(eth_address(1), 1);
-            store.update(id, 2);
+        for i in 0..COUNT {
+            let id = store.new_operation(TestOp::new(42, i as _));
+            store.update(id, TestOp::new(42, (i + 1) as _));
         }
 
         assert_eq!(store.operations_log.len(), 0);
@@ -438,7 +434,7 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(1), Some(Pagination::new(0, COUNT as usize)))
+                .get_for_address(&eth_address(42), Some(Pagination::new(0, COUNT as usize)))
                 .len(),
             COUNT as usize
         );
@@ -453,12 +449,12 @@ mod tests {
 
         let mut ids = vec![];
         for i in 0..COUNT {
-            ids.push(store.new_operation(eth_address(i as u8), 1));
+            ids.push(store.new_operation(TestOp::new(i as _, 1)));
         }
 
         for id in ids {
             let count_before = store.incomplete_operations.len();
-            store.update(id, COMPLETE);
+            store.update(id, TestOp::complete(id.nonce()));
             let count_after = store.incomplete_operations.len();
             assert_eq!(count_after, count_before - 1);
         }

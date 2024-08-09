@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt;
 
+use bridge_canister::memory::memory_by_id;
 use bridge_utils::evm_bridge::{BridgeSide, EvmInfo, EvmParams};
 use candid::{CandidType, Principal};
 use did::{codec, H160};
@@ -9,7 +10,7 @@ use ic_stable_structures::{CellStructure, StableCell, Storable, VirtualMemory};
 use serde::{Deserialize, Serialize};
 
 use super::Settings;
-use crate::memory::{CONFIG_MEMORY_ID, MEMORY_MANAGER};
+use crate::memory::CONFIG_MEMORY_ID;
 
 /// Configuration storage for the erc20-minter canister.
 pub struct Config {
@@ -27,11 +28,8 @@ impl fmt::Debug for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            data: StableCell::new(
-                MEMORY_MANAGER.with(|mm| mm.get(CONFIG_MEMORY_ID)),
-                ConfigData::default(),
-            )
-            .expect("stable memory config initialization failed"),
+            data: StableCell::new(memory_by_id(CONFIG_MEMORY_ID), ConfigData::default())
+                .expect("stable memory config initialization failed"),
         }
     }
 }

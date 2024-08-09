@@ -12,6 +12,7 @@ export-api = []
 alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did" }
+bridge-canister = { path = "../bridge-canister" }
 candid = { workspace = true }
 did = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [

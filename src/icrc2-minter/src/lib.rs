@@ -6,10 +6,8 @@ pub use crate::canister::MinterCanister;
 
 pub mod canister;
 mod constant;
-mod memory;
-pub mod operation;
+pub mod ops;
 pub mod state;
-mod tasks;
 pub mod tokens;
 
 pub fn idl() -> String {

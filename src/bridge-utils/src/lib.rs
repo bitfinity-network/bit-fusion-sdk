@@ -4,7 +4,6 @@ pub mod common;
 pub mod evm_bridge;
 pub mod evm_link;
 pub mod mint_orders;
-pub mod operation_store;
 pub mod query;
 
 sol! {

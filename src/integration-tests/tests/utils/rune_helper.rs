@@ -3,12 +3,10 @@ use std::time::{Duration, Instant};
 use bitcoin::bip32::DerivationPath;
 use bitcoin::{Address, Amount, FeeRate, PrivateKey, PublicKey, Txid};
 use ord_rs::wallet::{
-    CreateCommitTransactionArgsV2, CreateEdictTxArgs, LocalSigner, Runestone, ScriptType,
-    TxInputInfo,
+    CreateCommitTransactionArgsV2, CreateEdictTxArgs, EtchingTransactionArgs, LocalSigner,
+    Runestone, ScriptType, TxInputInfo,
 };
-use ord_rs::{
-    Nft, OrdTransactionBuilder, RevealTransactionArgs, SignCommitTransactionArgs, Utxo, Wallet,
-};
+use ord_rs::{Nft, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo, Wallet};
 use ordinals::{Etching, RuneId};
 use serde::Deserialize;
 
@@ -137,7 +135,7 @@ impl<'a> RuneHelper<'a> {
 
         // make reveal
         let reveal_transaction = builder
-            .build_reveal_transaction(RevealTransactionArgs {
+            .build_etching_transaction(EtchingTransactionArgs {
                 input: Utxo {
                     id: commit_txid,
                     index: 0,
@@ -145,11 +143,11 @@ impl<'a> RuneHelper<'a> {
                 },
                 recipient_address: self.address.clone(),
                 redeem_script: commit_tx.redeem_script,
-                runestone: Some(Runestone {
+                runestone: Runestone {
                     etching: Some(etching),
                     pointer: Some(1),
                     ..Default::default()
-                }),
+                },
             })
             .await?;
 

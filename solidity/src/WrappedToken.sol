@@ -12,11 +12,11 @@ contract WrappedToken is ERC20 {
     uint8 private _decimals;
 
     // Initializes contract with the given name and symbl
-    constructor(string memory name_, string memory symbol_, address _owner) ERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_, uint8 decimals_, address _owner) ERC20(name_, symbol_) {
         owner = _owner;
         _name = name_;
         _symbol = symbol_;
-        _decimals = super.decimals();
+        _decimals = decimals_;
     }
 
     // Perform IERC20 transfer.

@@ -4,29 +4,22 @@ use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
 use bitcoin::{Network, PrivateKey, PublicKey};
-use bridge_utils::evm_bridge::{EvmInfo, EvmParams};
-use bridge_utils::evm_link::EvmLink;
+use bridge_did::init::BridgeInitData;
 use candid::{CandidType, Deserialize, Principal};
-use did::H160;
-use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
+use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
-use ic_log::{init_log, LogSettings};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{StableCell, VirtualMemory};
+use ic_log::did::LogCanisterSettings;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
 use ordinals::RuneId;
 
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
-use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
-
-type SignerStorage = StableCell<TxSigner, VirtualMemory<DefaultMemoryImpl>>;
 
 const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
 const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
@@ -34,11 +27,9 @@ const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
 /// Minimum number of indexers required to start the bridge.
 const MIN_INDEXERS: u8 = 2;
 
-pub struct State {
+#[derive(Default)]
+pub struct RuneState {
     pub(crate) config: RuneBridgeConfig,
-    pub(crate) bft_config: BftBridgeConfig,
-    pub(crate) signer: SignerStorage,
-    pub(crate) evm_params: Option<EvmParams>,
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
@@ -51,39 +42,13 @@ pub struct MasterKey {
     pub key_id: EcdsaKeyId,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        let default_signer = SigningStrategy::Local {
-            private_key: [1; 32],
-        }
-        .make_signer(0)
-        .expect("Failed to create default signer");
-
-        let signer = SignerStorage::new(
-            MEMORY_MANAGER.with(|mm| mm.get(SIGNER_MEMORY_ID)),
-            default_signer,
-        )
-        .expect("failed to initialize transaction signer");
-
-        Self {
-            config: Default::default(),
-            bft_config: Default::default(),
-            signer,
-            evm_params: None,
-            master_key: None,
-            ledger: Default::default(),
-            runes: Default::default(),
-        }
-    }
-}
-
 #[derive(Debug, CandidType, Deserialize)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
-    pub evm_link: EvmLink,
+    pub evm_principal: Principal,
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
-    pub log_settings: LogSettings,
+    pub log_settings: LogCanisterSettings,
     pub min_confirmations: u32,
     pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
@@ -95,12 +60,12 @@ impl Default for RuneBridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
-            evm_link: EvmLink::default(),
+            evm_principal: Principal::management_canister(),
             signing_strategy: SigningStrategy::Local {
                 private_key: [0; 32],
             },
             admin: Principal::management_canister(),
-            log_settings: LogSettings::default(),
+            log_settings: LogCanisterSettings::default(),
             min_confirmations: 12,
             no_of_indexers: MIN_INDEXERS,
             indexer_urls: HashSet::default(),
@@ -111,7 +76,7 @@ impl Default for RuneBridgeConfig {
 }
 
 impl RuneBridgeConfig {
-    fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), String> {
         if self.indexer_urls.is_empty() {
             return Err("Indexer url is empty".to_string());
         }
@@ -134,15 +99,18 @@ impl RuneBridgeConfig {
 
         Ok(())
     }
+
+    pub fn bridge_init_data(&self) -> BridgeInitData {
+        BridgeInitData {
+            owner: self.admin,
+            evm_principal: self.evm_principal,
+            signing_strategy: self.signing_strategy.clone(),
+            log_settings: Some(self.log_settings.clone()),
+        }
+    }
 }
 
-#[derive(Default, Debug, CandidType, Deserialize)]
-pub struct BftBridgeConfig {
-    pub erc20_chain_id: u32,
-    pub bridge_address: H160,
-}
-
-impl State {
+impl RuneState {
     /// Returns id of the IC ECDSA key used by the canister.
     pub fn ecdsa_key_id(&self) -> EcdsaKeyId {
         let key_name = match &self.config.signing_strategy {
@@ -246,53 +214,12 @@ impl State {
         &mut self.ledger
     }
 
-    /// Eth transaction signer.
-    pub fn signer(&self) -> &SignerStorage {
-        &self.signer
-    }
-
-    /// Current EVM link state.
-    pub fn get_evm_info(&self) -> EvmInfo {
-        EvmInfo {
-            link: self.config.evm_link.clone(),
-            bridge_contract: self.bft_config.bridge_address.clone(),
-            params: self.evm_params.clone(),
-        }
-    }
-
-    /// Chain id of the EVM.
-    pub fn erc20_chain_id(&self) -> u32 {
-        self.bft_config.erc20_chain_id
-    }
-
     /// Chain id to be used for the rune.
     pub fn btc_chain_id(&self) -> u32 {
         match self.config.network {
             BitcoinNetwork::Mainnet => MAINNET_CHAIN_ID,
             BitcoinNetwork::Testnet => TESTNET_CHAIN_ID,
             BitcoinNetwork::Regtest => REGTEST_CHAIN_ID,
-        }
-    }
-
-    /// Returns EVM parameters.
-    pub fn get_evm_params(&self) -> &Option<EvmParams> {
-        &self.evm_params
-    }
-
-    /// Updates EVM parameters with the given closure.
-    pub fn update_evm_params(&mut self, f: impl FnOnce(&mut Option<EvmParams>)) {
-        f(&mut self.evm_params)
-    }
-
-    /// Admin principal of the canister.
-    pub fn admin(&self) -> Principal {
-        self.config.admin
-    }
-
-    /// Panics if the current caller is not admin of the canister.
-    pub fn check_admin(&self, caller: Principal) {
-        if caller != self.admin() {
-            panic!("access denied");
         }
     }
 
@@ -308,17 +235,6 @@ impl State {
             .iter()
             .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
             .collect();
-
-        let signer = config
-            .signing_strategy
-            .clone()
-            .make_signer(0)
-            .expect("Failed to create signer");
-        let stable = SignerStorage::new(MEMORY_MANAGER.with(|mm| mm.get(SIGNER_MEMORY_ID)), signer)
-            .expect("failed to init signer in stable memory");
-        self.signer = stable;
-
-        init_log(&config.log_settings).expect("failed to init logger");
 
         self.config = config;
     }
@@ -357,11 +273,6 @@ impl State {
         self.config.no_of_indexers = no_of_indexers;
     }
 
-    /// Configures the link to BFT bridge contract.
-    pub fn configure_bft(&mut self, bft_config: BftBridgeConfig) {
-        self.bft_config = bft_config;
-    }
-
     pub fn mempool_timeout(&self) -> Duration {
         self.config.mempool_timeout
     }
@@ -369,6 +280,8 @@ impl State {
 
 #[cfg(test)]
 mod tests {
+    use ic_exports::ic_kit::MockContext;
+
     use super::*;
 
     #[test]
@@ -413,6 +326,7 @@ mod tests {
 
     #[test]
     fn test_configure_with_trailing_slash() {
+        MockContext::new().inject();
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
             no_of_indexers: 1,
@@ -421,7 +335,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let mut state = State::default();
+        let mut state = RuneState::default();
         state.configure(config);
 
         assert_eq!(
@@ -432,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_configure_indexers_valid() {
-        let mut state = State::default();
+        let mut state = RuneState::default();
         let urls = vec![
             "http://indexer1.com",
             "http://indexer2.com",
@@ -448,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_configure_indexers_strip_trailing_slash() {
-        let mut state = State::default();
+        let mut state = RuneState::default();
         let urls = vec![
             "http://indexer1.com/",
             "http://indexer2.com",
@@ -471,7 +385,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "number of indexers must be at least")]
     fn test_configure_indexers_too_few_indexers() {
-        let mut state = State::default();
+        let mut state = RuneState::default();
         let indexer_urls: HashSet<String> = HashSet::new();
 
         state.configure_indexers(MIN_INDEXERS - 1, indexer_urls);
@@ -480,7 +394,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "number of indexers must be at least")]
     fn test_configure_indexers_fewer_than_urls() {
-        let mut state = State::default();
+        let mut state = RuneState::default();
         let urls = vec![
             "http://indexer1.com",
             "http://indexer2.com",
@@ -493,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_configure_indexers_more_than_urls() {
-        let mut state = State::default();
+        let mut state = RuneState::default();
         let urls = vec!["http://indexer1.com", "http://indexer2.com"];
         let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
 

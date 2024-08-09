@@ -1,7 +1,7 @@
-use bridge_utils::operation_store::MinterOperationId;
+use bridge_did::op_id::OperationId;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use rune_bridge::operation::OperationState;
+use rune_bridge::ops::RuneBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 
@@ -17,7 +17,7 @@ impl<C: CanisterClient> RuneBridgeClient<C> {
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,
-    ) -> CanisterClientResult<Vec<(MinterOperationId, OperationState)>> {
+    ) -> CanisterClientResult<Vec<(OperationId, RuneBridgeOp)>> {
         self.client
             .update("get_operations_list", (wallet_address,))
             .await

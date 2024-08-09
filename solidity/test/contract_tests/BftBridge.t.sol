@@ -165,14 +165,24 @@ contract BftBridgeTest is Test {
 
     function testGetWrappedToken() public {
         bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", base_token_id);
+        address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", 18, base_token_id);
         assertEq(wrapped_address, _wrappedBridge.getWrappedToken(base_token_id));
     }
 
     function testGetBaseToken() public {
         bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
-        address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", base_token_id);
+        address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", 18, base_token_id);
         assertEq(base_token_id, _wrappedBridge.getBaseToken(wrapped_address));
+    }
+
+    // Creates a wrapped token with custom name, symbol, and decimals
+    function testDeployERC20CustomDecimals() public {
+        bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address wrapped_address = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id);
+        WrappedToken token = WrappedToken(wrapped_address);
+        assertEq(token.name(), "WholaLottaLove");
+        assertEq(token.symbol(), "LEDZEP");
+        assertEq(token.decimals(), 21);
     }
 
     function testListTokenPairs() public {
@@ -184,7 +194,7 @@ contract BftBridgeTest is Test {
 
         address[3] memory wrapped_tokens;
         for (uint256 i = 0; i < 3; i++) {
-            address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", base_token_ids[i]);
+            address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", 18, base_token_ids[i]);
             wrapped_tokens[i] = wrapped_address;
         }
 
@@ -214,7 +224,7 @@ contract BftBridgeTest is Test {
     function testBurnBaseSideWithoutApproveShouldFail() public {
         bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
 
-        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", 18, _owner);
         address erc20Address = address(erc20);
 
         vm.prank(address(_owner));
@@ -246,7 +256,7 @@ contract BftBridgeTest is Test {
     function testBurnWrappedSideWithUnregisteredToken() public {
         bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
 
-        address erc20 = address(new WrappedToken("omar", "OMAR", _owner));
+        address erc20 = address(new WrappedToken("omar", "OMAR", 18, _owner));
 
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.expectRevert(bytes("Invalid from address; not registered in the bridge"));
@@ -256,7 +266,7 @@ contract BftBridgeTest is Test {
     function testBurnBaseSideWithUnregisteredToken() public {
         bytes memory principal = abi.encodePacked(uint8(1), uint8(2), uint8(3));
 
-        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", 18, _owner);
         address erc20Address = address(erc20);
 
         vm.prank(address(_owner));
@@ -270,7 +280,7 @@ contract BftBridgeTest is Test {
     }
 
     function testMintBaseSideWithUnregisteredToken() public {
-        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", 18, _owner);
         address erc20Address = address(erc20);
 
         vm.prank(address(_owner));
@@ -285,7 +295,7 @@ contract BftBridgeTest is Test {
     }
 
     function testMintWrappedSideWithUnregisteredToken() public {
-        WrappedToken erc20 = new WrappedToken("omar", "OMAR", _owner);
+        WrappedToken erc20 = new WrappedToken("omar", "OMAR", 18, _owner);
         address erc20Address = address(erc20);
 
         vm.prank(address(_owner));
@@ -448,7 +458,7 @@ contract BftBridgeTest is Test {
         order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
         order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
         order.recipient = _alice;
-        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", order.fromTokenID);
+        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", 18, order.fromTokenID);
         order.nonce = 0;
         order.senderChainID = 0;
         order.recipientChainID = _CHAIN_ID;
@@ -467,7 +477,7 @@ contract BftBridgeTest is Test {
         order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
         order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
         order.recipient = address(_owner);
-        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", order.fromTokenID);
+        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", 18, order.fromTokenID);
         order.nonce = 0;
         order.senderChainID = 0;
         order.recipientChainID = _CHAIN_ID;

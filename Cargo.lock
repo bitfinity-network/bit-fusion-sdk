@@ -923,9 +923,9 @@ dependencies = [
  "bridge-utils",
  "candid",
  "cfg-if 1.0.0",
- "did 0.27.0",
+ "did",
  "env_logger",
- "eth-signer 0.27.0",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "hex",
@@ -933,7 +933,7 @@ dependencies = [
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
@@ -956,10 +956,10 @@ dependencies = [
  "bridge-did",
  "bridge-utils",
  "candid",
- "did 0.27.0",
+ "did",
  "env_logger",
  "erc20-minter",
- "eth-signer 0.27.0",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "hex",
@@ -967,7 +967,7 @@ dependencies = [
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "icrc2-minter",
@@ -989,13 +989,13 @@ name = "bridge-did"
 version = "0.2.0"
 dependencies = [
  "candid",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethers-core",
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "ordinals",
  "rand",
  "serde",
@@ -1013,8 +1013,8 @@ dependencies = [
  "bridge-utils",
  "candid",
  "clap 4.5.7",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethereum-types",
  "ethers-core",
@@ -1034,9 +1034,9 @@ dependencies = [
  "anyhow",
  "bridge-did",
  "candid",
- "did 0.27.0",
+ "did",
  "env_logger",
- "eth-signer 0.27.0",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "foundry-compilers",
@@ -1045,10 +1045,10 @@ dependencies = [
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
+ "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "num-bigint 0.4.5",
  "num-traits",
  "once_cell",
  "serde",
@@ -1071,8 +1071,8 @@ dependencies = [
  "bridge-did",
  "bridge-utils",
  "candid",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "futures",
@@ -1081,12 +1081,13 @@ dependencies = [
  "ic-ckbtc-minter",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
+ "num-traits",
  "serde",
  "tokio",
 ]
@@ -1843,8 +1844,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -1855,35 +1856,7 @@ dependencies = [
  "ethers-core",
  "hex",
  "ic-log",
- "ic-stable-structures 0.17.0",
- "jsonrpc-core",
- "log",
- "num",
- "once_cell",
- "rlp",
- "serde",
- "serde_json",
- "serde_with 3.8.1",
- "sha2 0.10.8",
- "sha3",
- "thiserror",
-]
-
-[[package]]
-name = "did"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
-dependencies = [
- "alloy-primitives",
- "bincode",
- "bytes",
- "candid",
- "derive_more",
- "ethereum-types",
- "ethers-core",
- "hex",
- "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "jsonrpc-core",
  "log",
  "num",
@@ -2128,9 +2101,9 @@ dependencies = [
 
 [[package]]
 name = "env_filter"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+checksum = "4f2c92ceda6ceec50f43169f9ee8424fe2db276791afde7b2cd8bc084cb376ab"
 dependencies = [
  "log",
  "regex",
@@ -2138,9 +2111,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.3"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+checksum = "e13fa619b91fb2381732789fc5de83b45675e882f66623b7d8cb4f643017018d"
 dependencies = [
  "env_filter",
  "log",
@@ -2167,19 +2140,20 @@ version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
  "anyhow",
+ "bridge-canister",
  "bridge-did",
  "bridge-utils",
  "candid",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "ic-canister",
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
@@ -2212,35 +2186,18 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "async-trait",
  "candid",
- "did 0.26.0",
- "ethereum-types",
- "ethers-core",
- "hex",
- "ic-stable-structures 0.17.0",
- "serde",
- "sha2 0.10.8",
- "thiserror",
-]
-
-[[package]]
-name = "eth-signer"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
-dependencies = [
- "async-trait",
- "candid",
- "did 0.27.0",
+ "did",
  "ethereum-types",
  "ethers-core",
  "hex",
  "ic-canister",
  "ic-exports",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "serde",
  "sha2 0.10.8",
  "thiserror",
@@ -2280,12 +2237,12 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "anyhow",
  "candid",
- "did 0.27.0",
+ "did",
  "ethers-core",
  "hex",
  "ic-canister-client",
@@ -2345,11 +2302,11 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "candid",
- "did 0.27.0",
+ "did",
  "ic-canister-client",
  "ic-cdk",
  "ic-log",
@@ -3290,8 +3247,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -3299,8 +3256,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister-client"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "async-trait",
  "candid",
@@ -3335,8 +3292,8 @@ dependencies = [
 
 [[package]]
 name = "ic-canister-macros"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -3775,8 +3732,8 @@ dependencies = [
 
 [[package]]
 name = "ic-crypto-getrandom-for-wasm"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "getrandom",
 ]
@@ -4592,15 +4549,15 @@ dependencies = [
 
 [[package]]
 name = "ic-exports"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "flate2",
  "ic-cdk",
  "ic-cdk-macros 0.13.2",
  "ic-cdk-timers",
- "ic-crypto-getrandom-for-wasm 0.17.0",
+ "ic-crypto-getrandom-for-wasm 0.19.0",
  "ic-kit",
  "ic-ledger-types",
  "icrc-ledger-types 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4794,8 +4751,8 @@ dependencies = [
 
 [[package]]
 name = "ic-kit"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "futures",
@@ -4862,15 +4819,19 @@ dependencies = [
 
 [[package]]
 name = "ic-log"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "anyhow",
  "arc-swap",
  "candid",
+ "cfg-if 1.0.0",
  "env_filter",
  "humantime",
+ "ic-canister",
  "ic-exports",
+ "ic-stable-structures 0.19.0",
+ "ic-storage",
  "log",
  "ringbuffer",
  "serde",
@@ -4965,8 +4926,8 @@ dependencies = [
 
 [[package]]
 name = "ic-metrics"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-canister",
@@ -5194,8 +5155,8 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-stable-structures 0.6.5",
@@ -5342,8 +5303,8 @@ dependencies = [
 
 [[package]]
 name = "ic-storage"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-exports",
@@ -5354,8 +5315,8 @@ dependencies = [
 
 [[package]]
 name = "ic-storage-derive"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "quote",
  "syn 2.0.68",
@@ -5411,14 +5372,14 @@ dependencies = [
 
 [[package]]
 name = "ic-task-scheduler"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "bincode",
  "candid",
  "ic-cdk-timers",
  "ic-kit",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "log",
  "parking_lot",
  "serde",
@@ -5564,8 +5525,8 @@ dependencies = [
 
 [[package]]
 name = "ic-test-utils"
-version = "0.17.0"
-source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.17.x#58c876a07552204a7abf6ffb283c388304392d5b"
+version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "dirs",
@@ -5847,8 +5808,8 @@ dependencies = [
 
 [[package]]
 name = "icrc-client"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "candid",
  "ic-canister-client",
@@ -5922,8 +5883,8 @@ dependencies = [
  "bridge-did",
  "bridge-utils",
  "candid",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "evm-canister-client",
@@ -5931,8 +5892,8 @@ dependencies = [
  "ic-canister",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "icrc-client",
@@ -6048,9 +6009,9 @@ dependencies = [
  "bridge-utils",
  "btc-bridge",
  "candid",
- "did 0.27.0",
+ "did",
  "erc20-minter",
- "eth-signer 0.27.0",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethereum-types",
  "ethers-core",
@@ -6071,8 +6032,8 @@ dependencies = [
  "ic-icrc1-ledger",
  "ic-log",
  "ic-management-canister-types",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
  "ic-state-machine-tests",
  "ic-test-utils",
  "ic-utils 0.34.0",
@@ -6528,11 +6489,11 @@ dependencies = [
 
 [[package]]
 name = "minter-client"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "candid",
- "did 0.26.0",
+ "did",
  "ethers-core",
  "ic-canister",
  "ic-canister-client",
@@ -6546,17 +6507,17 @@ dependencies = [
 
 [[package]]
 name = "minter-did"
-version = "0.26.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.26.x#d0cd53ad1fbaa2a25acc97c080c955eb6b860bf6"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "candid",
- "did 0.26.0",
- "eth-signer 0.26.0",
+ "did",
+ "eth-signer",
  "ethers-core",
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-stable-structures 0.17.0",
+ "ic-stable-structures 0.19.0",
  "serde",
  "thiserror",
 ]
@@ -6963,7 +6924,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 [[package]]
 name = "ord-rs"
 version = "0.1.6"
-source = "git+https://github.com/bitfinity-network/ord-rs?branch=EPROD-944-add-runestone-to-reveal#2429f8bb20d4ad3fa4d53bba24c0b08aa9e60139"
+source = "git+https://github.com/bitfinity-network/ord-rs?tag=v0.1.6#9cf75b9300e9911fcf524a60883ec58413a94448"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",
@@ -8071,11 +8032,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
+ "bridge-canister",
  "bridge-did",
  "bridge-utils",
  "candid",
- "did 0.27.0",
- "eth-signer 0.27.0",
+ "did",
+ "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "evm-canister-client",
@@ -8085,8 +8047,8 @@ dependencies = [
  "ic-canister-client",
  "ic-exports",
  "ic-log",
- "ic-metrics 0.17.0",
- "ic-stable-structures 0.17.0",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
  "ic-storage",
  "ic-task-scheduler",
  "jsonrpc-core",
@@ -8742,11 +8704,11 @@ dependencies = [
 
 [[package]]
 name = "signature-verification-canister-client"
-version = "0.27.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.27.x#44f9a98cf04707786e3ca02452db2d77905a3095"
+version = "0.29.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.29.x#c1237005c13793f7fdfa840f35dc7f859b854e96"
 dependencies = [
  "candid",
- "did 0.27.0",
+ "did",
  "ic-canister-client",
 ]
 

@@ -4,13 +4,15 @@ use candid::{CandidType, Principal};
 use did::H160;
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_log::{init_log, LogSettings};
+use ic_log::canister::LogState;
+use ic_log::did::LogCanisterSettings;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{StableCell, VirtualMemory};
+use ic_storage::IcStorage;
 use serde::Deserialize;
 
 use crate::burn_request_store::BurnRequestStore;
-use crate::memory::{MEMORY_MANAGER, SIGNER_MEMORY_ID};
+use crate::memory::{LOGGER_SETTINGS_MEMORY_ID, MEMORY_MANAGER, SIGNER_MEMORY_ID};
 use crate::orders_store::MintOrdersStore;
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
@@ -34,7 +36,7 @@ pub struct BtcBridgeConfig {
     pub signing_strategy: SigningStrategy,
     pub admin: Principal,
     pub ck_btc_ledger_fee: u64,
-    pub log_settings: LogSettings,
+    pub log_settings: LogCanisterSettings,
 }
 
 impl Default for BtcBridgeConfig {
@@ -49,7 +51,7 @@ impl Default for BtcBridgeConfig {
             },
             admin: Principal::management_canister(),
             ck_btc_ledger_fee: 10,
-            log_settings: LogSettings::default(),
+            log_settings: LogCanisterSettings::default(),
         }
     }
 }
@@ -100,7 +102,16 @@ impl State {
             .expect("failed to init signer in stable memory");
         self.signer = stable;
 
-        init_log(&config.log_settings).expect("failed to init logger");
+        MEMORY_MANAGER.with(|mm| {
+            LogState::get()
+                .borrow_mut()
+                .init(
+                    config.admin,
+                    mm.get(LOGGER_SETTINGS_MEMORY_ID),
+                    config.log_settings.clone(),
+                )
+                .expect("Failed to configure logger.");
+        });
 
         self.config = config;
     }

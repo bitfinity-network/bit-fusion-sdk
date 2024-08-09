@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::{BridgeEvent, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::operation_store::MinterOperationId;
 use candid::{CandidType, Decode};
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -23,7 +23,7 @@ use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::Withdrawal;
 use crate::operation::OperationState;
 use crate::rune_info::RuneName;
-use crate::state::State;
+use crate::state::RuneState;
 
 pub type TasksStorage =
     StableBTreeMap<u32, InnerScheduledTask<RuneBridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
@@ -36,9 +36,9 @@ mod minter_notify;
 pub enum RuneBridgeTask {
     InitEvmState,
     CollectEvmEvents,
-    Deposit(MinterOperationId),
+    Deposit(OperationId),
     RemoveMintOrder(MintedEventData),
-    Withdraw(MinterOperationId),
+    Withdraw(OperationId),
 }
 
 impl RuneBridgeTask {
@@ -119,14 +119,14 @@ impl RuneBridgeTask {
         Ok(())
     }
 
-    async fn deposit(deposit_request_id: MinterOperationId) -> Result<(), SchedulerError> {
+    async fn deposit(deposit_request_id: OperationId) -> Result<(), SchedulerError> {
         RuneDeposit::get()
             .process_deposit_request(deposit_request_id)
             .await;
         Ok(())
     }
 
-    fn task_by_log(log: Log, state: &RefCell<State>) -> Option<ScheduledTask<RuneBridgeTask>> {
+    fn task_by_log(log: Log, state: &RefCell<RuneState>) -> Option<ScheduledTask<RuneBridgeTask>> {
         log::trace!("creating task from the log: {log:?}");
 
         const TASK_RETRY_DELAY_SECS: u32 = 5;
@@ -140,10 +140,8 @@ impl RuneBridgeTask {
         match BridgeEvent::from_log(log).into_scheduler_result() {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
-                let operation_id = get_operations_store().new_operation(
-                    burnt.sender.clone(),
-                    OperationState::new_withdrawal(burnt, &state.borrow()),
-                );
+                let operation_id = get_operations_store()
+                    .new_operation(OperationState::new_withdrawal(burnt, &state.borrow()));
                 let mint_order_task = RuneBridgeTask::Withdraw(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
@@ -182,8 +180,11 @@ impl RuneBridgeTask {
 }
 
 impl Task for RuneBridgeTask {
+    type Ctx = ();
+
     fn execute(
         &self,
+        _: Self::Ctx,
         task_scheduler: Box<dyn 'static + TaskScheduler<Self>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), SchedulerError>>>> {
         match self {
@@ -225,38 +226,5 @@ impl<T, E: ToString> IntoSchedulerError for Result<T, E> {
 
     fn into_scheduler_result(self) -> Result<Self::Success, SchedulerError> {
         self.map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
-    }
-}
-
-pub enum RuneMinterNotification {
-    Deposit(RuneDepositRequestData),
-}
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-pub struct RuneDepositRequestData {
-    pub dst_address: H160,
-    pub erc20_address: H160,
-    pub amounts: Option<HashMap<RuneName, u128>>,
-}
-
-impl RuneMinterNotification {
-    pub const DEPOSIT_TYPE: u32 = 1;
-}
-
-impl RuneMinterNotification {
-    fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
-        match event_data.notification_type {
-            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
-                Ok(payload) => Some(Self::Deposit(payload)),
-                Err(err) => {
-                    log::warn!("Failed to decode deposit request event data: {err:?}");
-                    None
-                }
-            },
-            t => {
-                log::warn!("Unknown minter notify event type: {t}");
-                None
-            }
-        }
     }
 }

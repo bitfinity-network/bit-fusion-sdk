@@ -11,7 +11,7 @@ use ord_rs::wallet::LocalSigner;
 use ord_rs::BtcTxSigner;
 
 use crate::interface::GetAddressError;
-use crate::state::{MasterKey, State};
+use crate::state::{MasterKey, RuneState};
 
 pub const DERIVATION_PATH_PREFIX: u8 = 7;
 
@@ -126,7 +126,7 @@ impl BtcTxSigner for BtcSignerType {
 }
 
 pub fn get_transit_address(
-    state: &RefCell<State>,
+    state: &RefCell<RuneState>,
     eth_address: &H160,
 ) -> Result<Address, GetAddressError> {
     let state = state.borrow();

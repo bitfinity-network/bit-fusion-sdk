@@ -5,7 +5,7 @@ use did::H160;
 use ic_stable_structures::{Bound, Storable};
 use serde::Deserialize;
 
-use crate::error::Error;
+use crate::error::{BftResult, Error};
 
 /// 32-bytes entity identifier.
 /// Uniquely identifies:
@@ -60,9 +60,11 @@ impl Id256 {
         Self(buf)
     }
 
-    pub fn to_evm_address(&self) -> Result<(u32, H160), Error> {
+    pub fn to_evm_address(&self) -> BftResult<(u32, H160)> {
         if self.0[0] != Self::EVM_ADDRESS_MARK {
-            return Err(Error::Internal("wrong evm address mark in Id256".into()));
+            return Err(Error::Serialization(
+                "wrong evm address mark in Id256".into(),
+            ));
         }
 
         let chain_id_bytes = self.0[1..5]
@@ -121,9 +123,9 @@ impl Id256 {
 
     /// Converts Id256 into `(block_id, tx_index)` transaction index if the ID represents the rune id,
     /// or returns an error otherwise.
-    pub fn to_btc_tx_index(&self) -> Result<(u64, u32), Error> {
+    pub fn to_btc_tx_index(&self) -> BftResult<(u64, u32)> {
         if self.0[0] != Self::BTC_TX_MARK {
-            return Err(Error::Internal("wrong rune id mark in Id256".into()));
+            return Err(Error::Serialization("wrong rune id mark in Id256".into()));
         }
 
         let block_id_bytes = self.0[1..9]
@@ -142,14 +144,16 @@ impl Id256 {
 impl TryFrom<&[u8]> for Id256 {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let inner: [u8; Self::BYTE_SIZE as _] = value
-            .try_into()
-            .map_err(|_| Error::Internal("data of Id256 should contain exactly 32 bytes".into()))?;
+    fn try_from(value: &[u8]) -> BftResult<Self> {
+        let inner: [u8; Self::BYTE_SIZE as _] = value.try_into().map_err(|_| {
+            Error::Serialization("data of Id256 should contain exactly 32 bytes".into())
+        })?;
 
         match inner[0] {
             Self::PRINCIPAL_MARK | Self::EVM_ADDRESS_MARK | Self::BTC_TX_MARK => Ok(Self(inner)),
-            _ => Err(Error::Internal("wrong Id256 mark in first byte".into())),
+            _ => Err(Error::Serialization(
+                "wrong Id256 mark in first byte".into(),
+            )),
         }
     }
 }
@@ -171,14 +175,16 @@ impl From<&Principal> for Id256 {
 impl TryFrom<Id256> for Principal {
     type Error = Error;
 
-    fn try_from(id: Id256) -> std::result::Result<Self, Self::Error> {
+    fn try_from(id: Id256) -> BftResult<Self> {
         if id.0[0] != Id256::PRINCIPAL_MARK {
-            return Err(Error::Internal("wrong principal mark in Id256".into()));
+            return Err(Error::Serialization("wrong principal mark in Id256".into()));
         }
 
         let principal_len = id.0[1] as usize;
         if principal_len > 29 {
-            return Err(Error::Internal("wrong principal data len in Id256".into()));
+            return Err(Error::Serialization(
+                "wrong principal data len in Id256".into(),
+            ));
         }
 
         Ok(Principal::from_slice(&id.0[2..][..principal_len]))
@@ -188,9 +194,9 @@ impl TryFrom<Id256> for Principal {
 impl TryFrom<Id256> for H160 {
     type Error = Error;
 
-    fn try_from(id: Id256) -> std::result::Result<Self, Self::Error> {
+    fn try_from(id: Id256) -> BftResult<Self> {
         if id.0[0] != Id256::EVM_ADDRESS_MARK {
-            return Err(Error::Internal("wrong address mark in Id256".into()));
+            return Err(Error::Serialization("wrong address mark in Id256".into()));
         }
 
         Ok(H160::from_slice(&id.0[1..][..20]))
@@ -224,7 +230,7 @@ mod tests {
         let res = Id256::try_from(&[1u8; 33][..]);
         assert_eq!(
             res,
-            Err(Error::Internal(
+            Err(Error::Serialization(
                 "data of Id256 should contain exactly 32 bytes".into()
             ))
         );
@@ -248,7 +254,9 @@ mod tests {
 
         assert_eq!(
             id.to_evm_address(),
-            Err(Error::Internal("wrong evm address mark in Id256".into()))
+            Err(Error::Serialization(
+                "wrong evm address mark in Id256".into()
+            ))
         );
     }
 
@@ -269,7 +277,7 @@ mod tests {
 
         assert_eq!(
             Principal::try_from(id),
-            Err(Error::Internal("wrong principal mark in Id256".into()))
+            Err(Error::Serialization("wrong principal mark in Id256".into()))
         );
     }
 
@@ -306,7 +314,7 @@ mod tests {
     fn btc_tx_index_decode_error() {
         let id = Id256::from_evm_address(&H160::from_slice(&[42; 20]), 31156);
         assert!(
-            matches!(id.to_btc_tx_index(), Err(Error::Internal(_))),
+            matches!(id.to_btc_tx_index(), Err(Error::Serialization(_))),
             "unexpected to_rune_id result: {:?}",
             id.to_btc_tx_index()
         )
