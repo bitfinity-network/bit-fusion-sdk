@@ -27,10 +27,18 @@
 - Install [local-ssl-proxy](https://github.com/cameronhunter/local-ssl-proxy) to run Dfx tests. Required since to make calls to evm-rpc canister we require HTTPS.
 - Install SSL certificates to make local-ssl-proxy able to work.
 
-    On linux systems it should be enough to run
+    On Debian-based systems it should be enough to run
 
     ```sh
-    sudo cp btc-deploy/mkcert/* /etc/ssl/
+    sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
+    sudo update-ca-certificates --fresh --verbose
+    ```
+
+    On Arch linux based systems
+
+    ```sh
+    sudo trust anchor btc-deploy/mkcert/*
+    sudo update-ca-trust
     ```
 
     While on MacOS you should install them by clicking on the certificates in the mkcert folder.

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::str::FromStr as _;
 
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -32,7 +33,7 @@ pub trait HttpClient {
 }
 
 /// HTTP client implementation for the Internet Computer canisters.
-pub struct IcHttpClient {}
+pub struct IcHttpClient;
 
 impl HttpClient for IcHttpClient {
     async fn http_request<R: DeserializeOwned>(
@@ -40,7 +41,7 @@ impl HttpClient for IcHttpClient {
         url: &str,
         uri: &str,
     ) -> Result<R, DepositError> {
-        let url = format!("{url}/{uri}");
+        let url = format!("{url}/{}", uri.trim_start_matches('/'));
 
         log::trace!("Sending indexer request to: {url}");
 
@@ -163,18 +164,24 @@ where
     C: HttpClient,
 {
     async fn get_rune_amounts(&self, utxo: &Utxo) -> Result<HashMap<RuneName, u128>, DepositError> {
-        log::trace!(
-            "Requesting rune balances for utxo {}:",
-            format_outpoint(&utxo.outpoint)
-        );
+        let outpoint = format_outpoint(&utxo.outpoint);
+        log::trace!("Requesting rune balances for utxo: {outpoint}",);
 
-        let uri = format_outpoint(&utxo.outpoint);
+        let uri = format!("output/{outpoint}");
         let response = self.get_consensus_response::<OutputResponse>(&uri).await?;
 
         let amounts = response
             .runes
             .iter()
-            .map(|(spaced_rune, pile)| (spaced_rune.rune.into(), pile.amount))
+            .filter_map(
+                |(spaced_rune, pile)| match RuneName::from_str(spaced_rune) {
+                    Ok(rune_name) => Some((rune_name, pile.amount)),
+                    Err(err) => {
+                        log::warn!("Failed to parse rune name from the indexer response: {err:?}");
+                        None
+                    }
+                },
+            )
             .collect();
 
         log::trace!(

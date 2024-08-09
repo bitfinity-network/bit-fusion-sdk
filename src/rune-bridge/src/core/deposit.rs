@@ -411,7 +411,15 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         let mut used_utxos = vec![];
 
         for utxo in utxos {
-            let tx_rune_amounts = self.index_provider.get_rune_amounts(utxo).await?;
+            log::info!("Get rune amounts for: {:?}", utxo);
+            let tx_rune_amounts = match self.index_provider.get_rune_amounts(utxo).await {
+                Ok(v) => v,
+                Err(err) => {
+                    log::error!("Failed to get rune amounts for utxo: {err:?}");
+                    continue;
+                }
+            };
+
             if !tx_rune_amounts.is_empty() {
                 used_utxos.push(utxo.clone());
                 for (rune_name, amount) in tx_rune_amounts {

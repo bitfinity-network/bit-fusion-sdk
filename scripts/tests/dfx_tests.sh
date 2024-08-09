@@ -3,8 +3,6 @@
 set -e
 set -x
 
-export ORD_BITCOIN_RPC_USERNAME=ic-btc-integration
-export ORD_BITCOIN_RPC_PASSWORD="QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 LOGFILE=./target/dfx_tests.log
 
 usage() {
@@ -18,7 +16,9 @@ usage() {
 setup_docker() {
     PREV_PATH=$(pwd)
     cd btc-deploy/
-    docker compose up -d --build
+    rm -rf bitcoin-data/*
+    mkdir -p bitcoin-data/
+    docker compose up -d --build --force-recreate
     cd $PREV_PATH
 }
 
@@ -27,6 +27,15 @@ stop_docker() {
     cd btc-deploy/
     docker compose down
     cd $PREV_PATH
+}
+
+start_icx() {
+    killall icx-proxy
+    sleep 2
+    # Start ICX Proxy
+    dfx_local_port=$(dfx info replica-port)
+    icx-proxy --fetch-root-key --address 0.0.0.0:8545 --dns-alias 0.0.0.0:bd3sg-teaaa-aaaaa-qaaba-cai --replica http://localhost:$dfx_local_port &
+    sleep 2
 }
 
 DOCKER="0"
@@ -63,7 +72,14 @@ done
 
 # set dfxvm to use the correct version
 if [ "$GITHUB_CI" -gt 0 ]; then
-    dfxvm default 0.18.0
+    dfxvm default 0.19.0
+fi
+
+# check bad dfx version
+DFX_VERSION=$(dfx --version | awk '{print $2}')
+if [ "$DFX_VERSION" = "0.18.0" ]; then
+    echo "dfx version 0.18.0 doesn't work with bitcoin integration. Please upgrade to 0.19.0"
+    exit 1
 fi
 
 killall -9 icx-proxy || true
@@ -72,15 +88,6 @@ dfx stop
 if [ "$DOCKER" -gt 0 ]; then
     setup_docker
 fi
-
-start_icx() {
-    killall icx-proxy
-    sleep 2
-    # Start ICX Proxy
-    dfx_local_port=$(dfx info replica-port)
-    icx-proxy --fetch-root-key --address 0.0.0.0:8545 --dns-alias 0.0.0.0:bd3sg-teaaa-aaaaa-qaaba-cai --replica http://localhost:$dfx_local_port &
-    sleep 2
-}
 
 rm -f "$LOGFILE"
 
@@ -97,14 +104,19 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 
 sleep 10
 
+# run tests
+set +e
 cargo test -p integration-tests --features dfx_tests $@
 TEST_RESULT=$?
+mkdir -p .logs/
+cp $LOGFILE .logs/dfx.log
+set -e
 
 killall -9 icx-proxy || true
 
 dfx stop
 
-if [ "$DOCKER" -gt 0 ]; then
+if [ "$DOCKER" -gt 0 ] && [ "$TEST_RESULT" -eq 0 ]; then
     stop_docker
 fi
 
