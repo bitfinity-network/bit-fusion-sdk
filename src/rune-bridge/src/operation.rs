@@ -1,5 +1,6 @@
 use bridge_canister::bridge::{Operation, OperationContext};
 use bridge_canister::operation_store::OperationStore;
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::BftResult;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BurntEventData;
@@ -34,7 +35,7 @@ impl Operation for OperationState {
         }
     }
 
-    async fn progress(self, _id: OperationId, _ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
         todo!()
     }
 

@@ -284,3 +284,129 @@ impl Storable for SignedMintOrder {
         ))
     }
 }
+
+impl SignedMintOrder {
+    /// Returns mint amount.
+    pub fn get_amount(&self) -> U256 {
+        U256::from_big_endian(&self.0[..32])
+    }
+
+    /// Returns sender ID.
+    pub fn get_sender_id(&self) -> Id256 {
+        self.0[32..64].try_into().unwrap() // exactly 32 bytes, as expected
+    }
+
+    /// Returns source token.
+    pub fn get_src_token_id(&self) -> Id256 {
+        self.0[64..96].try_into().unwrap() // exactly 32 bytes, as expected
+    }
+
+    /// Returns recipient address.
+    pub fn get_recipient(&self) -> H160 {
+        H160::from_slice(&self.0[96..116])
+    }
+
+    /// Returns dst_token address.
+    pub fn get_dst_token(&self) -> H160 {
+        H160::from_slice(&self.0[116..136])
+    }
+
+    /// Returns nonce.
+    pub fn get_nonce(&self) -> u32 {
+        u32::from_be_bytes(self.0[136..140].try_into().unwrap()) // exactly 4 bytes, as expected
+    }
+
+    /// Returns sender chain ID.
+    pub fn get_sender_chain_id(&self) -> u32 {
+        u32::from_be_bytes(self.0[140..144].try_into().unwrap()) // exactly 4 bytes, as expected
+    }
+
+    /// Returns recipient chain ID.
+    pub fn get_recipient_chain_id(&self) -> u32 {
+        u32::from_be_bytes(self.0[144..148].try_into().unwrap()) // exactly 4 bytes, as expected
+    }
+
+    /// Returns token name.
+    pub fn get_token_name(&self) -> [u8; 32] {
+        self.0[148..180].try_into().unwrap() // exactly 32 bytes, as expected
+    }
+
+    /// Returns token symbol.
+    pub fn get_token_symbol(&self) -> [u8; 16] {
+        self.0[180..196].try_into().unwrap() // exactly 16 bytes, as expected
+    }
+
+    /// Returns token decimals.
+    pub fn get_token_decimals(&self) -> u8 {
+        self.0[196]
+    }
+
+    /// Returns approve spender.
+    pub fn get_approve_spender(&self) -> H160 {
+        H160::from_slice(&self.0[197..217])
+    }
+
+    /// Returns approve amount.
+    pub fn get_approve_amount(&self) -> U256 {
+        U256::from_big_endian(&self.0[217..249])
+    }
+
+    /// Returns fee payer.
+    pub fn get_fee_payer(&self) -> H160 {
+        H160::from_slice(&self.0[249..269])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use did::{H160, U256};
+    use eth_signer::sign_strategy::SigningStrategy;
+
+    use super::MintOrder;
+    use crate::id256::Id256;
+
+    #[tokio::test]
+    async fn signed_mint_order_getters() {
+        let order = MintOrder {
+            amount: U256::one(),
+            sender: Id256::from_evm_address(&H160::from_slice(&[1; 20]), 1),
+            src_token: Id256::from_evm_address(&H160::from_slice(&[2; 20]), 2),
+            recipient: H160::from_slice(&[3; 20]),
+            dst_token: H160::from_slice(&[4; 20]),
+            nonce: 42,
+            sender_chain_id: 43,
+            recipient_chain_id: 44,
+            name: [45; 32],
+            symbol: [46; 16],
+            decimals: 47,
+            approve_spender: H160::from_slice(&[5; 20]),
+            approve_amount: 48u64.into(),
+            fee_payer: H160::from_slice(&[6; 20]),
+        };
+
+        let signer = SigningStrategy::Local {
+            private_key: [42; 32],
+        }
+        .make_signer(0)
+        .unwrap();
+        let signed_order = order.encode_and_sign(&signer).await.unwrap();
+
+        assert_eq!(order.amount, signed_order.get_amount());
+        assert_eq!(order.sender, signed_order.get_sender_id());
+        assert_eq!(order.src_token, signed_order.get_src_token_id());
+        assert_eq!(order.recipient, signed_order.get_recipient());
+        assert_eq!(order.dst_token, signed_order.get_dst_token());
+        assert_eq!(order.nonce, signed_order.get_nonce());
+        assert_eq!(order.sender_chain_id, signed_order.get_sender_chain_id());
+        assert_eq!(
+            order.recipient_chain_id,
+            signed_order.get_recipient_chain_id()
+        );
+        assert_eq!(order.name, signed_order.get_token_name());
+        assert_eq!(order.symbol, signed_order.get_token_symbol());
+        assert_eq!(order.decimals, signed_order.get_token_decimals());
+        assert_eq!(order.approve_spender, signed_order.get_approve_spender());
+        assert_eq!(order.approve_amount, signed_order.get_approve_amount());
+        assert_eq!(order.fee_payer, signed_order.get_fee_payer());
+    }
+}
