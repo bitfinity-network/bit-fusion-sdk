@@ -18,7 +18,7 @@ pub struct IcUtxoProvider {
     network: BitcoinNetwork,
 }
 
-const DEFAULT_REGTEST_FEE: u64 = 10_000;
+const DEFAULT_REGTEST_FEE: u64 = 100_000 * 1_000;
 
 impl IcUtxoProvider {
     pub fn new(network: BitcoinNetwork) -> Self {
@@ -63,16 +63,13 @@ impl UtxoProvider for IcUtxoProvider {
             })?
             .0;
 
-        let middle_percentile = if response.is_empty() {
-            match self.network {
-                BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE * 1000,
-                _ => {
-                    log::error!("Empty response for fee rate request");
-                    return Err(WithdrawError::FeeRateRequest);
-                }
+        let middle_percentile = match self.network {
+            BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
+            _ if response.is_empty() => {
+                log::error!("Empty response for fee rate request");
+                return Err(WithdrawError::FeeRateRequest);
             }
-        } else {
-            response[response.len() / 2]
+            _ => response[response.len() / 2],
         };
 
         log::trace!("Received fee rate percentiles: {response:?}");

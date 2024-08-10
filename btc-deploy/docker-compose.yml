@@ -2,7 +2,7 @@ services:
   bitcoind:
     container_name: bitcoind
     image: lncm/bitcoind:v26.0
-    command: ["-txindex", "-rpcport=18443"]
+    command: ["-txindex", "-debug=mempool", "-rpcport=18443"]
     ports:
       - "18443:18443"
       - "18444:18444"

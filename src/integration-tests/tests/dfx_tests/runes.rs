@@ -266,11 +266,7 @@ impl RunesContext {
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
 
-    async fn deposit(
-        &self,
-        eth_address: &H160,
-        erc20_address: &H160,
-    ) -> Result<Vec<(RuneName, u128, H256)>, DepositError> {
+    async fn deposit(&self, eth_address: &H160, erc20_address: &H160) -> Result<(), DepositError> {
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
         let nonce = client
@@ -338,6 +334,7 @@ impl RunesContext {
             if !response.is_empty() {
                 if let RuneBridgeOp::MintOrderConfirmed { data } = &response[0].1 {
                     eprintln!("Deposit successful with amount: {:?}", data.amount);
+                    return Ok(());
                 }
             }
 
@@ -568,7 +565,14 @@ async fn runes_bridging_flow() {
     let ord_balance = ctx.ord_rune_balance().await;
     ctx.deposit_runes_to(100, &ctx.eth_wallet).await;
 
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // withdraw back 30 of rune
     ctx.withdraw(30).await;
+
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     ctx.admin_btc_rpc_client
         .generate_to_address(&ctx.admin_btc_address, 6)
@@ -577,18 +581,27 @@ async fn runes_bridging_flow() {
     let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
     assert_eq!(updated_balance, 70);
 
-    // wait
-    ctx.inner.advance_time(Duration::from_secs(5)).await;
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    // advance
-    ctx.admin_btc_rpc_client
-        .generate_to_address(&ctx.admin_btc_address, 2)
-        .expect("failed to generate blocks");
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    let expected_balance = ord_balance - 100 + 30;
+
+    for _ in 0..10 {
+        // wait
+        ctx.inner.advance_time(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        // advance
+        ctx.admin_btc_rpc_client
+            .generate_to_address(&ctx.admin_btc_address, 1)
+            .expect("failed to generate blocks");
+        tokio::time::sleep(Duration::from_secs(3)).await;
+
+        let updated_ord_balance = ctx.ord_rune_balance().await;
+        if updated_ord_balance == expected_balance {
+            break;
+        }
+    }
 
     let updated_ord_balance = ctx.ord_rune_balance().await;
 
-    assert_eq!(updated_ord_balance, ord_balance - 100 + 30);
+    assert_eq!(updated_ord_balance, expected_balance);
 
     ctx.stop().await
 }
@@ -609,14 +622,35 @@ async fn inputs_from_different_users() {
         .expect("failed to create an ETH wallet");
     ctx.deposit_runes_to(77, &another_wallet).await;
 
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
     ctx.withdraw(50).await;
 
     let updated_balance = ctx.wrapped_balance(&ctx.eth_wallet).await;
     assert_eq!(updated_balance, 50);
 
+    let expected_balance = rune_balance - 50 - 77;
+
+    for retry in 0..10 {
+        println!("retry {retry}");
+        // wait
+        ctx.inner.advance_time(Duration::from_secs(2)).await;
+        // advance
+        ctx.admin_btc_rpc_client
+            .generate_to_address(&ctx.admin_btc_address, 1)
+            .expect("failed to generate blocks");
+        ctx.inner.advance_time(Duration::from_secs(2)).await;
+
+        let updated_rune_balance = ctx.ord_rune_balance().await;
+        if updated_rune_balance == expected_balance {
+            break;
+        }
+    }
+
     let updated_rune_balance = ctx.ord_rune_balance().await;
 
-    assert_eq!(updated_rune_balance, rune_balance - 50 - 77);
+    assert_eq!(updated_rune_balance, expected_balance);
 
     assert_eq!(ctx.wrapped_balance(&another_wallet).await, 77);
     assert_eq!(ctx.wrapped_balance(&ctx.eth_wallet).await, 50);
