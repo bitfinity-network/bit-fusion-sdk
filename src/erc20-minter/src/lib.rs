@@ -1,6 +1,4 @@
 pub mod canister;
-#[cfg(feature = "export-api")]
-pub mod inspect;
 pub mod memory;
 pub mod ops;
 pub mod state;

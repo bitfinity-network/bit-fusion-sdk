@@ -5,7 +5,7 @@ use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
-use bridge_canister::{inspect, BridgeCanister};
+use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
@@ -25,6 +25,9 @@ use ic_storage::IcStorage;
 
 use crate::ops::{self, Erc20BridgeOp, Erc20OpStage};
 use crate::state::{BaseEvmSettings, SharedEvmState};
+
+#[cfg(feature = "export-api")]
+pub mod inspect;
 
 pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
 
@@ -71,7 +74,7 @@ impl EvmMinter {
     #[update]
     fn set_base_bft_bridge_contract(&mut self, address: H160) {
         let config = get_runtime_state().borrow().config.clone();
-        inspect::inspect_set_bft_bridge_contract(config);
+        bridge_canister::inspect::inspect_set_bft_bridge_contract(config);
         get_base_evm_config()
             .borrow_mut()
             .set_bft_bridge_contract(address.clone());
