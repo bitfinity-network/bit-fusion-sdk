@@ -34,6 +34,7 @@ icrc-client = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
 icrc2-minter = { path = "../icrc2-minter" }
+bridge-canister = { path = "../bridge-canister" }
 jsonrpc-core = { workspace = true }
 minter-client = { workspace = true }
 once_cell = { workspace = true }

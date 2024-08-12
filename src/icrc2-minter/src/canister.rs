@@ -6,10 +6,8 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::SignedMintOrder;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -28,7 +26,7 @@ use crate::state::IcrcState;
 #[cfg(feature = "export-api")]
 mod inspect;
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
@@ -62,34 +60,6 @@ impl MinterCanister {
     fn run_scheduler() {
         let runtime = get_runtime();
         runtime.borrow_mut().run();
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    /// Offset, if set, defines the starting index of the page,
-    /// Count, if set, defines the number of elements in the page.
-    #[query]
-    pub fn list_mint_orders(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        Self::token_mint_orders(wallet_address, src_token, pagination)
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
-    #[query]
-    pub fn get_mint_order(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        operation_id: u32,
-        pagination: Option<Pagination>,
-    ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, src_token, pagination)
-            .into_iter()
-            .find(|(nonce, _)| *nonce == operation_id)
-            .map(|(_, mint_order)| mint_order)
     }
 
     #[query]
@@ -161,30 +131,6 @@ impl MinterCanister {
     /// This should be the last fn to see previous endpoints in macro.
     pub fn idl() -> Idl {
         generate_idl!()
-    }
-
-    /// Get mint orders for the given wallet address and token;
-    /// if `offset` and `count` are provided, returns a page of mint orders.
-    fn token_mint_orders(
-        wallet_address: H160,
-        src_token: Id256,
-        pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
-        let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, None)
-            .into_iter()
-            .filter_map(|(operation_id, operation)| {
-                operation
-                    .get_signed_mint_order(&src_token)
-                    .map(|mint_order| (operation_id.nonce(), mint_order))
-            })
-            .skip(offset)
-            .take(count)
-            .collect()
     }
 }
 
@@ -318,148 +264,5 @@ mod test {
             .unwrap();
 
         assert!(whitelist.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_should_paginate_token_mint_orders() {
-        fn eth_address(seed: u8) -> H160 {
-            H160::from([seed; H160::BYTE_SIZE])
-        }
-
-        let token_id = eth_address(0);
-        let token_id_id256 = Id256::from_evm_address(&token_id, 5);
-
-        let owner_addr = eth_address(2);
-        let owner_other_addr = eth_address(3);
-
-        let op_state = IcrcBridgeOp::SendMintTransaction {
-            src_token: token_id_id256,
-            dst_address: owner_addr.clone(),
-            order: SignedMintOrder([0; 334]),
-            is_refund: false,
-        };
-
-        let token_id_other = eth_address(1);
-        let token_id_other_id256 = Id256::from_evm_address(&token_id_other, 5);
-
-        let op_state_other = IcrcBridgeOp::SendMintTransaction {
-            src_token: token_id_other_id256,
-            dst_address: owner_other_addr.clone(),
-            order: SignedMintOrder([0; 334]),
-            is_refund: false,
-        };
-
-        const COUNT: usize = 42;
-        const COUNT_OTHER: usize = 10;
-
-        let canister = init_canister().await;
-
-        inject::get_context().update_id(owner());
-
-        for _ in 0..COUNT {
-            get_runtime_state()
-                .borrow_mut()
-                .operations
-                .new_operation(op_state.clone());
-        }
-
-        for _ in 0..COUNT_OTHER {
-            get_runtime_state()
-                .borrow_mut()
-                .operations
-                .new_operation(op_state_other.clone());
-        }
-
-        // get orders for the first token
-        let orders = canister_call!(
-            canister.list_mint_orders(
-                owner_addr.clone(),
-                token_id_id256,
-                Some(Pagination {
-                    offset: 0,
-                    count: COUNT
-                })
-            ),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(orders.len(), COUNT);
-
-        // get with offset
-        let orders = canister_call!(
-            canister.list_mint_orders(
-                owner_addr.clone(),
-                token_id_id256,
-                Some(Pagination {
-                    offset: 10,
-                    count: 20
-                })
-            ),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert_eq!(orders.len(), 20);
-
-        // get with offset to the end
-        let orders = canister_call!(
-            canister.list_mint_orders(
-                owner_addr.clone(),
-                token_id_id256,
-                Some(Pagination {
-                    offset: COUNT - 5,
-                    count: 100
-                })
-            ),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert_eq!(orders.len(), 5);
-
-        // get orders with no limit
-        let orders = canister_call!(
-            canister.list_mint_orders(owner_addr.clone(), token_id_id256, None),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert_eq!(orders.len(), COUNT);
-
-        // get orders with offset but no limit
-        let orders = canister_call!(
-            canister.list_mint_orders(
-                owner_addr.clone(),
-                token_id_id256,
-                Some(Pagination {
-                    offset: 10,
-                    count: usize::MAX
-                })
-            ),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert_eq!(orders.len(), COUNT - 10);
-
-        // get orders for the second token but `owner`
-        let orders = canister_call!(
-            canister.list_mint_orders(owner_addr, token_id_other_id256, None),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert!(orders.is_empty());
-
-        // get orders for the second token
-        let orders = canister_call!(
-            canister.list_mint_orders(owner_other_addr.clone(), token_id_other_id256, None),
-            Vec<(u32, SignedMintOrder)>
-        )
-        .await
-        .unwrap();
-        assert_eq!(orders.len(), COUNT_OTHER);
     }
 }
