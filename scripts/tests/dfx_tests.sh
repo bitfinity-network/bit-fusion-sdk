@@ -6,11 +6,11 @@ set -x
 LOGFILE=./target/dfx_tests.log
 
 usage() {
-  echo "Usage: $0 [options]"
-  echo "Options:"
-  echo "  -h, --help                                      Display this help message"
-  echo "  --docker                                        Setup docker containers"
-  echo "  --github-ci                                     Use this flag when running in GitHub CI"
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  -h, --help                                      Display this help message"
+    echo "  --docker                                        Setup docker containers"
+    echo "  --github-ci                                     Use this flag when running in GitHub CI"
 }
 
 setup_docker() {
@@ -43,31 +43,31 @@ GITHUB_CI="0"
 
 ARGS=$(getopt -o h --long docker,github-ci,help -- "$@")
 while true; do
-  case "$1" in
-  --docker)
-    DOCKER="1"
-    shift
-    ;;
+    case "$1" in
+    --docker)
+        DOCKER="1"
+        shift
+        ;;
 
-  --github-ci)
-    GITHUB_CI="1"
-    shift
-    ;;
+    --github-ci)
+        GITHUB_CI="1"
+        shift
+        ;;
 
-  -h | --help)
-    usage
-    exit 255
-    ;;
+    -h | --help)
+        usage
+        exit 255
+        ;;
 
   --)
-    shift
-    break
-    ;;
+        shift
+        break
+        ;;
 
   *)
-    break
-    ;;
-  esac
+        break
+        ;;
+    esac
 done
 
 # set dfxvm to use the correct version
