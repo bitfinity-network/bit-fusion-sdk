@@ -10,6 +10,7 @@ export-api = []
 
 [dependencies]
 anyhow = { workspace = true }
+bridge-canister = { path = "../bridge-canister" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
@@ -37,3 +38,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+
+
+[build-dependencies]
+vergen = { workspace = true }

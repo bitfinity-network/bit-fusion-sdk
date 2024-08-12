@@ -15,6 +15,7 @@ use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
+use erc20_minter::state::BaseEvmSettings;
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
@@ -381,16 +382,21 @@ pub trait TestContext {
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
 
-        let decoded_output =
-            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
-                .unwrap();
+        println!("Burn transaction hash: {tx_hash}; receipt {receipt:?}",);
 
         if receipt.status != Some(U64::one()) {
+            let decoded_output =
+                BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
+                    .unwrap();
             return Err(TestError::Generic(format!(
                 "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
                 String::from_utf8_lossy(receipt.output.as_ref().unwrap())
             )));
         }
+
+        let decoded_output =
+            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
+                .unwrap();
 
         let operation_id = decoded_output._0;
         Ok((operation_id, tx_hash))
@@ -901,7 +907,7 @@ pub trait TestContext {
                     .get(CanisterType::Evm)
                     .unwrap_or_else(|| Principal::from_slice(&[1; 20]));
                 let init_data =
-                    minter_canister_init_data(self.admin(), evm_canister, self.sign_key());
+                    icrc_bridge_canister_init_data(self.admin(), evm_canister, self.sign_key());
                 self.install_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
                     .await
                     .unwrap();
@@ -951,23 +957,25 @@ pub trait TestContext {
                     "Installing default CK Erc20 minter canister with Principal {}",
                     self.canisters().ck_erc20_minter()
                 );
-                let evm_canister = self.canisters().evm();
-                let init_data = erc20_minter::state::Settings {
-                    base_evm_link: self.base_evm_link(),
-                    wrapped_evm_link: EvmLink::Ic(evm_canister),
+                let init_data = erc20_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                );
+
+                let base_evm_settings = BaseEvmSettings {
+                    evm_link: EvmLink::Ic(self.canisters().external_evm()),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: self.sign_key(),
                     },
-                    log_settings: Some(LogCanisterSettings {
-                        enable_console: Some(true),
-                        in_memory_records: None,
-                        log_filter: Some("trace".to_string()),
-                        ..Default::default()
-                    }),
                 };
-                self.install_canister(self.canisters().ck_erc20_minter(), wasm, (init_data,))
-                    .await
-                    .unwrap();
+                self.install_canister(
+                    self.canisters().ck_erc20_minter(),
+                    wasm,
+                    (init_data, base_evm_settings),
+                )
+                .await
+                .unwrap();
             }
             CanisterType::BtcBridge => {
                 todo!()
@@ -1028,7 +1036,7 @@ pub trait TestContext {
     async fn reinstall_minter_canister(&self) -> Result<()> {
         eprintln!("reinstalling Minter canister");
         let init_data =
-            minter_canister_init_data(self.admin(), self.canisters().evm(), self.sign_key());
+            icrc_bridge_canister_init_data(self.admin(), self.canisters().evm(), self.sign_key());
 
         let wasm = get_icrc2_minter_canister_bytecode().await;
         self.reinstall_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
@@ -1076,7 +1084,25 @@ pub fn icrc_canister_default_init_args(
     }
 }
 
-pub fn minter_canister_init_data(
+pub fn icrc_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> BridgeInitData {
+    BridgeInitData {
+        owner,
+        evm_principal,
+        signing_strategy: SigningStrategy::ManagementCanister { key_id },
+        log_settings: Some(LogCanisterSettings {
+            enable_console: Some(true),
+            in_memory_records: None,
+            log_filter: Some("trace".to_string()),
+            ..Default::default()
+        }),
+    }
+}
+
+pub fn erc20_bridge_canister_init_data(
     owner: Principal,
     evm_principal: Principal,
     key_id: SigningKeyId,

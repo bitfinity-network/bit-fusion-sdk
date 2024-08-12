@@ -5,11 +5,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_utils::evm_link::EvmLink;
 use bridge_utils::BFTBridge;
-use btc_bridge::state::BftBridgeConfig;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
@@ -19,11 +18,10 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use rune_bridge::core::deposit::DepositRequestStatus;
+use ic_log::did::LogCanisterSettings;
 use rune_bridge::interface::{DepositError, GetAddressError};
-use rune_bridge::operation::OperationState;
+use rune_bridge::ops::{RuneBridgeOp, RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::rune_info::{RuneInfo, RuneName};
-use rune_bridge::scheduler::{RuneDepositRequestData, RuneMinterNotification};
 use rune_bridge::state::RuneBridgeConfig;
 use serde_json::Value;
 use tokio::process::Command;
@@ -84,7 +82,7 @@ impl RunesContext {
         let bridge = context.canisters().rune_bridge();
         let init_args = RuneBridgeConfig {
             network: BitcoinNetwork::Regtest,
-            evm_link: EvmLink::Ic(context.canisters().evm()),
+            evm_principal: context.canisters().evm(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },
@@ -117,9 +115,9 @@ impl RunesContext {
 
         let wallet = context.new_wallet(u128::MAX).await.unwrap();
 
-        let btc_bridge_eth_address: Option<H160> = context
-            .client(bridge, ADMIN)
-            .update("get_evm_address", ())
+        let btc_bridge_eth_address = context
+            .rune_bridge_client(ADMIN)
+            .get_bridge_canister_evm_address()
             .await
             .unwrap();
 
@@ -141,25 +139,14 @@ impl RunesContext {
             .await
             .unwrap();
 
-        let chain_id = context.evm_client(ADMIN).eth_chain_id().await.unwrap();
-
         let mut token_name = [0; 32];
         token_name[0..7].copy_from_slice(b"wrapper");
         let mut token_symbol = [0; 16];
         token_symbol[0..3].copy_from_slice(b"WPT");
 
-        let bft_config = BftBridgeConfig {
-            erc20_chain_id: chain_id as u32,
-            bridge_address: bft_bridge.clone(),
-            token_address: token.clone(),
-            token_name,
-            token_symbol,
-            decimals: 0,
-        };
-
         let _: () = context
-            .client(bridge, ADMIN)
-            .update("admin_configure_bft_bridge", (bft_config,))
+            .rune_bridge_client(ADMIN)
+            .set_bft_bridge_contract(&bft_bridge)
             .await
             .unwrap();
 
@@ -324,7 +311,11 @@ impl RunesContext {
 
         let data = RuneDepositRequestData {
             dst_address: eth_address.clone(),
-            erc20_address: erc20_address.clone(),
+            dst_tokens: [(
+                RuneName::from_str(RUNE_NAME).unwrap(),
+                erc20_address.clone(),
+            )]
+            .into(),
             amounts: None,
         };
 
@@ -364,7 +355,7 @@ impl RunesContext {
 
             eprintln!("Checking deposit status. Try #{retry_count}...");
 
-            let response: Vec<(OperationId, OperationState)> = self
+            let response: Vec<(OperationId, RuneBridgeOp)> = self
                 .inner
                 .rune_bridge_client(ADMIN)
                 .get_operations_list(eth_address)
@@ -372,12 +363,8 @@ impl RunesContext {
                 .expect("canister call failed");
 
             if !response.is_empty() {
-                if let OperationState::Deposit(payload) = &response[0].1 {
-                    if let DepositRequestStatus::Minted { amounts } = &payload.status {
-                        eprintln!("Deposit successful with amounts: {amounts:?}");
-
-                        return Ok(amounts.clone());
-                    }
+                if let RuneBridgeOp::MintOrderConfirmed { data } = &response[0].1 {
+                    eprintln!("Deposit successful with amount: {:?}", data.amount);
                 }
             }
 

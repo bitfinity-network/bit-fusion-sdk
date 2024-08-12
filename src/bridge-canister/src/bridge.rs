@@ -3,7 +3,9 @@
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
-use bridge_utils::bft_events::{self, BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_utils::bft_events::{
+    self, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
+};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use candid::CandidType;
@@ -13,12 +15,14 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::runtime::RuntimeState;
+
 /// Defines an operation that can be executed by the bridge.
 pub trait Operation:
     Sized + CandidType + Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
     /// Execute the operation, and move it to next stage.
-    async fn progress(self, id: OperationId, ctx: impl OperationContext) -> BftResult<Self>;
+    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self>;
 
     /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
@@ -33,20 +37,20 @@ pub trait Operation:
 
     /// Action to perform when a WrappedToken is minted.
     async fn on_wrapped_token_minted(
-        _ctx: impl OperationContext,
-        _event: MintedEventData,
+        ctx: RuntimeState<Self>,
+        event: MintedEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform when a WrappedToken is burnt.
     async fn on_wrapped_token_burnt(
-        _ctx: impl OperationContext,
-        _event: BurntEventData,
+        ctx: RuntimeState<Self>,
+        event: BurntEventData,
     ) -> Option<OperationAction<Self>>;
 
     /// Action to perform on notification from BftBridge contract.
     async fn on_minter_notification(
-        _ctx: impl OperationContext,
-        _event: NotifyMinterEventData,
+        ctx: RuntimeState<Self>,
+        event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>>;
 }
 
@@ -94,10 +98,47 @@ pub trait OperationContext {
 
         Ok(tx_hash.into())
     }
+
+    async fn collect_evm_events(&self, max_logs_number: u64) -> BftResult<CollectedEvents> {
+        log::trace!("collecting evm events");
+
+        let client = self.get_evm_link().get_json_rpc_client();
+        let evm_params = self.get_evm_params()?;
+        let bridge_contract = self.get_bridge_contract_address()?;
+
+        let last_chain_block = match client.get_block_number().await {
+            Ok(block) => block,
+            Err(e) => {
+                log::warn!("failed to get evm block number: {e}");
+                return Err(Error::EvmRequestFailed(e.to_string()));
+            }
+        };
+        let last_request_block = last_chain_block.min(evm_params.next_block + max_logs_number);
+
+        let events = BridgeEvent::collect(
+            &client,
+            evm_params.next_block,
+            last_chain_block,
+            bridge_contract.0,
+        )
+        .await?;
+
+        Ok(CollectedEvents {
+            events,
+            last_block_nubmer: last_request_block,
+        })
+    }
 }
 
 /// Action to create or update an operation.
 pub enum OperationAction<Op> {
     Create(Op),
+    CreateWithId(OperationId, Op),
     Update { nonce: u32, update_to: Op },
+}
+
+#[derive(Debug)]
+pub struct CollectedEvents {
+    pub events: Vec<BridgeEvent>,
+    pub last_block_nubmer: u64,
 }

@@ -13,7 +13,7 @@ use ic_utils::interfaces::ManagementCanister;
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
-mod erc20_minter;
+// mod erc20_minter;
 mod runes;
 
 sol! {
