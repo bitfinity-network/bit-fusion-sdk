@@ -1,39 +1,35 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::memory::{memory_by_id, StableMemory, MEMO_OPERATION_MEMORY_ID};
-use bridge_canister::operation_store::{OperationStore, OperationsMemory};
+use bridge_canister::bridge::OperationContext;
+use bridge_canister::runtime::state::config::ConfigStorage;
+use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
+use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
+use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::SignedMintOrder;
+use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
 use bridge_utils::evm_bridge::BridgeSide;
 use candid::Principal;
+use did::build::BuildData;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
+use drop_guard::guard;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{CellStructure, StableBTreeMap, VirtualMemory};
 use ic_storage::IcStorage;
-use ic_task_scheduler::retry::BackoffPolicy;
-use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
-use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskOptions, TaskStatus};
 
-use crate::memory::{
-    OPERATIONS_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
-    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
-};
-use crate::operation::OperationPayload;
-use crate::state::{Settings, State};
-use crate::tasks::BridgeTask;
+use crate::ops::{self, Erc20BridgeOp, Erc20OpStage};
+use crate::state::{BaseEvmSettings, SharedEvmState};
 
-const EVM_INFO_INITIALIZATION_RETRIES: u32 = 5;
-const EVM_INFO_INITIALIZATION_RETRY_DELAY: u32 = 2;
-const EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER: u32 = 2;
+#[cfg(feature = "export-api")]
+pub mod inspect;
+
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct EvmMinter {
@@ -43,158 +39,71 @@ pub struct EvmMinter {
 
 impl PreUpdate for EvmMinter {}
 
+impl BridgeCanister for EvmMinter {
+    fn config(&self) -> SharedConfig {
+        ConfigStorage::get()
+    }
+}
+
 impl EvmMinter {
-    fn set_timers(&mut self) {
-        // Set the metrics updating interval
-        #[cfg(target_family = "wasm")]
-        {
-            use std::time::Duration;
-
-            self.update_metrics_timer(std::time::Duration::from_secs(60 * 60));
-
-            const GLOBAL_TIMER_INTERVAL: Duration = Duration::from_secs(1);
-            ic_exports::ic_cdk_timers::set_timer_interval(GLOBAL_TIMER_INTERVAL, move || {
-                // Tasks to collect EVMs events
-                let tasks = vec![
-                    Self::collect_evm_events_task(BridgeSide::Base),
-                    Self::collect_evm_events_task(BridgeSide::Wrapped),
-                ];
-
-                get_scheduler().borrow_mut().append_tasks(tasks);
-
-                let task_execution_result = get_scheduler().borrow_mut().run(());
-
-                if let Err(err) = task_execution_result {
-                    log::error!("task execution failed: {err}",);
-                }
-            });
-        }
-    }
-
     #[init]
-    pub fn init(&mut self, settings: Settings) {
-        let admin = ic::caller();
-
-        Self::check_anonymous_principal(admin).expect("admin principal is anonymous");
-
-        let state = get_state();
-        state.borrow_mut().init(admin, settings);
-
-        log::info!("starting erc20-minter canister");
-
-        let tasks = vec![
-            // Tasks to init EVMs state
-            Self::init_evm_info_task(BridgeSide::Base),
-            Self::init_evm_info_task(BridgeSide::Wrapped),
-        ];
-
-        {
-            let scheduler = get_scheduler();
-            let mut borrowed_scheduler = scheduler.borrow_mut();
-            borrowed_scheduler.on_completion_callback(log_task_execution_error);
-            borrowed_scheduler.append_tasks(tasks);
-        }
-
-        self.set_timers();
-
-        log::info!("erc20-minter canister initialized");
-    }
-
-    fn init_evm_info_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
-        let init_options = TaskOptions::default()
-            .with_max_retries_policy(EVM_INFO_INITIALIZATION_RETRIES)
-            .with_backoff_policy(BackoffPolicy::Exponential {
-                secs: EVM_INFO_INITIALIZATION_RETRY_DELAY,
-                multiplier: EVM_INFO_INITIALIZATION_RETRY_MULTIPLIER,
-            });
-        BridgeTask::InitEvmState(bridge_side).into_scheduled(init_options)
-    }
-
-    #[cfg(target_family = "wasm")]
-    fn collect_evm_events_task(bridge_side: BridgeSide) -> ScheduledTask<BridgeTask> {
-        const EVM_EVENTS_COLLECTING_DELAY: u32 = 1;
-
-        let options = TaskOptions::default()
-            .with_retry_policy(ic_task_scheduler::retry::RetryPolicy::Infinite)
-            .with_backoff_policy(BackoffPolicy::Fixed {
-                secs: EVM_EVENTS_COLLECTING_DELAY,
-            });
-
-        BridgeTask::CollectEvmEvents(bridge_side).into_scheduled(options)
+    pub fn init(&mut self, bridge_settings: BridgeInitData, base_evm_settings: BaseEvmSettings) {
+        get_base_evm_state().0.borrow_mut().reset(base_evm_settings);
+        self.init_bridge(bridge_settings, Self::run_scheduler);
     }
 
     #[post_upgrade]
     pub fn post_upgrade(&mut self) {
-        self.set_timers();
+        self.bridge_post_upgrade(Self::run_scheduler);
     }
 
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    #[query]
-    pub fn list_mint_orders(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        pagination: Option<Pagination>,
-        memo: Option<String>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        get_operations_store()
-            .get_for_address(&wallet_address, pagination, memo)
-            .into_iter()
-            .filter_map(|(operation_id, status)| {
-                status
-                    .get_signed_mint_order(Some(src_token))
-                    .map(|mint_order| (operation_id.nonce(), *mint_order))
-            })
-            .collect()
+    fn run_scheduler() {
+        if get_base_evm_state().0.borrow().should_collect_evm_logs() {
+            get_base_evm_state().0.borrow_mut().collecting_logs_ts = Some(ic::time());
+            ic::spawn(process_base_evm_logs());
+        }
+
+        if get_base_evm_state().0.borrow().should_refresh_evm_params() {
+            get_base_evm_state().0.borrow_mut().refreshing_evm_params_ts = Some(ic::time());
+            ic::spawn(get_base_evm_state().refresh_base_evm_params());
+        }
+
+        get_runtime().borrow_mut().run();
     }
 
-    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
-    #[query]
-    pub fn get_mint_order(
-        &self,
-        wallet_address: H160,
-        src_token: Id256,
-        operation_id: u32,
-        pagination: Option<Pagination>,
-        memo: Option<String>,
-    ) -> Option<SignedMintOrder> {
-        self.list_mint_orders(wallet_address, src_token, pagination, memo)
-            .into_iter()
-            .find(|(nonce, _)| *nonce == operation_id)
-            .map(|(_, mint_order)| mint_order)
+    #[update]
+    fn set_base_bft_bridge_contract(&mut self, address: H160) {
+        let config = get_runtime_state().borrow().config.clone();
+        bridge_canister::inspect::inspect_set_bft_bridge_contract(config);
+        get_base_evm_config()
+            .borrow_mut()
+            .set_bft_bridge_contract(address.clone());
+
+        log::info!("Bridge canister base EVM BFT bridge contract address changed to {address}");
     }
 
     #[query]
+    /// Returns the list of operations for the given wallet address.
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>,
-    ) -> Vec<(OperationId, OperationPayload)> {
-        get_operations_store().get_for_address(&wallet_address, pagination, memo)
+        memo: Option<String>
+    ) -> Vec<(OperationId, Erc20BridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_for_address(&wallet_address, pagination, memo)
     }
 
-    /// Returns EVM address of the canister.
-    #[update]
-    pub async fn get_evm_address(&self) -> Option<H160> {
-        let signer = get_state().borrow().signer.get().clone();
-        match signer.get_address().await {
-            Ok(address) => Some(address),
-            Err(e) => {
-                log::error!("failed to get EVM address: {e}");
-                None
-            }
-        }
+    /// Returns the build data of the canister
+    #[query]
+    fn get_canister_build_data(&self) -> BuildData {
+        bridge_canister::build_data!()
     }
 
-    fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
-        if principal == Principal::anonymous() {
-            return Err(Error::AnonymousPrincipal);
-        }
-
-        Ok(())
-    }
-
+    /// Returns candid IDL.
+    /// This should be the last fn to see previous endpoints in macro.
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -213,90 +122,133 @@ impl LogCanister for EvmMinter {
     }
 }
 
-type TasksStorage =
-    StableBTreeMap<u32, InnerScheduledTask<BridgeTask>, VirtualMemory<DefaultMemoryImpl>>;
-type PersistentScheduler = Scheduler<BridgeTask, TasksStorage>;
+async fn process_base_evm_logs() {
+    log::trace!("processing base evm logs");
 
-fn log_task_execution_error(task: InnerScheduledTask<BridgeTask>) {
-    match task.status() {
-        TaskStatus::Failed {
-            timestamp_secs,
-            error,
-        } => {
-            log::error!(
-                "task #{} execution failed: {error} at {timestamp_secs}",
-                task.id()
-            )
+    let _lock = guard(get_base_evm_state(), |s| {
+        s.0.borrow_mut().collecting_logs_ts = None
+    });
+
+    let base_evm_state = get_base_evm_state();
+    const MAX_LOGS_PER_REQUEST: u64 = 1000;
+    let collect_result = base_evm_state
+        .collect_evm_events(MAX_LOGS_PER_REQUEST)
+        .await;
+    let collected = match collect_result {
+        Ok(c) => c,
+        Err(_) => {
+            log::warn!("failed to collect base EVM events");
+            return;
         }
-        TaskStatus::TimeoutOrPanic { timestamp_secs } => {
-            log::error!("task #{} panicked at {timestamp_secs}", task.id())
-        }
-        _ => (),
     };
+
+    log::debug!("collected base evm events: {collected:?}");
+
+    get_base_evm_config()
+        .borrow_mut()
+        .update_evm_params(|params| params.next_block = collected.last_block_nubmer + 1);
+
+    for event in collected.events {
+        if let Err(e) = process_base_evm_event(event) {
+            log::warn!("failed to process base EVM event: {e}")
+        };
+    }
+
+    log::debug!("base EVM logs processed");
+}
+
+fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
+    match event {
+        BridgeEvent::Burnt(event) => {
+            log::trace!("base token burnt");
+
+            let wrapped_evm_params = get_runtime_state().get_evm_params().expect(
+                "process_base_evm_event must not be called if wrapped evm params are not initialized",
+            );
+            let base_evm_params = get_base_evm_config().borrow().get_evm_params().expect(
+                "process_base_evm_logs must not be called if base evm params are not initialized",
+            );
+
+            let nonce = get_base_evm_state().0.borrow_mut().next_nonce();
+            let order = ops::mint_order_from_burnt_event(
+                event.clone(),
+                base_evm_params,
+                wrapped_evm_params,
+                nonce,
+            )
+            .ok_or_else(|| {
+                Error::Serialization(format!(
+                    "failed to create mint order from base evm burnt event: {event:?}"
+                ))
+            })?;
+
+            let op_id = OperationId::new(nonce as _);
+            let operation = Erc20BridgeOp {
+                side: BridgeSide::Wrapped,
+                stage: Erc20OpStage::SignMintOrder(order),
+            };
+            get_runtime_state()
+                .borrow_mut()
+                .operations
+                .new_operation_with_id(op_id, operation.clone());
+
+            get_runtime()
+                .borrow_mut()
+                .schedule_operation(op_id, operation);
+        }
+        BridgeEvent::Minted(event) => {
+            log::trace!("base token minted");
+
+            let Some((_, wrapped_token_sender)) =
+                Id256::from_slice(&event.sender_id).and_then(|id| id.to_evm_address().ok())
+            else {
+                return Err(Error::Serialization(
+                    "failed to decode wrapped address from minted event".into(),
+                ));
+            };
+
+            let Some((op_id, _)) = get_runtime_state()
+                .borrow()
+                .operations
+                .get_for_address_nonce(&wrapped_token_sender, event.nonce)
+            else {
+                return Err(Error::OperationNotFound(OperationId::new(event.nonce as _)));
+            };
+
+            let confirmed = Erc20BridgeOp {
+                side: BridgeSide::Base,
+                stage: Erc20OpStage::TokenMintConfirmed(event),
+            };
+            get_runtime_state()
+                .borrow_mut()
+                .operations
+                .update(op_id, confirmed);
+        }
+        BridgeEvent::Notify(_) => {}
+    };
+
+    Ok(())
 }
 
 thread_local! {
-    pub static STATE: Rc<RefCell<State>> = Rc::default();
+    pub static RUNTIME: SharedRuntime =
+        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static SCHEDULER: Rc<RefCell<PersistentScheduler>> = Rc::new(RefCell::new({
-        let pending_tasks =
-            TasksStorage::new(memory_by_id(PENDING_TASKS_MEMORY_ID));
-            PersistentScheduler::new(pending_tasks)
-    }));
+    pub static BASE_EVM_STATE: SharedEvmState = SharedEvmState::default();
 }
 
-pub fn get_state() -> Rc<RefCell<State>> {
-    STATE.with(|state| state.clone())
+pub fn get_runtime() -> SharedRuntime {
+    RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_scheduler() -> Rc<RefCell<PersistentScheduler>> {
-    SCHEDULER.with(|scheduler| scheduler.clone())
+pub fn get_runtime_state() -> RuntimeState<Erc20BridgeOp> {
+    get_runtime().borrow().state().clone()
 }
 
-pub fn get_operations_store() -> OperationStore<StableMemory, OperationPayload> {
-    let mem = OperationsMemory {
-        id_counter: memory_by_id(OPERATIONS_COUNTER_MEMORY_ID),
-        incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
-        operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
-        operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
-        memo_operations_map: memory_by_id(MEMO_OPERATION_MEMORY_ID),
-    };
-
-    OperationStore::with_memory(mem, None)
+pub fn get_base_evm_state() -> SharedEvmState {
+    BASE_EVM_STATE.with(|s| s.clone())
 }
 
-#[cfg(test)]
-mod test {
-    use bridge_utils::evm_link::EvmLink;
-    use candid::Principal;
-    use eth_signer::sign_strategy::SigningStrategy;
-    use ic_canister::{canister_call, Canister};
-    use ic_exports::ic_kit::inject::{self};
-    use ic_exports::ic_kit::MockContext;
-
-    use super::*;
-    use crate::EvmMinter;
-
-    #[tokio::test]
-    #[should_panic = "admin principal is anonymous"]
-    async fn disallow_anonymous_owner_in_init() {
-        MockContext::new().inject();
-        const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
-        let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-
-        inject::get_context().update_id(Principal::anonymous());
-
-        let mut canister = EvmMinter::from_principal(mock_canister_id);
-
-        let init_data = Settings {
-            base_evm_link: EvmLink::Http("".to_string()),
-            wrapped_evm_link: EvmLink::Http("".to_string()),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [0; 32],
-            },
-            log_settings: None,
-        };
-
-        canister_call!(canister.init(init_data), ()).await.unwrap();
-    }
+pub fn get_base_evm_config() -> Rc<RefCell<ConfigStorage>> {
+    BASE_EVM_STATE.with(|s| s.0.borrow().config.clone())
 }

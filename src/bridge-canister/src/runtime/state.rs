@@ -1,16 +1,17 @@
 pub mod config;
-mod task_lock;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use ic_exports::ic_kit::ic;
-pub use task_lock::{TaskLock, TASK_LOCK_TIMEOUT};
 
 use self::config::ConfigStorage;
 use crate::bridge::Operation;
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
+
+const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
 
@@ -39,7 +40,7 @@ impl<Op: Operation> State<Op> {
     /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `refreshing_evm_params_ts` is `None`.
     pub fn should_refresh_evm_params(&self) -> bool {
         self.refreshing_evm_params_ts
-            .map(|ts| (ts + TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
+            .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
             .unwrap_or(true)
     }
 
@@ -48,7 +49,7 @@ impl<Op: Operation> State<Op> {
     /// The EVM logs are collected if the `collecting_logs_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `collecting_logs_ts` is `None`.
     pub fn should_collect_evm_logs(&self) -> bool {
         self.collecting_logs_ts
-            .map(|ts| (ts + TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
+            .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
             .unwrap_or(true)
     }
 }
@@ -125,7 +126,7 @@ mod tests {
         state.borrow_mut().refreshing_evm_params_ts = Some(time);
         assert!(!state.borrow().should_refresh_evm_params());
 
-        context.add_time(TASK_LOCK_TIMEOUT.as_nanos() as u64 + 1);
+        context.add_time(SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64 + 1);
         assert!(state.borrow().should_refresh_evm_params());
     }
 
@@ -140,7 +141,7 @@ mod tests {
         state.borrow_mut().collecting_logs_ts = Some(time);
         assert!(!state.borrow().should_collect_evm_logs());
 
-        context.add_time(TASK_LOCK_TIMEOUT.as_nanos() as u64 + 1);
+        context.add_time(SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64 + 1);
         assert!(state.borrow().should_collect_evm_logs());
     }
 }
