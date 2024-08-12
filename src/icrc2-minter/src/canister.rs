@@ -25,6 +25,7 @@ use ic_storage::IcStorage;
 use crate::ops::IcrcBridgeOp;
 use crate::state::IcrcState;
 
+#[cfg(feature = "export-api")]
 mod inspect;
 
 type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;

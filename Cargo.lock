@@ -1027,6 +1027,7 @@ name = "btc-bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-canister",
  "bridge-did",
  "bridge-utils",
  "candid",
@@ -1049,6 +1050,7 @@ dependencies = [
  "num-traits",
  "serde",
  "tokio",
+ "vergen",
 ]
 
 [[package]]
