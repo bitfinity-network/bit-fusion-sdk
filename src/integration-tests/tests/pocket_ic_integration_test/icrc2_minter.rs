@@ -6,7 +6,8 @@ use bridge_did::id256::Id256;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
-use eth_signer::Signer;
+use eth_signer::{Signer, Wallet};
+use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
@@ -396,4 +397,107 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .into();
 
     assert_eq!(allowance, approve_amount);
+}
+
+async fn icrc2_token_bridge(
+    ctx: &PocketIcTestContext,
+    john_wallet: Wallet<'static, SigningKey>,
+    bft_bridge: &H160,
+    fee_charge: &H160,
+    wrapped_token: &H160,
+) {
+    let minter_client = ctx.icrc_minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let amount = 300_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(10);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
+    eprintln!("burning icrc tokens and creating mint order");
+    ctx.burn_icrc2(
+        JOHN,
+        &john_wallet,
+        bft_bridge,
+        wrapped_token,
+        amount as _,
+        Some(john_address),
+        None,
+    )
+    .await
+    .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+}
+
+#[tokio::test]
+async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip() {
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let evm_client = ctx.evm_client(ADMIN);
+
+    let minter_address = ctx
+        .get_icrc_bridge_canister_evm_address(ADMIN)
+        .await
+        .unwrap();
+
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    const TOTAL_TX: u64 = 100;
+    for _ in 0..TOTAL_TX {
+        let bridge_balance_before_mint = evm_client
+            .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+            .await
+            .unwrap()
+            .unwrap();
+
+        icrc2_token_bridge(
+            &ctx,
+            john_wallet.clone(),
+            &bft_bridge,
+            &fee_charge,
+            &wrapped_token,
+        )
+        .await;
+
+        let bridge_balance_after_mint = evm_client
+            .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(dbg!(bridge_balance_before_mint) <= dbg!(bridge_balance_after_mint));
+    }
 }
