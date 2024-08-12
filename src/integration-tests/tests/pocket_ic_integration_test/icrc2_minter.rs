@@ -480,9 +480,13 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await
         .unwrap();
 
-    const TOTAL_TX: u64 = 1;
+    let bridge_balance_before_mint = evm_client
+        .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap();
 
-    // Do over 10 transaction and see the balance gets replenished
+    const TOTAL_TX: u64 = 10;
     for _ in 0..TOTAL_TX {
         icrc2_token_bridge(
             &ctx,
