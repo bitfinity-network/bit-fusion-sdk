@@ -88,7 +88,7 @@ impl EvmMinter {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>
+        memo: Option<String>,
     ) -> Vec<(OperationId, Erc20BridgeOp)> {
         get_runtime_state()
             .borrow()
@@ -190,7 +190,7 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
             get_runtime_state()
                 .borrow_mut()
                 .operations
-                .new_operation_with_id(op_id, operation.clone());
+                .new_operation_with_id(op_id, operation.clone(), None);
 
             get_runtime()
                 .borrow_mut()

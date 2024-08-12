@@ -135,6 +135,7 @@ pub enum OperationAction<Op> {
     Create(Op),
     CreateWithId(OperationId, Op),
     Update { nonce: u32, update_to: Op },
+    CreateWithIdAndMemo(OperationId, Op, String),
 }
 
 #[derive(Debug)]

@@ -149,7 +149,13 @@ impl ServiceTask {
                 Some(OperationAction::CreateWithId(id, op)) => {
                     ctx.borrow_mut()
                         .operations
-                        .new_operation_with_id(id, op.clone());
+                        .new_operation_with_id(id, op.clone(), None);
+                    op.scheduling_options().zip(Some((id, op)))
+                }
+                Some(OperationAction::CreateWithIdAndMemo(id, op, memo)) => {
+                    ctx.borrow_mut()
+                        .operations
+                        .new_operation_with_id(id, op.clone(), Some(memo));
                     op.scheduling_options().zip(Some((id, op)))
                 }
                 Some(OperationAction::Update { nonce, update_to }) => {

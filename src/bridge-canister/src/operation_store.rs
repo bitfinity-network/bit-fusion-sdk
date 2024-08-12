@@ -177,8 +177,6 @@ where
         if let Some(memo) = memo {
             self.memo_operation_map.insert(memo, id);
         }
-
-        
     }
 
     /// Retrieves an operation by its ID.
@@ -199,7 +197,7 @@ where
         dst_address: &H160,
         nonce: u32,
     ) -> Option<(OperationId, P)> {
-        self.get_for_address(dst_address, None)
+        self.get_for_address(dst_address, None, None)
             .iter()
             .find(|(op_id, _)| op_id.nonce() == nonce)
             .cloned()
