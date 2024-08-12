@@ -140,7 +140,7 @@ impl RunesContext {
 
         let _: () = context
             .rune_bridge_client(ADMIN)
-            .set_bft_bridge_contract(bft_bridge.clone())
+            .set_bft_bridge_contract(&bft_bridge)
             .await
             .unwrap();
 

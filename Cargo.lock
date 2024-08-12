@@ -924,6 +924,7 @@ dependencies = [
  "candid",
  "cfg-if 1.0.0",
  "did",
+ "drop_guard",
  "env_logger",
  "eth-signer",
  "ethereum-json-rpc-client",
@@ -1068,6 +1069,7 @@ name = "btc-bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-canister",
  "bridge-did",
  "bridge-utils",
  "candid",
@@ -1090,6 +1092,7 @@ dependencies = [
  "num-traits",
  "serde",
  "tokio",
+ "vergen",
 ]
 
 [[package]]
@@ -1963,6 +1966,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 
 [[package]]
+name = "drop_guard"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c4a817d8b683f6e649aed359aab0c47a875377516bb5791d0f7e46d9066d209"
+
+[[package]]
 name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2145,6 +2154,7 @@ dependencies = [
  "bridge-utils",
  "candid",
  "did",
+ "drop_guard",
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
@@ -2160,6 +2170,7 @@ dependencies = [
  "log",
  "serde",
  "tokio",
+ "vergen",
 ]
 
 [[package]]
@@ -6004,6 +6015,7 @@ dependencies = [
  "bip39",
  "bitcoin 0.31.2",
  "bitcoincore-rpc",
+ "bridge-canister",
  "bridge-client",
  "bridge-did",
  "bridge-utils",
