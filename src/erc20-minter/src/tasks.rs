@@ -271,7 +271,7 @@ impl BridgeTask {
             Ok(BridgeEvent::Burnt(burnt)) => {
                 log::debug!("Adding PrepareMintOrder task");
                 let operation_id = get_operations_store()
-                    .new_operation(OperationPayload::new(sender_side.other(), burnt));
+                    .new_operation(OperationPayload::new(sender_side.other(), burnt), None);
                 let mint_order_task = BridgeTask::PrepareMintOrder(operation_id);
                 return Some(mint_order_task.into_scheduled(options));
             }
@@ -313,7 +313,7 @@ impl BridgeTask {
         let mut operation_store = get_operations_store();
         let nonce = minted_event.nonce;
         let Some((operation_id, operation_state)) = operation_store
-            .get_for_address(&wallet_id, None)
+            .get_for_address(&wallet_id, None, None)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {

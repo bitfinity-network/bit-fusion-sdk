@@ -25,6 +25,7 @@ where
 {
     dst_address: H160,
     payload: P,
+    memo: Option<String>,
 }
 
 impl<P> Storable for OperationStoreEntry<P>
@@ -79,6 +80,7 @@ pub struct OperationsMemory<Mem> {
     pub incomplete_operations: Mem,
     pub operations_log: Mem,
     pub operations_map: Mem,
+    pub memo_operations_map: Mem,
 }
 
 /// A structure to store user-initiated operations in IC stable memory.
@@ -97,6 +99,7 @@ where
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
+    memo_operation_map: StableBTreeMap<String, OperationId, M>,
     max_operation_log_size: u64,
 }
 
@@ -120,6 +123,7 @@ where
             ),
             operations_log: StableBTreeMap::new(memory.operations_log),
             address_operation_map: StableBTreeMap::new(memory.operations_map),
+            memo_operation_map: StableBTreeMap::new(memory.memo_operations_map),
             max_operation_log_size: options.max_operations_count,
         }
     }
@@ -137,12 +141,14 @@ where
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation(&mut self, payload: P) -> OperationId {
+    pub fn new_operation(&mut self, payload: P, memo: Option<String>) -> OperationId {
         let id = self.next_operation_id();
         let dst_address = payload.evm_wallet_address();
+
         let entry = OperationStoreEntry {
             dst_address: dst_address.clone(),
             payload,
+            memo: memo.clone(),
         };
 
         log::trace!("Operation {id} is created.");
@@ -159,6 +165,11 @@ where
             .unwrap_or_default();
         ids.0.push(id);
         self.address_operation_map.insert(dst_address, ids);
+
+        // Add memo to memo_operation_map
+        if let Some(memo) = memo {
+            self.memo_operation_map.insert(memo, id);
+        }
 
         id
     }
@@ -183,21 +194,40 @@ where
         &self,
         dst_address: &H160,
         pagination: Option<Pagination>,
+        memo: Option<String>,
     ) -> Vec<(OperationId, P)> {
         log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
 
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
         let count = pagination.map(|p| p.count).unwrap_or(usize::MAX);
 
-        self.address_operation_map
-            .get(dst_address)
-            .unwrap_or_default()
-            .0
-            .into_iter()
-            .filter_map(|id| self.get_with_id(id))
-            .skip(offset)
-            .take(count)
-            .collect()
+        if let Some(memo) = memo {
+            self.memo_operation_map
+                .get(&memo)
+                .and_then(|id| self.get_with_id(id))
+                .filter(|(_, p)| p.evm_wallet_address() == *dst_address)
+                .into_iter()
+                .skip(offset)
+                .take(count)
+                .collect()
+        } else {
+            self.address_operation_map
+                .get(dst_address)
+                .unwrap_or_default()
+                .0
+                .into_iter()
+                .filter_map(|id| self.get_with_id(id))
+                .skip(offset)
+                .take(count)
+                .collect()
+        }
+    }
+
+    /// Retrieves an operation by its memo.
+    pub fn get_by_memo(&self, memo: impl Into<String>) -> Option<P> {
+        self.memo_operation_map
+            .get(&memo.into())
+            .and_then(|id| self.get(id))
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
@@ -248,6 +278,10 @@ where
                 } else {
                     self.address_operation_map.insert(oldest.dst_address, ids);
                 }
+            }
+
+            if let Some(memo) = oldest.memo {
+                self.memo_operation_map.remove(&memo);
             }
 
             log::trace!("Operation {id} is evicted from the operation log");
@@ -326,6 +360,7 @@ mod tests {
             incomplete_operations: VectorMemory::default(),
             operations_log: VectorMemory::default(),
             operations_map: VectorMemory::default(),
+            memo_operations_map: VectorMemory::default(),
         };
         OperationStore::with_memory(
             memory,
@@ -348,7 +383,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            store.new_operation(TestOp::complete(i as _));
+            store.new_operation(TestOp::complete(i as _), None);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -356,12 +391,17 @@ mod tests {
 
         for i in 0..(COUNT - LIMIT) {
             assert!(store
-                .get_for_address(&eth_address(i as u8), None)
+                .get_for_address(&eth_address(i as u8), None, None)
                 .is_empty());
         }
 
         for i in (COUNT - LIMIT)..COUNT {
-            assert_eq!(store.get_for_address(&eth_address(i as u8), None).len(), 1,);
+            assert_eq!(
+                store
+                    .get_for_address(&eth_address(i as u8), None, None)
+                    .len(),
+                1,
+            );
         }
     }
 
@@ -373,24 +413,24 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(TestOp::complete(0));
+            store.new_operation(TestOp::complete(0), None);
         }
 
         assert_eq!(store.operations_log.len(), COUNT);
 
         // No offset, with count
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 10)));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 10)), None);
         assert_eq!(page.len(), 10);
         // No offset with count > total
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 120)));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 120)), None);
         assert_eq!(page.len() as u64, COUNT);
 
         // Offset with count
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(20, 15)));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(20, 15)), None);
         assert_eq!(page.len(), 15);
 
         // Offset with count beyond total
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(100, 10)));
+        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(100, 10)), None);
         assert!(page.is_empty());
     }
 
@@ -402,7 +442,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(TestOp::complete(42));
+            store.new_operation(TestOp::complete(42), None);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -410,7 +450,7 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), Some(Pagination::new(0, 10)))
+                .get_for_address(&eth_address(42), Some(Pagination::new(0, 10)), None)
                 .len(),
             LIMIT as usize
         );
@@ -424,7 +464,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            let id = store.new_operation(TestOp::new(42, i as _));
+            let id = store.new_operation(TestOp::new(42, i as _), None);
             store.update(id, TestOp::new(42, (i + 1) as _));
         }
 
@@ -434,7 +474,11 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), Some(Pagination::new(0, COUNT as usize)))
+                .get_for_address(
+                    &eth_address(42),
+                    Some(Pagination::new(0, COUNT as usize)),
+                    None
+                )
                 .len(),
             COUNT as usize
         );
@@ -449,7 +493,7 @@ mod tests {
 
         let mut ids = vec![];
         for i in 0..COUNT {
-            ids.push(store.new_operation(TestOp::new(i as _, 1)));
+            ids.push(store.new_operation(TestOp::new(i as _, 1), None));
         }
 
         for id in ids {
@@ -462,5 +506,20 @@ mod tests {
         assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.incomplete_operations.len(), 0);
         assert_eq!(store.address_operation_map.len(), LIMIT);
+    }
+
+    #[test]
+    fn test_get_operation_by_memo() {
+        const COUNT: u64 = 42;
+
+        let mut store = test_store(COUNT);
+
+        for i in 0..COUNT {
+            store.new_operation(TestOp::new(i as _, 1), Some(format!("{i}")));
+        }
+
+        for i in 0..COUNT {
+            assert_eq!(store.get_by_memo(&format!("{i}")).unwrap().addr, i as u32);
+        }
     }
 }

@@ -188,7 +188,7 @@ impl ServiceTask {
         };
 
         log::debug!(
-            "Got evm logs between blocks {} and {last_request_block} (last chain block is {last_chain_block}: {logs:?}", 
+            "Got evm logs between blocks {} and {last_request_block} (last chain block is {last_chain_block}: {logs:?}",
             evm_params.next_block
         );
 
@@ -218,14 +218,14 @@ impl ServiceTask {
 
             let to_schedule = match operation_action {
                 Some(OperationAction::Create(op)) => {
-                    let new_op_id = ctx.borrow_mut().operations.new_operation(op.clone());
+                    let new_op_id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
                     op.scheduling_options().zip(Some((new_op_id, op)))
                 }
                 Some(OperationAction::Update { nonce, update_to }) => {
                     let Some((operation_id, _)) = ctx
                         .borrow()
                         .operations
-                        .get_for_address(&update_to.evm_wallet_address(), None)
+                        .get_for_address(&update_to.evm_wallet_address(), None, None)
                         .into_iter()
                         .find(|(operation_id, _)| operation_id.nonce() == nonce)
                     else {

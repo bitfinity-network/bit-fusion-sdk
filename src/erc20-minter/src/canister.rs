@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::memory::{memory_by_id, StableMemory, MEMO_OPERATION_MEMORY_ID};
 use bridge_canister::operation_store::{OperationStore, OperationsMemory};
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
@@ -135,9 +135,10 @@ impl EvmMinter {
         wallet_address: H160,
         src_token: Id256,
         pagination: Option<Pagination>,
+        memo: Option<String>,
     ) -> Vec<(u32, SignedMintOrder)> {
         get_operations_store()
-            .get_for_address(&wallet_address, pagination)
+            .get_for_address(&wallet_address, pagination, memo)
             .into_iter()
             .filter_map(|(operation_id, status)| {
                 status
@@ -155,8 +156,9 @@ impl EvmMinter {
         src_token: Id256,
         operation_id: u32,
         pagination: Option<Pagination>,
+        memo: Option<String>,
     ) -> Option<SignedMintOrder> {
-        self.list_mint_orders(wallet_address, src_token, pagination)
+        self.list_mint_orders(wallet_address, src_token, pagination, memo)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
@@ -167,8 +169,9 @@ impl EvmMinter {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
+        memo: Option<String>,
     ) -> Vec<(OperationId, OperationPayload)> {
-        get_operations_store().get_for_address(&wallet_address, pagination)
+        get_operations_store().get_for_address(&wallet_address, pagination, memo)
     }
 
     /// Returns EVM address of the canister.
@@ -256,6 +259,7 @@ pub fn get_operations_store() -> OperationStore<StableMemory, OperationPayload> 
         incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
         operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
         operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
+        memo_operations_map: memory_by_id(MEMO_OPERATION_MEMORY_ID),
     };
 
     OperationStore::with_memory(mem, None)

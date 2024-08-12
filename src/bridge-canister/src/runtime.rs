@@ -19,9 +19,9 @@ use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
 use crate::memory::{
-    memory_by_id, StableMemory, CONFIG_MEMORY_ID, OPERATIONS_ID_COUNTER_MEMORY_ID,
-    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID,
+    memory_by_id, StableMemory, CONFIG_MEMORY_ID, MEMO_OPERATION_MEMORY_ID,
+    OPERATIONS_ID_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
 };
 use crate::operation_store::OperationsMemory;
 
@@ -120,6 +120,7 @@ fn operation_storage_memory() -> OperationsMemory<StableMemory> {
         incomplete_operations: memory_by_id(OPERATIONS_MEMORY_ID),
         operations_log: memory_by_id(OPERATIONS_LOG_MEMORY_ID),
         operations_map: memory_by_id(OPERATIONS_MAP_MEMORY_ID),
+        memo_operations_map: memory_by_id(MEMO_OPERATION_MEMORY_ID),
     }
 }
 

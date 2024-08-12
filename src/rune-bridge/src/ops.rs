@@ -193,7 +193,7 @@ impl RuneBridgeOp {
         let mut state = state.borrow_mut();
         let ids = operations
             .into_iter()
-            .map(|op| state.operations.new_operation(op))
+            .map(|op| state.operations.new_operation(op, None))
             .collect();
         Self::OperationSplit {
             wallet_address,

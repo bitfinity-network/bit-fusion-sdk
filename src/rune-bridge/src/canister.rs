@@ -72,11 +72,12 @@ impl RuneBridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
+        memo: Option<String>,
     ) -> Vec<(OperationId, RuneBridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_for_address(&wallet_address, pagination)
+            .get_for_address(&wallet_address, pagination, memo)
     }
 
     #[update]
