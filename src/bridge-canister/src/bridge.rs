@@ -9,6 +9,7 @@ use bridge_utils::evm_link::EvmLink;
 use candid::CandidType;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
+use ethers_core::types::U64;
 use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

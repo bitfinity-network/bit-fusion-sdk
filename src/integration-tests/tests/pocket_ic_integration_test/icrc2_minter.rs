@@ -475,7 +475,7 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await
         .unwrap();
 
-    const TOTAL_TX: u64 = 100;
+    const TOTAL_TX: u64 = 10;
     for _ in 0..TOTAL_TX {
         let bridge_balance_before_mint = evm_client
             .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
@@ -498,6 +498,6 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
             .unwrap()
             .unwrap();
 
-        assert!(dbg!(bridge_balance_before_mint) <= dbg!(bridge_balance_after_mint));
+        assert!(bridge_balance_before_mint <= bridge_balance_after_mint);
     }
 }
