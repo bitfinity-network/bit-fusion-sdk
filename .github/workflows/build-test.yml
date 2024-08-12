@@ -79,6 +79,7 @@ jobs:
         run: |
           export RUST_BACKTRACE="full"
           cargo install ic-wasm
+          # TO BE FIXED: https://infinityswap.atlassian.net/browse/EPROD-958
           cargo install icx-proxy --version 0.10.1
           sudo apt update
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates

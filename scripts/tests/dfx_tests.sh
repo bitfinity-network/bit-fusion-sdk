@@ -78,7 +78,7 @@ fi
 # check bad dfx version
 DFX_VERSION=$(dfx --version | awk '{print $2}')
 if [ "$DFX_VERSION" = "0.18.0" ]; then
-    echo "dfx version 0.18.0 doesn't work with bitcoin integration. Please upgrade to 0.19.0"
+    echo "dfx version 0.18.0 doesn't work with bitcoin integration. Please upgrade to >=0.19.0"
     exit 1
 fi
 
