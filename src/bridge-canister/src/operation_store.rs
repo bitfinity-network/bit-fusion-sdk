@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
@@ -17,30 +18,6 @@ use crate::bridge::Operation;
 
 const DEFAULT_CACHE_SIZE: u32 = 1000;
 const DEFAULT_MAX_REQUEST_COUNT: u64 = 100_000;
-
-#[derive(Debug, Clone, CandidType, Deserialize)]
-struct OperationStoreEntry<P>
-where
-    P: CandidType,
-{
-    dst_address: H160,
-    payload: P,
-}
-
-impl<P> Storable for OperationStoreEntry<P>
-where
-    P: CandidType + Clone + for<'de> Deserialize<'de>,
-{
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).expect("failed to encode deposit request"))
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(&bytes, Self).expect("failed to decode deposit request")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
 
 #[derive(Default, Debug, Clone, CandidType, Deserialize)]
 struct OperationIdList(Vec<OperationId>);
@@ -94,8 +71,8 @@ where
     P: Operation,
 {
     operation_id_counter: StableCell<u64, M>,
-    incomplete_operations: CachedStableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
-    operations_log: StableBTreeMap<OperationId, OperationStoreEntry<P>, M>,
+    incomplete_operations: CachedStableBTreeMap<OperationId, OperationLog<P>, M>,
+    operations_log: StableBTreeMap<OperationId, OperationLog<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
     max_operation_log_size: u64,
 }
@@ -145,39 +122,46 @@ where
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation_with_id(&mut self, id: OperationId, payload: P) {
-        let dst_address = payload.evm_wallet_address();
-        let entry = OperationStoreEntry {
-            dst_address: dst_address.clone(),
-            payload,
-        };
+    pub fn new_operation_with_id(&mut self, id: OperationId, payload: P) -> OperationId {
+        let wallet_address = payload.evm_wallet_address();
+        let is_complete = payload.is_complete();
+        let log = OperationLog::new(payload, wallet_address.clone());
 
         log::trace!("Operation {id} is created.");
 
-        if entry.payload.is_complete() {
-            self.move_to_log(id, entry);
+        if is_complete {
+            self.move_to_log(id, log);
         } else {
-            self.incomplete_operations.insert(id, entry);
+            self.incomplete_operations.insert(id, log);
         }
 
         let mut ids = self
             .address_operation_map
-            .get(&dst_address)
+            .get(&wallet_address)
             .unwrap_or_default();
         ids.0.push(id);
-        self.address_operation_map.insert(dst_address, ids);
+        self.address_operation_map.insert(wallet_address, ids);
+
+        id
     }
 
     /// Retrieves an operation by its ID.
     pub fn get(&self, operation_id: OperationId) -> Option<P> {
-        self.get_with_id(operation_id).map(|(_, p)| p)
+        self.get_log(operation_id).map(|p| p.current_step().clone())
+    }
+
+    /// Returns log of an operation by its ID.
+    pub fn get_log(&self, operation_id: OperationId) -> Option<OperationLog<P>> {
+        self.incomplete_operations
+            .get(&operation_id)
+            .or_else(|| self.operations_log.get(&operation_id))
     }
 
     fn get_with_id(&self, operation_id: OperationId) -> Option<(OperationId, P)> {
         self.incomplete_operations
             .get(&operation_id)
             .or_else(|| self.operations_log.get(&operation_id))
-            .map(|entry| (operation_id, entry.payload))
+            .map(|log| (operation_id, log.current_step().clone()))
     }
 
     /// Returns operation for the given address with the given nonce, if present.
@@ -220,23 +204,34 @@ where
     /// Update the payload of the operation with the given id. If no operation with the given ID
     /// is found, nothing is done (except an error message in the log).
     pub fn update(&mut self, operation_id: OperationId, payload: P) {
-        let Some(mut entry) = self.incomplete_operations.get(&operation_id) else {
+        let Some(mut log) = self.incomplete_operations.get(&operation_id) else {
             log::error!("Cannot update operation {operation_id} status: not found");
             return;
         };
 
-        entry.payload = payload;
+        let is_complete = payload.is_complete();
+        log.add_step(Ok(payload));
 
-        if entry.payload.is_complete() {
-            self.move_to_log(operation_id, entry);
+        if is_complete {
+            self.move_to_log(operation_id, log);
         } else {
-            self.incomplete_operations.insert(operation_id, entry);
+            self.incomplete_operations.insert(operation_id, log);
         }
     }
 
-    fn move_to_log(&mut self, operation_id: OperationId, entry: OperationStoreEntry<P>) {
+    pub fn update_with_err(&mut self, operation_id: OperationId, error_message: String) {
+        let Some(mut log) = self.incomplete_operations.get(&operation_id) else {
+            log::error!("Cannot update operation {operation_id} status: not found");
+            return;
+        };
+
+        log.add_step(Err(error_message));
+        self.incomplete_operations.insert(operation_id, log);
+    }
+
+    fn move_to_log(&mut self, operation_id: OperationId, log: OperationLog<P>) {
         self.incomplete_operations.remove(&operation_id);
-        self.operations_log.insert(operation_id, entry);
+        self.operations_log.insert(operation_id, log);
 
         log::trace!("Operation {operation_id} is marked as complete and moved to the log.");
 
@@ -254,16 +249,18 @@ where
             self.operations_log.remove(&id);
             let mut ids = self
                 .address_operation_map
-                .get(&oldest.dst_address)
+                .get(oldest.wallet_address())
                 .unwrap_or_default();
             let count_before = ids.0.len();
             ids.0.retain(|stored_id| *stored_id != id);
 
             if ids.0.len() != count_before {
                 if ids.0.is_empty() {
-                    self.address_operation_map.remove(&oldest.dst_address);
+                    self.address_operation_map.remove(oldest.wallet_address());
                 } else {
-                    self.address_operation_map.insert(oldest.dst_address, ids);
+                    // We rewrite the value stored in stable memory with the updated value here
+                    self.address_operation_map
+                        .insert(oldest.wallet_address().clone(), ids);
                 }
             }
 
@@ -275,6 +272,7 @@ where
 #[cfg(test)]
 mod tests {
     use bridge_did::error::BftResult;
+    use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::VectorMemory;
     use serde::Serialize;
 
@@ -338,6 +336,7 @@ mod tests {
     }
 
     fn test_store(max_operations: u64) -> OperationStore<VectorMemory, TestOp> {
+        MockContext::new().inject();
         let memory = OperationsMemory {
             id_counter: VectorMemory::default(),
             incomplete_operations: VectorMemory::default(),
