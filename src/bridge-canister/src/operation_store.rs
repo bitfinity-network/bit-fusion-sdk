@@ -2,7 +2,6 @@
 //! to track an operation status and retrieve all operations for a given user ETH wallet.
 
 use std::borrow::Cow;
-use std::fmt::Debug;
 
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
@@ -117,6 +116,13 @@ where
     /// and stores it.
     pub fn new_operation(&mut self, payload: P) -> OperationId {
         let id = self.next_operation_id();
+        self.new_operation_with_id(id, payload);
+        id
+    }
+
+    /// Initializes a new operation with the given payload for the given ETH wallet address
+    /// and stores it.
+    pub fn new_operation_with_id(&mut self, id: OperationId, payload: P) -> OperationId {
         let wallet_address = payload.evm_wallet_address();
         let is_complete = payload.is_complete();
         let log = OperationLog::new(payload, wallet_address.clone());
@@ -156,6 +162,18 @@ where
             .get(&operation_id)
             .or_else(|| self.operations_log.get(&operation_id))
             .map(|log| (operation_id, log.current_step().clone()))
+    }
+
+    /// Returns operation for the given address with the given nonce, if present.
+    pub fn get_for_address_nonce(
+        &self,
+        dst_address: &H160,
+        nonce: u32,
+    ) -> Option<(OperationId, P)> {
+        self.get_for_address(dst_address, None)
+            .iter()
+            .find(|(op_id, _)| op_id.nonce() == nonce)
+            .cloned()
     }
 
     /// Retrieves all operations for the given ETH wallet address,

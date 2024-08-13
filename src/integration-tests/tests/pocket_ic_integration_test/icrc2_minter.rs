@@ -6,7 +6,8 @@ use bridge_did::id256::Id256;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
-use eth_signer::Signer;
+use eth_signer::{Signer, Wallet};
+use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
@@ -200,10 +201,15 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
     let minter_client = ctx.icrc_minter_client(ADMIN);
-    let (_, refund_mint_order) = minter_client
-        .list_mint_orders(&john_address, &base_token_id, Some(0u64), Some(1024u64))
+    let refund_mint_order = dbg!(minter_client
+        .get_operations_list(&john_address, None)
         .await
-        .unwrap()[0];
+        .unwrap())
+    .last()
+    .unwrap()
+    .1
+    .get_signed_mint_order(&dbg!(base_token_id))
+    .expect("mint order prepared");
 
     let receipt = ctx
         .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
@@ -396,4 +402,126 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .into();
 
     assert_eq!(allowance, approve_amount);
+}
+
+async fn icrc2_token_bridge(
+    ctx: &PocketIcTestContext,
+    john_wallet: Wallet<'static, SigningKey>,
+    bft_bridge: &H160,
+    fee_charge: &H160,
+    wrapped_token: &H160,
+) {
+    let minter_client = ctx.icrc_minter_client(ADMIN);
+    minter_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let amount = 300_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(10);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
+    eprintln!("burning icrc tokens and creating mint order");
+    ctx.burn_icrc2(
+        JOHN,
+        &john_wallet,
+        bft_bridge,
+        wrapped_token,
+        amount as _,
+        Some(john_address),
+        None,
+    )
+    .await
+    .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+}
+
+#[tokio::test]
+async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip() {
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let evm_client = ctx.evm_client(ADMIN);
+
+    let minter_address = ctx
+        .get_icrc_bridge_canister_evm_address(ADMIN)
+        .await
+        .unwrap();
+
+    // Get balance before replenishment
+    let original_balance = evm_client
+        .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap();
+
+    println!("original balance: {original_balance:?}");
+
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(10);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    assert_eq!(original_balance, U256::from(1_000_000_000_000_000_000_u64));
+
+    const TOTAL_TX: u64 = 1;
+
+    // Do over 10 transaction and see the balance gets replenished
+    for _ in 0..TOTAL_TX {
+        icrc2_token_bridge(
+            &ctx,
+            john_wallet.clone(),
+            &bft_bridge,
+            &fee_charge,
+            &wrapped_token,
+        )
+        .await;
+
+        ctx.advance_by_times(Duration::from_secs(2), 20).await;
+    }
+
+    let new_balance = evm_client
+        .eth_get_balance(minter_address, did::BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap();
+
+    println!("balance: {new_balance:?}");
+
+    // // Find the average balance
+    // let average_balance = (original_balance - new_balance)
+    //     .checked_div(&TOTAL_TX.into())
+    //     .unwrap();
+
+    // println!("average balance: {average_balance:?}"); // 633_244_621_465 //729_843_323_269
+
+    // Find the gas spent on each transaction
+    // convert ether to gas
 }
