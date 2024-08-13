@@ -8,6 +8,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
@@ -77,6 +78,18 @@ impl RuneBridge {
             .borrow()
             .operations
             .get_for_address(&wallet_address, pagination)
+    }
+
+    /// Returns log of an operation by its ID.
+    #[query]
+    pub fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> Option<OperationLog<RuneBridgeOp>> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_log(operation_id)
     }
 
     #[update]
