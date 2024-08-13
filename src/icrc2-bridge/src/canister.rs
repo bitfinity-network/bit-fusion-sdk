@@ -30,22 +30,22 @@ pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
-pub struct MinterCanister {
+pub struct Icrc2BridgeCanister {
     #[id]
     id: Principal,
 }
 
-impl PreUpdate for MinterCanister {
+impl PreUpdate for Icrc2BridgeCanister {
     fn pre_update(&self, _method_name: &str, _method_type: MethodType) {}
 }
 
-impl BridgeCanister for MinterCanister {
+impl BridgeCanister for Icrc2BridgeCanister {
     fn config(&self) -> SharedConfig {
         ConfigStorage::get()
     }
 }
 
-impl MinterCanister {
+impl Icrc2BridgeCanister {
     /// Initialize the canister with given data.
     #[init]
     pub fn init(&mut self, init_data: BridgeInitData) {
@@ -134,13 +134,13 @@ impl MinterCanister {
     }
 }
 
-impl LogCanister for MinterCanister {
+impl LogCanister for Icrc2BridgeCanister {
     fn log_state(&self) -> Rc<RefCell<LogState>> {
         LogState::get()
     }
 }
 
-impl Metrics for MinterCanister {
+impl Metrics for Icrc2BridgeCanister {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         MetricsStorage::get()
     }
@@ -193,18 +193,18 @@ mod test {
     use ic_exports::ic_kit::{inject, MockContext};
 
     use super::*;
-    use crate::MinterCanister;
+    use crate::Icrc2BridgeCanister;
 
     fn owner() -> Principal {
         Principal::from_slice(&[1; 20])
     }
 
-    async fn init_canister() -> MinterCanister {
+    async fn init_canister() -> Icrc2BridgeCanister {
         MockContext::new().inject();
 
         const MOCK_PRINCIPAL: &str = "mfufu-x6j4c-gomzb-geilq";
         let mock_canister_id = Principal::from_text(MOCK_PRINCIPAL).expect("valid principal");
-        let mut canister = MinterCanister::from_principal(mock_canister_id);
+        let mut canister = Icrc2BridgeCanister::from_principal(mock_canister_id);
 
         let init_data = BridgeInitData {
             owner: owner(),

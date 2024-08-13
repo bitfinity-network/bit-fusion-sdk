@@ -35,7 +35,7 @@ create_canister() {
   dfx canister --network=$NETWORK create --with-cycles=600000000000 $CANISTER
 }
 
-deploy_icrc2_minter() {
+deploy_icrc2_bridge() {
   NETWORK="$1"
   INSTALL_MODE="$2"
   EVM_PRINCIPAL="$3"
@@ -43,7 +43,7 @@ deploy_icrc2_minter() {
   SIGNING_STRATEGY="$5"
   LOG_SETTINGS="$6"
 
-  create_canister $NETWORK icrc2-minter
+  create_canister $NETWORK icrc2-bridge
 
   args="(record {
     evm_principal = principal \"$EVM_PRINCIPAL\";
@@ -52,12 +52,12 @@ deploy_icrc2_minter() {
     owner = principal \"$ADMIN_PRINCIPAL\";
   })"
 
-  echo "deploying icrc2-minter with args: $args"
+  echo "deploying icrc2-bridge with args: $args"
 
-  dfx canister install --mode=$INSTALL_MODE --wasm=./.artifact/icrc2-minter.wasm.gz --yes --network=$NETWORK --argument="$args" icrc2-minter
+  dfx canister install --mode=$INSTALL_MODE --wasm=./.artifact/icrc2-bridge.wasm.gz --yes --network=$NETWORK --argument="$args" icrc2-bridge
 }
 
-deploy_erc20_minter() {
+deploy_erc20_bridge() {
   NETWORK="$1"
   INSTALL_MODE="$2"
   BASE_EVM_LINK=$(link_to_variant "$3")
@@ -67,7 +67,7 @@ deploy_erc20_minter() {
   SIGNING_STRATEGY="$7"
   LOG_SETTINGS="$8"
 
-  create_canister $NETWORK erc20-minter
+  create_canister $NETWORK erc20-bridge
 
   args="(record {
     base_evm_link = $BASE_EVM_LINK;
@@ -78,9 +78,9 @@ deploy_erc20_minter() {
     log_settings = opt $LOG_SETTINGS;
   })"
 
-  echo "deploying erc20-minter with args: $args"
+  echo "deploying erc20-bridge with args: $args"
 
-  dfx canister install --mode=$INSTALL_MODE --yes --wasm=./.artifact/erc20-minter.wasm.gz --network=$NETWORK --argument="$args" erc20-minter
+  dfx canister install --mode=$INSTALL_MODE --yes --wasm=./.artifact/erc20-bridge.wasm.gz --network=$NETWORK --argument="$args" erc20-bridge
 }
 
 deploy_rune_bridge() {

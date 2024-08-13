@@ -79,14 +79,14 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
         self.client().update("set_owner", (owner,)).await
     }
 
-    /// Returns principal of EVM canister with which the minter canister works.
+    /// Returns principal of EVM canister with which the bridge canister works.
     async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BftResult<H160>> {
         self.client()
             .update("get_bridge_canister_evm_address", ())
             .await
     }
 
-    /// Returns principal of EVM canister with which the minter canister works.
+    /// Returns principal of EVM canister with which the bridge canister works.
     async fn get_evm_principal(&self) -> CanisterClientResult<Principal> {
         self.client().query("get_evm_principal", ()).await
     }

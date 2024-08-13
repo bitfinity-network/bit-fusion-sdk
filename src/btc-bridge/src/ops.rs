@@ -24,7 +24,7 @@ use crate::ckbtc_client::{
     CkBtcLedgerClient, CkBtcMinterClient, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceError,
     UtxoStatus,
 };
-use crate::interface::{BtcWithdrawError, Erc20MintError};
+use crate::interface::{BtcBridgeError, BtcWithdrawError};
 use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -270,14 +270,14 @@ impl BtcBridgeOp {
                         }
                         UtxoStatus::ValueTooSmall(value) => {
                             log::debug!("Value too small for {eth_address}: {value:?}");
-                            return Err(Erc20MintError::ValueTooSmall.into());
+                            return Err(BtcBridgeError::ValueTooSmall.into());
                         }
                         UtxoStatus::Tainted(utxo) => {
                             log::debug!("Tainted UTXO for {eth_address}: {utxo:?}");
-                            return Err(Erc20MintError::Tainted(utxo).into());
+                            return Err(BtcBridgeError::Tainted(utxo).into());
                         }
                         UtxoStatus::Checked(_) => {
-                            return Err(Erc20MintError::CkBtcMinter(
+                            return Err(BtcBridgeError::CkBtcMinter(
                                 UpdateBalanceError::TemporarilyUnavailable(
                                     "KYT check passed, but mint failed. Try again later."
                                         .to_string(),
@@ -296,13 +296,13 @@ impl BtcBridgeOp {
                 ..
             }) => {
                 log::debug!("No new utxos found for {eth_address} with {current_confirmations} confirmations, waiting for {required_confirmations} confirmations");
-                Err(Erc20MintError::WaitingForConfirmations.into())
+                Err(BtcBridgeError::WaitingForConfirmations.into())
             }
             Err(UpdateBalanceError::NoNewUtxos { .. }) => {
                 log::debug!("No new utxos found for {eth_address}");
                 Ok(())
             }
-            Err(err) => Err(Erc20MintError::CkBtcMinter(err).into()),
+            Err(err) => Err(BtcBridgeError::CkBtcMinter(err).into()),
         }
     }
 
@@ -321,14 +321,14 @@ impl BtcBridgeOp {
             Ok(amount) => amount.0.to_u64().unwrap_or_default(),
             Err((rejection_code, message)) => {
                 log::error!("Failed to get current ckBTC balance: {rejection_code:?} {message}");
-                return Err(Erc20MintError::CkBtcLedgerBalance(rejection_code, message).into());
+                return Err(BtcBridgeError::CkBtcLedgerBalance(rejection_code, message).into());
             }
         };
 
         log::debug!("Current ckBTC balance for {eth_address}: {ckbtc_amount}");
 
         if ckbtc_amount == 0 {
-            return Err(Erc20MintError::NothingToMint.into());
+            return Err(BtcBridgeError::NothingToMint.into());
         }
 
         Ok(ckbtc_amount)
@@ -343,10 +343,10 @@ impl BtcBridgeOp {
     ) -> BftResult<u64> {
         let amount_minus_fee = amount
             .checked_sub(ckbtc_fee)
-            .ok_or(Erc20MintError::ValueTooSmall)?;
+            .ok_or(BtcBridgeError::ValueTooSmall)?;
 
         if amount_minus_fee == 0 {
-            return Err(Erc20MintError::ValueTooSmall.into());
+            return Err(BtcBridgeError::ValueTooSmall.into());
         }
 
         CkBtcLedgerClient::from(ckbtc_ledger)
@@ -364,7 +364,7 @@ impl BtcBridgeOp {
                 log::error!("icrc1_transfer failed: {e:?}");
                 Err(TransferError::TemporarilyUnavailable)
             })
-            .map_err(Erc20MintError::CkBtcLedgerTransfer)?;
+            .map_err(BtcBridgeError::CkBtcLedgerTransfer)?;
 
         Ok(amount_minus_fee)
     }
@@ -458,7 +458,7 @@ impl BtcBridgeOp {
         let signed_mint_order = mint_order
             .encode_and_sign(&signer)
             .await
-            .map_err(|err| Erc20MintError::Sign(format!("{err:?}")))?;
+            .map_err(|err| BtcBridgeError::Sign(format!("{err:?}")))?;
 
         Ok(signed_mint_order)
     }

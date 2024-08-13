@@ -1,5 +1,5 @@
-pub mod erc20_minter;
-pub mod icrc2_minter;
+pub mod erc20_bridge;
+pub mod icrc2_bridge;
 mod token;
 
 use std::fmt;

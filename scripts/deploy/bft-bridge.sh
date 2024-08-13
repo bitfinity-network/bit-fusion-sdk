@@ -15,9 +15,9 @@ function usage() {
   echo "  -h, --help                                      Display this help message"
   echo "  -e, --evm-canister <principal>                  EVM canister principal"
   echo "  -w, --wallet <ETH wallet address>               Ethereum wallet address for deploy"
-  echo "  --minter-address <minter-address>               Bridge minter address"
+  echo "  --minter-address <minter-address>               Bridge canister EVM address"
   echo "  --fee-charge-address <fee-charge-address>       Bridge fee charge address"
-  echo "  --is-wrapped                                     Is wrapped"
+  echo "  --is-wrapped                                    Is wrapped"
   echo "  --dfx-setup                                     Setup dfx locally"
 }
 
