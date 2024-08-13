@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
-import {RingBuffer} from "src/libraries/RingBuffer.sol";
+import "@forge-std-1.9.2/src/Test.sol";
+import "@forge-std-1.9.2/src/console.sol";
+import { RingBuffer } from "src/libraries/RingBuffer.sol";
 
 contract RingBufferTests is Test {
     using RingBuffer for RingBuffer.RingBufferUint32;
