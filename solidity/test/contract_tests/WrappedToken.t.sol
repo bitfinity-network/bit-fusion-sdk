@@ -160,5 +160,4 @@ contract WrappedTokenTest is Test {
         assertEq(token.symbol(), "UFO");
         assertEq(token.decimals(), 15);
     }
-
 }

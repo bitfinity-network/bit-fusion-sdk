@@ -461,17 +461,8 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await
         .unwrap();
 
-    // Get balance before replenishment
-    let original_balance = evm_client
-        .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
-        .await
-        .unwrap()
-        .unwrap();
-
-    println!("original balance: {original_balance:?}");
-
     let john_principal_id = Id256::from(&john());
-    let native_token_amount = 10_u64.pow(10);
+    let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
         fee_charge.clone(),
@@ -489,11 +480,13 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await
         .unwrap();
 
-    assert_eq!(original_balance, U256::from(1_000_000_000_000_000_000_u64));
+    let bridge_balance_before_mint = evm_client
+        .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+        .await
+        .unwrap()
+        .unwrap();
 
-    const TOTAL_TX: u64 = 1;
-
-    // Do over 10 transaction and see the balance gets replenished
+    const TOTAL_TX: u64 = 10;
     for _ in 0..TOTAL_TX {
         icrc2_token_bridge(
             &ctx,
@@ -504,24 +497,12 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         )
         .await;
 
-        ctx.advance_by_times(Duration::from_secs(2), 20).await;
+        let bridge_balance_after_mint = evm_client
+            .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(bridge_balance_before_mint <= bridge_balance_after_mint);
     }
-
-    let new_balance = evm_client
-        .eth_get_balance(minter_address, did::BlockNumber::Latest)
-        .await
-        .unwrap()
-        .unwrap();
-
-    println!("balance: {new_balance:?}");
-
-    // // Find the average balance
-    // let average_balance = (original_balance - new_balance)
-    //     .checked_div(&TOTAL_TX.into())
-    //     .unwrap();
-
-    // println!("average balance: {average_balance:?}"); // 633_244_621_465 //729_843_323_269
-
-    // Find the gas spent on each transaction
-    // convert ether to gas
 }
