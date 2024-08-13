@@ -1,4 +1,5 @@
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use rune_bridge::ops::RuneBridgeOp;
@@ -20,6 +21,15 @@ impl<C: CanisterClient> RuneBridgeClient<C> {
     ) -> CanisterClientResult<Vec<(OperationId, RuneBridgeOp)>> {
         self.client
             .update("get_operations_list", (wallet_address,))
+            .await
+    }
+
+    pub async fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> CanisterClientResult<Option<OperationLog<RuneBridgeOp>>> {
+        self.client
+            .query("get_operation_log", (operation_id,))
             .await
     }
 }
