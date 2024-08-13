@@ -8,6 +8,7 @@ use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -75,6 +76,18 @@ impl Icrc2BridgeCanister {
             .borrow()
             .operations
             .get_for_address(&wallet_address, pagination)
+    }
+
+    /// Returns log of an operation by its ID.
+    #[query]
+    pub fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> Option<OperationLog<IcrcBridgeOp>> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_log(operation_id)
     }
 
     /// Adds the provided principal to the whitelist.

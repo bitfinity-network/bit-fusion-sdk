@@ -79,9 +79,13 @@ jobs:
         run: |
           export RUST_BACKTRACE="full"
           cargo install ic-wasm
-          cargo install icx-proxy
+          # TO BE FIXED: https://infinityswap.atlassian.net/browse/EPROD-958
+          cargo install icx-proxy --version 0.10.1
           sudo apt update
-          sudo apt install gcc-multilib libunwind-dev
+          sudo apt install -y gcc-multilib libunwind-dev ca-certificates
+          mkdir -p /usr/local/share/ca-certificates/
+          sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
+          sudo update-ca-certificates --fresh --verbose
 
       - name: rustfmt
         run: |

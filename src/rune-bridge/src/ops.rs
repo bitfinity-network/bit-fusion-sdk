@@ -9,6 +9,7 @@ use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEven
 use candid::{CandidType, Decode, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
 
 use crate::canister::get_rune_state;
@@ -79,17 +80,31 @@ impl Operation for RuneBridgeOp {
                 dst_address,
                 dst_tokens,
                 requested_amounts,
-            } => Self::await_inputs(ctx, dst_address, dst_tokens, requested_amounts).await,
+            } => {
+                log::debug!(
+                    "RuneBridgeOp::AwaitInputs {dst_address} {dst_tokens:?} {requested_amounts:?}"
+                );
+                Self::await_inputs(ctx, dst_address, dst_tokens, requested_amounts).await
+            }
             RuneBridgeOp::AwaitConfirmations {
                 dst_address,
                 utxo,
                 runes_to_wrap,
-            } => Self::await_confirmations(ctx, dst_address, utxo, runes_to_wrap, id.nonce()).await,
+            } => {
+                log::debug!(
+                    "RuneBridgeOp::AwaitConfirmations {dst_address} {utxo:?} {runes_to_wrap:?}"
+                );
+                Self::await_confirmations(ctx, dst_address, utxo, runes_to_wrap, id.nonce()).await
+            }
             RuneBridgeOp::SignMintOrder {
                 dst_address,
                 mint_order,
-            } => Self::sign_mint_order(ctx, dst_address, mint_order).await,
+            } => {
+                log::debug!("RuneBridgeOp::SignMintOrder {dst_address} {mint_order:?}");
+                Self::sign_mint_order(ctx, dst_address, mint_order).await
+            }
             RuneBridgeOp::SendMintOrder { dst_address, order } => {
+                log::debug!("RuneBridgeOp::SendMintOrder {dst_address} {order:?}");
                 Self::send_mint_order(ctx, dst_address, order).await
             }
             RuneBridgeOp::ConfirmMintOrder { .. } => Err(Error::FailedToProgress(
@@ -99,18 +114,44 @@ impl Operation for RuneBridgeOp {
                 "MintOrderConfirmed task cannot be progressed".into(),
             )),
             RuneBridgeOp::CreateTransaction { payload } => {
+                log::debug!("RuneBridgeOp::CreateTransaction {payload:?}");
                 Self::create_withdrawal_transaction(payload).await
             }
             RuneBridgeOp::SendTransaction {
                 from_address,
                 transaction,
-            } => Self::send_transaction(from_address, transaction).await,
+            } => {
+                log::debug!("RuneBridgeOp::SendTransaction {from_address} {transaction:?}");
+                Self::send_transaction(from_address, transaction).await
+            }
             RuneBridgeOp::TransactionSent { .. } => Err(Error::FailedToProgress(
                 "TransactionSent task cannot be progressed".into(),
             )),
             RuneBridgeOp::OperationSplit { .. } => Err(Error::FailedToProgress(
                 "OperationSplit task cannot be progressed".into(),
             )),
+        }
+    }
+
+    fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
+        match self {
+            Self::SendTransaction { .. } | Self::CreateTransaction { .. } => Some(
+                TaskOptions::new()
+                    .with_fixed_backoff_policy(2)
+                    .with_max_retries_policy(10),
+            ),
+            Self::AwaitInputs { .. }
+            | Self::AwaitConfirmations { .. }
+            | Self::SignMintOrder { .. }
+            | Self::SendMintOrder { .. }
+            | Self::ConfirmMintOrder { .. }
+            | Self::MintOrderConfirmed { .. }
+            | Self::TransactionSent { .. }
+            | Self::OperationSplit { .. } => Some(
+                TaskOptions::new()
+                    .with_max_retries_policy(10)
+                    .with_fixed_backoff_policy(5),
+            ),
         }
     }
 

@@ -22,7 +22,9 @@ alloy-sol-types = "0.7"
 anyhow = "1.0"
 async-recursion = "1.0.4"
 async-trait = "0.1"
+bip39 = "2"
 bitcoin = "0.31"
+bitcoincore-rpc = "0.18.0"
 candid = { version = "0.10", features = ["value"] }
 cfg-if = "1.0"
 clap = { version = "4", features = ["derive"] }
@@ -57,13 +59,14 @@ mockall = "0.12"
 num-bigint = "0.4"
 num-traits = "0.2"
 once_cell = "1.16"
-ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.1.5" }
-ordinals = "0.0.8"
+ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.1.6" }
+ordinals = "0.0.9"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.12", default-features = false }
 serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
+serial_test = "3"
 signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.29.x" }
 tempfile = "3"
 thiserror = "1.0"
