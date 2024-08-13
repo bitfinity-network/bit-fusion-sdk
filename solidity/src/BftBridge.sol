@@ -17,8 +17,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     using SafeERC20 for IERC20;
 
     // Additional gas amount for fee charge.
-    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
-    uint256 constant additionalGasFee = 100_000;
+    uint256 constant additionalGasFee = 50000;
 
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
@@ -181,8 +180,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             order.feePayer != address(0) && msg.sender == minterCanisterAddress
                 && address(feeChargeContract) != address(0)
         ) {
-            uint256 additionalGasConsumed = initGasLeft + 21_000 + (additionalGasFee * 2) - gasleft();
-            uint256 fee = additionalGasConsumed * tx.gasprice;
+            uint256 gasConsumed = initGasLeft - gasleft();
+            uint256 gasFee = gasConsumed + additionalGasFee;
+            uint256 fee = gasFee * tx.gasprice;
 
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
         }
