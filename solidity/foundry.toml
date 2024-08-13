@@ -1,7 +1,7 @@
 [profile.default]
 src = 'src'
 out = 'out'
-libs = ['lib']
+libs = ['dependencies']
 ast = true
 ffi = true
 build_info = true
@@ -24,3 +24,9 @@ quote_style = 'double'
 number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
+
+
+[dependencies]
+"@openzeppelin-contracts-upgradeable" = "5.0.2"
+"@openzeppelin-contracts" = "5.0.2"
+forge-std = "1.9.2"
