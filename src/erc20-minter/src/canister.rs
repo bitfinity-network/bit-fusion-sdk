@@ -11,7 +11,6 @@ use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
-use bridge_did::order::SignedMintOrder;
 use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
 use bridge_utils::evm_bridge::BridgeSide;
@@ -102,8 +101,11 @@ impl EvmMinter {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<OperationPayload>> {
-        get_operations_store().get_log(operation_id)
+    ) -> Option<OperationLog<Erc20BridgeOp>> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_log(operation_id)
     }
 
     /// Returns the build data of the canister

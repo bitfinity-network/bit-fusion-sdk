@@ -249,14 +249,14 @@ where
             self.operations_log.remove(&id);
             let mut ids = self
                 .address_operation_map
-                .get(&oldest.wallet_address())
+                .get(oldest.wallet_address())
                 .unwrap_or_default();
             let count_before = ids.0.len();
             ids.0.retain(|stored_id| *stored_id != id);
 
             if ids.0.len() != count_before {
                 if ids.0.is_empty() {
-                    self.address_operation_map.remove(&oldest.wallet_address());
+                    self.address_operation_map.remove(oldest.wallet_address());
                 } else {
                     // We rewrite the value stored in stable memory with the updated value here
                     self.address_operation_map
