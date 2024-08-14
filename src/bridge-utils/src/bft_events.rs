@@ -285,7 +285,6 @@ mod tests {
     use alloy_sol_types::private::{Address, FixedBytes, Uint};
     use did::H256;
     use ethers_core::abi::{Bytes, RawLog};
-    use ethers_core::utils::hex::traits::FromHex;
 
     use super::*;
 
