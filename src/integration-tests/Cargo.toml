@@ -35,10 +35,9 @@ ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 icrc-client = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
-icrc2-minter = { path = "../icrc2-minter" }
+icrc2-bridge = { path = "../icrc2-bridge" }
 bridge-canister = { path = "../bridge-canister" }
 jsonrpc-core = { workspace = true }
-minter-client = { workspace = true }
 once_cell = { workspace = true }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
@@ -74,7 +73,7 @@ ic-utils = { workspace = true }
 ic-metrics = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
-erc20-minter = { path = "../erc20-minter" }
+erc20-bridge = { path = "../erc20-bridge" }
 signature-verification-canister-client = { workspace = true }
 rune-bridge = { path = "../rune-bridge" }
 serial_test = { workspace = true }

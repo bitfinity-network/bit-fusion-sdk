@@ -22,8 +22,8 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 async fn test_icrc2_tokens_roundtrip() {
     let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
-    let minter_client = ctx.icrc_minter_client(ADMIN);
-    minter_client
+    let bridge_client = ctx.icrc_bridge_client(ADMIN);
+    bridge_client
         .add_to_whitelist(ctx.canisters().token_1())
         .await
         .unwrap()
@@ -118,7 +118,7 @@ async fn test_icrc2_tokens_roundtrip() {
 async fn test_icrc2_token_canister_stopped() {
     let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
 
-    let minter_client = ctx.icrc_minter_client(ADMIN);
+    let minter_client = ctx.icrc_bridge_client(ADMIN);
     minter_client
         .add_to_whitelist(ctx.canisters().token_1())
         .await
@@ -200,7 +200,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
-    let minter_client = ctx.icrc_minter_client(ADMIN);
+    let minter_client = ctx.icrc_bridge_client(ADMIN);
     let refund_mint_order = dbg!(minter_client
         .get_operations_list(&john_address, None)
         .await
@@ -248,8 +248,8 @@ async fn test_icrc2_token_canister_stopped() {
 
 #[tokio::test]
 async fn set_owner_access() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
-    let mut admin_client = ctx.icrc_minter_client(ADMIN);
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
+    let mut admin_client = ctx.icrc_bridge_client(ADMIN);
     admin_client.set_owner(alice()).await.unwrap();
 
     // Now Alice is owner, so admin can't update owner anymore.
@@ -263,15 +263,15 @@ async fn set_owner_access() {
     ));
 
     // Now Alice is owner, so she can update owner.
-    let mut alice_client = ctx.icrc_minter_client(ALICE);
+    let mut alice_client = ctx.icrc_bridge_client(ALICE);
     alice_client.set_owner(alice()).await.unwrap();
 }
 
 #[tokio::test]
 async fn canister_log_config_should_still_be_storable_after_upgrade() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
 
-    let minter_client = ctx.icrc_minter_client(ADMIN);
+    let minter_client = ctx.icrc_bridge_client(ADMIN);
 
     minter_client
         .set_logger_filter("info".to_string())
@@ -285,7 +285,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
     }
 
     // upgrade canister
-    ctx.upgrade_minter_canister().await.unwrap();
+    ctx.upgrade_icrc2_bridge_canister().await.unwrap();
     let settings = minter_client.get_logger_settings().await.unwrap();
     println!("LOGGER SETTINGS: {settings:?}");
     minter_client
@@ -297,10 +297,10 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
 #[tokio::test]
 async fn test_canister_build_data() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Minter]).await;
-    let minter_client = ctx.icrc_minter_client(ALICE);
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
+    let minter_client = ctx.icrc_bridge_client(ALICE);
     let build_data = minter_client.get_canister_build_data().await.unwrap();
-    assert!(build_data.pkg_name.contains("icrc2-minter"));
+    assert!(build_data.pkg_name.contains("icrc2-bridge"));
 }
 
 #[tokio::test]
@@ -411,7 +411,7 @@ async fn icrc2_token_bridge(
     fee_charge: &H160,
     wrapped_token: &H160,
 ) {
-    let minter_client = ctx.icrc_minter_client(ADMIN);
+    let minter_client = ctx.icrc_bridge_client(ADMIN);
     minter_client
         .add_to_whitelist(ctx.canisters().token_1())
         .await

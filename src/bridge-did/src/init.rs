@@ -3,13 +3,13 @@ use eth_signer::sign_strategy::SigningStrategy;
 use ic_log::did::LogCanisterSettings;
 use serde::Deserialize;
 
-/// Minter canister initialization data.
+/// Bridge canister initialization data.
 #[derive(Debug, Deserialize, CandidType, Clone)]
 pub struct BridgeInitData {
     /// Principal of canister's owner.
     pub owner: Principal,
 
-    /// Principal of EVM canister, in which minter canister will withdraw/deposit tokens.
+    /// Principal of EVM canister, in which bridge canister will withdraw/deposit tokens.
     pub evm_principal: Principal,
 
     /// Signing strategy

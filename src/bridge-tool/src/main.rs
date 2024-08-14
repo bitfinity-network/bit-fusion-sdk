@@ -97,7 +97,7 @@ struct DepositIcrcArgs {
 
 #[derive(Debug, Parser)]
 struct DeployBftArgs {
-    /// ETH address of the minter
+    /// ETH address of the bridge
     #[arg(long)]
     minter_address: String,
 

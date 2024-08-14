@@ -262,7 +262,7 @@ impl CkBtcSetup {
                     }))
                     .unwrap(),
                 )
-                .expect("failed to install the minter");
+                .expect("failed to install the ckBTC minter");
 
                 let kyt_provider = PrincipalId::new_user_test_id(2);
 

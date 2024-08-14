@@ -53,7 +53,7 @@ pub enum ErrorCodes {
 
 /// Error during BTC to ERC20 transfer.
 #[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
-pub enum Erc20MintError {
+pub enum BtcBridgeError {
     /// The amount of BTC transferred to ckBTC is smaller than the fee. The transaction will not
     /// be precessed.
     ValueTooSmall,
@@ -78,52 +78,52 @@ pub enum Erc20MintError {
     WaitingForConfirmations,
 }
 
-impl From<TransferError> for Erc20MintError {
+impl From<TransferError> for BtcBridgeError {
     fn from(value: TransferError) -> Self {
         Self::CkBtcLedgerTransfer(value)
     }
 }
 
-impl From<Erc20MintError> for bridge_did::error::Error {
-    fn from(value: Erc20MintError) -> Self {
+impl From<BtcBridgeError> for bridge_did::error::Error {
+    fn from(value: BtcBridgeError) -> Self {
         match value {
-            Erc20MintError::ValueTooSmall => Self::Custom {
+            BtcBridgeError::ValueTooSmall => Self::Custom {
                 code: ErrorCodes::ValueTooSmall as u32,
                 msg: "Value too small".to_string(),
             },
-            Erc20MintError::Tainted(utxo) => Self::Custom {
+            BtcBridgeError::Tainted(utxo) => Self::Custom {
                 code: ErrorCodes::Tainted as u32,
                 msg: format!("Tainted UTXO: {:?}", utxo),
             },
-            Erc20MintError::CkBtcMinter(err) => Self::Custom {
+            BtcBridgeError::CkBtcMinter(err) => Self::Custom {
                 code: ErrorCodes::CkBtcMinter as u32,
                 msg: format!("CkBtcMinter error: {:?}", err),
             },
-            Erc20MintError::CkBtcLedgerTransfer(err) => Self::Custom {
+            BtcBridgeError::CkBtcLedgerTransfer(err) => Self::Custom {
                 code: ErrorCodes::CkBtcLedgerTransfer as u32,
                 msg: format!("CkBtcLedgerTransfer error: {:?}", err),
             },
-            Erc20MintError::CkBtcLedgerBalance(code, msg) => Self::Custom {
+            BtcBridgeError::CkBtcLedgerBalance(code, msg) => Self::Custom {
                 code: ErrorCodes::CkBtcLedgerBalance as u32,
                 msg: format!("CkBtcLedgerBalance error: {msg} ({code:?})"),
             },
-            Erc20MintError::Sign(msg) => Self::Custom {
+            BtcBridgeError::Sign(msg) => Self::Custom {
                 code: ErrorCodes::Sign as u32,
                 msg,
             },
-            Erc20MintError::NotInitialized => Self::Custom {
+            BtcBridgeError::NotInitialized => Self::Custom {
                 code: ErrorCodes::NotInitialized as u32,
                 msg: "Not initialized".to_string(),
             },
-            Erc20MintError::NothingToMint => Self::Custom {
+            BtcBridgeError::NothingToMint => Self::Custom {
                 code: ErrorCodes::NothingToMint as u32,
                 msg: "Nothing to mint".to_string(),
             },
-            Erc20MintError::WaitingForConfirmations => Self::Custom {
+            BtcBridgeError::WaitingForConfirmations => Self::Custom {
                 code: ErrorCodes::WaitingForConfirmtions as u32,
                 msg: "Waiting for confirmations".to_string(),
             },
-            Erc20MintError::Evm(msg) => Self::EvmRequestFailed(msg),
+            BtcBridgeError::Evm(msg) => Self::EvmRequestFailed(msg),
         }
     }
 }

@@ -33,20 +33,20 @@ pub mod inspect;
 pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
 
 #[derive(Canister, Clone, Debug)]
-pub struct EvmMinter {
+pub struct Erc20Bridge {
     #[id]
     id: Principal,
 }
 
-impl PreUpdate for EvmMinter {}
+impl PreUpdate for Erc20Bridge {}
 
-impl BridgeCanister for EvmMinter {
+impl BridgeCanister for Erc20Bridge {
     fn config(&self) -> SharedConfig {
         ConfigStorage::get()
     }
 }
 
-impl EvmMinter {
+impl Erc20Bridge {
     #[init]
     pub fn init(&mut self, bridge_settings: BridgeInitData, base_evm_settings: BaseEvmSettings) {
         get_base_evm_state().0.borrow_mut().reset(base_evm_settings);
@@ -121,14 +121,14 @@ impl EvmMinter {
     }
 }
 
-impl Metrics for EvmMinter {
+impl Metrics for Erc20Bridge {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()
     }
 }
 
-impl LogCanister for EvmMinter {
+impl LogCanister for Erc20Bridge {
     fn log_state(&self) -> Rc<RefCell<LogState>> {
         LogState::get()
     }

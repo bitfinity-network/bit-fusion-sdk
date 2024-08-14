@@ -20,9 +20,9 @@ ethereum-json-rpc-client = { workspace = true, features = [
 ] }
 ethers-core = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
-erc20-minter = { path = "../erc20-minter" }
+erc20-bridge = { path = "../erc20-bridge" }
 hex = { workspace = true }
-icrc2-minter = { path = "../icrc2-minter" }
+icrc2-bridge = { path = "../icrc2-bridge" }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-exports = { workspace = true }

@@ -3,7 +3,7 @@ use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use icrc2_minter::ops::IcrcBridgeOp;
+use icrc2_bridge::ops::IcrcBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 

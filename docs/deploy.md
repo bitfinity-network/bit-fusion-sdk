@@ -1,30 +1,33 @@
 # Deploy
 
 - [Deploy](#deploy)
-  - [Requirements](#requirements)
-    - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
-  - [Build](#build)
-  - [Canisters deployment](#canisters-deployment)
-    - [BFT Bridge](#bft-bridge)
-    - [BTC Bridge](#btc-bridge)
-    - [ERC20 Bridge](#erc20-bridge)
-    - [ERC721 Bridge](#erc721-bridge)
-    - [ICRC2 Minter](#icrc2-minter)
-    - [Rune Bridge](#rune-bridge)
+    - [Requirements](#requirements)
+        - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
+    - [Build](#build)
+    - [Canisters deployment](#canisters-deployment)
+        - [BFT Bridge](#bft-bridge)
+        - [BTC Bridge](#btc-bridge)
+        - [ERC20 Bridge](#erc20-bridge)
+        - [ERC721 Bridge](#erc721-bridge)
+        - [ICRC2 Bridge](#icrc2-bridge)
+        - [Rune Bridge](#rune-bridge)
 
 ## Requirements
 
-- [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if you don't have it already.
+- [Get `dfx` here](https://internetcomputer.org/docs/current/developer-docs/getting-started/install/#installing-dfx) if
+  you don't have it already.
 - [Install the Rust toolchain](https://www.rust-lang.org/tools/install) if it's not already installed.
 - Install the rust wasm32 target: `rustup target add wasm32-unknown-unknown`
-- [Download and install Docker, with Compose](https://www.docker.com/products/docker-desktop/) if you don't already have it.
+- [Download and install Docker, with Compose](https://www.docker.com/products/docker-desktop/) if you don't already have
+  it.
 - Install [foundry](https://book.getfoundry.sh/getting-started/installation).
 
     ```sh
     curl -L https://foundry.paradigm.xyz | bash
     ```
 
-- Install [local-ssl-proxy](https://github.com/cameronhunter/local-ssl-proxy) to run Dfx tests. Required since to make calls to evm-rpc canister we require HTTPS.
+- Install [local-ssl-proxy](https://github.com/cameronhunter/local-ssl-proxy) to run Dfx tests. Required since to make
+  calls to evm-rpc canister we require HTTPS.
 - Install SSL certificates to make local-ssl-proxy able to work.
 
     On Debian-based systems it should be enough to run
@@ -41,7 +44,7 @@
     sudo update-ca-trust
     ```
 
-    While on MacOS you should install them by clicking on the certificates in the mkcert folder.
+  While on MacOS you should install them by clicking on the certificates in the mkcert folder.
 
 ### Ubuntu 24.04 additional dependencies
 
@@ -72,7 +75,7 @@ Options:
   -h, --help                                      Display this help message
   -e, --evm-canister <principal>                  EVM canister principal
   -w, --wallet <ETH wallet address>               Ethereum wallet address for deploy
-  --minter-address <minter-address>               Bridge minter address
+  --minter-address <minter-address>               Bridge canister EVM address
   --dfx-setup                                     Setup dfx locally
 ```
 
@@ -197,10 +200,10 @@ If deploying on localhost just pass the `--dfx-setup` option.
 ./scripts/deploy/erc721-bridge.sh --dfx-setup
 ```
 
-### ICRC2 Minter
+### ICRC2 Bridge
 
 ```sh
-./scripts/deploy/icrc2-minter.sh
+./scripts/deploy/icrc2-bridge.sh
 ```
 
 ```txt
@@ -214,13 +217,13 @@ Options:
 If deploying on ic
 
 ```sh
-./scripts/deploy/icrc2-minter.sh -m <create|install|reinstall|update> -e <evm-principal> -i ic
+./scripts/deploy/icrc2-bridge.sh -m <create|install|reinstall|update> -e <evm-principal> -i ic
 ```
 
 If deploying on local
 
 ```sh
-./scripts/deploy/icrc2-minter.sh -m <create|install|reinstall|update>
+./scripts/deploy/icrc2-bridge.sh -m <create|install|reinstall|update>
 ```
 
 ### Rune Bridge
@@ -259,4 +262,4 @@ cd btc-deploy/ && docker compose up --build -d && cd -
 ./scripts/deploy/rune-bridge.sh -m <create|install|reinstall|update>
 ```
 
-By default this will run against the bitcoin regtest
+By default, this will run against the bitcoin regtest

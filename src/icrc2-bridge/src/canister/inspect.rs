@@ -5,7 +5,7 @@ use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::{api, inspect_message};
 use ic_exports::ic_kit::ic;
 
-use crate::MinterCanister;
+use crate::Icrc2BridgeCanister;
 
 #[inspect_message]
 async fn inspect_message() {
@@ -23,7 +23,7 @@ async fn inspect_method(method: &str) -> BftResult<()> {
     match method {
         "add_to_whitelist" | "remove_from_whitelist" => {
             let (principal,) = api::call::arg_data::<(Principal,)>(Default::default());
-            MinterCanister::access_control_inspect_message_check(ic::caller(), principal)
+            Icrc2BridgeCanister::access_control_inspect_message_check(ic::caller(), principal)
         }
         _ => Ok(()),
     }

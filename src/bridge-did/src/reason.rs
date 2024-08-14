@@ -29,7 +29,7 @@ pub struct Icrc2Burn {
     pub approve_after_mint: Option<ApproveAfterMint>,
 
     /// Address from which fee should be charged for mint transaction
-    /// performed by minter canister.
+    /// performed by bridge canister.
     /// If None, mint transaction will not be sent and user can send it by himself.
     pub fee_payer: Option<H160>,
 }
@@ -49,7 +49,7 @@ pub struct BtcDeposit {
     /// Recipient of the minted tokens.
     pub recipient: H160,
     /// Address from which fee should be charged for mint transaction
-    /// performed by minter canister.
+    /// performed by bridge canister.
     /// If None, mint transaction will not be sent and user can send it by himself.
     pub fee_payer: Option<H160>,
     /// If user want's mint operation to approve minted tokens,

@@ -79,7 +79,7 @@ pub async fn mint(
     })
 }
 
-/// Performs a transfer from the `from` account to the minter canister main account.
+/// Performs a transfer from the `from` account to the bridge canister main account.
 #[async_recursion::async_recursion]
 pub async fn burn(
     token: Principal,
@@ -90,7 +90,7 @@ pub async fn burn(
 ) -> Result<Success, IcrcCanisterError> {
     let icrc_client = IcrcCanisterClient::new(IcCanisterClient::new(token));
 
-    let minter_canister_account = Account::from(ic::id());
+    let bridge_canister_account = Account::from(ic::id());
 
     if amount == 0_u64 {
         return Err(IcrcCanisterError::Generic(
@@ -101,7 +101,7 @@ pub async fn burn(
     let args = TransferFromArgs {
         from,
         spender_subaccount,
-        to: minter_canister_account,
+        to: bridge_canister_account,
         amount: amount.clone(),
         fee: None,
         memo: None,

@@ -1,4 +1,4 @@
-name: "Release minter canisters"
+name: "Release bridge canisters"
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-            fetch-depth: 0
+          fetch-depth: 0
 
       - name: "Extract Version"
         id: version
@@ -68,7 +68,7 @@ jobs:
 
       - name: Build
         run: |
-          ./scripts/build.sh icrc2-minter erc20-minter
+          ./scripts/build.sh icrc2-bridge erc20-bridge
           ls -la .artifact
       #  Compress the artifacts into a tar.gz file
       - name: Compress artifacts
@@ -77,8 +77,8 @@ jobs:
           cd ./.artifact
           ls -la .
 
-          tar -czf ../.release/erc20-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions erc20-minter.wasm.gz erc20-minter.did
-          tar -czf ../.release/icrc2-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions icrc2-minter.wasm.gz icrc2-minter.did
+          tar -czf ../.release/erc20-bridge-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions erc20-bridge.wasm.gz erc20-bridge.did
+          tar -czf ../.release/icrc2-bridge-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions icrc2-bridge.wasm.gz icrc2-bridge.did
 
       # Create a new GitHub release with the tag version
       - name: Create Release

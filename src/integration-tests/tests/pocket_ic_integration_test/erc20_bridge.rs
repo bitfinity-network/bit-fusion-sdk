@@ -7,7 +7,7 @@ use bridge_did::id256::Id256;
 use bridge_utils::evm_bridge::BridgeSide;
 use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
-use erc20_minter::ops::Erc20OpStage;
+use erc20_bridge::ops::Erc20OpStage;
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
@@ -22,7 +22,7 @@ pub struct ContextWithBridges {
     pub context: PocketIcTestContext,
     pub bob_wallet: Wallet<'static, SigningKey>,
     pub bob_address: H160,
-    pub erc20_minter_address: H160,
+    pub erc20_bridge_address: H160,
     pub base_bft_bridge: H160,
     pub wrapped_bft_bridge: H160,
     pub base_token_address: H160,
@@ -70,24 +70,24 @@ impl ContextWithBridges {
             .unwrap();
         ctx.advance_time(Duration::from_secs(2)).await;
 
-        // get evm minter canister address
-        let erc20_minter_client =
-            Erc20BridgeClient::new(ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN));
-        let erc20_minter_address = erc20_minter_client
+        // get evm bridge canister address
+        let erc20_bridge_client =
+            Erc20BridgeClient::new(ctx.client(ctx.canisters().erc20_bridge(), ADMIN));
+        let erc20_bridge_address = erc20_bridge_client
             .get_bridge_canister_evm_address()
             .await
             .unwrap()
             .unwrap();
 
-        // mint native tokens for the erc20-minter on both EVMs
-        println!("Minting native tokens on both EVMs for {erc20_minter_address}");
+        // mint native tokens for the erc20-bridge on both EVMs
+        println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
         ctx.evm_client(ADMIN)
-            .mint_native_tokens(erc20_minter_address.clone(), u64::MAX.into())
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
         base_evm_client
-            .mint_native_tokens(erc20_minter_address.clone(), u64::MAX.into())
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
@@ -99,10 +99,10 @@ impl ContextWithBridges {
             &bob_wallet,
             BridgeSide::Base,
             expected_fee_charge_address.into(),
-            erc20_minter_address.clone(),
+            erc20_bridge_address.clone(),
         )
         .await;
-        erc20_minter_client
+        erc20_bridge_client
             .set_base_bft_bridge_contract(&base_bft_bridge)
             .await
             .unwrap();
@@ -112,10 +112,10 @@ impl ContextWithBridges {
             &bob_wallet,
             BridgeSide::Wrapped,
             expected_fee_charge_address.into(),
-            erc20_minter_address.clone(),
+            erc20_bridge_address.clone(),
         )
         .await;
-        erc20_minter_client
+        erc20_bridge_client
             .set_bft_bridge_contract(&wrapped_bft_bridge)
             .await
             .unwrap();
@@ -183,7 +183,7 @@ impl ContextWithBridges {
             context: ctx,
             bob_wallet,
             bob_address,
-            erc20_minter_address,
+            erc20_bridge_address,
             base_bft_bridge,
             wrapped_bft_bridge,
             base_token_address,
@@ -198,14 +198,14 @@ impl ContextWithBridges {
 }
 
 // Create a second EVM canister (base_evm) instance and create BFTBridge contract on it, // It will play role of external evm
-// Create erc20-minter instance, initialized with EvmInfos for both EVM canisters.
+// Create erc20-bridge instance, initialized with EvmInfos for both EVM canisters.
 // Deploy ERC-20 token on external_evm,
 // Deploy Wrapped token on first EVM for the ERC-20 from previous step,
 // Approve ERC-20 transfer on behalf of some user in external_evm,
 // Call BFTBridge::burn() on behalf of the user in external_evm.
-// Wait some time for the erc20-minter see and process it.
+// Wait some time for the erc20-bridge see and process it.
 // Make sure the tokens minted.
-// Make sure SignedMintOrder removed from erc20-minter after some time.
+// Make sure SignedMintOrder removed from erc20-bridge after some time.
 #[tokio::test]
 async fn test_external_bridging() {
     let ctx = ContextWithBridges::new().await;
@@ -234,7 +234,7 @@ async fn test_external_bridging() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
@@ -256,7 +256,7 @@ async fn test_external_bridging() {
         .await
         .unwrap();
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
@@ -276,8 +276,8 @@ async fn test_external_bridging() {
         .await;
 
     // Check mint operation complete
-    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
-    let operation = erc20_minter_client
+    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+    let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
@@ -356,7 +356,7 @@ async fn native_token_deposit_increase_and_decrease() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
@@ -378,16 +378,16 @@ async fn native_token_deposit_increase_and_decrease() {
         .await
         .unwrap();
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
         .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
-    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
+    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
 
-    let mint_op = erc20_minter_client
+    let mint_op = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
@@ -409,7 +409,7 @@ async fn native_token_deposit_increase_and_decrease() {
         eprintln!("TX status: {:?}", receipt.status);
     }
 
-    let operation = erc20_minter_client
+    let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
@@ -446,7 +446,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             .client(ctx.context.canisters().external_evm(), ADMIN),
     );
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
@@ -468,7 +468,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await
         .unwrap();
 
-    // Advance time to perform two tasks in erc20-minter:
+    // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
@@ -484,7 +484,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     let wrapped_evm_client = ctx.context.evm_client(ADMIN);
     let bridge_canister_evm_balance_after_failed_mint = wrapped_evm_client
-        .eth_get_balance(ctx.erc20_minter_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(ctx.erc20_bridge_address.clone(), did::BlockNumber::Latest)
         .await
         .unwrap()
         .unwrap();
@@ -495,8 +495,8 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await;
 
     // Check mint order is not removed
-    let erc20_minter_client = ctx.context.erc_minter_client(ADMIN);
-    let operation = erc20_minter_client
+    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+    let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
@@ -515,7 +515,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await;
 
     // check the operation is complete after the successful mint
-    let operation = erc20_minter_client
+    let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
@@ -526,7 +526,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // Check bridge canister balance not changed after user's transaction.
     let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client
-        .eth_get_balance(ctx.erc20_minter_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(ctx.erc20_bridge_address.clone(), did::BlockNumber::Latest)
         .await
         .unwrap()
         .unwrap();
@@ -541,7 +541,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
     let ctx = ContextWithBridges::new().await;
 
-    let init_erc20_minter_balance = ctx
+    let init_erc20_bridge_balance = ctx
         .context
         .evm_client(ADMIN)
         .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
@@ -564,7 +564,7 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
         .await
         .unwrap();
 
-    let erc20_minter_balance_after_deposit = ctx
+    let erc20_bridge_balance_after_deposit = ctx
         .context
         .evm_client(ADMIN)
         .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
@@ -573,8 +573,8 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
         .unwrap();
 
     assert_eq!(
-        erc20_minter_balance_after_deposit,
-        init_erc20_minter_balance + native_token_deposit.into()
+        erc20_bridge_balance_after_deposit,
+        init_erc20_bridge_balance + native_token_deposit.into()
     );
 }
 

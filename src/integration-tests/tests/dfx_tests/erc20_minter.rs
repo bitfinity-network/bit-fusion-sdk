@@ -21,7 +21,7 @@ pub struct ContextWithBridges {
     pub context: DfxTestContext,
     pub bob_wallet: Wallet<'static, SigningKey>,
     pub bob_address: H160,
-    pub erc20_minter_address: H160,
+    pub erc20_bridge_address: H160,
     pub base_bft_bridge: H160,
     pub wrapped_bft_bridge: H160,
     pub base_token_address: H160,
@@ -70,23 +70,23 @@ impl ContextWithBridges {
             .unwrap();
         ctx.advance_time(Duration::from_secs(2)).await;
 
-        // get evm minter canister address
-        let erc20_minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
-        let erc20_minter_address = erc20_minter_client
+        // get evm bridge canister address
+        let erc20_bridge_client = ctx.client(ctx.canisters().erc20_bridge(), ADMIN);
+        let erc20_bridge_address = erc20_bridge_client
             .update::<_, Option<H160>>("get_evm_address", ())
             .await
             .unwrap()
             .unwrap();
 
-        // mint native tokens for the erc20-minter on both EVMs
-        println!("Minting native tokens on both EVMs for {erc20_minter_address}");
+        // mint native tokens for the erc20-bridge on both EVMs
+        println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
         ctx.evm_client(ADMIN)
-            .mint_native_tokens(erc20_minter_address.clone(), u64::MAX.into())
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
         base_evm_client
-            .mint_native_tokens(erc20_minter_address.clone(), u64::MAX.into())
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
@@ -98,7 +98,7 @@ impl ContextWithBridges {
             &bob_wallet,
             BridgeSide::Base,
             expected_fee_charge_address.into(),
-            erc20_minter_address.clone(),
+            erc20_bridge_address.clone(),
         )
         .await;
         println!("Base BFT Bridge: {}", base_bft_bridge);
@@ -107,7 +107,7 @@ impl ContextWithBridges {
             &bob_wallet,
             BridgeSide::Wrapped,
             expected_fee_charge_address.into(),
-            erc20_minter_address.clone(),
+            erc20_bridge_address.clone(),
         )
         .await;
         println!("Wrapped BFT Bridge: {}", wrapped_bft_bridge);
@@ -175,7 +175,7 @@ impl ContextWithBridges {
             context: ctx,
             bob_wallet,
             bob_address,
-            erc20_minter_address,
+            erc20_bridge_address: erc20_bridge_address,
             base_bft_bridge,
             wrapped_bft_bridge,
             base_token_address,
@@ -186,14 +186,14 @@ impl ContextWithBridges {
 }
 
 // Create a second EVM canister (base_evm) instance and create BFTBridge contract on it, // It will play role of external evm
-// Create erc20-minter instance, initialized with EvmInfos for both EVM canisters.
+// Create erc20-bridge instance, initialized with EvmInfos for both EVM canisters.
 // Deploy ERC-20 token on external_evm,
 // Deploy Wrapped token on first EVM for the ERC-20 from previous step,
 // Approve ERC-20 transfer on behalf of some user in external_evm,
 // Call BFTBridge::burn() on behalf of the user in external_evm.
-// Wait some time for the erc20-minter see and process it.
+// Wait some time for the erc20-bridge see and process it.
 // Make sure the tokens minted.
-// Make sure SignedMintOrder removed from erc20-minter after some time.
+// Make sure SignedMintOrder removed from erc20-bridge after some time.
 #[tokio::test]
 async fn test_should_setup_with_evm_rpc_canister() {
     let _ = ContextWithBridges::new().await;
@@ -206,7 +206,7 @@ async fn create_bft_bridge(
     fee_charge: H160,
     minter_address: H160,
 ) -> H160 {
-    let minter_client = ctx.client(ctx.canisters().ck_erc20_minter(), ADMIN);
+    let minter_client = ctx.client(ctx.canisters().erc20_bridge(), ADMIN);
 
     let _hash = minter_client
         .update::<_, BftResult<H256>>("init_bft_bridge_contract", (side, fee_charge.clone()))
