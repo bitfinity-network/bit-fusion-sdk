@@ -59,12 +59,12 @@ dfx deploy token2 --argument "(variant {Init = record {
     }
 }})"
 
-########## Deploy EVM, ICRC2 Minter ##########
+########## Deploy EVM, ICRC2 Bridge ##########
 
 dfx canister create evm_testnet
-dfx canister create icrc2-minter
+dfx canister create icrc2-bridge
 EVM=$(dfx canister id evm_testnet)
-ICRC2_MINTER=$(dfx canister id icrc2-minter)
+ICRC2_MINTER=$(dfx canister id icrc2-bridge)
 
 dfx deploy signature_verification --argument "(vec { principal \"${EVM}\" })"
 SIGNATURE_VERIFICATION=$(dfx canister id signature_verification)
@@ -83,7 +83,7 @@ dfx deploy evm_testnet --argument "(record {
     coinbase = \"0x0000000000000000000000000000000000000000\";
 })"
 
-dfx deploy icrc2-minter --argument "(record {
+dfx deploy icrc2-bridge --argument "(record {
     evm_principal = principal \"$EVM\";
     signing_strategy = variant { 
         Local = record {
@@ -106,27 +106,27 @@ ETH_WALLET_ADDRESS=$(cargo run -q -p bridge-tool -- wallet-address --wallet="$ET
 FEE_CHARGE_DEPLOY_TX_NONCE=0
 FEE_CHARGE_CONTRACT_ADDRESS=$(cargo run -q -p bridge-tool -- expected-contract-address --wallet="$ETH_WALLET" --nonce=$FEE_CHARGE_DEPLOY_TX_NONCE)
 
-res=$(dfx canister call icrc2-minter get_bridge_canister_evm_address)
+res=$(dfx canister call icrc2-bridge get_bridge_canister_evm_address)
 res=${res#*\"}
-ICRC2_MINTER_ECDSA_ADDRESS=${res%\"*}
+ICRC2_BRIDGE_ECDSA_ADDRESS=${res%\"*}
 
-echo "ICRC2 Minter ecdsa address: ${ICRC2_MINTER_ECDSA_ADDRESS}"
+echo "ICRC2 Minter ecdsa address: ${ICRC2_BRIDGE_ECDSA_ADDRESS}"
 
-echo "Minting ETH tokens for ICRC2 Minter canister"
-dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_MINTER_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
+echo "Minting ETH tokens for ICRC2 Bridge canister"
+dfx canister call evm_testnet mint_native_tokens "(\"${ICRC2_BRIDGE_ECDSA_ADDRESS}\", \"340282366920938463463374607431768211455\")"
 
 echo "Deploying BftBridge contract"
 
 IS_WRAPPED="false"
-BFT_BRIDGE_ADDRESS=$(deploy_bft_bridge $EVM $ETH_WALLET_ADDRESS $ICRC2_MINTER_ECDSA_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS $IS_WRAPPED)
+BFT_BRIDGE_ADDRESS=$(deploy_bft_bridge $EVM $ETH_WALLET_ADDRESS $ICRC2_BRIDGE_ECDSA_ADDRESS $FEE_CHARGE_CONTRACT_ADDRESS $IS_WRAPPED)
 
 echo "Got BftBridge address: ${BFT_BRIDGE_ADDRESS}"
 
 echo "Setting ICRC2 Minter BftBridge address"
-dfx canister call icrc2-minter set_bft_bridge_contract "(\"${BFT_BRIDGE_ADDRESS}\")"
+dfx canister call icrc2-bridge set_bft_bridge_contract "(\"${BFT_BRIDGE_ADDRESS}\")"
 sleep 5
 
-res=$(dfx canister call icrc2-minter get_bft_bridge_contract)
+res=$(dfx canister call icrc2-bridge get_bft_bridge_contract)
 res=${res#*\"}
 BFT_BRIDGE_ADDRESS=${res%\"*}
 echo "Got BftBridge address: ${BFT_BRIDGE_ADDRESS}"

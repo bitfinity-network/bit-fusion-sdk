@@ -63,21 +63,28 @@ impl<Op: Operation> BridgeTask<Op> {
         match self {
             BridgeTask::Operation(id, _) => {
                 let Some(operation) = ctx.borrow().operations.get(id) else {
-                    log::warn!("Operation#{id} not found.");
+                    log::warn!("Operation #{id} not found.");
                     return Err(Error::OperationNotFound(id));
                 };
 
-                log::warn!("Starting Operation#{id}.");
+                let ctx_clone = ctx.clone();
+                let next_step =
+                    operation
+                        .progress(id, ctx.clone())
+                        .await
+                        .inspect_err(move |err| {
+                            ctx_clone
+                                .borrow_mut()
+                                .operations
+                                .update_with_err(id, err.to_string())
+                        })?;
 
-                let new_operation = operation.progress(id, ctx.clone()).await?;
-                let scheduling_options = new_operation.scheduling_options();
-                ctx.borrow_mut()
-                    .operations
-                    .update(id, new_operation.clone());
+                let scheduling_options = next_step.scheduling_options();
+                ctx.borrow_mut().operations.update(id, next_step.clone());
 
                 if let Some(options) = scheduling_options {
                     let scheduled_task =
-                        ScheduledTask::with_options(Self::Operation(id, new_operation), options);
+                        ScheduledTask::with_options(Self::Operation(id, next_step), options);
                     task_scheduler.append_task(scheduled_task);
                 }
 
@@ -210,5 +217,155 @@ impl<Op: Operation> Task for BridgeTask<Op> {
                 .await
                 .map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+    use did::H160;
+    use ic_exports::ic_kit::MockContext;
+    use ic_storage::IcStorage;
+
+    use super::*;
+    use crate::runtime::state::config::ConfigStorage;
+    use crate::runtime::BridgeRuntime;
+
+    #[derive(Debug, CandidType, Serialize, Deserialize, Clone, Eq, PartialEq)]
+    struct TestOperation {
+        successful: bool,
+        successful_runs: usize,
+    }
+
+    impl TestOperation {
+        const ERR_MESSAGE: &'static str = "test error";
+
+        fn new_err() -> Self {
+            Self {
+                successful: false,
+                successful_runs: 0,
+            }
+        }
+
+        fn new_ok() -> Self {
+            Self {
+                successful: true,
+                successful_runs: 0,
+            }
+        }
+    }
+
+    impl Operation for TestOperation {
+        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
+            if self.successful {
+                Ok(Self {
+                    successful_runs: self.successful_runs + 1,
+                    successful: self.successful,
+                })
+            } else {
+                Err(Error::FailedToProgress(Self::ERR_MESSAGE.to_string()))
+            }
+        }
+
+        fn is_complete(&self) -> bool {
+            false
+        }
+
+        fn evm_wallet_address(&self) -> H160 {
+            H160::from_slice(&[1; 20])
+        }
+
+        async fn on_wrapped_token_minted(
+            _ctx: RuntimeState<Self>,
+            _event: MintedEventData,
+        ) -> Option<OperationAction<Self>> {
+            todo!()
+        }
+
+        async fn on_wrapped_token_burnt(
+            _ctx: RuntimeState<Self>,
+            _event: BurntEventData,
+        ) -> Option<OperationAction<Self>> {
+            todo!()
+        }
+
+        async fn on_minter_notification(
+            _ctx: RuntimeState<Self>,
+            _event: NotifyMinterEventData,
+        ) -> Option<OperationAction<Self>> {
+            todo!()
+        }
+    }
+
+    #[tokio::test]
+    async fn operation_errors_are_stored_in_log() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_err();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone());
+
+        const COUNT: usize = 5;
+        for _ in 0..COUNT {
+            let op = ctx.borrow().operations.get(id).unwrap();
+            let task = BridgeTask::Operation(id, op);
+            task.execute_inner(ctx.clone(), Box::new(runtime.scheduler.clone()))
+                .await
+                .unwrap_err();
+        }
+
+        let log = ctx
+            .borrow()
+            .operations
+            .get_log(id)
+            .expect("operation is not in the log");
+        assert_eq!(log.log().len(), COUNT + 1);
+        assert_eq!(log.log()[0].step_result, Ok(op));
+
+        for i in 1..COUNT + 1 {
+            assert!(log.log()[i]
+                .step_result
+                .as_ref()
+                .unwrap_err()
+                .contains(TestOperation::ERR_MESSAGE));
+        }
+    }
+
+    #[tokio::test]
+    async fn operation_steps_are_stored_in_log() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_ok();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone());
+
+        const COUNT: usize = 5;
+        for _ in 0..COUNT {
+            let op = ctx.borrow().operations.get(id).unwrap();
+            let task = BridgeTask::Operation(id, op);
+            task.execute_inner(ctx.clone(), Box::new(runtime.scheduler.clone()))
+                .await
+                .unwrap();
+        }
+
+        let log = ctx
+            .borrow()
+            .operations
+            .get_log(id)
+            .expect("operation is not in the log");
+        assert_eq!(log.log().len(), COUNT + 1);
+        assert_eq!(log.log()[0].step_result, Ok(op));
+
+        for i in 0..COUNT + 1 {
+            assert_eq!(
+                log.log()[i].step_result.as_ref().unwrap(),
+                &TestOperation {
+                    successful: true,
+                    successful_runs: i
+                }
+            );
+        }
     }
 }

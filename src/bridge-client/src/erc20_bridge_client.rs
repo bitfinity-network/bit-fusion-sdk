@@ -1,7 +1,8 @@
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use did::H160;
-use erc20_minter::ops::Erc20BridgeOp;
+use erc20_bridge::ops::Erc20BridgeOp;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 
 use crate::bridge_client::BridgeCanisterClient;
@@ -21,7 +22,16 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
         pagination: Option<Pagination>,
     ) -> CanisterClientResult<Vec<(OperationId, Erc20BridgeOp)>> {
         self.client
-            .update("get_operations_list", (wallet_address, pagination))
+            .query("get_operations_list", (wallet_address, pagination))
+            .await
+    }
+
+    pub async fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> CanisterClientResult<Option<OperationLog<Erc20BridgeOp>>> {
+        self.client
+            .query("get_operation_log", (operation_id,))
             .await
     }
 

@@ -1,5 +1,5 @@
 [package]
-name = "icrc2-minter"
+name = "erc20-bridge"
 version.workspace = true
 edition.workspace = true
 
@@ -9,38 +9,33 @@ default = []
 export-api = []
 
 [dependencies]
-async-recursion = { workspace = true }
-async-trait = { workspace = true }
-candid = { workspace = true }
-bridge-canister = { path = "../bridge-canister" }
+alloy-sol-types = { workspace = true, features = ["json"] }
+anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did" }
+bridge-canister = { path = "../bridge-canister" }
+candid = { workspace = true }
 did = { workspace = true }
-eth-signer = { workspace = true, features = ["ic_sign"] }
-ethers-core = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
     "ic-canister-client",
+    "http-outcall",
 ] }
-evm-canister-client = { workspace = true }
-hex = { workspace = true }
 ic-canister = { workspace = true }
+ic-canister-client = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
-ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
-ic-task-scheduler = { workspace = true }
 ic-storage = { workspace = true }
-icrc-client = { workspace = true }
+ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
-log = { workspace = true }
-bridge-utils = { path = "../bridge-utils" }
-num-traits = { workspace = true }
 serde = { workspace = true }
-thiserror = { workspace = true }
+log = { workspace = true }
+ethers-core = { workspace = true }
+bridge-utils = { path = "../bridge-utils" }
+ic-log = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
+drop_guard = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-rand = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true }
 
 [build-dependencies]

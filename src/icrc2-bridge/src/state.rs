@@ -7,9 +7,9 @@ use crate::constant::ACCESS_LIST_MEMORY_ID;
 
 mod access_list;
 
-/// State of a minter canister.
+/// State of a bridge canister.
 pub struct IcrcState {
-    /// Minter canister configuration.
+    /// Bridge canister configuration.
     pub access_list: AccessList<VirtualMemory<DefaultMemoryImpl>>,
 }
 

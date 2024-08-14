@@ -55,7 +55,7 @@ if [ "$IC_NETWORK" != "local" ]; then
   assert_isset_param "$EVM_PRINCIPAL" "EVM_PRINCIPAL"
 fi
 
-LOG_SETTINGS="record { enable_console=true; in_memory_records = opt 10000: opt nat64; log_filter=opt \"info,icrc2_minter::tasks=trace\"; }"
+LOG_SETTINGS="record { enable_console=true; in_memory_records = opt 10000: opt nat64; log_filter=opt \"info,icrc2_bridge::tasks=trace\"; }"
 OWNER=$(dfx identity get-principal)
 SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Production }; } }"
 
@@ -72,7 +72,7 @@ elif [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "
   exit 1
 fi
 
-deploy_icrc2_minter "$IC_NETWORK" "$INSTALL_MODE" "$EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
+deploy_icrc2_bridge "$IC_NETWORK" "$INSTALL_MODE" "$EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
 
 if [ "$IC_NETWORK" = "local" ]; then
   start_icx "$EVM_PRINCIPAL"

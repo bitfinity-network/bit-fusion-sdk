@@ -1,8 +1,9 @@
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use icrc2_minter::ops::IcrcBridgeOp;
+use icrc2_bridge::ops::IcrcBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 
@@ -23,6 +24,15 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
     ) -> CanisterClientResult<Vec<(OperationId, IcrcBridgeOp)>> {
         self.client
             .query("get_operations_list", (wallet_address, pagination))
+            .await
+    }
+
+    pub async fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> CanisterClientResult<Option<OperationLog<IcrcBridgeOp>>> {
+        self.client
+            .query("get_operation_log", (operation_id,))
             .await
     }
 }

@@ -10,6 +10,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::OperationLog;
 use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
 use bridge_utils::evm_bridge::BridgeSide;
@@ -32,20 +33,20 @@ pub mod inspect;
 pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
 
 #[derive(Canister, Clone, Debug)]
-pub struct EvmMinter {
+pub struct Erc20Bridge {
     #[id]
     id: Principal,
 }
 
-impl PreUpdate for EvmMinter {}
+impl PreUpdate for Erc20Bridge {}
 
-impl BridgeCanister for EvmMinter {
+impl BridgeCanister for Erc20Bridge {
     fn config(&self) -> SharedConfig {
         ConfigStorage::get()
     }
 }
 
-impl EvmMinter {
+impl Erc20Bridge {
     #[init]
     pub fn init(&mut self, bridge_settings: BridgeInitData, base_evm_settings: BaseEvmSettings) {
         get_base_evm_state().0.borrow_mut().reset(base_evm_settings);
@@ -96,6 +97,18 @@ impl EvmMinter {
             .get_for_address(&wallet_address, pagination, memo)
     }
 
+    /// Returns log of an operation by its ID.
+    #[query]
+    pub fn get_operation_log(
+        &self,
+        operation_id: OperationId,
+    ) -> Option<OperationLog<Erc20BridgeOp>> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_log(operation_id)
+    }
+
     /// Returns the build data of the canister
     #[query]
     fn get_canister_build_data(&self) -> BuildData {
@@ -109,14 +122,14 @@ impl EvmMinter {
     }
 }
 
-impl Metrics for EvmMinter {
+impl Metrics for Erc20Bridge {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
         MetricsStorage::get()
     }
 }
 
-impl LogCanister for EvmMinter {
+impl LogCanister for Erc20Bridge {
     fn log_state(&self) -> Rc<RefCell<LogState>> {
         LogState::get()
     }
