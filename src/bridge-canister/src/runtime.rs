@@ -51,7 +51,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         f(&mut state);
     }
 
-    /// Provides access to tasks sheduler.
+    /// Provides access to tasks scheduler.
     pub fn schedule_operation(&mut self, id: OperationId, operation: Op) {
         let options = operation.scheduling_options().unwrap_or_default();
         let scheduled_task =

@@ -199,8 +199,12 @@ impl Operation for RuneBridgeOp {
         _ctx: RuntimeState<Self>,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
+        let memo = event.memo();
         match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
-            Ok(payload) => Some(OperationAction::Create(Self::CreateTransaction { payload })),
+            Ok(payload) => Some(OperationAction::Create(
+                Self::CreateTransaction { payload },
+                memo,
+            )),
             Err(err) => {
                 log::warn!("Invalid withdrawal data: {err:?}");
                 None
@@ -214,13 +218,14 @@ impl Operation for RuneBridgeOp {
     ) -> Option<OperationAction<Self>> {
         if let Some(notification) = RuneMinterNotification::decode(event.clone()) {
             match notification {
-                RuneMinterNotification::Deposit(payload) => {
-                    Some(OperationAction::Create(Self::AwaitInputs {
+                RuneMinterNotification::Deposit(payload) => Some(OperationAction::Create(
+                    Self::AwaitInputs {
                         dst_address: payload.dst_address,
                         dst_tokens: payload.dst_tokens,
                         requested_amounts: payload.amounts,
-                    }))
-                }
+                    },
+                    event.memo(),
+                )),
             }
         } else {
             log::warn!("Invalid minter notification: {event:?}");

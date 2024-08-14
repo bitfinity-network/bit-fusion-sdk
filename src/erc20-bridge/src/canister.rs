@@ -10,7 +10,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
 use bridge_utils::evm_bridge::BridgeSide;
@@ -89,12 +89,17 @@ impl Erc20Bridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>,
     ) -> Vec<(OperationId, Erc20BridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_for_address(&wallet_address, pagination, memo)
+            .get_for_address(&wallet_address, pagination)
+    }
+
+    #[query]
+    /// Returns operation by memo
+    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, Erc20BridgeOp)> {
+        get_runtime_state().borrow().operations.get_by_memo(&memo)
     }
 
     /// Returns log of an operation by its ID.
@@ -159,7 +164,7 @@ async fn process_base_evm_logs() {
 
     get_base_evm_config()
         .borrow_mut()
-        .update_evm_params(|params| params.next_block = collected.last_block_nubmer + 1);
+        .update_evm_params(|params| params.next_block = collected.last_block_number + 1);
 
     for event in collected.events {
         if let Err(e) = process_base_evm_event(event) {
@@ -200,10 +205,13 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
                 side: BridgeSide::Wrapped,
                 stage: Erc20OpStage::SignMintOrder(order),
             };
+
+            let memo = event.memo();
+
             get_runtime_state()
                 .borrow_mut()
                 .operations
-                .new_operation_with_id(op_id, operation.clone(), None);
+                .new_operation_with_id(op_id, operation.clone(), memo);
 
             get_runtime()
                 .borrow_mut()

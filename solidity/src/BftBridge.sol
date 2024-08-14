@@ -74,11 +74,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint32 operationID,
         bytes32 name,
         bytes16 symbol,
-        uint8 decimals
+        uint8 decimals,
+        bytes32 memo
     );
 
     /// Event that can be emited with a notification for the minter canister
-    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData);
+    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData, bytes32 memo);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -135,8 +136,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
-    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
-        emit NotifyMinterEvent(notificationType, msg.sender, userData);
+    function notifyMinter(uint32 notificationType, bytes calldata userData, bytes32 memo) external {
+        emit NotifyMinterEvent(notificationType, msg.sender, userData, memo);
     }
 
     /// Adds the given `controller` address to the `controllerAccessList`.
@@ -205,7 +206,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint256 amount,
         address fromERC20,
         bytes32 toTokenID,
-        bytes memory recipientID
+        bytes memory recipientID,
+        bytes32 memo
     ) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
@@ -235,7 +237,16 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint32 operationID = operationIDCounter++;
 
         emit BurnTokenEvent(
-            msg.sender, amount, fromERC20, recipientID, toTokenID, operationID, meta.name, meta.symbol, meta.decimals
+            msg.sender,
+            amount,
+            fromERC20,
+            recipientID,
+            toTokenID,
+            operationID,
+            meta.name,
+            meta.symbol,
+            meta.decimals,
+            memo
         );
 
         return operationID;

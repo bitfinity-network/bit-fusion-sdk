@@ -8,7 +8,7 @@ use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -71,12 +71,17 @@ impl Icrc2BridgeCanister {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>,
     ) -> Vec<(OperationId, IcrcBridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_for_address(&wallet_address, pagination, memo)
+            .get_for_address(&wallet_address, pagination)
+    }
+
+    #[query]
+    /// Returns operation by memo
+    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, IcrcBridgeOp)> {
+        get_runtime_state().borrow().operations.get_by_memo(&memo)
     }
 
     /// Returns log of an operation by its ID.

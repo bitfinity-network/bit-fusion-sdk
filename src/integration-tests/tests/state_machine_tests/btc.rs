@@ -1049,6 +1049,7 @@ impl CkBtcSetup {
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -1202,6 +1203,7 @@ impl CkBtcSetup {
                 &self.bft_bridge,
                 amount as u128,
                 true,
+                None,
             )
             .await
             .expect("failed to burn");

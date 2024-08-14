@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
@@ -56,6 +56,7 @@ pub struct OperationsMemory<Mem> {
     pub incomplete_operations: Mem,
     pub operations_log: Mem,
     pub operations_map: Mem,
+    pub memo_operations_map: Mem,
 }
 
 /// A structure to store user-initiated operations in IC stable memory.
@@ -74,6 +75,7 @@ where
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationLog<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationLog<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
+    memo_operation_map: StableBTreeMap<Memo, OperationId, M>,
     max_operation_log_size: u64,
 }
 
@@ -97,6 +99,7 @@ where
             ),
             operations_log: StableBTreeMap::new(memory.operations_log),
             address_operation_map: StableBTreeMap::new(memory.operations_map),
+            memo_operation_map: StableBTreeMap::new(memory.memo_operations_map),
             max_operation_log_size: options.max_operations_count,
         }
     }
@@ -114,18 +117,23 @@ where
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation(&mut self, payload: P) -> OperationId {
+    pub fn new_operation(&mut self, payload: P, memo: Option<Memo>) -> OperationId {
         let id = self.next_operation_id();
-        self.new_operation_with_id(id, payload);
+        self.new_operation_with_id(id, payload, memo);
         id
     }
 
     /// Initializes a new operation with the given payload for the given ETH wallet address
     /// and stores it.
-    pub fn new_operation_with_id(&mut self, id: OperationId, payload: P) -> OperationId {
+    pub fn new_operation_with_id(
+        &mut self,
+        id: OperationId,
+        payload: P,
+        memo: Option<Memo>,
+    ) -> OperationId {
         let wallet_address = payload.evm_wallet_address();
         let is_complete = payload.is_complete();
-        let log = OperationLog::new(payload, wallet_address.clone());
+        let log = OperationLog::new(payload, wallet_address.clone(), memo);
 
         log::trace!("Operation {id} is created.");
 
@@ -141,6 +149,10 @@ where
             .unwrap_or_default();
         ids.0.push(id);
         self.address_operation_map.insert(wallet_address, ids);
+
+        if let Some(memo) = memo {
+            self.memo_operation_map.insert(memo, id);
+        }
 
         id
     }
@@ -199,6 +211,14 @@ where
             .skip(offset)
             .take(count)
             .collect()
+    }
+
+    /// Retrieve operations for the given memo.
+    pub fn get_by_memo(&self, memo: &Memo) -> Option<(OperationId, P)> {
+        self.memo_operation_map
+            .get(memo)
+            .and_then(|id| self.get_with_id(id))
+            .or(None)
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
@@ -264,7 +284,21 @@ where
                 }
             }
 
-            log::trace!("Operation {id} is evicted from the operation log");
+            if let Some(memo) = oldest.memo() {
+                self.memo_operation_map.remove(memo);
+            }
+
+            let memos_to_remove: Vec<_> = self
+                .memo_operation_map
+                .iter()
+                .filter_map(|(memo, op_id)| (op_id == id).then_some(memo))
+                .collect();
+
+            for memo in memos_to_remove {
+                self.memo_operation_map.remove(&memo);
+            }
+
+            log::trace!("Operation {id} and its associated memos removed from the store.");
         }
     }
 }
@@ -342,6 +376,7 @@ mod tests {
             incomplete_operations: VectorMemory::default(),
             operations_log: VectorMemory::default(),
             operations_map: VectorMemory::default(),
+            memo_operations_map: VectorMemory::default(),
         };
         OperationStore::with_memory(
             memory,
@@ -364,7 +399,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            store.new_operation(TestOp::complete(i as _));
+            store.new_operation(TestOp::complete(i as _), None);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -389,7 +424,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(TestOp::complete(0));
+            store.new_operation(TestOp::complete(0), None);
         }
 
         assert_eq!(store.operations_log.len(), COUNT);
@@ -418,7 +453,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for _ in 0..COUNT {
-            store.new_operation(TestOp::complete(42));
+            store.new_operation(TestOp::complete(42), None);
         }
 
         assert_eq!(store.operations_log.len(), LIMIT);
@@ -440,7 +475,7 @@ mod tests {
         let mut store = test_store(LIMIT);
 
         for i in 0..COUNT {
-            let id = store.new_operation(TestOp::new(42, i as _));
+            let id = store.new_operation(TestOp::new(42, i as _), None);
             store.update(id, TestOp::new(42, (i + 1) as _));
         }
 
@@ -465,7 +500,7 @@ mod tests {
 
         let mut ids = vec![];
         for i in 0..COUNT {
-            ids.push(store.new_operation(TestOp::new(i as _, 1)));
+            ids.push(store.new_operation(TestOp::new(i as _, 1), None));
         }
 
         for id in ids {
@@ -478,5 +513,59 @@ mod tests {
         assert_eq!(store.operations_log.len(), LIMIT);
         assert_eq!(store.incomplete_operations.len(), 0);
         assert_eq!(store.address_operation_map.len(), LIMIT);
+    }
+
+    #[test]
+    fn test_get_operation_by_memo() {
+        const COUNT: u64 = 42;
+
+        let mut store = test_store(COUNT);
+
+        for i in 0..COUNT {
+            store.new_operation(TestOp::new(i as _, 1), Some([i as u8; 32]));
+        }
+
+        for i in 0..COUNT {
+            assert_eq!(store.get_by_memo(&[i as u8; 32]).unwrap().1.addr, i as u32);
+        }
+    }
+
+    #[test]
+    fn test_memo_operations_are_cleared_when_evicted() {
+        const LIMIT: u64 = 10;
+        const COUNT: u64 = 40;
+
+        let mut store = test_store(LIMIT);
+
+        for i in 0..COUNT {
+            store.new_operation(TestOp::new(i as _, 1), Some([i as u8; 32]));
+        }
+
+        // Ensure that the memo map is populated correctly
+        for i in 0..COUNT {
+            assert!(store.get_by_memo(&[i as u8; 32]).is_some());
+        }
+
+        // Let us mark all of them complete
+        for i in 0..COUNT {
+            store.update(
+                store.get_by_memo(&[i as u8; 32]).unwrap().0,
+                TestOp::complete(i as _),
+            );
+        }
+
+        for i in COUNT..COUNT + 10 {
+            store.new_operation(TestOp::new(i as _, 1), Some([i as u8; 32]));
+
+            store.update(
+                store.get_by_memo(&[i as u8; 32]).unwrap().0,
+                TestOp::complete(i as _),
+            );
+        }
+
+        // Try to get the old ones
+        for i in 0..COUNT {
+            assert!(store.get_by_memo(&[i as u8; 32]).is_none());
+        }
     }
 }

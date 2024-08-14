@@ -9,6 +9,8 @@ use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
+use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::common::Pagination;
 use candid::Principal;
@@ -68,9 +70,8 @@ impl BtcBridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>,
     ) -> Vec<(u32, SignedMintOrder)> {
-        Self::token_mint_orders(wallet_address, pagination, memo)
+        Self::token_mint_orders(wallet_address, pagination)
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
@@ -80,12 +81,17 @@ impl BtcBridge {
         wallet_address: H160,
         operation_id: u32,
         pagination: Option<Pagination>,
-        memo: Option<String>,
     ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, pagination, memo)
+        Self::token_mint_orders(wallet_address, pagination)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
+    }
+
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, BtcBridgeOp)> {
+        get_runtime_state().borrow().operations.get_by_memo(&memo)
     }
 
     #[update]
@@ -125,14 +131,13 @@ impl BtcBridge {
     fn token_mint_orders(
         wallet_address: H160,
         pagination: Option<Pagination>,
-        memo: Option<String>,
     ) -> Vec<(u32, SignedMintOrder)> {
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
         let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
         get_runtime_state()
             .borrow()
             .operations
-            .get_for_address(&wallet_address, None, memo)
+            .get_for_address(&wallet_address, None)
             .into_iter()
             .filter_map(|(operation_id, operation)| {
                 operation

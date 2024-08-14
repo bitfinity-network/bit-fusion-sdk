@@ -213,6 +213,10 @@ async fn test_external_bridging() {
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
     let alice_address: H160 = alice_wallet.address().into();
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
+
+    // Check mint operation complete
+    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+
     let amount = 1000_u128;
 
     // spender should deposit native tokens to bft bridge, to pay fee.
@@ -243,7 +247,10 @@ async fn test_external_bridging() {
 
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
-    ctx.context
+    let memo = [5 as _; 32];
+
+    let (expected_operation_id, _) = ctx
+        .context
         .burn_base_erc_20_tokens(
             &base_evm_client,
             &ctx.bob_wallet,
@@ -252,6 +259,7 @@ async fn test_external_bridging() {
             alice_id,
             &ctx.base_bft_bridge,
             amount,
+            Some(memo),
         )
         .await
         .unwrap();
@@ -262,6 +270,14 @@ async fn test_external_bridging() {
     ctx.context
         .advance_by_times(Duration::from_secs(2), 20)
         .await;
+
+    // Let us try fetching the operation by memo
+    let (operation_id, _) = erc20_bridge_client
+        .get_operation_by_memo(memo)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(operation_id.as_u64(), expected_operation_id as u64);
 
     let balance = ctx
         .context
@@ -275,8 +291,6 @@ async fn test_external_bridging() {
         .advance_by_times(Duration::from_secs(2), 4)
         .await;
 
-    // Check mint operation complete
-    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
     let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
@@ -374,6 +388,7 @@ async fn native_token_deposit_increase_and_decrease() {
             alice_id,
             &ctx.base_bft_bridge,
             amount,
+            None,
         )
         .await
         .unwrap();
@@ -464,6 +479,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             alice_id,
             &ctx.base_bft_bridge,
             amount,
+            None,
         )
         .await
         .unwrap();

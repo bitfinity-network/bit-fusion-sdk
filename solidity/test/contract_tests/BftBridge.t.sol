@@ -217,8 +217,10 @@ contract BftBridgeTest is Test {
 
         assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
 
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+
         vm.prank(address(_owner));
-        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal, memo);
     }
 
     function testBurnBaseSideWithoutApproveShouldFail() public {
@@ -233,7 +235,9 @@ contract BftBridgeTest is Test {
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.prank(address(_owner));
         vm.expectRevert(bytes("Insufficient allowance"));
-        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal, memo);
     }
 
     function testBurnWrappedSideWithDeployedErc20() public {
@@ -250,7 +254,8 @@ contract BftBridgeTest is Test {
         assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
 
         vm.prank(address(_owner));
-        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal, memo);
     }
 
     function testBurnWrappedSideWithUnregisteredToken() public {
@@ -260,7 +265,8 @@ contract BftBridgeTest is Test {
 
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.expectRevert(bytes("Invalid from address; not registered in the bridge"));
-        _wrappedBridge.burn(100, erc20, toTokenId, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _wrappedBridge.burn(100, erc20, toTokenId, principal, memo);
     }
 
     function testBurnBaseSideWithUnregisteredToken() public {
@@ -276,7 +282,8 @@ contract BftBridgeTest is Test {
 
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.prank(address(_owner));
-        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal, memo);
     }
 
     function testMintBaseSideWithUnregisteredToken() public {
@@ -410,6 +417,7 @@ contract BftBridgeTest is Test {
         bytes32 name;
         bytes16 symbol;
         uint8 decimals;
+        bytes32 memo;
     }
 
     function _expectBurnEvent(ExpectedBurnEvent memory expected) private {
@@ -437,8 +445,11 @@ contract BftBridgeTest is Test {
                     bytes32 toToken,
                     bytes32 name,
                     bytes16 symbol,
-                    uint8 decimals
-                ) = abi.decode(entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8));
+                    uint8 decimals,
+                    bytes32 memo
+                ) = abi.decode(
+                    entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8, bytes32)
+                );
                 assertEq(expected.sender, sender);
                 assertEq(expected.amount, amount);
                 assertEq(expected.fromERC20, fromERC20);
@@ -447,6 +458,7 @@ contract BftBridgeTest is Test {
                 assertEq(expected.name, name);
                 assertEq(expected.symbol, symbol);
                 assertEq(expected.decimals, decimals);
+                assertEq(expected.memo, memo);
             }
         }
 

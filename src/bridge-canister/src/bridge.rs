@@ -2,6 +2,7 @@
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::bft_events::{
     self, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
@@ -125,21 +126,20 @@ pub trait OperationContext {
 
         Ok(CollectedEvents {
             events,
-            last_block_nubmer: last_request_block,
+            last_block_number: last_request_block,
         })
     }
 }
 
 /// Action to create or update an operation.
 pub enum OperationAction<Op> {
-    Create(Op),
-    CreateWithId(OperationId, Op),
+    Create(Op, Option<Memo>),
+    CreateWithId(OperationId, Op, Option<Memo>),
     Update { nonce: u32, update_to: Op },
-    CreateWithIdAndMemo(OperationId, Op, String),
 }
 
 #[derive(Debug)]
 pub struct CollectedEvents {
     pub events: Vec<BridgeEvent>,
-    pub last_block_nubmer: u64,
+    pub last_block_number: u64,
 }

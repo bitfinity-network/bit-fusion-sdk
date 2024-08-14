@@ -139,7 +139,7 @@ impl ServiceTask {
         ctx.borrow()
             .config
             .borrow_mut()
-            .update_evm_params(|params| params.next_block = collected.last_block_nubmer + 1);
+            .update_evm_params(|params| params.next_block = collected.last_block_number + 1);
 
         for event in events {
             let operation_action = match event {
@@ -149,27 +149,21 @@ impl ServiceTask {
             };
 
             let to_schedule = match operation_action {
-                Some(OperationAction::Create(op)) => {
-                    let new_op_id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
+                Some(OperationAction::Create(op, memo)) => {
+                    let new_op_id = ctx.borrow_mut().operations.new_operation(op.clone(), memo);
                     op.scheduling_options().zip(Some((new_op_id, op)))
                 }
-                Some(OperationAction::CreateWithId(id, op)) => {
+                Some(OperationAction::CreateWithId(id, op, memo)) => {
                     ctx.borrow_mut()
                         .operations
-                        .new_operation_with_id(id, op.clone(), None);
-                    op.scheduling_options().zip(Some((id, op)))
-                }
-                Some(OperationAction::CreateWithIdAndMemo(id, op, memo)) => {
-                    ctx.borrow_mut()
-                        .operations
-                        .new_operation_with_id(id, op.clone(), Some(memo));
+                        .new_operation_with_id(id, op.clone(), memo);
                     op.scheduling_options().zip(Some((id, op)))
                 }
                 Some(OperationAction::Update { nonce, update_to }) => {
                     let Some((operation_id, _)) = ctx
                         .borrow()
                         .operations
-                        .get_for_address(&update_to.evm_wallet_address(), None, None)
+                        .get_for_address(&update_to.evm_wallet_address(), None)
                         .into_iter()
                         .find(|(operation_id, _)| operation_id.nonce() == nonce)
                     else {
@@ -304,7 +298,7 @@ mod tests {
         let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
         let ctx = runtime.state.clone();
         let op = TestOperation::new_err();
-        let id = ctx.borrow_mut().operations.new_operation(op.clone());
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
 
         const COUNT: usize = 5;
         for _ in 0..COUNT {
@@ -339,7 +333,7 @@ mod tests {
         let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
         let ctx = runtime.state.clone();
         let op = TestOperation::new_ok();
-        let id = ctx.borrow_mut().operations.new_operation(op.clone());
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
 
         const COUNT: usize = 5;
         for _ in 0..COUNT {

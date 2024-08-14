@@ -2,6 +2,7 @@ use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::operation_log::Memo;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
@@ -163,6 +164,18 @@ pub struct BurntEventData {
     pub name: Vec<u8>,
     pub symbol: Vec<u8>,
     pub decimals: u8,
+    pub memo: Vec<u8>,
+}
+
+impl BurntEventData {
+    pub fn memo(&self) -> Option<Memo> {
+        (!self.memo.is_empty()).then_some(
+            self.memo
+                .as_slice()
+                .try_into()
+                .expect("should be exactly 32 bytes"),
+        )
+    }
 }
 
 impl From<BurnTokenEvent> for BurntEventData {
@@ -177,6 +190,7 @@ impl From<BurnTokenEvent> for BurntEventData {
             name: event.name.0.into(),
             symbol: event.symbol.0.into(),
             decimals: event.decimals,
+            memo: event.memo.0.into(),
         }
     }
 }
@@ -210,6 +224,18 @@ pub struct NotifyMinterEventData {
     pub notification_type: u32,
     pub tx_sender: did::H160,
     pub user_data: Vec<u8>,
+    pub memo: Vec<u8>,
+}
+
+impl NotifyMinterEventData {
+    pub fn memo(&self) -> Option<Memo> {
+        (!self.memo.is_empty()).then_some(
+            self.memo
+                .as_slice()
+                .try_into()
+                .expect("should be exactly 32 bytes"),
+        )
+    }
 }
 
 impl From<NotifyMinterEvent> for NotifyMinterEventData {
@@ -218,6 +244,7 @@ impl From<NotifyMinterEvent> for NotifyMinterEventData {
             notification_type: event.notificationType,
             tx_sender: event.txSender.into(),
             user_data: event.userData.0.into(),
+            memo: event.memo.0.into(),
         }
     }
 }
@@ -253,7 +280,7 @@ pub fn mint_transaction(
 mod tests {
     use std::collections::HashMap;
 
-    use alloy_sol_types::private::FixedBytes;
+    use alloy_sol_types::private::{FixedBytes, Uint};
     use did::H256;
     use ethers_core::abi::{Bytes, RawLog};
     use ethers_core::utils::hex::traits::FromHex;
@@ -278,9 +305,30 @@ mod tests {
 
     #[test]
     fn convert_raw_log_into_burnt_event() {
+        let event = BurnTokenEvent {
+            sender: H160::random().0.into(),
+            amount: Uint::ZERO,
+            fromERC20: H160::random().0.into(),
+            recipientID: Bytes::default().into(),
+            toToken: FixedBytes::from([3; 32]),
+            operationID: 1,
+            name: FixedBytes::from([2; 32]),
+            symbol: FixedBytes::from([1; 16]),
+            decimals: 18,
+            memo: FixedBytes::from([1; 32]),
+        };
+
+        let raw_data = event.encode_data();
+
         let raw = RawLog {
-            topics: vec![H256::from_hex_str("0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79").unwrap().0],
-            data: Bytes::from_hex("0x000000000000000000000000e41b09c6e9eaa79356b10f4181564b4bdb169d3500000000000000000000000000000000000000000000000000000000000003e80000000000000000000000002ea5d83d5a08d8556f726d3004a50aa8aa81c5c200000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100056b29dc8b8e5954eebac85b3145745362adfa50d8ad9e00000000000000").unwrap(),
+            topics: vec![
+                H256::from_hex_str(
+                    "0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79",
+                )
+                .unwrap()
+                .0,
+            ],
+            data: raw_data,
         };
         let topics = raw
             .topics
@@ -288,7 +336,8 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let _event = BurnTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        let event = BurnTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        assert_eq!(event.sender, event.sender);
     }
 
     #[tokio::test]

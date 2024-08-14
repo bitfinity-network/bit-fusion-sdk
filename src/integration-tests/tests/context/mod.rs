@@ -5,9 +5,11 @@ use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
+use bridge_utils::BFTBridge::BurnTokenEvent;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
@@ -41,7 +43,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
-use alloy_sol_types::{SolCall, SolConstructor};
+use alloy_sol_types::{SolCall, SolConstructor, SolEvent};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
 use ic_log::did::LogCanisterSettings;
@@ -349,6 +351,7 @@ pub trait TestContext {
         bridge: &H160,
         amount: u128,
         wrapped: bool,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         let amount: U256 = amount.into();
 
@@ -376,14 +379,13 @@ pub trait TestContext {
             fromERC20: from_token.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
             recipientID: recipient.into(),
+            memo: memo.map(|m| m.into()).unwrap_or_default(),
         }
         .abi_encode();
 
         let (tx_hash, receipt) = self
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
-
-        println!("Burn transaction hash: {tx_hash}; receipt {receipt:?}",);
 
         if receipt.status != Some(U64::one()) {
             let decoded_output =
@@ -423,6 +425,7 @@ pub trait TestContext {
             bridge,
             amount,
             true,
+            None,
         )
         .await
     }
@@ -437,6 +440,7 @@ pub trait TestContext {
         recipient: Id256,
         bridge: &H160,
         amount: u128,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         self.burn_erc_20_tokens_raw(
             evm_client,
@@ -447,6 +451,7 @@ pub trait TestContext {
             bridge,
             amount,
             false,
+            memo,
         )
         .await
     }
@@ -652,6 +657,7 @@ pub trait TestContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
