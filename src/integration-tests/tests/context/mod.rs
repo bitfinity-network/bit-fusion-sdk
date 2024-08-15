@@ -1,3 +1,4 @@
+mod bridge_ctx;
 mod evm_rpc_canister;
 
 use std::collections::HashMap;
