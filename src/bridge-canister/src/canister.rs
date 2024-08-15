@@ -46,7 +46,7 @@ pub trait BridgeCanister: Canister + LogCanister {
         info!("Bridge canister owner changed to {owner}");
     }
 
-    /// Returns principal of EVM canister with which the minter canister works.
+    /// Returns principal of EVM canister with which the bridge canister works.
     #[query(trait = true)]
     fn get_evm_principal(&self) -> Principal {
         let link = self.config().borrow().get_evm_link();
@@ -73,13 +73,13 @@ pub trait BridgeCanister: Canister + LogCanister {
         info!("Bridge canister BFT bridge contract address changed to {address}");
     }
 
-    /// Returns evm_address of the minter canister.
+    /// Returns evm_address of the bridge canister.
     #[allow(async_fn_in_trait)]
     #[update(trait = true)]
     async fn get_bridge_canister_evm_address(&mut self) -> BftResult<H160> {
         let signer = self.config().borrow().get_signer()?;
         signer.get_address().await.map_err(|e| {
-            Error::Initialization(format!("failed to get minter canister address: {e}"))
+            Error::Initialization(format!("failed to get bridge canister address: {e}"))
         })
     }
 

@@ -6,7 +6,7 @@ use ic_exports::ic_kit::RejectionCode;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use serde::Deserialize;
 
-use crate::ck_btc_interface::{PendingUtxo, UpdateBalanceError};
+use crate::ckbtc_client::{PendingUtxo, RetrieveBtcError, UpdateBalanceError};
 
 /// Status of a pending BTC to ERC20 transfer.
 #[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
@@ -35,9 +35,25 @@ pub enum Erc20MintStatus {
     },
 }
 
+pub enum ErrorCodes {
+    // Deposit errors
+    ValueTooSmall = 0,
+    Tainted = 1,
+    CkBtcMinter = 2,
+    CkBtcLedgerTransfer = 3,
+    CkBtcLedgerBalance = 4,
+    Sign = 5,
+    NotInitialized = 6,
+    NothingToMint = 7,
+    WaitingForConfirmtions = 8,
+    // Withdrawal errors
+    InvalidRecipient = 9,
+    RetrieveBtcError = 10,
+}
+
 /// Error during BTC to ERC20 transfer.
 #[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
-pub enum Erc20MintError {
+pub enum BtcBridgeError {
     /// The amount of BTC transferred to ckBTC is smaller than the fee. The transaction will not
     /// be precessed.
     ValueTooSmall,
@@ -58,10 +74,102 @@ pub enum Erc20MintError {
     NotInitialized,
     /// No pending transactions.
     NothingToMint,
+    /// Waiting for confirmations on the UTXOs.
+    WaitingForConfirmations,
 }
 
-impl From<TransferError> for Erc20MintError {
+impl From<TransferError> for BtcBridgeError {
     fn from(value: TransferError) -> Self {
         Self::CkBtcLedgerTransfer(value)
+    }
+}
+
+impl From<BtcBridgeError> for bridge_did::error::Error {
+    fn from(value: BtcBridgeError) -> Self {
+        match value {
+            BtcBridgeError::ValueTooSmall => Self::Custom {
+                code: ErrorCodes::ValueTooSmall as u32,
+                msg: "Value too small".to_string(),
+            },
+            BtcBridgeError::Tainted(utxo) => Self::Custom {
+                code: ErrorCodes::Tainted as u32,
+                msg: format!("Tainted UTXO: {:?}", utxo),
+            },
+            BtcBridgeError::CkBtcMinter(err) => Self::Custom {
+                code: ErrorCodes::CkBtcMinter as u32,
+                msg: format!("CkBtcMinter error: {:?}", err),
+            },
+            BtcBridgeError::CkBtcLedgerTransfer(err) => Self::Custom {
+                code: ErrorCodes::CkBtcLedgerTransfer as u32,
+                msg: format!("CkBtcLedgerTransfer error: {:?}", err),
+            },
+            BtcBridgeError::CkBtcLedgerBalance(code, msg) => Self::Custom {
+                code: ErrorCodes::CkBtcLedgerBalance as u32,
+                msg: format!("CkBtcLedgerBalance error: {msg} ({code:?})"),
+            },
+            BtcBridgeError::Sign(msg) => Self::Custom {
+                code: ErrorCodes::Sign as u32,
+                msg,
+            },
+            BtcBridgeError::NotInitialized => Self::Custom {
+                code: ErrorCodes::NotInitialized as u32,
+                msg: "Not initialized".to_string(),
+            },
+            BtcBridgeError::NothingToMint => Self::Custom {
+                code: ErrorCodes::NothingToMint as u32,
+                msg: "Nothing to mint".to_string(),
+            },
+            BtcBridgeError::WaitingForConfirmations => Self::Custom {
+                code: ErrorCodes::WaitingForConfirmtions as u32,
+                msg: "Waiting for confirmations".to_string(),
+            },
+            BtcBridgeError::Evm(msg) => Self::EvmRequestFailed(msg),
+        }
+    }
+}
+
+/// Error during BTC withdrawal.
+#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
+pub enum BtcWithdrawError {
+    InvalidRecipient(Vec<u8>),
+    RetrieveBtcError(String),
+}
+
+impl From<RetrieveBtcError> for BtcWithdrawError {
+    fn from(err: RetrieveBtcError) -> Self {
+        Self::RetrieveBtcError(match err {
+            RetrieveBtcError::AlreadyProcessing => "Already processing".to_string(),
+            RetrieveBtcError::AmountTooLow(amount) => format!("Amount too low: {}", amount),
+            RetrieveBtcError::GenericError {
+                error_message,
+                error_code,
+            } => {
+                format!("Generic error: {} ({})", error_message, error_code)
+            }
+            RetrieveBtcError::InsufficientFunds { balance } => {
+                format!("Insufficient funds: {}", balance)
+            }
+            RetrieveBtcError::MalformedAddress(address) => {
+                format!("Malformed address: {}", address)
+            }
+            RetrieveBtcError::TemporarilyUnavailable(error_message) => {
+                format!("Temporarily unavailable: {}", error_message)
+            }
+        })
+    }
+}
+
+impl From<BtcWithdrawError> for bridge_did::error::Error {
+    fn from(value: BtcWithdrawError) -> Self {
+        match value {
+            BtcWithdrawError::InvalidRecipient(recipient) => Self::Custom {
+                code: ErrorCodes::InvalidRecipient as u32,
+                msg: format!("Invalid recipient: {:?}", recipient),
+            },
+            BtcWithdrawError::RetrieveBtcError(msg) => Self::Custom {
+                code: ErrorCodes::RetrieveBtcError as u32,
+                msg,
+            },
+        }
     }
 }

@@ -6,16 +6,20 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use alloy_sol_types::SolCall;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
+use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
-use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::evm_link::EvmLink;
+use bridge_did::init::BridgeInitData;
+use bridge_did::order::SignedMintOrder;
+use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
+use bridge_utils::BFTBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::state::{BftBridgeConfig, BtcBridgeConfig};
+use btc_bridge::state::{BtcConfig, WrappedTokenConfig};
 use candid::{Decode, Encode, Nat, Principal};
-use did::H160;
+use did::{H160, U256};
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::sign_strategy::SigningStrategy;
 use eth_signer::{Signer, Wallet};
@@ -53,6 +57,7 @@ use ic_state_machine_tests::{Cycles, StateMachine, StateMachineBuilder, WasmResu
 
 use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;
+use crate::utils::error::TestError;
 use crate::utils::wasm::{
     get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
     get_ck_btc_minter_canister_bytecode, get_icrc1_token_canister_bytecode,
@@ -257,7 +262,7 @@ impl CkBtcSetup {
                     }))
                     .unwrap(),
                 )
-                .expect("failed to install the minter");
+                .expect("failed to install the ckBTC minter");
 
                 let kyt_provider = PrincipalId::new_user_test_id(2);
 
@@ -319,22 +324,18 @@ impl CkBtcSetup {
 
         let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
 
-        let config = BtcBridgeConfig {
-            ck_btc_minter: minter_id.into(),
-            ck_btc_ledger: ledger_id.into(),
-            network: BitcoinNetwork::Mainnet,
-            evm_link: EvmLink::Ic((&context).canisters().evm()),
+        let bridge_config = BridgeInitData {
+            owner: (&context).admin(),
+            evm_principal: context.canisters.evm(),
             signing_strategy: SigningStrategy::ManagementCanister {
-                key_id: SigningKeyId::Custom("test_key".into()),
+                key_id: SigningKeyId::Custom("master_ecdsa_public_key".into()),
             },
-            admin: (&context).admin(),
-            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
-            log_settings: LogCanisterSettings {
+            log_settings: Some(LogCanisterSettings {
                 enable_console: Some(true),
                 in_memory_records: None,
                 log_filter: Some("trace".to_string()),
                 ..Default::default()
-            },
+            }),
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();
@@ -342,58 +343,100 @@ impl CkBtcSetup {
             .install_canister(
                 btc_bridge,
                 get_btc_bridge_canister_bytecode().await,
-                (config,),
+                (bridge_config,),
             )
             .await
             .unwrap();
         context.canisters.set(CanisterType::BtcBridge, btc_bridge);
+        println!("Btc bridge installed with id {btc_bridge}");
 
-        let btc_bridge_eth_address: Option<H160> = (&context)
+        let btc_config = BtcConfig {
+            ck_btc_minter: minter_id.into(),
+            ck_btc_ledger: ledger_id.into(),
+            network: BitcoinNetwork::Mainnet,
+            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
+        };
+
+        // configure btc
+        let res: BftResult<()> = (&context)
             .client(btc_bridge, "admin")
-            .update("get_evm_address", ())
+            .update("admin_configure_btc", (btc_config,))
+            .await
+            .unwrap();
+        assert!(res.is_ok());
+
+        println!("Btc config OK");
+        for _ in 0..5 {
+            (&context).advance_time(Duration::from_secs(2)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+
+        let btc_bridge_eth_address: BftResult<H160> = (&context)
+            .client(btc_bridge, "admin")
+            .update::<_, BftResult<H160>>("get_bridge_canister_evm_address", ())
             .await
             .unwrap();
 
+        let btc_bridge_eth_address =
+            btc_bridge_eth_address.expect("get_bridge_canister_evm_address error");
+
+        println!("btc_bridge_eth_address {btc_bridge_eth_address}",);
+
         let client = (&context).evm_client("admin");
         client
-            .mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
 
         let bft_bridge = (&context)
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None, true)
+            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address, None, true)
             .await
             .unwrap();
+
+        println!("bft_bridge {bft_bridge}",);
+
+        // set bft bridge
+        (&context)
+            .client(btc_bridge, "admin")
+            .update::<_, ()>("set_bft_bridge_contract", (bft_bridge.clone(),))
+            .await
+            .unwrap();
+
         let token_id = Id256::from(&Principal::from(ledger_id));
         let token = (&context)
             .create_wrapped_token(&wallet, &bft_bridge, token_id)
             .await
             .unwrap();
 
-        let chain_id = (&context).evm_client("admin").eth_chain_id().await.unwrap();
+        println!("wrapped token {token}",);
 
         let mut token_name = [0; 32];
         token_name[0..7].copy_from_slice(b"wrapper");
         let mut token_symbol = [0; 16];
         token_symbol[0..3].copy_from_slice(b"WPT");
 
-        let bft_config = BftBridgeConfig {
-            erc20_chain_id: chain_id as u32,
-            bridge_address: bft_bridge.clone(),
+        let bft_config = WrappedTokenConfig {
             token_address: token.clone(),
             token_name,
             token_symbol,
             decimals: 0,
         };
 
-        let _: () = (&context)
+        let res: BftResult<()> = (&context)
             .client(btc_bridge, "admin")
-            .update("admin_configure_bft_bridge", (bft_config,))
+            .update("admin_configure_wrapped_token", (bft_config,))
             .await
             .unwrap();
 
-        (&context).advance_time(Duration::from_secs(2)).await;
+        assert!(res.is_ok());
+
+        println!("wrapped token configured");
+
+        println!("Wait for setup to complete");
+        for _ in 0..15 {
+            (&context).advance_time(Duration::from_secs(10)).await;
+        }
 
         Self {
             context,
@@ -987,18 +1030,39 @@ impl CkBtcSetup {
         .expect("minter self-check failed")
     }
 
-    pub fn btc_to_erc20(&self, eth_address: &H160) {
-        let payload = Encode!(eth_address).unwrap();
-        let result = self
-            .env()
-            .execute_ingress(
-                CanisterId::try_from(PrincipalId(self.context.canisters.btc_bridge())).unwrap(),
-                "btc_to_erc20",
-                payload,
-            )
-            .expect("btc_to_erc20 call failed");
+    pub async fn btc_to_erc20(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        bft_bridge: &H160,
+        eth_address: &H160,
+    ) -> Result<(), TestError> {
+        let user_data = BtcDeposit {
+            recipient: eth_address.clone(),
+            approve_after_mint: Some(ApproveAfterMint {
+                approve_spender: wallet.address().into(),
+                approve_amount: U256::from(1000_u64),
+            }),
+            fee_payer: Some(eth_address.clone()),
+        };
+        let encoded_reason = Encode!(&user_data).unwrap();
 
-        Decode!(&result.bytes(), ()).expect("failed to decode btc_to_erc20 result")
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: Default::default(),
+            userData: encoded_reason.into(),
+        }
+        .abi_encode();
+
+        // advance
+        (&self.context).advance_time(Duration::from_secs(2)).await;
+
+        let receipt = (&self.context)
+            .call_contract(wallet, bft_bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)?;
+
+        println!("btc_to_erc20 receipt: {:?}", receipt);
+
+        Ok(())
     }
 
     pub fn list_mint_orders(&self, eth_address: &H160) -> Vec<(u32, SignedMintOrder)> {
@@ -1053,7 +1117,7 @@ impl CkBtcSetup {
 
     pub async fn mint_wrapped_btc(&self, amount: u64, wallet: &Wallet<'_, SigningKey>) -> u64 {
         let utxo = Utxo {
-            height: self.tip_height.load(Ordering::Relaxed),
+            height: 12,
             outpoint: OutPoint {
                 txid: range_to_txid(1..=32).into(),
                 vout: 1,
@@ -1067,22 +1131,35 @@ impl CkBtcSetup {
             owner: self.context.canisters.btc_bridge(),
             subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
         };
+
         let deposit_address = self.get_btc_address(deposit_account);
         self.push_utxo(deposit_address, utxo.clone());
 
-        self.btc_to_erc20(&caller_eth_address);
+        for _ in 0..15 {
+            (&self.context).advance_time(Duration::from_secs(10)).await;
+            self.advance_blocks(16);
+        }
+
+        assert!(self
+            .btc_to_erc20(wallet, &self.bft_bridge, &caller_eth_address)
+            .await
+            .is_ok());
 
         self.advance_blocks(16);
-        (&self.context).advance_time(Duration::from_secs(30)).await;
+        for _ in 0..60 {
+            (&self.context)
+                .advance_time(Duration::from_millis(500))
+                .await;
+        }
 
-        let mint_order = self
-            .list_mint_orders(&caller_eth_address)
-            .pop()
-            .expect("mint order failed")
-            .1;
-        let mint_order = MintOrder::decode_data(&mint_order.0).expect("invalid mint order");
+        let balance = (&self.context)
+            .check_erc20_balance(&self.wrapped_token, wallet, None)
+            .await
+            .expect("Failed to check balance");
 
-        mint_order.amount.0.as_u64()
+        assert!(balance > 0);
+
+        balance as u64
     }
 
     pub async fn get_btc_transactions(&self, address: &str) -> Vec<Utxo> {
@@ -1208,46 +1285,13 @@ async fn btc_to_erc20_test() {
     ckbtc.set_tip_height(12);
 
     let deposit_value = 100_000_000;
-    let utxo = Utxo {
-        height: 12,
-        outpoint: OutPoint {
-            txid: range_to_txid(1..=32).into(),
-            vout: 1,
-        },
-        value: deposit_value,
-    };
 
     let wallet = (&ckbtc.context)
         .new_wallet(u128::MAX)
         .await
         .expect("Failed to create a wallet");
-    let caller_eth_address = wallet.address().0.into();
 
-    let deposit_account = Account {
-        owner: ckbtc.context.canisters.btc_bridge(),
-        subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
-    };
-
-    let deposit_address = ckbtc.get_btc_address(deposit_account);
-    ckbtc.push_utxo(deposit_address, utxo.clone());
-
-    ckbtc.btc_to_erc20(&caller_eth_address);
-
-    ckbtc.advance_blocks(16);
-    (&ckbtc.context).advance_time(Duration::from_secs(30)).await;
-
-    let mint_order = ckbtc
-        .get_mint_order(&caller_eth_address, 0)
-        .expect("mint order 0 not found");
-    let mint_order = MintOrder::decode_data(&mint_order.0).expect("invalid mint order");
-    let value = mint_order.amount.0.as_u64();
-    assert_eq!(value, deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE);
-
-    assert!(ckbtc.get_mint_order(&caller_eth_address, 1).is_none());
-
-    // wait for tx to be submitted
-    ckbtc.advance_blocks(6);
-    (&ckbtc.context).advance_time(Duration::from_secs(2)).await;
+    let minted = ckbtc.mint_wrapped_btc(deposit_value, &wallet).await;
 
     let expected_balance = (deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE) as u128;
     let balance = (&ckbtc.context)
@@ -1255,6 +1299,7 @@ async fn btc_to_erc20_test() {
         .await
         .expect("Failed to check balance");
     assert_eq!(balance, expected_balance);
+    assert_eq!(minted as u128, balance);
 
     let canister_balance = ckbtc
         .balance_of(Account {
@@ -1269,28 +1314,28 @@ async fn btc_to_erc20_test() {
 
 #[tokio::test]
 async fn erc20_to_btc_test() {
-    let context = CkBtcSetup::new().await;
-    const DEPOSIT_AMOUNT: u64 = 10_000_000;
-    let wallet = (&context.context)
+    let ckbtc = CkBtcSetup::new().await;
+    let deposit_value = 100_000_000;
+    let wallet = (&ckbtc.context)
         .new_wallet(u128::MAX)
         .await
         .expect("Failed to create a wallet");
 
-    let minted = context.mint_wrapped_btc(DEPOSIT_AMOUNT, &wallet).await;
+    let minted = ckbtc.mint_wrapped_btc(deposit_value, &wallet).await;
 
     let address = generate_btc_address();
 
-    (&context.context)
-        .advance_time(Duration::from_secs(2))
+    // advance blocks
+    ckbtc.advance_blocks(16);
+    (&ckbtc.context)
+        .advance_time(Duration::from_millis(4200))
         .await;
-    context.burn_btc_to(&wallet, &address, minted).await;
+    ckbtc.burn_btc_to(&wallet, &address, minted).await;
 
-    (&context.context)
-        .advance_time(Duration::from_secs(10))
-        .await;
+    (&ckbtc.context).advance_time(Duration::from_secs(10)).await;
 
-    let txid = context.await_btc_transaction(3, 10).await;
-    let mempool = context.mempool();
+    let txid = ckbtc.await_btc_transaction(3, 10).await;
+    let mempool = ckbtc.mempool();
     assert_eq!(
         mempool.len(),
         1,
@@ -1300,7 +1345,7 @@ async fn erc20_to_btc_test() {
         .get(&txid)
         .expect("the mempool does not contain the withdrawal transaction");
 
-    context.finalize_transaction(tx);
+    ckbtc.finalize_transaction(tx);
 
     eprintln!("Transaction: {tx:?}");
     assert_eq!(tx.output.len(), 2);
@@ -1308,7 +1353,7 @@ async fn erc20_to_btc_test() {
     // Total fee lost on transfers depends on BTC transfer fee
     assert!(minted - tx.output[0].value.to_sat() < 5000);
 
-    context.async_drop().await;
+    ckbtc.async_drop().await;
 }
 
 fn generate_btc_address() -> String {

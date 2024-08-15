@@ -3,7 +3,11 @@ use std::time::Duration;
 
 use candid::utils::ArgumentEncoder;
 use candid::{encode_args, CandidType, Decode, Nat, Principal};
+use did::{Transaction, H160, U256};
 use eth_signer::ic_sign::SigningKeyId;
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::{Signer as _, Wallet};
+use ethers_core::k256::ecdsa::SigningKey;
 use ic_base_types::{CanisterId, PrincipalId};
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 use ic_exports::ic_kit::mock_principals::{alice, bob};
@@ -14,6 +18,7 @@ use serde::de::DeserializeOwned;
 
 use crate::context::{TestCanisters, TestContext};
 use crate::utils::error::TestError;
+use crate::utils::CHAIN_ID;
 
 mod btc;
 mod rune;
@@ -140,6 +145,31 @@ impl<'a> TestContext for &'a StateMachineContext {
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
         todo!()
+    }
+
+    /// Returns a signed transaction from the given `wallet`.
+    fn signed_transaction(
+        &self,
+        wallet: &Wallet<SigningKey>,
+        to: Option<H160>,
+        nonce: U256,
+        value: u128,
+        input: Vec<u8>,
+    ) -> Transaction {
+        let address = wallet.address();
+        TransactionBuilder {
+            from: &address.into(),
+            to,
+            nonce,
+            value: value.into(),
+            gas: 5_000_000u64.into(),
+            gas_price: Some(100_000u64.into()),
+            input,
+            signature: SigningMethod::SigningKey(wallet.signer()),
+            chain_id: CHAIN_ID,
+        }
+        .calculate_hash_and_build()
+        .unwrap()
     }
 }
 

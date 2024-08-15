@@ -17,8 +17,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     using SafeERC20 for IERC20;
 
     // Additional gas amount for fee charge.
-    // todo: estimate better: https://infinityswap.atlassian.net/browse/EPROD-919
-    uint256 constant additionalGasFee = 100_000;
+    uint256 constant additionalGasFee = 50000;
 
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
@@ -62,7 +61,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     // Event for mint operation
     event MintTokenEvent(
-        uint256 amount, bytes32 fromToken, bytes32 senderID, address toERC20, address recipient, uint32 nonce
+        uint256 amount,
+        bytes32 fromToken,
+        bytes32 senderID,
+        address toERC20,
+        address recipient,
+        uint32 nonce,
+        uint256 chargedFee
     );
 
     /// Event for burn operation
@@ -177,19 +182,21 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
+        uint256 fee = 0;
         if (
             order.feePayer != address(0) && msg.sender == minterCanisterAddress
                 && address(feeChargeContract) != address(0)
         ) {
-            uint256 additionalGasConsumed = initGasLeft + 21_000 + (additionalGasFee * 2) - gasleft();
-            uint256 fee = additionalGasConsumed * tx.gasprice;
+            uint256 gasConsumed = initGasLeft - gasleft();
+            uint256 gasFee = gasConsumed + additionalGasFee;
+            fee = gasFee * tx.gasprice;
 
             feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
         }
 
         // Emit event
         emit MintTokenEvent(
-            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce
+            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce, fee
         );
     }
 

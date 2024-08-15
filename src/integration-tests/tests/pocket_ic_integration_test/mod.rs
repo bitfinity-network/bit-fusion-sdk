@@ -1,5 +1,5 @@
-pub mod erc20_minter;
-pub mod icrc2_minter;
+pub mod erc20_bridge;
+pub mod icrc2_bridge;
 mod token;
 
 use std::fmt;
@@ -41,7 +41,8 @@ pub struct PocketIcTestContext {
 
 impl PocketIcTestContext {
     pub async fn new(canisters_set: &[CanisterType]) -> Self {
-        let client = Arc::new(PocketIc::new().await);
+        let pocket_ic = ic_exports::pocket_ic::init_pocket_ic().await;
+        let client = Arc::new(pocket_ic);
         let mut ctx = PocketIcTestContext {
             client,
             canisters: TestCanisters::default(),

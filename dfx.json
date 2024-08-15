@@ -33,16 +33,10 @@
       "wasm": ".artifact/icrc1-ledger.wasm.gz",
       "type": "custom"
     },
-    "minter": {
+    "erc20-bridge": {
       "build": "",
-      "candid": ".artifact/minter.did",
-      "wasm": ".artifact/minter.wasm.gz",
-      "type": "custom"
-    },
-    "erc20-minter": {
-      "build": "",
-      "candid": ".artifact/erc20-minter.did",
-      "wasm": ".artifact/erc20-minter.wasm.gz",
+      "candid": ".artifact/erc20-bridge.did",
+      "wasm": ".artifact/erc20-bridge.wasm.gz",
       "type": "custom"
     },
     "spender": {
@@ -51,10 +45,10 @@
       "wasm": ".artifact/spender.wasm.gz",
       "type": "custom"
     },
-    "icrc2-minter": {
+    "icrc2-bridge": {
       "build": "",
-      "candid": ".artifact/icrc2-minter.did",
-      "wasm": ".artifact/icrc2-minter.wasm.gz",
+      "candid": ".artifact/icrc2-bridge.did",
+      "wasm": ".artifact/icrc2-bridge.wasm.gz",
       "type": "custom"
     },
     "btc-bridge": {
