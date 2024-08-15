@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::hashes::Hash;
-use bitcoin::{Address, Amount, Network, OutPoint, Transaction, TxOut, Txid};
+use bitcoin::{Address, Amount, FeeRate, Network, OutPoint, Transaction, TxOut, Txid};
 use bridge_did::id256::Id256;
 use bridge_utils::bft_events::BurntEventData;
 use candid::types::{Serializer, Type};
@@ -18,6 +18,7 @@ use ordinals::RuneId;
 use serde::{Deserializer, Serialize};
 
 use crate::canister::get_rune_state;
+use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::WithdrawError;
 use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
@@ -296,7 +297,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
         let rune_change_address = self.get_change_address().await;
-        let fee_rate = self.utxo_provider.get_fee_rate().await?;
+        let fee_rate = self.get_fee_rate().await?;
 
         let args = CreateEdictTxArgs {
             rune,
@@ -328,5 +329,88 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
     fn get_change_derivation_path(&self) -> Vec<Vec<u8>> {
         get_derivation_path_ic(&H160::default())
+    }
+
+    /// Get current fee rate, otherwise if too old, request a new one from the utxo provider.
+    async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError> {
+        let (current_fee_rate, elapsed_since_last_fee_rate_update) = {
+            let state_ref = self.state.borrow();
+            (
+                state_ref.fee_rate(),
+                state_ref.last_fee_rate_update_elapsed(),
+            )
+        };
+
+        if elapsed_since_last_fee_rate_update > FEE_RATE_UPDATE_INTERVAL {
+            let fee_rate = self.utxo_provider.get_fee_rate().await?;
+            let mut state_ref = self.state.borrow_mut();
+            state_ref.update_fee_rate(fee_rate);
+
+            Ok(fee_rate)
+        } else {
+            Ok(current_fee_rate)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bitcoin::{Address, FeeRate, PrivateKey, Transaction};
+    use ic_exports::ic_cdk::api::management_canister::bitcoin::GetUtxosResponse;
+    use ic_exports::ic_kit::MockContext;
+    use ord_rs::wallet::LocalSigner;
+
+    use super::*;
+    use crate::core::utxo_provider::UtxoProvider;
+    use crate::interface::{DepositError, WithdrawError};
+    use crate::key::BtcSignerType;
+    use crate::state::RuneState;
+
+    #[tokio::test]
+    async fn test_should_get_fee_rate() {
+        MockContext::new().inject();
+        let state = RuneState::default();
+        let fake_utxo_provider = FakeUtxoProvider {
+            fee_rate: FeeRate::from_sat_per_vb(1).unwrap(),
+        };
+        let mut withdrawal = Withdrawal {
+            state: Rc::new(RefCell::new(state)),
+            utxo_provider: fake_utxo_provider,
+            signer: BtcSignerType::Local(LocalSigner::new(PrivateKey::generate(
+                bitcoin::Network::Regtest,
+            ))),
+            network: bitcoin::Network::Regtest,
+        };
+
+        // First call should return the fee rate from the provider
+        let fee_rate = withdrawal.get_fee_rate().await.unwrap();
+        assert_eq!(fee_rate, FeeRate::from_sat_per_vb(1).unwrap());
+
+        // update the fee rate in the provider
+        withdrawal.utxo_provider = FakeUtxoProvider {
+            fee_rate: FeeRate::from_sat_per_vb(2).unwrap(),
+        };
+
+        // Second call should return the fee rate from the state
+        let fee_rate = withdrawal.get_fee_rate().await.unwrap();
+        assert_eq!(fee_rate, FeeRate::from_sat_per_vb(1).unwrap());
+    }
+
+    struct FakeUtxoProvider {
+        fee_rate: FeeRate,
+    }
+
+    impl UtxoProvider for FakeUtxoProvider {
+        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, DepositError> {
+            unimplemented!()
+        }
+
+        async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError> {
+            Ok(self.fee_rate)
+        }
+
+        async fn send_tx(&self, _transaction: &Transaction) -> Result<(), WithdrawError> {
+            unimplemented!()
+        }
     }
 }

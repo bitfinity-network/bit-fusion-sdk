@@ -3218,6 +3218,7 @@ dependencies = [
 [[package]]
 name = "ic-canister"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "ic-canister-macros",
  "ic-exports",
@@ -3226,6 +3227,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-client"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "async-trait",
  "candid",
@@ -3261,6 +3263,7 @@ dependencies = [
 [[package]]
 name = "ic-canister-macros"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -3700,6 +3703,7 @@ dependencies = [
 [[package]]
 name = "ic-crypto-getrandom-for-wasm"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "getrandom",
 ]
@@ -4516,6 +4520,7 @@ dependencies = [
 [[package]]
 name = "ic-exports"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "flate2",
@@ -4717,6 +4722,7 @@ dependencies = [
 [[package]]
 name = "ic-kit"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "futures",
@@ -4784,6 +4790,7 @@ dependencies = [
 [[package]]
 name = "ic-log"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4890,6 +4897,7 @@ dependencies = [
 [[package]]
 name = "ic-metrics"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-canister",
@@ -5118,6 +5126,7 @@ dependencies = [
 [[package]]
 name = "ic-stable-structures"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-stable-structures 0.6.5",
@@ -5265,6 +5274,7 @@ dependencies = [
 [[package]]
 name = "ic-storage"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "ic-exports",
@@ -5276,6 +5286,7 @@ dependencies = [
 [[package]]
 name = "ic-storage-derive"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "quote",
  "syn 2.0.68",
@@ -5332,6 +5343,7 @@ dependencies = [
 [[package]]
 name = "ic-task-scheduler"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "bincode",
  "candid",
@@ -5484,6 +5496,7 @@ dependencies = [
 [[package]]
 name = "ic-test-utils"
 version = "0.19.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.19.x#905d562e7acedf18e1aa0c5671ba4bba91881b0b"
 dependencies = [
  "candid",
  "dirs",

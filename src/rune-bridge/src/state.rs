@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PrivateKey, PublicKey};
+use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_did::init::BridgeInitData;
 use candid::{CandidType, Deserialize, Principal};
 use eth_signer::sign_strategy::SigningStrategy;
@@ -11,6 +11,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
+use ic_exports::ic_kit::ic;
 use ic_log::did::LogCanisterSettings;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
@@ -33,6 +34,7 @@ pub struct RuneState {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    pub(crate) fee_rate_state: FeeRateState,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +42,21 @@ pub struct MasterKey {
     pub public_key: PublicKey,
     pub chain_code: ChainCode,
     pub key_id: EcdsaKeyId,
+}
+
+pub struct FeeRateState {
+    fee_rate: FeeRate,
+    /// Last update timestamp in nanoseconds
+    last_update_timestamp: u64,
+}
+
+impl Default for FeeRateState {
+    fn default() -> Self {
+        Self {
+            fee_rate: FeeRate::ZERO,
+            last_update_timestamp: 0,
+        }
+    }
 }
 
 #[derive(Debug, CandidType, Deserialize)]
@@ -276,6 +293,25 @@ impl RuneState {
     pub fn mempool_timeout(&self) -> Duration {
         self.config.mempool_timeout
     }
+
+    /// Update fee rate and the last update timestamp.
+    pub fn update_fee_rate(&mut self, fee_rate: FeeRate) {
+        self.fee_rate_state.fee_rate = fee_rate;
+        self.fee_rate_state.last_update_timestamp = ic::time();
+    }
+
+    /// Fee rate used by the canister.
+    pub fn fee_rate(&self) -> FeeRate {
+        self.fee_rate_state.fee_rate
+    }
+
+    /// Elapsed time since the last fee rate update. (nano seconds)
+    pub fn last_fee_rate_update_elapsed(&self) -> Duration {
+        ic::time()
+            .checked_sub(self.fee_rate_state.last_update_timestamp)
+            .map(Duration::from_nanos)
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
@@ -415,5 +451,21 @@ mod tests {
 
         assert_eq!(state.config.no_of_indexers, 3);
         assert_eq!(state.config.indexer_urls, indexer_urls);
+    }
+
+    #[test]
+    fn test_should_update_and_read_fee_rate() {
+        let ctx = MockContext::new().inject();
+        let mut state = RuneState::default();
+
+        assert_eq!(state.fee_rate(), FeeRate::ZERO);
+        assert_eq!(state.fee_rate_state.last_update_timestamp, 0);
+
+        let fee_rate = FeeRate::from_sat_per_vb(1000).unwrap();
+        state.update_fee_rate(fee_rate);
+
+        assert_eq!(state.fee_rate(), fee_rate);
+        ctx.add_time(Duration::from_secs(1).as_nanos() as u64);
+        assert!(state.last_fee_rate_update_elapsed() >= Duration::from_secs(1));
     }
 }
