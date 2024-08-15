@@ -9,7 +9,6 @@ use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
-use bridge_utils::BFTBridge::BurnTokenEvent;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
@@ -43,7 +42,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
-use alloy_sol_types::{SolCall, SolConstructor, SolEvent};
+use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
 use ic_log::did::LogCanisterSettings;
