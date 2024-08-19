@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 use std::mem::size_of;
 use std::str::FromStr;
@@ -14,10 +15,43 @@ use ord_rs::wallet::TxInputInfo;
 use serde::Deserialize;
 
 use crate::key::{ic_dp_to_derivation_path, IcBtcSigner};
-use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER, USED_UTXOS_REGISTRY_MEMORY_ID};
+use crate::memory::{
+    LEDGER_MEMORY_ID, MEMORY_MANAGER, RUNE_INFO_BY_UTXO_MEMORY_ID, USED_UTXOS_REGISTRY_MEMORY_ID,
+};
+use crate::rune_info::RuneInfo;
+
+/// Data structure to keep track rune information for a utxo.
+struct UtxoRunes(Vec<RuneInfo>);
+
+impl Storable for UtxoRunes {
+    const BOUND: Bound = Bound::Unbounded;
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let list_len = u64::from_be_bytes(bytes[0..8].try_into().unwrap()) as usize;
+        let mut runes = Vec::with_capacity(list_len);
+
+        for rune_buf in bytes[8..bytes.len()].chunks(RuneInfo::BOUND.max_size() as usize) {
+            runes.push(RuneInfo::from_bytes(Cow::Borrowed(rune_buf)));
+        }
+
+        Self(runes)
+    }
+
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut bytes = Vec::with_capacity(8 + self.0.len() * RuneInfo::BOUND.max_size() as usize);
+        bytes.extend_from_slice(&(self.0.len() as u64).to_be_bytes());
+
+        for rune in &self.0 {
+            bytes.extend_from_slice(&rune.to_bytes());
+        }
+
+        Cow::Owned(bytes)
+    }
+}
 
 /// Data structure to keep track of utxos owned by the canister.
 pub struct UtxoLedger {
+    rune_info_by_utxo: StableBTreeMap<UtxoKey, UtxoRunes, VirtualMemory<DefaultMemoryImpl>>,
     /// contains a list of utxos on the main canister account (which get there as a change from withdrawal transactions)
     utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
     /// contains a list of utxos that are on user's deposit address.
@@ -27,6 +61,9 @@ pub struct UtxoLedger {
 impl Default for UtxoLedger {
     fn default() -> Self {
         Self {
+            rune_info_by_utxo: StableBTreeMap::new(
+                MEMORY_MANAGER.with(|mm| mm.get(RUNE_INFO_BY_UTXO_MEMORY_ID)),
+            ),
             utxo_storage: StableBTreeMap::new(MEMORY_MANAGER.with(|mm| mm.get(LEDGER_MEMORY_ID))),
             used_utxos_registry: StableBTreeMap::new(
                 MEMORY_MANAGER.with(|mm| mm.get(USED_UTXOS_REGISTRY_MEMORY_ID)),
@@ -35,7 +72,7 @@ impl Default for UtxoLedger {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize, Hash)]
 pub struct UtxoKey {
     pub tx_id: [u8; 32],
     pub vout: u32,
@@ -142,51 +179,78 @@ impl Storable for UsedUtxoDetails {
     };
 }
 
+/// Information about the unspent utxo.
+#[derive(Debug, Clone)]
+pub struct UnspentUtxoInfo {
+    pub tx_input_info: TxInputInfo,
+    pub rune_info: Vec<RuneInfo>,
+}
+
 impl UtxoLedger {
     /// Adds the utxo to the store.
-    pub fn deposit(&mut self, utxos: &[Utxo], address: &Address, derivation_path: Vec<Vec<u8>>) {
+    pub fn deposit(
+        &mut self,
+        utxo: Utxo,
+        address: &Address,
+        derivation_path: Vec<Vec<u8>>,
+        rune_info: Vec<RuneInfo>,
+    ) {
         let script = address.script_pubkey();
-        for utxo in utxos {
-            self.utxo_storage.insert(
-                (&utxo.outpoint).into(),
-                UtxoDetails {
-                    value: utxo.value,
-                    script_buf: script.clone().into_bytes(),
-                    derivation_path: derivation_path.clone(),
-                },
-            );
 
-            log::debug!(
-                "Added utxo {}:{} with value {} to the ledger",
-                hex::encode(&utxo.outpoint.txid),
-                utxo.outpoint.vout,
-                utxo.value
-            );
+        let utxo_key = UtxoKey::from(&utxo.outpoint);
+
+        self.utxo_storage.insert(
+            utxo_key,
+            UtxoDetails {
+                value: utxo.value,
+                script_buf: script.clone().into_bytes(),
+                derivation_path: derivation_path.clone(),
+            },
+        );
+
+        // Add rune info if it is present
+        if !rune_info.is_empty() {
+            self.rune_info_by_utxo
+                .insert(utxo_key, UtxoRunes(rune_info));
         }
+
+        log::debug!(
+            "Added utxo {}:{} with value {} to the ledger",
+            hex::encode(&utxo.outpoint.txid),
+            utxo.outpoint.vout,
+            utxo.value
+        );
     }
 
     /// Lists all unspent utxos in the store.
-    pub fn load_unspent_utxos(&self) -> (Vec<UtxoKey>, Vec<TxInputInfo>) {
+    pub fn load_unspent_utxos(&self) -> HashMap<UtxoKey, UnspentUtxoInfo> {
         self.utxo_storage
             .iter()
             .filter(|(key, _)| !self.used_utxos_registry.contains_key(key))
             .map(|(key, details)| {
                 (
                     key,
-                    TxInputInfo {
-                        outpoint: OutPoint {
-                            txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
-                            vout: key.vout,
+                    UnspentUtxoInfo {
+                        tx_input_info: TxInputInfo {
+                            outpoint: OutPoint {
+                                txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
+                                vout: key.vout,
+                            },
+                            tx_out: TxOut {
+                                value: Amount::from_sat(details.value),
+                                script_pubkey: details.script_buf.into(),
+                            },
+                            derivation_path: ic_dp_to_derivation_path(&details.derivation_path),
                         },
-                        tx_out: TxOut {
-                            value: Amount::from_sat(details.value),
-                            script_pubkey: details.script_buf.into(),
-                        },
-                        derivation_path: ic_dp_to_derivation_path(&details.derivation_path),
+                        rune_info: self
+                            .rune_info_by_utxo
+                            .get(&key)
+                            .map(|rune_info| rune_info.0.clone())
+                            .unwrap_or_default(),
                     },
                 )
             })
-            .unzip()
+            .collect()
     }
 
     /// Marks the utxo as used.
@@ -209,10 +273,11 @@ impl UtxoLedger {
 
     /// Removes the spent utxo from the store.
     ///
-    /// It gets removed from both the utxo storage and the used utxos registry.
+    /// It gets removed from both the utxo storage, the rune info registry and the used utxos registry.
     pub fn remove_spent_utxo(&mut self, key: &UtxoKey) {
         self.utxo_storage.remove(key);
         self.used_utxos_registry.remove(key);
+        self.rune_info_by_utxo.remove(key);
     }
 
     /// Removes the unspent utxo from the store.
@@ -229,10 +294,12 @@ mod tests {
     use bitcoin::{Network, PublicKey};
     use did::H160;
     use ic_exports::ic_kit::MockContext;
+    use ordinals::Rune;
 
     use super::*;
     use crate::canister::get_rune_state;
     use crate::key::get_derivation_path_ic;
+    use crate::rune_info::RuneName;
 
     #[test]
     fn key_serialization() {
@@ -325,10 +392,16 @@ mod tests {
         state
             .borrow_mut()
             .ledger_mut()
-            .deposit(&[utxo], &address, vec![]);
+            .deposit(utxo, &address, vec![], vec![]);
 
         // list unspent
-        let (keys, _) = state.borrow().ledger().load_unspent_utxos();
+        let keys = state
+            .borrow()
+            .ledger()
+            .load_unspent_utxos()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0].tx_id, [0xde; 32]);
         assert_eq!(keys[0].vout, 1);
@@ -354,9 +427,15 @@ mod tests {
         state
             .borrow_mut()
             .ledger_mut()
-            .deposit(&[utxo], &address, vec![]);
+            .deposit(utxo, &address, vec![], vec![]);
 
-        let (keys, _) = state.borrow().ledger().load_unspent_utxos();
+        let keys = state
+            .borrow()
+            .ledger()
+            .load_unspent_utxos()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
 
         state
             .borrow_mut()
@@ -376,7 +455,7 @@ mod tests {
             .unwrap()
             .assume_checked();
 
-        let utxos = vec![
+        let utxos = [
             Utxo {
                 outpoint: Outpoint {
                     txid: vec![0xaa; 32],
@@ -399,7 +478,11 @@ mod tests {
         state
             .borrow_mut()
             .ledger_mut()
-            .deposit(&utxos, &address, vec![]);
+            .deposit(utxos[0].clone(), &address, vec![], vec![]);
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(utxos[1].clone(), &address, vec![], vec![]);
 
         // mark first as spent
         state
@@ -408,7 +491,13 @@ mod tests {
             .mark_as_used(UtxoKey::from(&utxos[0].outpoint), address.clone());
 
         // load unspent
-        let (keys, _) = state.borrow().ledger().load_unspent_utxos();
+        let keys = state
+            .borrow()
+            .ledger()
+            .load_unspent_utxos()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0].tx_id.to_vec(), utxos[1].outpoint.txid);
         assert_eq!(keys[0].vout, utxos[1].outpoint.vout);
@@ -427,7 +516,7 @@ mod tests {
             .unwrap()
             .assume_checked();
 
-        let utxos = vec![
+        let utxos = [
             Utxo {
                 outpoint: Outpoint {
                     txid: vec![0xaa; 32],
@@ -450,7 +539,11 @@ mod tests {
         state
             .borrow_mut()
             .ledger_mut()
-            .deposit(&utxos, &address, vec![]);
+            .deposit(utxos[0].clone(), &address, vec![], vec![]);
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(utxos[1].clone(), &address, vec![], vec![]);
 
         // mark first as spent
         state
@@ -465,7 +558,13 @@ mod tests {
             .remove_spent_utxo(&UtxoKey::from(&utxos[0].outpoint));
 
         // check
-        let (keys, _) = state.borrow().ledger().load_unspent_utxos();
+        let keys = state
+            .borrow()
+            .ledger()
+            .load_unspent_utxos()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0].tx_id.to_vec(), utxos[1].outpoint.txid);
         assert_eq!(keys[0].vout, utxos[1].outpoint.vout);
@@ -481,7 +580,7 @@ mod tests {
             .unwrap()
             .assume_checked();
 
-        let utxos = vec![
+        let utxos = [
             Utxo {
                 outpoint: Outpoint {
                     txid: vec![0xaa; 32],
@@ -504,7 +603,11 @@ mod tests {
         state
             .borrow_mut()
             .ledger_mut()
-            .deposit(&utxos, &address, vec![]);
+            .deposit(utxos[0].clone(), &address, vec![], vec![]);
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(utxos[1].clone(), &address, vec![], vec![]);
 
         // mark first as spent
         state
@@ -519,7 +622,13 @@ mod tests {
             .remove_unspent_utxo(&UtxoKey::from(&utxos[0].outpoint));
 
         // check
-        let (keys, _) = state.borrow().ledger().load_unspent_utxos();
+        let keys = state
+            .borrow()
+            .ledger()
+            .load_unspent_utxos()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         assert_eq!(keys.len(), 2);
         assert_eq!(keys[0].tx_id.to_vec(), utxos[0].outpoint.txid);
         assert_eq!(keys[0].vout, utxos[0].outpoint.vout);
@@ -528,5 +637,52 @@ mod tests {
 
         let used_utxos = state.borrow().ledger().load_used_utxos();
         assert_eq!(used_utxos.len(), 0);
+    }
+
+    #[test]
+    fn test_should_deposit_utxo_with_rune_info() {
+        MockContext::new().inject();
+        let address = Address::from_str("bc1quyjp8qxkdc22cej962xaydd5arm7trwtcnkzks")
+            .unwrap()
+            .assume_checked();
+
+        let utxo = Utxo {
+            outpoint: Outpoint {
+                txid: vec![0xde; 32],
+                vout: 1,
+            },
+            value: 0,
+            height: 0,
+        };
+
+        let rune_info = vec![
+            RuneInfo {
+                name: RuneName::from(Rune(0xdeadbeef)),
+                decimals: 18,
+                block: 0x1234567890abcdef,
+                tx: 0x12345678,
+            },
+            RuneInfo {
+                name: RuneName::from(Rune(0xcafebabe)),
+                decimals: 18,
+                block: 0x1234567890abcdef,
+                tx: 0x12345678,
+            },
+        ];
+
+        let key = UtxoKey::from(&utxo.outpoint);
+
+        let state = get_rune_state();
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(utxo, &address, vec![], rune_info.clone());
+
+        // list unspent
+        let utxos = state.borrow().ledger().load_unspent_utxos();
+        assert_eq!(utxos.len(), 1);
+        assert!(utxos.contains_key(&key));
+
+        assert_eq!(utxos.get(&key).unwrap().rune_info, rune_info);
     }
 }

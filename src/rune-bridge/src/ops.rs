@@ -332,8 +332,9 @@ impl RuneBridgeOp {
             .await
             .map_err(|err| Error::FailedToProgress(format!("inputs are not confirmed: {err:?}")))?;
 
+        let deposit_runes = runes_to_wrap.iter().map(|rune| rune.rune_info).collect();
         deposit
-            .mark_used_utxo(&utxo, &dst_address)
+            .deposit(&utxo, &dst_address, deposit_runes)
             .await
             .map_err(|err| Error::FailedToProgress(format!("{err:?}")))?;
 

@@ -105,7 +105,10 @@ dfx ledger fabricate-cycles --t 1000000 --canister $wallet_principal
 sleep 10
 
 # run tests
+set +e
 cargo test -p integration-tests --features dfx_tests $@
+TEST_RESULT=$?
+set -e
 
 killall -9 icx-proxy || true
 
@@ -115,4 +118,4 @@ if [ "$DOCKER" -gt 0 ] && [ "$TEST_RESULT" -eq 0 ]; then
     stop_docker
 fi
 
-exit 0
+exit $TEST_RESULT

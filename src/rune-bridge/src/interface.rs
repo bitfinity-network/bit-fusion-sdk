@@ -101,6 +101,7 @@ pub enum WithdrawError {
     TransactionSending,
     FeeRateRequest,
     ChangeAddress,
+    InsufficientFunds,
     InvalidRequest(String),
     InternalError(String),
 }
