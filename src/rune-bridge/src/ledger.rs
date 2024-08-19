@@ -622,14 +622,16 @@ mod tests {
             .remove_unspent_utxo(&UtxoKey::from(&utxos[0].outpoint));
 
         // check
-        let keys = state
+        let mut keys = state
             .borrow()
             .ledger()
             .load_unspent_utxos()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
+        keys.sort();
         assert_eq!(keys.len(), 2);
+
         assert_eq!(keys[0].tx_id.to_vec(), utxos[0].outpoint.txid);
         assert_eq!(keys[0].vout, utxos[0].outpoint.vout);
         assert_eq!(keys[1].tx_id.to_vec(), utxos[1].outpoint.txid);
