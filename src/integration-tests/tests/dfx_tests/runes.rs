@@ -89,7 +89,7 @@ impl RunesContext {
             },
             min_confirmations: 1,
             no_of_indexers: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
+            indexer_urls: HashSet::new(),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
         };
