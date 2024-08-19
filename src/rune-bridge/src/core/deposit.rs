@@ -406,27 +406,6 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         Ok(())
     }
 
-    pub async fn mark_used_utxo(
-        &self,
-        utxo: &Utxo,
-        dst_address: &H160,
-    ) -> Result<(), DepositError> {
-        let address = self.get_transit_address(dst_address).await;
-        let mut state = self.rune_state.borrow_mut();
-        let ledger = state.ledger_mut();
-        let existing = ledger.load_unspent_utxos();
-
-        if existing
-            .values()
-            .any(|v| Self::check_already_used_utxo(v, utxo))
-        {
-            return Err(DepositError::UtxoAlreadyUsed);
-        }
-
-        ledger.mark_as_used((&utxo.outpoint).into(), address.clone());
-        Ok(())
-    }
-
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
         v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
             && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
