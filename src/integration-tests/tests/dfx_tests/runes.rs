@@ -304,7 +304,7 @@ impl RunesContext {
 
         let amounts = runes;
         let runes = runes
-            .into_iter()
+            .iter()
             .map(|(rune_id, amount)| (**rune_id, *amount))
             .collect::<Vec<_>>();
 
@@ -402,13 +402,15 @@ impl RunesContext {
             hex::encode(tx_id.0)
         );
 
-        const MAX_RETRIES: u32 = 10;
+        const MAX_RETRIES: u32 = 20;
         let mut retry_count = 0;
+        let mut successful_orders = HashSet::new();
+
         while retry_count < MAX_RETRIES {
             self.inner.advance_time(Duration::from_secs(2)).await;
             retry_count += 1;
 
-            eprintln!("Checking deposit status. Try #{retry_count}...");
+            println!("Checking deposit status. Try #{retry_count}...");
 
             let response: Vec<(OperationId, RuneBridgeOp)> = self
                 .inner
@@ -418,14 +420,21 @@ impl RunesContext {
                 .expect("canister call failed");
 
             if !response.is_empty() {
-                if let RuneBridgeOp::MintOrderConfirmed { data } = &response[0].1 {
-                    eprintln!("Deposit successful with amount: {:?}", data.amount);
-                    return Ok(());
+                for (op_id, op) in &response {
+                    if matches!(op, RuneBridgeOp::MintOrderConfirmed { .. }) {
+                        successful_orders.insert(*op_id);
+                    }
                 }
             }
 
-            eprintln!("Deposit response: {response:?}");
+            println!("Deposit response: {response:?}");
+
+            if successful_orders.len() == runes.len() {
+                return Ok(());
+            }
         }
+
+        println!("Successful {}/{}", successful_orders.len(), runes.len());
 
         Err(DepositError::NothingToDeposit)
     }
