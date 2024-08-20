@@ -77,8 +77,7 @@ impl UtxoLedger {
 
         // Add rune info if it is present
         if !rune_info.is_empty() {
-            self.rune_info_by_utxo
-                .insert(utxo_key, UtxoRunes(rune_info));
+            self.rune_info_by_utxo.insert(utxo_key, rune_info.into());
         }
 
         log::debug!(
@@ -112,7 +111,7 @@ impl UtxoLedger {
                         rune_info: self
                             .rune_info_by_utxo
                             .get(&key)
-                            .map(|rune_info| rune_info.0.clone())
+                            .map(|rune_info| rune_info.runes().to_vec())
                             .unwrap_or_default(),
                     },
                 )

@@ -8,9 +8,12 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use ic_stable_structures::{Bound, Storable};
 use serde::Deserialize;
 
+/// Unique identifier for a utxo.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize, Hash)]
 pub struct UtxoKey {
+    /// Transaction id of the utxo.
     pub tx_id: [u8; 32],
+    /// Vout of the utxo. (Index of the output in the transaction)
     pub vout: u32,
 }
 

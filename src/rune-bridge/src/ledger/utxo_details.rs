@@ -6,10 +6,14 @@ use serde::Deserialize;
 
 use crate::key::IcBtcSigner;
 
+/// Utxo details to be stored in the ledger.
 #[derive(Debug, Clone, Eq, PartialEq, CandidType, Deserialize)]
 pub struct UtxoDetails {
+    /// btc value of the utxo.
     pub value: u64,
+    /// script buffer of the utxo.
     pub script_buf: Vec<u8>,
+    /// derivation path of the utxo.
     pub derivation_path: Vec<Vec<u8>>,
 }
 

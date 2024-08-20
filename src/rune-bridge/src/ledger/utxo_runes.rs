@@ -5,7 +5,20 @@ use ic_stable_structures::{Bound, Storable};
 use crate::rune_info::RuneInfo;
 
 /// Data structure to keep track rune information for a utxo.
-pub struct UtxoRunes(pub Vec<RuneInfo>);
+pub struct UtxoRunes(Vec<RuneInfo>);
+
+impl UtxoRunes {
+    /// Returns the list of rune information.
+    pub fn runes(&self) -> &[RuneInfo] {
+        &self.0
+    }
+}
+
+impl From<Vec<RuneInfo>> for UtxoRunes {
+    fn from(runes: Vec<RuneInfo>) -> Self {
+        Self(runes)
+    }
+}
 
 impl Storable for UtxoRunes {
     const BOUND: Bound = Bound::Unbounded;

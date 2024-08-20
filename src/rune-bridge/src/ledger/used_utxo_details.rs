@@ -6,9 +6,12 @@ use candid::{CandidType, Decode, Encode};
 use ic_stable_structures::{Bound, Storable};
 use serde::Deserialize;
 
+/// Details regarding a used utxo.
 #[derive(Debug, Clone, Eq, PartialEq, CandidType, Deserialize)]
 pub struct UsedUtxoDetails {
+    /// timestamp when the utxo was used.
     pub used_at: u64,
+    /// address of the utxo owner.
     pub owner_address: String,
 }
 
