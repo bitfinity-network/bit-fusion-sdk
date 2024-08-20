@@ -18,7 +18,7 @@ setup_docker() {
     cd btc-deploy/
     rm -rf bitcoin-data/*
     mkdir -p bitcoin-data/
-    docker compose up -d --build --force-recreate
+    sudo docker-compose up -d --build --force-recreate
     cd $PREV_PATH
 }
 
@@ -72,7 +72,7 @@ done
 
 # set dfxvm to use the correct version
 if [ "$GITHUB_CI" -gt 0 ]; then
-    dfxvm default 0.19.0
+    dfxvm default 0.20.1
 fi
 
 # check bad dfx version
