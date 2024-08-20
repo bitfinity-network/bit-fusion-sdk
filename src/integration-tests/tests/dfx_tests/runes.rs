@@ -509,6 +509,20 @@ impl RunesContext {
             .expect("Failed to get wrapped token balance")
     }
 
+    async fn wrapped_balances(
+        &self,
+        runes: &[RuneId],
+        wallet: &Wallet<'_, SigningKey>,
+    ) -> HashMap<RuneId, u128> {
+        let mut balances = HashMap::new();
+        for rune_id in runes {
+            let balance = self.wrapped_balance(rune_id, wallet).await;
+            balances.insert(*rune_id, balance);
+        }
+
+        balances
+    }
+
     async fn ord_rune_balance(&self, rune_id: &RuneId) -> u128 {
         let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
 
@@ -537,7 +551,7 @@ impl RunesContext {
             .iter()
             .map(|(rune_id, _)| **rune_id)
             .collect::<Vec<_>>();
-        let balance_before = self.runes_balance(&rune_ids, wallet).await;
+        let balance_before = self.wrapped_balances(&rune_ids, wallet).await;
 
         let wallet_address = wallet.address();
         let address = self.get_deposit_address(&wallet_address.into()).await;
@@ -552,7 +566,7 @@ impl RunesContext {
             .await
             .expect("failed to deposit runes");
 
-        let balance_after = self.runes_balance(&rune_ids, wallet).await;
+        let balance_after = self.wrapped_balances(&rune_ids, wallet).await;
 
         for (rune_id, rune_amount) in runes {
             let balance_after = balance_after.get(rune_id).copied().unwrap();
@@ -565,20 +579,6 @@ impl RunesContext {
             .admin_btc_rpc_client
             .generate_to_address(&self.runes.admin_address, 6)
             .expect("failed to generate blocks");
-    }
-
-    async fn runes_balance(
-        &self,
-        runes: &[RuneId],
-        wallet: &Wallet<'_, SigningKey>,
-    ) -> HashMap<RuneId, u128> {
-        let mut balances = HashMap::new();
-        for rune_id in runes {
-            let balance = self.wrapped_balance(rune_id, wallet).await;
-            balances.insert(*rune_id, balance);
-        }
-
-        balances
     }
 }
 
@@ -728,7 +728,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
     let before_balances = ctx
-        .runes_balance(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
+        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
     // deposit runes
     ctx.deposit_runes_to(&[(&foo_rune_id, 100), (&bar_rune_id, 200)], &ctx.eth_wallet)
@@ -739,7 +739,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
 
     // check balances
     let after_balances = ctx
-        .runes_balance(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
+        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
 
     assert_eq!(
