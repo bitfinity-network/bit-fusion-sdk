@@ -300,12 +300,11 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let fee_rate = self.get_fee_rate().await?;
 
         let args = CreateEdictTxArgs {
-            rune,
+            runes: vec![(rune, amount)],
             inputs,
             destination: dst_address,
             change_address,
             rune_change_address,
-            amount,
             fee_rate,
         };
         let unsigned_tx = builder.create_edict_transaction(&args).map_err(|err| {

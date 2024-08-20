@@ -6967,8 +6967,8 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ord-rs"
-version = "0.1.6"
-source = "git+https://github.com/bitfinity-network/ord-rs?tag=v0.1.6#9cf75b9300e9911fcf524a60883ec58413a94448"
+version = "0.2.0"
+source = "git+https://github.com/bitfinity-network/ord-rs?branch=multi-runes-for-edict-tx#523406c79bcb47e31cb8a40efa2c9345b05cc221"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",

@@ -236,7 +236,7 @@ impl RunesContext {
             .expect("get_deposit_address error")
     }
 
-    async fn send_runes(&self, btc_address: &str, rune_id: &RuneId, amount: u128) {
+    async fn send_runes(&self, btc_address: &str, runes: &[(&RuneId, u128)]) {
         let btc_address = Address::from_str(btc_address)
             .expect("failed to parse btc address")
             .assume_checked();
@@ -247,38 +247,40 @@ impl RunesContext {
             &self.runes.ord_wallet.address,
         );
 
-        let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
+        // load utxos
+        let mut utxos = Vec::with_capacity(runes.len());
+        for (rune_id, _) in runes {
+            let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
 
-        // find the utxo
-        let balance = OrdClient::dfx_test_client()
-            .get_balances(&rune_info.name)
-            .await
-            .expect("failed to get rune balances");
-
-        let mut utxo = None;
-        for outpoint in balance.keys() {
-            let outpoint_info = OrdClient::dfx_test_client()
-                .get_outpoint(outpoint)
+            // find the utxo
+            let balance = OrdClient::dfx_test_client()
+                .get_balances(&rune_info.name)
                 .await
-                .expect("failed to get outpoint owner");
+                .expect("failed to get rune balances");
 
-            let tokens = outpoint.split(':').collect::<Vec<_>>();
-            let txid = Txid::from_str(tokens[0]).expect("failed to parse txid");
-            let index = tokens[1].parse::<u32>().expect("failed to parse index");
+            for outpoint in balance.keys() {
+                let outpoint_info = OrdClient::dfx_test_client()
+                    .get_outpoint(outpoint)
+                    .await
+                    .expect("failed to get outpoint owner");
 
-            if outpoint_info.address == self.runes.ord_wallet.address {
-                utxo = Some(Utxo {
-                    index,
-                    id: txid,
-                    amount: outpoint_info.value,
-                });
-                break;
+                let tokens = outpoint.split(':').collect::<Vec<_>>();
+                let txid = Txid::from_str(tokens[0]).expect("failed to parse txid");
+                let index = tokens[1].parse::<u32>().expect("failed to parse index");
+
+                if outpoint_info.address == self.runes.ord_wallet.address {
+                    utxos.push(Utxo {
+                        index,
+                        id: txid,
+                        amount: outpoint_info.value,
+                    });
+                }
             }
         }
 
-        let Some(utxo) = utxo else {
-            panic!("No utxo found for the ord wallet");
-        };
+        if utxos.len() < runes.len() {
+            panic!("Runes not found; got {utxos:?}; required {runes:?}");
+        }
 
         // get funding utxo
         let edict_fund_tx = self
@@ -297,18 +299,25 @@ impl RunesContext {
             .get_utxo_by_address(&edict_fund_tx, &self.runes.ord_wallet.address)
             .expect("failed to get utxo");
 
-        etcher
-            .edict_rune(
-                vec![utxo, edict_funds_utxo],
-                *rune_id,
-                btc_address.clone(),
-                amount,
-            )
+        let mut inputs = utxos;
+        inputs.push(edict_funds_utxo);
+
+        let amounts = runes;
+        let runes = runes
+            .into_iter()
+            .map(|(rune_id, amount)| (**rune_id, *amount))
+            .collect::<Vec<_>>();
+
+        let tx_id = etcher
+            .edict_runes(inputs, runes, btc_address.clone())
             .await
             .expect("failed to send runes");
 
         self.mint_blocks(6).await;
-        println!("{amount} Runes sent to {btc_address}");
+        println!(
+            "{runes_count} Runes sent. txid: {tx_id}; sent to {btc_address}; amounts: {amounts:?}",
+            runes_count = amounts.len(),
+        );
     }
 
     async fn send_btc(&self, btc_address: &str, amount: Amount) {
@@ -336,8 +345,17 @@ impl RunesContext {
         self.inner.advance_time(Duration::from_secs(5)).await;
     }
 
-    async fn deposit(&self, rune_id: &RuneId, eth_address: &H160) -> Result<(), DepositError> {
-        let erc20_address = self.tokens.get(rune_id).expect("token not found");
+    async fn deposit(&self, runes: &[RuneId], eth_address: &H160) -> Result<(), DepositError> {
+        let mut dst_tokens = HashMap::new();
+        for rune_id in runes {
+            let erc20_address = self.tokens.get(rune_id).expect("token not found");
+            let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
+
+            dst_tokens.insert(
+                RuneName::from_str(&rune_info.name).unwrap(),
+                erc20_address.clone(),
+            );
+        }
 
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
@@ -347,15 +365,9 @@ impl RunesContext {
             .unwrap()
             .unwrap();
 
-        let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
-
         let data = RuneDepositRequestData {
             dst_address: eth_address.clone(),
-            dst_tokens: [(
-                RuneName::from_str(&rune_info.name).unwrap(),
-                erc20_address.clone(),
-            )]
-            .into(),
+            dst_tokens,
             amounts: None,
         };
 
@@ -520,35 +532,53 @@ impl RunesContext {
         amount
     }
 
-    async fn deposit_runes_to(
-        &self,
-        rune_id: &RuneId,
-        rune_amount: u128,
-        wallet: &Wallet<'_, SigningKey>,
-    ) {
-        let balance_before = self.wrapped_balance(rune_id, wallet).await;
+    async fn deposit_runes_to(&self, runes: &[(&RuneId, u128)], wallet: &Wallet<'_, SigningKey>) {
+        let rune_ids = runes
+            .iter()
+            .map(|(rune_id, _)| **rune_id)
+            .collect::<Vec<_>>();
+        let balance_before = self.runes_balance(&rune_ids, wallet).await;
 
         let wallet_address = wallet.address();
         let address = self.get_deposit_address(&wallet_address.into()).await;
         println!("Wallet address: {wallet_address}; deposit_address {address}");
 
-        self.send_runes(&address, rune_id, rune_amount).await;
+        self.send_runes(&address, runes).await;
         self.send_btc(&address, Amount::from_int_btc(1)).await;
 
         self.inner.advance_time(Duration::from_secs(5)).await;
 
-        self.deposit(rune_id, &wallet_address.into())
+        self.deposit(&rune_ids, &wallet_address.into())
             .await
             .expect("failed to deposit runes");
 
-        let balance_after = self.wrapped_balance(rune_id, wallet).await;
-        assert_eq!(balance_after - balance_before, rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
+        let balance_after = self.runes_balance(&rune_ids, wallet).await;
+
+        for (rune_id, rune_amount) in runes {
+            let balance_after = balance_after.get(rune_id).copied().unwrap();
+            let balance_before = balance_before.get(rune_id).copied().unwrap();
+            assert_eq!(balance_after - balance_before, *rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
+        }
 
         self.inner.advance_time(Duration::from_secs(5)).await;
         self.runes
             .admin_btc_rpc_client
             .generate_to_address(&self.runes.admin_address, 6)
             .expect("failed to generate blocks");
+    }
+
+    async fn runes_balance(
+        &self,
+        runes: &[RuneId],
+        wallet: &Wallet<'_, SigningKey>,
+    ) -> HashMap<RuneId, u128> {
+        let mut balances = HashMap::new();
+        for rune_id in runes {
+            let balance = self.wrapped_balance(rune_id, wallet).await;
+            balances.insert(*rune_id, balance);
+        }
+
+        balances
     }
 }
 
@@ -585,7 +615,8 @@ async fn runes_bridging_flow() {
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
     let ord_balance = ctx.ord_rune_balance(&rune_id).await;
-    ctx.deposit_runes_to(&rune_id, 100, &ctx.eth_wallet).await;
+    ctx.deposit_runes_to(&[(&rune_id, 100)], &ctx.eth_wallet)
+        .await;
 
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -639,14 +670,16 @@ async fn inputs_from_different_users() {
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
     let rune_balance = ctx.ord_rune_balance(&rune_id).await;
-    ctx.deposit_runes_to(&rune_id, 100, &ctx.eth_wallet).await;
+    ctx.deposit_runes_to(&[(&rune_id, 100)], &ctx.eth_wallet)
+        .await;
 
     let another_wallet = ctx
         .inner
         .new_wallet(u128::MAX)
         .await
         .expect("failed to create an ETH wallet");
-    ctx.deposit_runes_to(&rune_id, 77, &another_wallet).await;
+    ctx.deposit_runes_to(&[(&rune_id, 77)], &another_wallet)
+        .await;
 
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -687,4 +720,36 @@ async fn inputs_from_different_users() {
 
 #[tokio::test]
 #[serial_test::serial]
-async fn test_should_deposit_two_runes_in_a_single_tx() {}
+async fn test_should_deposit_two_runes_in_a_single_tx() {
+    let ctx = RunesContext::new(&[generate_rune_name(), generate_rune_name()]).await;
+    let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
+    let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
+
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let before_balances = ctx
+        .runes_balance(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
+        .await;
+    // deposit runes
+    ctx.deposit_runes_to(&[(&foo_rune_id, 100), (&bar_rune_id, 200)], &ctx.eth_wallet)
+        .await;
+
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // check balances
+    let after_balances = ctx
+        .runes_balance(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
+        .await;
+
+    assert_eq!(
+        after_balances[&foo_rune_id],
+        before_balances[&foo_rune_id] + 100
+    );
+    assert_eq!(
+        after_balances[&bar_rune_id],
+        before_balances[&bar_rune_id] + 200
+    );
+
+    ctx.stop().await
+}
