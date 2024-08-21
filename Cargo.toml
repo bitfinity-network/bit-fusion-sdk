@@ -10,6 +10,7 @@ members = [
     "src/erc20-bridge",
     "src/btc-bridge",
     "src/rune-bridge",
+    "src/bridge-deployer",
 ]
 resolver = "2"
 

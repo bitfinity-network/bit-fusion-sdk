@@ -740,6 +740,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bip39"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93f2635620bf0b9d4576eb7bb9a38a55df78bd1205d26fa994b25911a69f212f"
+dependencies = [
+ "bitcoin_hashes 0.11.0",
+ "serde",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -799,6 +810,12 @@ checksum = "73290177011694f38ec25e165d0387ab7ea749a4b81cd4c80dae5988229f7a57"
 
 [[package]]
 name = "bitcoin_hashes"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90064b8dee6815a6470d60bad07bbbaee885c0e12d04177138fa3291a01b7bc4"
+
+[[package]]
+name = "bitcoin_hashes"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d7066118b13d4b20b23645932dfb3a81ce7e29f95726c2036fa33cd7b092501"
@@ -815,6 +832,30 @@ dependencies = [
  "bitcoin-internals",
  "hex-conservative",
  "serde",
+]
+
+[[package]]
+name = "bitcoincore-rpc"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb70725a621848c83b3809913d5314c0d20ca84877d99dd909504b564edab00"
+dependencies = [
+ "bitcoincore-rpc-json",
+ "jsonrpc",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "bitcoincore-rpc-json"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "856ffbee2e492c23bca715d72ea34aae80d58400f2bda26a82015d6bc2ec3662"
+dependencies = [
+ "bitcoin 0.31.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -942,6 +983,73 @@ dependencies = [
  "thiserror",
  "tokio",
  "vergen",
+]
+
+[[package]]
+name = "bridge-deployer"
+version = "0.2.0"
+dependencies = [
+ "alloy-sol-types",
+ "anyhow",
+ "async-trait",
+ "bip39",
+ "bitcoin 0.31.2",
+ "bitcoincore-rpc",
+ "bridge-canister",
+ "bridge-client",
+ "bridge-did",
+ "bridge-utils",
+ "btc-bridge",
+ "candid",
+ "chrono",
+ "clap 4.5.7",
+ "did",
+ "erc20-bridge",
+ "eth-signer",
+ "ethereum-json-rpc-client",
+ "ethereum-types",
+ "ethers-core",
+ "evm-canister-client",
+ "futures",
+ "hex",
+ "ic-agent",
+ "ic-base-types",
+ "ic-bitcoin-canister-mock",
+ "ic-btc-interface 0.2.2",
+ "ic-canister",
+ "ic-canister-client",
+ "ic-canisters-http-types",
+ "ic-ckbtc-kyt",
+ "ic-ckbtc-minter",
+ "ic-config",
+ "ic-exports",
+ "ic-icrc1-ledger",
+ "ic-log",
+ "ic-management-canister-types",
+ "ic-metrics 0.19.0",
+ "ic-stable-structures 0.19.0",
+ "ic-state-machine-tests",
+ "ic-test-utils",
+ "ic-utils 0.34.0",
+ "icrc-client",
+ "icrc2-bridge",
+ "jsonrpc-core",
+ "once_cell",
+ "ord-rs",
+ "ordinals",
+ "rand",
+ "reqwest 0.12.5",
+ "rune-bridge",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "serial_test",
+ "sha2 0.10.8",
+ "signature-verification-canister-client",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1215,8 +1323,10 @@ checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets 0.52.5",
 ]
 
@@ -5971,7 +6081,9 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "async-trait",
+ "bip39",
  "bitcoin 0.31.2",
+ "bitcoincore-rpc",
  "bridge-canister",
  "bridge-client",
  "bridge-did",
@@ -6010,11 +6122,15 @@ dependencies = [
  "icrc2-bridge",
  "jsonrpc-core",
  "once_cell",
+ "ord-rs",
+ "ordinals",
  "rand",
+ "reqwest 0.12.5",
  "rune-bridge",
  "serde",
  "serde_bytes",
  "serde_json",
+ "serial_test",
  "signature-verification-canister-client",
  "thiserror",
  "tokio",
@@ -6103,6 +6219,17 @@ dependencies = [
  "pest",
  "pest_derive",
  "serde",
+]
+
+[[package]]
+name = "jsonrpc"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8128f36b47411cd3f044be8c1f5cc0c9e24d1d1bfdc45f0a57897b32513053f2"
+dependencies = [
+ "base64 0.13.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -6841,8 +6968,8 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ord-rs"
-version = "0.1.5"
-source = "git+https://github.com/bitfinity-network/ord-rs?tag=v0.1.5#dde7e4176521539e5e96d4cf1d16ffc9f02dfff5"
+version = "0.1.6"
+source = "git+https://github.com/bitfinity-network/ord-rs?tag=v0.1.6#9cf75b9300e9911fcf524a60883ec58413a94448"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",
@@ -6859,9 +6986,9 @@ dependencies = [
 
 [[package]]
 name = "ordinals"
-version = "0.0.8"
+version = "0.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f69dc8f090e996b63e1f96972f0d619f497c9545464c7bddf65e42d38576b3f3"
+checksum = "fb572a6faac38e826e5a6e8a143d6104d47ce75757a93dfd31912a0b91cada8d"
 dependencies = [
  "bitcoin 0.30.2",
  "derive_more",
@@ -8179,6 +8306,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scc"
+version = "2.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeb7ac86243095b70a7920639507b71d51a63390d1ba26c4f60a552fbb914a37"
+dependencies = [
+ "sdd",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8243,6 +8379,12 @@ dependencies = [
  "ring 0.17.8",
  "untrusted 0.9.0",
 ]
+
+[[package]]
+name = "sdd"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0495e4577c672de8254beb68d01a9b62d0e8a13c099edecdbedccce3223cd29f"
 
 [[package]]
 name = "sec1"
@@ -8503,6 +8645,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65569b702f41443e8bc8bbb1c5779bd0450bbe723b56198980e80ec45780bce2"
 dependencies = [
  "darling 0.20.9",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.68",
+]
+
+[[package]]
+name = "serial_test"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b4b487fe2acf240a021cf57c6b2b4903b1e78ca0ecd862a71b71d2a51fed77d"
+dependencies = [
+ "futures",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "scc",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82fe9db325bcef1fbcde82e078a5cc4efdf787e96b3b9cf45b50b529f2083d67"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.68",
@@ -9573,9 +9740,9 @@ checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
 name = "unicode-normalization"
-version = "0.1.23"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a56d1686db2308d901306f92a263857ef59ea39678a5458e7cb17f01415101f5"
+checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]

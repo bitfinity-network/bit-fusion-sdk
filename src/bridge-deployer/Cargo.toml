@@ -1,0 +1,83 @@
+[package]
+name = "bridge-deployer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+clap.workspace = true
+alloy-sol-types = { workspace = true, features = ["json"] }
+async-trait = { workspace = true }
+bip39 = { workspace = true }
+bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
+bitcoincore-rpc = { workspace = true }
+bridge-client = { path = "../bridge-client" }
+bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
+candid = { workspace = true }
+did = { workspace = true }
+eth-signer = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "reqwest",
+    "pocket-ic-tests-client",
+] }
+ethereum-types = { workspace = true }
+ethers-core = { workspace = true }
+evm-canister-client = { workspace = true }
+hex = { workspace = true }
+ic-btc-interface = { workspace = true }
+ic-canister = { workspace = true }
+ic-canister-client = { workspace = true, features = [
+    "pocket-ic-client",
+    "ic-agent-client",
+] }
+ic-exports = { workspace = true, features = ["icrc", "ledger"] }
+icrc-client = { workspace = true }
+ic-log = { workspace = true }
+ic-stable-structures = { workspace = true }
+icrc2-bridge = { path = "../icrc2-bridge" }
+bridge-canister = { path = "../bridge-canister" }
+jsonrpc-core = { workspace = true }
+once_cell = { workspace = true }
+ord-rs = { workspace = true, features = ["rune"] }
+ordinals = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_bytes = { workspace = true }
+
+
+# state machine tests deps
+ic-config = { workspace = true, optional = true }
+ic-base-types = { workspace = true, optional = true }
+ic-bitcoin-canister-mock = { workspace = true, optional = true }
+ic-canisters-http-types = { workspace = true, optional = true }
+ic-ckbtc-kyt = { workspace = true, optional = true }
+ic-ckbtc-minter = { workspace = true, optional = true }
+ic-icrc1-ledger = { workspace = true, optional = true }
+ic-management-canister-types = { workspace = true, optional = true }
+ic-state-machine-tests = { workspace = true, optional = true }
+ic-test-utils = { workspace = true }
+ic-utils = { workspace = true }
+
+rune-bridge = { path = "../rune-bridge" }
+erc20-bridge = { path = "../erc20-bridge" }
+ic-agent = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true, features = ["fs", "process", "full"] }
+tracing = "*"
+tracing-subscriber = "0.3.18"
+sha2 = "0.10"
+chrono = { version = "*", features = ["serde"] }
+[dev-dependencies]
+btc-bridge = { path = "../btc-bridge" }
+ethereum-json-rpc-client = { workspace = true, features = [
+    "reqwest",
+    "pocket-ic-tests-client",
+] }
+futures = { workspace = true, features = ["executor"] }
+
+ic-metrics = { workspace = true }
+thiserror = { workspace = true }
+signature-verification-canister-client = { workspace = true }
+serial_test = { workspace = true }
