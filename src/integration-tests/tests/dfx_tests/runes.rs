@@ -34,6 +34,12 @@ use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum RuneDepositStrategy {
+    AllInOne,
+    OnePerTx,
+}
+
 struct RuneWalletInfo {
     id256: Id256,
     name: String,
@@ -555,7 +561,12 @@ impl RunesContext {
         amount
     }
 
-    async fn deposit_runes_to(&self, runes: &[(&RuneId, u128)], wallet: &Wallet<'_, SigningKey>) {
+    async fn deposit_runes_to(
+        &self,
+        runes: &[(&RuneId, u128)],
+        wallet: &Wallet<'_, SigningKey>,
+        deposit_strategy: RuneDepositStrategy,
+    ) {
         let rune_ids = runes
             .iter()
             .map(|(rune_id, _)| **rune_id)
@@ -566,10 +577,20 @@ impl RunesContext {
         let address = self.get_deposit_address(&wallet_address.into()).await;
         println!("Wallet address: {wallet_address}; deposit_address {address}");
 
-        self.send_runes(&address, runes).await;
-        self.send_btc(&address, Amount::from_int_btc(1)).await;
-
-        self.inner.advance_time(Duration::from_secs(5)).await;
+        match deposit_strategy {
+            RuneDepositStrategy::OnePerTx => {
+                for rune in runes {
+                    self.send_runes(&address, &[*rune]).await;
+                    self.send_btc(&address, Amount::from_int_btc(1)).await;
+                    self.inner.advance_time(Duration::from_secs(5)).await;
+                }
+            }
+            RuneDepositStrategy::AllInOne => {
+                self.send_runes(&address, runes).await;
+                self.send_btc(&address, Amount::from_int_btc(1)).await;
+                self.inner.advance_time(Duration::from_secs(5)).await;
+            }
+        }
 
         self.deposit(&rune_ids, &wallet_address.into())
             .await
@@ -624,8 +645,12 @@ async fn runes_bridging_flow() {
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
     let ord_balance = ctx.ord_rune_balance(&rune_id).await;
-    ctx.deposit_runes_to(&[(&rune_id, 100)], &ctx.eth_wallet)
-        .await;
+    ctx.deposit_runes_to(
+        &[(&rune_id, 100)],
+        &ctx.eth_wallet,
+        RuneDepositStrategy::AllInOne,
+    )
+    .await;
 
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -679,16 +704,24 @@ async fn inputs_from_different_users() {
     // Mint one block in case there are some pending transactions
     ctx.mint_blocks(1).await;
     let rune_balance = ctx.ord_rune_balance(&rune_id).await;
-    ctx.deposit_runes_to(&[(&rune_id, 100)], &ctx.eth_wallet)
-        .await;
+    ctx.deposit_runes_to(
+        &[(&rune_id, 100)],
+        &ctx.eth_wallet,
+        RuneDepositStrategy::AllInOne,
+    )
+    .await;
 
     let another_wallet = ctx
         .inner
         .new_wallet(u128::MAX)
         .await
         .expect("failed to create an ETH wallet");
-    ctx.deposit_runes_to(&[(&rune_id, 77)], &another_wallet)
-        .await;
+    ctx.deposit_runes_to(
+        &[(&rune_id, 77)],
+        &another_wallet,
+        RuneDepositStrategy::AllInOne,
+    )
+    .await;
 
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -740,8 +773,52 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
         .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
     // deposit runes
-    ctx.deposit_runes_to(&[(&foo_rune_id, 100), (&bar_rune_id, 200)], &ctx.eth_wallet)
+    ctx.deposit_runes_to(
+        &[(&foo_rune_id, 100), (&bar_rune_id, 200)],
+        &ctx.eth_wallet,
+        RuneDepositStrategy::AllInOne,
+    )
+    .await;
+
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // check balances
+    let after_balances = ctx
+        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
+
+    assert_eq!(
+        after_balances[&foo_rune_id],
+        before_balances[&foo_rune_id] + 100
+    );
+    assert_eq!(
+        after_balances[&bar_rune_id],
+        before_balances[&bar_rune_id] + 200
+    );
+
+    ctx.stop().await
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_should_deposit_two_runes_in_two_tx() {
+    let ctx = RunesContext::new(&[generate_rune_name(), generate_rune_name()]).await;
+    let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
+    let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
+
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let before_balances = ctx
+        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
+        .await;
+    // deposit runes
+    ctx.deposit_runes_to(
+        &[(&foo_rune_id, 100), (&bar_rune_id, 200)],
+        &ctx.eth_wallet,
+        RuneDepositStrategy::OnePerTx,
+    )
+    .await;
 
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
