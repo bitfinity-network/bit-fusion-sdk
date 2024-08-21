@@ -80,7 +80,7 @@ DFX_VERSION=$(dfx --version | awk '{print $2}')
 DFX_VERSION_MINOR=$(echo $DFX_VERSION | cut -d. -f2)
 if [ "$DFX_VERSION_MINOR" -lt 20 ]; then
     echo "dfx version 0.18.0 doesn't work with bitcoin integration."
-    echo "dfx version 0.19.0 doesn't build."
+    echo "dfx version 0.19.0 wont't build."
     echo "Please upgrade dfx to >=0.20.1"
 
     exit 1
