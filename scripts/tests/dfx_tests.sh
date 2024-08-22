@@ -110,6 +110,7 @@ sleep 10
 
 # run tests
 cargo test -p integration-tests --features dfx_tests $@
+TEST_RESULT=$?
 
 killall -9 icx-proxy || true
 
@@ -119,4 +120,4 @@ if [ "$DOCKER" -gt 0 ]; then
     stop_docker
 fi
 
-exit 0
+exit $TEST_RESULT

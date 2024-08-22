@@ -8,6 +8,7 @@ use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
+use bridge_utils::bft_events::MinterNotificationType;
 use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -22,7 +23,7 @@ use ic_log::did::LogCanisterSettings;
 use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::interface::{DepositError, GetAddressError};
-use rune_bridge::ops::{RuneBridgeOp, RuneDepositRequestData, RuneMinterNotification};
+use rune_bridge::ops::{RuneBridgeOp, RuneDepositRequestData};
 use rune_bridge::rune_info::RuneName;
 use rune_bridge::state::RuneBridgeConfig;
 use tokio::time::Instant;
@@ -378,7 +379,7 @@ impl RunesContext {
         };
 
         let input = BFTBridge::notifyMinterCall {
-            notificationType: RuneMinterNotification::DEPOSIT_TYPE,
+            notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
         }
         .abi_encode();
