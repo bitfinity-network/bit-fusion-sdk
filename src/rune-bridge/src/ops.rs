@@ -5,7 +5,9 @@ use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_utils::bft_events::{
+    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
+};
 use candid::{CandidType, Decode, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
@@ -431,19 +433,17 @@ pub struct RuneDepositRequestData {
 }
 
 impl RuneMinterNotification {
-    pub const DEPOSIT_TYPE: u32 = 1;
-}
-
-impl RuneMinterNotification {
     fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
         match event_data.notification_type {
-            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
-                Ok(payload) => Some(Self::Deposit(payload)),
-                Err(err) => {
-                    log::warn!("Failed to decode deposit request event data: {err:?}");
-                    None
+            MinterNotificationType::DepositRequest => {
+                match Decode!(&event_data.user_data, RuneDepositRequestData) {
+                    Ok(payload) => Some(Self::Deposit(payload)),
+                    Err(err) => {
+                        log::warn!("Failed to decode deposit request event data: {err:?}");
+                        None
+                    }
                 }
-            },
+            }
             t => {
                 log::warn!("Unknown minter notify event type: {t}");
                 None

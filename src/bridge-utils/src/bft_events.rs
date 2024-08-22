@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;
@@ -208,8 +210,36 @@ impl From<MintTokenEvent> for MintedEventData {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
+#[repr(u32)]
+pub enum MinterNotificationType {
+    DepositRequest = 1,
+    RescheduleOperation = 2,
+    Other,
+}
+
+impl From<u32> for MinterNotificationType {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::DepositRequest,
+            2 => Self::RescheduleOperation,
+            _ => Self::Other,
+        }
+    }
+}
+
+impl Display for MinterNotificationType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MinterNotificationType::DepositRequest => write!(f, "DepositRequest"),
+            MinterNotificationType::RescheduleOperation => write!(f, "RescheduleOperation"),
+            MinterNotificationType::Other => write!(f, "Other"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
 pub struct NotifyMinterEventData {
-    pub notification_type: u32,
+    pub notification_type: MinterNotificationType,
     pub tx_sender: did::H160,
     pub user_data: Vec<u8>,
 }
@@ -217,7 +247,7 @@ pub struct NotifyMinterEventData {
 impl From<NotifyMinterEvent> for NotifyMinterEventData {
     fn from(event: NotifyMinterEvent) -> Self {
         Self {
-            notification_type: event.notificationType,
+            notification_type: event.notificationType.into(),
             tx_sender: event.txSender.into(),
             user_data: event.userData.0.into(),
         }
