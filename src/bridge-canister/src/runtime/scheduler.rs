@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::BridgeEvent;
-use candid::CandidType;
+use bridge_utils::bft_events::{BridgeEvent, MinterNotificationType, NotifyMinterEventData};
+use candid::{CandidType, Decode};
 use drop_guard::guard;
 use ic_stable_structures::StableBTreeMap;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
@@ -145,7 +145,9 @@ impl ServiceTask {
             let operation_action = match event {
                 BridgeEvent::Burnt(event) => Op::on_wrapped_token_burnt(ctx.clone(), event).await,
                 BridgeEvent::Minted(event) => Op::on_wrapped_token_minted(ctx.clone(), event).await,
-                BridgeEvent::Notify(event) => Op::on_minter_notification(ctx.clone(), event).await,
+                BridgeEvent::Notify(event) => {
+                    Self::on_minter_notification(ctx.clone(), event, &task_scheduler).await
+                }
             };
 
             let to_schedule = match operation_action {
@@ -193,6 +195,63 @@ impl ServiceTask {
 
         log::debug!("EVM logs collected");
         Ok(())
+    }
+
+    async fn on_minter_notification<Op: Operation>(
+        ctx: RuntimeState<Op>,
+        data: NotifyMinterEventData,
+        scheduler: &DynScheduler<Op>,
+    ) -> Option<OperationAction<Op>> {
+        match data.notification_type {
+            MinterNotificationType::RescheduleOperation => {
+                let operation_id = match Decode!(&data.user_data, OperationId) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        log::warn!("Failed to decode operation id from reschedule operation request: {err:?}");
+                        return None;
+                    }
+                };
+
+                Self::reschedule_operation(ctx, operation_id, scheduler);
+                None
+            }
+            _ => Op::on_minter_notification(ctx, data).await,
+        }
+    }
+
+    fn reschedule_operation<Op: Operation>(
+        ctx: RuntimeState<Op>,
+        operation_id: OperationId,
+        scheduler: &DynScheduler<Op>,
+    ) {
+        let Some(operation) = ctx.borrow().operations.get(operation_id) else {
+            log::warn!(
+                "Reschedule of operation #{operation_id} is requested but it does not exist"
+            );
+            return;
+        };
+
+        let Some(task_options) = operation.scheduling_options() else {
+            log::info!("Reschedule of operation #{operation_id} is requested but no scheduling is required for this operation");
+            return;
+        };
+
+        let current_task_id = scheduler.find_id(&|op| match op {
+            BridgeTask::Operation(id, _) => id == operation_id,
+            BridgeTask::Service(_) => false,
+        });
+        match current_task_id {
+            Some(task_id) => {
+                scheduler.reschedule(task_id, task_options.clone());
+                log::trace!("Updated schedule for operation #{operation_id} task #{task_id} to {task_options:?}");
+            }
+            None => {
+                let task_id = scheduler.append_task(
+                    (BridgeTask::Operation(operation_id, operation), task_options).into(),
+                );
+                log::trace!("Restarted operation #{operation_id} with task id #{task_id}");
+            }
+        }
     }
 }
 
