@@ -159,12 +159,11 @@ impl<'a> RuneHelper<'a> {
     }
 
     /// Transfer a rune to another address
-    pub async fn edict_rune(
+    pub async fn edict_runes(
         &self,
         utxos: Vec<Utxo>,
-        rune_id: RuneId,
+        runes: Vec<(RuneId, u128)>,
         destination: Address,
-        amount: u128,
     ) -> anyhow::Result<Txid> {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let wallet = Wallet::new_with_signer(LocalSigner::new(*self.private_key));
@@ -190,12 +189,11 @@ impl<'a> RuneHelper<'a> {
             .collect::<Vec<_>>();
 
         let unsigned_tx = builder.create_edict_transaction(&CreateEdictTxArgs {
-            rune: rune_id,
+            runes,
             inputs: inputs.clone(),
             destination,
             change_address: self.address.clone(),
             rune_change_address: self.address.clone(),
-            amount,
             fee_rate: FeeRate::from_sat_per_vb(10).unwrap(),
         })?;
 

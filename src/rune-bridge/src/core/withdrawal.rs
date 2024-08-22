@@ -266,13 +266,12 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
         let tx = self
             .build_withdraw_transaction(WithdrawalTransactionArgs {
-                amount,
-                dst_address: dst_address.clone(),
                 change_address: funding_address,
-                rune: rune_info.id(),
-                inputs: input_utxos.clone(),
+                dst_address: dst_address.clone(),
                 fee_rate,
+                inputs: input_utxos.clone(),
                 rune_change_address,
+                runes: vec![(rune_info.id(), amount)],
             })
             .await?;
 
@@ -340,12 +339,11 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
         let args = CreateEdictTxArgs {
-            rune: args.rune,
+            runes: args.runes,
             inputs: args.inputs,
             destination: args.dst_address,
             change_address: args.change_address,
             rune_change_address: args.rune_change_address,
-            amount: args.amount,
             fee_rate: args.fee_rate,
         };
         let unsigned_tx = builder.create_edict_transaction(&args).map_err(|err| {
@@ -446,10 +444,9 @@ struct GetGreedyFundingUtxosArgs {
 
 /// Arguments for the `build_withdraw_transaction` function.
 struct WithdrawalTransactionArgs {
-    amount: u128,
+    runes: Vec<(RuneId, u128)>,
     dst_address: Address,
     change_address: Address,
-    rune: RuneId,
     inputs: Vec<TxInputInfo>,
     fee_rate: FeeRate,
     rune_change_address: Address,
