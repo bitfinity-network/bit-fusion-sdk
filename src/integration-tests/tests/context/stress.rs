@@ -32,7 +32,11 @@ pub trait BaseTokens {
     async fn new_user(&self) -> Result<Self::UserId>;
     async fn mint(&self, token_idx: usize, to: &Self::UserId, amount: U256) -> Result<()>;
 
-    async fn deposit(&self, info: &BurnInfo<Self::UserId>) -> Result<U256>;
+    async fn deposit(
+        &self,
+        to_wallet: &Wallet<'_, SigningKey>,
+        info: &BurnInfo<Self::UserId>,
+    ) -> Result<U256>;
 
     async fn new_user_with_balance(&self, token_idx: usize, balance: U256) -> Result<Self::UserId> {
         let user = self.new_user().await?;
@@ -44,8 +48,8 @@ pub trait BaseTokens {
 pub struct BurnInfo<UserId> {
     pub bridge: H160,
     pub base_token_idx: usize,
+    pub wrapped_token: H160,
     pub from: UserId,
-    pub to: H160,
     pub amount: U256,
 }
 
@@ -105,13 +109,14 @@ impl<B: BaseTokens> StressTestState<B> {
 
                 // Deposit native token to charge fee.
                 let evm_client = base_tokens.ctx().evm_client(ADMIN);
+                let user_id256 = base_tokens.user_id256(user_id.clone());
                 base_tokens
                     .ctx()
                     .native_token_deposit(
                         &evm_client,
                         fee_charge_address.clone(),
                         &user_wallet,
-                        &[user_id.clone().into()],
+                        &[user_id256],
                         10_u128.pow(20),
                     )
                     .await?;
@@ -216,11 +221,11 @@ impl<B: BaseTokens> StressTestState<B> {
         let burn_info = BurnInfo {
             bridge: self.bft_bridge.clone(),
             base_token_idx: token_idx,
+            wrapped_token: self.wrapped_tokens[token_idx].clone(),
             from: user.1.clone(),
-            to: user.0.address().into(),
             amount: self.config.operation_amount.clone(),
         };
-        self.base_tokens.deposit(&burn_info).await?;
+        self.base_tokens.deposit(&user.0, &burn_info).await?;
 
         Ok(())
     }
@@ -258,6 +263,7 @@ impl<B: BaseTokens> StressTestState<B> {
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<()> {
         let evm_client = self.base_tokens.ctx().evm_client(ADMIN);
         let base_token_id: Id256 = self.base_tokens.ids()[token_idx].clone().into();
+        let user_id256 = self.base_tokens.user_id256(self.users[user_idx].1.clone());
         self.base_tokens
             .ctx()
             .burn_wrapped_erc_20_tokens(
@@ -265,7 +271,7 @@ impl<B: BaseTokens> StressTestState<B> {
                 &self.users[user_idx].0,
                 &self.wrapped_tokens[token_idx],
                 &base_token_id.0,
-                self.users[user_idx].1.clone().into(),
+                user_id256,
                 &self.bft_bridge,
                 amount.0.as_u128(),
             )
