@@ -1,10 +1,12 @@
-use std::collections::HashMap;
+mod icrc;
+
+use std::time::Duration;
 
 use bridge_did::id256::Id256;
-use bridge_utils::bft_events::{BurntEventData, MintedEventData};
 use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
+use futures::future;
 
 use crate::context::TestContext;
 use crate::dfx_tests::ADMIN;
@@ -18,11 +20,12 @@ pub struct StressTestConfig {
 }
 
 pub trait BaseTokens {
-    type TokenId: Into<Id256> + TryFrom<Id256> + Clone + Send + Sync;
-    type UserId: Into<Id256> + TryFrom<Id256> + Clone + Send + Sync;
+    type TokenId: Into<Id256> + Clone + Send + Sync;
+    type UserId: Clone + Send + Sync;
 
     fn ctx(&self) -> &(impl TestContext + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
+    fn user_id256(&self, user_id: Self::UserId) -> Id256;
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
 
@@ -30,7 +33,6 @@ pub trait BaseTokens {
     async fn mint(&self, token_idx: usize, to: &Self::UserId, amount: U256) -> Result<()>;
 
     async fn deposit(&self, info: &BurnInfo<Self::UserId>) -> Result<U256>;
-    async fn on_withdraw(&self, token_idx: usize, memo: u64) -> Result<U256>;
 
     async fn new_user_with_balance(&self, token_idx: usize, balance: U256) -> Result<Self::UserId> {
         let user = self.new_user().await?;
@@ -125,23 +127,159 @@ impl<B: BaseTokens> StressTestState<B> {
             config,
         };
 
-        state.run_operations().await;
-
-        todo!()
+        state.run_operations().await
     }
 
-    async fn run_operations(self) {
-        let expected_deposits_number = self.config.operations_per_user * self.users.len();
+    async fn run_operations(self) -> Result<StressTestStats> {
+        let init_bridge_canister_native_balance = self
+            .base_tokens
+            .ctx()
+            .evm_client(ADMIN)
+            .eth_get_balance(
+                self.base_tokens.bridge_canister_evm_address().await?,
+                did::BlockNumber::Latest,
+            )
+            .await??;
+
+        let operations_number = self.config.operations_per_user * self.users.len();
+
+        // Perform deposits
+        let mut token_counter = 0;
+        let mut user_counter = 0;
+        let mut deposits_futures = Vec::new();
+        for _ in 0..operations_number {
+            let user_idx = user_counter;
+            user_counter = (user_counter + 1) % self.users.len();
+            let token_idx = token_counter;
+            token_counter = (token_counter + 1) % self.wrapped_tokens.len();
+
+            let deposit = Box::pin(self.token_roundtrip(token_idx, user_idx));
+            deposits_futures.push(deposit);
+        }
+
+        // Perform withdrawals
+        let mut withdrawals_futures = Vec::new();
+        for token_idx in 0..self.wrapped_tokens.len() {
+            for user_idx in 0..self.users.len() {
+                let withdrawal = Box::pin(self.withdraw_on_positive_balance(token_idx, user_idx));
+                withdrawals_futures.push(withdrawal);
+            }
+        }
+
+        // Run all the operations concurrently.
+        let deposit_future = future::join_all(deposits_futures);
+        let withdrawal_future = future::join_all(withdrawals_futures);
+        let (deposit_results, withdrawal_results) = tokio::join!(deposit_future, withdrawal_future);
+
+        let mut successful_deposits = 0;
+        let mut failed_deposits = 0;
+        for result in deposit_results {
+            if result.is_ok() {
+                successful_deposits += 1;
+            } else {
+                failed_deposits += 1;
+            }
+        }
+
+        let mut successful_withdrawals = 0;
+        let mut failed_withdrawals = 0;
+        for result in withdrawal_results {
+            if result.is_ok() {
+                successful_withdrawals += 1;
+            } else {
+                failed_withdrawals += 1;
+            }
+        }
+
+        let finish_bridge_canister_native_balance = self
+            .base_tokens
+            .ctx()
+            .evm_client(ADMIN)
+            .eth_get_balance(
+                self.base_tokens.bridge_canister_evm_address().await?,
+                did::BlockNumber::Latest,
+            )
+            .await??;
+
+        Ok(StressTestStats {
+            successful_deposits,
+            failed_deposits,
+            successful_withdrawals,
+            failed_withdrawals,
+            init_bridge_canister_native_balance,
+            finish_bridge_canister_native_balance,
+        })
+    }
+
+    async fn token_roundtrip(&self, token_idx: usize, user_idx: usize) -> Result<()> {
+        let user = &self.users[user_idx];
+        let burn_info = BurnInfo {
+            bridge: self.bft_bridge.clone(),
+            base_token_idx: token_idx,
+            from: user.1.clone(),
+            to: user.0.address().into(),
+            amount: self.config.operation_amount.clone(),
+        };
+        self.base_tokens.deposit(&burn_info).await?;
+
+        Ok(())
+    }
+
+    async fn withdraw_on_positive_balance(&self, token_idx: usize, user_idx: usize) -> Result<()> {
+        const WAIT_FOR_BALANCE_TIMEOUT: Duration = Duration::from_secs(30);
+        let balance_future = self.wait_for_wrapped_balance(token_idx, user_idx);
+        let balance_result = tokio::time::timeout(WAIT_FOR_BALANCE_TIMEOUT, balance_future).await;
+
+        if let Ok(Ok(balance)) = balance_result {
+            self.withdraw(token_idx, user_idx, balance).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn wait_for_wrapped_balance(&self, token_idx: usize, user_idx: usize) -> Result<U256> {
+        loop {
+            let balance = self
+                .base_tokens
+                .ctx()
+                .check_erc20_balance(
+                    &self.wrapped_tokens[token_idx],
+                    &self.users[user_idx].0,
+                    None,
+                )
+                .await?;
+
+            if balance > 0 {
+                return Ok(balance.into());
+            }
+        }
+    }
+
+    async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<()> {
+        let evm_client = self.base_tokens.ctx().evm_client(ADMIN);
+        let base_token_id: Id256 = self.base_tokens.ids()[token_idx].clone().into();
+        self.base_tokens
+            .ctx()
+            .burn_wrapped_erc_20_tokens(
+                &evm_client,
+                &self.users[user_idx].0,
+                &self.wrapped_tokens[token_idx],
+                &base_token_id.0,
+                self.users[user_idx].1.clone().into(),
+                &self.bft_bridge,
+                amount.0.as_u128(),
+            )
+            .await?;
+
+        Ok(())
     }
 }
 
 pub struct StressTestStats {
-    pub expected_deposits_number: u64,
-    pub deposits_number: u64,
-    pub total_deposit_amount: U256,
-    pub expected_withdraws_number: u64,
-    pub withdraws_number: u64,
-    pub total_withdraw_amount: U256,
+    pub successful_deposits: usize,
+    pub failed_deposits: usize,
+    pub successful_withdrawals: usize,
+    pub failed_withdrawals: usize,
     pub init_bridge_canister_native_balance: U256,
     pub finish_bridge_canister_native_balance: U256,
 }

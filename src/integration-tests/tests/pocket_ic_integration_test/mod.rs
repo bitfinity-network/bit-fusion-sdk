@@ -73,7 +73,11 @@ impl PocketIcTestContext {
             ADMIN => Self::admin(),
             JOHN => john(),
             ALICE => alice(),
-            _ => panic!("unexpected caller"),
+            _ => {
+                let name = format!("user {name}");
+                let bytes = name.as_bytes();
+                Principal::from_slice(bytes)
+            }
         }
     }
 }

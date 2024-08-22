@@ -93,14 +93,23 @@ pub trait TestContext {
         RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
+    /// Returns client for the ICRC token canister.
+    fn icrc_token_client(
+        &self,
+        canister: Principal,
+        caller: &str,
+    ) -> IcrcCanisterClient<Self::Client> {
+        IcrcCanisterClient::new(self.client(canister, caller))
+    }
+
     /// Returns client for the ICRC token 1 canister.
     fn icrc_token_1_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_1(), caller))
+        self.icrc_token_client(self.canisters().token_1(), caller)
     }
 
     /// Returns client for the ICRC token 2 canister.
     fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_2(), caller))
+        self.icrc_token_client(self.canisters().token_2(), caller)
     }
 
     /// Sends tx with notification to EVMc.
