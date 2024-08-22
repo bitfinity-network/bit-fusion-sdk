@@ -1,4 +1,5 @@
 pub mod canister;
+pub mod constants;
 pub mod core;
 pub mod interface;
 pub mod key;
