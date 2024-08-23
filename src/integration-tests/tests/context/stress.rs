@@ -66,8 +66,16 @@ impl<B: BaseTokens> StressTestState<B> {
     pub async fn run(base_tokens: B, config: StressTestConfig) -> Result<StressTestStats> {
         let admin_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
 
-        let expected_fee_charge_address =
-            ethers_core::utils::get_contract_address(admin_wallet.address(), 0);
+        let admin_nonce = base_tokens
+            .ctx()
+            .evm_client(base_tokens.ctx().admin_name())
+            .account_basic(admin_wallet.address().into())
+            .await?
+            .nonce;
+        let expected_fee_charge_address = ethers_core::utils::get_contract_address(
+            admin_wallet.address(),
+            admin_nonce + U256::from(2u64),
+        );
 
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;
         let bft_bridge = base_tokens
