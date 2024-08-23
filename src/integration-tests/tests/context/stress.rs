@@ -1,4 +1,6 @@
-mod icrc;
+#![allow(async_fn_in_trait)]
+
+pub mod icrc;
 
 use std::time::Duration;
 
@@ -281,6 +283,7 @@ impl<B: BaseTokens> StressTestState<B> {
     }
 }
 
+#[derive(Debug)]
 pub struct StressTestStats {
     pub successful_deposits: usize,
     pub failed_deposits: usize,

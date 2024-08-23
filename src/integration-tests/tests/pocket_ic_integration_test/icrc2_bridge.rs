@@ -13,6 +13,7 @@ use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
+use crate::context::stress::{icrc, StressTestConfig};
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
@@ -505,4 +506,23 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
 
         assert!(bridge_balance_before_mint <= bridge_balance_after_mint);
     }
+}
+
+#[tokio::test]
+async fn icrc_bridge_stress_test() {
+    let context = PocketIcTestContext::new(&[
+        CanisterType::Evm,
+        CanisterType::Signature,
+        CanisterType::Icrc2Bridge,
+    ])
+    .await;
+
+    let config = StressTestConfig {
+        users_number: 16,
+        operations_per_user: 16,
+        init_user_balance: u64::MAX.into(),
+        operation_amount: 2u64.pow(20).into(),
+    };
+
+    icrc::stress_test_icrc_bridge_with_ctx(context, 4, config).await;
 }

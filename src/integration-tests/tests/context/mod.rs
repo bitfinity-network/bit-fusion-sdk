@@ -1,5 +1,5 @@
 mod evm_rpc_canister;
-mod stress;
+pub mod stress;
 
 use std::collections::HashMap;
 use std::time::Duration;

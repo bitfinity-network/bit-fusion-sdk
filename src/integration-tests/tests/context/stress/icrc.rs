@@ -8,22 +8,51 @@ use candid::{Encode, Principal};
 use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
+use ic_exports::icrc_types::icrc1_ledger::LedgerArgument;
 use icrc_client::account::Account;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
-use crate::context::TestContext;
+use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::dfx_tests::ADMIN;
 use crate::utils::error::Result;
 
-use super::{BaseTokens, BurnInfo};
+use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 
-static USER_COUNTER: AtomicU32 = AtomicU32::new(256);
+static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub struct IcrcBaseTokens<Ctx> {
     ctx: Ctx,
-    bridge_canister: Principal,
     tokens: Vec<Principal>,
+}
+
+impl<Ctx: TestContext> IcrcBaseTokens<Ctx> {
+    async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
+        let mut tokens = Vec::with_capacity(base_tokens_number);
+        for token_idx in 0..base_tokens_number {
+            let icrc_principal = Self::init_icrc_token_canister(&ctx, token_idx).await?;
+            tokens.push(icrc_principal);
+        }
+
+        Ok(Self { ctx, tokens })
+    }
+
+    async fn init_icrc_token_canister(ctx: &Ctx, token_idx: usize) -> Result<Principal> {
+        let token = ctx.create_canister().await?;
+
+        let init_balances = vec![];
+        let init_data = icrc_canister_default_init_args(
+            ctx.admin(),
+            &format!("Tkn#{token_idx}"),
+            init_balances,
+        );
+        let wasm = CanisterType::Icrc1Ledger.default_canister_wasm().await;
+        ctx.install_canister(token, wasm, (LedgerArgument::Init(init_data),))
+            .await
+            .unwrap();
+
+        Ok(token)
+    }
 }
 
 impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
@@ -83,7 +112,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         let to = to_wallet.address();
         let subaccount = Some(evm_link::address_to_icrc_subaccount(&to));
         let minter_canister = Account {
-            owner: self.bridge_canister,
+            owner: self.ctx.canisters().icrc2_bridge(),
             subaccount,
         };
 
@@ -128,4 +157,21 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
         Ok(info.amount.clone())
     }
+}
+
+/// Run stress test with the given TestContext implementation.
+pub async fn stress_test_icrc_bridge_with_ctx<T>(
+    ctx: T,
+    base_tokens_number: usize,
+    config: StressTestConfig,
+) where
+    T: TestContext + Send + Sync,
+{
+    let base_tokens = IcrcBaseTokens::init(ctx, base_tokens_number).await.unwrap();
+    let icrc_stress_test_stats = StressTestState::run(base_tokens, config).await.unwrap();
+
+    dbg!(&icrc_stress_test_stats);
+
+    assert!(icrc_stress_test_stats.failed_deposits == 0);
+    assert!(icrc_stress_test_stats.failed_withdrawals == 0);
 }
