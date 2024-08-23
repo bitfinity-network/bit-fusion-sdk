@@ -13,11 +13,9 @@ use icrc_client::account::Account;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
-use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
-use crate::dfx_tests::ADMIN;
-use crate::utils::error::Result;
-
 use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
+use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
+use crate::utils::error::Result;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -73,7 +71,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
     }
 
     async fn bridge_canister_evm_address(&self) -> Result<H160> {
-        let client = self.ctx.icrc_bridge_client(ADMIN);
+        let client = self.ctx.icrc_bridge_client(self.ctx.admin_name());
         let address = client.get_bridge_canister_evm_address().await??;
         Ok(address)
     }
@@ -87,7 +85,9 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
     async fn mint(&self, token_idx: usize, to: &Self::UserId, amount: U256) -> Result<()> {
         let token_principal = self.tokens[token_idx];
-        let client = self.ctx.icrc_token_client(token_principal, ADMIN);
+        let client = self
+            .ctx
+            .icrc_token_client(token_principal, self.ctx.admin_name());
         let to_principal = self.ctx.principal_by_caller_name(to);
         let transfer_args = TransferArg {
             from_subaccount: None,

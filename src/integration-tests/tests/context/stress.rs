@@ -11,7 +11,6 @@ use ethers_core::k256::ecdsa::SigningKey;
 use futures::future;
 
 use crate::context::TestContext;
-use crate::dfx_tests::ADMIN;
 use crate::utils::error::Result;
 
 pub struct StressTestConfig {
@@ -110,7 +109,7 @@ impl<B: BaseTokens> StressTestState<B> {
                 let user_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
 
                 // Deposit native token to charge fee.
-                let evm_client = base_tokens.ctx().evm_client(ADMIN);
+                let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
                 let user_id256 = base_tokens.user_id256(user_id.clone());
                 base_tokens
                     .ctx()
@@ -141,7 +140,7 @@ impl<B: BaseTokens> StressTestState<B> {
         let init_bridge_canister_native_balance = self
             .base_tokens
             .ctx()
-            .evm_client(ADMIN)
+            .evm_client(self.base_tokens.ctx().admin_name())
             .eth_get_balance(
                 self.base_tokens.bridge_canister_evm_address().await?,
                 did::BlockNumber::Latest,
@@ -201,7 +200,7 @@ impl<B: BaseTokens> StressTestState<B> {
         let finish_bridge_canister_native_balance = self
             .base_tokens
             .ctx()
-            .evm_client(ADMIN)
+            .evm_client(self.base_tokens.ctx().admin_name())
             .eth_get_balance(
                 self.base_tokens.bridge_canister_evm_address().await?,
                 did::BlockNumber::Latest,
@@ -263,7 +262,10 @@ impl<B: BaseTokens> StressTestState<B> {
     }
 
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<()> {
-        let evm_client = self.base_tokens.ctx().evm_client(ADMIN);
+        let evm_client = self
+            .base_tokens
+            .ctx()
+            .evm_client(self.base_tokens.ctx().admin_name());
         let base_token_id: Id256 = self.base_tokens.ids()[token_idx].clone().into();
         let user_id256 = self.base_tokens.user_id256(self.users[user_idx].1.clone());
         self.base_tokens
