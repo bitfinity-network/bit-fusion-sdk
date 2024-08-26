@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "src/brc20-bridge",
     "src/bridge-canister",
     "src/bridge-client",
     "src/bridge-did",
