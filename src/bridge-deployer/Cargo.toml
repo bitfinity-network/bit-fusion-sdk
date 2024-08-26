@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-clap.workspace = true
+clap = { workspace = true, features = ["env"] }
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 bip39 = { workspace = true }

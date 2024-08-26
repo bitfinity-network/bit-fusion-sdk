@@ -1,21 +1,16 @@
-use std::ffi::OsString;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, trace, Level};
-use tracing_subscriber::filter::Directive;
-use tracing_subscriber::EnvFilter;
 
-use crate::canister_manager::CanisterManager;
-use crate::commands::Commands;
+use crate::commands::{BFTArgs, Commands};
 use crate::contracts::EvmNetwork;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Some operations with BFT bridge.
+/// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
 #[command(author, version = VERSION, about = "Bitfinity Deployer", long_about = None)]
 pub struct Cli {
@@ -27,8 +22,35 @@ pub struct Cli {
     identity: PathBuf,
 
     /// Private Key of the wallet to use for the transaction
-    #[arg(short('p'), long, value_name = "PRIVATE_KEY")]
-    private_key: String,
+    #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
+    private_key: H256,
+
+    /// Ths is the host of the IC.
+    #[arg(
+        short,
+        long,
+        value_name = "IC_HOST",
+        default_value = "http://localhost:8080",
+        help_heading = "IC Host"
+    )]
+    ic_host: String,
+
+    /// Deploy the BFT bridge.
+    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
+    deploy_bft: bool,
+
+    /// These are extra arguments for the BFT bridge.
+    #[command(flatten, next_help_heading = "Bridge Contract Args")]
+    bft_args: BFTArgs,
+
+    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    #[arg(
+        long,
+        value_name = "EVM_NETWORK",
+        default_value = "local",
+        help_heading = "Bridge Contract Args"
+    )]
+    evm_network: EvmNetwork,
 
     /// Set the minimum log level.
     ///
@@ -48,58 +70,39 @@ pub struct Cli {
         help_heading = "Display"
     )]
     quiet: bool,
-
-    /// Ths is the host of the IC.
-    #[arg(
-        short,
-        long,
-        value_name = "IC_HOST",
-        default_value = "http://localhost:8080",
-        help_heading = "IC Host"
-    )]
-    ic_host: String,
-
-    /// Deploy BFT contract
-    #[arg(long, value_name = "DEPLOY_BFT")]
-    deploy_bft: bool,
-
-    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
-    #[arg(long, value_name = "EVM_NETWORK")]
-    evm_network: EvmNetwork,
-
-    /// Path to the canister manager state file
-    #[arg(long, value_name = "STATE_FILE", default_value = "canister_state.json")]
-    state_file: PathBuf,
 }
 
 impl Cli {
     /// Runs the Bitfinity Deployer application.
     pub async fn run() -> anyhow::Result<()> {
         let cli = Cli::parse();
-        let identity = &cli.identity;
-        let deploy_bft = cli.deploy_bft;
-        let pk = H256::from_str(&cli.private_key).expect("Invalid private key");
 
+        // Initialize tracing with the appropriate log level based on the verbosity setting.
         cli.init_tracing();
 
-        let mut canister_manager =
-            CanisterManager::load_from_file(&cli.state_file).unwrap_or_else(|_| {
-                info!("No existing state file found. Creating a new CanisterManager.");
-                CanisterManager::new()
-            });
+        let Cli {
+            identity,
+            private_key,
+            ic_host,
+            deploy_bft,
+            bft_args,
+            evm_network,
+            command,
+            ..
+        } = cli;
 
         info!("Starting Bitfinity Deployer v{}", VERSION);
-        debug!("IC host: {}", cli.ic_host);
+        debug!("IC host: {}", ic_host);
 
-        trace!("Executing command: {:?}", cli.command);
-        cli.command
+        trace!("Executing command: {:?}", command);
+        command
             .run(
                 identity.to_path_buf(),
-                &cli.ic_host,
-                &mut canister_manager,
+                &ic_host,
+                evm_network,
+                private_key,
                 deploy_bft,
-                cli.evm_network,
-                pk,
+                bft_args,
             )
             .await?;
 
@@ -124,7 +127,6 @@ impl Cli {
     }
 
     /// Initializes tracing with the appropriate log level based on the verbosity setting.
-
     pub fn init_tracing(&self) {
         let directive = self.level();
         tracing_subscriber::fmt()

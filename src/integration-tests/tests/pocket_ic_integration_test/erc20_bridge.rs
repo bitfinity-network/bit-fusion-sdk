@@ -610,6 +610,8 @@ async fn create_bft_bridge(
         minterAddress: minter_address.into(),
         feeChargeAddress: fee_charge.into(),
         isWrappedSide: is_wrapped,
+        owner: [0; 20].into(),
+        controllers: vec![],
     }
     .abi_encode();
 

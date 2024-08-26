@@ -515,6 +515,8 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
         isWrappedSide: args.is_wrapped_side,
+        owner: [0; 20].into(),
+        controllers: vec![],
     }
     .abi_encode();
 

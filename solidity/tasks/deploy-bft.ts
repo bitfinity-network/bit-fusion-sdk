@@ -19,9 +19,11 @@ task('deploy-bft', 'Deploys the BFT contract')
     .addParam('minterAddress', 'The address of the minter')
     .addParam('feeChargeAddress', 'The address of the fee charge')
     .addParam('isWrappedSide', 'Is the wrapped side', undefined, boolean)
+    .addOptionalParam("owner", "The owner of the contract")
+    .addOptionalParam("controllers", "The controllers of the contract", [])
     .setAction(
         async (
-            { minterAddress, feeChargeAddress, isWrappedSide },
+            { minterAddress, feeChargeAddress, isWrappedSide, owner, controllers },
             hre: HardhatRuntimeEnvironment
         ) => {
             console.log('Compiling contract');
@@ -29,7 +31,7 @@ task('deploy-bft', 'Deploys the BFT contract')
             console.log('Contract compiled');
 
             // Validate the arguments that it is address
-            for (const address of [minterAddress, feeChargeAddress]) {
+            for (const address of [minterAddress, feeChargeAddress, owner, ...controllers]) {
                 if (!hre.ethers.isAddress(address)) {
                     throw new Error(`Invalid address: ${address}`);
                 }
@@ -49,6 +51,8 @@ task('deploy-bft', 'Deploys the BFT contract')
                 minterAddress,
                 feeChargeAddress,
                 isWrappedSide,
+                owner,
+                controllers
             ]);
 
             // Wait for the deployment to be confirmed

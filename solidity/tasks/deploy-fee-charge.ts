@@ -5,9 +5,8 @@ import { int } from 'hardhat/internal/core/params/argumentTypes';
 
 task('deploy-fee-charge', 'Deploys the fee charge contract')
     .addParam('bridges', 'The addresses of the bridges')
-    .addOptionalParam('nonce', 'The nonce of the transaction', undefined, int)
     .addOptionalParam('expectedAddress', 'The expected address of the fee charge')
-    .setAction(async ({ nonce, bridges, expectedAddress }, hre) => {
+    .setAction(async ({ bridges, expectedAddress }, hre) => {
         const { network } = hre.hardhatArguments;
 
         if (!network) {
@@ -16,10 +15,6 @@ task('deploy-fee-charge', 'Deploys the fee charge contract')
 
         let [deployer] = await hre.ethers.getSigners();
 
-        // If nonce is not provided, get the nonce from the deployer
-        if (nonce === undefined) {
-            nonce = await deployer.getNonce('pending');
-        }
 
         if (!Array.isArray(bridges) || bridges.length === 0) {
             throw new Error('Bridges must be a non-empty array of addresses');

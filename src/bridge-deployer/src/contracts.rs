@@ -1,10 +1,13 @@
 use anyhow::{Context, Result};
 use clap::ValueEnum;
 use eth_signer::{Signer, Wallet};
+use ethereum_json_rpc_client::reqwest::ReqwestClient;
+use ethereum_json_rpc_client::EthJsonRpcClient;
 use ethereum_types::H256;
 use ethers_core::k256::ecdsa::SigningKey;
-use ethers_core::types::H160;
+use ethers_core::types::{BlockNumber, H160};
 use std::process::Command;
+use std::str::FromStr;
 use tracing::{error, info};
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
@@ -36,6 +39,14 @@ impl ContractDeployer<'_> {
         Self { network, wallet }
     }
 
+    pub fn get_network_url(&self) -> &'static str {
+        match self.network {
+            EvmNetwork::Local => "http://localhost:8545",
+            EvmNetwork::Testnet => "https://testnet.bitfinity.network",
+            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network",
+        }
+    }
+
     /// Deploys the BFT contract with the given parameters.
     ///
     /// # Arguments
@@ -52,21 +63,47 @@ impl ContractDeployer<'_> {
         minter_address: &H160,
         fee_charge_address: &H160,
         is_wrapped_side: bool,
-    ) -> Result<String> {
+        owner: Option<H160>,
+        controllers: &Option<Vec<H160>>,
+    ) -> Result<H160> {
         info!("Deploying BFT contract");
+
+        let network = self.network.to_string();
+        let minter_address = minter_address.to_string();
+        let fee_charge_address = fee_charge_address.to_string();
+        let is_wrapped_side = is_wrapped_side.to_string();
+        let owner = owner.map(|o| o.to_string());
+        let controllers = controllers.as_ref().map(|c| {
+            c.iter()
+                .map(H160::to_string)
+                .collect::<Vec<String>>()
+                .join(",")
+        });
+        let mut args = vec![
+            "hardhat",
+            "deploy-bft",
+            "--network",
+            &network,
+            "--minter-address",
+            &minter_address,
+            "--fee-charge-address",
+            &fee_charge_address,
+            "--is-wrapped-side",
+            &is_wrapped_side,
+        ];
+
+        if let Some(ref owner) = owner {
+            args.push("--owner");
+            args.push(owner);
+        }
+
+        if let Some(ref controllers) = controllers {
+            args.push("--controllers");
+            args.push(controllers);
+        }
+
         let output = Command::new("npx")
-            .args([
-                "hardhat",
-                "deploy-bft",
-                "--network",
-                &self.network.to_string(),
-                "--minter-address",
-                &minter_address.to_string(),
-                "--fee-charge-address",
-                &fee_charge_address.to_string(),
-                "--is-wrapped-side",
-                &is_wrapped_side.to_string(),
-            ])
+            .args(&args)
             .output()
             .context("Failed to execute deploy-bft command")?;
 
@@ -87,7 +124,8 @@ impl ContractDeployer<'_> {
             .map(str::trim)
             .context("Failed to extract BFT proxy address")?;
 
-        Ok(proxy_address.to_string())
+        let address = H160::from_str(proxy_address).context("Invalid BFT proxy address")?;
+        Ok(address)
     }
 
     /// Deploys the Fee Charge contract with the given parameters.
@@ -106,7 +144,7 @@ impl ContractDeployer<'_> {
         bridges: &[H160],
         nonce: u64,
         expected_address: Option<&str>,
-    ) -> Result<String> {
+    ) -> Result<H160> {
         info!("Deploying Fee Charge contract");
         let binding = bridges
             .iter()
@@ -153,7 +191,9 @@ impl ContractDeployer<'_> {
             .map(str::trim)
             .context("Failed to extract Fee Charge address")?;
 
-        Ok(fee_charge_address.to_string())
+        let address = H160::from_str(fee_charge_address).context("Invalid Fee Charge address")?;
+
+        Ok(address)
     }
 
     /// Computes the address of the fee charge contract based on the deployer's address and the given nonce.
@@ -170,5 +210,23 @@ impl ContractDeployer<'_> {
         let contract_address = ethers_core::utils::get_contract_address(deployer, nonce);
 
         Ok(contract_address)
+    }
+
+    /// Retrieves the nonce of the deployer's address.
+    ///
+    /// # Returns
+    ///
+    /// The nonce of the deployer's address.
+    pub async fn get_nonce(&self) -> Result<u64> {
+        let url = self.get_network_url();
+
+        let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
+
+        let address = self.wallet.address();
+        let nonce = client
+            .get_transaction_count(address, BlockNumber::Latest)
+            .await?;
+
+        Ok(nonce)
     }
 }
