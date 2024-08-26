@@ -139,28 +139,6 @@ impl Operation for RuneBridgeOp {
         }
     }
 
-    fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
-        match self {
-            Self::SendTransaction { .. } | Self::CreateTransaction { .. } => Some(
-                TaskOptions::new()
-                    .with_fixed_backoff_policy(2)
-                    .with_max_retries_policy(10),
-            ),
-            Self::AwaitInputs { .. }
-            | Self::AwaitConfirmations { .. }
-            | Self::SignMintOrder { .. }
-            | Self::SendMintOrder { .. }
-            | Self::ConfirmMintOrder { .. }
-            | Self::MintOrderConfirmed { .. }
-            | Self::TransactionSent { .. }
-            | Self::OperationSplit { .. } => Some(
-                TaskOptions::new()
-                    .with_max_retries_policy(10)
-                    .with_fixed_backoff_policy(5),
-            ),
-        }
-    }
-
     fn is_complete(&self) -> bool {
         match self {
             RuneBridgeOp::AwaitInputs { .. } => false,
@@ -188,6 +166,28 @@ impl Operation for RuneBridgeOp {
             RuneBridgeOp::SendTransaction { from_address, .. } => from_address.clone(),
             RuneBridgeOp::TransactionSent { from_address, .. } => from_address.clone(),
             RuneBridgeOp::OperationSplit { wallet_address, .. } => wallet_address.clone(),
+        }
+    }
+
+    fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
+        match self {
+            Self::SendTransaction { .. } | Self::CreateTransaction { .. } => Some(
+                TaskOptions::new()
+                    .with_fixed_backoff_policy(2)
+                    .with_max_retries_policy(10),
+            ),
+            Self::AwaitInputs { .. }
+            | Self::AwaitConfirmations { .. }
+            | Self::SignMintOrder { .. }
+            | Self::SendMintOrder { .. }
+            | Self::ConfirmMintOrder { .. }
+            | Self::MintOrderConfirmed { .. }
+            | Self::TransactionSent { .. }
+            | Self::OperationSplit { .. } => Some(
+                TaskOptions::new()
+                    .with_max_retries_policy(10)
+                    .with_fixed_backoff_policy(5),
+            ),
         }
     }
 
