@@ -1,10 +1,12 @@
 pub mod brc20_info;
 pub mod canister;
+pub mod constants;
 pub mod core;
 pub mod interface;
 pub mod key;
 pub mod ledger;
 pub mod memory;
+pub mod ops;
 pub mod state;
 
 use ic_metrics::Metrics;
