@@ -112,7 +112,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -129,7 +129,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
  "syn-solidity",
  "tiny-keccak",
 ]
@@ -147,7 +147,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_json",
- "syn 2.0.75",
+ "syn 2.0.76",
  "syn-solidity",
 ]
 
@@ -432,7 +432,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -527,7 +527,7 @@ checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -549,7 +549,7 @@ checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -560,7 +560,7 @@ checksum = "6e0c28dcc82d7c8ead5cb13beb15405b57b8546e93215673ff8ca0349a028107"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -588,7 +588,7 @@ checksum = "3c87f3f15e7794432337fc718554eaa4dc8f04c9677a950ffe366f20a162ae42"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -922,20 +922,14 @@ dependencies = [
 name = "bridge-canister"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "bridge-did",
  "bridge-utils",
  "candid",
- "cfg-if 1.0.0",
  "did",
  "drop_guard",
- "env_logger",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
  "hex",
  "ic-canister",
- "ic-canister-client",
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.20.1",
@@ -943,12 +937,7 @@ dependencies = [
  "ic-task-scheduler",
  "jsonrpc-core",
  "log",
- "num-bigint 0.4.6",
- "num-traits",
- "once_cell",
  "serde",
- "serde_json",
- "thiserror",
  "tokio",
 ]
 
@@ -956,56 +945,26 @@ dependencies = [
 name = "bridge-client"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "bridge-did",
  "bridge-utils",
  "candid",
  "did",
- "env_logger",
  "erc20-bridge",
- "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
- "hex",
- "ic-canister",
  "ic-canister-client",
- "ic-exports",
  "ic-log",
- "ic-stable-structures 0.20.1",
- "ic-storage",
- "ic-task-scheduler",
  "icrc2-bridge",
- "jsonrpc-core",
- "log",
- "num-bigint 0.4.6",
- "num-traits",
- "once_cell",
  "rune-bridge",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "vergen",
 ]
 
 [[package]]
 name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
- "alloy-sol-types",
  "anyhow",
- "async-trait",
- "bip39",
- "bitcoin 0.31.2",
- "bitcoincore-rpc",
- "bridge-canister",
- "bridge-client",
  "bridge-did",
  "bridge-utils",
- "btc-bridge",
  "candid",
- "chrono",
  "clap 4.5.16",
  "did",
  "erc20-bridge",
@@ -1013,45 +972,15 @@ dependencies = [
  "ethereum-json-rpc-client",
  "ethereum-types",
  "ethers-core",
- "evm-canister-client",
- "futures",
- "hex",
  "ic-agent",
- "ic-base-types",
- "ic-bitcoin-canister-mock",
- "ic-btc-interface 0.2.2",
- "ic-canister",
  "ic-canister-client",
- "ic-canisters-http-types",
- "ic-ckbtc-kyt",
- "ic-ckbtc-minter",
- "ic-config",
  "ic-exports",
- "ic-icrc1-ledger",
  "ic-log",
- "ic-management-canister-types",
- "ic-metrics 0.20.1",
- "ic-stable-structures 0.20.1",
- "ic-state-machine-tests",
- "ic-test-utils",
  "ic-utils 0.37.0",
- "icrc-client",
  "icrc2-bridge",
- "jsonrpc-core",
- "once_cell",
- "ord-rs",
- "ordinals",
- "rand",
- "reqwest",
  "rune-bridge",
  "serde",
- "serde_bytes",
- "serde_json",
- "serial_test",
- "sha2 0.10.8",
- "signature-verification-canister-client",
  "strum",
- "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1065,12 +994,10 @@ dependencies = [
  "did",
  "eth-signer",
  "ethers-core",
- "ic-canister-client",
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.20.1",
  "ordinals",
- "rand",
  "serde",
  "thiserror",
  "tokio",
@@ -1081,19 +1008,16 @@ name = "bridge-tool"
 version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
- "anyhow",
  "bridge-did",
  "bridge-utils",
  "candid",
  "clap 4.5.16",
  "did",
  "eth-signer",
- "ethereum-json-rpc-client",
  "ethereum-types",
  "ethers-core",
  "evm-canister-client",
  "hex",
- "ic-agent",
  "ic-canister-client",
  "rand",
  "tokio",
@@ -1109,21 +1033,16 @@ dependencies = [
  "candid",
  "did",
  "env_logger",
- "eth-signer",
  "ethereum-json-rpc-client",
  "ethers-core",
  "foundry-compilers",
  "hex",
- "ic-canister",
  "ic-canister-client",
  "ic-exports",
- "ic-log",
  "ic-stable-structures 0.20.1",
- "ic-task-scheduler",
  "jsonrpc-core",
  "log",
  "num-traits",
- "once_cell",
  "serde",
  "serde_json",
  "thiserror",
@@ -1140,18 +1059,13 @@ checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 name = "btc-bridge"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "bridge-canister",
  "bridge-did",
  "bridge-utils",
  "candid",
  "did",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
- "futures",
  "ic-canister",
- "ic-canister-client",
  "ic-ckbtc-minter",
  "ic-exports",
  "ic-log",
@@ -1159,7 +1073,6 @@ dependencies = [
  "ic-stable-structures 0.20.1",
  "ic-storage",
  "ic-task-scheduler",
- "jsonrpc-core",
  "log",
  "num-traits",
  "serde",
@@ -1276,7 +1189,7 @@ dependencies = [
  "lazy_static",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1304,9 +1217,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.13"
+version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72db2f7947ecee9b03b510377e8bb9077afa27176fdbff55c51027e976fdcc48"
+checksum = "57b6a275aa2903740dc87da01c62040406b8812552e97129a63ea8850a17c6e6"
 dependencies = [
  "shlex",
 ]
@@ -1331,10 +1244,8 @@ checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -1426,7 +1337,7 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1760,7 +1671,7 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1830,7 +1741,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim 0.11.1",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1852,7 +1763,7 @@ checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
 dependencies = [
  "darling_core 0.20.10",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1915,7 +1826,7 @@ checksum = "67e77553c4162a157adbf834ebae5b415acbecbeafc7a74b0e886657506a7611"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1928,7 +1839,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustc_version 0.4.0",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -2042,7 +1953,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -2182,7 +2093,7 @@ dependencies = [
  "num-traits",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -2224,8 +2135,6 @@ dependencies = [
 name = "erc20-bridge"
 version = "0.2.0"
 dependencies = [
- "alloy-sol-types",
- "anyhow",
  "bridge-canister",
  "bridge-did",
  "bridge-utils",
@@ -2233,20 +2142,15 @@ dependencies = [
  "did",
  "drop_guard",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
  "ic-canister",
- "ic-canister-client",
  "ic-exports",
  "ic-log",
  "ic-metrics 0.20.1",
  "ic-stable-structures 0.20.1",
  "ic-storage",
  "ic-task-scheduler",
- "jsonrpc-core",
  "log",
  "serde",
- "tokio",
  "vergen",
 ]
 
@@ -2429,9 +2333,9 @@ checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fastrand"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
+checksum = "e8c02a5121d4ea3eb16a80748c74f5549a5665e4c21333c6098f283870fbdea6"
 
 [[package]]
 name = "fastrlp"
@@ -2503,9 +2407,9 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.32"
+version = "1.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c0596c1eac1f9e04ed902702e9878208b336edc9d6fddc8a48387349bab3666"
+checksum = "324a1be68054ef05ad64b861cc9eaf1d623d2d8cb25b4bf2cb9cdd902b4bf253"
 dependencies = [
  "crc32fast",
  "miniz_oxide 0.8.0",
@@ -2713,7 +2617,7 @@ checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -3402,7 +3306,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_tokenstream 0.2.2",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -3556,7 +3460,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_tokenstream 0.2.2",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -4874,7 +4778,7 @@ dependencies = [
  "ic-interfaces-state-manager",
  "ic-replicated-state",
  "ic-types",
- "mockall 0.11.4",
+ "mockall",
 ]
 
 [[package]]
@@ -5447,7 +5351,7 @@ version = "0.20.1"
 source = "git+https://github.com/bitfinity-network/canister-sdk?tag=v0.20.x#fadfe78ff97d8ebbc926a97309bdc6ba5e961d19"
 dependencies = [
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -6039,10 +5943,7 @@ dependencies = [
  "candid",
  "did",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
  "evm-canister-client",
- "hex",
  "ic-canister",
  "ic-exports",
  "ic-log",
@@ -6051,11 +5952,8 @@ dependencies = [
  "ic-storage",
  "ic-task-scheduler",
  "icrc-client",
- "jsonrpc-core",
  "log",
- "mockall 0.12.1",
  "num-traits",
- "rand",
  "serde",
  "serde_json",
  "thiserror",
@@ -6167,17 +6065,12 @@ dependencies = [
  "did",
  "erc20-bridge",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethereum-types",
  "ethers-core",
  "evm-canister-client",
- "futures",
  "hex",
- "ic-agent",
  "ic-base-types",
  "ic-bitcoin-canister-mock",
  "ic-btc-interface 0.2.2",
- "ic-canister",
  "ic-canister-client",
  "ic-canisters-http-types",
  "ic-ckbtc-kyt",
@@ -6187,14 +6080,12 @@ dependencies = [
  "ic-icrc1-ledger",
  "ic-log",
  "ic-management-canister-types",
- "ic-metrics 0.20.1",
  "ic-stable-structures 0.20.1",
  "ic-state-machine-tests",
  "ic-test-utils",
  "ic-utils 0.37.0",
  "icrc-client",
  "icrc2-bridge",
- "jsonrpc-core",
  "once_cell",
  "ord-rs",
  "ordinals",
@@ -6205,7 +6096,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serial_test",
- "signature-verification-canister-client",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -6673,23 +6563,8 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive 0.11.4",
- "predicates 2.1.5",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
-dependencies = [
- "cfg-if 1.0.0",
- "downcast",
- "fragile",
- "lazy_static",
- "mockall_derive 0.12.1",
- "predicates 3.1.2",
+ "mockall_derive",
+ "predicates",
  "predicates-tree",
 ]
 
@@ -6703,18 +6578,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
-dependencies = [
- "cfg-if 1.0.0",
- "proc-macro2",
- "quote",
- "syn 2.0.75",
 ]
 
 [[package]]
@@ -6917,7 +6780,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7256,7 +7119,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7320,7 +7183,7 @@ dependencies = [
  "phf_shared 0.11.2",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7358,7 +7221,7 @@ checksum = "2f38a4412a78282e09a2cf38d195ea5420d15ba0602cb375210efbc877243965"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7452,16 +7315,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "predicates"
-version = "3.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e9086cc7640c29a356d1a29fd134380bee9d8f79a17410aa76e7ad295f42c97"
-dependencies = [
- "anstyle",
- "predicates-core",
-]
-
-[[package]]
 name = "predicates-core"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7500,12 +7353,12 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.20"
+version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f12335488a2f3b0a83b14edad48dca9879ce89b2edd10e80237e4e852dd645e"
+checksum = "479cf940fbbb3426c32c5d5176f62ad57549a0bb84773423ba8be9d089f5faba"
 dependencies = [
  "proc-macro2",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7674,7 +7527,7 @@ dependencies = [
  "prost",
  "prost-types",
  "regex",
- "syn 2.0.75",
+ "syn 2.0.76",
  "tempfile",
 ]
 
@@ -7688,7 +7541,7 @@ dependencies = [
  "itertools 0.12.1",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -7771,9 +7624,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.36"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
+checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
 dependencies = [
  "proc-macro2",
 ]
@@ -8127,7 +7980,6 @@ checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 name = "rune-bridge"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "bitcoin 0.31.2",
  "bridge-canister",
@@ -8136,20 +7988,14 @@ dependencies = [
  "candid",
  "did",
  "eth-signer",
- "ethereum-json-rpc-client",
- "ethers-core",
- "evm-canister-client",
- "futures",
  "hex",
  "ic-canister",
- "ic-canister-client",
  "ic-exports",
  "ic-log",
  "ic-metrics 0.20.1",
  "ic-stable-structures 0.20.1",
  "ic-storage",
  "ic-task-scheduler",
- "jsonrpc-core",
  "log",
  "ord-rs",
  "ordinals",
@@ -8394,7 +8240,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_derive_internals",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8543,9 +8389,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.208"
+version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
+checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
 dependencies = [
  "serde_derive",
 ]
@@ -8571,13 +8417,13 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.208"
+version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24008e81ff7613ed8e5ba0cfaf24e2c2f1e5b8a0495711e44fcd4882fca62bcf"
+checksum = "a5831b979fd7b5439637af1752d535ff49f4860c0f341d1baeb6faf0f4242170"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8588,14 +8434,14 @@ checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.125"
+version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83c8e735a073ccf5be70aa8066aa984eaf2fa000db6c8d0100ae605b366d31ed"
+checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
 dependencies = [
  "itoa",
  "memchr",
@@ -8611,7 +8457,7 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8634,7 +8480,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8698,7 +8544,7 @@ dependencies = [
  "darling 0.20.10",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8723,7 +8569,7 @@ checksum = "82fe9db325bcef1fbcde82e078a5cc4efdf787e96b3b9cf45b50b529f2083d67"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -8802,16 +8648,6 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core",
-]
-
-[[package]]
-name = "signature-verification-canister-client"
-version = "0.30.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.30.x#afbade3d7e3b2033c54ca20f33619d987a92c51c"
-dependencies = [
- "candid",
- "did",
- "ic-canister-client",
 ]
 
 [[package]]
@@ -9047,7 +8883,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9118,9 +8954,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.75"
+version = "2.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6af063034fc1935ede7be0122941bafa9bacb949334d090b77ca98b5817c7d9"
+checksum = "578e081a14e0cefc3279b0472138c513f37b41a08d5a3cca9b6e4e8ceb6cd525"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9136,7 +8972,7 @@ dependencies = [
  "paste",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9281,7 +9117,7 @@ checksum = "a4558b58466b9ad7ca0f102865eccc95938dca1a74a856f2b57b6629050da261"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9402,7 +9238,7 @@ checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9548,7 +9384,7 @@ dependencies = [
  "proc-macro2",
  "prost-build",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9616,7 +9452,7 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -9924,7 +9760,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
  "wasm-bindgen-shared",
 ]
 
@@ -9958,7 +9794,7 @@ checksum = "afc340c74d9005395cf9dd098506f7f44e38f2b4a21c6aaacf9a105ea5e1e836"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -9990,9 +9826,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.215.0"
+version = "0.216.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb56df3e06b8e6b77e37d2969a50ba51281029a9aeb3855e76b7f49b6418847"
+checksum = "04c23aebea22c8a75833ae08ed31ccc020835b12a41999e58c31464271b94a88"
 dependencies = [
  "leb128",
 ]
@@ -10199,7 +10035,7 @@ checksum = "ffaafa5c12355b1a9ee068e9295d50c4ca0a400c721950cdae4f5b54391a2da5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -10210,22 +10046,22 @@ checksum = "c9a8c62e9df8322b2166d2a6f096fbec195ddb093748fd74170dcf25ef596769"
 
 [[package]]
 name = "wast"
-version = "215.0.0"
+version = "216.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff1d00d893593249e60720be04a7c1f42f1c4dc3806a2869f4e66ab61eb54cb"
+checksum = "f7eb1f2eecd913fdde0dc6c3439d0f24530a98ac6db6cb3d14d92a5328554a08"
 dependencies = [
  "bumpalo",
  "leb128",
  "memchr",
  "unicode-width",
- "wasm-encoder 0.215.0",
+ "wasm-encoder 0.216.0",
 ]
 
 [[package]]
 name = "wat"
-version = "1.215.0"
+version = "1.216.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670bf4d9c8cf76ae242d70ded47c546525b6dafaa6871f9bcb065344bf2b4e3d"
+checksum = "ac0409090fb5154f95fb5ba3235675fd9e579e731524d63b6a2f653e1280c82a"
 dependencies = [
  "wast",
 ]
@@ -10623,7 +10459,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -10643,7 +10479,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.75",
+ "syn 2.0.76",
 ]
 
 [[package]]

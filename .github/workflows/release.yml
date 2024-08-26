@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   release:
-    name: 'Release'
+    name: "Release"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -23,12 +23,12 @@ jobs:
           beginswith() { case $1 in "$2"*) true;; *) false;; esac; }
 
           TOML="${{ steps.toml.outputs.path }}"
-          
+
           V_TOML=$(awk -F= '{gsub(/[ \t]+/, "", $1); gsub(/[ \t"]+/, "", $2); if($1 == "version"){print $2}}' $TOML)
           V_GIT=$(git describe --tag)
 
           # Assuming that we tag each version in git
-          # If toml version was not changed manually 
+          # If toml version was not changed manually
           # expecting git tag like "v1.1.1-ab8d" and toml version like "1.1.1"
 
           echo "Tag for this commit: $V_GIT"

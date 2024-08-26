@@ -1,8 +1,8 @@
 [package]
-categories = ["cryptography::cryptocurrencies"]
-description = "API types definition for bridge canisters"
-include = ["src/**/*", "../../LICENSE", "../../README.md"]
 name = "bridge-did"
+categories = ["cryptography::cryptocurrencies"]
+include = ["src/**/*", "../../LICENSE", "../../README.md"]
+description = "API types definition for bridge canisters"
 
 version.workspace = true
 edition.workspace = true
@@ -18,7 +18,6 @@ candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
 ethers-core = { workspace = true }
-ic-canister-client = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
@@ -27,5 +26,4 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-rand = { workspace = true }
 tokio = { workspace = true }

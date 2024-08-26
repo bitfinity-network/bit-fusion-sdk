@@ -8,31 +8,22 @@ default = []
 export-api = []
 
 [dependencies]
-anyhow = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
-bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-canister = { path = "../bridge-canister" }
+bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
-ethers-core = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = [
-    "ic-canister-client",
-] }
-evm-canister-client = { workspace = true }
-futures = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
-ic-canister-client = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true, features = ["canister"] }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
-jsonrpc-core = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
