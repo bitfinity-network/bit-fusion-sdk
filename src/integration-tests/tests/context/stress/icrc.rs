@@ -4,7 +4,7 @@ use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{evm_link, BFTBridge};
-use candid::{Encode, Principal};
+use candid::{Encode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -13,9 +13,12 @@ use icrc_client::account::Account;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
-use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
-use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
+use crate::context::{
+    icrc_canister_default_init_args, CanisterType, TestContext, ICRC1_TRANSFER_FEE,
+};
 use crate::utils::error::Result;
+
+use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -26,11 +29,14 @@ pub struct IcrcBaseTokens<Ctx> {
 
 impl<Ctx: TestContext> IcrcBaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
+        println!("Creating icrc token canisters");
         let mut tokens = Vec::with_capacity(base_tokens_number);
         for token_idx in 0..base_tokens_number {
             let icrc_principal = Self::init_icrc_token_canister(&ctx, token_idx).await?;
             tokens.push(icrc_principal);
         }
+
+        println!("Icrc token canisters created");
 
         Ok(Self { ctx, tokens })
     }
@@ -89,16 +95,33 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
             .ctx
             .icrc_token_client(token_principal, self.ctx.admin_name());
         let to_principal = self.ctx.principal_by_caller_name(to);
+        let amount: Nat = (&amount).into();
         let transfer_args = TransferArg {
             from_subaccount: None,
             to: to_principal.into(),
             fee: None,
             created_at_time: None,
             memo: None,
-            amount: (&amount).into(),
+            amount: amount.clone(),
         };
         client.icrc1_transfer(transfer_args).await??;
+
+        let balance = client.icrc1_balance_of(to_principal.into()).await.unwrap();
+        assert_eq!(amount, balance);
+
         Ok(())
+    }
+
+    async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<U256> {
+        let token_principal = self.tokens[token_idx];
+        let client = self
+            .ctx
+            .icrc_token_client(token_principal, self.ctx.admin_name());
+
+        let user_principal = self.ctx.principal_by_caller_name(user);
+
+        let balance = client.icrc1_balance_of(user_principal.into()).await?;
+        Ok((&balance).try_into().expect("balance is too big"))
     }
 
     async fn deposit(
@@ -116,10 +139,12 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
             subaccount,
         };
 
+        let fee = U256::from(ICRC1_TRANSFER_FEE);
+        let approve_amount = &info.amount + &fee;
         let approve_args = ApproveArgs {
             from_subaccount: None,
             spender: minter_canister,
-            amount: (&info.amount).into(),
+            amount: (&approve_amount).into(),
             expected_allowance: None,
             expires_at: None,
             fee: None,
@@ -149,13 +174,20 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         }
         .abi_encode();
 
-        let _receipt = self
-            .ctx
-            .call_contract(to_wallet, &info.bridge, input, 0)
-            .await
-            .map(|(_, receipt)| receipt)?;
+        self.ctx
+            .call_contract_without_waiting(to_wallet, &info.bridge, input, 0)
+            .await?;
 
         Ok(info.amount.clone())
+    }
+
+    async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()> {
+        self.ctx
+            .icrc_bridge_client(self.ctx.admin_name())
+            .set_bft_bridge_contract(bft_bridge)
+            .await?;
+
+        Ok(())
     }
 }
 

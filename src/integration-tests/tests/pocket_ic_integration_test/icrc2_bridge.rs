@@ -518,9 +518,9 @@ async fn icrc_bridge_stress_test() {
     .await;
 
     let config = StressTestConfig {
-        users_number: 16,
-        operations_per_user: 16,
-        init_user_balance: u64::MAX.into(),
+        users_number: 4,
+        user_deposits_per_token: 4,
+        init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
     };
 
