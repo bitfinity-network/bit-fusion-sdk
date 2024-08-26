@@ -1,7 +1,9 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use clap::{ArgAction, Parser};
+use ethereum_types::H256;
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, trace, Level};
 use tracing_subscriber::filter::Directive;
@@ -9,6 +11,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::canister_manager::CanisterManager;
 use crate::commands::Commands;
+use crate::contracts::EvmNetwork;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -56,6 +59,14 @@ pub struct Cli {
     )]
     ic_host: String,
 
+    /// Deploy BFT contract
+    #[arg(long, value_name = "DEPLOY_BFT")]
+    deploy_bft: bool,
+
+    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    #[arg(long, value_name = "EVM_NETWORK")]
+    evm_network: EvmNetwork,
+
     /// Path to the canister manager state file
     #[arg(long, value_name = "STATE_FILE", default_value = "canister_state.json")]
     state_file: PathBuf,
@@ -63,10 +74,11 @@ pub struct Cli {
 
 impl Cli {
     /// Runs the Bitfinity Deployer application.
-    ///
     pub async fn run() -> anyhow::Result<()> {
         let cli = Cli::parse();
         let identity = &cli.identity;
+        let deploy_bft = cli.deploy_bft;
+        let pk = H256::from_str(&cli.private_key).expect("Invalid private key");
 
         cli.init_tracing();
 
@@ -81,7 +93,14 @@ impl Cli {
 
         trace!("Executing command: {:?}", cli.command);
         cli.command
-            .run(identity.to_path_buf(), &cli.ic_host, &mut canister_manager)
+            .run(
+                identity.to_path_buf(),
+                &cli.ic_host,
+                &mut canister_manager,
+                deploy_bft,
+                cli.evm_network,
+                pk,
+            )
             .await?;
 
         Ok(())

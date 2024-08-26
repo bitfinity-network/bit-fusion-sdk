@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::Subcommand;
 use deploy::DeployCommands;
+use ethereum_types::H256;
 use reinstall::ReinstallCommands;
 use serde::{Deserialize, Serialize};
 use upgrade::UpgradeCommands;
 
 use crate::canister_manager::CanisterManager;
 use crate::config;
+use crate::contracts::EvmNetwork;
 
 mod deploy;
 mod reinstall;
@@ -71,11 +73,14 @@ impl Commands {
         identity: PathBuf,
         ic_host: &str,
         canister_manager: &mut CanisterManager,
+        deploy_bft: bool,
+        network: EvmNetwork,
+        pk: H256,
     ) -> anyhow::Result<()> {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, canister_manager)
+                    .deploy_canister(identity, ic_host, canister_manager, deploy_bft, network, pk)
                     .await?
             }
             Commands::Reinstall(reinstall) => {

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use candid::{CandidType, Encode, Principal};
 use clap::Parser;
+use ethereum_types::H256;
 use ic_agent::Identity;
 use ic_canister_client::agent::identity::GenericIdentity;
 
@@ -10,6 +11,7 @@ use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
 
 use crate::canister_manager::{compute_wasm_hash, CanisterManager, DeploymentMode};
+use crate::contracts::{ContractDeployer, EvmNetwork};
 
 use super::Bridge;
 
@@ -38,6 +40,9 @@ impl DeployCommands {
         identity: PathBuf,
         url: &str,
         canister_manager: &mut CanisterManager,
+        deploy_bft: bool,
+        network: EvmNetwork,
+        pk: H256,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let canister_wasm = std::fs::read(&self.wasm)?;
@@ -105,6 +110,13 @@ impl DeployCommands {
             DeploymentMode::Install,
             self.bridge_type.clone(),
         );
+
+        if deploy_bft {
+            let contract_deployer = ContractDeployer::new(network, pk);
+
+            let bft_address = contract_deployer
+                .de
+        }
 
         Ok(())
     }
