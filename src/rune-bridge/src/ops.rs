@@ -19,7 +19,7 @@ use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
 use crate::rune_info::{RuneInfo, RuneName};
 
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
 pub enum RuneBridgeOp {
     // Deposit
     AwaitInputs {
@@ -68,7 +68,7 @@ pub enum RuneBridgeOp {
     },
 }
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuneToWrap {
     rune_info: RuneInfo,
     amount: u128,
@@ -225,19 +225,31 @@ impl Operation for RuneBridgeOp {
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_minter_notification {event:?}");
-        if let Some(notification) = RuneMinterNotification::decode(event.clone()) {
-            match notification {
-                RuneMinterNotification::Deposit(payload) => {
-                    Some(OperationAction::Create(Self::AwaitInputs {
-                        dst_address: payload.dst_address,
-                        dst_tokens: payload.dst_tokens,
-                        requested_amounts: payload.amounts,
-                    }))
+
+        match event.notification_type {
+            MinterNotificationType::DepositRequest => {
+                match Decode!(&event.user_data, RuneDepositRequestData) {
+                    Ok(data) => Some(OperationAction::Create(Self::AwaitInputs {
+                        dst_address: data.dst_address,
+                        dst_tokens: data.dst_tokens,
+                        requested_amounts: data.amounts,
+                    })),
+                    _ => {
+                        log::warn!(
+                            "Invalid encoded deposit request: {}",
+                            hex::encode(&event.user_data)
+                        );
+                        None
+                    }
                 }
             }
-        } else {
-            log::warn!("Invalid minter notification: {event:?}");
-            None
+            _ => {
+                log::warn!(
+                    "Unsupported minter notification type: {:?}",
+                    event.notification_type
+                );
+                None
+            }
         }
     }
 }
@@ -461,10 +473,6 @@ impl RuneBridgeOp {
     }
 }
 
-pub enum RuneMinterNotification {
-    Deposit(RuneDepositRequestData),
-}
-
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct RuneDepositRequestData {
     pub dst_address: H160,
@@ -472,22 +480,158 @@ pub struct RuneDepositRequestData {
     pub amounts: Option<HashMap<RuneName, u128>>,
 }
 
-impl RuneMinterNotification {
-    fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
-        match event_data.notification_type {
-            MinterNotificationType::DepositRequest => {
-                match Decode!(&event_data.user_data, RuneDepositRequestData) {
-                    Ok(payload) => Some(Self::Deposit(payload)),
-                    Err(err) => {
-                        log::warn!("Failed to decode deposit request event data: {err:?}");
-                        None
-                    }
-                }
-            }
-            t => {
-                log::warn!("Unknown minter notify event type: {t}");
-                None
-            }
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::str::FromStr;
+
+    use bridge_canister::memory::{memory_by_id, StableMemory};
+    use bridge_canister::operation_store::OperationsMemory;
+    use bridge_canister::runtime::state::config::ConfigStorage;
+    use bridge_canister::runtime::state::{SharedConfig, State};
+    use candid::Encode;
+    use ic_stable_structures::MemoryId;
+
+    use super::*;
+
+    fn op_memory() -> OperationsMemory<StableMemory> {
+        OperationsMemory {
+            id_counter: memory_by_id(MemoryId::new(1)),
+            incomplete_operations: memory_by_id(MemoryId::new(2)),
+            operations_log: memory_by_id(MemoryId::new(3)),
+            operations_map: memory_by_id(MemoryId::new(4)),
         }
+    }
+
+    fn config() -> SharedConfig {
+        Rc::new(RefCell::new(ConfigStorage::default(memory_by_id(
+            MemoryId::new(5),
+        ))))
+    }
+
+    fn test_state() -> RuntimeState<RuneBridgeOp> {
+        Rc::new(RefCell::new(State::default(op_memory(), config())))
+    }
+
+    fn sender() -> H160 {
+        H160::from_slice(&[1; 20])
+    }
+
+    fn rune_name() -> RuneName {
+        RuneName::from_str("AAA").unwrap()
+    }
+
+    fn rune_address() -> H160 {
+        H160::from_slice(&[2; 20])
+    }
+
+    fn dst_tokens() -> HashMap<RuneName, H160> {
+        [(rune_name(), rune_address())].into()
+    }
+
+    #[tokio::test]
+    async fn invalid_notification_type_is_noop() {
+        let notification = RuneDepositRequestData {
+            dst_address: sender(),
+            dst_tokens: dst_tokens(),
+            amounts: None,
+        };
+
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::RescheduleOperation,
+            tx_sender: sender(),
+            user_data: Encode!(&notification).unwrap(),
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert!(result.is_none());
+
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::Other,
+            ..event
+        };
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn invalid_notification_payload_is_noop() {
+        let notification = RuneDepositRequestData {
+            dst_address: sender(),
+            dst_tokens: dst_tokens(),
+            amounts: None,
+        };
+        let mut data = Encode!(&notification).unwrap();
+        data.push(0);
+
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: sender(),
+            user_data: data,
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert!(result.is_none());
+
+        let event = NotifyMinterEventData {
+            user_data: vec![],
+            ..event
+        };
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn deposit_request_creates_correct_operation() {
+        let notification = RuneDepositRequestData {
+            dst_address: sender(),
+            dst_tokens: dst_tokens(),
+            amounts: None,
+        };
+        let data = Encode!(&notification).unwrap();
+
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: sender(),
+            user_data: data,
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert_eq!(
+            result,
+            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
+                dst_address: sender(),
+                dst_tokens: dst_tokens(),
+                requested_amounts: None,
+            }))
+        )
+    }
+
+    #[tokio::test]
+    async fn deposit_request_adds_amounts_to_operation() {
+        let amounts: HashMap<RuneName, u128> = [(rune_name(), 1000)].into();
+        let notification = RuneDepositRequestData {
+            dst_address: sender(),
+            dst_tokens: dst_tokens(),
+            amounts: Some(amounts.clone()),
+        };
+        let data = Encode!(&notification).unwrap();
+
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: sender(),
+            user_data: data,
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        assert_eq!(
+            result,
+            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
+                dst_address: sender(),
+                dst_tokens: dst_tokens(),
+                requested_amounts: Some(amounts),
+            }))
+        )
     }
 }

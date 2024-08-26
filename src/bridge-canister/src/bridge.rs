@@ -131,6 +131,7 @@ pub trait OperationContext {
 }
 
 /// Action to create or update an operation.
+#[derive(Debug, PartialEq, Eq)]
 pub enum OperationAction<Op> {
     Create(Op),
     CreateWithId(OperationId, Op),

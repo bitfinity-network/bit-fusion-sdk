@@ -10,7 +10,7 @@ export-api = []
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-bitcoin = { workspace = true }
+bitcoin = { workspace = true, features = ["rand-std"] }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-canister = { path = "../bridge-canister" }
 bridge-utils = { path = "../bridge-utils" }

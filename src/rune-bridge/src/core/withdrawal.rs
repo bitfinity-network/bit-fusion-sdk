@@ -26,7 +26,7 @@ use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
 use crate::rune_info::RuneInfo;
 use crate::state::RuneState;
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuneWithdrawalPayload {
     pub rune_info: RuneInfo,
     pub amount: u128,
@@ -90,7 +90,7 @@ impl RuneWithdrawalPayload {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidTransaction(Transaction);
 
 impl CandidType for DidTransaction {
