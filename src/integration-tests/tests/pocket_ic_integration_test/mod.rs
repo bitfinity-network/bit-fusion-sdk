@@ -3,6 +3,7 @@ pub mod icrc2_bridge;
 mod token;
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_sol_types::sol;
@@ -16,7 +17,7 @@ use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
-use ic_exports::pocket_ic::nio::PocketIcAsync;
+use ic_exports::pocket_ic::PocketIc;
 
 use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
@@ -33,14 +34,16 @@ sol! {
     "../../solidity/out/TestWTM.sol/WatermelonToken.json"
 }
 
+#[derive(Clone)]
 pub struct PocketIcTestContext {
-    pub client: PocketIcAsync,
+    pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
 }
 
 impl PocketIcTestContext {
     pub async fn new(canisters_set: &[CanisterType]) -> Self {
-        let client = PocketIcAsync::init().await;
+        let pocket_ic = ic_exports::pocket_ic::init_pocket_ic().await;
+        let client = Arc::new(pocket_ic);
         let mut ctx = PocketIcTestContext {
             client,
             canisters: TestCanisters::default(),
@@ -107,15 +110,18 @@ impl TestContext for PocketIcTestContext {
     }
 
     async fn create_canister(&self) -> Result<Principal> {
-        let principal = self.client.create_canister(Some(self.admin())).await;
+        let principal = self
+            .client
+            .create_canister_with_settings(Some(self.admin()), None)
+            .await;
         self.client.add_cycles(principal, u128::MAX).await;
         Ok(principal)
     }
 
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
-        let sync_client = ic_exports::pocket_ic::PocketIc::new();
-        sync_client
+        self.client
             .create_canister_with_id(Some(self.admin()), None, id)
+            .await
             .expect("failed to create canister");
         self.client.add_cycles(id, u128::MAX).await;
         Ok(id)

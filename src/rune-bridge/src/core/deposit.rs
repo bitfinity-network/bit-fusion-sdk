@@ -18,7 +18,8 @@ use crate::canister::get_rune_state;
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::BtcSignerType;
+use crate::key::{get_derivation_path_ic, BtcSignerType};
+use crate::ledger::UnspentUtxoInfo;
 use crate::ops::RuneBridgeOp;
 use crate::rune_info::{RuneInfo, RuneName};
 use crate::state::RuneState;
@@ -371,35 +372,43 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     }
 
     fn filter_out_used_utxos(&self, get_utxos_response: &mut GetUtxosResponse) {
-        let (_, existing) = self.rune_state.borrow().ledger().load_unspent_utxos();
+        let existing = self.rune_state.borrow().ledger().load_unspent_utxos();
 
         get_utxos_response.utxos.retain(|utxo| {
-            !existing.iter().any(|v| {
-                v.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-                    && v.outpoint.vout == utxo.outpoint.vout
-            })
+            !existing
+                .values()
+                .any(|v| Self::check_already_used_utxo(v, utxo))
         })
     }
 
-    pub async fn mark_used_utxo(
+    /// Deposit UTXO to the ledger.
+    pub async fn deposit(
         &self,
         utxo: &Utxo,
         dst_address: &H160,
+        rune_info: Vec<RuneInfo>,
     ) -> Result<(), DepositError> {
         let address = self.get_transit_address(dst_address).await;
+        let derivation_path = get_derivation_path_ic(dst_address);
         let mut state = self.rune_state.borrow_mut();
         let ledger = state.ledger_mut();
-        let (_, existing) = ledger.load_unspent_utxos();
+        let existing = ledger.load_unspent_utxos();
 
-        if existing.iter().any(|v| {
-            v.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-                && v.outpoint.vout == utxo.outpoint.vout
-        }) {
+        if existing
+            .values()
+            .any(|v| Self::check_already_used_utxo(v, utxo))
+        {
             return Err(DepositError::UtxoAlreadyUsed);
         }
 
-        ledger.mark_as_used((&utxo.outpoint).into(), address.clone());
+        ledger.deposit(utxo.clone(), &address, derivation_path, rune_info);
+
         Ok(())
+    }
+
+    fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
+        v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
+            && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
     }
 
     pub async fn get_mint_amounts(
