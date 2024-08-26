@@ -1,3 +1,6 @@
+use std::process::Command;
+use std::str::FromStr;
+
 use anyhow::{Context, Result};
 use clap::ValueEnum;
 use eth_signer::{Signer, Wallet};
@@ -6,8 +9,6 @@ use ethereum_json_rpc_client::EthJsonRpcClient;
 use ethereum_types::H256;
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, H160};
-use std::process::Command;
-use std::str::FromStr;
 use tracing::{error, info};
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]

@@ -284,8 +284,8 @@ pub trait TestContext {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
             isWrappedSide: is_wrapped,
-              owner: [0; 20].into(),
-        controllers: vec![],
+            owner: [0; 20].into(),
+            controllers: vec![],
         }
         .abi_encode();
 

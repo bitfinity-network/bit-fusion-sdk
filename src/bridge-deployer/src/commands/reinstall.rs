@@ -1,8 +1,5 @@
 use std::path::PathBuf;
 
-use crate::contracts::EvmNetwork;
-
-use super::{BFTArgs, Bridge};
 use candid::Principal;
 use clap::Parser;
 use ethereum_types::H256;
@@ -11,6 +8,9 @@ use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
 use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
+
+use super::{BFTArgs, Bridge};
+use crate::contracts::EvmNetwork;
 
 #[derive(Debug, Parser)]
 pub struct ReinstallCommands {

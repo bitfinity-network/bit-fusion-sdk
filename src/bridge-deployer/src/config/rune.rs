@@ -1,10 +1,10 @@
+use std::time::Duration;
+
 use candid::Principal;
 use clap::{Parser, ValueEnum};
-
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use icrc2_bridge::SigningStrategy;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 use super::{LogCanisterSettings, SigningKeyId};
 
