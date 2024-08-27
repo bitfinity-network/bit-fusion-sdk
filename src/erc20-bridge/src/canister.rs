@@ -96,10 +96,25 @@ impl Erc20Bridge {
             .get_for_address(&wallet_address, pagination)
     }
 
+    /// Returns operation by memo and user.
     #[query]
-    /// Returns operation by memo
-    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, Erc20BridgeOp)> {
-        get_runtime_state().borrow().operations.get_by_memo(&memo)
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, Erc20BridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, Erc20BridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
     }
 
     /// Returns log of an operation by its ID.

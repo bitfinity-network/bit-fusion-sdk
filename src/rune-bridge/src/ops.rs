@@ -211,7 +211,7 @@ impl Operation for RuneBridgeOp {
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
-             let memo = event.memo();
+        let memo = event.memo();
         match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
             Ok(payload) => Some(OperationAction::Create(
                 Self::CreateTransaction { payload },

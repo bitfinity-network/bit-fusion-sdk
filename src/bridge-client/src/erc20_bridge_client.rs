@@ -1,5 +1,5 @@
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use did::H160;
 use erc20_bridge::ops::Erc20BridgeOp;
@@ -35,11 +35,21 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
             .await
     }
 
-    pub async fn get_operation_by_memo(
+    pub async fn get_operation_by_memo_and_user(
         &self,
-        memo: bridge_did::operation_log::Memo,
+        memo: Memo,
+        user_id: &H160,
     ) -> CanisterClientResult<Option<(OperationId, Erc20BridgeOp)>> {
-        self.client.query("get_operation_by_memo", (memo,)).await
+        self.client
+            .query("get_operation_by_memo_and_user", (memo, user_id))
+            .await
+    }
+
+    pub async fn get_operations_by_memo(
+        &self,
+        memo: Memo,
+    ) -> CanisterClientResult<Vec<(OperationId, Erc20BridgeOp)>> {
+        self.client.query("get_operations_by_memo", (memo,)).await
     }
 
     pub async fn set_base_bft_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {

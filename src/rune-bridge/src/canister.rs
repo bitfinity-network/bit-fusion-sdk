@@ -80,10 +80,26 @@ impl RuneBridge {
             .get_for_address(&wallet_address, pagination)
     }
 
-    #[query]
     /// Returns operation by memo
-    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, RuneBridgeOp)> {
-        get_runtime_state().borrow().operations.get_by_memo(&memo)
+    #[query]
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, RuneBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, RuneBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
     }
 
     /// Returns log of an operation by its ID.

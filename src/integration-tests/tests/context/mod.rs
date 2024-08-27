@@ -680,6 +680,7 @@ pub trait TestContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::RescheduleOperation as u32,
             userData: encoded_op_id.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 

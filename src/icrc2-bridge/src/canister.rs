@@ -80,8 +80,15 @@ impl Icrc2BridgeCanister {
 
     #[query]
     /// Returns operation by memo
-    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, IcrcBridgeOp)> {
-        get_runtime_state().borrow().operations.get_by_memo(&memo)
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, IcrcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
     }
 
     /// Returns log of an operation by its ID.

@@ -90,8 +90,23 @@ impl BtcBridge {
 
     /// Returns operation by memo
     #[query]
-    pub fn get_operation_by_memo(&self, memo: Memo) -> Option<(OperationId, BtcBridgeOp)> {
-        get_runtime_state().borrow().operations.get_by_memo(&memo)
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, BtcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, BtcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
     }
 
     #[update]

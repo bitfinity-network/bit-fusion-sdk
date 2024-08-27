@@ -10,8 +10,8 @@ use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
-    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, StableBTreeMap, StableCell,
-    Storable,
+    BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, MultimapStructure,
+    StableBTreeMap, StableCell, StableMultimap, Storable,
 };
 
 use crate::bridge::Operation;
@@ -75,7 +75,7 @@ where
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationLog<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationLog<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
-    memo_operation_map: StableBTreeMap<Memo, OperationId, M>,
+    memo_operation_map: StableMultimap<Memo, H160, OperationId, M>,
     max_operation_log_size: u64,
 }
 
@@ -99,7 +99,7 @@ where
             ),
             operations_log: StableBTreeMap::new(memory.operations_log),
             address_operation_map: StableBTreeMap::new(memory.operations_map),
-            memo_operation_map: StableBTreeMap::new(memory.memo_operations_map),
+            memo_operation_map: StableMultimap::new(memory.memo_operations_map),
             max_operation_log_size: options.max_operations_count,
         }
     }
@@ -148,10 +148,11 @@ where
             .get(&wallet_address)
             .unwrap_or_default();
         ids.0.push(id);
-        self.address_operation_map.insert(wallet_address, ids);
+        self.address_operation_map
+            .insert(wallet_address.0.into(), ids);
 
         if let Some(memo) = memo {
-            self.memo_operation_map.insert(memo, id);
+            self.memo_operation_map.insert(&memo, &wallet_address, id);
         }
 
         id
@@ -214,11 +215,24 @@ where
     }
 
     /// Retrieve operations for the given memo.
-    pub fn get_by_memo(&self, memo: &Memo) -> Option<(OperationId, P)> {
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: &Memo,
+        user: &H160,
+    ) -> Option<(OperationId, P)> {
         self.memo_operation_map
-            .get(memo)
+            .get(memo, user)
             .and_then(|id| self.get_with_id(id))
             .or(None)
+    }
+
+    /// Retrieve operations for the given memo.
+    pub fn get_operations_by_memo(&self, memo: &Memo) -> Vec<(OperationId, P)> {
+        self.memo_operation_map
+            .into_iter()
+            .filter_map(|(m, _, id)| (m == *memo).then_some(id))
+            .filter_map(|id| self.get_with_id(id))
+            .collect()
     }
 
     /// Update the payload of the operation with the given id. If no operation with the given ID
@@ -285,17 +299,17 @@ where
             }
 
             if let Some(memo) = oldest.memo() {
-                self.memo_operation_map.remove(memo);
+                self.memo_operation_map.remove_partial(memo);
             }
 
             let memos_to_remove: Vec<_> = self
                 .memo_operation_map
                 .iter()
-                .filter_map(|(memo, op_id)| (op_id == id).then_some(memo))
+                .filter_map(|(memo, _, op_id)| (op_id == id).then_some(memo))
                 .collect();
 
             for memo in memos_to_remove {
-                self.memo_operation_map.remove(&memo);
+                self.memo_operation_map.remove_partial(&memo);
             }
 
             log::trace!("Operation {id} and its associated memos removed from the store.");
@@ -526,7 +540,14 @@ mod tests {
         }
 
         for i in 0..COUNT {
-            assert_eq!(store.get_by_memo(&[i as u8; 32]).unwrap().1.addr, i as u32);
+            assert_eq!(
+                store
+                    .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                    .unwrap()
+                    .1
+                    .addr,
+                i as u32
+            );
         }
     }
 
@@ -543,13 +564,18 @@ mod tests {
 
         // Ensure that the memo map is populated correctly
         for i in 0..COUNT {
-            assert!(store.get_by_memo(&[i as u8; 32]).is_some());
+            assert!(store
+                .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                .is_some());
         }
 
         // Let us mark all of them complete
         for i in 0..COUNT {
             store.update(
-                store.get_by_memo(&[i as u8; 32]).unwrap().0,
+                store
+                    .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                    .unwrap()
+                    .0,
                 TestOp::complete(i as _),
             );
         }
@@ -558,14 +584,19 @@ mod tests {
             store.new_operation(TestOp::new(i as _, 1), Some([i as u8; 32]));
 
             store.update(
-                store.get_by_memo(&[i as u8; 32]).unwrap().0,
+                store
+                    .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                    .unwrap()
+                    .0,
                 TestOp::complete(i as _),
             );
         }
 
         // Try to get the old ones
         for i in 0..COUNT {
-            assert!(store.get_by_memo(&[i as u8; 32]).is_none());
+            assert!(store
+                .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                .is_none());
         }
     }
 }

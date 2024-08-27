@@ -268,16 +268,24 @@ async fn test_external_bridging() {
     // 1. Minted event collection
     // 2. Mint order removal
     ctx.context
-        .advance_by_times(Duration::from_secs(2), 20)
+        .advance_by_times(Duration::from_secs(2), 30)
         .await;
 
-    // Let us try fetching the operation by memo
     let (operation_id, _) = erc20_bridge_client
-        .get_operation_by_memo(memo)
+        .get_operation_by_memo_and_user(memo, &alice_address)
         .await
         .unwrap()
         .unwrap();
+
     assert_eq!(operation_id.as_u64(), expected_operation_id as u64);
+
+    // Let us try fetching the operation by memo
+    let operations = erc20_bridge_client
+        .get_operations_by_memo(memo)
+        .await
+        .unwrap();
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].0.as_u64(), expected_operation_id as u64);
 
     let balance = ctx
         .context
