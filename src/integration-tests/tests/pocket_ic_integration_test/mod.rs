@@ -34,6 +34,7 @@ sol! {
     "../../solidity/out/TestWTM.sol/WatermelonToken.json"
 }
 
+#[derive(Clone)]
 pub struct PocketIcTestContext {
     pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
