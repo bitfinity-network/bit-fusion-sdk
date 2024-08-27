@@ -15,10 +15,9 @@ use icrc_client::allowance::AllowanceArgs;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
+use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::utils::error::{Result, TestError};
-
-use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
