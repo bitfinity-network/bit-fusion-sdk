@@ -5,18 +5,18 @@ use bridge_client::BridgeCanisterClient;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{evm_link, BFTBridge};
 use candid::{Encode, Nat, Principal};
+use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_exports::icrc_types::icrc1_ledger::LedgerArgument;
 use icrc_client::account::Account;
+use icrc_client::allowance::AllowanceArgs;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
-use crate::context::{
-    icrc_canister_default_init_args, CanisterType, TestContext, ICRC1_TRANSFER_FEE,
-};
-use crate::utils::error::Result;
+use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
+use crate::utils::error::{Result, TestError};
 
 use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 
@@ -139,22 +139,30 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
             subaccount,
         };
 
-        let fee = U256::from(ICRC1_TRANSFER_FEE);
-        let approve_amount = &info.amount + &fee;
-        let approve_args = ApproveArgs {
-            from_subaccount: None,
-            spender: minter_canister,
-            amount: (&approve_amount).into(),
-            expected_allowance: None,
-            expires_at: None,
-            fee: None,
-            memo: None,
-            created_at_time: None,
-        };
-
-        client.icrc2_approve(approve_args).await?.unwrap();
-
         let sender = self.ctx.principal_by_caller_name(&info.from);
+        let args = AllowanceArgs {
+            account: sender.into(),
+            spender: minter_canister,
+        };
+        let allowance = match client.icrc2_allowance(args).await {
+            Ok(a) => a,
+            Err(e) => return Err(TestError::from(e)),
+        };
+        if allowance.allowance == 0u64 {
+            let approve_args = ApproveArgs {
+                from_subaccount: None,
+                spender: minter_canister,
+                amount: u64::MAX.into(),
+                expected_allowance: None,
+                expires_at: None,
+                fee: None,
+                memo: None,
+                created_at_time: None,
+            };
+
+            client.icrc2_approve(approve_args).await?.unwrap();
+        }
+
         let reason = Icrc2Burn {
             sender,
             amount: info.amount.clone(),
@@ -174,9 +182,26 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         }
         .abi_encode();
 
-        self.ctx
-            .call_contract_without_waiting(to_wallet, &info.bridge, input, 0)
-            .await?;
+        loop {
+            let call_result = self
+                .ctx
+                .call_contract_without_waiting(to_wallet, &info.bridge, input.clone(), 0)
+                .await;
+
+            // Retry on invalid nonce or alerady exits.
+            match call_result {
+                Err(TestError::Evm(EvmError::TransactionPool(
+                    TransactionPoolError::InvalidNonce { .. },
+                )))
+                | Err(TestError::Evm(EvmError::TransactionPool(
+                    TransactionPoolError::TransactionAlreadyExists,
+                ))) => continue,
+                _ => (),
+            }
+
+            call_result?;
+            break;
+        }
 
         Ok(info.amount.clone())
     }

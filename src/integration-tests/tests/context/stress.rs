@@ -197,7 +197,7 @@ impl<B: BaseTokens> StressTestState<B> {
             for _ in 0..1000 {
                 self.base_tokens
                     .ctx()
-                    .advance_time(Duration::from_millis(100))
+                    .advance_time(Duration::from_millis(200))
                     .await;
             }
         };
@@ -212,20 +212,24 @@ impl<B: BaseTokens> StressTestState<B> {
         let mut successful_deposits = 0;
         let mut failed_deposits = 0;
         for result in deposit_results {
-            if result.is_ok() {
-                successful_deposits += 1;
-            } else {
-                failed_deposits += 1;
+            match result {
+                Ok(_) => successful_deposits += 1,
+                Err(e) => {
+                    failed_deposits += 1;
+                    eprintln!("deposit failed: {e}");
+                }
             }
         }
 
         let mut successful_withdrawals = 0;
         let mut failed_withdrawals = 0;
         for result in withdrawal_results {
-            if result.is_ok() {
-                successful_withdrawals += 1;
-            } else {
-                failed_withdrawals += 1;
+            match result {
+                Ok(_) => successful_withdrawals += 1,
+                Err(e) => {
+                    failed_withdrawals += 1;
+                    eprintln!("withdrawal failed: {e}");
+                }
             }
         }
 
