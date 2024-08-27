@@ -1,8 +1,8 @@
+use brc20_bridge::ops::Brc20BridgeOp;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use rune_bridge::ops::RuneBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 
@@ -18,7 +18,7 @@ impl<C: CanisterClient> Brc20BridgeClient<C> {
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,
-    ) -> CanisterClientResult<Vec<(OperationId, RuneBridgeOp)>> {
+    ) -> CanisterClientResult<Vec<(OperationId, Brc20BridgeOp)>> {
         self.client
             .update("get_operations_list", (wallet_address,))
             .await
@@ -27,7 +27,7 @@ impl<C: CanisterClient> Brc20BridgeClient<C> {
     pub async fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> CanisterClientResult<Option<OperationLog<RuneBridgeOp>>> {
+    ) -> CanisterClientResult<Option<OperationLog<Brc20BridgeOp>>> {
         self.client
             .query("get_operation_log", (operation_id,))
             .await

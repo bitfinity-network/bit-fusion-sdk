@@ -20,7 +20,7 @@ pub(crate) trait Brc20IndexProvider {
     async fn get_brc20_balances(
         &self,
         address: &Address,
-    ) -> Result<HashMap<Brc20Tick, u128>, DepositError>;
+    ) -> Result<HashMap<Brc20Tick, u64>, DepositError>;
 
     /// Get list of BRC20 tokens.
     async fn get_brc20_tokens(&self) -> Result<HashMap<Brc20Tick, Brc20Info>, DepositError>;
@@ -161,7 +161,7 @@ where
     async fn get_brc20_balances(
         &self,
         address: &Address,
-    ) -> Result<HashMap<Brc20Tick, u128>, DepositError> {
+    ) -> Result<HashMap<Brc20Tick, u64>, DepositError> {
         let mut balances = HashMap::new();
         let mut offset = 0;
         let mut total = usize::MAX;

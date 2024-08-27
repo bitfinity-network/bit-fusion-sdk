@@ -160,7 +160,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         &self,
         dst_address: &H160,
         tick: &Brc20Tick,
-    ) -> Result<u128, DepositError> {
+    ) -> Result<u64, DepositError> {
         let transit_address = self.get_transit_address(dst_address).await;
         let balances = self
             .index_provider
@@ -270,7 +270,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         &self,
         dst_address: &H160,
         token_address: &H160,
-        amount: u128,
+        amount: u64,
         brc20_info: Brc20Info,
         nonce: u32,
     ) -> MintOrder {

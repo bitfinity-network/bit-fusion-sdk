@@ -5,6 +5,8 @@ use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
+#[cfg(feature = "dfx_tests")]
+pub mod brc20_helper;
 pub mod btc;
 #[cfg(feature = "dfx_tests")]
 pub mod btc_rpc_client;

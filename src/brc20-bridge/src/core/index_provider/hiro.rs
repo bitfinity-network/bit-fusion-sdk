@@ -23,5 +23,5 @@ pub struct GetBrc20BalancesResponse {
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Brc20BalanceResponse {
     pub ticker: String,
-    pub overall_balance: u128,
+    pub overall_balance: u64,
 }
