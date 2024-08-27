@@ -45,6 +45,8 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
+use bridge_did::op_id::OperationId;
+use bridge_utils::bft_events::MinterNotificationType;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
@@ -654,9 +656,30 @@ pub trait TestContext {
         let encoded_reason = Encode!(&reason).unwrap();
 
         let input = BFTBridge::notifyMinterCall {
-            notificationType: Default::default(),
+            notificationType: MinterNotificationType::DepositRequest as u32,
             userData: encoded_reason.into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
+        }
+        .abi_encode();
+
+        let _receipt = self
+            .call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)?;
+
+        Ok(())
+    }
+
+    async fn reschedule_operation(
+        &self,
+        operation_id: OperationId,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+    ) -> Result<()> {
+        let encoded_op_id = Encode!(&operation_id).unwrap();
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: MinterNotificationType::RescheduleOperation as u32,
+            userData: encoded_op_id.into(),
         }
         .abi_encode();
 

@@ -5,14 +5,16 @@ use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_utils::bft_events::{
+    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
+};
 use candid::{CandidType, Decode, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
 
-use crate::canister::get_rune_state;
+use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
 use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
 use crate::rune_info::{RuneInfo, RuneName};
@@ -94,14 +96,14 @@ impl Operation for RuneBridgeOp {
                 log::debug!(
                     "RuneBridgeOp::AwaitConfirmations {dst_address} {utxo:?} {runes_to_wrap:?}"
                 );
-                Self::await_confirmations(ctx, dst_address, utxo, runes_to_wrap, id.nonce()).await
+                Self::await_confirmations(ctx, dst_address, utxo, runes_to_wrap).await
             }
             RuneBridgeOp::SignMintOrder {
                 dst_address,
                 mint_order,
             } => {
                 log::debug!("RuneBridgeOp::SignMintOrder {dst_address} {mint_order:?}");
-                Self::sign_mint_order(ctx, dst_address, mint_order).await
+                Self::sign_mint_order(ctx, id.nonce(), dst_address, mint_order).await
             }
             RuneBridgeOp::SendMintOrder { dst_address, order } => {
                 log::debug!("RuneBridgeOp::SendMintOrder {dst_address} {order:?}");
@@ -127,9 +129,13 @@ impl Operation for RuneBridgeOp {
             RuneBridgeOp::TransactionSent { .. } => Err(Error::FailedToProgress(
                 "TransactionSent task cannot be progressed".into(),
             )),
-            RuneBridgeOp::OperationSplit { .. } => Err(Error::FailedToProgress(
-                "OperationSplit task cannot be progressed".into(),
-            )),
+            RuneBridgeOp::OperationSplit {
+                wallet_address,
+                new_operation_ids,
+            } => {
+                log::debug!("RuneBridgeOp::OperationSplit {wallet_address} {new_operation_ids:?}");
+                Self::schedule_operation_split(ctx, new_operation_ids).await
+            }
         }
     }
 
@@ -166,7 +172,7 @@ impl Operation for RuneBridgeOp {
             RuneBridgeOp::CreateTransaction { .. } => false,
             RuneBridgeOp::SendTransaction { .. } => false,
             RuneBridgeOp::TransactionSent { .. } => true,
-            RuneBridgeOp::OperationSplit { .. } => true,
+            RuneBridgeOp::OperationSplit { .. } => false,
         }
     }
 
@@ -189,6 +195,11 @@ impl Operation for RuneBridgeOp {
         _ctx: RuntimeState<Self>,
         event: MintedEventData,
     ) -> Option<OperationAction<Self>> {
+        log::debug!(
+            "on_wrapped_token_minted nonce {nonce} {event:?}",
+            nonce = event.nonce
+        );
+
         Some(OperationAction::Update {
             nonce: event.nonce,
             update_to: Self::MintOrderConfirmed { data: event },
@@ -199,7 +210,8 @@ impl Operation for RuneBridgeOp {
         _ctx: RuntimeState<Self>,
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
-        let memo = event.memo();
+        log::debug!("on_wrapped_token_burnt {event:?}");
+             let memo = event.memo();
         match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
             Ok(payload) => Some(OperationAction::Create(
                 Self::CreateTransaction { payload },
@@ -216,6 +228,7 @@ impl Operation for RuneBridgeOp {
         _ctx: RuntimeState<Self>,
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
+        log::debug!("on_minter_notification {event:?}");
         if let Some(notification) = RuneMinterNotification::decode(event.clone()) {
             match notification {
                 RuneMinterNotification::Deposit(payload) => Some(OperationAction::Create(
@@ -262,6 +275,31 @@ impl RuneBridgeOp {
         } else {
             operations.remove(0)
         }
+    }
+
+    async fn schedule_operation_split(
+        ctx: RuntimeState<Self>,
+        operation_ids: Vec<OperationId>,
+    ) -> BftResult<Self> {
+        let state = ctx.borrow();
+
+        let mut operations = operation_ids
+            .into_iter()
+            .filter_map(|id| state.operations.get(id).map(|op| (id, op)))
+            .collect::<Vec<_>>();
+
+        log::debug!("Splitting operation: {operations:?}");
+
+        let (_, next_op) = operations.pop().ok_or(Error::FailedToProgress(
+            "no operations to split".to_string(),
+        ))?;
+
+        // schedule the rest of the operations
+        for (id, operation) in operations {
+            get_runtime().borrow_mut().schedule_operation(id, operation);
+        }
+
+        Ok(next_op)
     }
 
     async fn await_inputs(
@@ -329,7 +367,6 @@ impl RuneBridgeOp {
         dst_address: H160,
         utxo: Utxo,
         runes_to_wrap: Vec<RuneToWrap>,
-        nonce: u32,
     ) -> BftResult<Self> {
         let deposit = RuneDeposit::get(ctx.clone());
         deposit
@@ -337,8 +374,9 @@ impl RuneBridgeOp {
             .await
             .map_err(|err| Error::FailedToProgress(format!("inputs are not confirmed: {err:?}")))?;
 
+        let deposit_runes = runes_to_wrap.iter().map(|rune| rune.rune_info).collect();
         deposit
-            .mark_used_utxo(&utxo, &dst_address)
+            .deposit(&utxo, &dst_address, deposit_runes)
             .await
             .map_err(|err| Error::FailedToProgress(format!("{err:?}")))?;
 
@@ -350,7 +388,7 @@ impl RuneBridgeOp {
                     &to_wrap.wrapped_address,
                     to_wrap.amount,
                     to_wrap.rune_info,
-                    nonce,
+                    0,
                 );
                 Self::SignMintOrder {
                     dst_address: dst_address.clone(),
@@ -364,9 +402,13 @@ impl RuneBridgeOp {
 
     async fn sign_mint_order(
         ctx: RuntimeState<Self>,
+        nonce: u32,
         dst_address: H160,
-        mint_order: MintOrder,
+        mut mint_order: MintOrder,
     ) -> BftResult<Self> {
+        // update nonce
+        mint_order.nonce = nonce;
+
         let deposit = RuneDeposit::get(ctx);
         let signed = deposit
             .sign_mint_order(mint_order)
@@ -436,19 +478,17 @@ pub struct RuneDepositRequestData {
 }
 
 impl RuneMinterNotification {
-    pub const DEPOSIT_TYPE: u32 = 1;
-}
-
-impl RuneMinterNotification {
     fn decode(event_data: NotifyMinterEventData) -> Option<Self> {
         match event_data.notification_type {
-            Self::DEPOSIT_TYPE => match Decode!(&event_data.user_data, RuneDepositRequestData) {
-                Ok(payload) => Some(Self::Deposit(payload)),
-                Err(err) => {
-                    log::warn!("Failed to decode deposit request event data: {err:?}");
-                    None
+            MinterNotificationType::DepositRequest => {
+                match Decode!(&event_data.user_data, RuneDepositRequestData) {
+                    Ok(payload) => Some(Self::Deposit(payload)),
+                    Err(err) => {
+                        log::warn!("Failed to decode deposit request event data: {err:?}");
+                        None
+                    }
                 }
-            },
+            }
             t => {
                 log::warn!("Unknown minter notify event type: {t}");
                 None

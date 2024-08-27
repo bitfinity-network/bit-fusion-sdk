@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -11,6 +12,9 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use icrc2_bridge::ops::IcrcBridgeOp;
+use tokio::sync::Semaphore;
+use tokio_util::sync::CancellationToken;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
 use crate::context::{
@@ -505,4 +509,288 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
 
         assert!(bridge_balance_before_mint <= bridge_balance_after_mint);
     }
+}
+
+#[tokio::test]
+async fn rescheduling_deposit_operation() {
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+
+    let bridge_client = ctx.icrc_bridge_client(ADMIN);
+    bridge_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    let amount = 300_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
+    ctx.advance_by_times(Duration::from_secs(2), 5).await;
+
+    eprintln!("burning icrc tokens and creating mint order");
+    ctx.burn_icrc2(
+        JOHN,
+        &john_wallet,
+        &bft_bridge,
+        &wrapped_token,
+        amount as _,
+        Some(john_address),
+        None,
+    )
+    .await
+    .unwrap();
+
+    let mut num_tries = 0;
+    const MAX_RETRIES: usize = 30;
+    loop {
+        let operations_list = bridge_client
+            .get_operations_list(&john_wallet.address().into(), None)
+            .await
+            .unwrap();
+        if !operations_list.is_empty() {
+            ctx.client
+                .stop_canister(ctx.canisters.evm(), Some(ctx.admin()))
+                .await
+                .unwrap();
+            break;
+        } else {
+            num_tries += 1;
+            if num_tries > MAX_RETRIES {
+                panic!("Deposit operation was not scheduled after {MAX_RETRIES} tries");
+            }
+
+            ctx.advance_time(Duration::from_secs(1)).await;
+        }
+    }
+
+    // Need to wait for all the operation retries to execute
+    ctx.advance_by_times(Duration::from_secs(10), 60).await;
+
+    let base_token_client = ctx.icrc_token_1_client(JOHN);
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
+        .await
+        .unwrap();
+
+    ctx.client
+        .start_canister(ctx.canisters.evm(), Some(ctx.admin()))
+        .await
+        .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 5).await;
+
+    let operations = bridge_client
+        .get_operations_list(&john_wallet.address().into(), None)
+        .await
+        .unwrap();
+    let (operation_id, _) = &operations[0];
+
+    let log = bridge_client
+        .get_operation_log(*operation_id)
+        .await
+        .unwrap();
+    eprintln!("OPERATION LOG");
+    dbg!(&log);
+
+    eprintln!("checking wrapped token balance");
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        base_balance,
+        ICRC1_INITIAL_BALANCE - amount - ICRC1_TRANSFER_FEE * 2
+    );
+    assert_eq!(wrapped_balance as u64, 0);
+
+    let bridge_client = ctx.icrc_bridge_client(JOHN);
+    let operations = bridge_client
+        .get_operations_list(&john_wallet.address().into(), None)
+        .await
+        .unwrap();
+    let (operation_id, state) = &operations[0];
+
+    assert!(matches!(*state, IcrcBridgeOp::SendMintTransaction { .. }));
+
+    ctx.reschedule_operation(*operation_id, &john_wallet, &bft_bridge)
+        .await
+        .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
+
+    let operations = bridge_client
+        .get_operations_list(&john_wallet.address().into(), None)
+        .await
+        .unwrap();
+    let (_, state) = &operations[0];
+
+    dbg!(state);
+
+    assert!(matches!(
+        *state,
+        IcrcBridgeOp::WrappedTokenMintConfirmed { .. }
+    ));
+
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
+        .await
+        .unwrap();
+    assert_eq!(wrapped_balance as u64, amount);
+}
+
+// Let's check that spamming reschedule does not break anything
+#[tokio::test]
+async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
+    async fn spam_reschedule_requests(
+        ctx: PocketIcTestContext,
+        wallet: Wallet<'_, SigningKey>,
+        bft_bridge: H160,
+        spam_stopper: CancellationToken,
+        semaphore: Arc<Semaphore>,
+    ) {
+        let bridge_client = ctx.icrc_bridge_client(JOHN);
+        while !spam_stopper.is_cancelled() {
+            let operations = bridge_client
+                .get_operations_list(&wallet.address().into(), None)
+                .await
+                .unwrap();
+            for (id, _) in &operations {
+                let _ = semaphore.acquire().await;
+                ctx.reschedule_operation(*id, &wallet, &bft_bridge)
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+
+    let spam_stopper = CancellationToken::new();
+    let semaphore = Arc::new(Semaphore::new(1));
+    tokio::task::spawn(spam_reschedule_requests(
+        ctx.clone(),
+        john_wallet.clone(),
+        bft_bridge.clone(),
+        spam_stopper.clone(),
+        semaphore.clone(),
+    ));
+    let _ = spam_stopper.drop_guard();
+
+    let bridge_client = ctx.icrc_bridge_client(ADMIN);
+    bridge_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    let amount = 300_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let native_token_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id],
+        native_token_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
+    eprintln!("burning icrc tokens and creating mint order");
+    {
+        let _ = semaphore.acquire().await;
+        ctx.burn_icrc2(
+            JOHN,
+            &john_wallet,
+            &bft_bridge,
+            &wrapped_token,
+            amount as _,
+            Some(john_address),
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
+
+    let base_token_client = ctx.icrc_token_1_client(JOHN);
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
+        .await
+        .unwrap();
+
+    eprintln!("checking wrapped token balance");
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        base_balance,
+        ICRC1_INITIAL_BALANCE - amount - ICRC1_TRANSFER_FEE * 2
+    );
+    assert_eq!(wrapped_balance as u64, amount);
+
+    {
+        let _ = semaphore.acquire().await;
+        let _operation_id = ctx
+            .burn_wrapped_erc_20_tokens(
+                &ctx.evm_client(ADMIN),
+                &john_wallet,
+                &wrapped_token,
+                base_token_id.0.as_slice(),
+                (&john()).into(),
+                &bft_bridge,
+                wrapped_balance,
+            )
+            .await
+            .unwrap()
+            .0;
+    }
+
+    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+
+    println!("john principal: {}", john());
+
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
+        .await
+        .unwrap();
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
+        .await
+        .unwrap();
+    assert_eq!(wrapped_balance, 0);
+    assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 3);
 }

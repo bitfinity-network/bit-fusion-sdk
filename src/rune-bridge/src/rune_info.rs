@@ -1,18 +1,53 @@
+use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
+use ic_stable_structures::{Bound, Storable};
 use ordinals::{Rune, RuneId};
 use serde::{Deserializer, Serialize};
 
-#[derive(Debug, Copy, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, CandidType, Serialize, Deserialize)]
 pub struct RuneInfo {
     pub name: RuneName,
     pub decimals: u8,
     pub block: u64,
     pub tx: u32,
+}
+
+impl Storable for RuneInfo {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut buf = Vec::with_capacity(Self::BOUND.max_size() as usize);
+        buf.extend_from_slice(&self.name.inner().0.to_le_bytes());
+        buf.extend_from_slice(&self.decimals.to_le_bytes());
+        buf.extend_from_slice(&self.block.to_le_bytes());
+        buf.extend_from_slice(&self.tx.to_le_bytes());
+
+        buf.into()
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let name = u128::from_le_bytes(bytes[0..16].try_into().unwrap());
+        let decimals = u8::from_le_bytes(bytes[16..17].try_into().unwrap());
+        let block = u64::from_le_bytes(bytes[17..25].try_into().unwrap());
+        let tx = u32::from_le_bytes(bytes[25..29].try_into().unwrap());
+        Self {
+            name: RuneName(Rune(name)),
+            decimals,
+            block,
+            tx,
+        }
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: size_of::<u128>() as u32
+            + size_of::<u8>() as u32
+            + size_of::<u64>() as u32
+            + size_of::<u32>() as u32,
+        is_fixed_size: true,
+    };
 }
 
 impl RuneInfo {
@@ -129,5 +164,26 @@ impl<'de> Deserialize<'de> for RuneName {
     {
         let value = u128::deserialize(deserializer)?;
         Ok(Self(Rune(value)))
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_rune_info() {
+        let rune_info = RuneInfo {
+            name: RuneName(Rune(0x1234567890abcdef)),
+            decimals: 18,
+            block: 0x1234567890abcdef,
+            tx: 0x12345678,
+        };
+
+        let bytes = rune_info.to_bytes();
+        let decoded = RuneInfo::from_bytes(bytes);
+
+        assert_eq!(rune_info, decoded);
     }
 }

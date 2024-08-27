@@ -73,6 +73,7 @@ ic-utils = { workspace = true }
 ic-metrics = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
+tokio-util = { workspace = true }
 erc20-bridge = { path = "../erc20-bridge" }
 signature-verification-canister-client = { workspace = true }
 rune-bridge = { path = "../rune-bridge" }
