@@ -14,6 +14,7 @@ use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
 // mod erc20_bridge;
+mod brc20_bridge;
 mod runes;
 
 sol! {

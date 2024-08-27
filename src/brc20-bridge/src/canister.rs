@@ -1,9 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::str::FromStr;
 
-use bitcoin::Address;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
@@ -22,7 +20,6 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
-use crate::core::deposit::Brc20Deposit;
 use crate::interface::GetAddressError;
 use crate::ops::Brc20BridgeOp;
 use crate::state::{Brc20BridgeConfig, Brc20State};

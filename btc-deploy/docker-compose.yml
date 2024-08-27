@@ -16,6 +16,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  hiro-ordinals-api:
+    container_name: hiro-ordinals-api
+    build:
+      dockerfile: hiro-ordinals-api.dockerfile
+      context: .
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8004:3000"
+      - "8005:8005"
+
   ord:
     container_name: ord
     build:
@@ -27,6 +42,16 @@ services:
     ports:
       - "8000:8000"
       - "8001:8001"
+
+  postgres:
+    image: "postgres:15"
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PORT: 5432
 
   evm-rpc-canister-proxy:
     container_name: evm-rpc-canister-proxy

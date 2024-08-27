@@ -83,6 +83,33 @@ deploy_erc20_bridge() {
   dfx canister install --mode=$INSTALL_MODE --yes --wasm=./.artifact/erc20-bridge.wasm.gz --network=$NETWORK --argument="$args" erc20-bridge
 }
 
+deploy_brc20_bridge() {
+  NETWORK="$1"
+  INSTALL_MODE="$2"
+  BITCOIN_NETWORK="$3"
+  EVM_LINK=$(link_to_variant "$4")
+  ADMIN_PRINCIPAL="$5"
+  INDEXER_URL="$6"
+  SIGNING_STRATEGY="$7"
+  LOG_SETTINGS="$8"
+
+  create_canister $NETWORK brc20-bridge
+
+  args="(record {
+    network = variant { $BITCOIN_NETWORK };
+    evm_link = $EVM_LINK;
+    signing_strategy = $SIGNING_STRATEGY;
+    admin = principal \"$ADMIN_PRINCIPAL\";
+    log_settings = opt $LOG_SETTINGS;
+    min_confirmations = 1;
+    indexer_url = \"$INDEXER_URL\";
+  })"
+
+  echo "deploying brc20-bridge with args: $args"
+
+  dfx canister install --mode=$INSTALL_MODE --yes --wasm=./.artifact/brc20-bridge.wasm.gz --network=$NETWORK --argument="$args" brc20-bridge
+}
+
 deploy_rune_bridge() {
   NETWORK="$1"
   INSTALL_MODE="$2"

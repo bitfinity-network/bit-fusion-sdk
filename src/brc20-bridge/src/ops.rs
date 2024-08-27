@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
@@ -15,7 +13,7 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
 
 use crate::brc20_info::Brc20Tick;
-use crate::canister::{get_brc20_state, get_runtime};
+use crate::core::deposit::Brc20Deposit;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Brc20BridgeOp {
@@ -31,7 +29,7 @@ pub enum Brc20BridgeOp {
         brc20_tick: Brc20Tick,
         dst_address: H160,
         dst_token: H160,
-        utxo: Utxo,
+        utxos: Vec<Utxo>,
     },
     SignMintOrder {
         dst_address: H160,
@@ -68,11 +66,19 @@ impl Operation for Brc20BridgeOp {
                 brc20_tick,
                 dst_address,
                 dst_token,
-                utxo,
+                utxos,
             } => {
-                log::debug!("Self::AwaitConfirmations {amount} {brc20_tick} {dst_address} {dst_token} {utxo:?}");
-                Self::await_confirmations(ctx, amount, brc20_tick, dst_address, dst_token, utxo)
-                    .await
+                log::debug!("Self::AwaitConfirmations {amount} {brc20_tick} {dst_address} {dst_token} {utxos:?}");
+                Self::await_confirmations(
+                    ctx,
+                    amount,
+                    brc20_tick,
+                    dst_address,
+                    dst_token,
+                    utxos,
+                    id.nonce(),
+                )
+                .await
             }
             Self::SignMintOrder {
                 dst_address,
@@ -177,7 +183,110 @@ impl Operation for Brc20BridgeOp {
     }
 }
 
-impl Brc20BridgeOp {}
+impl Brc20BridgeOp {
+    async fn await_inputs(
+        state: RuntimeState<Self>,
+        brc20_tick: Brc20Tick,
+        dst_address: H160,
+        dst_token: H160,
+        amount: u128,
+    ) -> BftResult<Self> {
+        let deposit = Brc20Deposit::get(state.clone());
+        let utxos = deposit.get_inputs(&dst_address).await.map_err(|err| {
+            Error::FailedToProgress(format!("cannot find deposit inputs: {err:?}"))
+        })?;
+
+        if utxos.is_empty() {
+            return Err(Error::FailedToProgress("no inputs".to_string()));
+        }
+
+        Ok(Self::AwaitConfirmations {
+            amount,
+            brc20_tick,
+            dst_address,
+            dst_token,
+            utxos,
+        })
+    }
+
+    async fn await_confirmations(
+        state: RuntimeState<Self>,
+        amount: u128,
+        brc20_tick: Brc20Tick,
+        dst_address: H160,
+        dst_token: H160,
+        utxos: Vec<Utxo>,
+        nonce: u32,
+    ) -> BftResult<Self> {
+        let deposit = Brc20Deposit::get(state.clone());
+        deposit
+            .check_confirmations(&dst_address, &utxos)
+            .await
+            .map_err(|err| Error::FailedToProgress(format!("inputs are not confirmed: {err:?}")))?;
+
+        // check balance
+        let brc20_balance = deposit
+            .get_brc20_balance(&dst_address, &brc20_tick)
+            .await
+            .map_err(|err| Error::FailedToProgress(format!("cannot get brc20 balance: {err:?}")))?;
+
+        let brc20_info =
+            deposit
+                .get_brc20_info(&brc20_tick)
+                .await
+                .ok_or(Error::FailedToProgress(format!(
+                    "cannot get brc20 info for {brc20_tick}"
+                )))?;
+
+        if amount > brc20_balance {
+            return Err(Error::FailedToProgress(format!(
+                "requested amount {amount} is bigger than actual balance {brc20_balance}"
+            )));
+        }
+
+        let unsigned_mint_order =
+            deposit.create_unsigned_mint_order(&dst_address, &dst_token, amount, brc20_info, nonce);
+
+        Ok(Self::SignMintOrder {
+            dst_address,
+            mint_order: unsigned_mint_order,
+        })
+    }
+
+    async fn sign_mint_order(
+        ctx: RuntimeState<Self>,
+        nonce: u32,
+        dst_address: H160,
+        mut mint_order: MintOrder,
+    ) -> BftResult<Self> {
+        // update nonce
+        mint_order.nonce = nonce;
+
+        let deposit = Brc20Deposit::get(ctx);
+        let signed = deposit
+            .sign_mint_order(mint_order)
+            .await
+            .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
+
+        Ok(Self::SendMintOrder {
+            dst_address,
+            order: signed,
+        })
+    }
+
+    async fn send_mint_order(
+        ctx: RuntimeState<Self>,
+        dst_address: H160,
+        order: SignedMintOrder,
+    ) -> BftResult<Self> {
+        let tx_id = ctx.send_mint_transaction(&order).await?;
+        Ok(Self::ConfirmMintOrder {
+            dst_address,
+            order,
+            tx_id,
+        })
+    }
+}
 
 pub enum Brc20MinterNotification {
     Deposit(Brc20DepositRequestData),

@@ -19,7 +19,7 @@ use crate::canister::get_brc20_state;
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{get_derivation_path_ic, BtcSignerType};
+use crate::key::BtcSignerType;
 use crate::ledger::UnspentUtxoInfo;
 use crate::ops::Brc20BridgeOp;
 use crate::state::Brc20State;
@@ -110,18 +110,6 @@ impl Brc20DepositPayload {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Brc20Inputs {
-    pub inputs: Vec<Utxo>,
-    pub balances: HashMap<Brc20Tick, u128>,
-}
-
-impl Brc20Inputs {
-    pub fn is_empty(&self) -> bool {
-        self.inputs.is_empty()
-    }
-}
-
 pub(crate) struct Brc20Deposit<
     UTXO: UtxoProvider = IcUtxoProvider,
     INDEX: Brc20IndexProvider = OrdIndexProvider<IcHttpClient>,
@@ -161,17 +149,27 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
 }
 
 impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
-    pub async fn get_balances(&self, dst_address: &H160) -> Result<Brc20Inputs, DepositError> {
+    // Get input utxos
+    pub async fn get_inputs(&self, dst_address: &H160) -> Result<Vec<Utxo>, DepositError> {
         let transit_address = self.get_transit_address(dst_address).await;
 
-        let mut inputs = Brc20Inputs::default();
-        inputs.inputs = self.get_deposit_utxos(&transit_address).await?.utxos;
-        inputs.balances = self
+        Ok(self.get_deposit_utxos(&transit_address).await?.utxos)
+    }
+
+    pub async fn get_brc20_balance(
+        &self,
+        dst_address: &H160,
+        tick: &Brc20Tick,
+    ) -> Result<u128, DepositError> {
+        let transit_address = self.get_transit_address(dst_address).await;
+        let balances = self
             .index_provider
             .get_brc20_balances(&transit_address)
             .await?;
 
-        Ok(inputs)
+        let amount = balances.get(tick).copied().unwrap_or_default();
+
+        Ok(amount)
     }
 
     pub async fn check_confirmations(
@@ -334,64 +332,8 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         })
     }
 
-    /// Deposit UTXO to the ledger.
-    pub async fn deposit(&self, utxo: &Utxo, dst_address: &H160) -> Result<(), DepositError> {
-        let address = self.get_transit_address(dst_address).await;
-        let derivation_path = get_derivation_path_ic(dst_address);
-        let mut state = self.brc20_state.borrow_mut();
-        let ledger = state.ledger_mut();
-        let existing = ledger.load_unspent_utxos();
-
-        if existing
-            .values()
-            .any(|v| Self::check_already_used_utxo(v, utxo))
-        {
-            return Err(DepositError::UtxoAlreadyUsed);
-        }
-
-        ledger.deposit(utxo.clone(), &address, derivation_path);
-
-        Ok(())
-    }
-
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
         v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
             && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
-    }
-
-    pub async fn get_mint_amounts(
-        &self,
-        address: &Address,
-        tick: &Brc20Tick,
-        amount: u128,
-    ) -> Result<(Brc20Info, u128), DepositError> {
-        log::info!("Get brc20 amounts for: {address}");
-        let brc20_amounts = match self.index_provider.get_brc20_balances(address).await {
-            Ok(v) => v,
-            Err(err) => {
-                log::error!("Failed to get brc20 amounts for utxo: {err:?}");
-                return Err(err);
-            }
-        };
-
-        if brc20_amounts.is_empty() {
-            return Err(DepositError::NoBrc20ToDeposit);
-        }
-
-        let owned_balance = brc20_amounts.get(tick).copied().unwrap_or(0);
-        if owned_balance < amount {
-            return Err(DepositError::InvalidAmounts {
-                requested: amount,
-                actual: owned_balance,
-            });
-        }
-
-        let Some(brc20_info) = self.get_brc20_info(tick).await else {
-            return Err(DepositError::Unavailable(
-                "Ord indexer is in invalid state".to_string(),
-            ));
-        };
-
-        Ok((brc20_info, amount))
     }
 }

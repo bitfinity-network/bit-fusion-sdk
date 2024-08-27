@@ -6122,6 +6122,7 @@ dependencies = [
  "bip39",
  "bitcoin 0.31.2",
  "bitcoincore-rpc",
+ "brc20-bridge",
  "bridge-canister",
  "bridge-client",
  "bridge-did",

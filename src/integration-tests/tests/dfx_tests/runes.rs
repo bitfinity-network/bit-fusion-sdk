@@ -208,11 +208,6 @@ impl RunesContext {
             tokens.insert(*rune_id, token);
         }
 
-        let mut token_name = [0; 32];
-        token_name[0..7].copy_from_slice(b"wrapper");
-        let mut token_symbol = [0; 16];
-        token_symbol[0..3].copy_from_slice(b"WPT");
-
         let _: () = context
             .rune_bridge_client(ADMIN)
             .set_bft_bridge_contract(&bft_bridge)

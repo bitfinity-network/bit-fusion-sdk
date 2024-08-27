@@ -61,23 +61,24 @@ ic-state-machine-tests = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+brc20-bridge = { path = "../brc20-bridge" }
 btc-bridge = { path = "../btc-bridge" }
+erc20-bridge = { path = "../erc20-bridge" }
 ethereum-json-rpc-client = { workspace = true, features = [
     "reqwest",
     "pocket-ic-tests-client",
 ] }
 futures = { workspace = true, features = ["executor"] }
-ic-test-utils = { workspace = true }
 ic-agent = { workspace = true }
-ic-utils = { workspace = true }
 ic-metrics = { workspace = true }
+ic-test-utils = { workspace = true }
+ic-utils = { workspace = true }
+rune-bridge = { path = "../rune-bridge" }
+serial_test = { workspace = true }
+signature-verification-canister-client = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 tokio-util = { workspace = true }
-erc20-bridge = { path = "../erc20-bridge" }
-signature-verification-canister-client = { workspace = true }
-rune-bridge = { path = "../rune-bridge" }
-serial_test = { workspace = true }
 
 # IC deps
 [features]

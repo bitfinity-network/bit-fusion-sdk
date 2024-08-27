@@ -122,6 +122,7 @@ build_requested_canisters() {
 
         build_canister "icrc2-bridge" "export-api" "icrc2-bridge.wasm" "icrc2-bridge"
         build_canister "erc20-bridge" "export-api" "erc20-bridge.wasm" "erc20-bridge"
+        build_canister "brc20-bridge" "export-api" "brc20-bridge.wasm" "brc20-bridge"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
         build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
@@ -139,7 +140,7 @@ build_requested_canisters() {
             signature_verification)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
-            btc-bridge | rune-bridge | icrc2-bridge | erc20-bridge)
+            brc20-bridge | btc-bridge | rune-bridge | icrc2-bridge | erc20-bridge)
                 build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)
