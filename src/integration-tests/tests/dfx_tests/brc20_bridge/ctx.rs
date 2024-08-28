@@ -94,7 +94,7 @@ pub struct Brc20Context {
     pub tokens: HashMap<Brc20Tick, H160>,
 }
 
-/// Setup a new rune for DFX tests
+/// Setup a new brc20 for DFX tests
 async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20Wallet> {
     let wallet_name = generate_wallet_name();
     let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&wallet_name);
@@ -208,7 +208,7 @@ impl Brc20Context {
         let wallet = context.new_wallet(u128::MAX).await.unwrap();
 
         let btc_bridge_eth_address = context
-            .rune_bridge_client(ADMIN)
+            .brc20_bridge_client(ADMIN)
             .get_bridge_canister_evm_address()
             .await
             .unwrap();
@@ -237,7 +237,7 @@ impl Brc20Context {
         }
 
         let _: () = context
-            .rune_bridge_client(ADMIN)
+            .brc20_bridge_client(ADMIN)
             .set_bft_bridge_contract(&bft_bridge)
             .await
             .unwrap();
@@ -275,7 +275,7 @@ impl Brc20Context {
     }
 
     pub fn bridge(&self) -> Principal {
-        self.inner.canisters().rune_bridge()
+        self.inner.canisters().brc20_bridge()
     }
 
     pub async fn get_deposit_address(&self, eth_address: &H160) -> Address {
@@ -456,9 +456,9 @@ impl Brc20Context {
             .await
             .expect("Failed to stop evm canister");
         self.inner
-            .stop_canister(self.inner.canisters().rune_bridge())
+            .stop_canister(self.inner.canisters().brc20_bridge())
             .await
-            .expect("Failed to stop rune bridge canister");
+            .expect("Failed to stop brc20 bridge canister");
     }
 
     pub async fn wrapped_balance(&self, tick: &Brc20Tick, wallet: &Wallet<'_, SigningKey>) -> u128 {

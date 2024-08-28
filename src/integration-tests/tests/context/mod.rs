@@ -1329,7 +1329,7 @@ impl TestCanisters {
     pub fn brc20_bridge(&self) -> Principal {
         *self
             .0
-            .get(&CanisterType::Erc20Bridge)
+            .get(&CanisterType::Brc20Bridge)
             .expect("brc20 bridge canister should be initialized (see `TestContext::new()`)")
     }
 
