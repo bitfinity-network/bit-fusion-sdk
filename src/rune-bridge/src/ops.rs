@@ -16,6 +16,7 @@ use serde::Serialize;
 
 use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
+use crate::core::rune_inputs::RuneInputProvider;
 use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
 use crate::rune_info::{RuneInfo, RuneName};
 
@@ -86,7 +87,14 @@ impl Operation for RuneBridgeOp {
                 log::debug!(
                     "RuneBridgeOp::AwaitInputs {dst_address} {dst_tokens:?} {requested_amounts:?}"
                 );
-                Self::await_inputs(ctx, dst_address, dst_tokens, requested_amounts).await
+                Self::await_inputs(
+                    ctx.clone(),
+                    &RuneDeposit::get(ctx),
+                    dst_address,
+                    dst_tokens,
+                    requested_amounts,
+                )
+                .await
             }
             RuneBridgeOp::AwaitConfirmations {
                 dst_address,
@@ -311,14 +319,17 @@ impl RuneBridgeOp {
 
     async fn await_inputs(
         state: RuntimeState<Self>,
+        input_provider: &impl RuneInputProvider,
         dst_address: H160,
         dst_tokens: HashMap<RuneName, H160>,
         requested_amounts: Option<HashMap<RuneName, u128>>,
     ) -> BftResult<Self> {
-        let deposit = RuneDeposit::get(state.clone());
-        let inputs = deposit.get_inputs(&dst_address).await.map_err(|err| {
-            Error::FailedToProgress(format!("cannot find deposit inputs: {err:?}"))
-        })?;
+        let inputs = input_provider
+            .get_inputs(&dst_address)
+            .await
+            .map_err(|err| {
+                Error::FailedToProgress(format!("failed to get deposit inputs: {err}"))
+            })?;
 
         if inputs.is_empty() {
             return Err(Error::FailedToProgress("no inputs".to_string()));
@@ -335,7 +346,7 @@ impl RuneBridgeOp {
 
         let mut operations = vec![];
         for input in inputs.inputs.iter() {
-            let infos = deposit
+            let infos = input_provider
                 .get_rune_infos(&input.runes)
                 .await
                 .ok_or_else(|| Error::FailedToProgress("rune info not found".into()))?;
@@ -491,9 +502,14 @@ mod tests {
     use bridge_canister::runtime::state::config::ConfigStorage;
     use bridge_canister::runtime::state::{SharedConfig, State};
     use candid::Encode;
+    use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
+    use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::MemoryId;
+    use snapbox::{assert_data_eq, str};
 
     use super::*;
+    use crate::core::rune_inputs::mock::TestRuneInputProvider;
+    use crate::core::rune_inputs::{GetInputsError, RuneInput};
 
     fn op_memory() -> OperationsMemory<StableMemory> {
         OperationsMemory {
@@ -518,16 +534,21 @@ mod tests {
         H160::from_slice(&[1; 20])
     }
 
-    fn rune_name() -> RuneName {
-        RuneName::from_str("AAA").unwrap()
+    fn rune_name(name: &str) -> RuneName {
+        RuneName::from_str(name).unwrap()
     }
 
-    fn rune_address() -> H160 {
-        H160::from_slice(&[2; 20])
+    fn token_address(v: u8) -> H160 {
+        H160::from_slice(&[v; 20])
     }
 
     fn dst_tokens() -> HashMap<RuneName, H160> {
-        [(rune_name(), rune_address())].into()
+        [
+            (rune_name("AAA"), token_address(2)),
+            (rune_name("A"), token_address(3)),
+            (rune_name("B"), token_address(4)),
+        ]
+        .into()
     }
 
     #[tokio::test]
@@ -610,7 +631,7 @@ mod tests {
 
     #[tokio::test]
     async fn deposit_request_adds_amounts_to_operation() {
-        let amounts: HashMap<RuneName, u128> = [(rune_name(), 1000)].into();
+        let amounts: HashMap<RuneName, u128> = [(rune_name("AAA"), 1000)].into();
         let notification = RuneDepositRequestData {
             dst_address: sender(),
             dst_tokens: dst_tokens(),
@@ -633,5 +654,204 @@ mod tests {
                 requested_amounts: Some(amounts),
             }))
         )
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_no_inputs() {
+        let provider = TestRuneInputProvider::empty();
+        let result =
+            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["no inputs"])
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_provider_returns_btc_error() {
+        let provider =
+            TestRuneInputProvider::err(GetInputsError::BtcAdapter("not available".to_string()));
+        let result =
+            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(
+            message,
+            str![
+                "failed to get deposit inputs: failed to connect to IC BTC adapter: not available"
+            ]
+        )
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_provider_returns_indexer_error() {
+        let provider = TestRuneInputProvider::err(GetInputsError::IndexersNotAvailable {
+            checked_indexers: vec!["url".to_string()],
+        });
+        let result =
+            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(
+            message,
+            str![[r#"failed to get deposit inputs: rune indexers are not available: ["url"]"#]]
+        )
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_provider_returns_consensus_error() {
+        let provider = TestRuneInputProvider::err(GetInputsError::IndexersDisagree {
+            indexer_responses: vec![("indexer_name".to_string(), "indexer_response".to_string())],
+        });
+        let result =
+            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(
+            message,
+            str![[
+                r#"failed to get deposit inputs: rune indexers returned different result for same request: [("indexer_name", "indexer_response")]"#
+            ]]
+        )
+    }
+
+    fn rune_input(rune_name: &str, amount: u128) -> RuneInput {
+        RuneInput {
+            utxo: Utxo {
+                outpoint: Outpoint {
+                    txid: vec![],
+                    vout: 0,
+                },
+                value: 10_000,
+                height: 0,
+            },
+            runes: [(RuneName::from_str(rune_name).unwrap(), amount)].into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
+        let input = rune_input("A", 1000);
+        let provider = TestRuneInputProvider::with_input(input.clone());
+        let result = RuneBridgeOp::await_inputs(
+            test_state(),
+            &provider,
+            sender(),
+            dst_tokens(),
+            Some([(RuneName::from_str("B").unwrap(), 1000)].into()),
+        )
+        .await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["requested amounts {RuneName(Rune(1)): 1000} are not equal actual amounts {RuneName(Rune(0)): 1000}"]);
+
+        let input = rune_input("A", 1000);
+        let provider = TestRuneInputProvider::with_input(input.clone());
+        let result = RuneBridgeOp::await_inputs(
+            test_state(),
+            &provider,
+            sender(),
+            dst_tokens(),
+            Some([(RuneName::from_str("A").unwrap(), 2000)].into()),
+        )
+        .await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 2000} are not equal actual amounts {RuneName(Rune(0)): 1000}"])
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
+        let inputs = [rune_input("A", 1000), rune_input("B", 2000)];
+        let provider = TestRuneInputProvider::with_inputs(&inputs);
+        let result = RuneBridgeOp::await_inputs(
+            test_state(),
+            &provider,
+            sender(),
+            dst_tokens(),
+            Some([(RuneName::from_str("A").unwrap(), 1000)].into()),
+        )
+        .await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 1000} are not equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]);
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_error_if_no_token_address() {
+        let inputs = [rune_input("A", 1000)];
+        let provider = TestRuneInputProvider::with_inputs(&inputs);
+        let result = RuneBridgeOp::await_inputs(
+            test_state(),
+            &provider,
+            sender(),
+            [(RuneName::from_str("C").unwrap(), token_address(5))].into(),
+            None,
+        )
+        .await;
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Invalid result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["wrapped token address for rune A not found"]);
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_correct_operation_single_input() {
+        let input = rune_input("A", 1000);
+        let provider = TestRuneInputProvider::with_input(input.clone());
+        let result =
+            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+        assert_eq!(
+            result,
+            Ok(RuneBridgeOp::AwaitConfirmations {
+                dst_address: sender(),
+                utxo: input.utxo,
+                runes_to_wrap: vec![RuneToWrap {
+                    rune_info: provider.rune_info(&RuneName::from_str("A").unwrap()),
+                    amount: 1000,
+                    wrapped_address: token_address(3),
+                }],
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn await_inputs_returns_correct_operation_multiple_inputs() {
+        MockContext::new().inject();
+
+        let inputs = vec![rune_input("A", 1000), rune_input("B", 2000)];
+        let provider = TestRuneInputProvider::with_inputs(&inputs);
+        let state = test_state();
+        let result =
+            RuneBridgeOp::await_inputs(state.clone(), &provider, sender(), dst_tokens(), None)
+                .await;
+
+        let Ok(RuneBridgeOp::OperationSplit {
+            wallet_address,
+            new_operation_ids,
+        }) = result
+        else {
+            panic!("Incorrect operation returned")
+        };
+
+        for operation in new_operation_ids {
+            assert!(state.borrow().operations.get(operation).is_some());
+        }
+
+        assert_eq!(wallet_address, sender());
     }
 }

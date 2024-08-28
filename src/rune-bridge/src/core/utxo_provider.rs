@@ -6,10 +6,11 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     SendTransactionRequest,
 };
 
-use crate::interface::{DepositError, WithdrawError};
+use crate::core::rune_inputs::GetInputsError;
+use crate::interface::WithdrawError;
 
 pub(crate) trait UtxoProvider {
-    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError>;
+    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, GetInputsError>;
     async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError>;
     async fn send_tx(&self, transaction: &Transaction) -> Result<(), WithdrawError>;
 }
@@ -27,7 +28,7 @@ impl IcUtxoProvider {
 }
 
 impl UtxoProvider for IcUtxoProvider {
-    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError> {
+    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, GetInputsError> {
         let args = GetUtxosRequest {
             address: address.to_string(),
             network: self.network,
@@ -39,11 +40,7 @@ impl UtxoProvider for IcUtxoProvider {
         let response = bitcoin_get_utxos(args)
             .await
             .map(|value| value.0)
-            .map_err(|err| {
-                DepositError::Unavailable(format!(
-                    "Unexpected response from management canister: {err:?}"
-                ))
-            })?;
+            .map_err(GetInputsError::btc)?;
 
         log::trace!("Got UTXO list result for address {address}:");
         log::trace!("{response:?}");

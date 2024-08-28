@@ -29,6 +29,8 @@ ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+snapbox = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
