@@ -1,15 +1,19 @@
 use std::path::PathBuf;
 
+use candid::Principal;
 use clap::Parser;
 use ethereum_types::H256;
 use ic_agent::Identity;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use ic_utils::interfaces::ManagementCanister;
+use ic_utils::interfaces::{ManagementCanister, WalletCanister};
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
 use crate::contracts::EvmNetwork;
+
+/// The default number of cycles to deposit to the canister
+const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
 
 /// The deploy command.
 ///
@@ -18,12 +22,29 @@ use crate::contracts::EvmNetwork;
 #[derive(Debug, Parser)]
 pub struct DeployCommands {
     /// The type of Bridge to deploy
+    ///
+    /// The bridge type to deploy. This can be one of the following:
+    /// - `rune`: The Rune bridge.
+    /// - `icrc`: The ICRC bridge.
+    /// - `erc20`: The ERC20 bridge.
+    /// - `btc`: The BTC bridge.
     #[command(subcommand)]
     bridge_type: Bridge,
 
     /// The path to the wasm file to deploy
     #[arg(long, value_name = "WASM_PATH")]
     wasm: PathBuf,
+
+    /// The number of cycles to deposit to the canister
+    ///
+    /// If not specified, the default value is 2_000_000_000_000 (2T) cycles.
+    #[arg(long, default_value_t = DEFAULT_CYCLES)]
+    cycles: u128,
+
+    /// Wallet canister ID that is used in the creation of
+    /// canisters
+    #[arg(long, value_name = "WALLET_CANISTER", env)]
+    wallet_canister: Principal,
 }
 
 impl DeployCommands {
@@ -52,13 +73,17 @@ impl DeployCommands {
             .with_identity(identity)
             .build()?;
 
-        let management_canister = ManagementCanister::create(&agent);
+        agent.fetch_root_key().await?;
 
-        let (canister_id,) = management_canister
-            .create_canister()
-            .call_and_wait()
-            .await?;
-        info!("Canister created with ID: {:?}", canister_id);
+        info!("Using  wallet canister ID: {}", self.wallet_canister);
+        let wallet = WalletCanister::create(&agent, self.wallet_canister).await?;
+
+        let canister_id = wallet
+            .wallet_create_canister(self.cycles, None, None, None, None)
+            .await?
+            .canister_id;
+
+        let management_canister = ManagementCanister::create(&agent);
 
         let arg = self.bridge_type.init_raw_arg()?;
         trace!("Bridge configuration prepared");
@@ -70,12 +95,12 @@ impl DeployCommands {
             .call_and_wait()
             .await?;
 
-        info!("Canister installed successfully with ID: {:?}", canister_id);
+        info!("Canister installed successfully with ID: {}", canister_id);
 
         if deploy_bft {
             info!("Deploying BFT bridge");
             bft_args
-                .deploy_bft(network, canister_id, &self.bridge_type, pk)
+                .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
             info!("BFT bridge deployed successfully");

@@ -8,11 +8,9 @@ use tracing::{debug, info, trace, Level};
 use crate::commands::{BFTArgs, Commands};
 use crate::contracts::EvmNetwork;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
-#[command(author, version = VERSION, about = "Bitfinity Deployer", long_about = None)]
+#[command(author, version, about = "Bitfinity Deployer", long_about = None)]
 pub struct Cli {
     /// The command to run
     #[command(subcommand)]
@@ -30,13 +28,15 @@ pub struct Cli {
         short,
         long,
         value_name = "IC_HOST",
-        default_value = "http://localhost:8080",
+        default_value = "http://localhost:4943",
         help_heading = "IC Host"
     )]
     ic_host: String,
 
     /// Deploy the BFT bridge.
-    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
+    ///
+    /// Default: true
+    #[arg(long, default_value = "true", help_heading = "Bridge Contract Args")]
     deploy_bft: bool,
 
     /// These are extra arguments for the BFT bridge.
@@ -91,7 +91,7 @@ impl Cli {
             ..
         } = cli;
 
-        info!("Starting Bitfinity Deployer v{}", VERSION);
+        info!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("IC host: {}", ic_host);
 
         trace!("Executing command: {:?}", command);

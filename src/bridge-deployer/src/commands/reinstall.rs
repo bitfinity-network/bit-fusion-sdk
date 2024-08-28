@@ -17,7 +17,12 @@ use crate::contracts::EvmNetwork;
 /// This command is used to reinstall a bridge canister to the IC network.
 #[derive(Debug, Parser)]
 pub struct ReinstallCommands {
-    /// The type of Bridge to deploy
+    /// The type of Bridge to reinstall
+    /// This can be one of the following:
+    /// - `rune`: The Rune bridge.
+    /// - `icrc`: The ICRC bridge.
+    /// - `erc20`: The ERC20 bridge.
+    /// - `btc`: The BTC bridge.
     #[command(subcommand)]
     bridge_type: Bridge,
 
@@ -74,7 +79,7 @@ impl ReinstallCommands {
         if deploy_bft {
             info!("Deploying BFT bridge");
             bft_args
-                .deploy_bft(network, self.canister_id, &self.bridge_type, pk)
+                .deploy_bft(network, self.canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
             info!("BFT bridge deployed successfully");

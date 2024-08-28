@@ -14,7 +14,7 @@ pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
     #[arg(long)]
     pub evm_principal: Principal,
-    #[arg(long)]
+    #[arg(long, default_value_t = SigningKeyId::Test)]
     pub signing_key_id: SigningKeyId,
     #[arg(long)]
     pub admin: Principal,
@@ -22,7 +22,7 @@ pub struct RuneBridgeConfig {
     pub min_confirmations: u32,
     #[arg(long)]
     pub no_of_indexers: u8,
-    #[arg(long)]
+    #[arg(long, value_delimiter = ',')]
     pub indexer_urls: Vec<String>,
     #[arg(long)]
     pub deposit_fee: u64,

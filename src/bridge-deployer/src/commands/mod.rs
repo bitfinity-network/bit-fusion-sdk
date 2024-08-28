@@ -1,14 +1,16 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use bridge_did::error::BftResult;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
 use deploy::DeployCommands;
 use ethereum_types::{H160, H256};
-use ic_canister_client::CanisterClient;
+use ic_agent::Agent;
+use ic_canister_client::{CanisterClient, IcAgentClient};
 use reinstall::ReinstallCommands;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 use upgrade::UpgradeCommands;
 
 use crate::config;
@@ -47,17 +49,17 @@ pub enum Commands {
 pub enum Bridge {
     Rune {
         /// The configuration to use
-        #[command(name = "config", flatten)]
+        #[command(flatten)]
         config: config::RuneBridgeConfig,
     },
     Icrc {
         /// The configuration to use
-        #[command(name = "config", flatten)]
+        #[command(flatten)]
         config: config::InitBridgeConfig,
     },
     Erc20 {
         /// The configuration to use
-        #[command(name = "config", flatten)]
+        #[command(flatten)]
         init: config::InitBridgeConfig,
         /// Extra configuration for the ERC20 bridge
         #[command(name = "erc", flatten)]
@@ -65,7 +67,7 @@ pub enum Bridge {
     },
     Btc {
         /// The configuration to use
-        #[command(name = "config", flatten)]
+        #[command(flatten)]
         config: config::InitBridgeConfig,
     },
 }
@@ -120,6 +122,7 @@ impl Commands {
     /// It takes in various parameters such as the identity file path, the IC host, the Ethereum network,
     /// the private key, whether to deploy the BFT contract, and the BFT contract arguments.
     /// The function returns a result indicating whether the operation was successful or not.
+
     pub async fn run(
         &self,
         identity: PathBuf,
@@ -166,6 +169,7 @@ impl BFTArgs {
         canister_id: Principal,
         bridge: &Bridge,
         pk: H256,
+        agent: &Agent,
     ) -> anyhow::Result<H160> {
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
@@ -173,11 +177,16 @@ impl BFTArgs {
 
         let expected_address = contract_deployer.compute_fee_charge_address(expected_nonce)?;
 
-        let canister_client = ic_canister_client::ic_client::IcCanisterClient::new(canister_id);
+        let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
+
+        // Sleep for 1 second to allow the canister to be created
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
             .await??;
+
+        info!("Minter address: {:x}", minter_address);
 
         let is_wrapped_side = bridge.is_wrapped_side();
 
@@ -189,11 +198,7 @@ impl BFTArgs {
             &self.controllers,
         )?;
 
-        contract_deployer.deploy_fee_charge(
-            &[bft_address],
-            expected_nonce,
-            Some(expected_address.to_string().as_str()),
-        )?;
+        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_address))?;
 
         Ok(bft_address)
     }

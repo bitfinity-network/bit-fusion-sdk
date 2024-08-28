@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
@@ -9,11 +9,13 @@ use ethereum_json_rpc_client::EthJsonRpcClient;
 use ethereum_types::H256;
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, H160};
-use tracing::{error, info};
+use ethers_core::utils::hex::ToHexExt;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
+#[strum(serialize_all = "snake_case")]
 pub enum EvmNetwork {
-    Local,
+    Localhost,
     Testnet,
     Mainnet,
 }
@@ -42,7 +44,7 @@ impl SolidityContractDeployer<'_> {
 
     pub fn get_network_url(&self) -> &'static str {
         match self.network {
-            EvmNetwork::Local => "http://localhost:8545",
+            EvmNetwork::Localhost => "http://127.0.0.1:8545",
             EvmNetwork::Testnet => "https://testnet.bitfinity.network",
             EvmNetwork::Mainnet => "https://mainnet.bitfinity.network",
         }
@@ -70,13 +72,13 @@ impl SolidityContractDeployer<'_> {
         info!("Deploying BFT contract");
 
         let network = self.network.to_string();
-        let minter_address = minter_address.to_string();
-        let fee_charge_address = fee_charge_address.to_string();
+        let minter_address = minter_address.encode_hex_with_prefix();
+        let fee_charge_address = fee_charge_address.encode_hex_with_prefix();
         let is_wrapped_side = is_wrapped_side.to_string();
-        let owner = owner.map(|o| o.to_string());
+        let owner = owner.map(|o| o.encode_hex_with_prefix());
         let controllers = controllers.as_ref().map(|c| {
             c.iter()
-                .map(H160::to_string)
+                .map(H160::encode_hex_upper_with_prefix)
                 .collect::<Vec<String>>()
                 .join(",")
         });
@@ -103,19 +105,41 @@ impl SolidityContractDeployer<'_> {
             args.push(controllers);
         }
 
-        let output = Command::new("npx")
-            .args(&args)
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join("solidity");
+        let dir = dir.display();
+        info!("Deploying Fee Charge contract in {}", dir);
+
+        debug!(
+            "Executing command: sh -c cd {} && npx {}",
+            dir,
+            args.join(" ")
+        );
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .output()
             .context("Failed to execute deploy-bft command")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("BFT deployment failed: {}", stderr);
-            return Err(anyhow::anyhow!("BFT deployment failed: {}", stderr));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            eprintln!(
+                "deploy-bft command failed. Stdout:\n{}\nStderr:\n{}",
+                stdout, stderr
+            );
+
+            return Err(anyhow::anyhow!("deploy-bft command failed"));
+        } else {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("deploy-bft command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        info!("BFT deployment output: {}", stdout);
 
         // Extract the proxy address from the output
         let proxy_address = stdout
@@ -143,46 +167,67 @@ impl SolidityContractDeployer<'_> {
     pub fn deploy_fee_charge(
         &self,
         bridges: &[H160],
-        nonce: u64,
-        expected_address: Option<&str>,
+        expected_address: Option<H160>,
     ) -> Result<H160> {
         info!("Deploying Fee Charge contract");
-        let binding = bridges
+        let bridges = bridges
             .iter()
-            .map(H160::to_string)
+            .map(H160::encode_hex_upper_with_prefix)
             .collect::<Vec<String>>()
             .join(",");
-        let nonce = nonce.to_string();
         let network = self.network.to_string();
+        let expected_address = expected_address.map(|addr| addr.encode_hex_upper_with_prefix());
+
         let mut args = vec![
             "hardhat",
             "deploy-fee-charge",
             "--network",
             &network,
             "--bridges",
-            &binding,
-            "--nonce",
-            &nonce,
+            &bridges,
         ];
 
-        if let Some(addr) = expected_address {
+        if let Some(ref addr) = expected_address {
             args.push("--expected-address");
-            args.push(addr);
+            args.push(addr)
         }
 
-        let output = Command::new("npx")
-            .args(&args)
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join("solidity");
+
+        let dir = dir.display();
+        info!("Deploying Fee Charge contract in {}", dir);
+
+        debug!(
+            "Executing command: sh -c cd {} && npx {}",
+            dir,
+            args.join(" ")
+        );
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .output()
-            .context("Failed to execute deploy-fee-charge command")?;
+            .context("Failed to execute deploy-bft command")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Fee Charge deployment failed: {}", stderr);
-            return Err(anyhow::anyhow!("Fee Charge deployment failed: {}", stderr));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            eprintln!(
+                "deploy-fee-charge command failed. Stdout:\n{}\nStderr:\n{}",
+                stdout, stderr
+            );
+
+            return Err(anyhow::anyhow!("deploy-fee-charge command failed"));
+        } else {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("deploy-fee-charge command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        info!("Fee Charge deployment output: {}", stdout);
 
         // Extract the fee charge address from the output
         let fee_charge_address = stdout

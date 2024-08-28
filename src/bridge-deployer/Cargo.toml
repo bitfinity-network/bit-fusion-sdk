@@ -12,11 +12,11 @@ clap = { workspace = true, features = ["env"] }
 did = { workspace = true }
 erc20-bridge = { path = "../erc20-bridge" }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest", "pocket-ic-tests-client"] }
+ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 ic-agent = { workspace = true }
-ic-canister-client = { workspace = true, features = ["pocket-ic-client", "ic-agent-client"] }
+ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-utils = { workspace = true }

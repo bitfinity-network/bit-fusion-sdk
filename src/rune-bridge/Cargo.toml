@@ -10,8 +10,8 @@ export-api = []
 [dependencies]
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
-bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-canister = { path = "../bridge-canister" }
+bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
@@ -32,6 +32,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+bitcoin = { workspace = true, features = ["rand-std"] }
 snapbox = { workspace = true }
 tokio = { workspace = true }
-bitcoin = { workspace = true, features = ["rand-std"] }
