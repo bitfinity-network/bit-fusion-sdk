@@ -241,11 +241,14 @@ impl Operation for RuneBridgeOp {
         match event.notification_type {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event.user_data, RuneDepositRequestData) {
-                    Ok(data) => Some(OperationAction::Create(Self::AwaitInputs {
-                        dst_address: data.dst_address,
-                        dst_tokens: data.dst_tokens,
-                        requested_amounts: data.amounts,
-                    })),
+                    Ok(data) => Some(OperationAction::Create(
+                        Self::AwaitInputs {
+                            dst_address: data.dst_address,
+                            dst_tokens: data.dst_tokens,
+                            requested_amounts: data.amounts,
+                        },
+                        event.memo(),
+                    )),
                     _ => {
                         log::warn!(
                             "Invalid encoded deposit request: {}",
