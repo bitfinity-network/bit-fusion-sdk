@@ -9,7 +9,7 @@ export-api = []
 
 [dependencies]
 async-trait = { workspace = true }
-bitcoin = { workspace = true, features = ["rand-std"] }
+bitcoin = { workspace = true }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-canister = { path = "../bridge-canister" }
 bridge-utils = { path = "../bridge-utils" }
@@ -34,3 +34,4 @@ thiserror = { workspace = true }
 [dev-dependencies]
 snapbox = { workspace = true }
 tokio = { workspace = true }
+bitcoin = { workspace = true, features = ["rand-std"] }
