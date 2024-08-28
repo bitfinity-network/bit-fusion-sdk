@@ -163,7 +163,7 @@ impl Brc20Context {
             .await
             .expect("failed to setup brc20 tokens");
 
-        let context = DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
+        let context = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
         context
             .evm_client(ADMIN)
             .set_logger_filter("info")

@@ -1330,7 +1330,7 @@ impl TestCanisters {
         *self
             .0
             .get(&CanisterType::Erc20Bridge)
-            .expect("erc20 bridge canister should be initialized (see `TestContext::new()`)")
+            .expect("brc20 bridge canister should be initialized (see `TestContext::new()`)")
     }
 
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {

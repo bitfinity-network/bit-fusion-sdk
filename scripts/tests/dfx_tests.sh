@@ -18,6 +18,8 @@ setup_docker() {
     cd btc-deploy/
     rm -rf bitcoin-data/*
     mkdir -p bitcoin-data/
+    rm -rf db-data/*
+    mkdir -p db-data/
     docker compose up -d --build --force-recreate
     cd $PREV_PATH
 }

@@ -34,18 +34,10 @@ services:
   ordhook:
     container_name: ordhook
     build:
-      context: https://github.com/hirosystems/ordhook.git
-      dockerfile: dockerfiles/components/ordhook.dockerfile
+      context: .
+      dockerfile: ordhook.dockerfile
     ports:
       - "20456:20456"
-    command:
-      [
-        "service",
-        "start",
-        "--post-to=http://hiro-ordinals-api:3099/payload",
-        "--auth-token=1",
-        "--config-path=/Ordhook.toml",
-      ]
     volumes:
       - ./Ordhook.toml:/Ordhook.toml
     depends_on:
@@ -84,7 +76,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - ./db-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -100,6 +92,3 @@ services:
       - "8002:8002"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-volumes:
-  db-data:
