@@ -13,7 +13,9 @@ RUN git clone https://github.com/hirosystems/ordinals-api.git && \
   cd ordinals-api && \
   git checkout v4.0.4 && \
   npm install && \
-  npm run build
+  npm run build && \
+  npm run generate:git-info && \
+  npm prune --production
 
 EXPOSE 3000 8005
 
