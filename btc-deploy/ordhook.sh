@@ -1,4 +1,5 @@
 #!/bin/bash
 
-ordhook db sync --config-path=/Ordhook.toml
-ordhook service start --post-to=http://hiro-ordinals-api:3099/payload --auth-token=1 --config-path=/Ordhook.toml
+ordhook db new --config-path=/Ordhook.toml
+echo "Database created"
+ordhook service start --post-to=http://hiro-ordinals-api:3000/payload --auth-token=1 --config-path=/Ordhook.toml
