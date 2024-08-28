@@ -102,7 +102,7 @@ impl BtcBridge {
     }
 
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, BtcBridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations

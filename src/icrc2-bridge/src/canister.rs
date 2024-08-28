@@ -103,6 +103,14 @@ impl Icrc2BridgeCanister {
             .get_log(operation_id)
     }
 
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, IcrcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
+    }
+
     /// Adds the provided principal to the whitelist.
     #[update]
     pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {

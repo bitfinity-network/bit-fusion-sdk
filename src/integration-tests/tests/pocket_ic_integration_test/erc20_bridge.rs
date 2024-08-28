@@ -285,7 +285,8 @@ async fn test_external_bridging() {
         .await
         .unwrap();
     assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0].0.as_u64(), expected_operation_id as u64);
+    assert_eq!(operations[0].0, alice_address);
+    assert_eq!(operations[0].1.as_u64(), expected_operation_id as u64);
 
     let balance = ctx
         .context

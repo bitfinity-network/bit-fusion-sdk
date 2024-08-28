@@ -110,7 +110,7 @@ impl Erc20Bridge {
     }
 
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, Erc20BridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, Erc20BridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations

@@ -95,7 +95,7 @@ impl RuneBridge {
 
     /// Returns operation by memo
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(OperationId, RuneBridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, RuneBridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations

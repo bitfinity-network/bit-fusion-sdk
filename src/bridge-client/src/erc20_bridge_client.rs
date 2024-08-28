@@ -48,7 +48,7 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
     pub async fn get_operations_by_memo(
         &self,
         memo: Memo,
-    ) -> CanisterClientResult<Vec<(OperationId, Erc20BridgeOp)>> {
+    ) -> CanisterClientResult<Vec<(H160, OperationId, Erc20BridgeOp)>> {
         self.client.query("get_operations_by_memo", (memo,)).await
     }
 

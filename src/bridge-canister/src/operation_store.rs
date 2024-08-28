@@ -227,11 +227,16 @@ where
     }
 
     /// Retrieve operations for the given memo.
-    pub fn get_operations_by_memo(&self, memo: &Memo) -> Vec<(OperationId, P)> {
+    pub fn get_operations_by_memo(&self, memo: &Memo) -> Vec<(H160, OperationId, P)> {
         self.memo_operation_map
-            .into_iter()
-            .filter_map(|(m, _, id)| (m == *memo).then_some(id))
-            .filter_map(|id| self.get_with_id(id))
+            .iter()
+            .filter_map(|(stored_memo, user, id)| {
+                if *memo == stored_memo {
+                    self.get_with_id(id).map(|(id, op)| (user, id, op))
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
