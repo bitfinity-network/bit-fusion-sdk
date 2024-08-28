@@ -18,12 +18,12 @@ pub enum EvmNetwork {
     Mainnet,
 }
 
-pub struct ContractDeployer<'a> {
+pub struct SolidityContractDeployer<'a> {
     network: EvmNetwork,
     wallet: Wallet<'a, SigningKey>,
 }
 
-impl ContractDeployer<'_> {
+impl SolidityContractDeployer<'_> {
     /// Creates a new `ContractDeployer` instance with the given network and private key.
     ///
     /// # Arguments

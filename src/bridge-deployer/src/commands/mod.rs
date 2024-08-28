@@ -12,7 +12,7 @@ use tracing::{debug, trace};
 use upgrade::UpgradeCommands;
 
 use crate::config;
-use crate::contracts::{ContractDeployer, EvmNetwork};
+use crate::contracts::{EvmNetwork, SolidityContractDeployer};
 
 mod deploy;
 mod reinstall;
@@ -167,7 +167,7 @@ impl BFTArgs {
         bridge: &Bridge,
         pk: H256,
     ) -> anyhow::Result<H160> {
-        let contract_deployer = ContractDeployer::new(network, pk);
+        let contract_deployer = SolidityContractDeployer::new(network, pk);
 
         let expected_nonce = contract_deployer.get_nonce().await? + 2;
 

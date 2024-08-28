@@ -11,6 +11,10 @@ use tracing::{debug, info, trace};
 use super::{BFTArgs, Bridge};
 use crate::contracts::EvmNetwork;
 
+/// The deploy command.
+///
+/// This command is used to deploy a bridge canister to the IC network.
+/// It will also deploy the BFT bridge if the `deploy_bft` flag is set to true.
 #[derive(Debug, Parser)]
 pub struct DeployCommands {
     /// The type of Bridge to deploy

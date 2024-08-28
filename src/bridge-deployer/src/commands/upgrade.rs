@@ -7,6 +7,9 @@ use ic_utils::interfaces::management_canister::builders::InstallMode;
 use ic_utils::interfaces::ManagementCanister;
 use tracing::info;
 
+/// The upgrade command.
+///
+/// This command is used to upgrade a canister on the IC network.
 #[derive(Debug, Parser)]
 pub struct UpgradeCommands {
     #[arg(long, value_name = "CANISTER_ID")]

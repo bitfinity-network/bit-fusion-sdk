@@ -12,6 +12,9 @@ use tracing::{debug, info, trace};
 use super::{BFTArgs, Bridge};
 use crate::contracts::EvmNetwork;
 
+/// The reinstall command.
+///
+/// This command is used to reinstall a bridge canister to the IC network.
 #[derive(Debug, Parser)]
 pub struct ReinstallCommands {
     /// The type of Bridge to deploy

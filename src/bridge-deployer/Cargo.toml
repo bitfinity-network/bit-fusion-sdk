@@ -23,7 +23,7 @@ ic-utils = { workspace = true }
 icrc2-bridge = { path = "../icrc2-bridge" }
 rune-bridge = { path = "../rune-bridge" }
 serde = { workspace = true }
-strum = "0.26"
+strum = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
