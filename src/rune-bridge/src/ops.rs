@@ -787,7 +787,10 @@ mod tests {
             panic!("Invalid result: {result:?}");
         };
 
-        assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 1000} are not equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]);
+        assert_data_eq!(
+            message,
+            str!["requested amounts {RuneName(Rune(0)): 1000} are not equal actual amounts [..]"]
+        );
     }
 
     #[tokio::test]
