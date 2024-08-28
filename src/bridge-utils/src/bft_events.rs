@@ -198,7 +198,7 @@ impl From<BurnTokenEvent> for BurntEventData {
 }
 
 /// Event emitted when token is minted by BFTBridge.
-#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MintedEventData {
     pub amount: did::U256,
     pub from_token: Vec<u8>,
