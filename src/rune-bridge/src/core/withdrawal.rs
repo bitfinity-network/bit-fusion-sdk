@@ -460,8 +460,9 @@ mod test {
     use ord_rs::wallet::LocalSigner;
 
     use super::*;
+    use crate::core::rune_inputs::GetInputsError;
     use crate::core::utxo_provider::UtxoProvider;
-    use crate::interface::{DepositError, WithdrawError};
+    use crate::interface::WithdrawError;
     use crate::key::BtcSignerType;
     use crate::state::RuneState;
 
@@ -490,7 +491,7 @@ mod test {
     }
 
     impl UtxoProvider for FakeUtxoProvider {
-        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, DepositError> {
+        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, GetInputsError> {
             unimplemented!()
         }
 
