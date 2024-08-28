@@ -197,8 +197,8 @@ impl<'a> Brc20Helper<'a> {
         loop {
             self.client.generate_to_address(self.address, 1)?;
             tokio::time::sleep(Duration::from_millis(100)).await;
-            let confirmations = self.client.get_transaction_confirmations(&txid)?;
-            println!("commit transaction confirmations: {}", confirmations);
+            let confirmations: u32 = self.client.get_transaction_confirmations(txid)?;
+            println!("commit transaction {txid} confirmations: {}", confirmations);
             if confirmations >= required_confirmations {
                 break;
             }

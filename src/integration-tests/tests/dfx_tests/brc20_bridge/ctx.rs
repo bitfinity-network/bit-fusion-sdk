@@ -72,9 +72,7 @@ pub fn generate_brc20_tick() -> Brc20Tick {
     for _ in 0..4 {
         name.push(rng.gen_range(b'a'..=b'z') as char);
     }
-    let tick = Brc20Tick::from_str(&name).unwrap();
-
-    tick
+    Brc20Tick::from_str(&name).unwrap()
 }
 
 pub fn generate_wallet_name() -> String {

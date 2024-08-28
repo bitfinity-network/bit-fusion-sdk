@@ -62,7 +62,7 @@ impl FromStr for Brc20Tick {
 
 impl Display for Brc20Tick {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", String::from_utf8_lossy(&self.0).to_string())
+        write!(f, "{}", String::from_utf8_lossy(&self.0))
     }
 }
 

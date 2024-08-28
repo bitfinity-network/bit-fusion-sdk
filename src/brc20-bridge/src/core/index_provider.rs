@@ -3,7 +3,6 @@ mod hiro;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::str::FromStr;
-use std::usize;
 
 use bitcoin::Address;
 use ic_exports::ic_cdk::api::management_canister::http_request::{
