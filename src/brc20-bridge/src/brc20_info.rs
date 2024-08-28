@@ -83,7 +83,7 @@ impl Storable for Brc20Info {
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let name = bytes[0..4].try_into().unwrap();
-        let decimals = u8::from_le_bytes(bytes[16..17].try_into().unwrap());
+        let decimals = u8::from_le_bytes(bytes[4..5].try_into().unwrap());
         Self {
             tick: Brc20Tick(name),
             decimals,
