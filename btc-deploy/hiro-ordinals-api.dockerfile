@@ -16,9 +16,10 @@ RUN git clone https://github.com/hirosystems/ordinals-api.git && \
   npm run build && \
   npm run generate:git-info && \
   npm prune --production && \
-  sed -i -e 's/BRC20_GENESIS_BLOCK = 779832/BRC20_GENESIS_BLOCK = 0/g' src/pg/brc20/brc20-pg-store.ts
+  sed -i -e 's/BRC20_GENESIS_BLOCK = 779832/BRC20_GENESIS_BLOCK = 0/g' src/pg/brc20/brc20-pg-store.ts && \
+  sed -i -e 's/ORDINALS_GENESIS_BLOCK = 767430/ORDINALS_GENESIS_BLOCK = 0/g' src/pg/pg-store.ts
 
 
-EXPOSE 3000 8005
+EXPOSE 3000 3099 8005
 
 ENTRYPOINT ./ordinals-api.sh

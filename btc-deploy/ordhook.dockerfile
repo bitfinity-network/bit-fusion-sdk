@@ -1,6 +1,6 @@
 FROM rust:bullseye as build
 
-ARG GIT_COMMIT='a435dc0'
+ARG GIT_COMMIT='ee160a28'
 
 ENV GIT_COMMIT=${GIT_COMMIT}
 
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y git ca-certificates pkg-config libssl-d
 
 RUN rustup update 1.77.1 && rustup default 1.77.1
 
-RUN git clone https://github.com/veeso/ordhook.git /src && cd /src && git checkout $GIT_COMMIT
+RUN git clone https://github.com/veeso/ordhook.git /src && cd /src
 
 RUN mkdir /out
 
