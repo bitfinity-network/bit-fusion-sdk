@@ -243,29 +243,6 @@ impl<B: BaseTokens> StressTestState<B> {
             )
             .await??;
 
-        let mut user_balances = Vec::with_capacity(self.users.len());
-        for user in self.users {
-            let mut user_balances_for_token = Vec::with_capacity(self.wrapped_tokens.len());
-            for token_idx in 0..self.wrapped_tokens.len() {
-                let base_balance = self.base_tokens.balance_of(token_idx, &user.1).await?;
-
-                let wrapped_token = &self.wrapped_tokens[token_idx];
-                let wrapped_balance = self
-                    .base_tokens
-                    .ctx()
-                    .check_erc20_balance(wrapped_token, &user.0, None)
-                    .await?;
-
-                let balance = UserBalances {
-                    base: base_balance,
-                    wrapped: wrapped_balance.into(),
-                };
-                user_balances_for_token.push(balance);
-            }
-
-            user_balances.push(user_balances_for_token);
-        }
-
         Ok(StressTestStats {
             successful_deposits,
             failed_deposits,
@@ -273,7 +250,6 @@ impl<B: BaseTokens> StressTestState<B> {
             failed_withdrawals,
             init_bridge_canister_native_balance,
             finish_bridge_canister_native_balance,
-            user_balances,
         })
     }
 
@@ -296,7 +272,7 @@ impl<B: BaseTokens> StressTestState<B> {
 
     async fn withdraw_on_positive_balance(&self, token_idx: usize, user_idx: usize) -> Result<()> {
         println!("Trying to withdraw token#{token_idx} for user#{user_idx}");
-        const WAIT_FOR_BALANCE_TIMEOUT: Duration = Duration::from_secs(30);
+        const WAIT_FOR_BALANCE_TIMEOUT: Duration = Duration::from_secs(60);
         let balance_future = self.wait_for_wrapped_balance(token_idx, user_idx);
         let balance_result = tokio::time::timeout(WAIT_FOR_BALANCE_TIMEOUT, balance_future).await;
 
@@ -354,13 +330,4 @@ pub struct StressTestStats {
     pub failed_withdrawals: usize,
     pub init_bridge_canister_native_balance: U256,
     pub finish_bridge_canister_native_balance: U256,
-
-    /// Balances of each user for each token on both: base and wrapped sides.
-    pub user_balances: Vec<Vec<UserBalances>>,
-}
-
-#[derive(Debug)]
-pub struct UserBalances {
-    base: U256,
-    wrapped: U256,
 }

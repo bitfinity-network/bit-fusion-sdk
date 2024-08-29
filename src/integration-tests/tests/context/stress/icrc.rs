@@ -228,6 +228,6 @@ pub async fn stress_test_icrc_bridge_with_ctx<T>(
 
     dbg!(&icrc_stress_test_stats);
 
-    assert!(icrc_stress_test_stats.failed_deposits == 0);
-    assert!(icrc_stress_test_stats.failed_withdrawals == 0);
+    assert_eq!(icrc_stress_test_stats.failed_deposits, 0);
+    assert_eq!(icrc_stress_test_stats.failed_withdrawals, 0);
 }
