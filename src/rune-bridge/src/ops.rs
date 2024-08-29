@@ -524,6 +524,7 @@ mod tests {
             incomplete_operations: memory_by_id(MemoryId::new(2)),
             operations_log: memory_by_id(MemoryId::new(3)),
             operations_map: memory_by_id(MemoryId::new(4)),
+            memo_operations_map: memory_by_id(MemoryId::new(5)),
         }
     }
 
@@ -570,6 +571,7 @@ mod tests {
             notification_type: MinterNotificationType::RescheduleOperation,
             tx_sender: sender(),
             user_data: Encode!(&notification).unwrap(),
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
@@ -597,6 +599,7 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
@@ -623,16 +626,20 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
         assert_eq!(
             result,
-            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
-                dst_address: sender(),
-                dst_tokens: dst_tokens(),
-                requested_amounts: None,
-            }))
+            Some(OperationAction::Create(
+                RuneBridgeOp::AwaitInputs {
+                    dst_address: sender(),
+                    dst_tokens: dst_tokens(),
+                    requested_amounts: None,
+                },
+                None
+            ))
         )
     }
 
@@ -650,16 +657,20 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
         assert_eq!(
             result,
-            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
-                dst_address: sender(),
-                dst_tokens: dst_tokens(),
-                requested_amounts: Some(amounts),
-            }))
+            Some(OperationAction::Create(
+                RuneBridgeOp::AwaitInputs {
+                    dst_address: sender(),
+                    dst_tokens: dst_tokens(),
+                    requested_amounts: Some(amounts),
+                },
+                None
+            ))
         )
     }
 
