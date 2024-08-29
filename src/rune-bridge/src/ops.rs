@@ -17,8 +17,9 @@ use serde::Serialize;
 use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
 use crate::core::rune_inputs::RuneInputProvider;
+use crate::core::utxo_handler::{RuneToWrap, UtxoHandler};
 use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
-use crate::rune_info::{RuneInfo, RuneName};
+use crate::rune_info::RuneName;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
 pub enum RuneBridgeOp {
@@ -69,13 +70,6 @@ pub enum RuneBridgeOp {
     },
 }
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuneToWrap {
-    rune_info: RuneInfo,
-    amount: u128,
-    wrapped_address: H160,
-}
-
 impl Operation for RuneBridgeOp {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
@@ -104,7 +98,14 @@ impl Operation for RuneBridgeOp {
                 log::debug!(
                     "RuneBridgeOp::AwaitConfirmations {dst_address} {utxo:?} {runes_to_wrap:?}"
                 );
-                Self::await_confirmations(ctx, dst_address, utxo, runes_to_wrap).await
+                Self::await_confirmations(
+                    ctx.clone(),
+                    &RuneDeposit::get(ctx),
+                    dst_address,
+                    utxo,
+                    runes_to_wrap,
+                )
+                .await
             }
             RuneBridgeOp::SignMintOrder {
                 dst_address,
@@ -382,36 +383,26 @@ impl RuneBridgeOp {
 
     async fn await_confirmations(
         ctx: RuntimeState<Self>,
+        utxo_handler: &impl UtxoHandler,
         dst_address: H160,
         utxo: Utxo,
         runes_to_wrap: Vec<RuneToWrap>,
     ) -> BftResult<Self> {
-        let deposit = RuneDeposit::get(ctx.clone());
-        deposit
-            .check_confirmations(&dst_address, &[utxo.clone()])
+        utxo_handler
+            .check_confirmations(&dst_address, &utxo)
             .await
-            .map_err(|err| Error::FailedToProgress(format!("inputs are not confirmed: {err:?}")))?;
+            .map_err(|err| Error::FailedToProgress(err.to_string()))?;
 
-        let deposit_runes = runes_to_wrap.iter().map(|rune| rune.rune_info).collect();
-        deposit
-            .deposit(&utxo, &dst_address, deposit_runes)
+        let mint_orders = utxo_handler
+            .deposit(&utxo, &dst_address, runes_to_wrap)
             .await
-            .map_err(|err| Error::FailedToProgress(format!("{err:?}")))?;
+            .map_err(|err| Error::FailedToProgress(err.to_string()))?;
 
-        let operations = runes_to_wrap
+        let operations = mint_orders
             .into_iter()
-            .map(|to_wrap| {
-                let mint_order = deposit.create_unsigned_mint_order(
-                    &dst_address,
-                    &to_wrap.wrapped_address,
-                    to_wrap.amount,
-                    to_wrap.rune_info,
-                    0,
-                );
-                Self::SignMintOrder {
-                    dst_address: dst_address.clone(),
-                    mint_order,
-                }
+            .map(|mint_order| Self::SignMintOrder {
+                dst_address: dst_address.clone(),
+                mint_order,
             })
             .collect();
 
@@ -510,6 +501,9 @@ mod tests {
     use super::*;
     use crate::core::rune_inputs::mock::TestRuneInputProvider;
     use crate::core::rune_inputs::{GetInputsError, RuneInput};
+    use crate::core::utxo_handler::test::TestUtxoHandler;
+    use crate::core::utxo_handler::UtxoHandlerError;
+    use crate::rune_info::RuneInfo;
 
     fn op_memory() -> OperationsMemory<StableMemory> {
         OperationsMemory {
@@ -853,6 +847,174 @@ mod tests {
 
         for operation in new_operation_ids {
             assert!(state.borrow().operations.get(operation).is_some());
+        }
+
+        assert_eq!(wallet_address, sender());
+    }
+
+    fn get_utxo() -> Utxo {
+        Utxo {
+            outpoint: Outpoint {
+                txid: vec![],
+                vout: 0,
+            },
+            value: 0,
+            height: 0,
+        }
+    }
+
+    fn get_to_wrap(count: usize) -> Vec<RuneToWrap> {
+        let mut result = vec![];
+        for _ in 0..count {
+            result.push(RuneToWrap {
+                rune_info: RuneInfo {
+                    name: RuneName::from_str("A").unwrap(),
+                    decimals: 0,
+                    block: 0,
+                    tx: 0,
+                },
+                amount: 0,
+                wrapped_address: H160::from_slice(&[1; 20]),
+            })
+        }
+
+        result
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_utxo_not_found() {
+        let utxo_handler = TestUtxoHandler::with_error(UtxoHandlerError::UtxoNotFound);
+        let result = RuneBridgeOp::await_confirmations(
+            test_state(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(1),
+        )
+        .await;
+
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["requested utxo is not in the main branch"]);
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_not_confirmed() {
+        let utxo_handler = TestUtxoHandler::with_error(UtxoHandlerError::NotConfirmed {
+            required_confirmations: 12,
+            current_confirmations: 5,
+        });
+        let result = RuneBridgeOp::await_confirmations(
+            test_state(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(1),
+        )
+        .await;
+
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert_data_eq!(
+            message,
+            str!["utxo is not confirmed, required 12, currently 5 confirmations"]
+        );
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_btc_adapter_not_available() {
+        let utxo_handler =
+            TestUtxoHandler::with_error(UtxoHandlerError::BtcAdapter("btc error".to_string()));
+        let result = RuneBridgeOp::await_confirmations(
+            test_state(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(1),
+        )
+        .await;
+
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert_data_eq!(
+            message,
+            str!["failed to connect to IC BTC adapter: btc error"]
+        );
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_utxo_already_used() {
+        let utxo_handler = TestUtxoHandler::already_used_utxo();
+        let result = RuneBridgeOp::await_confirmations(
+            test_state(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(1),
+        )
+        .await;
+
+        let Err(Error::FailedToProgress(message)) = result else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert_data_eq!(message, str!["utxo is already used to create mint orders"]);
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_one_mint_order() {
+        let utxo_handler = TestUtxoHandler::ok();
+        let result = RuneBridgeOp::await_confirmations(
+            test_state(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(1),
+        )
+        .await;
+
+        let Ok(operation) = result else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
+    }
+
+    #[tokio::test]
+    async fn await_confirmations_multiple_mint_orders() {
+        MockContext::new().inject();
+
+        const COUNT: usize = 3;
+        let utxo_handler = TestUtxoHandler::ok();
+        let state = test_state();
+        let result = RuneBridgeOp::await_confirmations(
+            state.clone(),
+            &utxo_handler,
+            sender(),
+            get_utxo(),
+            get_to_wrap(COUNT),
+        )
+        .await;
+
+        let Ok(RuneBridgeOp::OperationSplit {
+            new_operation_ids,
+            wallet_address,
+        }) = result
+        else {
+            panic!("Wrong result: {result:?}");
+        };
+
+        assert_eq!(new_operation_ids.len(), COUNT);
+
+        for operation_id in new_operation_ids {
+            let operation = state.borrow().operations.get(operation_id).unwrap();
+            assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
         }
 
         assert_eq!(wallet_address, sender());
