@@ -688,8 +688,10 @@ mod tests {
 
     #[tokio::test]
     async fn await_inputs_returns_error_if_provider_returns_indexer_error() {
-        let provider = TestRuneInputProvider::err(GetInputsError::IndexersNotAvailable {
-            checked_indexers: vec!["url".to_string()],
+        let provider = TestRuneInputProvider::err(GetInputsError::InsufficientConsensus {
+            received_responses: 0,
+            required_responses: 1,
+            checked_indexers: 0,
         });
         let result =
             RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
@@ -699,7 +701,9 @@ mod tests {
 
         assert_data_eq!(
             message,
-            str![[r#"failed to get deposit inputs: rune indexers are not available: ["url"]"#]]
+            str![
+                "failed to get deposit inputs: insufficient consensus from rune indexers: 0/1 responses received, 0 indexers checked"
+            ]
         )
     }
 

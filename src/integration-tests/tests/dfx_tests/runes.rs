@@ -162,6 +162,7 @@ impl RunesContext {
             indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
         };
         context
             .install_canister(
