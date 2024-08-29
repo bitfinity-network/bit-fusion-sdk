@@ -17,10 +17,10 @@ services:
       timeout: 10s
       retries: 5
 
-  hiro-ordinals-api:
-    container_name: hiro-ordinals-api
+  ordinals-api:
+    container_name: ordinals-api
     build:
-      dockerfile: hiro-ordinals-api.dockerfile
+      dockerfile: ordinals-api.dockerfile
       context: .
     depends_on:
       bitcoind:
@@ -42,7 +42,7 @@ services:
     volumes:
       - ./Ordhook.toml:/Ordhook.toml
     depends_on:
-      hiro-ordinals-api:
+      ordinals-api:
         condition: service_started
 
   ordinals-explorer:
@@ -56,7 +56,7 @@ services:
     volumes:
       - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
     depends_on:
-      hiro-ordinals-api:
+      ordinals-api:
         condition: service_started
 
   ord:

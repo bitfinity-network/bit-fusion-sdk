@@ -1,4 +1,4 @@
-FROM rust:bullseye as build
+FROM rust:bullseye AS build
 
 ARG GIT_COMMIT='ee160a28'
 
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y git ca-certificates pkg-config libssl-d
 
 RUN rustup update 1.77.1 && rustup default 1.77.1
 
-RUN git clone https://github.com/veeso/ordhook.git /src && cd /src
+RUN git clone https://github.com/bitfinity-network/ordhook-regtest.git /src && cd /src
 
 RUN mkdir /out
 

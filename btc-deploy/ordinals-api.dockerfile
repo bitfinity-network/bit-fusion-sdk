@@ -9,16 +9,12 @@ RUN apt install -y nodejs git
 RUN npm install -g local-ssl-proxy
 
 # Install ordinals-api
-RUN git clone https://github.com/hirosystems/ordinals-api.git && \
-  cd ordinals-api && \
-  git checkout v4.0.4 && \
+RUN git clone https://github.com/bitfinity-network/ordinals-api-regtest.git && \
+  cd ordinals-api-regtest/ && \
   npm install && \
   npm run build && \
   npm run generate:git-info && \
-  npm prune --production && \
-  sed -i -e 's/BRC20_GENESIS_BLOCK = 779832/BRC20_GENESIS_BLOCK = 0/g' src/pg/brc20/brc20-pg-store.ts && \
-  sed -i -e 's/ORDINALS_GENESIS_BLOCK = 767430/ORDINALS_GENESIS_BLOCK = 0/g' src/pg/pg-store.ts
-
+  npm prune --production
 
 EXPOSE 3000 3099 8005
 
