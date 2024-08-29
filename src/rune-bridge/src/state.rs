@@ -377,6 +377,7 @@ mod tests {
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
             no_of_indexers: 1,
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         assert!(config.validate().is_ok());
@@ -391,6 +392,7 @@ mod tests {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1; 32],
             },
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         let mut state = RuneState::default();
