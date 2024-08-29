@@ -17,6 +17,7 @@ pub mod hiro_ordinals_client;
 pub mod ord_client;
 #[cfg(feature = "dfx_tests")]
 pub mod rune_helper;
+pub mod token_amount;
 pub mod wasm;
 
 /// Returns the Path to the workspace root dir

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bitcoin::key::Secp256k1;
-use bitcoin::{Address, Amount, PrivateKey};
+use bitcoin::{Address, Amount, PrivateKey, Txid};
 use brc20_bridge::brc20_info::Brc20Tick;
 use brc20_bridge::interface::{DepositError, GetAddressError};
 use brc20_bridge::ops::{Brc20BridgeOp, Brc20DepositRequestData};
@@ -27,12 +27,25 @@ use ord_rs::Utxo;
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
-use crate::dfx_tests::brc20_bridge::{DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT};
 use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
+use crate::utils::token_amount::TokenAmount;
 use crate::utils::wasm::get_brc20_bridge_canister_bytecode;
+
+/// Maximum supply of the BRC20 token
+pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
+/// Initial supply of the BRC20 token for the wallet
+pub const DEFAULT_MINT_AMOUNT: u64 = 100_000;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Brc20InitArgs {
+    pub tick: Brc20Tick,
+    pub decimals: Option<u8>,
+    pub limit: Option<u64>,
+    pub max_supply: u64,
+}
 
 pub struct Brc20Wallet {
     admin_address: Address,
@@ -95,10 +108,12 @@ pub struct Brc20Context {
 }
 
 /// Setup a new brc20 for DFX tests
-async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20Wallet> {
+async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20Wallet> {
     let wallet_name = generate_wallet_name();
     let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&wallet_name);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
+
+    println!("Dfx BTC wallet address: {}", admin_address);
 
     admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
 
@@ -114,6 +129,13 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20W
     );
 
     for brc20 in brc20_to_deploy {
+        let Brc20InitArgs {
+            tick,
+            decimals,
+            limit,
+            max_supply,
+        } = *brc20;
+
         // deploy
         let commit_fund_tx =
             admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
@@ -123,7 +145,13 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20W
             admin_btc_rpc_client.get_utxo_by_address(&commit_fund_tx, &ord_wallet.address)?;
 
         let deploy_reveal_txid = brc20_helper
-            .deploy(*brc20, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT, deploy_utxo)
+            .deploy(
+                tick,
+                max_supply,
+                limit,
+                decimals.map(|d| d as u64),
+                deploy_utxo,
+            )
             .await?;
         println!("BRC20 deploy txid: {}", deploy_reveal_txid);
         brc20_helper
@@ -138,7 +166,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20W
         let mint_utxo =
             admin_btc_rpc_client.get_utxo_by_address(&commit_fund_tx, &ord_wallet.address)?;
         let mint_reveal_txid = brc20_helper
-            .mint(*brc20, DEFAULT_MINT_AMOUNT, mint_utxo)
+            .mint(tick, limit.unwrap_or(DEFAULT_MINT_AMOUNT), mint_utxo)
             .await?;
 
         println!("BRC20 mint txid: {}", mint_reveal_txid);
@@ -146,7 +174,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20W
             .wait_for_confirmations(&mint_reveal_txid, 6)
             .await?;
 
-        brc20_tokens.insert(*brc20);
+        brc20_tokens.insert(tick);
     }
 
     Ok(Brc20Wallet {
@@ -158,7 +186,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20Tick]) -> anyhow::Result<Brc20W
 }
 
 impl Brc20Context {
-    pub async fn new(brc20_to_deploy: &[Brc20Tick]) -> Self {
+    pub async fn new(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         let brc20_wallet = dfx_brc20_setup(brc20_to_deploy)
             .await
             .expect("failed to setup brc20 tokens");
@@ -254,10 +282,10 @@ impl Brc20Context {
     }
 
     pub async fn get_funding_utxo(&self) -> anyhow::Result<Utxo> {
-        let commit_fund_tx = self
+        let fund_tx = self
             .brc20
             .admin_btc_rpc_client
-            .send_to_address(&self.brc20.admin_address, Amount::from_int_btc(10))?;
+            .send_to_address(&self.brc20.ord_wallet.address, Amount::from_int_btc(10))?;
         self.brc20
             .admin_btc_rpc_client
             .generate_to_address(&self.brc20.admin_address, 1)?;
@@ -265,7 +293,7 @@ impl Brc20Context {
         let utxo = self
             .brc20
             .admin_btc_rpc_client
-            .get_utxo_by_address(&commit_fund_tx, &self.brc20.ord_wallet.address)?;
+            .get_utxo_by_address(&fund_tx, &self.brc20.ord_wallet.address)?;
 
         Ok(utxo)
     }
@@ -292,22 +320,25 @@ impl Brc20Context {
         &self,
         btc_address: &Address,
         tick: Brc20Tick,
-        amount: u64,
-    ) -> anyhow::Result<()> {
+        amount: TokenAmount,
+    ) -> anyhow::Result<Txid> {
         let brc20_helper = Brc20Helper::new(
             &self.brc20.admin_btc_rpc_client,
             &self.brc20.ord_wallet.private_key,
             &self.brc20.ord_wallet.address,
         );
 
-        let inscription_utxo = self.get_funding_utxo().await?;
+        println!("Sending {amount} of {tick} to {btc_address}");
 
+        let inscription_utxo = self.get_funding_utxo().await?;
+        println!("Inscription utxo: {:?}", inscription_utxo);
         let transfer_utxo = self.get_funding_utxo().await?;
+        println!("Transfer utxo: {:?}", transfer_utxo);
 
         let transfer_txid = brc20_helper
             .transfer(
                 tick,
-                amount,
+                amount.as_int() as u64,
                 btc_address.clone(),
                 inscription_utxo,
                 transfer_utxo,
@@ -316,7 +347,7 @@ impl Brc20Context {
 
         println!("BRC20 transfer txid: {}", transfer_txid);
 
-        Ok(())
+        Ok(transfer_txid)
     }
 
     pub async fn mint_blocks(&self, count: u64) {
@@ -335,7 +366,7 @@ impl Brc20Context {
     pub async fn deposit(
         &self,
         tick: Brc20Tick,
-        amount: u64,
+        amount: TokenAmount,
         eth_address: &H160,
     ) -> Result<(), DepositError> {
         let dst_token = self.tokens.get(&tick).expect("token not found").clone();
@@ -351,7 +382,7 @@ impl Brc20Context {
         let data = Brc20DepositRequestData {
             dst_address: eth_address.clone(),
             dst_token,
-            amount,
+            amount: amount.amount(),
             brc20_tick: tick,
         };
 
@@ -391,6 +422,7 @@ impl Brc20Context {
 
         while retry_count < MAX_RETRIES {
             self.inner.advance_time(Duration::from_secs(2)).await;
+            self.mint_blocks(1).await;
             retry_count += 1;
 
             println!("Checking deposit status. Try #{retry_count}...");
@@ -470,7 +502,7 @@ impl Brc20Context {
             .expect("Failed to get wrapped token balance")
     }
 
-    pub async fn brc20_balance(&self, address: &Address, tick: &Brc20Tick) -> u64 {
+    pub async fn brc20_balance(&self, address: &Address, tick: &Brc20Tick) -> TokenAmount {
         let client = HiroOrdinalsClient::dfx_test_client();
 
         let balances = client
@@ -478,6 +510,9 @@ impl Brc20Context {
             .await
             .expect("failed to get brc20 balances");
 
-        balances.get(tick).copied().unwrap_or_default()
+        balances
+            .get(tick)
+            .copied()
+            .expect("brc20 balance not found")
     }
 }

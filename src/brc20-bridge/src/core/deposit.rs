@@ -161,7 +161,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         &self,
         dst_address: &H160,
         tick: &Brc20Tick,
-    ) -> Result<u64, DepositError> {
+    ) -> Result<u128, DepositError> {
         let transit_address = self.get_transit_address(dst_address).await;
         let balances = self
             .index_provider
@@ -180,13 +180,13 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
     }
 
     /// Converts the amount to the integer representation of the token.
-    fn get_integer_amount(amount: Decimal, decimals: u8) -> Result<u64, DepositError> {
+    fn get_integer_amount(amount: Decimal, decimals: u8) -> Result<u128, DepositError> {
         use rust_decimal::prelude::ToPrimitive;
 
         let factor = Decimal::new(10i64.pow(decimals as u32), 0);
-        (amount * factor).trunc().to_u64().ok_or_else(|| {
+        (amount * factor).trunc().to_u128().ok_or_else(|| {
             DepositError::AmountTooBig(format!(
-                "Amount {amount} with {decimals} decimals is too large to be represented as u64."
+                "Amount {amount} with {decimals} decimals is too large to be represented as u128."
             ))
         })
     }
@@ -289,7 +289,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         &self,
         dst_address: &H160,
         token_address: &H160,
-        amount: u64,
+        amount: u128,
         brc20_info: Brc20Info,
         nonce: u32,
     ) -> MintOrder {

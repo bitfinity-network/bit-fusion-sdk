@@ -6234,6 +6234,7 @@ dependencies = [
  "rand",
  "reqwest",
  "rune-bridge",
+ "rust_decimal",
  "serde",
  "serde_bytes",
  "serde_json",

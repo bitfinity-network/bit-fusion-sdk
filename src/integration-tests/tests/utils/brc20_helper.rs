@@ -10,10 +10,8 @@ use bitcoin::{
 };
 use brc20_bridge::brc20_info::Brc20Tick;
 use ord_rs::constants::POSTAGE;
-use ord_rs::wallet::{
-    CreateCommitTransactionArgsV2, LocalSigner, RevealTransactionArgs, ScriptType,
-};
-use ord_rs::{Brc20, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo, Wallet};
+use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs};
+use ord_rs::{Brc20, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo};
 
 use super::btc_rpc_client::BitcoinRpcClient;
 
@@ -41,10 +39,11 @@ impl<'a> Brc20Helper<'a> {
         &self,
         tick: Brc20Tick,
         amount: u64,
-        limit: u64,
+        limit: Option<u64>,
+        decimals: Option<u64>,
         input: Utxo,
     ) -> anyhow::Result<Txid> {
-        let deploy_inscription = Brc20::deploy(tick, amount, Some(limit), Some(8), None);
+        let deploy_inscription = Brc20::deploy(tick, amount, limit, decimals, None);
 
         self.inscribe(deploy_inscription, input).await
     }
@@ -71,20 +70,27 @@ impl<'a> Brc20Helper<'a> {
             .inscribe(transfer_inscription, inscription_input)
             .await?;
 
+        println!("BRC20 Transfer - Reveal transaction: {reveal_txid}");
+
         // wait for 6 confirmations
         self.wait_for_confirmations(&reveal_txid, 6).await?;
 
+        let reveal_utxo = self
+            .client
+            .get_utxo_by_address(&reveal_txid, self.address)?;
+        println!("BRC20 Transfer - Reveal UTXO: {reveal_utxo:?}");
+
         // transfer to recipient
-        let reveal_utxo = TxIn {
+        let reveal_input = TxIn {
             previous_output: OutPoint {
-                txid: reveal_txid,
-                vout: 0,
+                txid: reveal_utxo.id,
+                vout: reveal_utxo.index,
             },
             script_sig: ScriptBuf::new(),
             sequence: Sequence::from_consensus(0xffffffff),
             witness: Witness::new(),
         };
-        let funding_utxo = TxIn {
+        let funding_input = TxIn {
             previous_output: OutPoint {
                 txid: transfer_input.id,
                 vout: transfer_input.index,
@@ -93,21 +99,22 @@ impl<'a> Brc20Helper<'a> {
             sequence: Sequence::from_consensus(0xffffffff),
             witness: Witness::new(),
         };
-        let input = vec![reveal_utxo, funding_utxo];
+        let input = vec![reveal_input, funding_input];
 
-        let output = vec![TxOut {
-            value: Amount::from_sat(POSTAGE),
-            script_pubkey: recipient.script_pubkey(),
-        }];
+        let leftovers = transfer_input.amount - Amount::from_sat(15_000);
 
-        let input_utxos = vec![
-            Utxo {
-                id: reveal_txid,
-                index: 0,
-                amount: Amount::from_sat(POSTAGE),
+        let output = vec![
+            TxOut {
+                value: Amount::from_sat(POSTAGE),
+                script_pubkey: recipient.script_pubkey(),
             },
-            transfer_input,
+            TxOut {
+                value: leftovers,
+                script_pubkey: self.address.script_pubkey(),
+            },
         ];
+
+        let input_utxos = vec![reveal_utxo, transfer_input];
 
         let unsigned_tx = Transaction {
             version: Version::TWO,
@@ -115,6 +122,8 @@ impl<'a> Brc20Helper<'a> {
             input,
             output,
         };
+
+        println!("BRC20 Transfer - Unsigned transfer UTXO transaction {unsigned_tx:?}");
 
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let signed_tx = Self::sign_transaction(
@@ -131,11 +140,7 @@ impl<'a> Brc20Helper<'a> {
     }
 
     async fn inscribe(&self, inscription: Brc20, input: Utxo) -> anyhow::Result<Txid> {
-        let secp = bitcoin::secp256k1::Secp256k1::new();
-        let public_key = self.private_key.public_key(&secp);
-
-        let wallet = Wallet::new_with_signer(LocalSigner::new(*self.private_key));
-        let mut builder = OrdTransactionBuilder::new(public_key, ScriptType::P2TR, wallet);
+        let mut builder = OrdTransactionBuilder::p2tr(*self.private_key);
 
         let inputs = vec![input];
 
@@ -151,6 +156,8 @@ impl<'a> Brc20Helper<'a> {
             },
         )?;
 
+        println!("Commit transaction: {:?}", commit_tx.unsigned_tx);
+
         let signed_commit_tx = builder
             .sign_commit_transaction(
                 commit_tx.unsigned_tx,
@@ -161,8 +168,12 @@ impl<'a> Brc20Helper<'a> {
             )
             .await?;
 
+        println!("Signed Commit transaction: {signed_commit_tx:?}");
+
         // send tx
         let commit_txid = self.client.send_transaction(&signed_commit_tx)?;
+
+        println!("Commit transaction: {:?}", commit_txid);
 
         // wait for 6 confirmations
         self.wait_for_confirmations(&commit_txid, 6).await?;

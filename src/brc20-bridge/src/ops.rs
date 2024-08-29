@@ -19,13 +19,13 @@ use crate::core::deposit::Brc20Deposit;
 pub enum Brc20BridgeOp {
     // Deposit
     AwaitInputs {
-        amount: u64,
+        amount: u128,
         brc20_tick: Brc20Tick,
         dst_address: H160,
         dst_token: H160,
     },
     AwaitConfirmations {
-        amount: u64,
+        amount: u128,
         brc20_tick: Brc20Tick,
         dst_address: H160,
         dst_token: H160,
@@ -189,7 +189,7 @@ impl Brc20BridgeOp {
         brc20_tick: Brc20Tick,
         dst_address: H160,
         dst_token: H160,
-        amount: u64,
+        amount: u128,
     ) -> BftResult<Self> {
         let deposit = Brc20Deposit::get(state.clone());
         let utxos = deposit.get_inputs(&dst_address).await.map_err(|err| {
@@ -211,7 +211,7 @@ impl Brc20BridgeOp {
 
     async fn await_confirmations(
         state: RuntimeState<Self>,
-        amount: u64,
+        amount: u128,
         brc20_tick: Brc20Tick,
         dst_address: H160,
         dst_token: H160,
@@ -294,7 +294,7 @@ pub enum Brc20MinterNotification {
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub struct Brc20DepositRequestData {
-    pub amount: u64,
+    pub amount: u128,
     pub brc20_tick: Brc20Tick,
     pub dst_address: H160,
     pub dst_token: H160,
