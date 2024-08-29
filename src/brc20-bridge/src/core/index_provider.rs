@@ -8,6 +8,7 @@ use bitcoin::Address;
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
+use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 
 use self::hiro::{GetBrc20BalancesResponse, GetBrc20TokensResponse};
@@ -19,7 +20,7 @@ pub(crate) trait Brc20IndexProvider {
     async fn get_brc20_balances(
         &self,
         address: &Address,
-    ) -> Result<HashMap<Brc20Tick, u64>, DepositError>;
+    ) -> Result<HashMap<Brc20Tick, Decimal>, DepositError>;
 
     /// Get list of BRC20 tokens.
     async fn get_brc20_tokens(&self) -> Result<HashMap<Brc20Tick, Brc20Info>, DepositError>;
@@ -160,7 +161,7 @@ where
     async fn get_brc20_balances(
         &self,
         address: &Address,
-    ) -> Result<HashMap<Brc20Tick, u64>, DepositError> {
+    ) -> Result<HashMap<Brc20Tick, Decimal>, DepositError> {
         let mut balances = HashMap::new();
         let mut offset = 0;
         let mut total = usize::MAX;

@@ -7,8 +7,8 @@ use eth_signer::Signer;
 use self::ctx::Brc20Context;
 use crate::context::TestContext as _;
 
-const DEFAULT_MAX_AMOUNT: u64 = 21_000_000 * 100_000_000;
-const DEFAULT_MINT_AMOUNT: u64 = 100_000 * 100_000_000;
+const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
+const DEFAULT_MINT_AMOUNT: u64 = 100_000;
 
 #[tokio::test]
 async fn test_should_deposit_brc20_tokens() {

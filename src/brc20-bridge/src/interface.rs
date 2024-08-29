@@ -70,6 +70,7 @@ pub enum DepositError {
     UtxosNotConfirmed,
     NoDstTokenAddress,
     UtxoAlreadyUsed,
+    AmountTooBig(String),
     InvalidAmounts {
         requested: u128,
         actual: u128,

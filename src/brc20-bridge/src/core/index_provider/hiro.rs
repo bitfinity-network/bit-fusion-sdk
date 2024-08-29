@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use serde::Deserialize;
 
 /// Response for `/ordinals/v1/brc-20/tokens` endpoint.
@@ -23,5 +24,5 @@ pub struct GetBrc20BalancesResponse {
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Brc20BalanceResponse {
     pub ticker: String,
-    pub overall_balance: u64,
+    pub overall_balance: Decimal,
 }

@@ -77,7 +77,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./db-data:/var/lib/postgresql/data
+      - type: bind
+        source: ./db-data
+        target: /var/lib/postgresql/data
+    user: "1000:1000"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

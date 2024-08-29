@@ -35,6 +35,7 @@ ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 ord-rs = { workspace = true }
+rust_decimal = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

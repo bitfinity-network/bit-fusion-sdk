@@ -11,6 +11,7 @@ use bridge_did::order::{MintOrder, SignedMintOrder};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
+use rust_decimal::Decimal;
 use serde::Serialize;
 
 use super::index_provider::IcHttpClient;
@@ -167,9 +168,27 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
             .get_brc20_balances(&transit_address)
             .await?;
 
+        let info = self.get_brc20_info(tick).await.ok_or_else(|| {
+            DepositError::Unavailable(format!(
+                "Brc20 information for {tick} is not available. Please try again later."
+            ))
+        })?;
+
         let amount = balances.get(tick).copied().unwrap_or_default();
 
-        Ok(amount)
+        Self::get_integer_amount(amount, info.decimals)
+    }
+
+    /// Converts the amount to the integer representation of the token.
+    fn get_integer_amount(amount: Decimal, decimals: u8) -> Result<u64, DepositError> {
+        use rust_decimal::prelude::ToPrimitive;
+
+        let factor = Decimal::new(10i64.pow(decimals as u32), 0);
+        (amount * factor).trunc().to_u64().ok_or_else(|| {
+            DepositError::AmountTooBig(format!(
+                "Amount {amount} with {decimals} decimals is too large to be represented as u64."
+            ))
+        })
     }
 
     pub async fn check_confirmations(
@@ -335,5 +354,24 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
         v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
             && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_should_convert_amount_to_integer() {
+        let amount = Decimal::new(1, 0);
+        let decimals = 8;
+
+        let res =
+            Brc20Deposit::<IcUtxoProvider, OrdIndexProvider<IcHttpClient>>::get_integer_amount(
+                amount, decimals,
+            );
+
+        assert_eq!(res.unwrap(), 100_000_000);
     }
 }
