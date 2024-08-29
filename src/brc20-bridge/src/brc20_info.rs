@@ -7,6 +7,7 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::{Bound, Storable};
 use serde::Serialize;
 
+/// Brc20Tick is a 4 bytes ASCII identifier for a BRC20 token.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CandidType, Serialize, Deserialize, Hash)]
 pub struct Brc20Tick([u8; 4]);
 
