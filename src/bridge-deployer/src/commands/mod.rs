@@ -130,17 +130,16 @@ impl Commands {
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
-        bft_args: BFTArgs,
     ) -> anyhow::Result<()> {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, network, pk, deploy_bft, bft_args)
+                    .deploy_canister(identity, ic_host, network, pk, deploy_bft)
                     .await?
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, pk, deploy_bft, bft_args)
+                    .reinstall_canister(identity, ic_host, network, pk, deploy_bft)
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
@@ -202,4 +201,15 @@ impl BFTArgs {
 
         Ok(bft_address)
     }
+}
+
+/// By default, the agent is configured to talk to the main
+/// Internet Computer, and verifies responses using a hard-coded public key.
+/// So we need to fetch the root key if the host is localhost.
+pub(crate) async fn fetch_root_key(ic_host: &str, agent: &Agent) -> anyhow::Result<()> {
+    if ic_host.contains("localhost") || ic_host.contains("127.0.0.1") {
+        agent.fetch_root_key().await?;
+    }
+
+    Ok(())
 }

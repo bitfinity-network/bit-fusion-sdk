@@ -11,7 +11,7 @@ use super::{LogCanisterSettings, SigningKeyId};
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct RuneBridgeConfig {
     #[arg(long)]
-    pub network: BitcoinNetwork,
+    pub bitcoin_network: BitcoinNetwork,
     #[arg(long)]
     pub evm_principal: Principal,
     #[arg(long, default_value_t = SigningKeyId::Test)]
@@ -52,7 +52,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
 impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
     fn from(value: RuneBridgeConfig) -> Self {
         Self {
-            network: value.network.into(),
+            network: value.bitcoin_network.into(),
             evm_principal: value.evm_principal,
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: value.signing_key_id.into(),

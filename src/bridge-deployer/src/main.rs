@@ -1,4 +1,9 @@
-use bridge_deployer::cli::Cli;
+use cli::Cli;
+
+mod cli;
+mod commands;
+mod config;
+mod contracts;
 
 #[tokio::main]
 async fn main() {

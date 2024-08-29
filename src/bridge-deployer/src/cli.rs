@@ -5,7 +5,7 @@ use ethereum_types::H256;
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, trace, Level};
 
-use crate::commands::{BFTArgs, Commands};
+use crate::commands::Commands;
 use crate::contracts::EvmNetwork;
 
 /// The main CLI struct for the Bitfinity Deployer.
@@ -20,6 +20,8 @@ pub struct Cli {
     identity: PathBuf,
 
     /// Private Key of the wallet to use for the transaction
+    ///
+    /// This must be provided in all the commands except for the `upgrade` command.
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
@@ -36,18 +38,14 @@ pub struct Cli {
     /// Deploy the BFT bridge.
     ///
     /// Default: true
-    #[arg(long, default_value = "true", help_heading = "Bridge Contract Args")]
+    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
     deploy_bft: bool,
-
-    /// These are extra arguments for the BFT bridge.
-    #[command(flatten, next_help_heading = "Bridge Contract Args")]
-    bft_args: BFTArgs,
 
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[arg(
         long,
         value_name = "EVM_NETWORK",
-        default_value = "local",
+        default_value = "localhost",
         help_heading = "Bridge Contract Args"
     )]
     evm_network: EvmNetwork,
@@ -85,7 +83,6 @@ impl Cli {
             private_key,
             ic_host,
             deploy_bft,
-            bft_args,
             evm_network,
             command,
             ..
@@ -102,7 +99,6 @@ impl Cli {
                 evm_network,
                 private_key,
                 deploy_bft,
-                bft_args,
             )
             .await?;
 

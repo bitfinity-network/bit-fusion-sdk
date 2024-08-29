@@ -45,6 +45,10 @@ pub struct DeployCommands {
     /// canisters
     #[arg(long, value_name = "WALLET_CANISTER", env)]
     wallet_canister: Principal,
+
+    /// These are extra arguments for the BFT bridge.
+    #[command(flatten, next_help_heading = "Bridge Contract Args")]
+    bft_args: BFTArgs,
 }
 
 impl DeployCommands {
@@ -52,11 +56,10 @@ impl DeployCommands {
     pub async fn deploy_canister(
         &self,
         identity: PathBuf,
-        url: &str,
+        ic_host: &str,
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
-        bft_args: BFTArgs,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let canister_wasm = std::fs::read(&self.wasm)?;
@@ -69,11 +72,11 @@ impl DeployCommands {
         );
 
         let agent = ic_agent::Agent::builder()
-            .with_url(url)
+            .with_url(ic_host)
             .with_identity(identity)
             .build()?;
 
-        agent.fetch_root_key().await?;
+        super::fetch_root_key(ic_host, &agent).await?;
 
         info!("Using  wallet canister ID: {}", self.wallet_canister);
         let wallet = WalletCanister::create(&agent, self.wallet_canister).await?;
@@ -99,7 +102,7 @@ impl DeployCommands {
 
         if deploy_bft {
             info!("Deploying BFT bridge");
-            bft_args
+            self.bft_args
                 .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 

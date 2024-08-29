@@ -33,19 +33,19 @@ pub struct ReinstallCommands {
     #[arg(long, value_name = "WASM_PATH")]
     wasm: PathBuf,
 
-    #[command(flatten)]
-    args: BFTArgs,
+    /// These are extra arguments for the BFT bridge.
+    #[command(flatten, next_help_heading = "Bridge Contract Args")]
+    bft_args: BFTArgs,
 }
 
 impl ReinstallCommands {
     pub async fn reinstall_canister(
         &self,
         identity: PathBuf,
-        url: &str,
+        ic_host: &str,
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
-        bft_args: BFTArgs,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
         let canister_wasm = std::fs::read(&self.wasm)?;
@@ -58,9 +58,11 @@ impl ReinstallCommands {
         );
 
         let agent = ic_agent::Agent::builder()
-            .with_url(url)
+            .with_url(ic_host)
             .with_identity(identity)
             .build()?;
+
+        super::fetch_root_key(ic_host, &agent).await?;
 
         let management_canister = ManagementCanister::create(&agent);
 
@@ -78,7 +80,7 @@ impl ReinstallCommands {
 
         if deploy_bft {
             info!("Deploying BFT bridge");
-            bft_args
+            self.bft_args
                 .deploy_bft(network, self.canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
