@@ -86,7 +86,7 @@ async fn dfx_rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> 
 
     for rune_name in runes_to_etch {
         let commit_fund_tx =
-            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
+            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
         admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
         let commit_utxo =

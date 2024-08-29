@@ -138,7 +138,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
 
         // deploy
         let commit_fund_tx =
-            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
+            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
         admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
         let deploy_utxo =
@@ -160,7 +160,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
 
         // mint
         let commit_fund_tx =
-            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(10))?;
+            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
         admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
         let mint_utxo =
@@ -285,7 +285,7 @@ impl Brc20Context {
         let fund_tx = self
             .brc20
             .admin_btc_rpc_client
-            .send_to_address(&self.brc20.ord_wallet.address, Amount::from_int_btc(10))?;
+            .send_to_address(&self.brc20.ord_wallet.address, Amount::from_int_btc(1))?;
         self.brc20
             .admin_btc_rpc_client
             .generate_to_address(&self.brc20.admin_address, 1)?;
