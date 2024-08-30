@@ -16,7 +16,7 @@ use crate::canister::{get_base_evm_config, get_base_evm_state};
 /// Erc20 bridge operation.
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOp {
-    /// Side of the bridge to perfrom the operation.
+    /// Side of the bridge to perform the operation.
     pub side: BridgeSide,
 
     /// Stage of the operation.
@@ -132,7 +132,9 @@ impl Operation for Erc20BridgeOp {
             side: BridgeSide::Base,
             stage: Erc20OpStage::SignMintOrder(order),
         };
-        let action = OperationAction::CreateWithId(OperationId::new(nonce as _), operation);
+        let memo = event.memo();
+
+        let action = OperationAction::CreateWithId(OperationId::new(nonce as _), operation, memo);
         Some(action)
     }
 
