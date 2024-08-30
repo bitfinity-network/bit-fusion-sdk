@@ -171,12 +171,19 @@ pub struct BurntEventData {
 
 impl BurntEventData {
     pub fn memo(&self) -> Option<Memo> {
-        (!self.memo.is_empty()).then_some(
-            self.memo
-                .as_slice()
-                .try_into()
-                .expect("should be exactly 32 bytes"),
-        )
+        if self.memo.is_empty() {
+            None
+        } else if self.memo.len() == 32 {
+            Some(
+                self.memo
+                    .as_slice()
+                    .try_into()
+                    .expect("should be exactly 32 bytes"),
+            )
+        } else {
+            log::warn!("Invalid memo length: {}", self.memo.len());
+            None
+        }
     }
 }
 
@@ -260,13 +267,25 @@ pub struct NotifyMinterEventData {
 }
 
 impl NotifyMinterEventData {
+    /// Returns the memo of this [`NotifyMinterEventData`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the memo is not exactly 32 bytes.
     pub fn memo(&self) -> Option<Memo> {
-        (!self.memo.is_empty()).then_some(
-            self.memo
-                .as_slice()
-                .try_into()
-                .expect("should be exactly 32 bytes"),
-        )
+        if self.memo.is_empty() {
+            None
+        } else if self.memo.len() == 32 {
+            Some(
+                self.memo
+                    .as_slice()
+                    .try_into()
+                    .expect("should be exactly 32 bytes"),
+            )
+        } else {
+            log::warn!("Invalid memo length: {}", self.memo.len());
+            None
+        }
     }
 }
 
