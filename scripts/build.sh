@@ -77,6 +77,13 @@ build_bridge_tool() {
     cp target/release/bridge-tool "$WASM_DIR/bridge-tool"
 }
 
+build_bridge_deployer_tool() {
+    echo "Building create BFTBridge tool"
+
+    cargo build -p bridge-deployer --release
+    cp target/release/bridge-deployer "$WASM_DIR/bridge-deployer"
+}
+
 # Function to build a single canister with a feature flag
 build_canister() {
     local canister_name="$1"
@@ -128,6 +135,7 @@ build_requested_canisters() {
 
         # Build tools
         build_bridge_tool
+        build_bridge_deployer_tool
     else
         for canister in "$@"; do
             case "$canister" in

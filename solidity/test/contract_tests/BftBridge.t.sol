@@ -52,7 +52,11 @@ contract BftBridgeTest is Test {
         vm.startPrank(_owner);
 
         // Encode the initialization call
-        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+        address[] memory initialControllers = new address[](0);
+
+        // Encode the initialization call
+        bytes memory initializeData =
+            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true, _owner, initialControllers);
 
         BFTBridge wrappedImpl = new BFTBridge();
 
@@ -65,7 +69,7 @@ contract BftBridgeTest is Test {
 
         // Encode the initialization call
         bytes memory baseInitializeData =
-            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false);
+            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false, _owner, initialControllers);
 
         BFTBridge baseImpl = new BFTBridge();
 
@@ -406,6 +410,103 @@ contract BftBridgeTest is Test {
         proxy.upgradeToAndCall(address(_newImpl), data);
 
         vm.stopPrank();
+    }
+
+    function testPauseByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        vm.prank(controller);
+        _wrappedBridge.pause();
+
+        assertTrue(_wrappedBridge.paused());
+    }
+
+    function testPauseByNonController() public {
+        address nonController = address(43);
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.pause();
+    }
+
+    function testUnpauseByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        vm.prank(controller);
+        _wrappedBridge.pause();
+
+        vm.prank(controller);
+        _wrappedBridge.unpause();
+
+        assertFalse(_wrappedBridge.paused());
+    }
+
+    function testUnpauseByNonController() public {
+        address nonController = address(43);
+
+        vm.prank(_owner);
+        _wrappedBridge.pause();
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.unpause();
+    }
+
+    function testAddAllowedImplementationByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(controller);
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+
+        assertTrue(_wrappedBridge.allowedImplementations(newImplementationHash));
+    }
+
+    function testAddAllowedImplementationByNonController() public {
+        address nonController = address(43);
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+    }
+
+    function testAddAllowedImplementationAlreadyAllowed() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(controller);
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+
+        vm.prank(controller);
+        vm.expectRevert("Implementation already allowed");
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+    }
+
+    function testAddAndRemoveController() public {
+        address newController = address(44);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(newController);
+        assertTrue(_wrappedBridge.controllerAccessList(newController));
+
+        vm.prank(_owner);
+        _wrappedBridge.removeController(newController);
+        assertFalse(_wrappedBridge.controllerAccessList(newController));
     }
 
     struct ExpectedBurnEvent {

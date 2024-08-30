@@ -59,7 +59,7 @@ impl Default for FeeRateState {
     }
 }
 
-#[derive(Debug, CandidType, Deserialize)]
+#[derive(Debug, CandidType, Deserialize, Clone)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
     pub evm_principal: Principal,

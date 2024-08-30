@@ -8,45 +8,14 @@ default = ["export-api"]
 export-api = []
 
 [dependencies]
-anyhow = { workspace = true }
 async-trait = { workspace = true }
 brc20-bridge = { path = "../brc20-bridge" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = [
-    "ic-canister-client",
-    "http-outcall",
-] }
-ethers-core = { workspace = true }
-eth-signer = { workspace = true, features = ["ic_sign"] }
 erc20-bridge = { path = "../erc20-bridge" }
-hex = { workspace = true }
-icrc2-bridge = { path = "../icrc2-bridge" }
-ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
-ic-exports = { workspace = true }
 ic-log = { workspace = true }
-ic-stable-structures = { workspace = true }
-ic-storage = { workspace = true }
-ic-task-scheduler = { workspace = true }
-jsonrpc-core = { workspace = true }
-log = { workspace = true }
-num-bigint = { workspace = true }
-num-traits = { workspace = true }
-once_cell = { workspace = true }
+icrc2-bridge = { path = "../icrc2-bridge" }
 rune-bridge = { path = "../rune-bridge" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-
-[build-dependencies]
-anyhow = { workspace = true }
-vergen = { workspace = true }
-
-[dev-dependencies]
-candid = { workspace = true }
-env_logger = { workspace = true }
-ic-exports = { workspace = true }
-tokio = { workspace = true }

@@ -93,16 +93,37 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _disableInitializers();
     }
 
-    /// Constructor to initialize minterCanisterAddress and feeChargeContract
-    /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
+    /// Initializes the BftBridge contract.
+    ///
+    /// @param minterAddress The address of the minter canister.
+    /// @param feeChargeAddress The address of the fee charge contract.
+    /// @param isWrappedSide A boolean indicating whether this is the wrapped side of the bridge.
+    /// @param owner The initial owner of the contract. If set to 0x0, the caller becomes the owner.
+    /// @param controllers The initial list of authorized controllers.
+    /// @dev This function is called only once during the contract deployment.
+    function initialize(
+        address minterAddress,
+        address feeChargeAddress,
+        bool isWrappedSide,
+        address owner,
+        address[] memory controllers
+    ) public initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        __TokenManager__initi(isWrappedSide);
+        __TokenManager__init(isWrappedSide);
 
-        controllerAccessList[msg.sender] = true;
-        // Call super initializer
-        __Ownable_init(msg.sender);
+        // Set the owner
+        address newOwner = owner != address(0) ? owner : msg.sender;
+        __Ownable_init(newOwner);
+
+        // Add owner to the controller list
+        controllerAccessList[newOwner] = true;
+
+        // Add controllers
+        for (uint256 i = 0; i < controllers.length; i++) {
+            controllerAccessList[controllers[i]] = true;
+        }
+
         __UUPSUpgradeable_init();
         __Pausable_init();
     }
@@ -114,13 +135,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     /// Pause the contract and prevent any future mint or burn operations
     /// Can be called only by the owner
-    function pause() external onlyOwner {
+    function pause() external onlyControllers {
         _pause();
     }
 
     /// Unpause the contract
     /// Can be called only by the owner
-    function unpause() external onlyOwner {
+    function unpause() external onlyControllers {
         _unpause();
     }
 
