@@ -313,10 +313,12 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         fee_payer: None,
         erc20_token_address: args.erc20_token_address.into(),
     };
+    let memo = alloy_sol_types::private::FixedBytes::ZERO;
 
     let input = BFTBridge::notifyMinterCall {
         notificationType: 0,
         userData: Encode!(&data).unwrap().into(),
+        memo,
     }
     .abi_encode();
 
@@ -801,11 +803,14 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .expect("Failed to execute approve transaction");
     wait_for_tx_success(&client, hash).await;
 
+    let memo = alloy_sol_types::private::FixedBytes::ZERO;
+
     let input = BFTBridge::burnCall {
         amount: amount.into(),
         fromERC20: token.0.into(),
         toTokenID: alloy_sol_types::private::FixedBytes::from_slice(args.to_token_id.as_bytes()),
         recipientID: args.address.into_bytes().into(),
+        memo,
     }
     .abi_encode();
 

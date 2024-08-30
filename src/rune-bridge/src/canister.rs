@@ -8,7 +8,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
@@ -80,6 +80,28 @@ impl RuneBridge {
             .get_for_address(&wallet_address, pagination)
     }
 
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, RuneBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, RuneBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
+    }
+
     /// Returns log of an operation by its ID.
     #[query]
     pub fn get_operation_log(
@@ -135,6 +157,13 @@ impl RuneBridge {
         get_rune_state()
             .borrow_mut()
             .configure_indexers(no_of_indexer_urls, indexer_urls);
+    }
+
+    #[update]
+    pub fn admin_set_indexer_consensus_threshold(&self, indexer_consensus_threshold: u8) {
+        get_rune_state()
+            .borrow_mut()
+            .set_indexer_consensus_threshold(indexer_consensus_threshold)
     }
 
     pub fn idl() -> Idl {

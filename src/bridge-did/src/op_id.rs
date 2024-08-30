@@ -32,6 +32,11 @@ impl OperationId {
     pub fn nonce(&self) -> u32 {
         (self.0 % u32::MAX as u64) as u32
     }
+
+    ///Returns the number of the operation.
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 impl Storable for OperationId {

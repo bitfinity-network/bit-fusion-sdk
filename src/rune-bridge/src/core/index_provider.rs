@@ -97,16 +97,20 @@ struct RunesResponse {
 pub struct OrdIndexProvider<C: HttpClient> {
     client: C,
     indexer_urls: HashSet<String>,
+    /// Minimum quantity of indexer nodes required to reach agreement on a
+    /// request
+    pub indexer_consensus_threshold: u8,
 }
 
 impl<C> OrdIndexProvider<C>
 where
     C: HttpClient,
 {
-    pub fn new(client: C, indexer_urls: HashSet<String>) -> Self {
+    pub fn new(client: C, indexer_urls: HashSet<String>, indexer_consensus_threshold: u8) -> Self {
         Self {
             client,
             indexer_urls,
+            indexer_consensus_threshold,
         }
     }
 
@@ -138,9 +142,11 @@ where
             }
         }
 
-        if responses.is_empty() {
-            Err(GetInputsError::IndexersNotAvailable {
-                checked_indexers: failed_urls,
+        if responses.len() < self.indexer_consensus_threshold as usize {
+            Err(GetInputsError::InsufficientConsensus {
+                received_responses: responses.len(),
+                required_responses: self.indexer_consensus_threshold,
+                checked_indexers: self.indexer_urls.len(),
             })
         } else if !indexers_agree {
             // TODO: After https://infinityswap.atlassian.net/browse/EPROD-971 is done, return
@@ -298,6 +304,7 @@ mod tests {
         let provider = OrdIndexProvider::new(
             client,
             HashSet::from_iter(vec!["http://localhost:8080".into()]),
+            1,
         );
 
         let runes = provider.get_rune_list().await.unwrap();

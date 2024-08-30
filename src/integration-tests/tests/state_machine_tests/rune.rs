@@ -52,6 +52,7 @@ impl RunesSetup {
             indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
             deposit_fee: 0,
             mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
         };
         (&context)
             .install_canister(

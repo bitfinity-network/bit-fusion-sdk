@@ -69,6 +69,9 @@ pub struct RuneBridgeConfig {
     pub min_confirmations: u32,
     pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
+    /// Minimum quantity of indexer nodes required to reach agreement on a
+    /// request
+    pub indexer_consensus_threshold: u8,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
 }
@@ -85,6 +88,7 @@ impl Default for RuneBridgeConfig {
             log_settings: LogCanisterSettings::default(),
             min_confirmations: 12,
             no_of_indexers: MIN_INDEXERS,
+            indexer_consensus_threshold: 2,
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
@@ -112,6 +116,14 @@ impl RuneBridgeConfig {
             .any(|url| !url.starts_with("https"))
         {
             return Err("Indexer url must specify https url".to_string());
+        }
+
+        if self.indexer_consensus_threshold > self.indexer_urls.len() as u8 {
+            return Err(format!(
+               "The consensus threshold ({}) must be less than or equal to the number of indexers ({})",
+                self.indexer_consensus_threshold,
+                self.indexer_urls.len()
+            ));
         }
 
         Ok(())
@@ -290,6 +302,16 @@ impl RuneState {
         self.config.no_of_indexers = no_of_indexers;
     }
 
+    /// Returns the number of indexers required to reach consensus.
+    pub fn indexer_consensus_threshold(&self) -> u8 {
+        self.config.indexer_consensus_threshold
+    }
+
+    /// Sets the number of indexers required to reach consensus.
+    pub fn set_indexer_consensus_threshold(&mut self, threshold: u8) {
+        self.config.indexer_consensus_threshold = threshold;
+    }
+
     pub fn mempool_timeout(&self) -> Duration {
         self.config.mempool_timeout
     }
@@ -355,6 +377,7 @@ mod tests {
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
             no_of_indexers: 1,
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         assert!(config.validate().is_ok());
@@ -369,6 +392,7 @@ mod tests {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1; 32],
             },
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         let mut state = RuneState::default();

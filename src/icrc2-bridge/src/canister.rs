@@ -8,7 +8,7 @@ use bridge_canister::BridgeCanister;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -78,6 +78,19 @@ impl Icrc2BridgeCanister {
             .get_for_address(&wallet_address, pagination)
     }
 
+    #[query]
+    /// Returns operation by memo
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, IcrcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
     /// Returns log of an operation by its ID.
     #[query]
     pub fn get_operation_log(
@@ -88,6 +101,14 @@ impl Icrc2BridgeCanister {
             .borrow()
             .operations
             .get_log(operation_id)
+    }
+
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, IcrcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
     }
 
     /// Adds the provided principal to the whitelist.
