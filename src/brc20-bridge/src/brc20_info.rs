@@ -67,6 +67,7 @@ impl Display for Brc20Tick {
     }
 }
 
+/// Brc20 token information.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CandidType, Serialize, Deserialize)]
 pub struct Brc20Info {
     pub tick: Brc20Tick,

@@ -16,32 +16,25 @@ use crate::brc20_info::Brc20Tick;
 use crate::core::deposit::Brc20Deposit;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
+pub struct DepositRequest {
+    amount: u128,
+    brc20_tick: Brc20Tick,
+    dst_address: H160,
+    dst_token: H160,
+}
+
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Brc20BridgeOp {
     // Deposit
-    AwaitInputs {
-        amount: u128,
-        brc20_tick: Brc20Tick,
-        dst_address: H160,
-        dst_token: H160,
-    },
+    AwaitInputs(DepositRequest),
     AwaitConfirmations {
-        amount: u128,
-        brc20_tick: Brc20Tick,
-        dst_address: H160,
-        dst_token: H160,
+        deposit: DepositRequest,
         utxos: Vec<Utxo>,
     },
-    SignMintOrder {
-        dst_address: H160,
-        mint_order: MintOrder,
-    },
-    SendMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
-    },
+    SignMintOrder(MintOrder),
+    SendMintOrder(SignedMintOrder),
     ConfirmMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
+        signed_mint_order: SignedMintOrder,
         tx_id: H256,
     },
     MintOrderConfirmed {
@@ -52,44 +45,21 @@ pub enum Brc20BridgeOp {
 impl Operation for Brc20BridgeOp {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
-            Self::AwaitInputs {
-                amount,
-                brc20_tick,
-                dst_address,
-                dst_token,
-            } => {
-                log::debug!("Self::AwaitInputs {amount} {brc20_tick} {dst_address} {dst_token}");
-                Self::await_inputs(ctx, brc20_tick, dst_address, dst_token, amount).await
+            Self::AwaitInputs(deposit) => {
+                log::debug!("Self::AwaitInputs {deposit:?}");
+                Self::await_inputs(ctx, deposit).await
             }
-            Self::AwaitConfirmations {
-                amount,
-                brc20_tick,
-                dst_address,
-                dst_token,
-                utxos,
-            } => {
-                log::debug!("Self::AwaitConfirmations {amount} {brc20_tick} {dst_address} {dst_token} {utxos:?}");
-                Self::await_confirmations(
-                    ctx,
-                    amount,
-                    brc20_tick,
-                    dst_address,
-                    dst_token,
-                    utxos,
-                    id.nonce(),
-                )
-                .await
+            Self::AwaitConfirmations { deposit, utxos } => {
+                log::debug!("Self::AwaitConfirmations {deposit:?} {utxos:?}");
+                Self::await_confirmations(ctx, deposit, utxos, id.nonce()).await
             }
-            Self::SignMintOrder {
-                dst_address,
-                mint_order,
-            } => {
-                log::debug!("Self::SignMintOrder {dst_address} {mint_order:?}");
-                Self::sign_mint_order(ctx, id.nonce(), dst_address, mint_order).await
+            Self::SignMintOrder(mint_order) => {
+                log::debug!("Self::SignMintOrder {mint_order:?}");
+                Self::sign_mint_order(ctx, id.nonce(), mint_order).await
             }
-            Self::SendMintOrder { dst_address, order } => {
-                log::debug!("Self::SendMintOrder {dst_address} {order:?}");
-                Self::send_mint_order(ctx, dst_address, order).await
+            Self::SendMintOrder(mint_order) => {
+                log::debug!("Self::SendMintOrder {mint_order:?}");
+                Self::send_mint_order(ctx, mint_order).await
             }
             Self::ConfirmMintOrder { .. } => Err(Error::FailedToProgress(
                 "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
@@ -128,11 +98,13 @@ impl Operation for Brc20BridgeOp {
 
     fn evm_wallet_address(&self) -> H160 {
         match self {
-            Self::AwaitInputs { dst_address, .. } => dst_address.clone(),
-            Self::AwaitConfirmations { dst_address, .. } => dst_address.clone(),
-            Self::SignMintOrder { dst_address, .. } => dst_address.clone(),
-            Self::SendMintOrder { dst_address, .. } => dst_address.clone(),
-            Self::ConfirmMintOrder { dst_address, .. } => dst_address.clone(),
+            Self::AwaitInputs(DepositRequest { dst_address, .. }) => dst_address.clone(),
+            Self::AwaitConfirmations { deposit, .. } => deposit.dst_address.clone(),
+            Self::SignMintOrder(MintOrder { recipient, .. }) => recipient.clone(),
+            Self::SendMintOrder(signed_mint_order) => signed_mint_order.get_recipient(),
+            Self::ConfirmMintOrder {
+                signed_mint_order, ..
+            } => signed_mint_order.get_recipient(),
             Self::MintOrderConfirmed { data } => data.recipient.clone(),
         }
     }
@@ -168,12 +140,12 @@ impl Operation for Brc20BridgeOp {
         if let Some(notification) = Brc20MinterNotification::decode(event.clone()) {
             match notification {
                 Brc20MinterNotification::Deposit(payload) => {
-                    Some(OperationAction::Create(Self::AwaitInputs {
+                    Some(OperationAction::Create(Self::AwaitInputs(DepositRequest {
                         amount: payload.amount,
                         brc20_tick: payload.brc20_tick,
                         dst_address: payload.dst_address,
                         dst_token: payload.dst_token,
-                    }))
+                    })))
                 }
             }
         } else {
@@ -184,40 +156,38 @@ impl Operation for Brc20BridgeOp {
 }
 
 impl Brc20BridgeOp {
-    async fn await_inputs(
-        state: RuntimeState<Self>,
-        brc20_tick: Brc20Tick,
-        dst_address: H160,
-        dst_token: H160,
-        amount: u128,
-    ) -> BftResult<Self> {
+    async fn await_inputs(state: RuntimeState<Self>, request: DepositRequest) -> BftResult<Self> {
         let deposit = Brc20Deposit::get(state.clone());
-        let utxos = deposit.get_inputs(&dst_address).await.map_err(|err| {
-            Error::FailedToProgress(format!("cannot find deposit inputs: {err:?}"))
-        })?;
+        let utxos = deposit
+            .get_inputs(&request.dst_address)
+            .await
+            .map_err(|err| {
+                Error::FailedToProgress(format!("cannot find deposit inputs: {err:?}"))
+            })?;
 
         if utxos.is_empty() {
             return Err(Error::FailedToProgress("no inputs".to_string()));
         }
 
         Ok(Self::AwaitConfirmations {
-            amount,
-            brc20_tick,
-            dst_address,
-            dst_token,
+            deposit: request,
             utxos,
         })
     }
 
     async fn await_confirmations(
         state: RuntimeState<Self>,
-        amount: u128,
-        brc20_tick: Brc20Tick,
-        dst_address: H160,
-        dst_token: H160,
+        deposit_request: DepositRequest,
         utxos: Vec<Utxo>,
         nonce: u32,
     ) -> BftResult<Self> {
+        let DepositRequest {
+            amount,
+            brc20_tick,
+            dst_address,
+            dst_token,
+        } = deposit_request;
+
         let deposit = Brc20Deposit::get(state.clone());
         deposit
             .check_confirmations(&dst_address, &utxos)
@@ -247,16 +217,12 @@ impl Brc20BridgeOp {
         let unsigned_mint_order =
             deposit.create_unsigned_mint_order(&dst_address, &dst_token, amount, brc20_info, nonce);
 
-        Ok(Self::SignMintOrder {
-            dst_address,
-            mint_order: unsigned_mint_order,
-        })
+        Ok(Self::SignMintOrder(unsigned_mint_order))
     }
 
     async fn sign_mint_order(
         ctx: RuntimeState<Self>,
         nonce: u32,
-        dst_address: H160,
         mut mint_order: MintOrder,
     ) -> BftResult<Self> {
         // update nonce
@@ -268,21 +234,13 @@ impl Brc20BridgeOp {
             .await
             .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
 
-        Ok(Self::SendMintOrder {
-            dst_address,
-            order: signed,
-        })
+        Ok(Self::SendMintOrder(signed))
     }
 
-    async fn send_mint_order(
-        ctx: RuntimeState<Self>,
-        dst_address: H160,
-        order: SignedMintOrder,
-    ) -> BftResult<Self> {
+    async fn send_mint_order(ctx: RuntimeState<Self>, order: SignedMintOrder) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
         Ok(Self::ConfirmMintOrder {
-            dst_address,
-            order,
+            signed_mint_order: order,
             tx_id,
         })
     }
