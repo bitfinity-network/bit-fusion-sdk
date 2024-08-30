@@ -8,12 +8,19 @@ use super::{LogCanisterSettings, SigningKeyId};
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct InitBridgeConfig {
+    /// The principal of the EVM canister that is being deployed
     #[arg(long)]
     pub evm_principal: Principal,
+    /// The signing key ID to use for signing messages
+    ///
+    /// This key are fixed in the management canister depending on the environment
+    /// being used
     #[arg(long)]
     pub signing_key_id: SigningKeyId,
+    //// Owner of the bridge cansiter
     #[arg(long)]
     pub owner: Principal,
+    /// Log settings for the canister
     #[command(flatten, next_help_heading = "Log Settings for the canister")]
     pub log_settings: Option<LogCanisterSettings>,
 }

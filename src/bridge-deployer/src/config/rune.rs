@@ -10,24 +10,37 @@ use super::{LogCanisterSettings, SigningKeyId};
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct RuneBridgeConfig {
+    /// The network to use for the Bitcoin blockchain
     #[arg(long)]
     pub bitcoin_network: BitcoinNetwork,
+    /// The principal of the EVM canister that is being deployed
     #[arg(long)]
     pub evm_principal: Principal,
+    /// The signing key ID to use for signing messages
     #[arg(long, default_value_t = SigningKeyId::Test)]
     pub signing_key_id: SigningKeyId,
+    /// Admin of the bridge canister
     #[arg(long)]
     pub admin: Principal,
+    /// The minimum number of confirmations required for a Bitcoin transaction
+    /// to be considered final
     #[arg(long)]
     pub min_confirmations: u32,
+    /// The number of indexers to use for the Bitcoin blockchain
     #[arg(long)]
     pub no_of_indexers: u8,
+    /// The URLs of the indexers to use for the Bitcoin blockchain
+    ///
+    /// Note: The number of URLs must match the number of indexers specified above
     #[arg(long, value_delimiter = ',')]
     pub indexer_urls: Vec<String>,
+    /// The fee to charge for deposits
     #[arg(long)]
     pub deposit_fee: u64,
+    /// The timeout for the mempool to confirm a transaction
     #[arg(long)]
     pub mempool_timeout: u64,
+    /// Log settings for the canister
     #[command(flatten, next_help_heading = "Log Settings for the canister")]
     pub log_settings: Option<LogCanisterSettings>,
 }
