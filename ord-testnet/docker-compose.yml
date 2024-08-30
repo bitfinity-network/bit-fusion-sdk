@@ -39,7 +39,13 @@ services:
       dockerfile: dockerfiles/components/ordhook.dockerfile
     ports:
       - "20456:20456"
-    command: ["service", "start", "--post-to=http://ordinals-api:3099/payload", "--auth-token=1", "--config-path=/Ordhook.toml"]
+    command: [
+      "service",
+      "start",
+      "--post-to=http://ordinals-api:3099/payload",
+      "--auth-token=1",
+      "--config-path=/Ordhook.toml",
+    ]
     volumes:
       - ./Ordhook.toml:/Ordhook.toml
     depends_on:
@@ -70,7 +76,16 @@ services:
       - bitcoind
   ord:
     build: https://github.com/ordinals/ord.git
-    command: ["ord", "-r", "--bitcoin-rpc-url", "http://bitcoind:18443", "--index-runes", "server", "--http-port", "1338"]
+    command: [
+      "ord",
+      "-r",
+      "--bitcoin-rpc-url",
+      "http://bitcoind:18443",
+      "--index-runes",
+      "server",
+      "--http-port",
+      "1338",
+    ]
     ports:
       - "1338:1338"
     environment:
