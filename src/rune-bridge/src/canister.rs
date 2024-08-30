@@ -159,6 +159,13 @@ impl RuneBridge {
             .configure_indexers(no_of_indexer_urls, indexer_urls);
     }
 
+    #[update]
+    pub fn admin_set_indexer_consensus_threshold(&self, indexer_consensus_threshold: u8) {
+        get_rune_state()
+            .borrow_mut()
+            .set_indexer_consensus_threshold(indexer_consensus_threshold)
+    }
+
     pub fn idl() -> Idl {
         generate_idl!()
     }

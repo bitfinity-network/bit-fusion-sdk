@@ -39,11 +39,15 @@ impl RuneInputs {
 pub(crate) enum GetInputsError {
     #[error("failed to connect to IC BTC adapter: {0}")]
     BtcAdapter(String),
-    #[error("rune indexers are not available: {checked_indexers:?}")]
-    IndexersNotAvailable { checked_indexers: Vec<String> },
     #[error("rune indexers returned different result for same request: {indexer_responses:?}")]
     IndexersDisagree {
         indexer_responses: Vec<(String, String)>,
+    },
+    #[error("insufficient consensus from rune indexers: {received_responses}/{required_responses} responses received, {checked_indexers} indexers checked")]
+    InsufficientConsensus {
+        received_responses: usize,
+        required_responses: u8,
+        checked_indexers: usize,
     },
 }
 
