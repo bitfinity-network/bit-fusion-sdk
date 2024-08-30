@@ -18,6 +18,7 @@ where
 {
     log: Vec<OperationLogEntry<P>>,
     wallet_address: H160,
+    memo: Option<Memo>,
 }
 
 /// The result of a single step taken in the process of an operation execution.
@@ -42,13 +43,14 @@ where
     /// Creates a new operation log with a single entry - creation of the operation with the given
     /// payload. `wallet_address` parameter is the address of the ETH wallet that initiated the
     /// operation.
-    pub fn new(payload: P, wallet_address: H160) -> Self {
+    pub fn new(payload: P, wallet_address: H160, memo: Option<Memo>) -> Self {
         Self {
             log: vec![OperationLogEntry {
                 time_stamp: Self::timestamp(),
                 step_result: Ok(payload),
             }],
             wallet_address,
+            memo,
         }
     }
 
@@ -85,6 +87,11 @@ where
     fn timestamp() -> u64 {
         ic::time()
     }
+
+    /// Returns the memo associated with the operation.
+    pub fn memo(&self) -> Option<&Memo> {
+        self.memo.as_ref()
+    }
 }
 
 impl<P> Storable for OperationLog<P>
@@ -101,3 +108,6 @@ where
 
     const BOUND: Bound = Bound::Unbounded;
 }
+
+/// Additional metadata for bridge operations
+pub type Memo = [u8; 32];

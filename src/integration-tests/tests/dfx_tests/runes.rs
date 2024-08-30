@@ -381,6 +381,7 @@ impl RunesContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -507,6 +508,7 @@ impl RunesContext {
                 &self.bft_bridge_contract,
                 amount,
                 true,
+                None,
             )
             .await
             .expect("failed to burn wrapped token");

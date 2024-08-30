@@ -208,7 +208,8 @@ impl Operation for BtcBridgeOp {
         event: BurntEventData,
     ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         log::trace!("wrapped token burnt");
-        Some(OperationAction::Create(Self::WithdrawBtc(event)))
+        let memo = event.memo();
+        Some(OperationAction::Create(Self::WithdrawBtc(event), memo))
     }
 
     async fn on_minter_notification(
@@ -232,9 +233,14 @@ impl Operation for BtcBridgeOp {
             btc_deposit.approve_after_mint = None;
         }
 
-        Some(OperationAction::Create(BtcBridgeOp::UpdateCkBtcBalance {
-            eth_address: btc_deposit.recipient,
-        }))
+        let memo = event.memo();
+
+        Some(OperationAction::Create(
+            BtcBridgeOp::UpdateCkBtcBalance {
+                eth_address: btc_deposit.recipient,
+            },
+            memo,
+        ))
     }
 }
 

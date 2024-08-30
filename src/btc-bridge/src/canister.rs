@@ -9,6 +9,8 @@ use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
+use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::common::Pagination;
 use candid::Principal;
@@ -84,6 +86,27 @@ impl BtcBridge {
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
             .map(|(_, mint_order)| mint_order)
+    }
+
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, BtcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    #[query]
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOp)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operations_by_memo(&memo)
     }
 
     #[update]
