@@ -71,6 +71,14 @@ pub enum DepositError {
     NoDstTokenAddress,
     UtxoAlreadyUsed,
     AmountTooBig(String),
+    IndexersDisagree {
+        indexer_responses: Vec<(String, String)>,
+    },
+    InsufficientConsensus {
+        received_responses: usize,
+        required_responses: u8,
+        checked_indexers: usize,
+    },
     InvalidAmounts {
         requested: u128,
         actual: u128,

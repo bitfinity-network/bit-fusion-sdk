@@ -87,16 +87,18 @@ impl HttpClient for IcHttpClient {
 pub struct OrdIndexProvider<C: HttpClient> {
     client: C,
     indexer_urls: HashSet<String>,
+    indexer_consensus_threshold: u8,
 }
 
 impl<C> OrdIndexProvider<C>
 where
     C: HttpClient,
 {
-    pub fn new(client: C, indexer_urls: HashSet<String>) -> Self {
+    pub fn new(client: C, indexer_urls: HashSet<String>, indexer_consensus_threshold: u8) -> Self {
         Self {
             client,
             indexer_urls,
+            indexer_consensus_threshold,
         }
     }
 
@@ -106,50 +108,45 @@ where
     /// the function will return an error.
     async fn get_consensus_response<T>(&self, uri: &str) -> Result<T, DepositError>
     where
-        T: Clone + DeserializeOwned + PartialEq,
+        T: Clone + DeserializeOwned + PartialEq + std::fmt::Debug,
     {
-        let mut first_response: Option<T> = None;
-
         let mut failed_urls = Vec::with_capacity(self.indexer_urls.len());
-
-        let mut inconsistent_urls = Vec::new();
+        let mut responses: Vec<(String, T)> = Vec::new();
+        let mut indexers_agree = true;
 
         for url in &self.indexer_urls {
             match self.client.http_request::<T>(url, uri).await {
-                Ok(response) => match &first_response {
-                    None => first_response = Some(response),
-                    Some(first) => {
-                        if &response != first {
-                            inconsistent_urls.push(url);
-                        }
+                Ok(response) => {
+                    if !responses.is_empty() && responses[0].1 != response {
+                        indexers_agree = false;
                     }
-                },
+
+                    responses.push((url.clone(), response));
+                }
                 Err(e) => {
                     log::warn!("Failed to get response from indexer {}: {:?}", url, e);
-                    failed_urls.push(url);
+                    failed_urls.push(url.clone());
                 }
             }
         }
 
-        match first_response {
-            None => Err(DepositError::Unavailable(format!(
-                "All indexers failed to respond. Failed URLs: {:?}",
-                failed_urls
-            ))),
-            Some(response) => {
-                if inconsistent_urls.is_empty() {
-                    Ok(response)
-                } else {
-                    log::error!(
-                        "Inconsistent responses from indexers. Inconsistent URLs: {:?}",
-                        inconsistent_urls
-                    );
-                    Err(DepositError::Unavailable(format!(
-                    "Indexer responses are not consistent. Inconsistent URLs: {:?}, Please wait for a while and try again",
-                    inconsistent_urls
-                )))
-                }
-            }
+        if responses.len() < self.indexer_consensus_threshold as usize {
+            Err(DepositError::InsufficientConsensus {
+                received_responses: responses.len(),
+                required_responses: self.indexer_consensus_threshold,
+                checked_indexers: self.indexer_urls.len(),
+            })
+        } else if !indexers_agree {
+            // TODO: After https://infinityswap.atlassian.net/browse/EPROD-971 is done, return
+            // actual values here instead of formated response
+            Err(DepositError::IndexersDisagree {
+                indexer_responses: responses
+                    .into_iter()
+                    .map(|(url, response)| (url, format!("{response:?}")))
+                    .collect(),
+            })
+        } else {
+            Ok(responses.pop().expect("responses vector is empty").1)
         }
     }
 }

@@ -218,6 +218,7 @@ impl Brc20Context {
             indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
         };
         context
             .install_canister(
@@ -389,6 +390,7 @@ impl Brc20Context {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 

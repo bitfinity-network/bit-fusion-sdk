@@ -131,6 +131,7 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
         let ic_network = state_ref.ic_btc_network();
         let indexer_urls = state_ref.indexer_urls();
         let signer = state_ref.btc_signer();
+        let consensus_threshold = state_ref.indexer_consensus_threshold();
 
         drop(state_ref);
 
@@ -140,7 +141,11 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
             network,
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
-            index_provider: OrdIndexProvider::new(IcHttpClient {}, indexer_urls),
+            index_provider: OrdIndexProvider::new(
+                IcHttpClient {},
+                indexer_urls,
+                consensus_threshold,
+            ),
         }
     }
 

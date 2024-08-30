@@ -22,6 +22,7 @@ use crate::ledger::UtxoLedger;
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
 const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
+const DEFAULT_INDEXER_CONSENSUS_THRESHOLD: u8 = 2;
 const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Minimum number of indexers required to start the bridge.
@@ -70,6 +71,9 @@ pub struct Brc20BridgeConfig {
     pub indexer_urls: HashSet<String>,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
+    /// Minimum quantity of indexer nodes required to reach agreement on a
+    /// request
+    pub indexer_consensus_threshold: u8,
 }
 
 impl Default for Brc20BridgeConfig {
@@ -87,6 +91,7 @@ impl Default for Brc20BridgeConfig {
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
+            indexer_consensus_threshold: DEFAULT_INDEXER_CONSENSUS_THRESHOLD,
         }
     }
 }
@@ -310,6 +315,16 @@ impl Brc20State {
 
     pub fn update_brc20_tokens(&mut self, brc20_tokens: HashMap<Brc20Tick, Brc20Info>) {
         self.brc20_tokens = brc20_tokens;
+    }
+
+    /// Returns the number of indexers required to reach consensus.
+    pub fn indexer_consensus_threshold(&self) -> u8 {
+        self.config.indexer_consensus_threshold
+    }
+
+    /// Sets the number of indexers required to reach consensus.
+    pub fn set_indexer_consensus_threshold(&mut self, threshold: u8) {
+        self.config.indexer_consensus_threshold = threshold;
     }
 }
 

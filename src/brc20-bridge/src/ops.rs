@@ -137,16 +137,18 @@ impl Operation for Brc20BridgeOp {
         event: NotifyMinterEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_minter_notification {event:?}");
+        let memo = event.memo();
         if let Some(notification) = Brc20MinterNotification::decode(event.clone()) {
             match notification {
-                Brc20MinterNotification::Deposit(payload) => {
-                    Some(OperationAction::Create(Self::AwaitInputs(DepositRequest {
+                Brc20MinterNotification::Deposit(payload) => Some(OperationAction::Create(
+                    Self::AwaitInputs(DepositRequest {
                         amount: payload.amount,
                         brc20_tick: payload.brc20_tick,
                         dst_address: payload.dst_address,
                         dst_token: payload.dst_token,
-                    })))
-                }
+                    }),
+                    memo,
+                )),
             }
         } else {
             log::warn!("Invalid minter notification: {event:?}");
