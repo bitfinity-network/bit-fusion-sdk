@@ -218,19 +218,22 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<U
     ) -> Result<Vec<MintOrder>, UtxoHandlerError> {
         let address = self.get_transit_address(dst_address).await;
         let derivation_path = get_derivation_path_ic(dst_address);
-        let mut state = self.rune_state.borrow_mut();
-        let ledger = state.ledger_mut();
-        let existing = ledger.load_unspent_utxos();
 
-        if existing
-            .values()
-            .any(|v| Self::check_already_used_utxo(v, utxo))
         {
-            return Err(UtxoHandlerError::UtxoAlreadyUsed);
-        }
+            let mut state = self.rune_state.borrow_mut();
+            let ledger = state.ledger_mut();
+            let existing = ledger.load_unspent_utxos();
 
-        let deposit_runes = utxo_runes.iter().map(|rune| rune.rune_info).collect();
-        ledger.deposit(utxo.clone(), &address, derivation_path, deposit_runes);
+            if existing
+                .values()
+                .any(|v| Self::check_already_used_utxo(v, utxo))
+            {
+                return Err(UtxoHandlerError::UtxoAlreadyUsed);
+            }
+
+            let deposit_runes = utxo_runes.iter().map(|rune| rune.rune_info).collect();
+            ledger.deposit(utxo.clone(), &address, derivation_path, deposit_runes);
+        }
 
         let mut mint_orders = vec![];
         for to_wrap in utxo_runes {
