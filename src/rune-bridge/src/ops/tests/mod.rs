@@ -6,13 +6,16 @@ use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::operation_store::OperationsMemory;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::{SharedConfig, State};
+use bridge_did::id256::Id256;
 use ic_stable_structures::MemoryId;
 
 use super::*;
+use crate::ops::tests::sign_mint_order::TestSigner;
 
 mod await_confirmations;
 mod await_inputs;
 mod deposit_request;
+mod send_mint_order;
 mod sign_mint_order;
 
 fn op_memory() -> OperationsMemory<StableMemory> {
@@ -54,4 +57,30 @@ fn dst_tokens() -> HashMap<RuneName, H160> {
         (rune_name("B"), token_address(4)),
     ]
     .into()
+}
+
+fn test_mint_order() -> MintOrder {
+    MintOrder {
+        amount: Default::default(),
+        sender: Id256::from_evm_address(&H160::from_slice(&[1; 20]), 1),
+        src_token: Id256::from_evm_address(&H160::from_slice(&[2; 20]), 1),
+        recipient: Default::default(),
+        dst_token: Default::default(),
+        nonce: 0,
+        sender_chain_id: 0,
+        recipient_chain_id: 0,
+        name: [1; 32],
+        symbol: [1; 16],
+        decimals: 0,
+        approve_spender: Default::default(),
+        approve_amount: Default::default(),
+        fee_payer: Default::default(),
+    }
+}
+
+async fn test_signed_order() -> SignedMintOrder {
+    test_mint_order()
+        .encode_and_sign(&TestSigner::ok())
+        .await
+        .unwrap()
 }

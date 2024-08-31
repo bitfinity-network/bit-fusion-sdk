@@ -118,7 +118,7 @@ impl Operation for RuneBridgeOp {
             }
             RuneBridgeOp::SendMintOrder { dst_address, order } => {
                 log::debug!("RuneBridgeOp::SendMintOrder {dst_address} {order:?}");
-                Self::send_mint_order(ctx, dst_address, order).await
+                Self::send_mint_order(&ctx, dst_address, order).await
             }
             RuneBridgeOp::ConfirmMintOrder { .. } => Err(Error::FailedToProgress(
                 "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
@@ -436,7 +436,7 @@ impl RuneBridgeOp {
     }
 
     async fn send_mint_order(
-        ctx: RuntimeState<Self>,
+        ctx: &impl OperationContext,
         dst_address: H160,
         order: SignedMintOrder,
     ) -> BftResult<Self> {
