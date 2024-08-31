@@ -162,6 +162,7 @@ impl RunesContext {
             indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
         };
         context
             .install_canister(
@@ -381,6 +382,7 @@ impl RunesContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -507,6 +509,7 @@ impl RunesContext {
                 &self.bft_bridge_contract,
                 amount,
                 true,
+                None,
             )
             .await
             .expect("failed to burn wrapped token");

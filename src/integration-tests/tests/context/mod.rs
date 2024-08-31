@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
@@ -284,6 +285,8 @@ pub trait TestContext {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
             isWrappedSide: is_wrapped,
+            owner: [0; 20].into(),
+            controllers: vec![],
         }
         .abi_encode();
 
@@ -351,6 +354,7 @@ pub trait TestContext {
         bridge: &H160,
         amount: u128,
         wrapped: bool,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         let amount: U256 = amount.into();
 
@@ -378,14 +382,13 @@ pub trait TestContext {
             fromERC20: from_token.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
             recipientID: recipient.into(),
+            memo: memo.map(|m| m.into()).unwrap_or_default(),
         }
         .abi_encode();
 
         let (tx_hash, receipt) = self
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
-
-        println!("Burn transaction hash: {tx_hash}; receipt {receipt:?}",);
 
         if receipt.status != Some(U64::one()) {
             let decoded_output =
@@ -425,6 +428,7 @@ pub trait TestContext {
             bridge,
             amount,
             true,
+            None,
         )
         .await
     }
@@ -439,6 +443,7 @@ pub trait TestContext {
         recipient: Id256,
         bridge: &H160,
         amount: u128,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         self.burn_erc_20_tokens_raw(
             evm_client,
@@ -449,6 +454,7 @@ pub trait TestContext {
             bridge,
             amount,
             false,
+            memo,
         )
         .await
     }
@@ -654,6 +660,7 @@ pub trait TestContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: encoded_reason.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -675,6 +682,7 @@ pub trait TestContext {
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::RescheduleOperation as u32,
             userData: encoded_op_id.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 

@@ -220,8 +220,12 @@ impl Operation for RuneBridgeOp {
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
+        let memo = event.memo();
         match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
-            Ok(payload) => Some(OperationAction::Create(Self::CreateTransaction { payload })),
+            Ok(payload) => Some(OperationAction::Create(
+                Self::CreateTransaction { payload },
+                memo,
+            )),
             Err(err) => {
                 log::warn!("Invalid withdrawal data: {err:?}");
                 None
@@ -238,11 +242,14 @@ impl Operation for RuneBridgeOp {
         match event.notification_type {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event.user_data, RuneDepositRequestData) {
-                    Ok(data) => Some(OperationAction::Create(Self::AwaitInputs {
-                        dst_address: data.dst_address,
-                        dst_tokens: data.dst_tokens,
-                        requested_amounts: data.amounts,
-                    })),
+                    Ok(data) => Some(OperationAction::Create(
+                        Self::AwaitInputs {
+                            dst_address: data.dst_address,
+                            dst_tokens: data.dst_tokens,
+                            requested_amounts: data.amounts,
+                        },
+                        event.memo(),
+                    )),
                     _ => {
                         log::warn!(
                             "Invalid encoded deposit request: {}",
@@ -268,7 +275,7 @@ impl RuneBridgeOp {
         let mut state = state.borrow_mut();
         let ids = operations
             .into_iter()
-            .map(|op| state.operations.new_operation(op))
+            .map(|op| state.operations.new_operation(op, None))
             .collect();
         Self::OperationSplit {
             wallet_address,
@@ -511,6 +518,7 @@ mod tests {
             incomplete_operations: memory_by_id(MemoryId::new(2)),
             operations_log: memory_by_id(MemoryId::new(3)),
             operations_map: memory_by_id(MemoryId::new(4)),
+            memo_operations_map: memory_by_id(MemoryId::new(5)),
         }
     }
 
@@ -557,6 +565,7 @@ mod tests {
             notification_type: MinterNotificationType::RescheduleOperation,
             tx_sender: sender(),
             user_data: Encode!(&notification).unwrap(),
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
@@ -584,6 +593,7 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
@@ -610,16 +620,20 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
         assert_eq!(
             result,
-            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
-                dst_address: sender(),
-                dst_tokens: dst_tokens(),
-                requested_amounts: None,
-            }))
+            Some(OperationAction::Create(
+                RuneBridgeOp::AwaitInputs {
+                    dst_address: sender(),
+                    dst_tokens: dst_tokens(),
+                    requested_amounts: None,
+                },
+                None
+            ))
         )
     }
 
@@ -637,16 +651,20 @@ mod tests {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: sender(),
             user_data: data,
+            memo: vec![],
         };
 
         let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
         assert_eq!(
             result,
-            Some(OperationAction::Create(RuneBridgeOp::AwaitInputs {
-                dst_address: sender(),
-                dst_tokens: dst_tokens(),
-                requested_amounts: Some(amounts),
-            }))
+            Some(OperationAction::Create(
+                RuneBridgeOp::AwaitInputs {
+                    dst_address: sender(),
+                    dst_tokens: dst_tokens(),
+                    requested_amounts: Some(amounts),
+                },
+                None
+            ))
         )
     }
 
@@ -682,8 +700,10 @@ mod tests {
 
     #[tokio::test]
     async fn await_inputs_returns_error_if_provider_returns_indexer_error() {
-        let provider = TestRuneInputProvider::err(GetInputsError::IndexersNotAvailable {
-            checked_indexers: vec!["url".to_string()],
+        let provider = TestRuneInputProvider::err(GetInputsError::InsufficientConsensus {
+            received_responses: 0,
+            required_responses: 1,
+            checked_indexers: 0,
         });
         let result =
             RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
@@ -693,7 +713,9 @@ mod tests {
 
         assert_data_eq!(
             message,
-            str![[r#"failed to get deposit inputs: rune indexers are not available: ["url"]"#]]
+            str![
+                "failed to get deposit inputs: insufficient consensus from rune indexers: 0/1 responses received, 0 indexers checked"
+            ]
         )
     }
 

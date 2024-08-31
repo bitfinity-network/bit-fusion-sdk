@@ -9,34 +9,22 @@ default = []
 export-api = []
 
 [dependencies]
-alloy-sol-types = { workspace = true, features = ["json"] }
-anyhow = { workspace = true }
-bridge-did = { path = "../bridge-did" }
 bridge-canister = { path = "../bridge-canister" }
+bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = [
-    "ic-canister-client",
-    "http-outcall",
-] }
+drop_guard = { workspace = true }
+eth-signer = { workspace = true, features = ["ic_sign"] }
 ic-canister = { workspace = true }
-ic-canister-client = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc"] }
+ic-log = { workspace = true }
 ic-metrics = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
-jsonrpc-core = { workspace = true }
-serde = { workspace = true }
 log = { workspace = true }
-ethers-core = { workspace = true }
-bridge-utils = { path = "../bridge-utils" }
-ic-log = { workspace = true }
-eth-signer = { workspace = true, features = ["ic_sign"] }
-drop_guard = { workspace = true }
-
-[dev-dependencies]
-tokio = { workspace = true }
+serde = { workspace = true }
 
 [build-dependencies]
 vergen = { workspace = true }
