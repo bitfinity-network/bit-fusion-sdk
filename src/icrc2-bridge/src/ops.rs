@@ -133,7 +133,8 @@ impl Operation for IcrcBridgeOp {
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt");
-        Some(OperationAction::Create(Self::MintIcrcTokens(event)))
+        let memo = event.memo();
+        Some(OperationAction::Create(Self::MintIcrcTokens(event), memo))
     }
 
     async fn on_wrapped_token_minted(
@@ -168,9 +169,12 @@ impl Operation for IcrcBridgeOp {
             icrc_burn.approve_after_mint = None;
         }
 
-        Some(OperationAction::Create(IcrcBridgeOp::BurnIcrc2Tokens(
-            icrc_burn,
-        )))
+        let memo = event.memo();
+
+        Some(OperationAction::Create(
+            IcrcBridgeOp::BurnIcrc2Tokens(icrc_burn),
+            memo,
+        ))
     }
 }
 

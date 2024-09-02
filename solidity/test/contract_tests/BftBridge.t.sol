@@ -52,7 +52,11 @@ contract BftBridgeTest is Test {
         vm.startPrank(_owner);
 
         // Encode the initialization call
-        bytes memory initializeData = abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true);
+        address[] memory initialControllers = new address[](0);
+
+        // Encode the initialization call
+        bytes memory initializeData =
+            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true, _owner, initialControllers);
 
         BFTBridge wrappedImpl = new BFTBridge();
 
@@ -65,7 +69,7 @@ contract BftBridgeTest is Test {
 
         // Encode the initialization call
         bytes memory baseInitializeData =
-            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false);
+            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false, _owner, initialControllers);
 
         BFTBridge baseImpl = new BFTBridge();
 
@@ -217,8 +221,10 @@ contract BftBridgeTest is Test {
 
         assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
 
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+
         vm.prank(address(_owner));
-        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal, memo);
     }
 
     function testBurnBaseSideWithoutApproveShouldFail() public {
@@ -233,7 +239,9 @@ contract BftBridgeTest is Test {
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.prank(address(_owner));
         vm.expectRevert(bytes("Insufficient allowance"));
-        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal, memo);
     }
 
     function testBurnWrappedSideWithDeployedErc20() public {
@@ -250,7 +258,8 @@ contract BftBridgeTest is Test {
         assertEq(WrappedToken(order.toERC20).balanceOf(address(_owner)), order.amount);
 
         vm.prank(address(_owner));
-        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _wrappedBridge.burn(1, order.toERC20, order.fromTokenID, principal, memo);
     }
 
     function testBurnWrappedSideWithUnregisteredToken() public {
@@ -260,7 +269,8 @@ contract BftBridgeTest is Test {
 
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.expectRevert(bytes("Invalid from address; not registered in the bridge"));
-        _wrappedBridge.burn(100, erc20, toTokenId, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _wrappedBridge.burn(100, erc20, toTokenId, principal, memo);
     }
 
     function testBurnBaseSideWithUnregisteredToken() public {
@@ -276,7 +286,8 @@ contract BftBridgeTest is Test {
 
         bytes32 toTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         vm.prank(address(_owner));
-        _baseBridge.burn(100, erc20Address, toTokenId, principal);
+        bytes32 memo = bytes32(abi.encodePacked(uint8(0)));
+        _baseBridge.burn(100, erc20Address, toTokenId, principal, memo);
     }
 
     function testMintBaseSideWithUnregisteredToken() public {
@@ -401,6 +412,103 @@ contract BftBridgeTest is Test {
         vm.stopPrank();
     }
 
+    function testPauseByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        vm.prank(controller);
+        _wrappedBridge.pause();
+
+        assertTrue(_wrappedBridge.paused());
+    }
+
+    function testPauseByNonController() public {
+        address nonController = address(43);
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.pause();
+    }
+
+    function testUnpauseByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        vm.prank(controller);
+        _wrappedBridge.pause();
+
+        vm.prank(controller);
+        _wrappedBridge.unpause();
+
+        assertFalse(_wrappedBridge.paused());
+    }
+
+    function testUnpauseByNonController() public {
+        address nonController = address(43);
+
+        vm.prank(_owner);
+        _wrappedBridge.pause();
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.unpause();
+    }
+
+    function testAddAllowedImplementationByController() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(controller);
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+
+        assertTrue(_wrappedBridge.allowedImplementations(newImplementationHash));
+    }
+
+    function testAddAllowedImplementationByNonController() public {
+        address nonController = address(43);
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(nonController);
+        vm.expectRevert("Not a controller");
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+    }
+
+    function testAddAllowedImplementationAlreadyAllowed() public {
+        address controller = address(42);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(controller);
+
+        bytes32 newImplementationHash = keccak256(abi.encodePacked("new implementation"));
+
+        vm.prank(controller);
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+
+        vm.prank(controller);
+        vm.expectRevert("Implementation already allowed");
+        _wrappedBridge.addAllowedImplementation(newImplementationHash);
+    }
+
+    function testAddAndRemoveController() public {
+        address newController = address(44);
+
+        vm.prank(_owner);
+        _wrappedBridge.addController(newController);
+        assertTrue(_wrappedBridge.controllerAccessList(newController));
+
+        vm.prank(_owner);
+        _wrappedBridge.removeController(newController);
+        assertFalse(_wrappedBridge.controllerAccessList(newController));
+    }
+
     struct ExpectedBurnEvent {
         address sender;
         uint256 amount;
@@ -410,6 +518,7 @@ contract BftBridgeTest is Test {
         bytes32 name;
         bytes16 symbol;
         uint8 decimals;
+        bytes32 memo;
     }
 
     function _expectBurnEvent(ExpectedBurnEvent memory expected) private {
@@ -437,8 +546,11 @@ contract BftBridgeTest is Test {
                     bytes32 toToken,
                     bytes32 name,
                     bytes16 symbol,
-                    uint8 decimals
-                ) = abi.decode(entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8));
+                    uint8 decimals,
+                    bytes32 memo
+                ) = abi.decode(
+                    entries[i].data, (address, uint256, address, bytes32, bytes32, bytes32, bytes16, uint8, bytes32)
+                );
                 assertEq(expected.sender, sender);
                 assertEq(expected.amount, amount);
                 assertEq(expected.fromERC20, fromERC20);
@@ -447,6 +559,7 @@ contract BftBridgeTest is Test {
                 assertEq(expected.name, name);
                 assertEq(expected.symbol, symbol);
                 assertEq(expected.decimals, decimals);
+                assertEq(expected.memo, memo);
             }
         }
 

@@ -1,0 +1,29 @@
+[package]
+name = "bridge-deployer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
+candid = { workspace = true }
+clap = { workspace = true, features = ["env"] }
+did = { workspace = true }
+erc20-bridge = { path = "../erc20-bridge" }
+eth-signer = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
+ethereum-types = { workspace = true }
+ethers-core = { workspace = true }
+ic-agent = { workspace = true }
+ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
+ic-exports = { workspace = true, features = ["icrc", "ledger"] }
+ic-log = { workspace = true }
+ic-utils = { workspace = true }
+icrc2-bridge = { path = "../icrc2-bridge" }
+rune-bridge = { path = "../rune-bridge" }
+serde = { workspace = true }
+strum = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

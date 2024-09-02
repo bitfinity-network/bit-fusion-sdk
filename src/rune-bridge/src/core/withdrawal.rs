@@ -26,7 +26,7 @@ use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
 use crate::rune_info::RuneInfo;
 use crate::state::RuneState;
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuneWithdrawalPayload {
     pub rune_info: RuneInfo,
     pub amount: u128,
@@ -90,7 +90,7 @@ impl RuneWithdrawalPayload {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidTransaction(Transaction);
 
 impl CandidType for DidTransaction {
@@ -460,8 +460,9 @@ mod test {
     use ord_rs::wallet::LocalSigner;
 
     use super::*;
+    use crate::core::rune_inputs::GetInputsError;
     use crate::core::utxo_provider::UtxoProvider;
-    use crate::interface::{DepositError, WithdrawError};
+    use crate::interface::WithdrawError;
     use crate::key::BtcSignerType;
     use crate::state::RuneState;
 
@@ -490,7 +491,7 @@ mod test {
     }
 
     impl UtxoProvider for FakeUtxoProvider {
-        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, DepositError> {
+        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, GetInputsError> {
             unimplemented!()
         }
 

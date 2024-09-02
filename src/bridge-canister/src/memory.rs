@@ -9,6 +9,7 @@ pub const OPERATIONS_LOG_MEMORY_ID: MemoryId = MemoryId::new(4);
 pub const OPERATIONS_MAP_MEMORY_ID: MemoryId = MemoryId::new(5);
 pub const PENDING_TASKS_MEMORY_ID: MemoryId = MemoryId::new(6);
 pub const LOG_SETTINGS_MEMORY_ID: MemoryId = MemoryId::new(7);
+pub const MEMO_OPERATION_MEMORY_ID: MemoryId = MemoryId::new(8);
 
 pub type StableMemory = VirtualMemory<DefaultMemoryImpl>;
 

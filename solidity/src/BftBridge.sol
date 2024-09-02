@@ -80,11 +80,12 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint32 operationID,
         bytes32 name,
         bytes16 symbol,
-        uint8 decimals
+        uint8 decimals,
+        bytes32 memo
     );
 
     /// Event that can be emited with a notification for the minter canister
-    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData);
+    event NotifyMinterEvent(uint32 notificationType, address txSender, bytes userData, bytes32 memo);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -92,16 +93,37 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _disableInitializers();
     }
 
-    /// Constructor to initialize minterCanisterAddress and feeChargeContract
-    /// and whether this contract is on the wrapped side
-    function initialize(address minterAddress, address feeChargeAddress, bool isWrappedSide) public initializer {
+    /// Initializes the BftBridge contract.
+    ///
+    /// @param minterAddress The address of the minter canister.
+    /// @param feeChargeAddress The address of the fee charge contract.
+    /// @param isWrappedSide A boolean indicating whether this is the wrapped side of the bridge.
+    /// @param owner The initial owner of the contract. If set to 0x0, the caller becomes the owner.
+    /// @param controllers The initial list of authorized controllers.
+    /// @dev This function is called only once during the contract deployment.
+    function initialize(
+        address minterAddress,
+        address feeChargeAddress,
+        bool isWrappedSide,
+        address owner,
+        address[] memory controllers
+    ) public initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        __TokenManager__initi(isWrappedSide);
+        __TokenManager__init(isWrappedSide);
 
-        controllerAccessList[msg.sender] = true;
-        // Call super initializer
-        __Ownable_init(msg.sender);
+        // Set the owner
+        address newOwner = owner != address(0) ? owner : msg.sender;
+        __Ownable_init(newOwner);
+
+        // Add owner to the controller list
+        controllerAccessList[newOwner] = true;
+
+        // Add controllers
+        for (uint256 i = 0; i < controllers.length; i++) {
+            controllerAccessList[controllers[i]] = true;
+        }
+
         __UUPSUpgradeable_init();
         __Pausable_init();
     }
@@ -113,13 +135,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     /// Pause the contract and prevent any future mint or burn operations
     /// Can be called only by the owner
-    function pause() external onlyOwner {
+    function pause() external onlyControllers {
         _pause();
     }
 
     /// Unpause the contract
     /// Can be called only by the owner
-    function unpause() external onlyOwner {
+    function unpause() external onlyControllers {
         _unpause();
     }
 
@@ -141,8 +163,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Emit minter notification event with the given `userData`. For details
     /// about what should be in the user data,
     /// check the implementation of the corresponding minter.
-    function notifyMinter(uint32 notificationType, bytes calldata userData) external {
-        emit NotifyMinterEvent(notificationType, msg.sender, userData);
+    function notifyMinter(uint32 notificationType, bytes calldata userData, bytes32 memo) external {
+        emit NotifyMinterEvent(notificationType, msg.sender, userData, memo);
     }
 
     /// Adds the given `controller` address to the `controllerAccessList`.
@@ -212,7 +234,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint256 amount,
         address fromERC20,
         bytes32 toTokenID,
-        bytes memory recipientID
+        bytes memory recipientID,
+        bytes32 memo
     ) public whenNotPaused returns (uint32) {
         require(fromERC20 != address(this), "From address must not be BFT bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
@@ -242,7 +265,16 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         uint32 operationID = operationIDCounter++;
 
         emit BurnTokenEvent(
-            msg.sender, amount, fromERC20, recipientID, toTokenID, operationID, meta.name, meta.symbol, meta.decimals
+            msg.sender,
+            amount,
+            fromERC20,
+            recipientID,
+            toTokenID,
+            operationID,
+            meta.name,
+            meta.symbol,
+            meta.decimals,
+            memo
         );
 
         return operationID;
