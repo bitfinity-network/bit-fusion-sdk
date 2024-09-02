@@ -24,7 +24,9 @@ library RingBuffer {
     }
 
     // Function to get the size of the buffer.
-    function size(RingBufferUint32 storage buffer) internal view returns (uint8 sizeOf) {
+    function size(
+        RingBufferUint32 storage buffer
+    ) internal view returns (uint8 sizeOf) {
         if (buffer.begin <= buffer.end) {
             sizeOf = buffer.end - buffer.begin;
         } else {
@@ -33,7 +35,9 @@ library RingBuffer {
     }
 
     // Returns all values in order of pushing.
-    function getAll(RingBufferUint32 storage buffer) internal view returns (uint32[] memory values) {
+    function getAll(
+        RingBufferUint32 storage buffer
+    ) internal view returns (uint32[] memory values) {
         uint8 _size = size(buffer);
         values = new uint32[](_size);
         for (uint8 i = 0; i < _size; i++) {

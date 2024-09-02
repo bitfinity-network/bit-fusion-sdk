@@ -17,7 +17,9 @@ import "@openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 /// @custom:oz-upgrades-from src/BftBridge.sol:BFTBridge
 contract BFTBridgeV2 is BFTBridge {
     // Hello World
-    function helloWorld(string memory name) public pure returns (string memory) {
+    function helloWorld(
+        string memory name
+    ) public pure returns (string memory) {
         return string(abi.encodePacked("Hello, ", name, "!"));
     }
 

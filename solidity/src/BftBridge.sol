@@ -102,7 +102,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Restrict who can upgrade this contract
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal view override onlyOwner {
         require(allowedImplementations[newImplementation.codehash], "Not allowed implementation");
     }
 
@@ -127,7 +129,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Add a new implementation to the allowed list
-    function addAllowedImplementation(bytes32 bytecodeHash) external onlyControllers {
+    function addAllowedImplementation(
+        bytes32 bytecodeHash
+    ) external onlyControllers {
         require(!allowedImplementations[bytecodeHash], "Implementation already allowed");
 
         allowedImplementations[bytecodeHash] = true;
@@ -142,18 +146,24 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
     /// Adds the given `controller` address to the `controllerAccessList`.
     /// This function can only be called by the contract owner.
-    function addController(address controller) external onlyOwner {
+    function addController(
+        address controller
+    ) external onlyOwner {
         controllerAccessList[controller] = true;
     }
 
     /// Removes the given `controller` address from the `controllerAccessList`.
     /// This function can only be called by the contract owner.
-    function removeController(address controller) external onlyOwner {
+    function removeController(
+        address controller
+    ) external onlyOwner {
         controllerAccessList[controller] = false;
     }
 
     /// Main function to withdraw funds
-    function mint(bytes calldata encodedOrder) external whenNotPaused {
+    function mint(
+        bytes calldata encodedOrder
+    ) external whenNotPaused {
         uint256 initGasLeft = gasleft();
 
         MintOrderData memory order = _decodeAndValidateOrder(encodedOrder[:269]);
@@ -247,7 +257,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Function to decode and validate the order data
-    function _decodeAndValidateOrder(bytes calldata encodedOrder) private view returns (MintOrderData memory order) {
+    function _decodeAndValidateOrder(
+        bytes calldata encodedOrder
+    ) private view returns (MintOrderData memory order) {
         // Decode order data
         order.amount = uint256(bytes32(encodedOrder[:32]));
         order.senderID = bytes32(encodedOrder[32:64]);
@@ -282,7 +294,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Function to check encodedOrder signature
-    function _checkMintOrderSignature(bytes calldata encodedOrder) private view {
+    function _checkMintOrderSignature(
+        bytes calldata encodedOrder
+    ) private view {
         // Create a hash of the order data
         bytes32 hash = keccak256(encodedOrder[:269]);
 

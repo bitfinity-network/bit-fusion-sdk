@@ -412,7 +412,9 @@ contract BftBridgeTest is Test {
         uint8 decimals;
     }
 
-    function _expectBurnEvent(ExpectedBurnEvent memory expected) private {
+    function _expectBurnEvent(
+        ExpectedBurnEvent memory expected
+    ) private {
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         bool eventFound = false;
@@ -534,7 +536,9 @@ contract BftBridgeTest is Test {
         return abi.encodePacked(encodedOrder, r, s, v);
     }
 
-    function _createIdFromPrincipal(bytes memory principal) private pure returns (bytes32) {
+    function _createIdFromPrincipal(
+        bytes memory principal
+    ) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(0), uint8(principal.length), principal));
     }
 
