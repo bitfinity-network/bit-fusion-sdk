@@ -16,12 +16,11 @@ EVM_FEATURES="export-api"
 
 # Function to print help instructions
 print_help() {
-    echo "Usage: $0 [all|evm|evm_testnet|signature_verification|spender|minter]"
+    echo "Usage: $0 [all|icrc2-bridge|rune-bridge|btc-bridge|erc20-bridge]"
     echo "Examples:"
-    echo "  $0                      # Build all canisters, download binaries and build tools (default)"
-    echo "  $0 all                  # Build all canisters and download binaries and build tools"
-    echo "  $0 evm_testnet          # Build only the EVM canister for testnet"
-    echo "  $0 spender minter       # Build the spender and minter canisters"
+    echo "  $0                          # Build all canisters, download binaries and build tools (default)"
+    echo "  $0 all                      # Build all canisters and download binaries and build tools"
+    echo "  $0 icrc2-bridge rune-bridge # Build the icrc2 and rune bridge"
 }
 
 # Initial setup
@@ -78,6 +77,13 @@ build_bridge_tool() {
     cp target/release/bridge-tool "$WASM_DIR/bridge-tool"
 }
 
+build_bridge_deployer_tool() {
+    echo "Building create BFTBridge tool"
+
+    cargo build -p bridge-deployer --release
+    cp target/release/bridge-deployer "$WASM_DIR/bridge-deployer"
+}
+
 # Function to build a single canister with a feature flag
 build_canister() {
     local canister_name="$1"
@@ -121,13 +127,14 @@ build_requested_canisters() {
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        build_canister "icrc2-minter" "export-api" "icrc2-minter.wasm" "icrc2-minter"
-        build_canister "erc20-minter" "export-api" "erc20-minter.wasm" "erc20-minter"
+        build_canister "icrc2-bridge" "export-api" "icrc2-bridge.wasm" "icrc2-bridge"
+        build_canister "erc20-bridge" "export-api" "erc20-bridge.wasm" "erc20-bridge"
         build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
         build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
 
         # Build tools
         build_bridge_tool
+        build_bridge_deployer_tool
     else
         for canister in "$@"; do
             case "$canister" in
@@ -137,10 +144,10 @@ build_requested_canisters() {
             evm_testnet)
                 build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet.wasm" "evm_testnet"
                 ;;
-            signature_verification | spender | minter)
+            signature_verification)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
-            btc-bridge | rune-bridge | icrc2-minter | erc20-minter)
+            btc-bridge | rune-bridge | icrc2-bridge | erc20-bridge)
                 build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             *)

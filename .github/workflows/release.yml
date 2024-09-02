@@ -1,4 +1,4 @@
-name: "Release minter canisters"
+name: "Release bridge canisters"
 
 on:
   workflow_dispatch:
@@ -9,12 +9,12 @@ concurrency:
 
 jobs:
   release:
-    name: 'Release'
+    name: "Release"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
-            fetch-depth: 0
+          fetch-depth: 0
 
       - name: "Extract Version"
         id: version
@@ -23,12 +23,12 @@ jobs:
           beginswith() { case $1 in "$2"*) true;; *) false;; esac; }
 
           TOML="${{ steps.toml.outputs.path }}"
-          
+
           V_TOML=$(awk -F= '{gsub(/[ \t]+/, "", $1); gsub(/[ \t"]+/, "", $2); if($1 == "version"){print $2}}' $TOML)
           V_GIT=$(git describe --tag)
 
           # Assuming that we tag each version in git
-          # If toml version was not changed manually 
+          # If toml version was not changed manually
           # expecting git tag like "v1.1.1-ab8d" and toml version like "1.1.1"
 
           echo "Tag for this commit: $V_GIT"
@@ -68,7 +68,7 @@ jobs:
 
       - name: Build
         run: |
-          ./scripts/build.sh icrc2-minter erc20-minter
+          ./scripts/build.sh icrc2-bridge erc20-bridge
           ls -la .artifact
       #  Compress the artifacts into a tar.gz file
       - name: Compress artifacts
@@ -77,8 +77,8 @@ jobs:
           cd ./.artifact
           ls -la .
 
-          tar -czf ../.release/erc20-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions erc20-minter.wasm.gz erc20-minter.did
-          tar -czf ../.release/icrc2-minter-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions icrc2-minter.wasm.gz icrc2-minter.did
+          tar -czf ../.release/erc20-bridge-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions erc20-bridge.wasm.gz erc20-bridge.did
+          tar -czf ../.release/icrc2-bridge-${{ env.RELEASE_TAG }}.tar.gz --owner=0 --group=0 --no-same-owner --no-same-permissions icrc2-bridge.wasm.gz icrc2-bridge.did
 
       # Create a new GitHub release with the tag version
       - name: Create Release

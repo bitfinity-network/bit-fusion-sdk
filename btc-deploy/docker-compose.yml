@@ -2,14 +2,14 @@ services:
   bitcoind:
     container_name: bitcoind
     image: lncm/bitcoind:v26.0
-    command: ["-txindex", "-rpcport=18443"]
+    command: ["-txindex", "-debug=mempool", "-rpcport=18443"]
     ports:
       - "18443:18443"
       - "18444:18444"
       - "28332:28332"
       - "28333:28333"
     volumes:
-      - bitcoin-data:/data/.bitcoin
+      - ./bitcoin-data:/data/.bitcoin
       - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 18443"]
@@ -37,6 +37,3 @@ services:
       - "8002:8002"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-volumes:
-  bitcoin-data:

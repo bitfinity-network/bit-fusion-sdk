@@ -86,7 +86,7 @@ fi
 # get positional arguments; skip $0, if empty 'all'
 CANISTERS_TO_DEPLOY="${@:1}"
 if [ -z "$CANISTERS_TO_DEPLOY" ]; then
-  CANISTERS_TO_DEPLOY="icrc2-minter erc20-minter rune-bridge btc-bridge"
+  CANISTERS_TO_DEPLOY="icrc2-bridge erc20-bridge rune-bridge btc-bridge"
 fi
 
 LOG_SETTINGS="opt record { enable_console=false; in_memory_records=opt 10000; log_filter=opt \"info,evm_core=debug,evm=info\"; }"
@@ -103,10 +103,10 @@ if [ "$IC_NETWORK" = "local" ]; then
 
   WRAPPED_EVM_PRINCIPAL=$(deploy_evm_testnet)
   echo "Wrapped EVM Principal: $WRAPPED_EVM_PRINCIPAL"
-  if [ -z "$ICRC2_MINTER_ID" ]; then
-    deploy_icrc2_minter "local" "install" "$WRAPPED_EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
+  if [ -z "$ICRC2_BRIDGE_ID" ]; then
+    deploy_icrc2_bridge "local" "install" "$WRAPPED_EVM_PRINCIPAL" "$OWNER" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
   fi
-  MINTER_ADDRESS=$(dfx canister call icrc2-minter get_bridge_canister_evm_address)
+  MINTER_ADDRESS=$(dfx canister call icrc2-bridge get_bridge_canister_evm_address)
   echo "Minter Address: $MINTER_ADDRESS"
   MINTER_ADDRESS=${MINTER_ADDRESS#*\"}
   MINTER_ADDRESS=${MINTER_ADDRESS%\"*}
@@ -127,7 +127,7 @@ if [ "$IC_NETWORK" = "local" ]; then
     exit 1
   fi
   SIGNING_STRATEGY="variant { ManagementCanister = record { key_id = variant { Dfx }; } }"
-  ICRC2_MINTER_ID=$(dfx canister id icrc2-minter)
+  ICRC2_BRIDGE_ID=$(dfx canister id icrc2-bridge)
   LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { Custom = record { url = \"http://127.0.0.1:8545\"; headers = opt null } } } } }"
 else
   LOCAL_EVM_LINK="variant { EvmRpcCanister = record { canister_id = principal \"$EVM_RPC_PRINCIPAL\"; rpc_service = vec { variant { EthMainnet = variant { Cloudflare } } } } }"
@@ -164,7 +164,7 @@ if [ "$INSTALL_MODE" != "install" ] && [ "$INSTALL_MODE" != "upgrade" ] && [ "$I
   exit 1
 fi
 
-deploy_erc20_minter "$IC_NETWORK" "$INSTALL_MODE" "$LOCAL_EVM_LINK" "$WRAPPED_EVM_PRINCIPAL" "$BASE_BRIDGE_CONTRACT" "$WRAPPED_BRIDGE_CONTRACT" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
+deploy_erc20_bridge "$IC_NETWORK" "$INSTALL_MODE" "$LOCAL_EVM_LINK" "$WRAPPED_EVM_PRINCIPAL" "$BASE_BRIDGE_CONTRACT" "$WRAPPED_BRIDGE_CONTRACT" "$SIGNING_STRATEGY" "$LOG_SETTINGS"
 
 if [ "$IC_NETWORK" == "local" ]; then
   start_icx "$WRAPPED_EVM_PRINCIPAL"

@@ -1,7 +1,10 @@
+use std::fmt::{Display, Formatter};
+
 use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::operation_log::Memo;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
@@ -163,6 +166,25 @@ pub struct BurntEventData {
     pub name: Vec<u8>,
     pub symbol: Vec<u8>,
     pub decimals: u8,
+    pub memo: Vec<u8>,
+}
+
+impl BurntEventData {
+    pub fn memo(&self) -> Option<Memo> {
+        if self.memo.is_empty() {
+            None
+        } else if self.memo.len() == 32 {
+            Some(
+                self.memo
+                    .as_slice()
+                    .try_into()
+                    .expect("should be exactly 32 bytes"),
+            )
+        } else {
+            log::warn!("Invalid memo length: {}", self.memo.len());
+            None
+        }
+    }
 }
 
 impl From<BurnTokenEvent> for BurntEventData {
@@ -177,12 +199,13 @@ impl From<BurnTokenEvent> for BurntEventData {
             name: event.name.0.into(),
             symbol: event.symbol.0.into(),
             decimals: event.decimals,
+            memo: event.memo.0.into(),
         }
     }
 }
 
 /// Event emitted when token is minted by BFTBridge.
-#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MintedEventData {
     pub amount: did::U256,
     pub from_token: Vec<u8>,
@@ -190,6 +213,7 @@ pub struct MintedEventData {
     pub to_erc20: did::H160,
     pub recipient: did::H160,
     pub nonce: u32,
+    pub fee_charged: did::U256,
 }
 
 impl From<MintTokenEvent> for MintedEventData {
@@ -201,23 +225,77 @@ impl From<MintTokenEvent> for MintedEventData {
             to_erc20: event.toERC20.into(),
             recipient: event.recipient.into(),
             nonce: event.nonce,
+            fee_charged: event.chargedFee.into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
+#[repr(u32)]
+pub enum MinterNotificationType {
+    DepositRequest = 1,
+    RescheduleOperation = 2,
+    Other,
+}
+
+impl From<u32> for MinterNotificationType {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::DepositRequest,
+            2 => Self::RescheduleOperation,
+            _ => Self::Other,
+        }
+    }
+}
+
+impl Display for MinterNotificationType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MinterNotificationType::DepositRequest => write!(f, "DepositRequest"),
+            MinterNotificationType::RescheduleOperation => write!(f, "RescheduleOperation"),
+            MinterNotificationType::Other => write!(f, "Other"),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, CandidType, Serialize, Deserialize)]
 pub struct NotifyMinterEventData {
-    pub notification_type: u32,
+    pub notification_type: MinterNotificationType,
     pub tx_sender: did::H160,
     pub user_data: Vec<u8>,
+    pub memo: Vec<u8>,
+}
+
+impl NotifyMinterEventData {
+    /// Returns the memo of this [`NotifyMinterEventData`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the memo is not exactly 32 bytes.
+    pub fn memo(&self) -> Option<Memo> {
+        if self.memo.is_empty() {
+            None
+        } else if self.memo.len() == 32 {
+            Some(
+                self.memo
+                    .as_slice()
+                    .try_into()
+                    .expect("should be exactly 32 bytes"),
+            )
+        } else {
+            log::warn!("Invalid memo length: {}", self.memo.len());
+            None
+        }
+    }
 }
 
 impl From<NotifyMinterEvent> for NotifyMinterEventData {
     fn from(event: NotifyMinterEvent) -> Self {
         Self {
-            notification_type: event.notificationType,
+            notification_type: event.notificationType.into(),
             tx_sender: event.txSender.into(),
             user_data: event.userData.0.into(),
+            memo: event.memo.0.into(),
         }
     }
 }
@@ -253,18 +331,33 @@ pub fn mint_transaction(
 mod tests {
     use std::collections::HashMap;
 
-    use alloy_sol_types::private::FixedBytes;
+    use alloy_sol_types::private::{Address, FixedBytes, Uint};
     use did::H256;
     use ethers_core::abi::{Bytes, RawLog};
-    use ethers_core::utils::hex::traits::FromHex;
 
     use super::*;
 
     #[test]
     fn convert_raw_log_into_minted_event() {
+        let bytes20 = FixedBytes([41; 20]);
+        let bytes32 = FixedBytes([42; 32]);
+        let addr = Address(bytes20);
+
+        let event = MintTokenEvent {
+            amount: did::U256::one().into(),
+            fromToken: bytes32,
+            senderID: bytes32,
+            toERC20: addr,
+            recipient: addr,
+            nonce: 32,
+            chargedFee: did::U256::from(2u64).into(),
+        };
+        let data = event.encode_data();
+        let topic = event.topics().0;
+
         let raw = RawLog {
-            topics: vec![H256::from_hex_str("0x4e37fc8684e0f7ad6a6c1178855450294a16b418314493bd7883699e6b3a0140").unwrap().0],
-            data: Bytes::from_hex("0x00000000000000000000000000000000000000000000000000000000000003e80100056b29e76e9f3b04252ff67c2e623a34dd275f46e5b79f000000000000000100056b29a2d1f5f7d0d6e524a73194b76469eba08460ba4400000000000000000000000000000000000000119544f158a75a60beb83d3a44dd16100ad6d1e50000000000000000000000001e368dfb3f4a2d4e326d2111e6415ce54e7403250000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+            topics: vec![H256::from_slice(&topic.0).into()],
+            data,
         };
 
         let topics = raw
@@ -273,14 +366,44 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let _event = MintTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        let decoded_event =
+            MintTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+
+        assert_eq!(event.amount, decoded_event.amount);
+        assert_eq!(event.fromToken, decoded_event.fromToken);
+        assert_eq!(event.senderID, decoded_event.senderID);
+        assert_eq!(event.toERC20, decoded_event.toERC20);
+        assert_eq!(event.recipient, decoded_event.recipient);
+        assert_eq!(event.nonce, decoded_event.nonce);
+        assert_eq!(event.chargedFee, decoded_event.chargedFee);
     }
 
     #[test]
     fn convert_raw_log_into_burnt_event() {
+        let event = BurnTokenEvent {
+            sender: H160::random().0.into(),
+            amount: Uint::ZERO,
+            fromERC20: H160::random().0.into(),
+            recipientID: Bytes::default().into(),
+            toToken: FixedBytes::from([3; 32]),
+            operationID: 1,
+            name: FixedBytes::from([2; 32]),
+            symbol: FixedBytes::from([1; 16]),
+            decimals: 18,
+            memo: FixedBytes::from([1; 32]),
+        };
+
+        let raw_data = event.encode_data();
+
         let raw = RawLog {
-            topics: vec![H256::from_hex_str("0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79").unwrap().0],
-            data: Bytes::from_hex("0x000000000000000000000000e41b09c6e9eaa79356b10f4181564b4bdb169d3500000000000000000000000000000000000000000000000000000000000003e80000000000000000000000002ea5d83d5a08d8556f726d3004a50aa8aa81c5c200000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000057617465726d656c6f6e0000000000000000000000000000000000000000000057544d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200100056b29dc8b8e5954eebac85b3145745362adfa50d8ad9e00000000000000").unwrap(),
+            topics: vec![
+                H256::from_hex_str(
+                    "0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79",
+                )
+                .unwrap()
+                .0,
+            ],
+            data: raw_data,
         };
         let topics = raw
             .topics
@@ -288,7 +411,8 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let _event = BurnTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        let event = BurnTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        assert_eq!(event.sender, event.sender);
     }
 
     #[tokio::test]

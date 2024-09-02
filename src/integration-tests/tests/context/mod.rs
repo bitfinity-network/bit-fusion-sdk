@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
+use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
@@ -15,7 +16,7 @@ use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
-use erc20_minter::state::BaseEvmSettings;
+use erc20_bridge::state::BaseEvmSettings;
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
@@ -29,7 +30,7 @@ use ic_exports::icrc_types::icrc1_ledger::{
     ArchiveOptions, FeatureFlags, InitArgs, LedgerArgument,
 };
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
-use icrc2_minter::SigningStrategy;
+use icrc2_bridge::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
 use tokio::time::Instant;
 
@@ -44,6 +45,8 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
+use bridge_did::op_id::OperationId;
+use bridge_utils::bft_events::MinterNotificationType;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
@@ -78,13 +81,14 @@ pub trait TestContext {
         EvmCanisterClient::new(self.client(self.canisters().evm(), caller))
     }
 
-    /// Returns client for the evm canister.
-    fn icrc_minter_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
-        Icrc2BridgeClient::new(self.client(self.canisters().icrc2_minter(), caller))
+    /// Returns client for the icrc2 bridge
+    fn icrc_bridge_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
+        Icrc2BridgeClient::new(self.client(self.canisters().icrc2_bridge(), caller))
     }
 
-    fn erc_minter_client(&self, caller: &str) -> Erc20BridgeClient<Self::Client> {
-        Erc20BridgeClient::new(self.client(self.canisters().ck_erc20_minter(), caller))
+    /// Returns client for the erc20 bridge
+    fn erc_bridge_client(&self, caller: &str) -> Erc20BridgeClient<Self::Client> {
+        Erc20BridgeClient::new(self.client(self.canisters().erc20_bridge(), caller))
     }
 
     fn rune_bridge_client(&self, caller: &str) -> RuneBridgeClient<Self::Client> {
@@ -174,9 +178,9 @@ pub trait TestContext {
         Ok(wallet)
     }
 
-    /// Returns minter canister EVM address.
+    /// Returns bridge canister EVM address.
     async fn get_icrc_bridge_canister_evm_address(&self, caller: &str) -> Result<H160> {
-        let client = self.client(self.canisters().icrc2_minter(), caller);
+        let client = self.client(self.canisters().icrc2_bridge(), caller);
         Ok(client
             .update::<_, McResult<H160>>("get_bridge_canister_evm_address", ())
             .await??)
@@ -252,7 +256,7 @@ pub trait TestContext {
             )
             .await?;
 
-        let raw_client = self.client(self.canisters().icrc2_minter(), self.admin_name());
+        let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
         raw_client
             .update("set_bft_bridge_contract", (bridge_address.clone(),))
             .await?;
@@ -281,6 +285,8 @@ pub trait TestContext {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
             isWrappedSide: is_wrapped,
+            owner: [0; 20].into(),
+            controllers: vec![],
         }
         .abi_encode();
 
@@ -348,6 +354,7 @@ pub trait TestContext {
         bridge: &H160,
         amount: u128,
         wrapped: bool,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         let amount: U256 = amount.into();
 
@@ -375,14 +382,13 @@ pub trait TestContext {
             fromERC20: from_token.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
             recipientID: recipient.into(),
+            memo: memo.map(|m| m.into()).unwrap_or_default(),
         }
         .abi_encode();
 
         let (tx_hash, receipt) = self
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
-
-        println!("Burn transaction hash: {tx_hash}; receipt {receipt:?}",);
 
         if receipt.status != Some(U64::one()) {
             let decoded_output =
@@ -422,6 +428,7 @@ pub trait TestContext {
             bridge,
             amount,
             true,
+            None,
         )
         .await
     }
@@ -436,6 +443,7 @@ pub trait TestContext {
         recipient: Id256,
         bridge: &H160,
         amount: u128,
+        memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         self.burn_erc_20_tokens_raw(
             evm_client,
@@ -446,6 +454,7 @@ pub trait TestContext {
             bridge,
             amount,
             false,
+            memo,
         )
         .await
     }
@@ -649,8 +658,31 @@ pub trait TestContext {
         let encoded_reason = Encode!(&reason).unwrap();
 
         let input = BFTBridge::notifyMinterCall {
-            notificationType: Default::default(),
+            notificationType: MinterNotificationType::DepositRequest as u32,
             userData: encoded_reason.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
+        }
+        .abi_encode();
+
+        let _receipt = self
+            .call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)?;
+
+        Ok(())
+    }
+
+    async fn reschedule_operation(
+        &self,
+        operation_id: OperationId,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+    ) -> Result<()> {
+        let encoded_op_id = Encode!(&operation_id).unwrap();
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: MinterNotificationType::RescheduleOperation as u32,
+            userData: encoded_op_id.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -668,7 +700,7 @@ pub trait TestContext {
 
         let subaccount = Some(address_to_icrc_subaccount(&recipient.0));
         let minter_canister = Account {
-            owner: self.canisters().icrc2_minter(),
+            owner: self.canisters().icrc2_bridge(),
             subaccount,
         };
 
@@ -897,10 +929,10 @@ pub trait TestContext {
                 .await
                 .unwrap();
             }
-            CanisterType::Icrc2Minter => {
+            CanisterType::Icrc2Bridge => {
                 println!(
-                    "Installing default ICRC2 minter canister with Principal {}",
-                    self.canisters().icrc2_minter()
+                    "Installing default ICRC2 bridge canister with Principal {}",
+                    self.canisters().icrc2_bridge()
                 );
                 let evm_canister = self
                     .canisters()
@@ -908,7 +940,7 @@ pub trait TestContext {
                     .unwrap_or_else(|| Principal::from_slice(&[1; 20]));
                 let init_data =
                     icrc_bridge_canister_init_data(self.admin(), evm_canister, self.sign_key());
-                self.install_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
+                self.install_canister(self.canisters().icrc2_bridge(), wasm, (init_data,))
                     .await
                     .unwrap();
 
@@ -952,10 +984,10 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
-            CanisterType::CkErc20Minter => {
+            CanisterType::Erc20Bridge => {
                 println!(
-                    "Installing default CK Erc20 minter canister with Principal {}",
-                    self.canisters().ck_erc20_minter()
+                    "Installing default CK Erc20 bridge canister with Principal {}",
+                    self.canisters().erc20_bridge()
                 );
                 let init_data = erc20_bridge_canister_init_data(
                     self.admin(),
@@ -970,7 +1002,7 @@ pub trait TestContext {
                     },
                 };
                 self.install_canister(
-                    self.canisters().ck_erc20_minter(),
+                    self.canisters().erc20_bridge(),
                     wasm,
                     (init_data, base_evm_settings),
                 )
@@ -1009,10 +1041,10 @@ pub trait TestContext {
         Ok(())
     }
 
-    /// Upgrades the minter canister with default settings.
-    async fn upgrade_minter_canister(&self) -> Result<()> {
-        let wasm = get_icrc2_minter_canister_bytecode().await;
-        self.upgrade_canister(self.canisters().icrc2_minter(), wasm, ())
+    /// Upgrades the icrc2 bridge canister with default settings.
+    async fn upgrade_icrc2_bridge_canister(&self) -> Result<()> {
+        let wasm = get_icrc2_bridge_canister_bytecode().await;
+        self.upgrade_canister(self.canisters().icrc2_bridge(), wasm, ())
             .await?;
         Ok(())
     }
@@ -1033,13 +1065,13 @@ pub trait TestContext {
         Ok(())
     }
 
-    async fn reinstall_minter_canister(&self) -> Result<()> {
-        eprintln!("reinstalling Minter canister");
+    async fn reinstall_icrc2_bridge_canister(&self) -> Result<()> {
+        eprintln!("reinstalling icrc2 bridge canister");
         let init_data =
             icrc_bridge_canister_init_data(self.admin(), self.canisters().evm(), self.sign_key());
 
-        let wasm = get_icrc2_minter_canister_bytecode().await;
-        self.reinstall_canister(self.canisters().icrc2_minter(), wasm, (init_data,))
+        let wasm = get_icrc2_bridge_canister_bytecode().await;
+        self.reinstall_canister(self.canisters().icrc2_bridge(), wasm, (init_data,))
             .await?;
 
         Ok(())
@@ -1241,18 +1273,18 @@ impl TestCanisters {
             .expect("signature canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn icrc2_minter(&self) -> Principal {
+    pub fn icrc2_bridge(&self) -> Principal {
         *self
             .0
-            .get(&CanisterType::Icrc2Minter)
-            .expect("icrc2 minter canister should be initialized (see `TestContext::new()`)")
+            .get(&CanisterType::Icrc2Bridge)
+            .expect("icrc2 bridge canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn ck_erc20_minter(&self) -> Principal {
+    pub fn erc20_bridge(&self) -> Principal {
         *self
             .0
-            .get(&CanisterType::CkErc20Minter)
-            .expect("ck erc20 minter canister should be initialized (see `TestContext::new()`)")
+            .get(&CanisterType::Erc20Bridge)
+            .expect("erc20 bridge canister should be initialized (see `TestContext::new()`)")
     }
 
     pub fn ck_btc_minter(&self) -> Principal {
@@ -1321,8 +1353,8 @@ pub enum CanisterType {
     Signature,
     Token1,
     Token2,
-    Icrc2Minter,
-    CkErc20Minter,
+    Icrc2Bridge,
+    Erc20Bridge,
     Btc,
     CkBtcMinter,
     Kyt,
@@ -1335,29 +1367,29 @@ impl CanisterType {
     /// EVM and SignatureVerification.
     pub const EVM_TEST_SET: [CanisterType; 2] = [CanisterType::Evm, CanisterType::Signature];
 
-    /// EVM, SignatureVerification, Minter and Token1.
+    /// EVM, SignatureVerification, Icrc2Bridge and Token1.
     pub const ICRC2_MINTER_TEST_SET: [CanisterType; 4] = [
         CanisterType::Evm,
         CanisterType::Signature,
         CanisterType::Token1,
-        CanisterType::Icrc2Minter,
+        CanisterType::Icrc2Bridge,
     ];
 
-    /// EVM, SignatureVerification, Minter, Spender and Token1.
+    /// EVM, ExternalEvm, SignatureVerification, Erc20Bridge
     pub const EVM_MINTER_TEST_SET: [CanisterType; 4] = [
         CanisterType::Evm,
         CanisterType::ExternalEvm,
         CanisterType::Signature,
-        CanisterType::CkErc20Minter,
+        CanisterType::Erc20Bridge,
     ];
 
-    /// EVM, SignatureVerification, Minter, Spender and Token1.
+    /// EVM, ExternalEvm, EvmRpc, SignatureVerification, Erc20Bridge
     pub const EVM_MINTER_WITH_EVMRPC_TEST_SET: [CanisterType; 5] = [
         CanisterType::Evm,
         CanisterType::ExternalEvm,
         CanisterType::EvmRpcCanister,
         CanisterType::Signature,
-        CanisterType::CkErc20Minter,
+        CanisterType::Erc20Bridge,
     ];
 
     pub const BTC_CANISTER_SET: [CanisterType; 4] = [
@@ -1381,8 +1413,8 @@ impl CanisterType {
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
-            CanisterType::Icrc2Minter => get_icrc2_minter_canister_bytecode().await,
-            CanisterType::CkErc20Minter => get_ck_erc20_minter_canister_bytecode().await,
+            CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_bytecode().await,
+            CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
             CanisterType::Btc => get_btc_canister_bytecode().await,
             CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
             CanisterType::Kyt => get_kyt_canister_bytecode().await,

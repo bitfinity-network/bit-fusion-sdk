@@ -158,14 +158,14 @@ impl ConfigStorage {
         Ok(())
     }
 
-    /// Returns parameters of EVM canister with which the minter canister works.
+    /// Returns parameters of EVM canister with which the bridge canister works.
     pub fn get_evm_params(&self) -> BftResult<EvmParams> {
         self.0.get().evm_params.clone().ok_or_else(|| {
             Error::Initialization("failed to get uninitialized get evm params".into())
         })
     }
 
-    /// Updates parameters of EVM canister with which the minter canister works.
+    /// Updates parameters of EVM canister with which the bridge canister works.
     pub fn update_evm_params<F: FnOnce(&mut EvmParams)>(&mut self, f: F) {
         self.update(|config| {
             let mut params = config.evm_params.clone().unwrap_or_default();

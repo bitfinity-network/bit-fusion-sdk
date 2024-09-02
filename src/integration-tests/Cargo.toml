@@ -8,49 +8,42 @@ edition.workspace = true
 [dependencies]
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
+bip39 = { workspace = true }
 bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
+bitcoincore-rpc = { workspace = true }
+bridge-canister = { path = "../bridge-canister" }
 bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = [
-    "reqwest",
-    "pocket-ic-tests-client",
-] }
-ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
-ic-canister = { workspace = true }
-ic-canister-client = { workspace = true, features = [
-    "pocket-ic-client",
-    "ic-agent-client",
-] }
+ic-canister-client = { workspace = true, features = ["pocket-ic-client", "ic-agent-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
-icrc-client = { workspace = true }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
-icrc2-minter = { path = "../icrc2-minter" }
-bridge-canister = { path = "../bridge-canister" }
-jsonrpc-core = { workspace = true }
-minter-client = { workspace = true }
+icrc-client = { workspace = true }
+icrc2-bridge = { path = "../icrc2-bridge" }
 once_cell = { workspace = true }
+ord-rs = { workspace = true, features = ["rune"] }
+ordinals = { workspace = true }
 rand = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
-serde_json = { workspace = true }
 serde_bytes = { workspace = true }
-
+serde_json = { workspace = true }
 
 # state machine tests deps
-ic-config = { workspace = true, optional = true }
 ic-base-types = { workspace = true, optional = true }
 ic-bitcoin-canister-mock = { workspace = true, optional = true }
 ic-canisters-http-types = { workspace = true, optional = true }
 ic-ckbtc-kyt = { workspace = true, optional = true }
 ic-ckbtc-minter = { workspace = true, optional = true }
+ic-config = { workspace = true, optional = true }
 ic-icrc1-ledger = { workspace = true, optional = true }
 ic-management-canister-types = { workspace = true, optional = true }
 ic-state-machine-tests = { workspace = true, optional = true }
@@ -58,34 +51,28 @@ ic-state-machine-tests = { workspace = true, optional = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 btc-bridge = { path = "../btc-bridge" }
-ethereum-json-rpc-client = { workspace = true, features = [
-    "reqwest",
-    "pocket-ic-tests-client",
-] }
-futures = { workspace = true, features = ["executor"] }
+erc20-bridge = { path = "../erc20-bridge" }
 ic-test-utils = { workspace = true }
-ic-agent = { workspace = true }
 ic-utils = { workspace = true }
-ic-metrics = { workspace = true }
+rune-bridge = { path = "../rune-bridge" }
+serial_test = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
-erc20-minter = { path = "../erc20-minter" }
-signature-verification-canister-client = { workspace = true }
-rune-bridge = { path = "../rune-bridge" }
+tokio-util = { workspace = true }
 
 # IC deps
 [features]
 pocket_ic_integration_test = []
 state_machine_tests = [
-    "bitcoin",
-    "ic-config",
-    "ic-base-types",
-    "ic-bitcoin-canister-mock",
-    "ic-canisters-http-types",
-    "ic-ckbtc-minter",
-    "ic-ckbtc-kyt",
-    "ic-icrc1-ledger",
-    "ic-management-canister-types",
-    "ic-state-machine-tests",
+  "bitcoin",
+  "ic-config",
+  "ic-base-types",
+  "ic-bitcoin-canister-mock",
+  "ic-canisters-http-types",
+  "ic-ckbtc-minter",
+  "ic-ckbtc-kyt",
+  "ic-icrc1-ledger",
+  "ic-management-canister-types",
+  "ic-state-machine-tests",
 ]
-dfx_tests = []
+dfx_tests = ["bitcoin"]

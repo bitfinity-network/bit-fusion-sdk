@@ -262,7 +262,7 @@ impl CkBtcSetup {
                     }))
                     .unwrap(),
                 )
-                .expect("failed to install the minter");
+                .expect("failed to install the ckBTC minter");
 
                 let kyt_provider = PrincipalId::new_user_test_id(2);
 
@@ -1049,6 +1049,7 @@ impl CkBtcSetup {
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
         }
         .abi_encode();
 
@@ -1202,6 +1203,7 @@ impl CkBtcSetup {
                 &self.bft_bridge,
                 amount as u128,
                 true,
+                None,
             )
             .await
             .expect("failed to burn");
@@ -1385,6 +1387,155 @@ async fn test_get_btc_address_from_bridge() {
     let deposit_address_anonymous = ckbtc.get_btc_address_from_bridge(deposit_account);
 
     assert_eq!(deposit_address, deposit_address_anonymous);
+
+    ckbtc.async_drop().await;
+}
+
+#[tokio::test]
+async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
+    let ckbtc = CkBtcSetup::new().await;
+
+    ckbtc.set_tip_height(12);
+
+    let deposit_value = 100_000_000;
+
+    let wallet = (&ckbtc.context)
+        .new_wallet(u128::MAX)
+        .await
+        .expect("Failed to create a wallet");
+
+    let tx_count: u64 = 40;
+    assert!(deposit_value % tx_count == 0);
+
+    let tx_value = deposit_value / tx_count;
+
+    let caller_eth_address = wallet.address().0.into();
+
+    for tx_count in 0..tx_count {
+        let utxo = Utxo {
+            height: 12,
+            outpoint: OutPoint {
+                txid: range_to_txid(1..=32).into(),
+                vout: 1 + tx_count as u32,
+            },
+            value: tx_value,
+        };
+
+        let deposit_account = Account {
+            owner: ckbtc.context.canisters.btc_bridge(),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+        };
+
+        let deposit_address = ckbtc.get_btc_address(deposit_account);
+        ckbtc.push_utxo(deposit_address, utxo.clone());
+
+        println!("Pushed tx {tx_count}: {utxo:?}");
+    }
+
+    (&ckbtc.context).advance_time(Duration::from_secs(10)).await;
+    ckbtc.advance_blocks(16);
+
+    // deposit
+    assert!(ckbtc
+        .btc_to_erc20(&wallet, &ckbtc.bft_bridge, &caller_eth_address)
+        .await
+        .is_ok());
+
+    ckbtc.advance_blocks(16);
+    for _ in 0..60 {
+        (&ckbtc.context)
+            .advance_time(Duration::from_millis(500))
+            .await;
+    }
+
+    let expected_balance =
+        (deposit_value - (ckbtc.kyt_fee() * tx_count) - CKBTC_LEDGER_FEE) as u128;
+    let balance = (&ckbtc.context)
+        .check_erc20_balance(&ckbtc.wrapped_token, &wallet, None)
+        .await
+        .expect("Failed to check balance");
+    assert_eq!(balance, expected_balance);
+
+    let canister_balance = ckbtc
+        .balance_of(Account {
+            owner: ckbtc.context.canisters.btc_bridge(),
+            subaccount: None,
+        })
+        .await;
+    assert_eq!(canister_balance, expected_balance);
+
+    ckbtc.async_drop().await;
+}
+
+#[tokio::test]
+async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
+    let ckbtc = CkBtcSetup::new().await;
+
+    ckbtc.set_tip_height(12);
+
+    let deposit_value = 100_000_000;
+    let wallets_count = 12;
+
+    let mut wallets = Vec::new();
+    for _ in 0..wallets_count {
+        let wallet = (&ckbtc.context)
+            .new_wallet(u128::MAX)
+            .await
+            .expect("Failed to create a wallet");
+        wallets.push(wallet);
+    }
+
+    for wallet in &wallets {
+        let utxo = Utxo {
+            height: 12,
+            outpoint: OutPoint {
+                txid: range_to_txid(1..=32).into(),
+                vout: 1,
+            },
+            value: deposit_value,
+        };
+
+        let caller_eth_address = wallet.address().0.into();
+
+        let deposit_account = Account {
+            owner: ckbtc.context.canisters.btc_bridge(),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+        };
+
+        let deposit_address = ckbtc.get_btc_address(deposit_account);
+        ckbtc.push_utxo(deposit_address, utxo.clone());
+
+        println!("Pushed tx: {utxo:?}");
+    }
+
+    ckbtc.advance_blocks(16);
+    (&ckbtc.context).advance_time(Duration::from_secs(30)).await;
+
+    // deposit
+    for wallet in &wallets {
+        // deposit
+        let caller_eth_address = wallet.address().0.into();
+        assert!(ckbtc
+            .btc_to_erc20(wallet, &ckbtc.bft_bridge, &caller_eth_address)
+            .await
+            .is_ok());
+    }
+
+    for _ in 0..100 {
+        ckbtc.advance_blocks(2);
+        (&ckbtc.context)
+            .advance_time(Duration::from_millis(50))
+            .await;
+    }
+
+    for wallet in &wallets {
+        let expected_balance = (deposit_value - ckbtc.kyt_fee() - CKBTC_LEDGER_FEE) as u128;
+        let balance = (&ckbtc.context)
+            .check_erc20_balance(&ckbtc.wrapped_token, wallet, None)
+            .await
+            .expect("Failed to check balance");
+        assert_eq!(balance, expected_balance);
+    }
 
     ckbtc.async_drop().await;
 }

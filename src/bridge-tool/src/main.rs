@@ -97,7 +97,7 @@ struct DepositIcrcArgs {
 
 #[derive(Debug, Parser)]
 struct DeployBftArgs {
-    /// ETH address of the minter
+    /// ETH address of the bridge
     #[arg(long)]
     minter_address: String,
 
@@ -313,10 +313,12 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         fee_payer: None,
         erc20_token_address: args.erc20_token_address.into(),
     };
+    let memo = alloy_sol_types::private::FixedBytes::ZERO;
 
     let input = BFTBridge::notifyMinterCall {
         notificationType: 0,
         userData: Encode!(&data).unwrap().into(),
+        memo,
     }
     .abi_encode();
 
@@ -515,6 +517,8 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
         isWrappedSide: args.is_wrapped_side,
+        owner: [0; 20].into(),
+        controllers: vec![],
     }
     .abi_encode();
 
@@ -801,11 +805,14 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .expect("Failed to execute approve transaction");
     wait_for_tx_success(&client, hash).await;
 
+    let memo = alloy_sol_types::private::FixedBytes::ZERO;
+
     let input = BFTBridge::burnCall {
         amount: amount.into(),
         fromERC20: token.0.into(),
         toTokenID: alloy_sol_types::private::FixedBytes::from_slice(args.to_token_id.as_bytes()),
         recipientID: args.address.into_bytes().into(),
+        memo,
     }
     .abi_encode();
 

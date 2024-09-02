@@ -6,8 +6,13 @@ use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
 pub mod btc;
+#[cfg(feature = "dfx_tests")]
+pub mod btc_rpc_client;
 pub mod error;
-
+#[cfg(feature = "dfx_tests")]
+pub mod ord_client;
+#[cfg(feature = "dfx_tests")]
+pub mod rune_helper;
 pub mod wasm;
 
 /// Returns the Path to the workspace root dir

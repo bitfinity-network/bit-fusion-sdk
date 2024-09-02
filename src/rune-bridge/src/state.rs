@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
-use bitcoin::{Network, PrivateKey, PublicKey};
+use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_did::init::BridgeInitData;
 use candid::{CandidType, Deserialize, Principal};
 use eth_signer::sign_strategy::SigningStrategy;
@@ -11,6 +11,7 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
+use ic_exports::ic_kit::ic;
 use ic_log::did::LogCanisterSettings;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
@@ -33,6 +34,7 @@ pub struct RuneState {
     pub(crate) master_key: Option<MasterKey>,
     pub(crate) ledger: UtxoLedger,
     pub(crate) runes: HashMap<RuneName, RuneInfo>,
+    pub(crate) fee_rate_state: FeeRateState,
 }
 
 #[derive(Debug, Clone)]
@@ -42,7 +44,22 @@ pub struct MasterKey {
     pub key_id: EcdsaKeyId,
 }
 
-#[derive(Debug, CandidType, Deserialize)]
+pub struct FeeRateState {
+    fee_rate: FeeRate,
+    /// Last update timestamp in nanoseconds
+    last_update_timestamp: u64,
+}
+
+impl Default for FeeRateState {
+    fn default() -> Self {
+        Self {
+            fee_rate: FeeRate::ZERO,
+            last_update_timestamp: 0,
+        }
+    }
+}
+
+#[derive(Debug, CandidType, Deserialize, Clone)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
     pub evm_principal: Principal,
@@ -52,6 +69,9 @@ pub struct RuneBridgeConfig {
     pub min_confirmations: u32,
     pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
+    /// Minimum quantity of indexer nodes required to reach agreement on a
+    /// request
+    pub indexer_consensus_threshold: u8,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
 }
@@ -68,6 +88,7 @@ impl Default for RuneBridgeConfig {
             log_settings: LogCanisterSettings::default(),
             min_confirmations: 12,
             no_of_indexers: MIN_INDEXERS,
+            indexer_consensus_threshold: 2,
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
@@ -95,6 +116,14 @@ impl RuneBridgeConfig {
             .any(|url| !url.starts_with("https"))
         {
             return Err("Indexer url must specify https url".to_string());
+        }
+
+        if self.indexer_consensus_threshold > self.indexer_urls.len() as u8 {
+            return Err(format!(
+               "The consensus threshold ({}) must be less than or equal to the number of indexers ({})",
+                self.indexer_consensus_threshold,
+                self.indexer_urls.len()
+            ));
         }
 
         Ok(())
@@ -273,8 +302,37 @@ impl RuneState {
         self.config.no_of_indexers = no_of_indexers;
     }
 
+    /// Returns the number of indexers required to reach consensus.
+    pub fn indexer_consensus_threshold(&self) -> u8 {
+        self.config.indexer_consensus_threshold
+    }
+
+    /// Sets the number of indexers required to reach consensus.
+    pub fn set_indexer_consensus_threshold(&mut self, threshold: u8) {
+        self.config.indexer_consensus_threshold = threshold;
+    }
+
     pub fn mempool_timeout(&self) -> Duration {
         self.config.mempool_timeout
+    }
+
+    /// Update fee rate and the last update timestamp.
+    pub fn update_fee_rate(&mut self, fee_rate: FeeRate) {
+        self.fee_rate_state.fee_rate = fee_rate;
+        self.fee_rate_state.last_update_timestamp = ic::time();
+    }
+
+    /// Fee rate used by the canister.
+    pub fn fee_rate(&self) -> FeeRate {
+        self.fee_rate_state.fee_rate
+    }
+
+    /// Elapsed time since the last fee rate update. (nano seconds)
+    pub fn last_fee_rate_update_elapsed(&self) -> Duration {
+        ic::time()
+            .checked_sub(self.fee_rate_state.last_update_timestamp)
+            .map(Duration::from_nanos)
+            .unwrap_or_default()
     }
 }
 
@@ -319,6 +377,7 @@ mod tests {
         let config = RuneBridgeConfig {
             indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
             no_of_indexers: 1,
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         assert!(config.validate().is_ok());
@@ -333,6 +392,7 @@ mod tests {
             signing_strategy: SigningStrategy::Local {
                 private_key: [1; 32],
             },
+            indexer_consensus_threshold: 1,
             ..Default::default()
         };
         let mut state = RuneState::default();
@@ -415,5 +475,21 @@ mod tests {
 
         assert_eq!(state.config.no_of_indexers, 3);
         assert_eq!(state.config.indexer_urls, indexer_urls);
+    }
+
+    #[test]
+    fn test_should_update_and_read_fee_rate() {
+        let ctx = MockContext::new().inject();
+        let mut state = RuneState::default();
+
+        assert_eq!(state.fee_rate(), FeeRate::ZERO);
+        assert_eq!(state.fee_rate_state.last_update_timestamp, 0);
+
+        let fee_rate = FeeRate::from_sat_per_vb(1000).unwrap();
+        state.update_fee_rate(fee_rate);
+
+        assert_eq!(state.fee_rate(), fee_rate);
+        ctx.add_time(Duration::from_secs(1).as_nanos() as u64);
+        assert!(state.last_fee_rate_update_elapsed() >= Duration::from_secs(1));
     }
 }

@@ -6,10 +6,11 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
     SendTransactionRequest,
 };
 
-use crate::interface::{DepositError, WithdrawError};
+use crate::core::rune_inputs::GetInputsError;
+use crate::interface::WithdrawError;
 
 pub(crate) trait UtxoProvider {
-    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError>;
+    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, GetInputsError>;
     async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError>;
     async fn send_tx(&self, transaction: &Transaction) -> Result<(), WithdrawError>;
 }
@@ -18,7 +19,7 @@ pub struct IcUtxoProvider {
     network: BitcoinNetwork,
 }
 
-const DEFAULT_REGTEST_FEE: u64 = 10_000;
+const DEFAULT_REGTEST_FEE: u64 = 100_000 * 1_000;
 
 impl IcUtxoProvider {
     pub fn new(network: BitcoinNetwork) -> Self {
@@ -27,7 +28,7 @@ impl IcUtxoProvider {
 }
 
 impl UtxoProvider for IcUtxoProvider {
-    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError> {
+    async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, GetInputsError> {
         let args = GetUtxosRequest {
             address: address.to_string(),
             network: self.network,
@@ -39,11 +40,7 @@ impl UtxoProvider for IcUtxoProvider {
         let response = bitcoin_get_utxos(args)
             .await
             .map(|value| value.0)
-            .map_err(|err| {
-                DepositError::Unavailable(format!(
-                    "Unexpected response from management canister: {err:?}"
-                ))
-            })?;
+            .map_err(GetInputsError::btc)?;
 
         log::trace!("Got UTXO list result for address {address}:");
         log::trace!("{response:?}");
@@ -63,16 +60,13 @@ impl UtxoProvider for IcUtxoProvider {
             })?
             .0;
 
-        let middle_percentile = if response.is_empty() {
-            match self.network {
-                BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
-                _ => {
-                    log::error!("Empty response for fee rate request");
-                    return Err(WithdrawError::FeeRateRequest);
-                }
+        let middle_percentile = match self.network {
+            BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
+            _ if response.is_empty() => {
+                log::error!("Empty response for fee rate request");
+                return Err(WithdrawError::FeeRateRequest);
             }
-        } else {
-            response[response.len() / 2]
+            _ => response[response.len() / 2],
         };
 
         log::trace!("Received fee rate percentiles: {response:?}");
