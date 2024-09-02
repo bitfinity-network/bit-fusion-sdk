@@ -17,6 +17,7 @@ use super::index_provider::IcHttpClient;
 use crate::canister::get_rune_state;
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
+use crate::core::utxo_handler::{RuneToWrap, UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{get_derivation_path_ic, BtcSignerType};
@@ -183,23 +184,79 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneInputProvider for RuneDep
     }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
-    pub async fn check_confirmations(
+impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<UTXO, INDEX> {
+    async fn check_confirmations(
         &self,
         dst_address: &H160,
-        utxos: &[Utxo],
-    ) -> Result<(), DepositError> {
+        utxo: &Utxo,
+    ) -> Result<(), UtxoHandlerError> {
         let transit_address = self.get_transit_address(dst_address).await;
-        let mut utxo_response = self
+        let utxo_response = self
             .get_deposit_utxos(&transit_address)
             .await
-            .map_err(|err| DepositError::Unavailable(err.to_string()))?;
-        utxo_response.utxos.retain(|v| utxos.contains(v));
+            .map_err(|err| UtxoHandlerError::BtcAdapter(err.to_string()))?;
+        let block_height = utxo_response.tip_height;
+        // todo: height of the utxo may change. Replace the comparison here and wherever we compare
+        // utxos and add unit test for this case
+        let Some(found_utxo) = utxo_response.utxos.into_iter().find(|v| v == utxo) else {
+            return Err(UtxoHandlerError::UtxoNotFound);
+        };
 
-        self.validate_utxo_confirmations(&utxo_response)
-            .map_err(|_| DepositError::UtxosNotConfirmed)
+        let min_confirmations = self.rune_state.borrow().min_confirmations();
+        let current_confirmations = block_height.saturating_sub(found_utxo.height + 1);
+        let is_confirmed = current_confirmations >= min_confirmations;
+        if is_confirmed {
+            Ok(())
+        } else {
+            Err(UtxoHandlerError::NotConfirmed {
+                current_confirmations,
+                required_confirmations: min_confirmations,
+            })
+        }
     }
 
+    async fn deposit(
+        &self,
+        utxo: &Utxo,
+        dst_address: &H160,
+        utxo_runes: Vec<RuneToWrap>,
+    ) -> Result<Vec<MintOrder>, UtxoHandlerError> {
+        let address = self.get_transit_address(dst_address).await;
+        let derivation_path = get_derivation_path_ic(dst_address);
+
+        {
+            let mut state = self.rune_state.borrow_mut();
+            let ledger = state.ledger_mut();
+            let existing = ledger.load_unspent_utxos();
+
+            if existing
+                .values()
+                .any(|v| Self::check_already_used_utxo(v, utxo))
+            {
+                return Err(UtxoHandlerError::UtxoAlreadyUsed);
+            }
+
+            let deposit_runes = utxo_runes.iter().map(|rune| rune.rune_info).collect();
+            ledger.deposit(utxo.clone(), &address, derivation_path, deposit_runes);
+        }
+
+        let mut mint_orders = vec![];
+        for to_wrap in utxo_runes {
+            let mint_order = self.create_unsigned_mint_order(
+                dst_address,
+                &to_wrap.wrapped_address,
+                to_wrap.amount,
+                to_wrap.rune_info,
+                0,
+            );
+            mint_orders.push(mint_order);
+        }
+
+        Ok(mint_orders)
+    }
+}
+
+impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     pub async fn get_deposit_utxos(
         &self,
         transit_address: &Address,
@@ -226,27 +283,6 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         self.signer
             .get_transit_address(eth_address, self.network)
             .await
-    }
-
-    pub fn validate_utxo_confirmations(&self, utxo_info: &GetUtxosResponse) -> Result<(), u32> {
-        let min_confirmations = self.rune_state.borrow().min_confirmations();
-        let utxo_min_confirmations = utxo_info
-            .utxos
-            .iter()
-            .map(|utxo| utxo_info.tip_height - utxo.height + 1)
-            .min()
-            .unwrap_or_default();
-
-        if min_confirmations > utxo_min_confirmations {
-            Err(utxo_min_confirmations)
-        } else {
-            log::trace!(
-                "Current utxo confirmations {} satisfies minimum {}. Proceeding.",
-                utxo_min_confirmations,
-                min_confirmations
-            );
-            Ok(())
-        }
     }
 
     fn get_rune_infos_from_state(
@@ -362,31 +398,6 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
                 .values()
                 .any(|v| Self::check_already_used_utxo(v, utxo))
         })
-    }
-
-    /// Deposit UTXO to the ledger.
-    pub async fn deposit(
-        &self,
-        utxo: &Utxo,
-        dst_address: &H160,
-        rune_info: Vec<RuneInfo>,
-    ) -> Result<(), DepositError> {
-        let address = self.get_transit_address(dst_address).await;
-        let derivation_path = get_derivation_path_ic(dst_address);
-        let mut state = self.rune_state.borrow_mut();
-        let ledger = state.ledger_mut();
-        let existing = ledger.load_unspent_utxos();
-
-        if existing
-            .values()
-            .any(|v| Self::check_already_used_utxo(v, utxo))
-        {
-            return Err(DepositError::UtxoAlreadyUsed);
-        }
-
-        ledger.deposit(utxo.clone(), &address, derivation_path, rune_info);
-
-        Ok(())
     }
 
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
