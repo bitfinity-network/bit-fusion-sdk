@@ -30,3 +30,9 @@ single_line_statement_blocks = "multi"
 "@openzeppelin-contracts-upgradeable" = "5.0.2"
 "@openzeppelin-contracts" = "5.0.2"
 forge-std = "1.9.2"
+
+[soldeer]
+# whether soldeer manages remappings
+remappings_generated = false
+remappings_regenerate = false
+remappings_version = false

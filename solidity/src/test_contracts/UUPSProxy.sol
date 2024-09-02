@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.17;
 
-import "@openzeppelin-contracts-5.0.2/proxy/ERC1967/ERC1967Proxy.sol";
+import "@openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract UUPSProxy is ERC1967Proxy {
     constructor(address _implementation, bytes memory _data) ERC1967Proxy(_implementation, _data) {}

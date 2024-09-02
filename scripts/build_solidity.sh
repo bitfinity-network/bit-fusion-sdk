@@ -5,8 +5,8 @@ set -x
 
 cd solidity
 
-echo "forge update and install deps..."
-forge soldeer update
+echo "soldeer install deps..."
+forge soldeer install
 
 echo "forge test..."
 forge test -vv

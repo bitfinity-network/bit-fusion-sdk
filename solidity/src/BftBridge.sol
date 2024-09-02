@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "@openzeppelin-contracts-5.0.2/utils/cryptography/ECDSA.sol";
-import "@openzeppelin-contracts-5.0.2/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/WrappedToken.sol";
 import "src/interfaces/IFeeCharge.sol";
 import { RingBuffer } from "src/libraries/RingBuffer.sol";
 import "src/abstract/TokenManager.sol";
-import "@openzeppelin-contracts-upgradeable-5.0.2/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin-contracts-upgradeable-5.0.2/access/OwnableUpgradeable.sol";
-import "@openzeppelin-contracts-upgradeable-5.0.2/proxy/utils/Initializable.sol";
-import "@openzeppelin-contracts-upgradeable-5.0.2/utils/PausableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin-contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     using RingBuffer for RingBuffer.RingBufferUint32;
