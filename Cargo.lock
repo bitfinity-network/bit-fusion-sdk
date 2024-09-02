@@ -1034,6 +1034,7 @@ name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "brc20-bridge",
  "bridge-did",
  "bridge-utils",
  "candid",

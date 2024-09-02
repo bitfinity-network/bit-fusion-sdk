@@ -4,3 +4,4 @@ pub mod utxo_provider;
 pub mod withdrawal;
 
 pub mod rune_inputs;
+pub mod utxo_handler;

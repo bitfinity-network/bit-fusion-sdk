@@ -29,9 +29,6 @@ pub struct RuneBridgeConfig {
     /// The number of indexers to use for the Bitcoin blockchain
     #[arg(long)]
     pub no_of_indexers: u8,
-    /// The consensus threshold for the indexers
-    #[arg(long)]
-    pub indexer_consensus_threshold: u8,
     /// The URLs of the indexers to use for the Bitcoin blockchain
     ///
     /// Note: The number of URLs must match the number of indexers specified above
@@ -95,7 +92,7 @@ impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
             indexer_urls: value.indexer_urls.into_iter().collect(),
             deposit_fee: value.deposit_fee,
             mempool_timeout: Duration::from_secs(value.mempool_timeout),
-            indexer_consensus_threshold: value.indexer_consensus_threshold,
+            indexer_consensus_threshold: value.no_of_indexers,
         }
     }
 }
