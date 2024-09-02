@@ -8,30 +8,33 @@ use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{BTreeMapStructure, StableBTreeMap, VirtualMemory};
+use ic_stable_structures::stable_structures::Memory;
+use ic_stable_structures::{BTreeMapStructure, MemoryId, MemoryManager, StableBTreeMap};
 use ord_rs::wallet::TxInputInfo;
 
 use self::used_utxo_details::UsedUtxoDetails;
 use self::utxo_details::UtxoDetails;
 pub use self::utxo_key::UtxoKey;
 use crate::key::{ic_dp_to_derivation_path, KeyError};
-use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER, USED_UTXOS_REGISTRY_MEMORY_ID};
+use crate::memory::{LEDGER_MEMORY_ID, USED_UTXOS_REGISTRY_MEMORY_ID};
 
 /// Data structure to keep track of utxos owned by the canister.
-pub struct UtxoLedger {
+pub struct UtxoLedger<M: Memory> {
     /// contains a list of utxos on the main canister account (which get there as a change from withdrawal transactions)
-    utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
+    utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, M>,
     /// contains a list of utxos that are on user's deposit address.
-    used_utxos_registry: StableBTreeMap<UtxoKey, UsedUtxoDetails, VirtualMemory<DefaultMemoryImpl>>,
+    used_utxos_registry: StableBTreeMap<UtxoKey, UsedUtxoDetails, M>,
 }
 
-impl Default for UtxoLedger {
-    fn default() -> Self {
+impl<M> UtxoLedger<M>
+where
+    M: Memory,
+{
+    pub fn new(memory_manager: &dyn MemoryManager<M, MemoryId>) -> Self {
         Self {
-            utxo_storage: StableBTreeMap::new(MEMORY_MANAGER.with(|mm| mm.get(LEDGER_MEMORY_ID))),
+            utxo_storage: StableBTreeMap::new(memory_manager.get(LEDGER_MEMORY_ID)),
             used_utxos_registry: StableBTreeMap::new(
-                MEMORY_MANAGER.with(|mm| mm.get(USED_UTXOS_REGISTRY_MEMORY_ID)),
+                memory_manager.get(USED_UTXOS_REGISTRY_MEMORY_ID),
             ),
         }
     }
@@ -43,7 +46,10 @@ pub struct UnspentUtxoInfo {
     pub tx_input_info: TxInputInfo,
 }
 
-impl UtxoLedger {
+impl<M> UtxoLedger<M>
+where
+    M: Memory,
+{
     /// Adds the utxo to the store.
     pub fn deposit(&mut self, utxo: Utxo, address: &Address, derivation_path: Vec<Vec<u8>>) {
         let script = address.script_pubkey();

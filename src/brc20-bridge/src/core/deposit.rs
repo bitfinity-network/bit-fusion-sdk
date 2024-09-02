@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use super::index_provider::IcHttpClient;
 use crate::brc20_info::{Brc20Info, Brc20Tick};
-use crate::canister::get_brc20_state;
+use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
@@ -130,11 +130,17 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
 
+        let signing_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
+
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
         let indexer_urls = state_ref.indexer_urls();
         let signer = state_ref
-            .btc_signer()
+            .btc_signer(&signing_strategy)
             .ok_or(DepositError::SignerNotInitialized)?;
         let consensus_threshold = state_ref.indexer_consensus_threshold();
 

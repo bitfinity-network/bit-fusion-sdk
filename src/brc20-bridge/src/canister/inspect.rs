@@ -21,13 +21,7 @@ async fn inspect_message() {
     api::call::accept_message();
 }
 
-pub fn inspect_configure_ecdsa(config: SharedConfig) {
-    let caller = ic::caller();
-    let owner = config.borrow().get_owner();
-    inspect_caller_is_owner(owner, caller)
-}
-
-pub fn inspect_configure_indexers(config: SharedConfig) {
+pub fn inspect_is_owner(config: SharedConfig) {
     let caller = ic::caller();
     let owner = config.borrow().get_owner();
     inspect_caller_is_owner(owner, caller)
@@ -37,8 +31,7 @@ pub fn inspect_configure_indexers(config: SharedConfig) {
 fn inspect_method(method: &str) {
     let config = ConfigStorage::get();
     match method {
-        "admin_configure_ecdsa" => inspect_configure_ecdsa(config),
-        "admin_configure_indexers" => inspect_configure_indexers(config),
+        method if method.starts_with("admin_") => inspect_is_owner(config),
         _ => {}
     }
 }

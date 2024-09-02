@@ -10,6 +10,7 @@ use brc20_bridge::interface::{DepositError, GetAddressError};
 use brc20_bridge::ops::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20DepositRequestData};
 use brc20_bridge::state::Brc20BridgeConfig;
 use bridge_client::BridgeCanisterClient;
+use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::MinterNotificationType;
 use bridge_utils::BFTBridge;
@@ -200,26 +201,21 @@ impl Brc20Context {
             .unwrap();
 
         let bridge = context.canisters().brc20_bridge();
-        let init_args = Brc20BridgeConfig {
-            network: BitcoinNetwork::Regtest,
+
+        let init_args = BridgeInitData {
             evm_principal: context.canisters().evm(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },
-            admin: context.admin(),
-            log_settings: LogCanisterSettings {
+            owner: context.admin(),
+            log_settings: Some(LogCanisterSettings {
                 enable_console: Some(true),
                 in_memory_records: None,
                 log_filter: Some("trace".to_string()),
                 ..Default::default()
-            },
-            min_confirmations: 1,
-            no_of_indexers: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
-            deposit_fee: 500_000,
-            mempool_timeout: Duration::from_secs(60),
-            indexer_consensus_threshold: 1,
+            }),
         };
+
         context
             .install_canister(
                 bridge,
@@ -228,9 +224,26 @@ impl Brc20Context {
             )
             .await
             .unwrap();
+
         let _: () = context
             .client(bridge, ADMIN)
             .update("admin_configure_ecdsa", ())
+            .await
+            .unwrap();
+
+        // configure brc20
+        let brc20_args = Brc20BridgeConfig {
+            network: BitcoinNetwork::Regtest,
+            min_confirmations: 1,
+            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
+            deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
+        };
+
+        let _: () = context
+            .client(bridge, ADMIN)
+            .update("admin_configure_brc20", (brc20_args,))
             .await
             .unwrap();
 

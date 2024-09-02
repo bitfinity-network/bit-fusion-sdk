@@ -5,6 +5,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
@@ -19,7 +20,7 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
+use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
 use crate::ops::Brc20BridgeOp;
 use crate::state::{Brc20BridgeConfig, Brc20State};
@@ -42,9 +43,7 @@ impl BridgeCanister for Brc20Bridge {
 
 impl Brc20Bridge {
     #[init]
-    pub fn init(&mut self, config: Brc20BridgeConfig) {
-        let bridge_init_data = config.bridge_init_data();
-        get_brc20_state().borrow_mut().configure(config);
+    pub fn init(&mut self, bridge_init_data: BridgeInitData) {
         self.init_bridge(bridge_init_data, Self::run_scheduler);
     }
 
@@ -90,30 +89,45 @@ impl Brc20Bridge {
             .get_log(operation_id)
     }
 
+    /// Configure brc20 parameters with the given parameters.
+    #[update]
+    pub async fn admin_configure_brc20(&self, config: Brc20BridgeConfig) {
+        get_brc20_state().borrow_mut().configure(config);
+    }
+
     #[update]
     pub async fn admin_configure_ecdsa(&self) {
-        inspect_configure_ecdsa(self.config());
+        inspect_is_owner(self.config());
 
-        let key_id = get_brc20_state().borrow().ecdsa_key_id();
+        let signing_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
 
-        let master_key = ecdsa_public_key(EcdsaPublicKeyArgument {
+        let key_id = get_brc20_state().borrow().ecdsa_key_id(&signing_strategy);
+
+        let (master_key,) = ecdsa_public_key(EcdsaPublicKeyArgument {
             canister_id: None,
             derivation_path: vec![],
-            key_id,
+            key_id: key_id.clone(),
         })
         .await
         .expect("failed to get master key");
 
-        get_brc20_state().borrow_mut().configure_ecdsa(master_key.0);
+        get_brc20_state()
+            .borrow_mut()
+            .configure_ecdsa(master_key, key_id)
+            .expect("failed to configure ecdsa");
     }
 
     #[update]
-    pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
-        inspect_configure_indexers(self.config());
+    pub fn admin_configure_indexers(&self, indexer_urls: HashSet<String>) {
+        inspect_is_owner(self.config());
 
         get_brc20_state()
             .borrow_mut()
-            .configure_indexers(no_of_indexer_urls, indexer_urls);
+            .configure_indexers(indexer_urls);
     }
 
     pub fn idl() -> Idl {
