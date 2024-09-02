@@ -29,6 +29,7 @@ pub trait BaseTokens {
     fn ctx(&self) -> &(impl TestContext + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
     fn user_id256(&self, user_id: Self::UserId) -> Id256;
+    fn next_memo(&self) -> [u8; 32];
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
 
@@ -310,6 +311,7 @@ impl<B: BaseTokens> StressTestState<B> {
             fromERC20: self.wrapped_tokens[token_idx].clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&base_token_id.0),
             recipientID: user_id256.0.into(),
+            memo: self.base_tokens.next_memo().into(),
         }
         .abi_encode();
 

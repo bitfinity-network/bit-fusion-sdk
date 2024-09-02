@@ -20,6 +20,7 @@ use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext}
 use crate::utils::error::{Result, TestError};
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
+static MEMO_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub struct IcrcBaseTokens<Ctx> {
     ctx: Ctx,
@@ -73,6 +74,13 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
     fn user_id256(&self, user_id: Self::UserId) -> bridge_did::id256::Id256 {
         let principal = self.ctx.principal_by_caller_name(&user_id);
         (&principal).into()
+    }
+
+    fn next_memo(&self) -> [u8; 32] {
+        let mut memo = [0u8; 32];
+        let memo_value = MEMO_COUNTER.fetch_add(1, Ordering::Relaxed);
+        memo[0..4].copy_from_slice(&memo_value.to_be_bytes());
+        memo
     }
 
     async fn bridge_canister_evm_address(&self) -> Result<H160> {
@@ -178,6 +186,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
+            memo: self.next_memo().into(),
         }
         .abi_encode();
 
