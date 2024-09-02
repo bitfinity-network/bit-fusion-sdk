@@ -51,6 +51,9 @@ pub enum Bridge {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+        /// Extra configuration for the BRC20 bridge
+        #[command(name = "brc20", flatten)]
+        brc20: config::Brc20BridgeConfig,
     },
     Btc {
         /// The configuration to use
@@ -81,11 +84,15 @@ impl Bridge {
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
-            Bridge::Brc20 { config: init } => {
+            Bridge::Brc20 {
+                config: init,
+                brc20,
+            } => {
                 trace!("Preparing BRC20 bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(init.clone());
-                debug!("BRC20 Bridge Config : {:?}", config);
-                Encode!(&config)?
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("BRC20 Bridge Config : {:?}", init_data);
+                let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
+                Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { config } => {
                 trace!("Preparing Rune bridge configuration");

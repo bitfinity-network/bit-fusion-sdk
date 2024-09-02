@@ -216,21 +216,6 @@ impl Brc20Context {
             }),
         };
 
-        context
-            .install_canister(
-                bridge,
-                get_brc20_bridge_canister_bytecode().await,
-                (init_args,),
-            )
-            .await
-            .unwrap();
-
-        let _: () = context
-            .client(bridge, ADMIN)
-            .update("admin_configure_ecdsa", ())
-            .await
-            .unwrap();
-
         // configure brc20
         let brc20_args = Brc20BridgeConfig {
             network: BitcoinNetwork::Regtest,
@@ -241,9 +226,18 @@ impl Brc20Context {
             indexer_consensus_threshold: 1,
         };
 
+        context
+            .install_canister(
+                bridge,
+                get_brc20_bridge_canister_bytecode().await,
+                (init_args, brc20_args),
+            )
+            .await
+            .unwrap();
+
         let _: () = context
             .client(bridge, ADMIN)
-            .update("admin_configure_brc20", (brc20_args,))
+            .update("admin_configure_ecdsa", ())
             .await
             .unwrap();
 

@@ -43,8 +43,9 @@ impl BridgeCanister for Brc20Bridge {
 
 impl Brc20Bridge {
     #[init]
-    pub fn init(&mut self, bridge_init_data: BridgeInitData) {
+    pub fn init(&mut self, bridge_init_data: BridgeInitData, brc20_config: Brc20BridgeConfig) {
         self.init_bridge(bridge_init_data, Self::run_scheduler);
+        get_brc20_state().borrow_mut().configure(brc20_config);
     }
 
     #[post_upgrade]
@@ -87,12 +88,6 @@ impl Brc20Bridge {
             .borrow()
             .operations
             .get_log(operation_id)
-    }
-
-    /// Configure brc20 parameters with the given parameters.
-    #[update]
-    pub async fn admin_configure_brc20(&self, config: Brc20BridgeConfig) {
-        get_brc20_state().borrow_mut().configure(config);
     }
 
     #[update]
