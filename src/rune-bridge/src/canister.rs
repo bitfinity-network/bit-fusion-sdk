@@ -132,25 +132,6 @@ impl RuneBridge {
     }
 
     #[update]
-    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
-        let address = Address::from_str(&btc_address)
-            .expect("invalid address")
-            .assume_checked();
-
-        let deposit = RuneDeposit::get(get_runtime_state());
-        let utxos = deposit
-            .get_deposit_utxos(&address)
-            .await
-            .expect("failed to get utxos");
-        let (rune_info_amounts, _) = deposit
-            .get_mint_amounts(&utxos.utxos, &None)
-            .await
-            .expect("failed to get rune amounts");
-
-        rune_info_amounts
-    }
-
-    #[update]
     pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
         inspect_configure_indexers(self.config());
 
