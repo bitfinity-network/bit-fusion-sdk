@@ -23,7 +23,6 @@ pub struct Outpoint {
 }
 
 impl HiroOrdinalsClient {
-    #[cfg(feature = "dfx_tests")]
     pub fn dfx_test_client() -> HiroOrdinalsClient {
         Self {
             client: Client::new(),

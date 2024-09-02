@@ -146,19 +146,13 @@ impl Brc20State {
     }
 
     /// Returns master public key of the canister.
-    pub fn public_key(&self) -> PublicKey {
-        self.master_key
-            .as_ref()
-            .expect("master key is not initialized")
-            .public_key
+    pub fn public_key(&self) -> Option<PublicKey> {
+        self.master_key.as_ref().map(|key| key.public_key)
     }
 
     /// Returns master chain code of the canister. Used for public key derivation.
-    pub fn chain_code(&self) -> ChainCode {
-        self.master_key
-            .as_ref()
-            .expect("master key is not initialized")
-            .chain_code
+    pub fn chain_code(&self) -> Option<ChainCode> {
+        self.master_key.as_ref().map(|key| key.chain_code)
     }
 
     /// Returns BTC network the canister works with (IC style).
@@ -180,24 +174,24 @@ impl Brc20State {
         self.config.min_confirmations
     }
 
-    fn master_key(&self) -> MasterKey {
-        self.master_key.clone().expect("ecdsa is not initialized")
+    fn master_key(&self) -> Option<MasterKey> {
+        self.master_key.clone()
     }
 
-    pub fn btc_signer(&self) -> BtcSignerType {
-        match &self.config.signing_strategy {
+    pub fn btc_signer(&self) -> Option<BtcSignerType> {
+        Some(match &self.config.signing_strategy {
             SigningStrategy::Local { private_key } => BtcSignerType::Local(LocalSigner::new(
                 PrivateKey::from_slice(private_key, self.network()).expect("invalid private key"),
             )),
             SigningStrategy::ManagementCanister { .. } => {
-                BtcSignerType::Ic(IcBtcSigner::new(self.master_key(), self.network()))
+                BtcSignerType::Ic(IcBtcSigner::new(self.master_key()?, self.network()))
             }
-        }
+        })
     }
 
     /// Wallet to be used to sign transactions with the given derivation path.
-    pub fn wallet(&self) -> Wallet {
-        Wallet::new_with_signer(self.btc_signer())
+    pub fn wallet(&self) -> Option<Wallet> {
+        Some(Wallet::new_with_signer(self.btc_signer()?))
     }
 
     /// BTC fee in SATs for a deposit request.
@@ -251,6 +245,7 @@ impl Brc20State {
     /// configuration must be set before any of the transactions can be processed.
     pub fn configure_ecdsa(&mut self, master_key: EcdsaPublicKeyResponse) {
         let chain_code: &[u8] = &master_key.chain_code;
+
         self.master_key = Some(MasterKey {
             public_key: PublicKey::from_slice(&master_key.public_key)
                 .expect("invalid public key slice"),

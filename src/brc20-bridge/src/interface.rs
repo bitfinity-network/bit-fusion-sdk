@@ -2,8 +2,10 @@ use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
 use serde::Deserialize;
+use thiserror::Error;
 
 use crate::core::deposit::Brc20DepositPayload;
+use crate::key::KeyError;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub struct PendingUtxo {}
@@ -51,9 +53,16 @@ pub enum Erc20MintError {
     NothingToMint,
 }
 
-#[derive(Debug, Clone, Copy, CandidType, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Error, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub enum GetAddressError {
-    Derivation,
+    #[error("key error: {0}")]
+    Key(String),
+}
+
+impl From<KeyError> for GetAddressError {
+    fn from(e: KeyError) -> Self {
+        Self::Key(e.to_string())
+    }
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
@@ -64,6 +73,7 @@ pub struct DepositResponse {
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub enum DepositError {
     NotInitialized,
+    SignerNotInitialized,
     NotScheduled,
     NothingToDeposit,
     NoBrc20ToDeposit,
@@ -71,6 +81,7 @@ pub enum DepositError {
     NoDstTokenAddress,
     UtxoAlreadyUsed,
     AmountTooBig(String),
+    KeyError(String),
     IndexersDisagree {
         indexer_responses: Vec<(String, String)>,
     },
@@ -95,6 +106,12 @@ pub enum DepositError {
     /// Error while signing the mint order.
     Sign(String),
     Evm(String),
+}
+
+impl From<KeyError> for DepositError {
+    fn from(e: KeyError) -> Self {
+        Self::KeyError(e.to_string())
+    }
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize)]

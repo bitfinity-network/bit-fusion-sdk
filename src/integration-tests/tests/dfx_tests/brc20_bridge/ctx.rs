@@ -7,7 +7,7 @@ use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
 use brc20_bridge::brc20_info::Brc20Tick;
 use brc20_bridge::interface::{DepositError, GetAddressError};
-use brc20_bridge::ops::{Brc20BridgeOp, Brc20DepositRequestData};
+use brc20_bridge::ops::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20DepositRequestData};
 use brc20_bridge::state::Brc20BridgeConfig;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::op_id::OperationId;
@@ -438,7 +438,10 @@ impl Brc20Context {
 
             if !response.is_empty() {
                 for (_, op) in &response {
-                    if matches!(op, Brc20BridgeOp::MintOrderConfirmed { .. }) {
+                    if matches!(
+                        op,
+                        Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. })
+                    ) {
                         return Ok(());
                     }
                 }

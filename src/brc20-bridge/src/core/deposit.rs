@@ -20,7 +20,7 @@ use crate::canister::get_brc20_state;
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::BtcSignerType;
+use crate::key::{BtcSignerType, KeyError};
 use crate::ledger::UnspentUtxoInfo;
 use crate::ops::Brc20BridgeOp;
 use crate::state::Brc20State;
@@ -124,18 +124,23 @@ pub(crate) struct Brc20Deposit<
 }
 
 impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
-    pub fn new(state: Rc<RefCell<Brc20State>>, runtime_state: RuntimeState<Brc20BridgeOp>) -> Self {
+    pub fn new(
+        state: Rc<RefCell<Brc20State>>,
+        runtime_state: RuntimeState<Brc20BridgeOp>,
+    ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
         let indexer_urls = state_ref.indexer_urls();
-        let signer = state_ref.btc_signer();
+        let signer = state_ref
+            .btc_signer()
+            .ok_or(DepositError::SignerNotInitialized)?;
         let consensus_threshold = state_ref.indexer_consensus_threshold();
 
         drop(state_ref);
 
-        Self {
+        Ok(Self {
             brc20_state: state,
             runtime_state,
             network,
@@ -146,10 +151,10 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
                 indexer_urls,
                 consensus_threshold,
             ),
-        }
+        })
     }
 
-    pub fn get(runtime_state: RuntimeState<Brc20BridgeOp>) -> Self {
+    pub fn get(runtime_state: RuntimeState<Brc20BridgeOp>) -> Result<Self, DepositError> {
         Self::new(get_brc20_state(), runtime_state)
     }
 }
@@ -157,7 +162,7 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
 impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
     // Get input utxos
     pub async fn get_inputs(&self, dst_address: &H160) -> Result<Vec<Utxo>, DepositError> {
-        let transit_address = self.get_transit_address(dst_address).await;
+        let transit_address = self.get_transit_address(dst_address).await?;
 
         Ok(self.get_deposit_utxos(&transit_address).await?.utxos)
     }
@@ -167,7 +172,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         dst_address: &H160,
         tick: &Brc20Tick,
     ) -> Result<u128, DepositError> {
-        let transit_address = self.get_transit_address(dst_address).await;
+        let transit_address = self.get_transit_address(dst_address).await?;
         let balances = self
             .index_provider
             .get_brc20_balances(&transit_address)
@@ -196,12 +201,13 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         })
     }
 
+    /// Check for confirmations
     pub async fn check_confirmations(
         &self,
         dst_address: &H160,
         utxos: &[Utxo],
     ) -> Result<(), DepositError> {
-        let transit_address = self.get_transit_address(dst_address).await;
+        let transit_address = self.get_transit_address(dst_address).await?;
         let mut utxo_response = self.get_deposit_utxos(&transit_address).await?;
         utxo_response.utxos.retain(|v| utxos.contains(v));
 
@@ -221,7 +227,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
             utxo_response.utxos
         );
 
-        self.filter_out_used_utxos(&mut utxo_response);
+        self.filter_out_used_utxos(&mut utxo_response)?;
 
         log::trace!(
             "Utxos at address {transit_address} after filtering out used utxos: {:?}",
@@ -231,7 +237,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(utxo_response)
     }
 
-    async fn get_transit_address(&self, eth_address: &H160) -> Address {
+    async fn get_transit_address(&self, eth_address: &H160) -> Result<Address, KeyError> {
         self.signer
             .get_transit_address(eth_address, self.network)
             .await
@@ -346,14 +352,19 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
-    fn filter_out_used_utxos(&self, get_utxos_response: &mut GetUtxosResponse) {
-        let existing = self.brc20_state.borrow().ledger().load_unspent_utxos();
+    fn filter_out_used_utxos(
+        &self,
+        get_utxos_response: &mut GetUtxosResponse,
+    ) -> Result<(), DepositError> {
+        let existing = self.brc20_state.borrow().ledger().load_unspent_utxos()?;
 
         get_utxos_response.utxos.retain(|utxo| {
             !existing
                 .values()
                 .any(|v| Self::check_already_used_utxo(v, utxo))
-        })
+        });
+
+        Ok(())
     }
 
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {

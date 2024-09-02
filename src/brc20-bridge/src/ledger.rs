@@ -15,7 +15,7 @@ use ord_rs::wallet::TxInputInfo;
 use self::used_utxo_details::UsedUtxoDetails;
 use self::utxo_details::UtxoDetails;
 pub use self::utxo_key::UtxoKey;
-use crate::key::ic_dp_to_derivation_path;
+use crate::key::{ic_dp_to_derivation_path, KeyError};
 use crate::memory::{LEDGER_MEMORY_ID, MEMORY_MANAGER, USED_UTXOS_REGISTRY_MEMORY_ID};
 
 /// Data structure to keep track of utxos owned by the canister.
@@ -68,29 +68,29 @@ impl UtxoLedger {
     }
 
     /// Lists all unspent utxos in the store.
-    pub fn load_unspent_utxos(&self) -> HashMap<UtxoKey, UnspentUtxoInfo> {
-        self.utxo_storage
-            .iter()
-            .filter(|(key, _)| !self.used_utxos_registry.contains_key(key))
-            .map(|(key, details)| {
-                (
-                    key,
-                    UnspentUtxoInfo {
-                        tx_input_info: TxInputInfo {
-                            outpoint: OutPoint {
-                                txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
-                                vout: key.vout,
-                            },
-                            tx_out: TxOut {
-                                value: Amount::from_sat(details.value),
-                                script_pubkey: details.script_buf.into(),
-                            },
-                            derivation_path: ic_dp_to_derivation_path(&details.derivation_path),
+    pub fn load_unspent_utxos(&self) -> Result<HashMap<UtxoKey, UnspentUtxoInfo>, KeyError> {
+        let mut map = HashMap::new();
+
+        for (key, details) in self.utxo_storage.iter() {
+            map.insert(
+                key,
+                UnspentUtxoInfo {
+                    tx_input_info: TxInputInfo {
+                        outpoint: OutPoint {
+                            txid: Txid::from_raw_hash(*Hash::from_bytes_ref(&key.tx_id)),
+                            vout: key.vout,
                         },
+                        tx_out: TxOut {
+                            value: Amount::from_sat(details.value),
+                            script_pubkey: details.script_buf.into(),
+                        },
+                        derivation_path: ic_dp_to_derivation_path(&details.derivation_path)?,
                     },
-                )
-            })
-            .collect()
+                },
+            );
+        }
+
+        Ok(map)
     }
 
     /// Marks the utxo as used.
@@ -102,6 +102,8 @@ impl UtxoLedger {
                 owner_address: address.to_string(),
             },
         );
+        // remove from the utxo storage
+        self.utxo_storage.remove(&key);
 
         log::trace!("Utxo {key} is marked as used.");
     }
@@ -163,6 +165,7 @@ mod tests {
             .borrow()
             .ledger()
             .load_unspent_utxos()
+            .unwrap()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -197,6 +200,7 @@ mod tests {
             .borrow()
             .ledger()
             .load_unspent_utxos()
+            .unwrap()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -259,6 +263,7 @@ mod tests {
             .borrow()
             .ledger()
             .load_unspent_utxos()
+            .unwrap()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -326,6 +331,7 @@ mod tests {
             .borrow()
             .ledger()
             .load_unspent_utxos()
+            .unwrap()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -390,16 +396,15 @@ mod tests {
             .borrow()
             .ledger()
             .load_unspent_utxos()
+            .unwrap()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
         keys.sort();
-        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.len(), 1);
 
-        assert_eq!(keys[0].tx_id.to_vec(), utxos[0].outpoint.txid);
-        assert_eq!(keys[0].vout, utxos[0].outpoint.vout);
-        assert_eq!(keys[1].tx_id.to_vec(), utxos[1].outpoint.txid);
-        assert_eq!(keys[1].vout, utxos[1].outpoint.vout);
+        assert_eq!(keys[0].tx_id.to_vec(), utxos[1].outpoint.txid);
+        assert_eq!(keys[0].vout, utxos[1].outpoint.vout);
 
         let used_utxos = state.borrow().ledger().load_used_utxos();
         assert_eq!(used_utxos.len(), 0);
