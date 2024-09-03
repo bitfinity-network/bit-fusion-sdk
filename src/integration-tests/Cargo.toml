@@ -40,6 +40,7 @@ rust_decimal = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+futures = { workspace = true }
 
 # state machine tests deps
 ic-base-types = { workspace = true, optional = true }

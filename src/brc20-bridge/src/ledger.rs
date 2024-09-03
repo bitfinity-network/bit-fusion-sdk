@@ -16,14 +16,14 @@ use self::used_utxo_details::UsedUtxoDetails;
 use self::utxo_details::UtxoDetails;
 pub use self::utxo_key::UtxoKey;
 use crate::key::{ic_dp_to_derivation_path, KeyError};
-use crate::memory::{LEDGER_MEMORY_ID, USED_UTXOS_REGISTRY_MEMORY_ID};
+use crate::memory::{UNUSED_UTXOS_MEMORY_ID, USED_UTXOS_MEMORY_ID};
 
 /// Data structure to keep track of utxos owned by the canister.
 pub struct UtxoLedger<M: Memory> {
     /// contains a list of utxos on the main canister account (which get there as a change from withdrawal transactions)
-    utxo_storage: StableBTreeMap<UtxoKey, UtxoDetails, M>,
+    unused_utxos: StableBTreeMap<UtxoKey, UtxoDetails, M>,
     /// contains a list of utxos that are on user's deposit address.
-    used_utxos_registry: StableBTreeMap<UtxoKey, UsedUtxoDetails, M>,
+    used_utxos: StableBTreeMap<UtxoKey, UsedUtxoDetails, M>,
 }
 
 impl<M> UtxoLedger<M>
@@ -32,10 +32,8 @@ where
 {
     pub fn new(memory_manager: &dyn MemoryManager<M, MemoryId>) -> Self {
         Self {
-            utxo_storage: StableBTreeMap::new(memory_manager.get(LEDGER_MEMORY_ID)),
-            used_utxos_registry: StableBTreeMap::new(
-                memory_manager.get(USED_UTXOS_REGISTRY_MEMORY_ID),
-            ),
+            unused_utxos: StableBTreeMap::new(memory_manager.get(UNUSED_UTXOS_MEMORY_ID)),
+            used_utxos: StableBTreeMap::new(memory_manager.get(USED_UTXOS_MEMORY_ID)),
         }
     }
 }
@@ -56,7 +54,7 @@ where
 
         let utxo_key = UtxoKey::from(&utxo.outpoint);
 
-        self.utxo_storage.insert(
+        self.unused_utxos.insert(
             utxo_key,
             UtxoDetails {
                 value: utxo.value,
@@ -77,7 +75,7 @@ where
     pub fn load_unspent_utxos(&self) -> Result<HashMap<UtxoKey, UnspentUtxoInfo>, KeyError> {
         let mut map = HashMap::new();
 
-        for (key, details) in self.utxo_storage.iter() {
+        for (key, details) in self.unused_utxos.iter() {
             map.insert(
                 key,
                 UnspentUtxoInfo {
@@ -101,7 +99,7 @@ where
 
     /// Marks the utxo as used.
     pub fn mark_as_used(&mut self, key: UtxoKey, address: Address) {
-        self.used_utxos_registry.insert(
+        self.used_utxos.insert(
             key,
             UsedUtxoDetails {
                 used_at: ic::time(),
@@ -109,28 +107,28 @@ where
             },
         );
         // remove from the utxo storage
-        self.utxo_storage.remove(&key);
+        self.unused_utxos.remove(&key);
 
         log::trace!("Utxo {key} is marked as used.");
     }
 
     /// Lists all used utxos in the store.
     pub fn load_used_utxos(&self) -> Vec<(UtxoKey, UsedUtxoDetails)> {
-        self.used_utxos_registry.iter().collect()
+        self.used_utxos.iter().collect()
     }
 
     /// Removes the spent utxo from the store.
     ///
     /// It gets removed from both the utxo storage and the used utxos registry.
     pub fn remove_spent_utxo(&mut self, key: &UtxoKey) {
-        self.utxo_storage.remove(key);
-        self.used_utxos_registry.remove(key);
+        self.unused_utxos.remove(key);
+        self.used_utxos.remove(key);
     }
 
     /// Removes the unspent utxo from the store.
     /// It gets removed only from the `used_utxos_registry`
     pub fn remove_unspent_utxo(&mut self, key: &UtxoKey) {
-        self.used_utxos_registry.remove(key);
+        self.used_utxos.remove(key);
     }
 }
 

@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
+use bridge_canister::memory::MEMORY_MANAGER;
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
@@ -14,7 +15,7 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
 };
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
+use ic_stable_structures::VirtualMemory;
 use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
 
@@ -44,14 +45,13 @@ pub struct Brc20State {
 
 impl Default for Brc20State {
     fn default() -> Self {
-        let memory_manager = default_ic_memory_manager();
-        Self {
+        MEMORY_MANAGER.with(|memory_manager| Self {
             brc20_tokens: HashMap::default(),
-            config: Brc20BridgeConfigStorage::new(&memory_manager),
-            master_key: MasterKeyStorage::new(&memory_manager),
-            ledger: UtxoLedger::new(&memory_manager),
+            config: Brc20BridgeConfigStorage::new(memory_manager),
+            master_key: MasterKeyStorage::new(memory_manager),
+            ledger: UtxoLedger::new(memory_manager),
             fee_rate_state: FeeRateState::default(),
-        }
+        })
     }
 }
 
@@ -211,7 +211,7 @@ impl Brc20State {
             panic!("number of indexers must be at least {}", MIN_INDEXERS)
         }
 
-        self.config.borrow_mut(|config| {
+        self.config.with_borrow_mut(|config| {
             config.indexer_urls = indexer_urls
                 .iter()
                 .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
@@ -265,7 +265,7 @@ impl Brc20State {
     /// Sets the number of indexers required to reach consensus.
     pub fn set_indexer_consensus_threshold(&mut self, threshold: u8) {
         self.config
-            .borrow_mut(|config| config.indexer_consensus_threshold = threshold);
+            .with_borrow_mut(|config| config.indexer_consensus_threshold = threshold);
     }
 }
 

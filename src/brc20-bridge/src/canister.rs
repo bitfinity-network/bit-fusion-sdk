@@ -156,7 +156,7 @@ thread_local! {
     pub static RUNTIME: SharedRuntime =
         Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static RUNE_STATE: Rc<RefCell<Brc20State>> = Rc::default();
+    pub static BRC20_STATE: Rc<RefCell<Brc20State>> = Rc::default();
 }
 
 pub fn get_runtime() -> SharedRuntime {
@@ -168,5 +168,5 @@ pub fn get_runtime_state() -> RuntimeState<Brc20BridgeOp> {
 }
 
 pub fn get_brc20_state() -> Rc<RefCell<Brc20State>> {
-    RUNE_STATE.with(|s| s.clone())
+    BRC20_STATE.with(|s| s.clone())
 }

@@ -17,6 +17,7 @@ use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use super::{init_bridge, PocketIcTestContext, JOHN};
+use crate::context::stress::{icrc, StressTestConfig};
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
@@ -793,4 +794,23 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
         .unwrap();
     assert_eq!(wrapped_balance, 0);
     assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 3);
+}
+
+#[tokio::test]
+async fn icrc_bridge_stress_test() {
+    let context = PocketIcTestContext::new(&[
+        CanisterType::Evm,
+        CanisterType::Signature,
+        CanisterType::Icrc2Bridge,
+    ])
+    .await;
+
+    let config = StressTestConfig {
+        users_number: 2,
+        user_deposits_per_token: 4,
+        init_user_balance: 2u64.pow(30).into(),
+        operation_amount: 2u64.pow(20).into(),
+    };
+
+    icrc::stress_test_icrc_bridge_with_ctx(context, 2, config).await;
 }

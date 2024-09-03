@@ -33,7 +33,7 @@ where
         self.config.set(config).expect("failed to set config");
     }
 
-    pub fn borrow_mut<F>(&mut self, f: F)
+    pub fn with_borrow_mut<F>(&mut self, f: F)
     where
         F: FnOnce(&mut Brc20BridgeConfig),
     {
@@ -58,19 +58,31 @@ pub struct Brc20BridgeConfig {
 }
 
 impl Storable for Brc20BridgeConfig {
-    const BOUND: ic_stable_structures::Bound = ic_stable_structures::Bound::Bounded {
-        max_size: 1 + // network
-        4 + // min_confirmations
-        1 + // no_of_indexers size + no_of_indexers
-        2048 + // indexer_urls
-        8 + // deposit_fee
-        8 + // mempool_timeout
-        1, // indexer_consensus_threshold
-        is_fixed_size: false,
-    };
+    const BOUND: ic_stable_structures::Bound = ic_stable_structures::Bound::Unbounded;
+
+    /* Encoding
+       1                                            // network
+       4                                            // min_confirmations
+       1                                            // number of indexers
+       number of indexers * [1 + indexer_url.len]   // [len] + [indexer_url]
+       8                                            // deposit_fee
+       8                                            // mempool_timeout
+       1                                            // indexer_consensus_threshold
+    */
 
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        let mut buf = Vec::with_capacity(Self::BOUND.max_size() as usize);
+        let mut buf = Vec::with_capacity(
+            1 + 4
+                + 1
+                + self
+                    .indexer_urls
+                    .iter()
+                    .map(|url| 1 + url.len())
+                    .sum::<usize>()
+                + 8
+                + 8
+                + 1,
+        );
 
         let network_byte = match self.network {
             BitcoinNetwork::Mainnet => 0,

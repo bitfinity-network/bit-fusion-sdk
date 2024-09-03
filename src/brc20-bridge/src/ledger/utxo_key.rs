@@ -3,13 +3,11 @@ use std::fmt;
 
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::OutPoint;
-use candid::{CandidType, Decode, Encode};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use ic_stable_structures::{Bound, Storable};
-use serde::Deserialize;
 
 /// Unique identifier for a utxo.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, CandidType, Deserialize, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct UtxoKey {
     /// Transaction id of the utxo.
     pub tx_id: [u8; 32],
@@ -25,16 +23,22 @@ impl fmt::Display for UtxoKey {
 
 impl Storable for UtxoKey {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let bytes = Encode!(self).expect("cannot serialize utxo key");
-        Cow::Owned(bytes)
+        let mut buff = Vec::with_capacity(Self::BOUND.max_size() as usize);
+        buff.extend_from_slice(&self.tx_id);
+        buff.extend_from_slice(&self.vout.to_le_bytes());
+
+        buff.into()
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(&bytes, Self).expect("cannot deserialize utxo key")
+        let tx_id = bytes[..32].try_into().expect("invalid tx id");
+        let vout = u32::from_le_bytes(bytes[32..].try_into().expect("invalid vout"));
+
+        Self { tx_id, vout }
     }
 
     const BOUND: Bound = Bound::Bounded {
-        max_size: 60,
+        max_size: 32 + 4,
         is_fixed_size: true,
     };
 }

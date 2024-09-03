@@ -172,6 +172,20 @@ impl From<&Principal> for Id256 {
     }
 }
 
+impl From<Principal> for Id256 {
+    fn from(principal: Principal) -> Self {
+        let mut buf = [0u8; 32];
+
+        buf[0] = Self::PRINCIPAL_MARK;
+
+        let principal_data = principal.as_slice();
+        buf[1] = principal_data.len() as u8;
+        buf[2..][..principal_data.len()].copy_from_slice(principal_data);
+
+        Self(buf)
+    }
+}
+
 impl TryFrom<Id256> for Principal {
     type Error = Error;
 
