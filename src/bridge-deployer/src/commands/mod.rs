@@ -47,12 +47,7 @@ pub enum Commands {
 
 #[derive(Subcommand, Clone, Serialize, Deserialize, Debug)]
 pub enum Bridge {
-    Rune {
-        /// The configuration to use
-        #[command(flatten)]
-        config: config::RuneBridgeConfig,
-    },
-    Icrc {
+    Btc {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
@@ -65,10 +60,18 @@ pub enum Bridge {
         #[command(name = "erc", flatten)]
         erc: config::BaseEvmSettingsConfig,
     },
-    Btc {
+    Icrc {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+    },
+    Rune {
+        /// Bridge configuration
+        #[command(flatten)]
+        init: config::InitBridgeConfig,
+        /// Rune bridge configuration
+        #[command(flatten, name = "rune")]
+        rune: config::RuneBridgeConfig,
     },
 }
 
@@ -76,11 +79,13 @@ impl Bridge {
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
-            Bridge::Rune { config } => {
+            Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let config = rune_bridge::state::RuneBridgeConfig::from(config.clone());
-                debug!("Rune Bridge Config : {:?}", config);
-                Encode!(&config)?
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("Init Bridge Config : {:?}", init_data);
+                let rune_config = rune_bridge::state::RuneBridgeConfig::from(rune.clone());
+                debug!("Rune Bridge Config : {:?}", rune_config);
+                Encode!(&init_data, &rune_config)?
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
