@@ -2,7 +2,7 @@ use bridge_utils::evm_link::EvmLink;
 use candid::Principal;
 use clap::Parser;
 use erc20_bridge::state::BaseEvmSettings;
-use icrc2_bridge::SigningStrategy;
+use eth_signer::sign_strategy::SigningStrategy;
 use serde::{Deserialize, Serialize};
 
 use super::SigningKeyId;

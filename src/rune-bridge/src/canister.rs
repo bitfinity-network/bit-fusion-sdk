@@ -7,6 +7,7 @@ use bitcoin::Address;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::init::RuneBridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
@@ -26,7 +27,7 @@ use crate::core::deposit::RuneDeposit;
 use crate::interface::GetAddressError;
 use crate::ops::RuneBridgeOp;
 use crate::rune_info::RuneInfo;
-use crate::state::{RuneBridgeConfig, RuneState};
+use crate::state::RuneState;
 
 mod inspect;
 

@@ -1,7 +1,7 @@
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use clap::Parser;
-use icrc2_bridge::SigningStrategy;
+use eth_signer::sign_strategy::SigningStrategy;
 use serde::{Deserialize, Serialize};
 
 use super::{LogCanisterSettings, SigningKeyId};
@@ -17,7 +17,7 @@ pub struct InitBridgeConfig {
     /// being used
     #[arg(long)]
     pub signing_key_id: SigningKeyId,
-    //// Owner of the bridge cansiter
+    /// Owner of the bridge canister
     #[arg(long)]
     pub owner: Principal,
     /// Log settings for the canister

@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use candid::Principal;
 use clap::{Parser, ValueEnum};
+use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
-use icrc2_bridge::SigningStrategy;
 use serde::{Deserialize, Serialize};
 
 use super::{LogCanisterSettings, SigningKeyId};
@@ -62,7 +62,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
+impl From<RuneBridgeConfig> for bridge_did::init::RuneBridgeConfig {
     fn from(value: RuneBridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),

@@ -1,17 +1,17 @@
-mod erc;
-mod icrc;
-mod rune;
-
 use std::collections::HashSet;
 
 use candid::{CandidType, Principal};
 use clap::{Parser, ValueEnum};
-pub use erc::*;
 use eth_signer::sign_strategy;
-pub use icrc::*;
-pub use rune::*;
 use serde::{Deserialize, Serialize};
 
+mod erc;
+mod icrc;
+mod rune;
+
+pub use erc::*;
+pub use icrc::*;
+pub use rune::*;
 #[derive(
     ValueEnum, Debug, Serialize, Deserialize, Clone, CandidType, PartialEq, Eq, strum::Display,
 )]

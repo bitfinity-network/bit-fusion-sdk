@@ -78,7 +78,7 @@ impl Bridge {
         let arg = match &self {
             Bridge::Rune { config } => {
                 trace!("Preparing Rune bridge configuration");
-                let config = rune_bridge::state::RuneBridgeConfig::from(config.clone());
+                let config = bridge_did::init::RuneBridgeConfig::from(config.clone());
                 debug!("Rune Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
