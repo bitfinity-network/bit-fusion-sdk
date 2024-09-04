@@ -30,30 +30,30 @@ bitcoincore-rpc = "0.18.0"
 candid = { version = "0.10", features = ["value"] }
 cfg-if = "1.0"
 clap = { version = "4", features = ["derive"] }
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.30.x" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", branch = "new_sdk" }
 drop_guard = "0.3"
 env_logger = { version = "0.11.4", default-features = false }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.30.x" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.30.x" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", branch = "new_sdk" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", branch = "new_sdk" }
 ethereum-types = "0.14"
 ethers-core = "2.0"
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.30.x" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", branch = "new_sdk" }
 foundry-compilers = { version = "0.9", features = ["svm-solc"] }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 ic-agent = "0.37"
 ic-btc-interface = "0.2"
-ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", tag = "v0.20.x" }
-ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.20.x" }
-ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.20.x" }
-ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.20.x" }
-ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.20.x", features = ["export-api"] }
-ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", tag = "v0.20.x" }
-ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.20.x" }
-ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.20.x" }
-ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.20.x" }
+ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", branch = "EPROD-976_unique_task_id" }
+ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", branch = "EPROD-976_unique_task_id" }
+ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", branch = "EPROD-976_unique_task_id" }
+ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", branch = "EPROD-976_unique_task_id" }
+ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", branch = "EPROD-976_unique_task_id", features = ["export-api"] }
+ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", branch = "EPROD-976_unique_task_id" }
+ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", branch = "EPROD-976_unique_task_id" }
+ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", branch = "EPROD-976_unique_task_id" }
+ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", branch = "EPROD-976_unique_task_id" }
 ic-utils = "0.37"
-icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.30.x" }
+icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", branch = "new_sdk" }
 jsonrpc-core = "18.0"
 log = "0.4"
 mockall = "0.13"
@@ -68,7 +68,7 @@ serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
 serial_test = "3"
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.30.x" }
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", branch = "new_sdk" }
 snapbox = "0.6"
 strum = "0.26"
 tempfile = "3"
@@ -77,7 +77,11 @@ tokio = { version = "1.36", features = ["macros", "rt"] }
 tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-vergen = { version = "8.3", default-features = false, features = ["build", "cargo", "git", "gitcl", "rustc"] }
+vergen-gitcl = { version = "1", default-features = false, features = [
+    "build",
+    "cargo",
+    "rustc",
+] }
 
 # state machine tests deps
 ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
