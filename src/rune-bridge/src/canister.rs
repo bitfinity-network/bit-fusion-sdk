@@ -23,7 +23,6 @@ use ic_storage::IcStorage;
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
 use crate::interface::GetAddressError;
 use crate::ops::RuneBridgeOp;
-use crate::rune_info::RuneInfo;
 use crate::state::RuneState;
 
 mod inspect;

@@ -7,6 +7,7 @@ use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
+use bridge_did::init::RuneBridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::MinterNotificationType;
 use bridge_utils::BFTBridge;
@@ -25,7 +26,6 @@ use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::interface::{DepositError, GetAddressError};
 use rune_bridge::ops::{RuneBridgeOp, RuneDepositRequestData};
 use rune_bridge::rune_info::RuneName;
-use rune_bridge::state::RuneBridgeConfig;
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
