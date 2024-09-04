@@ -18,7 +18,6 @@ use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
 use crate::core::utxo_handler::{RuneToWrap, UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
-use crate::interface::DepositError;
 use crate::key::{get_derivation_path_ic, BtcSignerType};
 use crate::ledger::UnspentUtxoInfo;
 use crate::ops::RuneBridgeOp;
