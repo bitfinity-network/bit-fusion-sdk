@@ -88,7 +88,6 @@ impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
                 })
                 .unwrap_or_default(),
             min_confirmations: value.min_confirmations,
-            indexer_consensus_threshold: 3,
             no_of_indexers: value.no_of_indexers,
             indexer_urls: value.indexer_urls.into_iter().collect(),
             deposit_fee: value.deposit_fee,
