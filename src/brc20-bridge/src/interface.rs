@@ -116,7 +116,9 @@ impl From<KeyError> for DepositError {
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub enum WithdrawError {
+    AmountTooBig(u128),
     NoInputs,
+    InvalidTxid(Vec<u8>),
     TransactionCreation,
     TransactionSigning,
     TransactionSerialization,
@@ -124,8 +126,18 @@ pub enum WithdrawError {
     FeeRateRequest,
     ChangeAddress,
     InsufficientFunds,
+    SignerNotInitialized,
+    CommitTransactionError(String),
+    RevealTransactionError(String),
+    KeyError(String),
     InvalidRequest(String),
     InternalError(String),
+}
+
+impl From<KeyError> for WithdrawError {
+    fn from(e: KeyError) -> Self {
+        Self::KeyError(e.to_string())
+    }
 }
 
 #[derive(Debug, Copy, Clone, CandidType, Deserialize, Hash, PartialEq, Eq)]
