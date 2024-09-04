@@ -84,3 +84,111 @@ async fn test_signed_order() -> SignedMintOrder {
         .await
         .unwrap()
 }
+
+pub mod minter_notification {
+    use bridge_canister::bridge::{Operation, OperationAction};
+    use bridge_utils::bft_events::{MinterNotificationType, NotifyMinterEventData};
+    use candid::Encode;
+
+    use crate::ops::tests::{dst_tokens, test_state, token_address};
+    use crate::ops::{RuneBridgeOp, RuneDepositRequestData};
+
+    fn test_deposit_data() -> RuneDepositRequestData {
+        RuneDepositRequestData {
+            dst_address: token_address(7),
+            dst_tokens: dst_tokens(),
+            amounts: None,
+        }
+    }
+
+    fn test_user_data() -> Vec<u8> {
+        Encode!(&test_deposit_data()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn incorrect_type_returns_none() {
+        let state = test_state();
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::Other,
+            tx_sender: Default::default(),
+            user_data: test_user_data(),
+            memo: vec![],
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn incorrect_data_returns_none() {
+        let state = test_state();
+        let mut data = test_user_data();
+        data.push(1);
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: Default::default(),
+            user_data: data,
+            memo: vec![],
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn valid_notification_returns_action() {
+        let state = test_state();
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: Default::default(),
+            user_data: test_user_data(),
+            memo: vec![],
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let expected = test_deposit_data();
+        assert_eq!(
+            result,
+            Some(OperationAction::Create(
+                RuneBridgeOp::AwaitInputs {
+                    dst_address: expected.dst_address,
+                    dst_tokens: expected.dst_tokens,
+                    requested_amounts: expected.amounts,
+                },
+                None,
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_memo_length_results_in_none_memo() {
+        let state = test_state();
+        let memo = vec![2; 20];
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: Default::default(),
+            user_data: test_user_data(),
+            memo: memo.clone(),
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        assert!(matches!(result, Some(OperationAction::Create(_, None))));
+    }
+
+    #[tokio::test]
+    async fn valid_memo_is_preserved() {
+        let state = test_state();
+        let memo = vec![2; 32];
+        let event = NotifyMinterEventData {
+            notification_type: MinterNotificationType::DepositRequest,
+            tx_sender: Default::default(),
+            user_data: test_user_data(),
+            memo: memo.clone(),
+        };
+
+        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        assert!(
+            matches!(result, Some(OperationAction::Create(_, Some(actual_memo))) if actual_memo.to_vec() == memo)
+        );
+    }
+}
