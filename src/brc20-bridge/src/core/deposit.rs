@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
@@ -21,7 +20,7 @@ use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{BtcSignerType, KeyError};
-use crate::ledger::UnspentUtxoInfo;
+use crate::ledger::UtxoKey;
 use crate::ops::Brc20BridgeOp;
 use crate::state::Brc20State;
 
@@ -362,20 +361,14 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         &self,
         get_utxos_response: &mut GetUtxosResponse,
     ) -> Result<(), DepositError> {
-        let existing = self.brc20_state.borrow().ledger().load_unspent_utxos()?;
+        let state_ref = self.brc20_state.borrow();
+        let ledger = state_ref.ledger();
 
-        get_utxos_response.utxos.retain(|utxo| {
-            !existing
-                .values()
-                .any(|v| Self::check_already_used_utxo(v, utxo))
-        });
+        get_utxos_response
+            .utxos
+            .retain(|utxo| !ledger.unspent_utxos_contains(&UtxoKey::from(&utxo.outpoint)));
 
         Ok(())
-    }
-
-    fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
-        v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
-            && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
     }
 }
 

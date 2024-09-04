@@ -97,6 +97,11 @@ where
         Ok(map)
     }
 
+    /// Checks if the unspent utxos contains the given utxo.
+    pub fn unspent_utxos_contains(&self, utxo: &UtxoKey) -> bool {
+        self.unused_utxos.contains_key(utxo)
+    }
+
     /// Marks the utxo as used.
     pub fn mark_as_used(&mut self, key: UtxoKey, address: Address) {
         self.used_utxos.insert(
@@ -412,5 +417,43 @@ mod tests {
 
         let used_utxos = state.borrow().ledger().load_used_utxos();
         assert_eq!(used_utxos.len(), 0);
+    }
+
+    #[test]
+    fn test_should_tell_whether_utxo_is_in_unspent_utxos_ledger() {
+        MockContext::new().inject();
+        let address = Address::from_str("bc1quyjp8qxkdc22cej962xaydd5arm7trwtcnkzks")
+            .unwrap()
+            .assume_checked();
+
+        let utxos = [
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xaa; 32],
+                    vout: 1,
+                },
+                value: 0,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0xab; 32],
+                    vout: 1,
+                },
+                value: 0,
+                height: 0,
+            },
+        ];
+
+        let state = get_brc20_state();
+        state
+            .borrow_mut()
+            .ledger_mut()
+            .deposit(utxos[0].clone(), &address, vec![]);
+
+        assert!(state
+            .borrow()
+            .ledger()
+            .unspent_utxos_contains(&UtxoKey::from(&utxos[0].outpoint)));
     }
 }
