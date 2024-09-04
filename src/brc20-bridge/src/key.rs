@@ -26,6 +26,8 @@ pub enum KeyError {
     BitcoinAddress(#[from] BitcoinAddressError),
     #[error("invalid derivation path")]
     InvalidDerivationPath,
+    #[error("invalid public key")]
+    InvalidPublicKey,
     #[error("secp256 error: {0}")]
     Secp256(#[from] Secp256Error),
     #[error("signer not initialized")]
@@ -58,8 +60,8 @@ impl BtcTxSigner for IcBtcSigner {
             depth: 0,
             parent_fingerprint: Default::default(),
             child_number: ChildNumber::from_normal_idx(0).expect("Failed to create child number"),
-            public_key: self.master_key.public_key.inner,
-            chain_code: self.master_key.chain_code,
+            public_key: self.master_key.public_key().expect("invalid pubkey").inner,
+            chain_code: self.master_key.chain_code(),
         };
         let public_key = x_public_key
             .derive_pub(&Secp256k1::new(), derivation_path)

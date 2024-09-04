@@ -86,12 +86,15 @@ impl Brc20State {
 
     /// Returns master public key of the canister.
     pub fn public_key(&self) -> Option<PublicKey> {
-        self.master_key.get().as_ref().map(|key| key.public_key)
+        self.master_key
+            .get()
+            .as_ref()
+            .and_then(|key| key.public_key().ok())
     }
 
     /// Returns master chain code of the canister. Used for public key derivation.
     pub fn chain_code(&self) -> Option<ChainCode> {
-        self.master_key.get().as_ref().map(|key| key.chain_code)
+        self.master_key.get().as_ref().map(|key| key.chain_code())
     }
 
     /// Returns BTC network the canister works with (IC style).
@@ -196,12 +199,14 @@ impl Brc20State {
             .try_into()
             .map_err(|e| format!("invalid chain code: {e:?}"))?;
 
-        self.master_key.set(MasterKey {
-            public_key: PublicKey::from_slice(&master_key.public_key)
+        let master_key = MasterKey::new(
+            PublicKey::from_slice(&master_key.public_key)
                 .map_err(|e| format!("invalid public key slice: {e}"))?,
-            chain_code: ChainCode::from(chain_code),
+            ChainCode::from(chain_code),
             key_id,
-        });
+        );
+
+        self.master_key.set(master_key);
 
         Ok(())
     }
