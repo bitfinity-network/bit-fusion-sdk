@@ -47,6 +47,14 @@ pub enum Commands {
 
 #[derive(Subcommand, Clone, Serialize, Deserialize, Debug)]
 pub enum Bridge {
+    Brc20 {
+        /// The configuration to use
+        #[command(flatten)]
+        config: config::InitBridgeConfig,
+        /// Extra configuration for the BRC20 bridge
+        #[command(name = "brc20", flatten)]
+        brc20: config::Brc20BridgeConfig,
+    },
     Btc {
         /// The configuration to use
         #[command(flatten)]
@@ -79,6 +87,16 @@ impl Bridge {
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
+            Bridge::Brc20 {
+                config: init,
+                brc20,
+            } => {
+                trace!("Preparing BRC20 bridge configuration");
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("BRC20 Bridge Config : {:?}", init_data);
+                let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
+                Encode!(&init_data, &brc20_config)?
+            }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
@@ -112,6 +130,7 @@ impl Bridge {
     /// Returns if the bridge is wrapped side or not
     pub fn is_wrapped_side(&self) -> bool {
         match self {
+            Bridge::Brc20 { .. } => true,
             Bridge::Rune { .. } => true,
             Bridge::Icrc { .. } => true,
             Bridge::Erc20 { .. } => false,

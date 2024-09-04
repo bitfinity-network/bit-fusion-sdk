@@ -62,6 +62,17 @@
         }
       ]
     },
+    "brc20-bridge": {
+      "build": "",
+      "candid": ".artifact/brc20-bridge.did",
+      "wasm": ".artifact/brc20-bridge.wasm.gz",
+      "type": "custom",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    },
     "rune-bridge": {
       "build": "",
       "candid": ".artifact/rune-bridge.did",
