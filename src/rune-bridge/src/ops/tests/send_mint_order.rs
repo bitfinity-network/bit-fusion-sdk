@@ -60,7 +60,10 @@ async fn returns_error_if_fails_to_send() {
         .await
         .expect_err("operation succeeded unexpectedly");
 
-    assert_data_eq!(err.to_string(), str!["EVM request failed: too many hedgehogs"]);
+    assert_data_eq!(
+        err.to_string(),
+        str!["EVM request failed: too many hedgehogs"]
+    );
 }
 
 #[tokio::test]
