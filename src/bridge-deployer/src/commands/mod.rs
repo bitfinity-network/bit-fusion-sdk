@@ -5,6 +5,7 @@ use bridge_did::error::BftResult;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
 use deploy::DeployCommands;
+use eth_signer::sign_strategy::SigningStrategy;
 use ethereum_types::{H160, H256};
 use ic_agent::Agent;
 use ic_canister_client::{CanisterClient, IcAgentClient};
@@ -91,7 +92,21 @@ impl Bridge {
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
                 let init = bridge_did::init::BridgeInitData::from(init.clone());
-                let erc = erc20_bridge::state::BaseEvmSettings::from(erc.clone());
+
+                // Workaround for not depending on the `erc-20` crate
+                #[derive(candid::CandidType)]
+                struct EvmSettings {
+                    pub evm_link: config::EvmLink,
+                    pub signing_strategy: SigningStrategy,
+                }
+
+                let erc = EvmSettings {
+                    evm_link: config::EvmLink::Ic(erc.evm_link),
+                    signing_strategy: SigningStrategy::ManagementCanister {
+                        key_id: erc.singing_key_id.clone().into(),
+                    },
+                };
+
                 Encode!(&init, &erc)?
             }
             Bridge::Btc { config } => {
