@@ -1,9 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::str::FromStr;
 
-use bitcoin::Address;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
@@ -23,7 +21,6 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
-use crate::core::deposit::RuneDeposit;
 use crate::interface::GetAddressError;
 use crate::ops::RuneBridgeOp;
 use crate::rune_info::RuneInfo;
@@ -130,25 +127,6 @@ impl RuneBridge {
         .expect("failed to get master key");
 
         get_rune_state().borrow_mut().configure_ecdsa(master_key.0);
-    }
-
-    #[update]
-    pub async fn get_rune_balances(&self, btc_address: String) -> Vec<(RuneInfo, u128)> {
-        let address = Address::from_str(&btc_address)
-            .expect("invalid address")
-            .assume_checked();
-
-        let deposit = RuneDeposit::get(get_runtime_state());
-        let utxos = deposit
-            .get_deposit_utxos(&address)
-            .await
-            .expect("failed to get utxos");
-        let (rune_info_amounts, _) = deposit
-            .get_mint_amounts(&utxos.utxos, &None)
-            .await
-            .expect("failed to get rune amounts");
-
-        rune_info_amounts
     }
 
     #[update]

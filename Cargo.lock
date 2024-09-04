@@ -6063,6 +6063,7 @@ dependencies = [
  "eth-signer",
  "ethers-core",
  "evm-canister-client",
+ "futures",
  "hex",
  "ic-base-types",
  "ic-bitcoin-canister-mock",

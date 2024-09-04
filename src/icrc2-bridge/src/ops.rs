@@ -61,7 +61,7 @@ impl IcrcBridgeOp {
 
 impl Operation for IcrcBridgeOp {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self {
+        let result = match self {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
             }
@@ -83,7 +83,9 @@ impl Operation for IcrcBridgeOp {
             IcrcBridgeOp::IcrcMintConfirmed { .. } => Err(Error::FailedToProgress(
                 "IcrcMintConfirmed task should not progress".into(),
             )),
-        }
+        };
+        log::debug!("icrc task execution result: {result:?}");
+        result
     }
 
     fn is_complete(&self) -> bool {

@@ -1,4 +1,5 @@
 mod evm_rpc_canister;
+pub mod stress;
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -95,14 +96,23 @@ pub trait TestContext {
         RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
+    /// Returns client for the ICRC token canister.
+    fn icrc_token_client(
+        &self,
+        canister: Principal,
+        caller: &str,
+    ) -> IcrcCanisterClient<Self::Client> {
+        IcrcCanisterClient::new(self.client(canister, caller))
+    }
+
     /// Returns client for the ICRC token 1 canister.
     fn icrc_token_1_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_1(), caller))
+        self.icrc_token_client(self.canisters().token_1(), caller)
     }
 
     /// Returns client for the ICRC token 2 canister.
     fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_2(), caller))
+        self.icrc_token_client(self.canisters().token_2(), caller)
     }
 
     /// Sends tx with notification to EVMc.
@@ -594,6 +604,25 @@ pub trait TestContext {
         Ok((hash, receipt))
     }
 
+    /// Calls contract in the evm_client without waiting for it's receipt.
+    async fn call_contract_without_waiting(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        contract: &H160,
+        input: Vec<u8>,
+        amount: u128,
+    ) -> Result<H256> {
+        let evm_client = self.evm_client(self.admin_name());
+        let from: H160 = wallet.address().into();
+        let nonce = evm_client.account_basic(from.clone()).await?.nonce;
+
+        let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
+
+        let hash = evm_client.send_raw_transaction(call_tx).await??;
+
+        Ok(hash)
+    }
+
     /// Creates wrapped token in EVMc by calling `BFTBridge:::deploy_wrapped_token()`.
     async fn create_wrapped_token(
         &self,
@@ -762,14 +791,25 @@ pub trait TestContext {
         }
         .abi_encode();
 
-        let results = self
-            .call_contract_on_evm(evm_client, wallet, token, input, 0)
-            .await?;
-        let output = results.1.output.unwrap();
-
-        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&output, true)
+        let response = evm_client
+            .eth_call(
+                Some(wallet.address().into()),
+                Some(token.clone()),
+                None,
+                3_000_000,
+                None,
+                Some(input.into()),
+            )
+            .await
             .unwrap()
-            ._0;
+            .unwrap();
+
+        let balance = WrappedToken::balanceOfCall::abi_decode_returns(
+            &hex::decode(response.trim_start_matches("0x")).unwrap(),
+            true,
+        )
+        .unwrap()
+        ._0;
         Ok(balance.to())
     }
 
