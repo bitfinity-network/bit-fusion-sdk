@@ -7,6 +7,7 @@ use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
+use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::MinterNotificationType;
 use bridge_utils::BFTBridge;
@@ -23,7 +24,7 @@ use ic_log::did::LogCanisterSettings;
 use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::interface::{DepositError, GetAddressError};
-use rune_bridge::ops::{RuneBridgeOp, RuneDepositRequestData};
+use rune_bridge::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneDepositRequestData};
 use rune_bridge::rune_info::RuneName;
 use rune_bridge::state::RuneBridgeConfig;
 use tokio::time::Instant;
@@ -144,21 +145,23 @@ impl RunesContext {
             .unwrap();
 
         let bridge = context.canisters().rune_bridge();
-        let init_args = RuneBridgeConfig {
-            network: BitcoinNetwork::Regtest,
+        let init_args = BridgeInitData {
             evm_principal: context.canisters().evm(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },
-            admin: context.admin(),
-            log_settings: LogCanisterSettings {
+            owner: context.admin(),
+            log_settings: Some(LogCanisterSettings {
                 enable_console: Some(true),
                 in_memory_records: None,
                 log_filter: Some("trace".to_string()),
                 ..Default::default()
-            },
+            }),
+        };
+
+        let rune_config = RuneBridgeConfig {
+            network: BitcoinNetwork::Regtest,
             min_confirmations: 1,
-            no_of_indexers: 1,
             indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
@@ -168,7 +171,7 @@ impl RunesContext {
             .install_canister(
                 bridge,
                 get_rune_bridge_canister_bytecode().await,
-                (init_args,),
+                (init_args, rune_config),
             )
             .await
             .unwrap();
@@ -430,7 +433,10 @@ impl RunesContext {
 
             if !response.is_empty() {
                 for (op_id, op) in &response {
-                    if matches!(op, RuneBridgeOp::MintOrderConfirmed { .. }) {
+                    if matches!(
+                        op,
+                        RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. })
+                    ) {
                         successful_orders.insert(*op_id);
                     }
                 }
