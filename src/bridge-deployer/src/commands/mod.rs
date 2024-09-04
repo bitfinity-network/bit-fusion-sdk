@@ -74,9 +74,12 @@ pub enum Bridge {
         config: config::InitBridgeConfig,
     },
     Rune {
-        /// The configuration to use
+        /// Bridge configuration
         #[command(flatten)]
-        config: config::RuneBridgeConfig,
+        init: config::InitBridgeConfig,
+        /// Rune bridge configuration
+        #[command(flatten, name = "rune")]
+        rune: config::RuneBridgeConfig,
     },
 }
 
@@ -94,11 +97,13 @@ impl Bridge {
                 let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
-            Bridge::Rune { config } => {
+            Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let config = rune_bridge::state::RuneBridgeConfig::from(config.clone());
-                debug!("Rune Bridge Config : {:?}", config);
-                Encode!(&config)?
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("Init Bridge Config : {:?}", init_data);
+                let rune_config = rune_bridge::state::RuneBridgeConfig::from(rune.clone());
+                debug!("Rune Bridge Config : {:?}", rune_config);
+                Encode!(&init_data, &rune_config)?
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
