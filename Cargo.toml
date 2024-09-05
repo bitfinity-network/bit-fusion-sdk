@@ -102,8 +102,7 @@ ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag 
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 
 [profile.dev]
-debug = true
-opt-level = 0
+debug = false
 
 
 # Set the settings for all dependencies (but not this crate itself or any workspace member).
