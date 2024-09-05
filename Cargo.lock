@@ -950,11 +950,8 @@ dependencies = [
  "bridge-utils",
  "candid",
  "did",
- "erc20-bridge",
  "ic-canister-client",
  "ic-log",
- "icrc2-bridge",
- "rune-bridge",
 ]
 
 [[package]]
@@ -986,6 +983,8 @@ dependencies = [
 name = "bridge-did"
 version = "0.2.0"
 dependencies = [
+ "alloy-sol-types",
+ "bitcoin 0.31.2",
  "candid",
  "did",
  "eth-signer",
@@ -993,6 +992,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.20.1",
+ "ord-rs",
  "ordinals",
  "serde",
  "thiserror",

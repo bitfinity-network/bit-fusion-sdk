@@ -7,5 +7,17 @@ pub mod operation_log;
 pub mod order;
 pub mod reason;
 
+pub mod bridge_side;
+mod events;
+pub mod operations;
 #[cfg(feature = "runes")]
 pub mod runes;
+
+/// Re-export the event data
+///
+pub mod event_data {
+    pub use crate::events::BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
+    pub use crate::events::{
+        BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
+    };
+}

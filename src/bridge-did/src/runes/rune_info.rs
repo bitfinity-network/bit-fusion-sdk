@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
+use did::H160;
 use ic_stable_structures::{Bound, Storable};
 use ordinals::{Rune, RuneId};
 use serde::{Deserializer, Serialize};
@@ -165,6 +166,13 @@ impl<'de> Deserialize<'de> for RuneName {
         let value = u128::deserialize(deserializer)?;
         Ok(Self(Rune(value)))
     }
+}
+
+#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuneToWrap {
+    pub rune_info: RuneInfo,
+    pub amount: u128,
+    pub wrapped_address: H160,
 }
 
 #[cfg(test)]

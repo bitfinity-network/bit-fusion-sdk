@@ -21,13 +21,13 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::IcrcBridgeOp;
+use crate::ops::IcrcBridgeOpImpl;
 use crate::state::IcrcState;
 
 #[cfg(feature = "export-api")]
 mod inspect;
 
-pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOpImpl>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
@@ -71,7 +71,7 @@ impl Icrc2BridgeCanister {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, IcrcBridgeOp)> {
+    ) -> Vec<(OperationId, IcrcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -84,7 +84,7 @@ impl Icrc2BridgeCanister {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, IcrcBridgeOp)> {
+    ) -> Option<(OperationId, IcrcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -96,7 +96,7 @@ impl Icrc2BridgeCanister {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<IcrcBridgeOp>> {
+    ) -> Option<OperationLog<IcrcBridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
@@ -104,7 +104,7 @@ impl Icrc2BridgeCanister {
     }
 
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, IcrcBridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, IcrcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -211,7 +211,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<IcrcBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<IcrcBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

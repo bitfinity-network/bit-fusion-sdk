@@ -1,9 +1,9 @@
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
+use bridge_did::operations::IcrcBridgeOp;
 use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use icrc2_bridge::ops::IcrcBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 
@@ -16,7 +16,7 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
         Self { client }
     }
 
-    /// Returns list of operatinst for the given parameters.
+    /// Returns list of operations for the given parameters.
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,

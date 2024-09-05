@@ -45,9 +45,9 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
+use bridge_did::event_data::MinterNotificationType;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::MinterNotificationType;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]

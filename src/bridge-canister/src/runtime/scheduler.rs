@@ -2,8 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::{BridgeEvent, MinterNotificationType, NotifyMinterEventData};
+use bridge_utils::bft_events::BridgeEvent;
 use candid::{CandidType, Decode};
 use drop_guard::guard;
 use ic_stable_structures::StableBTreeMap;
@@ -275,7 +276,7 @@ impl<Op: Operation> Task for BridgeTask<Op> {
 
 #[cfg(test)]
 mod tests {
-    use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+    use bridge_did::event_data::*;
     use did::H160;
     use ic_exports::ic_kit::MockContext;
     use ic_storage::IcStorage;

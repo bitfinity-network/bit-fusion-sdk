@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
+use bridge_did::runes::RuneInfo;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -21,7 +22,6 @@ use crate::key::ic_dp_to_derivation_path;
 use crate::memory::{
     LEDGER_MEMORY_ID, MEMORY_MANAGER, RUNE_INFO_BY_UTXO_MEMORY_ID, USED_UTXOS_REGISTRY_MEMORY_ID,
 };
-use crate::rune_info::RuneInfo;
 
 /// Data structure to keep track of utxos owned by the canister.
 pub struct UtxoLedger {
@@ -157,13 +157,13 @@ impl UtxoLedger {
 mod tests {
     use std::str::FromStr;
 
+    use bridge_did::runes::RuneName;
     use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
     use ic_exports::ic_kit::MockContext;
     use ordinals::Rune;
 
     use super::*;
     use crate::canister::get_rune_state;
-    use crate::rune_info::RuneName;
 
     #[test]
     fn test_should_deposit_utxo() {

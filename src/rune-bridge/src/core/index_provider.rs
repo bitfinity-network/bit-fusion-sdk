@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::str::FromStr as _;
 
+use bridge_did::runes::RuneName;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -13,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::rune_inputs::GetInputsError;
 use crate::interface::{DepositError, OutputResponse};
-use crate::rune_info::RuneName;
 
 pub(crate) trait RuneIndexProvider {
     /// Get amounts of all runes in the given UTXO.

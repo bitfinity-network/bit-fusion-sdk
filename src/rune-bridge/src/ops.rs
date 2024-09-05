@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
+use bridge_did::operations::RuneBridgeOp;
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::{
-    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
-};
+use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 use candid::{CandidType, Decode, Deserialize};
-use did::{H160, H256};
+use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
@@ -17,62 +17,15 @@ use serde::Serialize;
 use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
 use crate::core::rune_inputs::RuneInputProvider;
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandler};
-use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
-use crate::rune_info::RuneName;
+use crate::core::utxo_handler::UtxoHandler;
+use crate::core::withdrawal::{RuneWithdrawalPayloadImpl, Withdrawal};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
-pub enum RuneBridgeOp {
-    // Deposit
-    AwaitInputs {
-        dst_address: H160,
-        dst_tokens: HashMap<RuneName, H160>,
-        requested_amounts: Option<HashMap<RuneName, u128>>,
-    },
-    AwaitConfirmations {
-        dst_address: H160,
-        utxo: Utxo,
-        runes_to_wrap: Vec<RuneToWrap>,
-    },
-    SignMintOrder {
-        dst_address: H160,
-        mint_order: MintOrder,
-    },
-    SendMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
-    },
-    ConfirmMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
-        tx_id: H256,
-    },
-    MintOrderConfirmed {
-        data: MintedEventData,
-    },
+pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
 
-    // Withdraw
-    CreateTransaction {
-        payload: RuneWithdrawalPayload,
-    },
-    SendTransaction {
-        from_address: H160,
-        transaction: DidTransaction,
-    },
-    TransactionSent {
-        from_address: H160,
-        transaction: DidTransaction,
-    },
-
-    OperationSplit {
-        wallet_address: H160,
-        new_operation_ids: Vec<OperationId>,
-    },
-}
-
-impl Operation for RuneBridgeOp {
+impl Operation for RuneBridgeOpImpl {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self {
+        match self.0 {
             RuneBridgeOp::AwaitInputs {
                 dst_address,
                 dst_tokens,
@@ -149,7 +102,7 @@ impl Operation for RuneBridgeOp {
     }
 
     fn is_complete(&self) -> bool {
-        match self {
+        match self.0 {
             RuneBridgeOp::AwaitInputs { .. } => false,
             RuneBridgeOp::AwaitConfirmations { .. } => false,
             RuneBridgeOp::SignMintOrder { .. } => false,
@@ -164,7 +117,7 @@ impl Operation for RuneBridgeOp {
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match self {
+        match &self.0 {
             RuneBridgeOp::AwaitInputs { dst_address, .. } => dst_address.clone(),
             RuneBridgeOp::AwaitConfirmations { dst_address, .. } => dst_address.clone(),
             RuneBridgeOp::SignMintOrder { dst_address, .. } => dst_address.clone(),
@@ -179,20 +132,20 @@ impl Operation for RuneBridgeOp {
     }
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
-        match self {
-            Self::SendTransaction { .. } | Self::CreateTransaction { .. } => Some(
+        match self.0 {
+            RuneBridgeOp::SendTransaction { .. } | RuneBridgeOp::CreateTransaction { .. } => Some(
                 TaskOptions::new()
                     .with_fixed_backoff_policy(2)
                     .with_max_retries_policy(10),
             ),
-            Self::AwaitInputs { .. }
-            | Self::AwaitConfirmations { .. }
-            | Self::SignMintOrder { .. }
-            | Self::SendMintOrder { .. }
-            | Self::ConfirmMintOrder { .. }
-            | Self::MintOrderConfirmed { .. }
-            | Self::TransactionSent { .. }
-            | Self::OperationSplit { .. } => Some(
+            RuneBridgeOp::AwaitInputs { .. }
+            | RuneBridgeOp::AwaitConfirmations { .. }
+            | RuneBridgeOp::SignMintOrder { .. }
+            | RuneBridgeOp::SendMintOrder { .. }
+            | RuneBridgeOp::ConfirmMintOrder { .. }
+            | RuneBridgeOp::MintOrderConfirmed { .. }
+            | RuneBridgeOp::TransactionSent { .. }
+            | RuneBridgeOp::OperationSplit { .. } => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
@@ -211,7 +164,7 @@ impl Operation for RuneBridgeOp {
 
         Some(OperationAction::Update {
             nonce: event.nonce,
-            update_to: Self::MintOrderConfirmed { data: event },
+            update_to: Self(RuneBridgeOp::MintOrderConfirmed { data: event }),
         })
     }
 
@@ -221,9 +174,9 @@ impl Operation for RuneBridgeOp {
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
         let memo = event.memo();
-        match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
+        match RuneWithdrawalPayloadImpl::new(event, &get_rune_state().borrow()) {
             Ok(payload) => Some(OperationAction::Create(
-                Self::CreateTransaction { payload },
+                Self(RuneBridgeOp::CreateTransaction { payload: payload.0 }),
                 memo,
             )),
             Err(err) => {
@@ -243,11 +196,11 @@ impl Operation for RuneBridgeOp {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event.user_data, RuneDepositRequestData) {
                     Ok(data) => Some(OperationAction::Create(
-                        Self::AwaitInputs {
+                        Self(RuneBridgeOp::AwaitInputs {
                             dst_address: data.dst_address,
                             dst_tokens: data.dst_tokens,
                             requested_amounts: data.amounts,
-                        },
+                        }),
                         event.memo(),
                     )),
                     _ => {
@@ -270,17 +223,17 @@ impl Operation for RuneBridgeOp {
     }
 }
 
-impl RuneBridgeOp {
+impl RuneBridgeOpImpl {
     fn split(state: RuntimeState<Self>, wallet_address: H160, operations: Vec<Self>) -> Self {
         let mut state = state.borrow_mut();
         let ids = operations
             .into_iter()
             .map(|op| state.operations.new_operation(op, None))
             .collect();
-        Self::OperationSplit {
+        Self(RuneBridgeOp::OperationSplit {
             wallet_address,
             new_operation_ids: ids,
-        }
+        })
     }
 
     fn split_or_update(
@@ -374,11 +327,11 @@ impl RuneBridgeOp {
                 });
             }
 
-            operations.push(Self::AwaitConfirmations {
+            operations.push(RuneBridgeOpImpl(RuneBridgeOp::AwaitConfirmations {
                 dst_address: dst_address.clone(),
                 utxo: input.utxo.clone(),
                 runes_to_wrap,
-            });
+            }));
         }
 
         Ok(Self::split_or_update(
@@ -407,9 +360,11 @@ impl RuneBridgeOp {
 
         let operations = mint_orders
             .into_iter()
-            .map(|mint_order| Self::SignMintOrder {
-                dst_address: dst_address.clone(),
-                mint_order,
+            .map(|mint_order| {
+                RuneBridgeOpImpl(RuneBridgeOp::SignMintOrder {
+                    dst_address: dst_address.clone(),
+                    mint_order,
+                })
             })
             .collect();
 
@@ -431,10 +386,10 @@ impl RuneBridgeOp {
             .await
             .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
 
-        Ok(Self::SendMintOrder {
+        Ok(RuneBridgeOpImpl(RuneBridgeOp::SendMintOrder {
             dst_address,
             order: signed,
-        })
+        }))
     }
 
     async fn send_mint_order(
@@ -443,11 +398,11 @@ impl RuneBridgeOp {
         order: SignedMintOrder,
     ) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
-        Ok(Self::ConfirmMintOrder {
+        Ok(RuneBridgeOpImpl(RuneBridgeOp::ConfirmMintOrder {
             dst_address,
             order,
             tx_id,
-        })
+        }))
     }
 
     async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BftResult<Self> {
@@ -460,10 +415,10 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("cannot create withdrawal transaction: {err:?}"))
             })?;
 
-        Ok(Self::SendTransaction {
+        Ok(RuneBridgeOpImpl(RuneBridgeOp::SendTransaction {
             from_address,
             transaction: transaction.into(),
-        })
+        }))
     }
 
     async fn send_transaction(from_address: H160, transaction: DidTransaction) -> BftResult<Self> {
@@ -475,10 +430,10 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("failed to send transaction: {err:?}"))
             })?;
 
-        Ok(Self::TransactionSent {
+        Ok(RuneBridgeOpImpl(RuneBridgeOp::TransactionSent {
             from_address,
             transaction,
-        })
+        }))
     }
 }
 
@@ -499,6 +454,7 @@ mod tests {
     use bridge_canister::operation_store::OperationsMemory;
     use bridge_canister::runtime::state::config::ConfigStorage;
     use bridge_canister::runtime::state::{SharedConfig, State};
+    use bridge_did::runes::RuneInfo;
     use candid::Encode;
     use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
     use ic_exports::ic_kit::MockContext;
@@ -510,7 +466,6 @@ mod tests {
     use crate::core::rune_inputs::{GetInputsError, RuneInput};
     use crate::core::utxo_handler::test::TestUtxoHandler;
     use crate::core::utxo_handler::UtxoHandlerError;
-    use crate::rune_info::RuneInfo;
 
     fn op_memory() -> OperationsMemory<StableMemory> {
         OperationsMemory {
@@ -528,7 +483,7 @@ mod tests {
         ))))
     }
 
-    fn test_state() -> RuntimeState<RuneBridgeOp> {
+    fn test_state() -> RuntimeState<RuneBridgeOpImpl> {
         Rc::new(RefCell::new(State::default(op_memory(), config())))
     }
 
@@ -568,14 +523,14 @@ mod tests {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
         assert!(result.is_none());
 
         let event = NotifyMinterEventData {
             notification_type: MinterNotificationType::Other,
             ..event
         };
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
         assert!(result.is_none());
     }
 
@@ -596,14 +551,14 @@ mod tests {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
         assert!(result.is_none());
 
         let event = NotifyMinterEventData {
             user_data: vec![],
             ..event
         };
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
         assert!(result.is_none());
     }
 
@@ -623,15 +578,15 @@ mod tests {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
         assert_eq!(
             result,
             Some(OperationAction::Create(
-                RuneBridgeOp::AwaitInputs {
+                RuneBridgeOpImpl(RuneBridgeOp::AwaitInputs {
                     dst_address: sender(),
                     dst_tokens: dst_tokens(),
                     requested_amounts: None,
-                },
+                }),
                 None
             ))
         )
@@ -654,15 +609,16 @@ mod tests {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(test_state(), event.clone()).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(test_state(), event.clone()).await;
+
         assert_eq!(
             result,
             Some(OperationAction::Create(
-                RuneBridgeOp::AwaitInputs {
+                RuneBridgeOpImpl(RuneBridgeOp::AwaitInputs {
                     dst_address: sender(),
                     dst_tokens: dst_tokens(),
                     requested_amounts: Some(amounts),
-                },
+                }),
                 None
             ))
         )
@@ -672,7 +628,8 @@ mod tests {
     async fn await_inputs_returns_error_if_no_inputs() {
         let provider = TestRuneInputProvider::empty();
         let result =
-            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+            RuneBridgeOpImpl::await_inputs(test_state(), &provider, sender(), dst_tokens(), None)
+                .await;
         let Err(Error::FailedToProgress(message)) = result else {
             panic!("Invalid result: {result:?}");
         };
@@ -685,7 +642,8 @@ mod tests {
         let provider =
             TestRuneInputProvider::err(GetInputsError::BtcAdapter("not available".to_string()));
         let result =
-            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+            RuneBridgeOpImpl::await_inputs(test_state(), &provider, sender(), dst_tokens(), None)
+                .await;
         let Err(Error::FailedToProgress(message)) = result else {
             panic!("Invalid result: {result:?}");
         };
@@ -706,7 +664,8 @@ mod tests {
             checked_indexers: 0,
         });
         let result =
-            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+            RuneBridgeOpImpl::await_inputs(test_state(), &provider, sender(), dst_tokens(), None)
+                .await;
         let Err(Error::FailedToProgress(message)) = result else {
             panic!("Invalid result: {result:?}");
         };
@@ -725,7 +684,8 @@ mod tests {
             indexer_responses: vec![("indexer_name".to_string(), "indexer_response".to_string())],
         });
         let result =
-            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+            RuneBridgeOpImpl::await_inputs(test_state(), &provider, sender(), dst_tokens(), None)
+                .await;
         let Err(Error::FailedToProgress(message)) = result else {
             panic!("Invalid result: {result:?}");
         };
@@ -756,7 +716,7 @@ mod tests {
     async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
         let input = rune_input("A", 1000);
         let provider = TestRuneInputProvider::with_input(input.clone());
-        let result = RuneBridgeOp::await_inputs(
+        let result = RuneBridgeOpImpl::await_inputs(
             test_state(),
             &provider,
             sender(),
@@ -772,7 +732,7 @@ mod tests {
 
         let input = rune_input("A", 1000);
         let provider = TestRuneInputProvider::with_input(input.clone());
-        let result = RuneBridgeOp::await_inputs(
+        let result = RuneBridgeOpImpl::await_inputs(
             test_state(),
             &provider,
             sender(),
@@ -791,7 +751,7 @@ mod tests {
     async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
         let inputs = [rune_input("A", 1000), rune_input("B", 2000)];
         let provider = TestRuneInputProvider::with_inputs(&inputs);
-        let result = RuneBridgeOp::await_inputs(
+        let result = RuneBridgeOpImpl::await_inputs(
             test_state(),
             &provider,
             sender(),
@@ -813,7 +773,7 @@ mod tests {
     async fn await_inputs_returns_error_if_no_token_address() {
         let inputs = [rune_input("A", 1000)];
         let provider = TestRuneInputProvider::with_inputs(&inputs);
-        let result = RuneBridgeOp::await_inputs(
+        let result = RuneBridgeOpImpl::await_inputs(
             test_state(),
             &provider,
             sender(),
@@ -833,10 +793,11 @@ mod tests {
         let input = rune_input("A", 1000);
         let provider = TestRuneInputProvider::with_input(input.clone());
         let result =
-            RuneBridgeOp::await_inputs(test_state(), &provider, sender(), dst_tokens(), None).await;
+            RuneBridgeOpImpl::await_inputs(test_state(), &provider, sender(), dst_tokens(), None)
+                .await;
         assert_eq!(
             result,
-            Ok(RuneBridgeOp::AwaitConfirmations {
+            Ok(RuneBridgeOpImpl(RuneBridgeOp::AwaitConfirmations {
                 dst_address: sender(),
                 utxo: input.utxo,
                 runes_to_wrap: vec![RuneToWrap {
@@ -844,7 +805,7 @@ mod tests {
                     amount: 1000,
                     wrapped_address: token_address(3),
                 }],
-            })
+            }))
         );
     }
 
@@ -856,13 +817,13 @@ mod tests {
         let provider = TestRuneInputProvider::with_inputs(&inputs);
         let state = test_state();
         let result =
-            RuneBridgeOp::await_inputs(state.clone(), &provider, sender(), dst_tokens(), None)
+            RuneBridgeOpImpl::await_inputs(state.clone(), &provider, sender(), dst_tokens(), None)
                 .await;
 
-        let Ok(RuneBridgeOp::OperationSplit {
+        let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
             wallet_address,
             new_operation_ids,
-        }) = result
+        })) = result
         else {
             panic!("Incorrect operation returned")
         };
@@ -906,7 +867,7 @@ mod tests {
     #[tokio::test]
     async fn await_confirmations_utxo_not_found() {
         let utxo_handler = TestUtxoHandler::with_error(UtxoHandlerError::UtxoNotFound);
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             test_state(),
             &utxo_handler,
             sender(),
@@ -928,7 +889,7 @@ mod tests {
             required_confirmations: 12,
             current_confirmations: 5,
         });
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             test_state(),
             &utxo_handler,
             sender(),
@@ -951,7 +912,7 @@ mod tests {
     async fn await_confirmations_btc_adapter_not_available() {
         let utxo_handler =
             TestUtxoHandler::with_error(UtxoHandlerError::BtcAdapter("btc error".to_string()));
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             test_state(),
             &utxo_handler,
             sender(),
@@ -973,7 +934,7 @@ mod tests {
     #[tokio::test]
     async fn await_confirmations_utxo_already_used() {
         let utxo_handler = TestUtxoHandler::already_used_utxo();
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             test_state(),
             &utxo_handler,
             sender(),
@@ -992,7 +953,7 @@ mod tests {
     #[tokio::test]
     async fn await_confirmations_one_mint_order() {
         let utxo_handler = TestUtxoHandler::ok();
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             test_state(),
             &utxo_handler,
             sender(),
@@ -1005,7 +966,10 @@ mod tests {
             panic!("Wrong result: {result:?}");
         };
 
-        assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
+        assert!(matches!(
+            operation,
+            RuneBridgeOpImpl(RuneBridgeOp::SignMintOrder { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1015,7 +979,7 @@ mod tests {
         const COUNT: usize = 3;
         let utxo_handler = TestUtxoHandler::ok();
         let state = test_state();
-        let result = RuneBridgeOp::await_confirmations(
+        let result = RuneBridgeOpImpl::await_confirmations(
             state.clone(),
             &utxo_handler,
             sender(),
@@ -1024,10 +988,10 @@ mod tests {
         )
         .await;
 
-        let Ok(RuneBridgeOp::OperationSplit {
+        let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
             new_operation_ids,
             wallet_address,
-        }) = result
+        })) = result
         else {
             panic!("Wrong result: {result:?}");
         };
@@ -1036,7 +1000,10 @@ mod tests {
 
         for operation_id in new_operation_ids {
             let operation = state.borrow().operations.get(operation_id).unwrap();
-            assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
+            assert!(matches!(
+                operation,
+                RuneBridgeOpImpl(RuneBridgeOp::SignMintOrder { .. })
+            ));
         }
 
         assert_eq!(wallet_address, sender());

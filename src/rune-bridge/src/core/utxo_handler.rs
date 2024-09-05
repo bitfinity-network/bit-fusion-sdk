@@ -1,11 +1,8 @@
 use bridge_did::order::MintOrder;
-use candid::{CandidType, Deserialize};
+use bridge_did::runes::RuneToWrap;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
-use serde::Serialize;
 use thiserror::Error;
-
-use crate::rune_info::RuneInfo;
 
 #[derive(Debug, Clone, PartialEq, Error)]
 pub(crate) enum UtxoHandlerError {
@@ -20,13 +17,6 @@ pub(crate) enum UtxoHandlerError {
     },
     #[error("utxo is already used to create mint orders")]
     UtxoAlreadyUsed,
-}
-
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuneToWrap {
-    pub rune_info: RuneInfo,
-    pub amount: u128,
-    pub wrapped_address: H160,
 }
 
 pub(crate) trait UtxoHandler {

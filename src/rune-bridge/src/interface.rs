@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use bridge_did::order::SignedMintOrder;
+use bridge_did::runes::RuneName;
 use candid::CandidType;
 use did::H256;
 use ordinals::Pile;
 use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;
-use crate::rune_info::RuneName;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub struct PendingUtxo {}

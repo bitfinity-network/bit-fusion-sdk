@@ -5,6 +5,7 @@ use std::time::Duration;
 use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_did::init::{RuneBridgeConfig, MIN_INDEXERS};
+use bridge_did::runes::{RuneInfo, RuneName};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
@@ -17,7 +18,6 @@ use ordinals::RuneId;
 
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
-use crate::rune_info::{RuneInfo, RuneName};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
 
 #[derive(Default)]

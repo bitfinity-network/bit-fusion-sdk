@@ -1,55 +1,39 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
+use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::BftResult;
+use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
+use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
-use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
+use bridge_utils::evm_bridge::EvmParams;
 use candid::CandidType;
-use did::{H160, H256, U256};
+use did::{H160, U256};
 use ic_task_scheduler::task::TaskOptions;
 use serde::{Deserialize, Serialize};
 
 use crate::canister::{get_base_evm_config, get_base_evm_state};
 
-/// Erc20 bridge operation.
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub struct Erc20BridgeOp {
-    /// Side of the bridge to perform the operation.
-    pub side: BridgeSide,
+pub struct Erc20BridgeOpImpl(pub Erc20BridgeOp);
 
-    /// Stage of the operation.
-    pub stage: Erc20OpStage,
-}
-
-/// Erc20 bridge operation stages.
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub enum Erc20OpStage {
-    SignMintOrder(MintOrder),
-    SendMintTransaction(SignedMintOrder),
-    ConfirmMint {
-        order: SignedMintOrder,
-        tx_hash: Option<H256>,
-    },
-    TokenMintConfirmed(MintedEventData),
-}
-
-impl Operation for Erc20BridgeOp {
+impl Operation for Erc20BridgeOpImpl {
     async fn progress(self, _id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        let next_stage = match self.side {
-            BridgeSide::Base => self.stage.progress(get_base_evm_state()).await?,
-            BridgeSide::Wrapped => self.stage.progress(ctx).await?,
+        let stage = Erc20OpStageImpl(self.0.stage);
+        let next_stage = match self.0.side {
+            BridgeSide::Base => stage.progress(get_base_evm_state()).await?,
+            BridgeSide::Wrapped => stage.progress(ctx).await?,
         };
 
-        Ok(Self {
-            side: self.side,
-            stage: next_stage,
-        })
+        Ok(Erc20BridgeOpImpl(Erc20BridgeOp {
+            side: self.0.side,
+            stage: next_stage.0,
+        }))
     }
 
     fn is_complete(&self) -> bool {
-        match self.stage {
+        match self.0.stage {
             Erc20OpStage::SignMintOrder(_) => false,
             Erc20OpStage::SendMintTransaction(_) => false,
             Erc20OpStage::ConfirmMint { .. } => false,
@@ -58,7 +42,7 @@ impl Operation for Erc20BridgeOp {
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match (self.side, &self.stage) {
+        match (self.0.side, &self.0.stage) {
             // If withdrawal, then use sender address.
             (BridgeSide::Base, Erc20OpStage::SignMintOrder(order)) => {
                 order.sender.to_evm_address().expect("evm address").1
@@ -97,7 +81,7 @@ impl Operation for Erc20BridgeOp {
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
-        match self.stage {
+        match self.0.stage {
             Erc20OpStage::SignMintOrder(_) => Some(TaskOptions::default()),
             Erc20OpStage::SendMintTransaction(_) => Some(TaskOptions::default()),
             Erc20OpStage::ConfirmMint { .. } => None,
@@ -128,10 +112,10 @@ impl Operation for Erc20BridgeOp {
             return None;
         };
 
-        let operation = Self {
+        let operation = Self(Erc20BridgeOp {
             side: BridgeSide::Base,
             stage: Erc20OpStage::SignMintOrder(order),
-        };
+        });
         let memo = event.memo();
 
         let action = OperationAction::CreateWithId(OperationId::new(nonce as _), operation, memo);
@@ -145,10 +129,10 @@ impl Operation for Erc20BridgeOp {
         log::trace!("wrapped token minted. Updating operation to the complete state...");
 
         let nonce = event.nonce;
-        let operation = Self {
+        let operation = Self(Erc20BridgeOp {
             side: BridgeSide::Wrapped,
             stage: Erc20OpStage::TokenMintConfirmed(event),
-        };
+        });
         let action = OperationAction::Update {
             nonce,
             update_to: operation,
@@ -165,10 +149,12 @@ impl Operation for Erc20BridgeOp {
     }
 }
 
-impl Erc20OpStage {
+pub struct Erc20OpStageImpl(pub Erc20OpStage);
+
+impl Erc20OpStageImpl {
     /// Returns signed mint order if the stage contains it.
     pub fn get_signed_mint_order(&self) -> Option<&SignedMintOrder> {
-        match self {
+        match &self.0 {
             Erc20OpStage::SignMintOrder(_) => None,
             Erc20OpStage::SendMintTransaction(order) => Some(order),
             Erc20OpStage::ConfirmMint { order, .. } => Some(order),
@@ -177,7 +163,7 @@ impl Erc20OpStage {
     }
 
     async fn progress(self, ctx: impl OperationContext) -> BftResult<Self> {
-        match self {
+        match self.0 {
             Erc20OpStage::SignMintOrder(order) => Self::sign_mint_order(ctx, order).await,
             Erc20OpStage::SendMintTransaction(order) => Self::send_mint_tx(ctx, order).await,
             Erc20OpStage::ConfirmMint { .. } => Err(bridge_did::error::Error::FailedToProgress(
@@ -197,15 +183,15 @@ impl Erc20OpStage {
 
         let should_send_by_canister = order.fee_payer != H160::zero();
         let next_op = if should_send_by_canister {
-            Self::SendMintTransaction(signed_mint_order)
+            Erc20OpStage::SendMintTransaction(signed_mint_order)
         } else {
-            Self::ConfirmMint {
+            Erc20OpStage::ConfirmMint {
                 order: signed_mint_order,
                 tx_hash: None,
             }
         };
 
-        Ok(next_op)
+        Ok(Self(next_op))
     }
 
     async fn send_mint_tx(ctx: impl OperationContext, order: SignedMintOrder) -> BftResult<Self> {
@@ -213,10 +199,10 @@ impl Erc20OpStage {
 
         let tx_hash = ctx.send_mint_transaction(&order).await?;
 
-        Ok(Self::ConfirmMint {
+        Ok(Self(Erc20OpStage::ConfirmMint {
             order,
             tx_hash: Some(tx_hash),
-        })
+        }))
     }
 }
 

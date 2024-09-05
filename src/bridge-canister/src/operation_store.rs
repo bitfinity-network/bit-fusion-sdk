@@ -325,6 +325,7 @@ where
 #[cfg(test)]
 mod tests {
     use bridge_did::error::BftResult;
+    use bridge_did::event_data::*;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::VectorMemory;
     use serde::Serialize;
@@ -368,21 +369,21 @@ mod tests {
 
         async fn on_wrapped_token_minted(
             _ctx: RuntimeState<Self>,
-            _event: bridge_utils::bft_events::MintedEventData,
+            _event: MintedEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None
         }
 
         async fn on_wrapped_token_burnt(
             _ctx: RuntimeState<Self>,
-            _event: bridge_utils::bft_events::BurntEventData,
+            _event: BurntEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None
         }
 
         async fn on_minter_notification(
             _ctx: RuntimeState<Self>,
-            _event: bridge_utils::bft_events::NotifyMinterEventData,
+            _event: NotifyMinterEventData,
         ) -> Option<crate::bridge::OperationAction<Self>> {
             None
         }

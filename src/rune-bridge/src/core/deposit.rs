@@ -8,6 +8,7 @@ use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::id256::Id256;
 use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::runes::{RuneInfo, RuneName, RuneToWrap};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
@@ -17,13 +18,12 @@ use super::index_provider::IcHttpClient;
 use crate::canister::get_rune_state;
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandler, UtxoHandlerError};
+use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{get_derivation_path_ic, BtcSignerType};
 use crate::ledger::UnspentUtxoInfo;
-use crate::ops::RuneBridgeOp;
-use crate::rune_info::{RuneInfo, RuneName};
+use crate::ops::RuneBridgeOpImpl;
 use crate::state::RuneState;
 
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
@@ -117,7 +117,7 @@ pub(crate) struct RuneDeposit<
     INDEX: RuneIndexProvider = OrdIndexProvider<IcHttpClient>,
 > {
     rune_state: Rc<RefCell<RuneState>>,
-    runtime_state: RuntimeState<RuneBridgeOp>,
+    runtime_state: RuntimeState<RuneBridgeOpImpl>,
     network: Network,
     signer: BtcSignerType,
     utxo_provider: UTXO,
@@ -125,7 +125,10 @@ pub(crate) struct RuneDeposit<
 }
 
 impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
-    pub fn new(state: Rc<RefCell<RuneState>>, runtime_state: RuntimeState<RuneBridgeOp>) -> Self {
+    pub fn new(
+        state: Rc<RefCell<RuneState>>,
+        runtime_state: RuntimeState<RuneBridgeOpImpl>,
+    ) -> Self {
         let state_ref = state.borrow();
 
         let network = state_ref.network();
@@ -150,7 +153,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
         }
     }
 
-    pub fn get(runtime_state: RuntimeState<RuneBridgeOp>) -> Self {
+    pub fn get(runtime_state: RuntimeState<RuneBridgeOpImpl>) -> Self {
         Self::new(get_rune_state(), runtime_state)
     }
 }

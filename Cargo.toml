@@ -15,6 +15,7 @@ members = [
 
 resolver = "2"
 
+
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
@@ -47,7 +48,9 @@ ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", packa
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", tag = "v0.20.x" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", tag = "v0.20.x" }
 ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", tag = "v0.20.x" }
-ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.20.x", features = ["export-api"] }
+ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", tag = "v0.20.x", features = [
+  "export-api",
+] }
 ic-stable-structures = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-stable-structures", tag = "v0.20.x" }
 ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-storage", tag = "v0.20.x" }
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.20.x" }
@@ -77,7 +80,13 @@ tokio = { version = "1.36", features = ["macros", "rt"] }
 tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-vergen = { version = "8.3", default-features = false, features = ["build", "cargo", "git", "gitcl", "rustc"] }
+vergen = { version = "8.3", default-features = false, features = [
+  "build",
+  "cargo",
+  "git",
+  "gitcl",
+  "rustc",
+] }
 
 # state machine tests deps
 ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
@@ -91,7 +100,9 @@ ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag 
 ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 
 [profile.dev]
-debug = false
+debug = true
+opt-level = 0
+
 
 # Set the settings for all dependencies (but not this crate itself or any workspace member).
 # This includes build dependencies.

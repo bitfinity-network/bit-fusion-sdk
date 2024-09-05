@@ -13,8 +13,6 @@ bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
-erc20-bridge = { path = "../erc20-bridge" }
 ic-canister-client = { workspace = true }
 ic-log = { workspace = true }
-icrc2-bridge = { path = "../icrc2-bridge" }
-rune-bridge = { path = "../rune-bridge" }
+
