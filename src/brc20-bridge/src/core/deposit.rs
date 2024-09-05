@@ -313,7 +313,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
 
         let sender_chain_id = state_ref.btc_chain_id();
         let sender = Id256::from_evm_address(dst_address, sender_chain_id);
-        let src_token = Id256::from(brc20_info.tick);
+        let src_token = Id256::from_brc20_tick(brc20_info.tick.inner());
 
         let recipient_chain_id = self
             .runtime_state

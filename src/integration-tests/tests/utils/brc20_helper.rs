@@ -10,7 +10,7 @@ use bitcoin::{
 };
 use brc20_bridge::brc20_info::Brc20Tick;
 use ord_rs::constants::POSTAGE;
-use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs};
+use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs, TaprootKeypair};
 use ord_rs::{Brc20, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo};
 
 use super::btc_rpc_client::BitcoinRpcClient;
@@ -153,6 +153,7 @@ impl<'a> Brc20Helper<'a> {
                 commit_fee: Amount::from_sat(1000),
                 reveal_fee: Amount::from_sat(1000),
                 txin_script_pubkey: self.address.script_pubkey(),
+                taproot_keypair: Some(TaprootKeypair::Random),
             },
         )?;
 

@@ -127,6 +127,7 @@ pub enum WithdrawError {
     FeeRateRequest,
     InsufficientFunds,
     SignerNotInitialized,
+    FailedToGenerateTaprootKeypair,
     CommitTransactionError(String),
     RevealTransactionError(String),
     KeyError(String),

@@ -10,6 +10,7 @@ use brc20_bridge::interface::{DepositError, GetAddressError};
 use brc20_bridge::ops::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20DepositRequestData};
 use brc20_bridge::state::{Brc20BridgeConfig, SchnorrKeyIds};
 use bridge_client::BridgeCanisterClient;
+use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::MinterNotificationType;
@@ -49,8 +50,8 @@ pub struct Brc20InitArgs {
 }
 
 pub struct Brc20Wallet {
-    admin_address: Address,
-    admin_btc_rpc_client: BitcoinRpcClient,
+    pub admin_address: Address,
+    pub admin_btc_rpc_client: BitcoinRpcClient,
     ord_wallet: BtcWallet,
     pub brc20_tokens: HashSet<Brc20Tick>,
 }
@@ -459,6 +460,42 @@ impl Brc20Context {
         }
 
         Err(DepositError::NothingToDeposit)
+    }
+
+    pub async fn withdraw(&self, tick: &Brc20Tick, amount: TokenAmount) {
+        let token_address = self.tokens.get(tick).expect("token not found");
+
+        let withdrawal_address = self.brc20.ord_wallet.address.to_string();
+        let client = self.inner.evm_client(ADMIN);
+        self.inner
+            .burn_erc_20_tokens_raw(
+                &client,
+                &self.eth_wallet,
+                token_address,
+                Id256::from(*tick).0.as_slice(),
+                withdrawal_address.as_bytes().to_vec(),
+                &self.bft_bridge_contract,
+                amount.amount(),
+                true,
+                None,
+            )
+            .await
+            .expect("failed to burn wrapped token");
+    }
+
+    pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<()> {
+        let txid = self
+            .brc20
+            .admin_btc_rpc_client
+            .send_to_address(btc_address, amount)
+            .expect("failed to send btc");
+
+        let brc20_helper = Brc20Helper::new(
+            &self.brc20.admin_btc_rpc_client,
+            &self.brc20.ord_wallet.private_key,
+            &self.brc20.ord_wallet.address,
+        );
+        brc20_helper.wait_for_confirmations(&txid, 6).await
     }
 
     pub async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {

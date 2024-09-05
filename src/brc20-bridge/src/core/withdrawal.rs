@@ -5,7 +5,7 @@ use std::str::FromStr;
 use bitcoin::absolute::LockTime;
 use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::hashes::Hash as _;
-use bitcoin::secp256k1::ThirtyTwoByteHash;
+use bitcoin::secp256k1::{SecretKey, ThirtyTwoByteHash};
 use bitcoin::transaction::Version;
 use bitcoin::{
     Address, Amount, FeeRate, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut,
@@ -19,7 +19,7 @@ use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::ic;
 use ord_rs::fees::estimate_transaction_fees;
-use ord_rs::wallet::{ScriptType, TxInputInfo};
+use ord_rs::wallet::{ScriptType, TaprootKeypair, TxInputInfo};
 use ord_rs::{
     Brc20, CreateCommitTransaction, CreateCommitTransactionArgs, OrdError, OrdTransactionBuilder,
     RevealTransactionArgs, SignCommitTransactionArgs,
@@ -29,7 +29,7 @@ use serde::{Deserializer, Serialize};
 use super::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::brc20_info::{Brc20Info, Brc20Tick};
 use crate::canister::{get_brc20_state, get_runtime_state};
-use crate::constants::FEE_RATE_UPDATE_INTERVAL;
+use crate::constants::{FEE_RATE_UPDATE_INTERVAL, MAX_TAPROOT_KEYPAIR_GEN_ATTEMPTS};
 use crate::interface::WithdrawError;
 use crate::key::{get_derivation_path, BtcSignerType};
 use crate::state::Brc20State;
@@ -96,7 +96,7 @@ impl Brc20WithdrawalPayload {
             // called only when some tokens are burned, which means they have been minted before,
             // and that means that we already received the rune info from the indexer.
             return Err(WithdrawError::InvalidRequest(format!(
-                "Invalid rune id: {brc20_tick}. No such rune id in the rune list received from the indexer."
+                "Invalid brc20 id: {brc20_tick}. No such brc20 id in the brc20 list received from the indexer."
             )));
         };
 
@@ -245,14 +245,16 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let CommitTransaction {
             args: commit_tx,
             inputs: funding_tx_inputs,
-        } = self.build_commit_transaction(
-            &mut inscriber,
-            funding_utxos,
-            tick,
-            amount,
-            funding_address.clone(),
-            fee_rate,
-        )?;
+        } = self
+            .build_commit_transaction(
+                &mut inscriber,
+                funding_utxos,
+                tick,
+                amount,
+                funding_address.clone(),
+                fee_rate,
+            )
+            .await?;
 
         let signed_commit_tx = inscriber
             .sign_commit_transaction(
@@ -315,6 +317,8 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         reveal_utxo: RevealUtxo,
     ) -> Result<Utxo, WithdrawError> {
         let reveal_recipient_address = self.get_change_address().await?;
+        let txid = Txid::from_slice(&reveal_utxo.txid).unwrap();
+        log::debug!("checking whether the reveal transaction {txid} is confirmed for address {reveal_recipient_address}");
         // get utxos for the reveal address
         self.utxo_provider
             .get_utxos(&reveal_recipient_address)
@@ -386,7 +390,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
     }
 
     /// Build commit transaction
-    fn build_commit_transaction(
+    async fn build_commit_transaction(
         &self,
         inscriber: &mut OrdTransactionBuilder,
         mut funding_utxos: Vec<Utxo>,
@@ -416,6 +420,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             log::info!("input_utxos utxos: {}", inputs.len());
             log::debug!("input_utxos: {inputs:?}");
 
+            // get random keypair for taproot
+            let taproot_keypair = self.get_taproot_keypair().await?;
+
             match inscriber.build_commit_transaction(
                 self.network,
                 wallet_address.clone(),
@@ -426,6 +433,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
                     txin_script_pubkey: wallet_address.script_pubkey(),
                     fee_rate,
                     multisig_config: None,
+                    taproot_keypair: Some(TaprootKeypair::SecretKey(taproot_keypair)),
                 },
             ) {
                 Ok(commit_tx) => {
@@ -660,6 +668,41 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             .get_transit_address(&H160::default(), self.network)
             .await
             .map_err(WithdrawError::from)
+    }
+
+    /// Get the public key for the taproot keypair
+    ///
+    /// The taproot keypair is generated from a random 32 bytes buffer.
+    /// The buffer is generated until a valid secret key is created.
+    ///
+    /// This approach, which seems inefficient, is actually used in the official Bitcoin rust library.
+    async fn get_taproot_keypair(&self) -> Result<SecretKey, WithdrawError> {
+        for attempt in 1..=MAX_TAPROOT_KEYPAIR_GEN_ATTEMPTS {
+            let rand_buff = match ic_exports::ic_cdk::api::management_canister::main::raw_rand()
+                .await
+            {
+                Ok((rand_buff,)) => rand_buff,
+                Err((code, message)) => {
+                    log::error!(
+                        "Failed to get random bytes from management canister: {code:?}: {message}; Attempt {attempt} of {MAX_TAPROOT_KEYPAIR_GEN_ATTEMPTS}"
+                    );
+                    continue;
+                }
+            };
+
+            match SecretKey::from_slice(&rand_buff[0..32]) {
+                Ok(key) => {
+                    log::debug!("generated taproot keypair after {attempt} attempts");
+                    return Ok(key);
+                }
+                Err(e) => {
+                    log::debug!("Failed to create secret key from random bytes: {e}; Attempt {attempt} of {MAX_TAPROOT_KEYPAIR_GEN_ATTEMPTS}");
+                    continue;
+                }
+            }
+        }
+
+        Err(WithdrawError::FailedToGenerateTaprootKeypair)
     }
 }
 

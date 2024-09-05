@@ -4,7 +4,7 @@ use bitcoin::bip32::DerivationPath;
 use bitcoin::{Address, Amount, FeeRate, PrivateKey, PublicKey, Txid};
 use ord_rs::wallet::{
     CreateCommitTransactionArgsV2, CreateEdictTxArgs, EtchingTransactionArgs, LocalSigner,
-    Runestone, ScriptType, TxInputInfo,
+    Runestone, ScriptType, TaprootKeypair, TxInputInfo,
 };
 use ord_rs::{Nft, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo, Wallet};
 use ordinals::{Etching, RuneId};
@@ -103,6 +103,7 @@ impl<'a> RuneHelper<'a> {
                 commit_fee: Amount::from_sat(1000),
                 reveal_fee: Amount::from_sat(1000),
                 txin_script_pubkey: self.address.script_pubkey(),
+                taproot_keypair: Some(TaprootKeypair::Random),
             },
         )?;
         let signed_commit_tx = builder

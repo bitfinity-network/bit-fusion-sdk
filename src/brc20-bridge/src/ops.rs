@@ -90,7 +90,7 @@ impl Operation for Brc20BridgeOp {
                 payload,
                 reveal_utxo,
             }) => {
-                log::debug!("Self::AwaitInscriptionTxs {payload:?} {reveal_utxo:?}");
+                log::debug!("Self::AwaitInscriptionTxs {reveal_utxo:?} {payload:?} ");
                 Brc20BridgeWithdrawOp::await_inscription_transactions(payload, reveal_utxo).await
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx {
@@ -114,8 +114,8 @@ impl Operation for Brc20BridgeOp {
         match self {
             Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => Some(
                 TaskOptions::new()
-                    .with_max_retries_policy(20)
-                    .with_fixed_backoff_policy(300), // 5 minutes
+                    .with_max_retries_policy(300)
+                    .with_fixed_backoff_policy(10), // TODO: should be different between mainnet and regtest...
             ),
             Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. })
