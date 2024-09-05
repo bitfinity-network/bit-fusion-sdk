@@ -1,4 +1,5 @@
 pub mod scheduler;
+pub mod service;
 pub mod state;
 
 use std::cell::RefCell;

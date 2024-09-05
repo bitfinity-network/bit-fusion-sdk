@@ -244,7 +244,7 @@ impl EncodedMintOrder {
     /// Returns digest of the encoded data.
     /// The digest usually used for signing.
     pub fn digest(&self) -> [u8; 32] {
-        keccak256(&self.0)
+        keccak256(self.0)
     }
 
     /// Returns mint amount.

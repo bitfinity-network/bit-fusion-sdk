@@ -1000,6 +1000,7 @@ dependencies = [
  "did",
  "drop_guard",
  "eth-signer",
+ "ethers-core",
  "hex",
  "ic-canister",
  "ic-exports",
