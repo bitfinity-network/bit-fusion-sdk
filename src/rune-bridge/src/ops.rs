@@ -23,48 +23,52 @@ use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal}
 use crate::rune_info::RuneName;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
-pub enum RuneBridgeOp {
-    // Deposit
+pub enum RuneBridgeDepositOp {
+    /// Await inputs from the Rune deposit provider
     AwaitInputs {
         dst_address: H160,
         dst_tokens: HashMap<RuneName, H160>,
         requested_amounts: Option<HashMap<RuneName, u128>>,
     },
+    /// Await confirmations for the deposit
     AwaitConfirmations {
         dst_address: H160,
         utxo: Utxo,
         runes_to_wrap: Vec<RuneToWrap>,
     },
-    SignMintOrder {
-        dst_address: H160,
-        mint_order: MintOrder,
-    },
-    SendMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
-    },
-    ConfirmMintOrder {
-        dst_address: H160,
-        order: SignedMintOrder,
-        tx_id: H256,
-    },
-    MintOrderConfirmed {
-        data: MintedEventData,
-    },
+    /// Sign the mint order
+    SignMintOrder(MintOrder),
+    /// Send the mint order to the bridge
+    SendMintOrder(SignedMintOrder),
+    /// Confirm the mint order
+    ConfirmMintOrder { order: SignedMintOrder, tx_id: H256 },
+    /// The mint order has been confirmed
+    MintOrderConfirmed { data: MintedEventData },
+}
 
-    // Withdraw
-    CreateTransaction {
-        payload: RuneWithdrawalPayload,
-    },
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
+pub enum RuneBridgeWithdrawOp {
+    /// Create a withdrawal transaction
+    CreateTransaction { payload: RuneWithdrawalPayload },
+    /// Send the withdrawal transaction
     SendTransaction {
         from_address: H160,
         transaction: DidTransaction,
     },
+    /// The withdrawal transaction has been sent
     TransactionSent {
         from_address: H160,
         transaction: DidTransaction,
     },
+}
 
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
+pub enum RuneBridgeOp {
+    Deposit(RuneBridgeDepositOp),
+    Withdraw(RuneBridgeWithdrawOp),
+    /// The operation has been split into multiple operations
+    /// e.g. two runes deposit in a single call
     OperationSplit {
         wallet_address: H160,
         new_operation_ids: Vec<OperationId>,
@@ -74,34 +78,40 @@ pub enum RuneBridgeOp {
 impl Operation for RuneBridgeOp {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
         match self {
-            RuneBridgeOp::AwaitInputs {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address,
                 dst_tokens,
                 requested_amounts,
-            } => {
+            }) => {
+                let input_provider = RuneDeposit::get(ctx.clone()).map_err(|err| {
+                    Error::FailedToProgress(format!("cannot get deposit: {err:?}"))
+                })?;
                 log::debug!(
                     "RuneBridgeOp::AwaitInputs {dst_address} {dst_tokens:?} {requested_amounts:?}"
                 );
                 Self::await_inputs(
                     ctx.clone(),
-                    &RuneDeposit::get(ctx),
+                    &input_provider,
                     dst_address,
                     dst_tokens,
                     requested_amounts,
                 )
                 .await
             }
-            RuneBridgeOp::AwaitConfirmations {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitConfirmations {
                 dst_address,
                 utxo,
                 runes_to_wrap,
-            } => {
+            }) => {
+                let input_provider = RuneDeposit::get(ctx.clone()).map_err(|err| {
+                    Error::FailedToProgress(format!("cannot get deposit: {err:?}"))
+                })?;
                 log::debug!(
                     "RuneBridgeOp::AwaitConfirmations {dst_address} {utxo:?} {runes_to_wrap:?}"
                 );
                 Self::await_confirmations(
                     ctx.clone(),
-                    &RuneDeposit::get(ctx),
+                    &input_provider,
                     dst_address,
                     utxo,
                     runes_to_wrap,
@@ -120,26 +130,28 @@ impl Operation for RuneBridgeOp {
                 log::debug!("RuneBridgeOp::SendMintOrder {dst_address} {order:?}");
                 Self::send_mint_order(&ctx, dst_address, order).await
             }
-            RuneBridgeOp::ConfirmMintOrder { .. } => Err(Error::FailedToProgress(
-                "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
-            )),
-            RuneBridgeOp::MintOrderConfirmed { .. } => Err(Error::FailedToProgress(
-                "MintOrderConfirmed task cannot be progressed".into(),
-            )),
-            RuneBridgeOp::CreateTransaction { payload } => {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => {
+                Err(Error::FailedToProgress(
+                    "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
+                ))
+            }
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. }) => Err(
+                Error::FailedToProgress("MintOrderConfirmed task cannot be progressed".into()),
+            ),
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { payload }) => {
                 log::debug!("RuneBridgeOp::CreateTransaction {payload:?}");
                 Self::create_withdrawal_transaction(payload).await
             }
-            RuneBridgeOp::SendTransaction {
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction {
                 from_address,
                 transaction,
-            } => {
+            }) => {
                 log::debug!("RuneBridgeOp::SendTransaction {from_address} {transaction:?}");
                 Self::send_transaction(from_address, transaction).await
             }
-            RuneBridgeOp::TransactionSent { .. } => Err(Error::FailedToProgress(
-                "TransactionSent task cannot be progressed".into(),
-            )),
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent { .. }) => Err(
+                Error::FailedToProgress("TransactionSent task cannot be progressed".into()),
+            ),
             RuneBridgeOp::OperationSplit {
                 wallet_address,
                 new_operation_ids,
@@ -152,49 +164,61 @@ impl Operation for RuneBridgeOp {
 
     fn is_complete(&self) -> bool {
         match self {
-            RuneBridgeOp::AwaitInputs { .. } => false,
-            RuneBridgeOp::AwaitConfirmations { .. } => false,
-            RuneBridgeOp::SignMintOrder { .. } => false,
-            RuneBridgeOp::SendMintOrder { .. } => false,
-            RuneBridgeOp::ConfirmMintOrder { .. } => false,
-            RuneBridgeOp::MintOrderConfirmed { .. } => true,
-            RuneBridgeOp::CreateTransaction { .. } => false,
-            RuneBridgeOp::SendTransaction { .. } => false,
-            RuneBridgeOp::TransactionSent { .. } => true,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs { .. }) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitConfirmations { .. }) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(_)) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(_)) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. }) => true,
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => false,
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. }) => false,
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent { .. }) => true,
             RuneBridgeOp::OperationSplit { .. } => false,
         }
     }
 
     fn evm_wallet_address(&self) -> H160 {
         match self {
-            RuneBridgeOp::AwaitInputs { dst_address, .. } => dst_address.clone(),
-            RuneBridgeOp::AwaitConfirmations { dst_address, .. } => dst_address.clone(),
-            RuneBridgeOp::SignMintOrder { dst_address, .. } => dst_address.clone(),
-            RuneBridgeOp::SendMintOrder { dst_address, .. } => dst_address.clone(),
-            RuneBridgeOp::ConfirmMintOrder { dst_address, .. } => dst_address.clone(),
-            RuneBridgeOp::MintOrderConfirmed { data } => data.recipient.clone(),
-            RuneBridgeOp::CreateTransaction { payload } => payload.sender.clone(),
-            RuneBridgeOp::SendTransaction { from_address, .. } => from_address.clone(),
-            RuneBridgeOp::TransactionSent { from_address, .. } => from_address.clone(),
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs { dst_address, .. }) => {
+                dst_address.clone()
+            }
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitConfirmations {
+                dst_address, ..
+            }) => dst_address.clone(),
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)) => {
+                mint_order.recipient.clone()
+            }
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
+                order.get_recipient()
+            }
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { order, .. }) => {
+                order.get_recipient()
+            }
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { data }) => {
+                data.recipient.clone()
+            }
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { payload }) => {
+                payload.sender.clone()
+            }
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction {
+                from_address, ..
+            }) => from_address.clone(),
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent {
+                from_address, ..
+            }) => from_address.clone(),
             RuneBridgeOp::OperationSplit { wallet_address, .. } => wallet_address.clone(),
         }
     }
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
         match self {
-            Self::SendTransaction { .. } | Self::CreateTransaction { .. } => Some(
+            Self::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. })
+            | Self::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => Some(
                 TaskOptions::new()
                     .with_fixed_backoff_policy(2)
                     .with_max_retries_policy(10),
             ),
-            Self::AwaitInputs { .. }
-            | Self::AwaitConfirmations { .. }
-            | Self::SignMintOrder { .. }
-            | Self::SendMintOrder { .. }
-            | Self::ConfirmMintOrder { .. }
-            | Self::MintOrderConfirmed { .. }
-            | Self::TransactionSent { .. }
-            | Self::OperationSplit { .. } => Some(
+            Self::Deposit(_) | Self::Withdraw(_) | Self::OperationSplit { .. } => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
@@ -213,7 +237,7 @@ impl Operation for RuneBridgeOp {
 
         Some(OperationAction::Update {
             nonce: event.nonce,
-            update_to: Self::MintOrderConfirmed { data: event },
+            update_to: Self::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { data: event }),
         })
     }
 
@@ -225,7 +249,7 @@ impl Operation for RuneBridgeOp {
         let memo = event.memo();
         match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
             Ok(payload) => Some(OperationAction::Create(
-                Self::CreateTransaction { payload },
+                Self::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { payload }),
                 memo,
             )),
             Err(err) => {
@@ -245,11 +269,11 @@ impl Operation for RuneBridgeOp {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event.user_data, RuneDepositRequestData) {
                     Ok(data) => Some(OperationAction::Create(
-                        Self::AwaitInputs {
+                        Self::Deposit(RuneBridgeDepositOp::AwaitInputs {
                             dst_address: data.dst_address,
                             dst_tokens: data.dst_tokens,
                             requested_amounts: data.amounts,
-                        },
+                        }),
                         event.memo(),
                     )),
                     _ => {
@@ -376,11 +400,11 @@ impl RuneBridgeOp {
                 });
             }
 
-            operations.push(Self::AwaitConfirmations {
+            operations.push(Self::Deposit(RuneBridgeDepositOp::AwaitConfirmations {
                 dst_address: dst_address.clone(),
                 utxo: input.utxo.clone(),
                 runes_to_wrap,
-            });
+            }));
         }
 
         Ok(Self::split_or_update(
@@ -409,10 +433,7 @@ impl RuneBridgeOp {
 
         let operations = mint_orders
             .into_iter()
-            .map(|mint_order| Self::SignMintOrder {
-                dst_address: dst_address.clone(),
-                mint_order,
-            })
+            .map(|mint_order| Self::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)))
             .collect();
 
         Ok(Self::split_or_update(ctx, dst_address, operations))
@@ -421,7 +442,6 @@ impl RuneBridgeOp {
     async fn sign_mint_order(
         signer: &impl TransactionSigner,
         nonce: u32,
-        dst_address: H160,
         mut mint_order: MintOrder,
     ) -> BftResult<Self> {
         // update nonce
@@ -429,10 +449,7 @@ impl RuneBridgeOp {
 
         let signed = mint_order.encode_and_sign(signer).await?;
 
-        Ok(Self::SendMintOrder {
-            dst_address,
-            order: signed,
-        })
+        Ok(Self::Deposit(RuneBridgeDepositOp::SendMintOrder(signed)))
     }
 
     async fn send_mint_order(
@@ -441,15 +458,15 @@ impl RuneBridgeOp {
         order: SignedMintOrder,
     ) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
-        Ok(Self::ConfirmMintOrder {
-            dst_address,
+        Ok(Self::Deposit(RuneBridgeDepositOp::ConfirmMintOrder {
             order,
             tx_id,
-        })
+        }))
     }
 
     async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BftResult<Self> {
-        let withdraw = Withdrawal::get();
+        let withdraw = Withdrawal::get()
+            .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
         let from_address = payload.sender.clone();
         let transaction = withdraw
             .create_withdrawal_transaction(payload)
@@ -458,14 +475,15 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("cannot create withdrawal transaction: {err:?}"))
             })?;
 
-        Ok(Self::SendTransaction {
+        Ok(Self::Withdraw(RuneBridgeWithdrawOp::SendTransaction {
             from_address,
             transaction: transaction.into(),
-        })
+        }))
     }
 
     async fn send_transaction(from_address: H160, transaction: DidTransaction) -> BftResult<Self> {
-        let withdraw = Withdrawal::get();
+        let withdraw = Withdrawal::get()
+            .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
         withdraw
             .send_transaction(transaction.clone().into())
             .await
@@ -473,10 +491,10 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("failed to send transaction: {err:?}"))
             })?;
 
-        Ok(Self::TransactionSent {
+        Ok(Self::Withdraw(RuneBridgeWithdrawOp::TransactionSent {
             from_address,
             transaction,
-        })
+        }))
     }
 }
 

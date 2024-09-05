@@ -10,14 +10,14 @@ http_port = 20456
 
 [network]
 mode = "devnet"
-bitcoind_rpc_url = "http://bitcoind:18443"
-bitcoind_rpc_username = "user"
-bitcoind_rpc_password = "pass"
+bitcoind_rpc_url = "http://127.0.0.1:18443"
+bitcoind_rpc_username = "ic-btc-integration"
+bitcoind_rpc_password = "QPQiNaph19FqUsCrBRN0FII7lyM26B51fAMeBQzCb-E="
 # Bitcoin block events can be received by Chainhook
 # either through a Bitcoin node's ZeroMQ interface,
 # or through the Stacks node. Zmq is being
 # used by default:
-bitcoind_zmq_url = "tcp://bitcoind:28332"
+bitcoind_zmq_url = "tcp://127.0.0.1:28332"
 # but stacks can also be used:
 # stacks_node_rpc_url = "http://0.0.0.0:20443"
 
@@ -29,10 +29,8 @@ bitcoind_rpc_threads = 4
 bitcoind_rpc_timeout = 15
 expected_observers_count = 1
 
-# Disable the following section if the state
-# must be built locally
-[snapshot]
-download_url = "https://archive.hiro.so/mainnet/ordhook/mainnet-ordhook-sqlite-latest"
+[meta_protocols]
+brc20 = true
 
 [logs]
 ordinals_internals = true

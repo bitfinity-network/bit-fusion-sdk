@@ -1,9 +1,8 @@
-use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{IcMemoryManager, MemoryId};
+//! Memory IDs for the BTC Bridge program.
+//!
+//! DO NOT USE MEMORY IDS BELOW 100, as they are reserved for sdk use.
 
-pub const BTC_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(0);
-pub const WRAPPED_TOKEN_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(1);
+use ic_stable_structures::MemoryId;
 
-thread_local! {
-    pub static MEMORY_MANAGER: IcMemoryManager<DefaultMemoryImpl> = IcMemoryManager::init(DefaultMemoryImpl::default());
-}
+pub const BTC_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(100);
+pub const WRAPPED_TOKEN_CONFIG_MEMORY_ID: MemoryId = MemoryId::new(101);
