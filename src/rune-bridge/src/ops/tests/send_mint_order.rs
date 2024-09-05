@@ -71,7 +71,7 @@ async fn return_correct_operation_if_success() {
     const SEED: u8 = 47;
     let ctx = TestOperationContext::ok(SEED);
     let signed_order = test_signed_order().await;
-    let op = RuneBridgeOp::send_mint_order(&ctx, sender(), signed_order.clone())
+    let op = RuneBridgeOp::send_mint_order(&ctx, sender(), signed_order)
         .await
         .expect("operation failed");
 

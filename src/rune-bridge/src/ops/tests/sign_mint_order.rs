@@ -63,7 +63,7 @@ impl TransactionSigner for TestSigner {
 
 #[tokio::test]
 async fn returns_error_if_cannot_sign() {
-    let signer = TestSigner::with_err("something strange".into());
+    let signer = TestSigner::with_err("something strange");
     let mint_order = tests::test_mint_order();
     let err = RuneBridgeOp::sign_mint_order(&signer, 3, sender(), mint_order)
         .await
