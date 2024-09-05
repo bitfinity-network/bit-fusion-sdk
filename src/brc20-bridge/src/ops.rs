@@ -55,30 +55,52 @@ impl Operation for Brc20BridgeOp {
                 Error::FailedToProgress("MintOrderConfirmed task cannot be progressed".into()),
             ),
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)) => {
-                todo!()
+                log::debug!("Self::CreateInscriptionTxs {payload:?}");
+                Brc20BridgeWithdrawOp::create_inscription_txs(payload).await
             }
-            Self::Withdraw(Brc20BridgeWithdrawOp::SendInscriptionTxs {
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx {
                 payload,
                 commit_tx,
                 reveal_tx,
                 reveal_utxo,
             }) => {
-                todo!()
+                log::debug!(
+                    "Self::SendCommitTx {payload:?} {commit_tx:?} {reveal_tx:?} {reveal_utxo:?}"
+                );
+                Brc20BridgeWithdrawOp::send_commit_transaction(
+                    payload,
+                    commit_tx,
+                    reveal_tx,
+                    reveal_utxo,
+                )
+                .await
+            }
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx {
+                payload,
+                reveal_tx,
+                reveal_utxo,
+            }) => {
+                log::debug!("Self::SendRevealTx {payload:?} {reveal_tx:?} {reveal_utxo:?}");
+                Brc20BridgeWithdrawOp::send_reveal_transaction(payload, reveal_tx, reveal_utxo)
+                    .await
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs {
                 payload,
                 reveal_utxo,
             }) => {
-                todo!()
+                log::debug!("Self::AwaitInscriptionTxs {payload:?} {reveal_utxo:?}");
+                Brc20BridgeWithdrawOp::await_inscription_transactions(payload, reveal_utxo).await
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx {
                 payload,
                 reveal_utxo,
             }) => {
-                todo!()
+                log::debug!("Self::CreateTransferTx {payload:?} {reveal_utxo:?}");
+                Brc20BridgeWithdrawOp::create_transfer_transaction(payload, reveal_utxo).await
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { from_address, tx }) => {
-                todo!()
+                log::debug!("Self::SendTransferTx {from_address:?} {tx:?}");
+                Brc20BridgeWithdrawOp::send_transfer_transaction(from_address, tx).await
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent { .. }) => Err(
                 Error::FailedToProgress("TransferTxSent task cannot be progressed".into()),
@@ -93,7 +115,8 @@ impl Operation for Brc20BridgeOp {
                     .with_max_retries_policy(20)
                     .with_fixed_backoff_policy(300), // 5 minutes
             ),
-            Self::Withdraw(Brc20BridgeWithdrawOp::SendInscriptionTxs { .. })
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. })
+            | Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs { .. }) => Some(
@@ -120,7 +143,8 @@ impl Operation for Brc20BridgeOp {
             Self::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => false,
             Self::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. }) => true,
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs { .. }) => false,
-            Self::Withdraw(Brc20BridgeWithdrawOp::SendInscriptionTxs { .. }) => false,
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. }) => false,
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. }) => false,
             Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => false,
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx { .. }) => false,
             Self::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { .. }) => false,
@@ -152,7 +176,10 @@ impl Operation for Brc20BridgeOp {
             Self::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)) => {
                 payload.sender.clone()
             }
-            Self::Withdraw(Brc20BridgeWithdrawOp::SendInscriptionTxs { payload, .. }) => {
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { payload, .. }) => {
+                payload.sender.clone()
+            }
+            Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { payload, .. }) => {
                 payload.sender.clone()
             }
             Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { payload, .. }) => {
