@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};

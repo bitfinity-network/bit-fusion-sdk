@@ -1,4 +1,3 @@
-
 use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;

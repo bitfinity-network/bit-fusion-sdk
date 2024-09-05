@@ -16,7 +16,6 @@ use upgrade::UpgradeCommands;
 
 use crate::config;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
-
 mod deploy;
 mod reinstall;
 mod upgrade;
@@ -95,14 +94,14 @@ impl Bridge {
                 trace!("Preparing BRC20 bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("BRC20 Bridge Config : {:?}", init_data);
-                let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
+                let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("Init Bridge Config : {:?}", init_data);
-                let rune_config = rune_bridge::state::RuneBridgeConfig::from(rune.clone());
+                let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
                 Encode!(&init_data, &rune_config)?
             }

@@ -1,6 +1,6 @@
-use brc20_bridge::ops::Brc20BridgeOp;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
+use bridge_did::operations::Brc20BridgeOp;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 

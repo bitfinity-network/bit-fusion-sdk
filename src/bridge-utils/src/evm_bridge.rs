@@ -1,4 +1,3 @@
-
 use candid::CandidType;
 use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};

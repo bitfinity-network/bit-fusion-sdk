@@ -6,6 +6,7 @@ use clap::{Parser, ValueEnum};
 use eth_signer::sign_strategy;
 use serde::{Deserialize, Serialize};
 
+mod brc20;
 mod erc;
 mod icrc;
 mod rune;

@@ -1,53 +1,122 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use candid::{CandidType, Principal};
-use eth_signer::sign_strategy::SigningStrategy;
+use candid::CandidType;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_log::did::LogCanisterSettings;
+use ic_stable_structures::Storable;
 use serde::Deserialize;
 
-use super::BridgeInitData;
+use super::{DEFAULT_DEPOSIT_FEE, DEFAULT_INDEXER_CONSENSUS_THRESHOLD, DEFAULT_MEMPOOL_TIMEOUT};
 
-pub const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
-pub const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
-
-/// Minimum number of indexers required to start the bridge.
-pub const MIN_INDEXERS: u8 = 2;
-
-#[derive(Debug, CandidType, Deserialize, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
-    pub evm_principal: Principal,
-    pub signing_strategy: SigningStrategy,
-    pub admin: Principal,
-    pub log_settings: LogCanisterSettings,
     pub min_confirmations: u32,
-    pub no_of_indexers: u8,
     pub indexer_urls: HashSet<String>,
+    pub deposit_fee: u64,
+    pub mempool_timeout: Duration,
     /// Minimum quantity of indexer nodes required to reach agreement on a
     /// request
     pub indexer_consensus_threshold: u8,
-    pub deposit_fee: u64,
-    pub mempool_timeout: Duration,
+}
+
+impl Storable for RuneBridgeConfig {
+    const BOUND: ic_stable_structures::Bound = ic_stable_structures::Bound::Unbounded;
+
+    /* Encoding
+       1                                            // network
+       4                                            // min_confirmations
+       1                                            // number of indexers
+       number of indexers * [1 + indexer_url.len]   // [len] + [indexer_url]
+       8                                            // deposit_fee
+       8                                            // mempool_timeout
+       1                                            // indexer_consensus_threshold
+    */
+
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        let mut buf = Vec::with_capacity(
+            1 + 4
+                + 1
+                + self
+                    .indexer_urls
+                    .iter()
+                    .map(|url| 1 + url.len())
+                    .sum::<usize>()
+                + 8
+                + 8
+                + 1,
+        );
+
+        let network_byte = match self.network {
+            BitcoinNetwork::Mainnet => 0,
+            BitcoinNetwork::Testnet => 1,
+            BitcoinNetwork::Regtest => 2,
+        };
+
+        buf.push(network_byte);
+        buf.extend_from_slice(&self.min_confirmations.to_le_bytes());
+        buf.push(self.indexer_urls.len() as u8);
+        for url in &self.indexer_urls {
+            buf.push(url.len() as u8);
+            buf.extend_from_slice(url.as_bytes());
+        }
+        buf.extend_from_slice(&self.deposit_fee.to_le_bytes());
+        buf.extend_from_slice(&(self.mempool_timeout.as_nanos() as u64).to_le_bytes());
+        buf.push(self.indexer_consensus_threshold);
+
+        buf.into()
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        let mut offset = 0;
+        let network = bytes[offset];
+        offset += 1;
+        let min_confirmations = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+        offset += 4;
+        let no_of_indexers = bytes[offset];
+        offset += 1;
+        let mut indexer_urls = HashSet::with_capacity(no_of_indexers as usize);
+        for _ in 0..no_of_indexers {
+            let len = bytes[offset] as usize;
+            offset += 1;
+            let url =
+                String::from_utf8(bytes[offset..offset + len].to_vec()).expect("invalid utf8");
+            offset += len;
+            indexer_urls.insert(url);
+        }
+        let deposit_fee = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let mempool_timeout = Duration::from_nanos(u64::from_le_bytes(
+            bytes[offset..offset + 8].try_into().unwrap(),
+        ));
+        offset += 8;
+        let indexer_consensus_threshold = bytes[offset];
+
+        Self {
+            network: match network {
+                0 => BitcoinNetwork::Mainnet,
+                1 => BitcoinNetwork::Testnet,
+                2 => BitcoinNetwork::Regtest,
+                _ => panic!("invalid network"),
+            },
+            min_confirmations,
+            indexer_urls,
+            deposit_fee,
+            mempool_timeout,
+            indexer_consensus_threshold,
+        }
+    }
 }
 
 impl Default for RuneBridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
-            evm_principal: Principal::management_canister(),
-            signing_strategy: SigningStrategy::Local {
-                private_key: [0; 32],
-            },
-            admin: Principal::management_canister(),
-            log_settings: LogCanisterSettings::default(),
             min_confirmations: 12,
-            no_of_indexers: MIN_INDEXERS,
-            indexer_consensus_threshold: 2,
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
+            indexer_consensus_threshold: DEFAULT_INDEXER_CONSENSUS_THRESHOLD,
         }
     }
 }
@@ -58,14 +127,6 @@ impl RuneBridgeConfig {
             return Err("Indexer url is empty".to_string());
         }
 
-        if self.indexer_urls.len() != self.no_of_indexers as usize {
-            return Err(format!(
-                "Number of indexers ({}) required does not match number of indexer urls ({})",
-                self.no_of_indexers,
-                self.indexer_urls.len()
-            ));
-        }
-
         if self
             .indexer_urls
             .iter()
@@ -74,23 +135,52 @@ impl RuneBridgeConfig {
             return Err("Indexer url must specify https url".to_string());
         }
 
-        if self.indexer_consensus_threshold > self.indexer_urls.len() as u8 {
-            return Err(format!(
-                "The consensus threshold ({}) must be less than or equal to the number of indexers ({})",
-                self.indexer_consensus_threshold,
-                self.indexer_urls.len()
-            ));
-        }
-
         Ok(())
     }
+}
 
-    pub fn bridge_init_data(&self) -> BridgeInitData {
-        BridgeInitData {
-            owner: self.admin,
-            evm_principal: self.evm_principal,
-            signing_strategy: self.signing_strategy.clone(),
-            log_settings: Some(self.log_settings.clone()),
-        }
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_should_encode_and_decode_config() {
+        let config = RuneBridgeConfig {
+            network: BitcoinNetwork::Mainnet,
+            min_confirmations: 12,
+            indexer_urls: vec![
+                "https://indexer1.com".to_string(),
+                "https://indexer2.com".to_string(),
+                "https://indexer3.com".to_string(),
+            ]
+            .into_iter()
+            .collect(),
+            deposit_fee: 100,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 2,
+        };
+
+        let bytes = config.to_bytes();
+        let decoded = RuneBridgeConfig::from_bytes(bytes.clone());
+
+        assert_eq!(config, decoded);
+    }
+
+    #[test]
+    fn test_should_encode_and_decode_config_with_empty_urls() {
+        let config = RuneBridgeConfig {
+            network: BitcoinNetwork::Mainnet,
+            min_confirmations: 12,
+            indexer_urls: HashSet::new(),
+            deposit_fee: 100,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 2,
+        };
+
+        let bytes = config.to_bytes();
+        let decoded = RuneBridgeConfig::from_bytes(bytes.clone());
+
+        assert_eq!(config, decoded);
     }
 }

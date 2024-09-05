@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use clap::{Parser, ValueEnum};
-use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
 

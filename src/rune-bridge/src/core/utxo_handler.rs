@@ -3,6 +3,7 @@ use bridge_did::runes::RuneToWrap;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use thiserror::Error;
+
 use crate::key::KeyError;
 
 #[derive(Debug, Clone, PartialEq, Error)]

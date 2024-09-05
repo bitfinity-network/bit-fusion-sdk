@@ -44,7 +44,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 use alloy_sol_types::{SolCall, SolConstructor};
-use bridge_client::{Erc20BridgeClient, Brc20BridgeClient,Icrc2BridgeClient, RuneBridgeClient};
+use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;

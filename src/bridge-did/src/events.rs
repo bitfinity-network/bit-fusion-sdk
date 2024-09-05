@@ -8,7 +8,7 @@ use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 use crate::operation_log::Memo;
 
 sol! {
-    #[derive(Debug, Serialize,Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     BFTBridge,
     "../../solidity/out/BftBridge.sol/BFTBridge.json"
 }

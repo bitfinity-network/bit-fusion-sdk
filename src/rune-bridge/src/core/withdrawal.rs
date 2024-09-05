@@ -7,7 +7,6 @@ use bitcoin::{Address, Amount, FeeRate, Network, OutPoint, Transaction, TxOut, T
 use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
 use bridge_did::runes::RuneWithdrawalPayload;
-use candid::CandidType;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
