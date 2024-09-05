@@ -9,6 +9,7 @@ export-api = []
 
 [dependencies]
 async-trait = { workspace = true }
+brc20-bridge = { path = "../brc20-bridge" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }

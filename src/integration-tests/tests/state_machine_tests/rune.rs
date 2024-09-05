@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use bridge_did::init::RuneBridgeConfig;
+use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -39,16 +39,17 @@ impl RunesSetup {
         .unwrap();
 
         let bridge = (&context).create_canister().await.unwrap();
-        let init_args = RuneBridgeConfig {
-            network: BitcoinNetwork::Mainnet,
+        let init_args = BridgeInitData {
             evm_principal: bob(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Custom(KEY_ID.to_string()),
             },
-            admin: (&context).admin(),
+            owner: (&context).admin(),
             log_settings: Default::default(),
+        };
+        let rune_config = RuneBridgeConfig {
+            network: BitcoinNetwork::Mainnet,
             min_confirmations: 1,
-            no_of_indexers: 1,
             indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
             deposit_fee: 0,
             mempool_timeout: Duration::from_secs(60),
@@ -58,7 +59,7 @@ impl RunesSetup {
             .install_canister(
                 bridge,
                 get_rune_bridge_canister_bytecode().await,
-                (init_args,),
+                (init_args, rune_config),
             )
             .await
             .unwrap();

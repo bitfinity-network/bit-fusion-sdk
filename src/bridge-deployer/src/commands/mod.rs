@@ -48,12 +48,15 @@ pub enum Commands {
 
 #[derive(Subcommand, Clone, Serialize, Deserialize, Debug)]
 pub enum Bridge {
-    Rune {
+    Brc20 {
         /// The configuration to use
         #[command(flatten)]
-        config: config::RuneBridgeConfig,
+        config: config::InitBridgeConfig,
+        /// Extra configuration for the BRC20 bridge
+        #[command(name = "brc20", flatten)]
+        brc20: config::Brc20BridgeConfig,
     },
-    Icrc {
+    Btc {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
@@ -66,10 +69,18 @@ pub enum Bridge {
         #[command(name = "erc", flatten)]
         erc: config::BaseEvmSettingsConfig,
     },
-    Btc {
+    Icrc {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+    },
+    Rune {
+        /// Bridge configuration
+        #[command(flatten)]
+        init: config::InitBridgeConfig,
+        /// Rune bridge configuration
+        #[command(flatten, name = "rune")]
+        rune: config::RuneBridgeConfig,
     },
 }
 
@@ -77,11 +88,23 @@ impl Bridge {
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
-            Bridge::Rune { config } => {
+            Bridge::Brc20 {
+                config: init,
+                brc20,
+            } => {
+                trace!("Preparing BRC20 bridge configuration");
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("BRC20 Bridge Config : {:?}", init_data);
+                let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
+                Encode!(&init_data, &brc20_config)?
+            }
+            Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let config = bridge_did::init::RuneBridgeConfig::from(config.clone());
-                debug!("Rune Bridge Config : {:?}", config);
-                Encode!(&config)?
+                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                debug!("Init Bridge Config : {:?}", init_data);
+                let rune_config = rune_bridge::state::RuneBridgeConfig::from(rune.clone());
+                debug!("Rune Bridge Config : {:?}", rune_config);
+                Encode!(&init_data, &rune_config)?
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
@@ -122,6 +145,7 @@ impl Bridge {
     /// Returns if the bridge is wrapped side or not
     pub fn is_wrapped_side(&self) -> bool {
         match self {
+            Bridge::Brc20 { .. } => true,
             Bridge::Rune { .. } => true,
             Bridge::Icrc { .. } => true,
             Bridge::Erc20 { .. } => false,

@@ -15,13 +15,13 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Ut
 use serde::Serialize;
 
 use super::index_provider::IcHttpClient;
-use crate::canister::get_rune_state;
+use crate::canister::{get_rune_state, get_runtime_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
 use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{get_derivation_path_ic, BtcSignerType};
+use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UnspentUtxoInfo;
 use crate::ops::RuneBridgeOpImpl;
 use crate::state::RuneState;
@@ -128,18 +128,26 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     pub fn new(
         state: Rc<RefCell<RuneState>>,
         runtime_state: RuntimeState<RuneBridgeOpImpl>,
-    ) -> Self {
+    ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
+
+        let signer_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
         let indexer_urls = state_ref.indexer_urls();
-        let signer = state_ref.btc_signer();
+        let signer = state_ref
+            .btc_signer(&signer_strategy)
+            .ok_or(DepositError::SignerNotInitialized)?;
         let consensus_threshold = state_ref.indexer_consensus_threshold();
 
         drop(state_ref);
 
-        Self {
+        Ok(Self {
             rune_state: state,
             runtime_state,
             network,
@@ -150,17 +158,17 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
                 indexer_urls,
                 consensus_threshold,
             ),
-        }
+        })
     }
 
-    pub fn get(runtime_state: RuntimeState<RuneBridgeOpImpl>) -> Self {
+    pub fn get(runtime_state: RuntimeState<RuneBridgeOpImpl>) -> Result<Self, DepositError> {
         Self::new(get_rune_state(), runtime_state)
     }
 }
 
 impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneInputProvider for RuneDeposit<UTXO, INDEX> {
     async fn get_inputs(&self, dst_address: &H160) -> Result<RuneInputs, GetInputsError> {
-        let transit_address = self.get_transit_address(dst_address).await;
+        let transit_address = self.get_transit_address(dst_address).await?;
         let utxos = self.get_deposit_utxos(&transit_address).await?.utxos;
         let mut inputs = RuneInputs::default();
         for utxo in utxos {
@@ -193,7 +201,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<U
         dst_address: &H160,
         utxo: &Utxo,
     ) -> Result<(), UtxoHandlerError> {
-        let transit_address = self.get_transit_address(dst_address).await;
+        let transit_address = self.get_transit_address(dst_address).await?;
         let utxo_response = self
             .get_deposit_utxos(&transit_address)
             .await
@@ -224,13 +232,13 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<U
         dst_address: &H160,
         utxo_runes: Vec<RuneToWrap>,
     ) -> Result<Vec<MintOrder>, UtxoHandlerError> {
-        let address = self.get_transit_address(dst_address).await;
+        let address = self.get_transit_address(dst_address).await?;
         let derivation_path = get_derivation_path_ic(dst_address);
 
         {
             let mut state = self.rune_state.borrow_mut();
             let ledger = state.ledger_mut();
-            let existing = ledger.load_unspent_utxos();
+            let existing = ledger.load_unspent_utxos()?;
 
             if existing
                 .values()
@@ -272,7 +280,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             utxo_response.utxos
         );
 
-        self.filter_out_used_utxos(&mut utxo_response);
+        self.filter_out_used_utxos(&mut utxo_response)?;
 
         log::trace!(
             "Utxos at address {transit_address} after filtering out used utxos: {:?}",
@@ -282,7 +290,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         Ok(utxo_response)
     }
 
-    async fn get_transit_address(&self, eth_address: &H160) -> Address {
+    async fn get_transit_address(&self, eth_address: &H160) -> Result<Address, KeyError> {
         self.signer
             .get_transit_address(eth_address, self.network)
             .await
@@ -393,14 +401,19 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
-    fn filter_out_used_utxos(&self, get_utxos_response: &mut GetUtxosResponse) {
-        let existing = self.rune_state.borrow().ledger().load_unspent_utxos();
+    fn filter_out_used_utxos(
+        &self,
+        get_utxos_response: &mut GetUtxosResponse,
+    ) -> Result<(), KeyError> {
+        let existing = self.rune_state.borrow().ledger().load_unspent_utxos()?;
 
         get_utxos_response.utxos.retain(|utxo| {
             !existing
                 .values()
                 .any(|v| Self::check_already_used_utxo(v, utxo))
-        })
+        });
+
+        Ok(())
     }
 
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {

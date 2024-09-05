@@ -3,9 +3,12 @@ use bridge_did::runes::RuneToWrap;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use thiserror::Error;
+use crate::key::KeyError;
 
 #[derive(Debug, Clone, PartialEq, Error)]
 pub(crate) enum UtxoHandlerError {
+    #[error("key error {0}")]
+    KeyError(#[from] KeyError),
     #[error("failed to connect to IC BTC adapter: {0}")]
     BtcAdapter(String),
     #[error("requested utxo is not in the main branch")]

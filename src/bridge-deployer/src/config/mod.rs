@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+pub use brc20::Brc20BridgeConfig;
 use candid::{CandidType, Principal};
 use clap::{Parser, ValueEnum};
 use eth_signer::sign_strategy;

@@ -96,7 +96,7 @@ impl RuneInfo {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RuneName(Rune);
+pub struct RuneName(pub Rune);
 
 impl RuneName {
     pub fn inner(&self) -> Rune {
