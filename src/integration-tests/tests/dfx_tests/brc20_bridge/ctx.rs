@@ -8,7 +8,7 @@ use bitcoin::{Address, Amount, PrivateKey, Txid};
 use brc20_bridge::brc20_info::Brc20Tick;
 use brc20_bridge::interface::{DepositError, GetAddressError};
 use brc20_bridge::ops::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20DepositRequestData};
-use brc20_bridge::state::Brc20BridgeConfig;
+use brc20_bridge::state::{Brc20BridgeConfig, SchnorrKeyIds};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
@@ -224,6 +224,7 @@ impl Brc20Context {
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
+            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
         };
 
         context

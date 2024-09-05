@@ -17,6 +17,8 @@ use serde::Serialize;
 pub use self::deposit::{Brc20BridgeDepositOp, DepositRequest};
 pub use self::withdraw::Brc20BridgeWithdrawOp;
 use crate::brc20_info::Brc20Tick;
+use crate::canister::get_brc20_state;
+use crate::core::withdrawal::Brc20WithdrawalPayload;
 
 /// BRC20 bridge operations
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -217,7 +219,17 @@ impl Operation for Brc20BridgeOp {
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
-        todo!("withdraw");
+        let memo = event.memo();
+        match Brc20WithdrawalPayload::new(event, &get_brc20_state().borrow()) {
+            Ok(payload) => Some(OperationAction::Create(
+                Self::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)),
+                memo,
+            )),
+            Err(err) => {
+                log::warn!("Invalid withdrawal data: {err:?}");
+                None
+            }
+        }
     }
 
     async fn on_minter_notification(

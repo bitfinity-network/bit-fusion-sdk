@@ -1,3 +1,5 @@
+pub mod schnorr;
+
 use std::cell::RefCell;
 
 use async_trait::async_trait;
@@ -6,10 +8,12 @@ use bitcoin::bip32::{ChildNumber, DerivationPath, Error as Bip32Error, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey};
+use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::BtcTxSigner;
+use schnorr::{ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId};
 use thiserror::Error;
 
 use crate::state::{Brc20State, MasterKey};
@@ -39,15 +43,17 @@ pub const DERIVATION_PATH_PREFIX: u8 = 7;
 pub struct IcBtcSigner {
     master_key: MasterKey,
     network: Network,
+    schnorr_key_id: SchnorrKeyId,
 }
 
 impl IcBtcSigner {
     pub const DERIVATION_PATH_SIZE: u32 = 21 / 3 * 4;
 
-    pub fn new(master_key: MasterKey, network: Network) -> Self {
+    pub fn new(master_key: MasterKey, network: Network, schnorr_key_id: SchnorrKeyId) -> Self {
         Self {
             master_key,
             network,
+            schnorr_key_id,
         }
     }
 }
@@ -92,10 +98,29 @@ impl BtcTxSigner for IcBtcSigner {
 
     async fn sign_with_schnorr(
         &self,
-        _message: Message,
-        _derivation_path: &DerivationPath,
+        message: Message,
+        derivation_path: &DerivationPath,
     ) -> Result<bitcoin::secp256k1::schnorr::Signature, Secp256Error> {
-        Err(Secp256Error::IncorrectSignature)
+        let internal_request = ManagementCanisterSignatureRequest {
+            message: message.as_ref().to_vec(),
+            derivation_path: derivation_path_to_ic(derivation_path.clone()),
+            key_id: self.schnorr_key_id.clone(),
+        };
+
+        let (internal_reply,): (ManagementCanisterSignatureReply,) =
+            ic_exports::ic_cdk::api::call::call_with_payment(
+                Principal::management_canister(),
+                "sign_with_schnorr",
+                (internal_request,),
+                25_000_000_000,
+            )
+            .await
+            .map_err(|e| {
+                log::error!("Failed to call sign_with_schnorr: {:?}", e);
+                Secp256Error::InvalidSignature
+            })?;
+
+        bitcoin::secp256k1::schnorr::Signature::from_slice(&internal_reply.signature)
     }
 }
 

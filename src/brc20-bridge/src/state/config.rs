@@ -1,3 +1,5 @@
+mod schnorr_key_id;
+
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -7,6 +9,7 @@ use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{CellStructure, MemoryId, MemoryManager, StableCell, Storable};
 use serde::Deserialize;
 
+pub use self::schnorr_key_id::SchnorrKeyIds;
 use super::{DEFAULT_DEPOSIT_FEE, DEFAULT_INDEXER_CONSENSUS_THRESHOLD, DEFAULT_MEMPOOL_TIMEOUT};
 use crate::memory::CONFIG_MEMORY_ID;
 
@@ -55,6 +58,8 @@ pub struct Brc20BridgeConfig {
     /// Minimum quantity of indexer nodes required to reach agreement on a
     /// request
     pub indexer_consensus_threshold: u8,
+    /// Schnorr key ID for the management canister
+    pub schnorr_key_id: SchnorrKeyIds,
 }
 
 impl Storable for Brc20BridgeConfig {
@@ -80,6 +85,7 @@ impl Default for Brc20BridgeConfig {
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
             indexer_consensus_threshold: DEFAULT_INDEXER_CONSENSUS_THRESHOLD,
+            schnorr_key_id: SchnorrKeyIds::TestKey1,
         }
     }
 }
@@ -122,6 +128,7 @@ mod test {
             deposit_fee: 100,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 2,
+            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
         };
 
         let bytes = config.to_bytes();
@@ -139,6 +146,7 @@ mod test {
             deposit_fee: 100,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 2,
+            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
         };
 
         let bytes = config.to_bytes();

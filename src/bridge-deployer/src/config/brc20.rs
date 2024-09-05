@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use brc20_bridge::state::SchnorrKeyIds;
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
@@ -55,6 +56,7 @@ impl From<Brc20BridgeConfig> for brc20_bridge::state::Brc20BridgeConfig {
             deposit_fee: value.deposit_fee,
             mempool_timeout: Duration::from_secs(value.mempool_timeout),
             indexer_consensus_threshold: value.indexer_consensus_threshold,
+            schnorr_key_id: SchnorrKeyIds::ProductionKey1,
         }
     }
 }
