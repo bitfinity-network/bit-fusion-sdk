@@ -69,6 +69,9 @@ pub trait OperationContext {
     /// Get signer for transactions, orders, etc...
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
 
+    /// Increments cached nonce value of the bridge in EVM.
+    fn increment_nonce(&self);
+
     /// Send mint transaction with the given `order` to EVM.
     async fn send_mint_transaction(&self, order: &SignedMintOrder) -> BftResult<H256> {
         let signer = self.get_signer()?;
@@ -84,6 +87,8 @@ pub trait OperationContext {
             &order.0,
             evm_params.chain_id as _,
         );
+
+        self.increment_nonce();
 
         let signature = signer.sign_transaction(&(&tx).into()).await?;
         tx.r = signature.r.0;

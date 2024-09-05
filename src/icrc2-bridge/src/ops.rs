@@ -10,7 +10,6 @@ use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
 use did::{H160, H256, U256};
 use ic_exports::ic_kit::RejectionCode;
-use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
@@ -119,11 +118,8 @@ impl Operation for IcrcBridgeOp {
             IcrcBridgeOp::IcrcMintConfirmed { .. } => None,
             _ => Some(
                 TaskOptions::new()
-                    .with_max_retries_policy(3)
-                    .with_backoff_policy(BackoffPolicy::Exponential {
-                        secs: 2,
-                        multiplier: 4,
-                    }),
+                    .with_max_retries_policy(4)
+                    .with_fixed_backoff_policy(2),
             ),
         }
     }

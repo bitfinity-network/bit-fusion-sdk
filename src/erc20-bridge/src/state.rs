@@ -114,6 +114,14 @@ impl OperationContext for SharedEvmState {
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.0.borrow().config.borrow().get_signer()
     }
+
+    fn increment_nonce(&self) {
+        self.0
+            .borrow()
+            .config
+            .borrow_mut()
+            .update_evm_params(|p| p.nonce += 1);
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, CandidType)]

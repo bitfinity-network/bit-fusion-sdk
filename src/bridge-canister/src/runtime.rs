@@ -110,6 +110,13 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.borrow().config.borrow().get_signer()
     }
+
+    fn increment_nonce(&self) {
+        self.borrow()
+            .config
+            .borrow_mut()
+            .update_evm_params(|p| p.nonce += 1)
+    }
 }
 
 impl IcStorage for ConfigStorage {

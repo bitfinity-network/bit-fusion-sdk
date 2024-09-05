@@ -1,7 +1,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use alloy_sol_types::SolCall;
+use bridge_canister::bridge::Operation;
 use bridge_client::BridgeCanisterClient;
+use bridge_did::operation_log::Memo;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{evm_link, BFTBridge};
 use candid::{Encode, Nat, Principal};
@@ -131,11 +133,24 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         Ok((&balance).try_into().expect("balance is too big"))
     }
 
+    async fn check_operation_complete(&self, user: H160, memo: Memo) -> Result<bool> {
+        let client = self.ctx.icrc_bridge_client(self.ctx.admin_name());
+        let Some((_, operation)) = client.get_operation_by_memo_and_user(memo, user).await? else {
+            return Ok(false);
+        };
+
+        if !operation.is_complete() {
+            eprintln!("operataion is not complete: {operation:?}");
+        }
+
+        Ok(operation.is_complete())
+    }
+
     async fn deposit(
         &self,
         to_wallet: &Wallet<'_, SigningKey>,
         info: &BurnInfo<Self::UserId>,
-    ) -> Result<U256> {
+    ) -> Result<Memo> {
         let token_principal = self.tokens[info.base_token_idx];
         let client = self.ctx.icrc_token_client(token_principal, &info.from);
 
@@ -183,10 +198,11 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
         let encoded_reason = Encode!(&reason).unwrap();
 
+        let memo = self.next_memo();
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
-            memo: self.next_memo().into(),
+            memo: memo.into(),
         }
         .abi_encode();
 
@@ -207,11 +223,17 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
                 _ => (),
             }
 
+            if let Err(e) = &call_result {
+                println!("Deposit notify minter call failed: {e:?}");
+            }
+
             call_result?;
             break;
         }
 
-        Ok(info.amount.clone())
+        println!("deposit succeeded");
+
+        Ok(memo)
     }
 
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()> {
