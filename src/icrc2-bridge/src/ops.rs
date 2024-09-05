@@ -3,7 +3,7 @@ use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{self, MintOrder, SignedMintOrder};
+use bridge_did::order::{self, EncodedMintOrder, MintOrder};
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
@@ -29,11 +29,11 @@ pub enum IcrcBridgeOp {
         is_refund: bool,
     },
     SendMintTransaction {
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
         is_refund: bool,
     },
     ConfirmMint {
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
         tx_hash: Option<H256>,
         is_refund: bool,
     },
@@ -48,7 +48,7 @@ pub enum IcrcBridgeOp {
 }
 
 impl IcrcBridgeOp {
-    pub fn get_signed_mint_order(&self, token: &Id256) -> Option<SignedMintOrder> {
+    pub fn get_signed_mint_order(&self, token: &Id256) -> Option<EncodedMintOrder> {
         match self {
             Self::SendMintTransaction { order, .. } if &order.get_src_token_id() == token => {
                 Some(*order)
@@ -287,7 +287,7 @@ impl IcrcBridgeOp {
 
     async fn send_mint_tx(
         ctx: impl OperationContext,
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
         is_refund: bool,
     ) -> BftResult<IcrcBridgeOp> {
         let tx_hash = ctx.send_mint_transaction(&order).await?;

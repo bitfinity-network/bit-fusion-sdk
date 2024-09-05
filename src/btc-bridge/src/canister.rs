@@ -11,7 +11,7 @@ use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::EncodedMintOrder;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -70,7 +70,7 @@ impl BtcBridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
+    ) -> Vec<(u32, EncodedMintOrder)> {
         Self::token_mint_orders(wallet_address, pagination)
     }
 
@@ -81,7 +81,7 @@ impl BtcBridge {
         wallet_address: H160,
         operation_id: u32,
         pagination: Option<Pagination>,
-    ) -> Option<SignedMintOrder> {
+    ) -> Option<EncodedMintOrder> {
         Self::token_mint_orders(wallet_address, pagination)
             .into_iter()
             .find(|(nonce, _)| *nonce == operation_id)
@@ -146,7 +146,7 @@ impl BtcBridge {
     fn token_mint_orders(
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
+    ) -> Vec<(u32, EncodedMintOrder)> {
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
         let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
         get_runtime_state()

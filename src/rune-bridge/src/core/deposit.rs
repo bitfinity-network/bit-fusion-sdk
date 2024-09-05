@@ -7,7 +7,7 @@ use bitcoin::{Address, Network};
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::id256::Id256;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::{EncodedMintOrder, MintOrder};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
@@ -78,11 +78,11 @@ pub struct MintOrderDetails {
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum MintOrderStatus {
     Created {
-        mint_order: SignedMintOrder,
+        mint_order: EncodedMintOrder,
         nonce: u32,
     },
     Sent {
-        mint_order: SignedMintOrder,
+        mint_order: EncodedMintOrder,
         nonce: u32,
         tx_id: H256,
     },
@@ -389,7 +389,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     pub async fn sign_mint_order(
         &self,
         mint_order: MintOrder,
-    ) -> Result<SignedMintOrder, DepositError> {
+    ) -> Result<EncodedMintOrder, DepositError> {
         let signer = self.runtime_state.get_signer().map_err(|err| {
             DepositError::Unavailable(format!("cannot initialize signer: {err:?}"))
         })?;

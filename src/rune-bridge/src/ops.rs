@@ -4,7 +4,7 @@ use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::{EncodedMintOrder, MintOrder};
 use bridge_utils::bft_events::{
     BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
 };
@@ -38,9 +38,12 @@ pub enum RuneBridgeDepositOp {
     /// Sign the mint order
     SignMintOrder(MintOrder),
     /// Send the mint order to the bridge
-    SendMintOrder(SignedMintOrder),
+    SendMintOrder(EncodedMintOrder),
     /// Confirm the mint order
-    ConfirmMintOrder { order: SignedMintOrder, tx_id: H256 },
+    ConfirmMintOrder {
+        order: EncodedMintOrder,
+        tx_id: H256,
+    },
     /// The mint order has been confirmed
     MintOrderConfirmed { data: MintedEventData },
 }
@@ -452,7 +455,7 @@ impl RuneBridgeOp {
         Ok(Self::Deposit(RuneBridgeDepositOp::SendMintOrder(signed)))
     }
 
-    async fn send_mint_order(ctx: RuntimeState<Self>, order: SignedMintOrder) -> BftResult<Self> {
+    async fn send_mint_order(ctx: RuntimeState<Self>, order: EncodedMintOrder) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
         Ok(Self::Deposit(RuneBridgeDepositOp::ConfirmMintOrder {
             order,

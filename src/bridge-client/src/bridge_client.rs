@@ -1,6 +1,6 @@
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::EncodedMintOrder;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -108,7 +108,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
         &self,
         sender: Id256,
         src_token: Id256,
-    ) -> CanisterClientResult<Vec<(u32, SignedMintOrder)>> {
+    ) -> CanisterClientResult<Vec<(u32, EncodedMintOrder)>> {
         self.client()
             .query("list_mint_orders", (sender, src_token))
             .await

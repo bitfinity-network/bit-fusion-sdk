@@ -2,15 +2,12 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use candid::CandidType;
-use did::transaction::Signature;
 use did::{H160, U256};
-use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::utils::keccak256;
 use ic_stable_structures::{Bound, Storable};
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{BftResult, Error};
 use crate::id256::Id256;
 
 /// Data which should be signed and provided to the `BftBridge.mint()` call
@@ -63,7 +60,6 @@ pub struct MintOrder {
 
 impl MintOrder {
     pub const ENCODED_DATA_SIZE: usize = 269;
-    pub const SIGNED_ENCODED_DATA_SIZE: usize = Self::ENCODED_DATA_SIZE + 65;
 
     /// Encodes order data and signs it.
     /// Encoded data layout:
@@ -83,17 +79,13 @@ impl MintOrder {
     ///     197..217 bytes of approve_address,      }
     ///     217..249 bytes of approve_amount,       }
     ///     249..269 bytes of fee_payer,            }
-    ///     269..334 bytes of signature (r - 32 bytes, s - 32 bytes, v - 1 byte)
     /// ]
     /// ```
     ///
     /// All integers encoded in big-endian format.
     /// Signature signs KECCAK hash of the signed data.
-    pub async fn encode_and_sign(
-        &self,
-        signer: &impl TransactionSigner,
-    ) -> BftResult<SignedMintOrder> {
-        let mut buf = [0; Self::SIGNED_ENCODED_DATA_SIZE];
+    pub fn encode(&self) -> EncodedMintOrder {
+        let mut buf = [0; Self::ENCODED_DATA_SIZE];
 
         buf[..32].copy_from_slice(&self.amount.to_big_endian());
         buf[32..64].copy_from_slice(self.sender.0.as_slice());
@@ -110,73 +102,7 @@ impl MintOrder {
         buf[217..249].copy_from_slice(&self.approve_amount.to_big_endian());
         buf[249..269].copy_from_slice(self.fee_payer.0.as_bytes());
 
-        let digest = keccak256(&buf[..Self::ENCODED_DATA_SIZE]);
-
-        // Sign fields data hash.
-        let signature = signer
-            .sign_digest(digest)
-            .await
-            .map_err(|e| Error::Signing(format!("failed to sign MintOrder: {e}")))?;
-
-        // Add signature to the data.
-        let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
-        buf[Self::ENCODED_DATA_SIZE..].copy_from_slice(&signature_bytes);
-
-        Ok(SignedMintOrder(buf))
-    }
-
-    /// Decode Self from bytes.
-    pub fn decode_data(data: &[u8]) -> Option<Self> {
-        if data.len() < Self::ENCODED_DATA_SIZE {
-            return None;
-        }
-
-        let amount = U256::from_big_endian(&data[..32]);
-        let sender = data[32..64].try_into().unwrap(); // exactly 32 bytes, as expected
-        let src_token = data[64..96].try_into().unwrap(); // exactly 32 bytes, as expected
-        let recipient = H160::from_slice(&data[96..116]);
-        let dst_token = H160::from_slice(&data[116..136]);
-        let nonce = u32::from_be_bytes(data[136..140].try_into().unwrap()); // exactly 4 bytes, as expected
-        let sender_chain_id = u32::from_be_bytes(data[140..144].try_into().unwrap()); // exactly 4 bytes, as expected
-        let recipient_chain_id = u32::from_be_bytes(data[144..148].try_into().unwrap()); // exactly 4 bytes, as expected
-        let name = data[148..180].try_into().unwrap(); // exactly 32 bytes, as expected
-        let symbol = data[180..196].try_into().unwrap(); // exactly 16 bytes, as expected
-        let decimals = data[196];
-        let approve_spender = H160::from_slice(&data[197..217]);
-        let approve_amount = U256::from_big_endian(&data[217..249]);
-        let fee_payer = H160::from_slice(&data[249..269]);
-
-        Some(Self {
-            amount,
-            sender,
-            src_token,
-            recipient,
-            dst_token,
-            nonce,
-            sender_chain_id,
-            recipient_chain_id,
-            name,
-            symbol,
-            decimals,
-            approve_spender,
-            approve_amount,
-            fee_payer,
-        })
-    }
-
-    /// Decode Self from bytes.
-    pub fn decode_signed(data: &SignedMintOrder) -> Option<(Self, Signature)> {
-        if data.len() < Self::SIGNED_ENCODED_DATA_SIZE {
-            return None;
-        }
-
-        let decoded_data = Self::decode_data(data.as_ref())?;
-        let signature =
-            ethers_core::types::Signature::try_from(&data[Self::ENCODED_DATA_SIZE..][..65])
-                .ok()?
-                .into();
-
-        Some((decoded_data, signature))
+        EncodedMintOrder(buf)
     }
 }
 
@@ -194,34 +120,30 @@ pub fn fit_str_to_array<const SIZE: usize>(s: &str) -> [u8; SIZE] {
 /// New type for the SignedMintOrder.
 /// Allows to implement `Deserialize + CandidType` traits.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SignedMintOrder(pub [u8; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
+pub struct EncodedMintOrder(pub [u8; MintOrder::ENCODED_DATA_SIZE]);
 
 /// Visitor for `SignedMintOrder` objects deserialization.
 struct SignedMintOrderVisitor;
 
 impl<'v> Visitor<'v> for SignedMintOrderVisitor {
-    type Value = SignedMintOrder;
+    type Value = EncodedMintOrder;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            formatter,
-            "blob of size {}",
-            MintOrder::SIGNED_ENCODED_DATA_SIZE
-        )
+        write!(formatter, "blob of size {}", MintOrder::ENCODED_DATA_SIZE)
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(SignedMintOrder(
+        Ok(EncodedMintOrder(
             v.try_into()
                 .map_err(|_| E::invalid_length(v.len(), &Self))?,
         ))
     }
 }
 
-impl<'de> Deserialize<'de> for SignedMintOrder {
+impl<'de> Deserialize<'de> for EncodedMintOrder {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -230,7 +152,7 @@ impl<'de> Deserialize<'de> for SignedMintOrder {
     }
 }
 
-impl Serialize for SignedMintOrder {
+impl Serialize for EncodedMintOrder {
     fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -239,7 +161,7 @@ impl Serialize for SignedMintOrder {
     }
 }
 
-impl CandidType for SignedMintOrder {
+impl CandidType for EncodedMintOrder {
     fn _ty() -> candid::types::Type {
         candid::types::Type(Rc::new(candid::types::TypeInner::Vec(candid::types::Type(
             Rc::new(candid::types::TypeInner::Nat8),
@@ -254,23 +176,23 @@ impl CandidType for SignedMintOrder {
     }
 }
 
-impl Deref for SignedMintOrder {
-    type Target = [u8; MintOrder::SIGNED_ENCODED_DATA_SIZE];
+impl Deref for EncodedMintOrder {
+    type Target = [u8; MintOrder::ENCODED_DATA_SIZE];
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for SignedMintOrder {
+impl DerefMut for EncodedMintOrder {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl Storable for SignedMintOrder {
+impl Storable for EncodedMintOrder {
     const BOUND: Bound = Bound::Bounded {
-        max_size: MintOrder::SIGNED_ENCODED_DATA_SIZE as _,
+        max_size: MintOrder::ENCODED_DATA_SIZE as _,
         is_fixed_size: true,
     };
 
@@ -279,13 +201,52 @@ impl Storable for SignedMintOrder {
     }
 
     fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Self {
-        Self(<[u8; MintOrder::SIGNED_ENCODED_DATA_SIZE]>::from_bytes(
-            bytes,
-        ))
+        Self(<[u8; MintOrder::ENCODED_DATA_SIZE]>::from_bytes(bytes))
     }
 }
 
-impl SignedMintOrder {
+impl EncodedMintOrder {
+    /// Decode Self from bytes.
+    pub fn decode(&self) -> MintOrder {
+        let amount = U256::from_big_endian(&self[..32]);
+        let sender = self[32..64].try_into().unwrap(); // exactly 32 bytes, as expected
+        let src_token = self[64..96].try_into().unwrap(); // exactly 32 bytes, as expected
+        let recipient = H160::from_slice(&self[96..116]);
+        let dst_token = H160::from_slice(&self[116..136]);
+        let nonce = u32::from_be_bytes(self[136..140].try_into().unwrap()); // exactly 4 bytes, as expected
+        let sender_chain_id = u32::from_be_bytes(self[140..144].try_into().unwrap()); // exactly 4 bytes, as expected
+        let recipient_chain_id = u32::from_be_bytes(self[144..148].try_into().unwrap()); // exactly 4 bytes, as expected
+        let name = self[148..180].try_into().unwrap(); // exactly 32 bytes, as expected
+        let symbol = self[180..196].try_into().unwrap(); // exactly 16 bytes, as expected
+        let decimals = self[196];
+        let approve_spender = H160::from_slice(&self[197..217]);
+        let approve_amount = U256::from_big_endian(&self[217..249]);
+        let fee_payer = H160::from_slice(&self[249..269]);
+
+        MintOrder {
+            amount,
+            sender,
+            src_token,
+            recipient,
+            dst_token,
+            nonce,
+            sender_chain_id,
+            recipient_chain_id,
+            name,
+            symbol,
+            decimals,
+            approve_spender,
+            approve_amount,
+            fee_payer,
+        }
+    }
+
+    /// Returns digest of the encoded data.
+    /// The digest usually used for signing.
+    pub fn digest(&self) -> [u8; 32] {
+        keccak256(&self.0)
+    }
+
     /// Returns mint amount.
     pub fn get_amount(&self) -> U256 {
         U256::from_big_endian(&self.0[..32])
@@ -360,13 +321,12 @@ impl SignedMintOrder {
 #[cfg(test)]
 mod tests {
     use did::{H160, U256};
-    use eth_signer::sign_strategy::SigningStrategy;
 
     use super::MintOrder;
     use crate::id256::Id256;
 
     #[tokio::test]
-    async fn signed_mint_order_getters() {
+    async fn encoded_mint_order_getters() {
         let order = MintOrder {
             amount: U256::one(),
             sender: Id256::from_evm_address(&H160::from_slice(&[1; 20]), 1),
@@ -384,12 +344,7 @@ mod tests {
             fee_payer: H160::from_slice(&[6; 20]),
         };
 
-        let signer = SigningStrategy::Local {
-            private_key: [42; 32],
-        }
-        .make_signer(0)
-        .unwrap();
-        let signed_order = order.encode_and_sign(&signer).await.unwrap();
+        let signed_order = order.encode();
 
         assert_eq!(order.amount, signed_order.get_amount());
         assert_eq!(order.sender, signed_order.get_sender_id());

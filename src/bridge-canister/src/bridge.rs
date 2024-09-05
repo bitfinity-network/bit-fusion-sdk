@@ -3,7 +3,7 @@
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::EncodedMintOrder;
 use bridge_utils::bft_events::{
     self, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
 };
@@ -70,7 +70,7 @@ pub trait OperationContext {
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
 
     /// Send mint transaction with the given `order` to EVM.
-    async fn send_mint_transaction(&self, order: &SignedMintOrder) -> BftResult<H256> {
+    async fn send_mint_transaction(&self, order: &EncodedMintOrder) -> BftResult<H256> {
         let signer = self.get_signer()?;
         let sender = signer.get_address().await?;
         let bridge_contract = self.get_bridge_contract_address()?;

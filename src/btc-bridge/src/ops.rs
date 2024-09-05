@@ -5,7 +5,7 @@ use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::{EncodedMintOrder, MintOrder};
 use bridge_did::reason::BtcDeposit;
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use candid::{CandidType, Decode, Principal};
@@ -46,10 +46,10 @@ pub enum BtcBridgeOp {
     },
     MintErc20 {
         eth_address: H160,
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
     },
     ConfirmErc20Mint {
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
         eth_address: H160,
     },
     Erc20MintConfirmed(MintedEventData),
@@ -245,7 +245,7 @@ impl Operation for BtcBridgeOp {
 }
 
 impl BtcBridgeOp {
-    pub fn get_signed_mint_order(&self) -> Option<SignedMintOrder> {
+    pub fn get_signed_mint_order(&self) -> Option<EncodedMintOrder> {
         match self {
             Self::ConfirmErc20Mint { order, .. } => Some(*order),
             Self::MintErc20 { order, .. } => Some(*order),
@@ -381,7 +381,7 @@ impl BtcBridgeOp {
         eth_address: &H160,
         nonce: u32,
         amount: u64,
-    ) -> BftResult<SignedMintOrder> {
+    ) -> BftResult<EncodedMintOrder> {
         let state = get_state();
 
         log::debug!(
@@ -427,7 +427,7 @@ impl BtcBridgeOp {
         eth_address: H160,
         amount: u64,
         nonce: u32,
-    ) -> BftResult<SignedMintOrder> {
+    ) -> BftResult<EncodedMintOrder> {
         log::trace!("preparing mint order");
 
         let (signer, mint_order) = {

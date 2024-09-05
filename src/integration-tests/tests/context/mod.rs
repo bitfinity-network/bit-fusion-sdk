@@ -7,7 +7,7 @@ use std::time::Duration;
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::EncodedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
@@ -757,7 +757,7 @@ pub trait TestContext {
         &self,
         wallet: &Wallet<'_, SigningKey>,
         bridge: &H160,
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
     ) -> Result<TransactionReceipt> {
         let input = BFTBridge::mintCall {
             encodedOrder: order.0.to_vec().into(),

@@ -13,7 +13,7 @@ use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::EncodedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BFTBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
@@ -1066,7 +1066,7 @@ impl CkBtcSetup {
         Ok(())
     }
 
-    pub fn list_mint_orders(&self, eth_address: &H160) -> Vec<(u32, SignedMintOrder)> {
+    pub fn list_mint_orders(&self, eth_address: &H160) -> Vec<(u32, EncodedMintOrder)> {
         let payload = Encode!(eth_address).unwrap();
         let result = self
             .env()
@@ -1077,11 +1077,11 @@ impl CkBtcSetup {
             )
             .expect("list_mint_orders call failed");
 
-        Decode!(&result.bytes(), Vec<(u32, SignedMintOrder)>)
+        Decode!(&result.bytes(), Vec<(u32, EncodedMintOrder)>)
             .expect("failed to decode list_mint_orders result")
     }
 
-    pub fn get_mint_order(&self, eth_address: &H160, nonce: u32) -> Option<SignedMintOrder> {
+    pub fn get_mint_order(&self, eth_address: &H160, nonce: u32) -> Option<EncodedMintOrder> {
         let payload = Encode!(eth_address, &nonce).unwrap();
         let result = self
             .env()
@@ -1092,7 +1092,7 @@ impl CkBtcSetup {
             )
             .expect("get_mint_order call failed");
 
-        Decode!(&result.bytes(), Option<SignedMintOrder>)
+        Decode!(&result.bytes(), Option<EncodedMintOrder>)
             .expect("failed to decode list_mint_orders result")
     }
 

@@ -3,7 +3,7 @@ use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::BftResult;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::{EncodedMintOrder, MintOrder};
 use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_bridge::{BridgeSide, EvmParams};
 use candid::CandidType;
@@ -27,9 +27,9 @@ pub struct Erc20BridgeOp {
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Erc20OpStage {
     SignMintOrder(MintOrder),
-    SendMintTransaction(SignedMintOrder),
+    SendMintTransaction(EncodedMintOrder),
     ConfirmMint {
-        order: SignedMintOrder,
+        order: EncodedMintOrder,
         tx_hash: Option<H256>,
     },
     TokenMintConfirmed(MintedEventData),
@@ -167,7 +167,7 @@ impl Operation for Erc20BridgeOp {
 
 impl Erc20OpStage {
     /// Returns signed mint order if the stage contains it.
-    pub fn get_signed_mint_order(&self) -> Option<&SignedMintOrder> {
+    pub fn get_signed_mint_order(&self) -> Option<&EncodedMintOrder> {
         match self {
             Erc20OpStage::SignMintOrder(_) => None,
             Erc20OpStage::SendMintTransaction(order) => Some(order),
@@ -208,7 +208,7 @@ impl Erc20OpStage {
         Ok(next_op)
     }
 
-    async fn send_mint_tx(ctx: impl OperationContext, order: SignedMintOrder) -> BftResult<Self> {
+    async fn send_mint_tx(ctx: impl OperationContext, order: EncodedMintOrder) -> BftResult<Self> {
         log::trace!("sending mint transaction");
 
         let tx_hash = ctx.send_mint_transaction(&order).await?;
