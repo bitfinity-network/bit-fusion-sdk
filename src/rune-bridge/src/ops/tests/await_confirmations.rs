@@ -4,6 +4,7 @@ use bridge_did::error::Error;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::MockContext;
+use ordinals::Rune;
 use snapbox::{assert_data_eq, str};
 
 use crate::core::utxo_handler::test::TestUtxoHandler;
@@ -24,10 +25,10 @@ fn get_utxo() -> Utxo {
 
 fn get_to_wrap(count: usize) -> Vec<RuneToWrap> {
     let mut result = vec![];
-    for _ in 0..count {
+    for i in 0..count {
         result.push(RuneToWrap {
             rune_info: RuneInfo {
-                name: RuneName::from_str("A").unwrap(),
+                name: Rune((100500 + i) as u128).into(),
                 decimals: 0,
                 block: 0,
                 tx: 0,
