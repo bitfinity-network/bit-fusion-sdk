@@ -3,18 +3,18 @@ name = "@openzeppelin-contracts"
 version = "5.0.2"
 source = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin-contracts/5_0_2_14-03-2024_06:11:59_contracts.zip"
 checksum = "8bc4f0acc7c187771b878d46f7de4bfad1acad2eb5d096d9d05d34035853f5c3"
-integrity = "08d52599cc915d813d35f34a7d032d41276fde99bf2a2aadc8d55dcf456500c3"
+integrity = "55881f6114aa36158566ef52b486d9d96b217c3e47d0e24bbd4994a8cfb5ee7c"
 
 [[dependencies]]
 name = "@openzeppelin-contracts-upgradeable"
 version = "5.0.2"
 source = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin-contracts-upgradeable/5_0_2_14-03-2024_06:12:07_contracts-upgradeable.zip"
 checksum = "fb3f8db8541fc01636f91b0e7d9dd6f450f1bf7e2b4a17e96caf6e779ace8f5b"
-integrity = "2d6d82411d38ee418e1dd7eabb6b95ceda1262ca1ecec0f6ae8611b4945db9c2"
+integrity = "4bded842e12902cca59a500494d26586b3baea76b59150fd4e2b1d29078a2e71"
 
 [[dependencies]]
 name = "forge-std"
 version = "1.9.2"
 source = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_2_06-08-2024_17:31:25_forge-std-1.9.2.zip"
 checksum = "20fd008c7c69b6c737cc0284469d1c76497107bc3e004d8381f6d8781cb27980"
-integrity = "bd7dfb694882ddb0127927d1258c07fef28289c2fa5a96bd539e309c72846458"
+integrity = "f49457fb6591f0dfd8b59e02e6eb4508a115ef08a86b0803feb0a3939d82d783"

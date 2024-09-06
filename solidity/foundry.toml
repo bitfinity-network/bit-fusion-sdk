@@ -33,6 +33,8 @@ forge-std = "1.9.2"
 
 [soldeer]
 # whether soldeer manages remappings
-remappings_generated = false
+remappings_generate = false
+# whether soldeer re-generates all remappings when installing, updating or uninstalling deps
 remappings_regenerate = false
+# whether to suffix the remapping with the version: `name-a.b.c`
 remappings_version = false
