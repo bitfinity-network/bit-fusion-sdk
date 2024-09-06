@@ -9,7 +9,8 @@ use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdr
 use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 use candid::{CandidType, Decode, Deserialize};
-use did::H160;
+use did::{H160, H256};
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
@@ -68,11 +69,12 @@ impl Operation for RuneBridgeOpImpl {
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)) => {
                 log::debug!("RuneBridgeOp::SignMintOrder {mint_order:?}");
-                Self::sign_mint_order(ctx, id.nonce(), mint_order).await
+                let signer = ctx.get_signer()?;
+                Self::sign_mint_order(&signer, id.nonce(), mint_order).await
             }
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(mint_order)) => {
-                log::debug!("RuneBridgeOp::SendMintOrder {mint_order:?}");
-                Self::send_mint_order(ctx, mint_order).await
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
+                log::debug!("RuneBridgeOp::SendMintOrder {order:?}");
+                Self::send_mint_order(&ctx, order).await
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => {
                 Err(Error::FailedToProgress(
@@ -396,26 +398,24 @@ impl RuneBridgeOpImpl {
     }
 
     async fn sign_mint_order(
-        ctx: RuntimeState<Self>,
+        signer: &impl TransactionSigner,
         nonce: u32,
         mut mint_order: MintOrder,
     ) -> BftResult<Self> {
         // update nonce
         mint_order.nonce = nonce;
 
-        let deposit = RuneDeposit::get(ctx)
-            .map_err(|err| Error::FailedToProgress(format!("cannot get deposit: {err:?}")))?;
-        let signed = deposit
-            .sign_mint_order(mint_order)
-            .await
-            .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
+        let signed = mint_order.encode_and_sign(signer).await?;
 
         Ok(Self(RuneBridgeOp::Deposit(
             RuneBridgeDepositOp::SendMintOrder(signed),
         )))
     }
 
-    async fn send_mint_order(ctx: RuntimeState<Self>, order: SignedMintOrder) -> BftResult<Self> {
+    async fn send_mint_order(
+        ctx: &impl OperationContext,
+        order: SignedMintOrder,
+    ) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
         Ok(Self(RuneBridgeOp::Deposit(
             RuneBridgeDepositOp::ConfirmMintOrder { order, tx_id },
