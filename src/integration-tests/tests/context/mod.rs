@@ -1,4 +1,5 @@
 mod evm_rpc_canister;
+pub mod stress;
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -43,7 +44,7 @@ use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 use alloy_sol_types::{SolCall, SolConstructor};
-use bridge_client::{Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
+use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::MinterNotificationType;
@@ -95,14 +96,27 @@ pub trait TestContext {
         RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
+    fn brc20_bridge_client(&self, caller: &str) -> Brc20BridgeClient<Self::Client> {
+        Brc20BridgeClient::new(self.client(self.canisters().brc20_bridge(), caller))
+    }
+
+    /// Returns client for the ICRC token canister.
+    fn icrc_token_client(
+        &self,
+        canister: Principal,
+        caller: &str,
+    ) -> IcrcCanisterClient<Self::Client> {
+        IcrcCanisterClient::new(self.client(canister, caller))
+    }
+
     /// Returns client for the ICRC token 1 canister.
     fn icrc_token_1_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_1(), caller))
+        self.icrc_token_client(self.canisters().token_1(), caller)
     }
 
     /// Returns client for the ICRC token 2 canister.
     fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
-        IcrcCanisterClient::new(self.client(self.canisters().token_2(), caller))
+        self.icrc_token_client(self.canisters().token_2(), caller)
     }
 
     /// Sends tx with notification to EVMc.
@@ -595,6 +609,25 @@ pub trait TestContext {
         Ok((hash, receipt))
     }
 
+    /// Calls contract in the evm_client without waiting for it's receipt.
+    async fn call_contract_without_waiting(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        contract: &H160,
+        input: Vec<u8>,
+        amount: u128,
+    ) -> Result<H256> {
+        let evm_client = self.evm_client(self.admin_name());
+        let from: H160 = wallet.address().into();
+        let nonce = evm_client.account_basic(from.clone()).await?.nonce;
+
+        let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
+
+        let hash = evm_client.send_raw_transaction(call_tx).await??;
+
+        Ok(hash)
+    }
+
     /// Creates wrapped token in EVMc by calling `BFTBridge:::deploy_wrapped_token()`.
     async fn create_wrapped_token(
         &self,
@@ -763,14 +796,25 @@ pub trait TestContext {
         }
         .abi_encode();
 
-        let results = self
-            .call_contract_on_evm(evm_client, wallet, token, input, 0)
-            .await?;
-        let output = results.1.output.unwrap();
-
-        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&output, true)
+        let response = evm_client
+            .eth_call(
+                Some(wallet.address().into()),
+                Some(token.clone()),
+                None,
+                3_000_000,
+                None,
+                Some(input.into()),
+            )
+            .await
             .unwrap()
-            ._0;
+            .unwrap();
+
+        let balance = WrappedToken::balanceOfCall::abi_decode_returns(
+            &hex::decode(response.trim_start_matches("0x")).unwrap(),
+            true,
+        )
+        .unwrap()
+        ._0;
         Ok(balance.to())
     }
 
@@ -1013,6 +1057,7 @@ pub trait TestContext {
             CanisterType::BtcBridge => {
                 todo!()
             }
+            CanisterType::Brc20Bridge => {}
             CanisterType::RuneBridge => {}
         }
     }
@@ -1330,6 +1375,13 @@ impl TestCanisters {
             .expect("rune bridge canister should be initialized (see `TestContext::new()`)")
     }
 
+    pub fn brc20_bridge(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::Brc20Bridge)
+            .expect("brc20 bridge canister should be initialized (see `TestContext::new()`)")
+    }
+
     pub fn set(&mut self, canister_type: CanisterType, principal: Principal) {
         self.0.insert(canister_type, principal);
     }
@@ -1348,20 +1400,21 @@ impl TestCanisters {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CanisterType {
+    Brc20Bridge,
+    Btc,
+    BtcBridge,
+    CkBtcMinter,
+    Erc20Bridge,
     Evm,
     EvmRpcCanister,
     ExternalEvm,
+    Icrc1Ledger,
+    Icrc2Bridge,
+    Kyt,
+    RuneBridge,
     Signature,
     Token1,
     Token2,
-    Icrc2Bridge,
-    Erc20Bridge,
-    Btc,
-    CkBtcMinter,
-    Kyt,
-    Icrc1Ledger,
-    BtcBridge,
-    RuneBridge,
 }
 
 impl CanisterType {
@@ -1400,6 +1453,12 @@ impl CanisterType {
         CanisterType::Icrc1Ledger,
     ];
 
+    pub const BRC20_CANISTER_SET: [CanisterType; 3] = [
+        CanisterType::Brc20Bridge,
+        CanisterType::Evm,
+        CanisterType::Signature,
+    ];
+
     pub const RUNE_CANISTER_SET: [CanisterType; 3] = [
         CanisterType::Evm,
         CanisterType::Signature,
@@ -1408,20 +1467,21 @@ impl CanisterType {
 
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
+            CanisterType::Brc20Bridge => get_brc20_bridge_canister_bytecode().await,
+            CanisterType::Btc => get_btc_canister_bytecode().await,
+            CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
+            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
+            CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
             CanisterType::EvmRpcCanister => get_evm_rpc_canister_bytecode().await,
             CanisterType::ExternalEvm => get_evm_testnet_canister_bytecode().await,
+            CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
+            CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_bytecode().await,
+            CanisterType::Kyt => get_kyt_canister_bytecode().await,
+            CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
-            CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_bytecode().await,
-            CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
-            CanisterType::Btc => get_btc_canister_bytecode().await,
-            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
-            CanisterType::Kyt => get_kyt_canister_bytecode().await,
-            CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
-            CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
-            CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
         }
     }
 }

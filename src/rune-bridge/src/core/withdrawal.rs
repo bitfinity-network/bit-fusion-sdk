@@ -18,7 +18,7 @@ use ord_rs::OrdTransactionBuilder;
 use ordinals::RuneId;
 use serde::{Deserializer, Serialize};
 
-use crate::canister::get_rune_state;
+use crate::canister::{get_rune_state, get_runtime_state};
 use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::WithdrawError;
@@ -156,24 +156,32 @@ pub(crate) struct Withdrawal<UTXO: UtxoProvider> {
 }
 
 impl Withdrawal<IcUtxoProvider> {
-    pub fn new(state: Rc<RefCell<RuneState>>) -> Self {
+    pub fn new(state: Rc<RefCell<RuneState>>) -> Result<Self, WithdrawError> {
         let state_ref = state.borrow();
+
+        let signing_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
-        let signer = state_ref.btc_signer();
+        let signer = state_ref
+            .btc_signer(&signing_strategy)
+            .ok_or(WithdrawError::SignerNotInitialized)?;
 
         drop(state_ref);
 
-        Self {
+        Ok(Self {
             state,
             network,
             signer,
             utxo_provider: IcUtxoProvider::new(ic_network),
-        }
+        })
     }
 
-    pub fn get() -> Self {
+    pub fn get() -> Result<Self, WithdrawError> {
         Self::new(get_rune_state())
     }
 }
@@ -194,9 +202,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
         let fee_rate = self.get_fee_rate().await?;
 
-        let unspent_utxo_info = self.state.borrow().ledger().load_unspent_utxos();
-        let funding_address = self.get_transit_address(&sender).await;
-        let rune_change_address = self.get_change_address().await;
+        let unspent_utxo_info = self.state.borrow().ledger().load_unspent_utxos()?;
+        let funding_address = self.get_transit_address(&sender).await?;
+        let rune_change_address = self.get_change_address().await?;
 
         // get rune utxos
         let mut input_utxos: Vec<_> = unspent_utxo_info
@@ -234,7 +242,8 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let dst_address = dst_address.assume_checked();
 
         // Get the utxos that can fund the transaction with the minimum number of utxos
-        let funding_utxos: Vec<_> = self
+        let mut funding_tx_inputs = vec![];
+        for utxo in self
             .get_greedy_funding_utxos(GetGreedyFundingUtxosArgs {
                 rune_utxos_count: input_utxos.len(),
                 funding_utxos,
@@ -247,7 +256,8 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             })
             .ok_or(WithdrawError::InsufficientFunds)?
             .into_iter()
-            .map(|utxo| TxInputInfo {
+        {
+            funding_tx_inputs.push(TxInputInfo {
                 outpoint: OutPoint {
                     txid: Txid::from_slice(&utxo.outpoint.txid).unwrap(),
                     vout: utxo.outpoint.vout,
@@ -256,11 +266,11 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
                     value: Amount::from_sat(utxo.value),
                     script_pubkey: funding_address.script_pubkey(),
                 },
-                derivation_path: get_derivation_path(&sender),
-            })
-            .collect();
+                derivation_path: get_derivation_path(&sender)?,
+            });
+        }
 
-        input_utxos.extend(funding_utxos);
+        input_utxos.extend(funding_tx_inputs);
         log::info!("input_utxos utxos: {}", input_utxos.len());
         log::debug!("input_utxos: {input_utxos:?}");
 
@@ -288,8 +298,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
     pub async fn send_transaction(&self, tx: Transaction) -> Result<(), WithdrawError> {
         self.utxo_provider.send_tx(&tx).await?;
-
-        let change_address = self.get_change_address().await;
+        let change_address = self.get_change_address().await?;
 
         const CHANGE_OUTPOINT_INDEX: usize = 1;
         // Make sure that the transaction builder code is not change and the change outpoint
@@ -318,10 +327,11 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         Ok(())
     }
 
-    async fn get_transit_address(&self, eth_address: &H160) -> Address {
+    async fn get_transit_address(&self, eth_address: &H160) -> Result<Address, WithdrawError> {
         self.signer
             .get_transit_address(eth_address, self.network)
             .await
+            .map_err(WithdrawError::from)
     }
 
     /// Build a withdrawal transaction.
@@ -333,8 +343,23 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             return Err(WithdrawError::NoInputs);
         }
 
-        let public_key = self.state.borrow().public_key();
-        let wallet = self.state.borrow().wallet();
+        let public_key = self
+            .state
+            .borrow()
+            .public_key()
+            .ok_or(WithdrawError::SignerNotInitialized)?;
+
+        let signing_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
+
+        let wallet = self
+            .state
+            .borrow()
+            .wallet(&signing_strategy)
+            .ok_or(WithdrawError::SignerNotInitialized)?;
 
         let builder = OrdTransactionBuilder::new(public_key, ScriptType::P2WSH, wallet);
 
@@ -361,7 +386,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         Ok(signed_tx)
     }
 
-    async fn get_change_address(&self) -> Address {
+    async fn get_change_address(&self) -> Result<Address, WithdrawError> {
         self.get_transit_address(&H160::default()).await
     }
 

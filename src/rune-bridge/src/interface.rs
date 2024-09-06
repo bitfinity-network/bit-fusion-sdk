@@ -7,6 +7,7 @@ use ordinals::Pile;
 use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;
+use crate::key::KeyError;
 use crate::rune_info::RuneName;
 
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
@@ -55,9 +56,15 @@ pub enum Erc20MintError {
     NothingToMint,
 }
 
-#[derive(Debug, Clone, Copy, CandidType, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub enum GetAddressError {
-    Derivation,
+    Key(String),
+}
+
+impl From<KeyError> for GetAddressError {
+    fn from(e: KeyError) -> Self {
+        GetAddressError::Key(e.to_string())
+    }
 }
 
 #[derive(Debug, Clone, CandidType, Deserialize)]
@@ -74,6 +81,8 @@ pub enum DepositError {
     UtxosNotConfirmed,
     NoDstTokenAddress,
     UtxoAlreadyUsed,
+    SignerNotInitialized,
+    KeyError(String),
     InvalidAmounts {
         requested: HashMap<RuneName, u128>,
         actual: HashMap<RuneName, u128>,
@@ -92,8 +101,15 @@ pub enum DepositError {
     Evm(String),
 }
 
+impl From<KeyError> for DepositError {
+    fn from(e: KeyError) -> Self {
+        DepositError::KeyError(e.to_string())
+    }
+}
+
 #[derive(Debug, Clone, CandidType, Deserialize)]
 pub enum WithdrawError {
+    SignerNotInitialized,
     NoInputs,
     TransactionCreation,
     TransactionSigning,
@@ -104,6 +120,13 @@ pub enum WithdrawError {
     InsufficientFunds,
     InvalidRequest(String),
     InternalError(String),
+    KeyError(String),
+}
+
+impl From<KeyError> for WithdrawError {
+    fn from(e: KeyError) -> Self {
+        WithdrawError::KeyError(e.to_string())
+    }
 }
 
 #[derive(Debug, Copy, Clone, CandidType, Deserialize, Hash, PartialEq, Eq)]

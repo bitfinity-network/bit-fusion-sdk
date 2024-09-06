@@ -22,7 +22,10 @@ ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
-ic-canister-client = { workspace = true, features = ["pocket-ic-client", "ic-agent-client"] }
+ic-canister-client = { workspace = true, features = [
+  "pocket-ic-client",
+  "ic-agent-client",
+] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
@@ -33,9 +36,11 @@ ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
+rust_decimal = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+futures = { workspace = true }
 
 # state machine tests deps
 ic-base-types = { workspace = true, optional = true }
@@ -50,6 +55,7 @@ ic-state-machine-tests = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+brc20-bridge = { path = "../brc20-bridge" }
 btc-bridge = { path = "../btc-bridge" }
 erc20-bridge = { path = "../erc20-bridge" }
 ic-test-utils = { workspace = true }
