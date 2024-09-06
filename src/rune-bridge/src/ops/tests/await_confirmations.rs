@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bridge_did::error::Error;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
@@ -9,8 +7,8 @@ use snapbox::{assert_data_eq, str};
 
 use crate::core::utxo_handler::test::TestUtxoHandler;
 use crate::core::utxo_handler::{RuneToWrap, UtxoHandlerError};
-use crate::ops::{tests, RuneBridgeOp};
-use crate::rune_info::{RuneInfo, RuneName};
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp};
+use crate::rune_info::RuneInfo;
 
 fn get_utxo() -> Utxo {
     Utxo {
@@ -143,7 +141,10 @@ async fn await_confirmations_one_mint_order() {
         panic!("Wrong result: {result:?}");
     };
 
-    assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
+    assert!(matches!(
+        operation,
+        RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder { .. })
+    ));
 }
 
 #[tokio::test]
@@ -174,7 +175,10 @@ async fn await_confirmations_multiple_mint_orders() {
 
     for operation_id in new_operation_ids {
         let operation = state.borrow().operations.get(operation_id).unwrap();
-        assert!(matches!(operation, RuneBridgeOp::SignMintOrder { .. }));
+        assert!(matches!(
+            operation,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder { .. })
+        ));
     }
 
     assert_eq!(wallet_address, tests::sender());

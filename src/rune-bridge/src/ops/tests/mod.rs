@@ -91,7 +91,7 @@ pub mod minter_notification {
     use candid::Encode;
 
     use crate::ops::tests::{dst_tokens, test_state, token_address};
-    use crate::ops::{RuneBridgeOp, RuneDepositRequestData};
+    use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneDepositRequestData};
 
     fn test_deposit_data() -> RuneDepositRequestData {
         RuneDepositRequestData {
@@ -150,11 +150,11 @@ pub mod minter_notification {
         assert_eq!(
             result,
             Some(OperationAction::Create(
-                RuneBridgeOp::AwaitInputs {
+                RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                     dst_address: expected.dst_address,
                     dst_tokens: expected.dst_tokens,
                     requested_amounts: expected.amounts,
-                },
+                }),
                 None,
             ))
         );

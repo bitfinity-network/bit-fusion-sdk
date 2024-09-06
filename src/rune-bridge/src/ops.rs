@@ -118,17 +118,14 @@ impl Operation for RuneBridgeOp {
                 )
                 .await
             }
-            RuneBridgeOp::SignMintOrder {
-                dst_address,
-                mint_order,
-            } => {
-                log::debug!("RuneBridgeOp::SignMintOrder {dst_address} {mint_order:?}");
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)) => {
+                log::debug!("RuneBridgeOp::SignMintOrder {mint_order:?}");
                 let signer = ctx.get_signer()?;
-                Self::sign_mint_order(&signer, id.nonce(), dst_address, mint_order).await
+                Self::sign_mint_order(&signer, id.nonce(), mint_order).await
             }
-            RuneBridgeOp::SendMintOrder { dst_address, order } => {
-                log::debug!("RuneBridgeOp::SendMintOrder {dst_address} {order:?}");
-                Self::send_mint_order(&ctx, dst_address, order).await
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
+                log::debug!("RuneBridgeOp::SendMintOrder {order:?}");
+                Self::send_mint_order(&ctx, order).await
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => {
                 Err(Error::FailedToProgress(
@@ -454,7 +451,6 @@ impl RuneBridgeOp {
 
     async fn send_mint_order(
         ctx: &impl OperationContext,
-        dst_address: H160,
         order: SignedMintOrder,
     ) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;

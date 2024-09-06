@@ -8,8 +8,7 @@ use eth_signer::WalletError;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
 use snapbox::{assert_data_eq, str};
 
-use crate::ops::tests::sender;
-use crate::ops::{tests, RuneBridgeOp};
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp};
 
 pub(super) struct TestSigner {
     signing_error: Option<String>,
@@ -65,7 +64,7 @@ impl TransactionSigner for TestSigner {
 async fn returns_error_if_cannot_sign() {
     let signer = TestSigner::with_err("something strange");
     let mint_order = tests::test_mint_order();
-    let err = RuneBridgeOp::sign_mint_order(&signer, 3, sender(), mint_order)
+    let err = RuneBridgeOp::sign_mint_order(&signer, 3, mint_order)
         .await
         .expect_err("signing was unexpectedly successful");
 
@@ -82,14 +81,13 @@ async fn returns_correct_operation_and_sets_nonce() {
     let signer = TestSigner::ok();
     let mint_order = tests::test_mint_order();
     const NONCE: u32 = 42;
-    let op = RuneBridgeOp::sign_mint_order(&signer, NONCE, sender(), mint_order)
+    let op = RuneBridgeOp::sign_mint_order(&signer, NONCE, mint_order)
         .await
         .expect("signing failed unexpectedly");
 
-    let RuneBridgeOp::SendMintOrder { dst_address, order } = op else {
+    let RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) = op else {
         panic!("Unexpected resulting operation: {op:?}");
     };
 
-    assert_eq!(dst_address, sender());
     assert_eq!(order.get_nonce(), NONCE);
 }

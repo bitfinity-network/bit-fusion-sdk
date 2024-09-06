@@ -8,7 +8,7 @@ use snapbox::{assert_data_eq, str};
 use crate::core::rune_inputs::mock::TestRuneInputProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput};
 use crate::core::utxo_handler::RuneToWrap;
-use crate::ops::{tests, RuneBridgeOp};
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp};
 use crate::rune_info::RuneName;
 
 #[tokio::test]
@@ -207,15 +207,17 @@ async fn await_inputs_returns_correct_operation_single_input() {
     .await;
     assert_eq!(
         result,
-        Ok(RuneBridgeOp::AwaitConfirmations {
-            dst_address: tests::sender(),
-            utxo: input.utxo,
-            runes_to_wrap: vec![RuneToWrap {
-                rune_info: provider.rune_info(&RuneName::from_str("A").unwrap()),
-                amount: 1000,
-                wrapped_address: tests::token_address(3),
-            }],
-        })
+        Ok(RuneBridgeOp::Deposit(
+            RuneBridgeDepositOp::AwaitConfirmations {
+                dst_address: tests::sender(),
+                utxo: input.utxo,
+                runes_to_wrap: vec![RuneToWrap {
+                    rune_info: provider.rune_info(&RuneName::from_str("A").unwrap()),
+                    amount: 1000,
+                    wrapped_address: tests::token_address(3),
+                }],
+            }
+        ))
     );
 }
 

@@ -8,8 +8,8 @@ use eth_signer::sign_strategy::TransactionSigner;
 use snapbox::{assert_data_eq, str};
 
 use crate::ops::tests::sign_mint_order::TestSigner;
-use crate::ops::tests::{sender, test_signed_order};
-use crate::ops::RuneBridgeOp;
+use crate::ops::tests::test_signed_order;
+use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp};
 
 struct TestOperationContext {
     result: BftResult<H256>,
@@ -56,7 +56,7 @@ impl OperationContext for TestOperationContext {
 #[tokio::test]
 async fn returns_error_if_fails_to_send() {
     let ctx = TestOperationContext::err(Error::EvmRequestFailed("too many hedgehogs".to_string()));
-    let err = RuneBridgeOp::send_mint_order(&ctx, sender(), test_signed_order().await)
+    let err = RuneBridgeOp::send_mint_order(&ctx, test_signed_order().await)
         .await
         .expect_err("operation succeeded unexpectedly");
 
@@ -71,20 +71,14 @@ async fn return_correct_operation_if_success() {
     const SEED: u8 = 47;
     let ctx = TestOperationContext::ok(SEED);
     let signed_order = test_signed_order().await;
-    let op = RuneBridgeOp::send_mint_order(&ctx, sender(), signed_order)
+    let op = RuneBridgeOp::send_mint_order(&ctx, signed_order)
         .await
         .expect("operation failed");
 
-    let RuneBridgeOp::ConfirmMintOrder {
-        dst_address,
-        order,
-        tx_id,
-    } = op
-    else {
+    let RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { order, tx_id }) = op else {
         panic!("Unexpected operation: {op:?}");
     };
 
-    assert_eq!(dst_address, sender());
     assert_eq!(order, signed_order);
     assert_eq!(tx_id, TestOperationContext::hash(SEED));
 }

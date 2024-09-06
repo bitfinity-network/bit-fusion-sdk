@@ -4,7 +4,7 @@ use bridge_canister::bridge::{Operation, OperationAction};
 use bridge_utils::bft_events::{MinterNotificationType, NotifyMinterEventData};
 use candid::Encode;
 
-use crate::ops::{tests, RuneBridgeOp, RuneDepositRequestData};
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneDepositRequestData};
 use crate::rune_info::RuneName;
 
 #[tokio::test]
@@ -81,11 +81,11 @@ async fn deposit_request_creates_correct_operation() {
     assert_eq!(
         result,
         Some(OperationAction::Create(
-            RuneBridgeOp::AwaitInputs {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address: tests::sender(),
                 dst_tokens: tests::dst_tokens(),
                 requested_amounts: None,
-            },
+            }),
             None
         ))
     )
@@ -112,11 +112,11 @@ async fn deposit_request_adds_amounts_to_operation() {
     assert_eq!(
         result,
         Some(OperationAction::Create(
-            RuneBridgeOp::AwaitInputs {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address: tests::sender(),
                 dst_tokens: tests::dst_tokens(),
                 requested_amounts: Some(amounts),
-            },
+            }),
             None
         ))
     )
