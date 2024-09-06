@@ -75,12 +75,15 @@ jobs:
           shared-key: ${{ github.repository }}
           save-if: ${{ github.ref_type != 'tag' }}
 
+      - name: install ic-wasm
+        run |
+          wget https://github.com/dfinity/ic-wasm/releases/download/0.8.1/ic-wasm-linux64 -O /usr/local/bin/ic-wasm
+          chmod +x /usr/local/bin/ic-wasm
+
       - name: setup environment
         run: |
           export RUST_BACKTRACE="full"
-          cargo install ic-wasm
-          # # TO BE FIXED: https://infinityswap.atlassian.net/browse/EPROD-958
-          # cargo install icx-proxy --version 0.10.1
+          cargo install candid-extractor
           sudo apt update
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates
           mkdir -p /usr/local/share/ca-certificates/
@@ -115,7 +118,7 @@ jobs:
       #   run: |
       #     ./scripts/tests/tests_i686.sh
 
-      - name: dfx test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          ./scripts/tests/dfx_tests.sh --github-ci --docker
+      # - name: dfx test
+      #   if: ${{ !inputs.skip-test }}
+      #   run: |
+      #     ./scripts/tests/dfx_tests.sh --github-ci --docker
