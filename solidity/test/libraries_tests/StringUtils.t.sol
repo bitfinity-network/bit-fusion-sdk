@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import "forge-std/src/Test.sol";
+import "forge-std/src/console.sol";
 import "src/libraries/StringUtils.sol";
 
 contract StringUtilsTest is Test {
-    function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
+    function bytes32ToString(
+        bytes32 _bytes32
+    ) public pure returns (string memory) {
         uint8 i = 0;
         while (i < 32 && _bytes32[i] != 0) {
             i++;
