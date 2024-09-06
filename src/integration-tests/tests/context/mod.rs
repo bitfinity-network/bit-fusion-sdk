@@ -122,7 +122,7 @@ pub trait TestContext {
     /// Sends tx with notification to EVMc.
     async fn send_notification_tx(
         &self,
-        user: &Wallet<SigningKey>,
+        user: &Wallet<'_, SigningKey>,
         input: NotificationInput,
     ) -> Result<H256> {
         let address: H160 = user.address().into();
@@ -271,8 +271,9 @@ pub trait TestContext {
             .await?;
 
         let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
-        let _: () = raw_client
-            .update("set_bft_bridge_contract", (bridge_address.clone(),))
+
+        raw_client
+            .update::<_, ()>("set_bft_bridge_contract", (bridge_address.clone(),))
             .await?;
 
         Ok(bridge_address)

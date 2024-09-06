@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import "src/interfaces/IFeeCharge.sol";
 import { RingBuffer } from "src/libraries/RingBuffer.sol";
 
@@ -15,7 +15,9 @@ contract FeeCharge is IFeeCharge {
 
     mapping(address => bool) private _canChargeFee;
 
-    constructor(address[] memory canChargeFee) {
+    constructor(
+        address[] memory canChargeFee
+    ) {
         uint256 length = canChargeFee.length;
         for (uint256 i = 0; i < length; i++) {
             address approved = canChargeFee[i];
@@ -26,7 +28,9 @@ contract FeeCharge is IFeeCharge {
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees by the approvedSenderIDs.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
+    function nativeTokenDeposit(
+        bytes32[] calldata approvedSenderIDs
+    ) external payable returns (uint256 balance) {
         address to = msg.sender;
 
         // Add approved SpenderIDs
@@ -41,7 +45,9 @@ contract FeeCharge is IFeeCharge {
 
     // Withdraw the amount of native token to user's address.
     // Returns user's balance after the operation.
-    function nativeTokenWithdraw(uint256 amount) external payable returns (uint256 balance) {
+    function nativeTokenWithdraw(
+        uint256 amount
+    ) external payable returns (uint256 balance) {
         require(amount > 0, "failed to withdraw zero amount");
         address to = msg.sender;
 
@@ -53,7 +59,9 @@ contract FeeCharge is IFeeCharge {
     }
 
     // Returns user's native token deposit balance.
-    function nativeTokenBalance(address user) external view returns (uint256 balance) {
+    function nativeTokenBalance(
+        address user
+    ) external view returns (uint256 balance) {
         if (user == address(0)) {
             user = msg.sender;
         }
@@ -61,7 +69,9 @@ contract FeeCharge is IFeeCharge {
     }
 
     // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
+    function removeApprovedSenderIDs(
+        bytes32[] calldata approvedSenderIDs
+    ) external {
         for (uint256 i = 0; i < approvedSenderIDs.length; i++) {
             delete _approvedIDs[msg.sender][approvedSenderIDs[i]];
         }

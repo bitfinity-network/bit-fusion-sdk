@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "forge-std/src/Test.sol";
+import "forge-std/src/console.sol";
+import "@openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
@@ -521,7 +521,9 @@ contract BftBridgeTest is Test {
         bytes32 memo;
     }
 
-    function _expectBurnEvent(ExpectedBurnEvent memory expected) private {
+    function _expectBurnEvent(
+        ExpectedBurnEvent memory expected
+    ) private {
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         bool eventFound = false;
@@ -647,7 +649,9 @@ contract BftBridgeTest is Test {
         return abi.encodePacked(encodedOrder, r, s, v);
     }
 
-    function _createIdFromPrincipal(bytes memory principal) private pure returns (bytes32) {
+    function _createIdFromPrincipal(
+        bytes memory principal
+    ) private pure returns (bytes32) {
         return bytes32(abi.encodePacked(uint8(0), uint8(principal.length), principal));
     }
 
