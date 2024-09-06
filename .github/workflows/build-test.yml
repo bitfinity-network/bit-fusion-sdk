@@ -76,7 +76,7 @@ jobs:
           save-if: ${{ github.ref_type != 'tag' }}
 
       - name: install ic-wasm
-        run |
+        run: |
           wget https://github.com/dfinity/ic-wasm/releases/download/0.8.1/ic-wasm-linux64 -O /usr/local/bin/ic-wasm
           chmod +x /usr/local/bin/ic-wasm
 
