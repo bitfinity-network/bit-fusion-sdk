@@ -72,11 +72,6 @@ while true; do
     esac
 done
 
-# set dfxvm to use the correct version
-# if [ "$GITHUB_CI" -gt 0 ]; then
-#     dfxvm default 0.20.1
-# fi
-
 # check bad dfx version
 DFX_VERSION=$(dfx --version | awk '{print $2}')
 DFX_VERSION_MINOR=$(echo $DFX_VERSION | cut -d. -f2)
