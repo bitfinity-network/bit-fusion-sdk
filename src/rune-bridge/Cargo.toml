@@ -33,5 +33,6 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 bitcoin = { workspace = true, features = ["rand-std"] }
+rand = { workspace = true }
 snapbox = { workspace = true }
 tokio = { workspace = true }

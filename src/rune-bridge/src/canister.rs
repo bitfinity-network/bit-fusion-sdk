@@ -5,6 +5,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
@@ -42,10 +43,9 @@ impl BridgeCanister for RuneBridge {
 
 impl RuneBridge {
     #[init]
-    pub fn init(&mut self, config: RuneBridgeConfig) {
-        let bridge_init_data = config.bridge_init_data();
-        get_rune_state().borrow_mut().configure(config);
+    pub fn init(&mut self, bridge_init_data: BridgeInitData, rune_bridge_config: RuneBridgeConfig) {
         self.init_bridge(bridge_init_data, Self::run_scheduler);
+        get_rune_state().borrow_mut().configure(rune_bridge_config);
     }
 
     #[post_upgrade]
@@ -61,7 +61,9 @@ impl RuneBridge {
     /// Returns the bitcoin address that a user has to use to deposit runes to be received on the given Ethereum address.
     #[query]
     pub fn get_deposit_address(&self, eth_address: H160) -> Result<String, GetAddressError> {
-        crate::key::get_transit_address(&get_rune_state(), &eth_address).map(|v| v.to_string())
+        crate::key::get_transit_address(&get_rune_state(), &eth_address)
+            .map(|v| v.to_string())
+            .map_err(GetAddressError::from)
     }
 
     #[query]
@@ -114,26 +116,35 @@ impl RuneBridge {
     pub async fn admin_configure_ecdsa(&self) {
         inspect_configure_ecdsa(self.config());
 
-        let key_id = get_rune_state().borrow().ecdsa_key_id();
+        let signing_strategy = get_runtime_state()
+            .borrow()
+            .config
+            .borrow()
+            .get_signing_strategy();
 
-        let master_key = ecdsa_public_key(EcdsaPublicKeyArgument {
+        let key_id = get_rune_state().borrow().ecdsa_key_id(&signing_strategy);
+
+        let (master_key,) = ecdsa_public_key(EcdsaPublicKeyArgument {
             canister_id: None,
             derivation_path: vec![],
-            key_id,
+            key_id: key_id.clone(),
         })
         .await
         .expect("failed to get master key");
 
-        get_rune_state().borrow_mut().configure_ecdsa(master_key.0);
+        get_rune_state()
+            .borrow_mut()
+            .configure_ecdsa(master_key, key_id)
+            .expect("failed to configure ecdsa");
     }
 
     #[update]
-    pub fn admin_configure_indexers(&self, no_of_indexer_urls: u8, indexer_urls: HashSet<String>) {
+    pub fn admin_configure_indexers(&self, indexer_urls: HashSet<String>) {
         inspect_configure_indexers(self.config());
 
         get_rune_state()
             .borrow_mut()
-            .configure_indexers(no_of_indexer_urls, indexer_urls);
+            .configure_indexers(indexer_urls);
     }
 
     #[update]

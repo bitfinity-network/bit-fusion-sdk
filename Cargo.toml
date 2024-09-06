@@ -1,15 +1,16 @@
 [workspace]
 members = [
+  "src/brc20-bridge",
   "src/bridge-canister",
   "src/bridge-client",
   "src/bridge-deployer",
   "src/bridge-did",
   "src/bridge-tool",
   "src/bridge-utils",
-  "src/btc-bridge",
-  "src/erc20-bridge",
-  "src/icrc2-bridge",
   "src/integration-tests",
+  "src/icrc2-bridge",
+  "src/erc20-bridge",
+  "src/btc-bridge",
   "src/rune-bridge",
 ]
 
@@ -64,6 +65,7 @@ ord-rs = { git = "https://github.com/bitfinity-network/ord-rs", tag = "v0.2.0" }
 ordinals = "0.0.9"
 rand = { version = "0.8", features = ["std_rng", "small_rng"] }
 reqwest = { version = "0.12", default-features = false }
+rust_decimal = "1.36"
 serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
