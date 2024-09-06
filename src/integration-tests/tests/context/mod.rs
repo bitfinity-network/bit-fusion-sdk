@@ -271,8 +271,8 @@ pub trait TestContext {
             .await?;
 
         let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
-        raw_client
-            .update::<_, ()>("set_bft_bridge_contract", (bridge_address.clone(),))
+        let _: () = raw_client
+            .update("set_bft_bridge_contract", (bridge_address.clone(),))
             .await?;
 
         Ok(bridge_address)

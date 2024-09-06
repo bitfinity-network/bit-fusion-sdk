@@ -8219,6 +8219,7 @@ dependencies = [
  "candid",
  "did",
  "eth-signer",
+ "ethers-core",
  "hex",
  "ic-canister",
  "ic-exports",
