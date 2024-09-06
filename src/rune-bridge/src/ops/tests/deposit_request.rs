@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use bridge_canister::bridge::{Operation, OperationAction};
-use bridge_utils::bft_events::{MinterNotificationType, NotifyMinterEventData};
+use bridge_did::event_data::*;
+use bridge_did::runes::RuneName;
 use candid::Encode;
 
-use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneDepositRequestData};
-use crate::rune_info::RuneName;
+use crate::ops::{
+    tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData,
+};
 
 #[tokio::test]
 async fn invalid_notification_type_is_noop() {
@@ -22,14 +24,14 @@ async fn invalid_notification_type_is_noop() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert!(result.is_none());
 
     let event = NotifyMinterEventData {
         notification_type: MinterNotificationType::Other,
         ..event
     };
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert!(result.is_none());
 }
 
@@ -50,14 +52,14 @@ async fn invalid_notification_payload_is_noop() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert!(result.is_none());
 
     let event = NotifyMinterEventData {
         user_data: vec![],
         ..event
     };
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert!(result.is_none());
 }
 
@@ -77,15 +79,15 @@ async fn deposit_request_creates_correct_operation() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert_eq!(
         result,
         Some(OperationAction::Create(
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+            RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address: tests::sender(),
                 dst_tokens: tests::dst_tokens(),
                 requested_amounts: None,
-            }),
+            })),
             None
         ))
     )
@@ -108,15 +110,15 @@ async fn deposit_request_adds_amounts_to_operation() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOp::on_minter_notification(tests::test_state(), event.clone()).await;
+    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
     assert_eq!(
         result,
         Some(OperationAction::Create(
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+            RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address: tests::sender(),
                 dst_tokens: tests::dst_tokens(),
                 requested_amounts: Some(amounts),
-            }),
+            })),
             None
         ))
     )

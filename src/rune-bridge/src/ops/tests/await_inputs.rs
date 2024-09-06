@@ -1,20 +1,19 @@
 use std::str::FromStr;
 
 use bridge_did::error::Error;
+use bridge_did::runes::{RuneName, RuneToWrap};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::MockContext;
 use snapbox::{assert_data_eq, str};
 
 use crate::core::rune_inputs::mock::TestRuneInputProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput};
-use crate::core::utxo_handler::RuneToWrap;
-use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp};
-use crate::rune_info::RuneName;
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl};
 
 #[tokio::test]
 async fn await_inputs_returns_error_if_no_inputs() {
     let provider = TestRuneInputProvider::empty();
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -33,7 +32,7 @@ async fn await_inputs_returns_error_if_no_inputs() {
 async fn await_inputs_returns_error_if_provider_returns_btc_error() {
     let provider =
         TestRuneInputProvider::err(GetInputsError::BtcAdapter("not available".to_string()));
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -58,7 +57,7 @@ async fn await_inputs_returns_error_if_provider_returns_indexer_error() {
         required_responses: 1,
         checked_indexers: 0,
     });
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -83,7 +82,7 @@ async fn await_inputs_returns_error_if_provider_returns_consensus_error() {
     let provider = TestRuneInputProvider::err(GetInputsError::IndexersDisagree {
         indexer_responses: vec![("indexer_name".to_string(), "indexer_response".to_string())],
     });
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -121,7 +120,7 @@ fn rune_input(rune_name: &str, amount: u128) -> RuneInput {
 async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
     let input = rune_input("A", 1000);
     let provider = TestRuneInputProvider::with_input(input.clone());
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -137,7 +136,7 @@ async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
 
     let input = rune_input("A", 1000);
     let provider = TestRuneInputProvider::with_input(input.clone());
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -156,7 +155,7 @@ async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
 async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
     let inputs = [rune_input("A", 1000), rune_input("B", 2000)];
     let provider = TestRuneInputProvider::with_inputs(&inputs);
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -178,7 +177,7 @@ async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
 async fn await_inputs_returns_error_if_no_token_address() {
     let inputs = [rune_input("A", 1000)];
     let provider = TestRuneInputProvider::with_inputs(&inputs);
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -197,7 +196,7 @@ async fn await_inputs_returns_error_if_no_token_address() {
 async fn await_inputs_returns_correct_operation_single_input() {
     let input = rune_input("A", 1000);
     let provider = TestRuneInputProvider::with_input(input.clone());
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
         &provider,
         tests::sender(),
@@ -207,7 +206,7 @@ async fn await_inputs_returns_correct_operation_single_input() {
     .await;
     assert_eq!(
         result,
-        Ok(RuneBridgeOp::Deposit(
+        Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(
             RuneBridgeDepositOp::AwaitConfirmations {
                 dst_address: tests::sender(),
                 utxo: input.utxo,
@@ -217,7 +216,7 @@ async fn await_inputs_returns_correct_operation_single_input() {
                     wrapped_address: tests::token_address(3),
                 }],
             }
-        ))
+        )))
     );
 }
 
@@ -228,7 +227,7 @@ async fn await_inputs_returns_correct_operation_multiple_inputs() {
     let inputs = vec![rune_input("A", 1000), rune_input("B", 2000)];
     let provider = TestRuneInputProvider::with_inputs(&inputs);
     let state = tests::test_state();
-    let result = RuneBridgeOp::await_inputs(
+    let result = RuneBridgeOpImpl::await_inputs(
         state.clone(),
         &provider,
         tests::sender(),
@@ -237,10 +236,10 @@ async fn await_inputs_returns_correct_operation_multiple_inputs() {
     )
     .await;
 
-    let Ok(RuneBridgeOp::OperationSplit {
+    let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
         wallet_address,
         new_operation_ids,
-    }) = result
+    })) = result
     else {
         panic!("Incorrect operation returned")
     };

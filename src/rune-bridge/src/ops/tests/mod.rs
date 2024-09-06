@@ -34,7 +34,7 @@ fn config() -> SharedConfig {
     ))))
 }
 
-fn test_state() -> RuntimeState<RuneBridgeOp> {
+fn test_state() -> RuntimeState<RuneBridgeOpImpl> {
     Rc::new(RefCell::new(State::default(op_memory(), config())))
 }
 
@@ -87,11 +87,11 @@ async fn test_signed_order() -> SignedMintOrder {
 
 pub mod minter_notification {
     use bridge_canister::bridge::{Operation, OperationAction};
-    use bridge_utils::bft_events::{MinterNotificationType, NotifyMinterEventData};
+    use bridge_did::event_data::*;
     use candid::Encode;
 
     use crate::ops::tests::{dst_tokens, test_state, token_address};
-    use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneDepositRequestData};
+    use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData};
 
     fn test_deposit_data() -> RuneDepositRequestData {
         RuneDepositRequestData {
@@ -115,7 +115,7 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
         assert_eq!(result, None);
     }
 
@@ -131,7 +131,7 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
         assert_eq!(result, None);
     }
 
@@ -145,16 +145,16 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
         let expected = test_deposit_data();
         assert_eq!(
             result,
             Some(OperationAction::Create(
-                RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+                RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                     dst_address: expected.dst_address,
                     dst_tokens: expected.dst_tokens,
                     requested_amounts: expected.amounts,
-                }),
+                })),
                 None,
             ))
         );
@@ -171,7 +171,7 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
         assert!(matches!(result, Some(OperationAction::Create(_, None))));
     }
 
@@ -186,7 +186,7 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let result = RuneBridgeOp::on_minter_notification(state, event).await;
+        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
         assert!(
             matches!(result, Some(OperationAction::Create(_, Some(actual_memo))) if actual_memo.to_vec() == memo)
         );

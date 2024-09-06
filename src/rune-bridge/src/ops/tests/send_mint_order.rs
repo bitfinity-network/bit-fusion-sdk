@@ -9,7 +9,7 @@ use snapbox::{assert_data_eq, str};
 
 use crate::ops::tests::sign_mint_order::TestSigner;
 use crate::ops::tests::test_signed_order;
-use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp};
+use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl};
 
 struct TestOperationContext {
     result: BftResult<H256>,
@@ -56,7 +56,7 @@ impl OperationContext for TestOperationContext {
 #[tokio::test]
 async fn returns_error_if_fails_to_send() {
     let ctx = TestOperationContext::err(Error::EvmRequestFailed("too many hedgehogs".to_string()));
-    let err = RuneBridgeOp::send_mint_order(&ctx, test_signed_order().await)
+    let err = RuneBridgeOpImpl::send_mint_order(&ctx, test_signed_order().await)
         .await
         .expect_err("operation succeeded unexpectedly");
 
@@ -71,11 +71,15 @@ async fn return_correct_operation_if_success() {
     const SEED: u8 = 47;
     let ctx = TestOperationContext::ok(SEED);
     let signed_order = test_signed_order().await;
-    let op = RuneBridgeOp::send_mint_order(&ctx, signed_order)
+    let op = RuneBridgeOpImpl::send_mint_order(&ctx, signed_order)
         .await
         .expect("operation failed");
 
-    let RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { order, tx_id }) = op else {
+    let RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder {
+        order,
+        tx_id,
+    })) = op
+    else {
         panic!("Unexpected operation: {op:?}");
     };
 
