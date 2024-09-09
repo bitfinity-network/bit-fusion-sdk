@@ -16,6 +16,7 @@ members = [
 
 resolver = "2"
 
+
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
@@ -98,6 +99,7 @@ ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "rel
 
 [profile.dev]
 debug = false
+
 
 # Set the settings for all dependencies (but not this crate itself or any workspace member).
 # This includes build dependencies.

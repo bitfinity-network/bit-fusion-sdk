@@ -5,7 +5,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
@@ -22,8 +22,8 @@ use ic_storage::IcStorage;
 
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
 use crate::interface::GetAddressError;
-use crate::ops::RuneBridgeOp;
-use crate::state::{RuneBridgeConfig, RuneState};
+use crate::ops::RuneBridgeOpImpl;
+use crate::state::RuneState;
 
 mod inspect;
 
@@ -71,7 +71,7 @@ impl RuneBridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, RuneBridgeOp)> {
+    ) -> Vec<(OperationId, RuneBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -84,7 +84,7 @@ impl RuneBridge {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, RuneBridgeOp)> {
+    ) -> Option<(OperationId, RuneBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -93,7 +93,7 @@ impl RuneBridge {
 
     /// Returns operation by memo
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, RuneBridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, RuneBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -105,7 +105,7 @@ impl RuneBridge {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<RuneBridgeOp>> {
+    ) -> Option<OperationLog<RuneBridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
@@ -179,7 +179,7 @@ impl LogCanister for RuneBridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOp>>>;
+type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime =
@@ -192,7 +192,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<RuneBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<RuneBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

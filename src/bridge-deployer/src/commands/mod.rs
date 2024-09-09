@@ -5,6 +5,7 @@ use bridge_did::error::BftResult;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
 use deploy::DeployCommands;
+use eth_signer::sign_strategy::SigningStrategy;
 use ethereum_types::{H160, H256};
 use ic_agent::Agent;
 use ic_canister_client::{CanisterClient, IcAgentClient};
@@ -15,7 +16,6 @@ use upgrade::UpgradeCommands;
 
 use crate::config;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
-
 mod deploy;
 mod reinstall;
 mod upgrade;
@@ -94,14 +94,14 @@ impl Bridge {
                 trace!("Preparing BRC20 bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("BRC20 Bridge Config : {:?}", init_data);
-                let brc20_config = brc20_bridge::state::Brc20BridgeConfig::from(brc20.clone());
+                let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("Init Bridge Config : {:?}", init_data);
-                let rune_config = rune_bridge::state::RuneBridgeConfig::from(rune.clone());
+                let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
                 Encode!(&init_data, &rune_config)?
             }
@@ -114,7 +114,21 @@ impl Bridge {
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
                 let init = bridge_did::init::BridgeInitData::from(init.clone());
-                let erc = erc20_bridge::state::BaseEvmSettings::from(erc.clone());
+
+                // Workaround for not depending on the `erc-20` crate
+                #[derive(candid::CandidType)]
+                struct EvmSettings {
+                    pub evm_link: config::EvmLink,
+                    pub signing_strategy: SigningStrategy,
+                }
+
+                let erc = EvmSettings {
+                    evm_link: config::EvmLink::Ic(erc.evm_link),
+                    signing_strategy: SigningStrategy::ManagementCanister {
+                        key_id: erc.singing_key_id.clone().into(),
+                    },
+                };
+
                 Encode!(&init, &erc)?
             }
             Bridge::Btc { config } => {

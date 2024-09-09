@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr as _;
 
 use bitcoin::{Address, Amount};
-use brc20_bridge::brc20_info::{Brc20Info, Brc20Tick};
+use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
 use reqwest::{Client, StatusCode};
 use rust_decimal::Decimal;
 use serde::Deserialize;

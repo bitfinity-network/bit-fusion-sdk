@@ -1018,16 +1018,12 @@ name = "bridge-client"
 version = "0.2.0"
 dependencies = [
  "async-trait",
- "brc20-bridge",
  "bridge-did",
  "bridge-utils",
  "candid",
  "did",
- "erc20-bridge",
  "ic-canister-client",
  "ic-log",
- "icrc2-bridge",
- "rune-bridge",
 ]
 
 [[package]]
@@ -1035,13 +1031,10 @@ name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "brc20-bridge",
  "bridge-did",
- "bridge-utils",
  "candid",
  "clap 4.5.16",
  "did",
- "erc20-bridge",
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethereum-types",
@@ -1051,8 +1044,6 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-utils 0.37.0",
- "icrc2-bridge",
- "rune-bridge",
  "serde",
  "strum",
  "tokio",
@@ -1064,6 +1055,8 @@ dependencies = [
 name = "bridge-did"
 version = "0.2.0"
 dependencies = [
+ "alloy-sol-types",
+ "bitcoin 0.31.2",
  "candid",
  "did",
  "eth-signer",
@@ -1071,6 +1064,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-stable-structures 0.22.0",
+ "ord-rs",
  "ordinals",
  "serde",
  "thiserror",

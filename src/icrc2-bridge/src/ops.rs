@@ -1,14 +1,15 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
+use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::order::{self, MintOrder, SignedMintOrder};
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
-use did::{H160, H256, U256};
+use did::{H160, U256};
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
@@ -21,47 +22,11 @@ use crate::tokens::icrc1::{self, IcrcCanisterError};
 use crate::tokens::icrc2::{self, Success};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub enum IcrcBridgeOp {
-    // Deposit operations:
-    BurnIcrc2Tokens(Icrc2Burn),
-    SignMintOrder {
-        order: MintOrder,
-        is_refund: bool,
-    },
-    SendMintTransaction {
-        order: SignedMintOrder,
-        is_refund: bool,
-    },
-    ConfirmMint {
-        order: SignedMintOrder,
-        tx_hash: Option<H256>,
-        is_refund: bool,
-    },
-    WrappedTokenMintConfirmed(MintedEventData),
+pub struct IcrcBridgeOpImpl(pub IcrcBridgeOp);
 
-    // Withdraw operations:
-    MintIcrcTokens(BurntEventData),
-    IcrcMintConfirmed {
-        src_address: H160,
-        icrc_tx_id: Nat,
-    },
-}
-
-impl IcrcBridgeOp {
-    pub fn get_signed_mint_order(&self, token: &Id256) -> Option<SignedMintOrder> {
-        match self {
-            Self::SendMintTransaction { order, .. } if &order.get_src_token_id() == token => {
-                Some(*order)
-            }
-            Self::ConfirmMint { order, .. } if &order.get_src_token_id() == token => Some(*order),
-            _ => None,
-        }
-    }
-}
-
-impl Operation for IcrcBridgeOp {
+impl Operation for IcrcBridgeOpImpl {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        let result = match self {
+        let result = match self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
             }
@@ -85,11 +50,11 @@ impl Operation for IcrcBridgeOp {
             )),
         };
         log::debug!("icrc task execution result: {result:?}");
-        result
+        result.map(Self)
     }
 
     fn is_complete(&self) -> bool {
-        match self {
+        match self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(_) => false,
             IcrcBridgeOp::SignMintOrder { .. } => false,
             IcrcBridgeOp::SendMintTransaction { .. } => false,
@@ -101,7 +66,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match self {
+        match &self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn) => burn.recipient_address.clone(),
             IcrcBridgeOp::SignMintOrder { order, .. } => order.recipient.clone(),
             IcrcBridgeOp::SendMintTransaction { order, .. } => order.get_recipient(),
@@ -113,7 +78,7 @@ impl Operation for IcrcBridgeOp {
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
-        match self {
+        match self.0 {
             IcrcBridgeOp::ConfirmMint { .. } => None,
             IcrcBridgeOp::WrappedTokenMintConfirmed(_) => None,
             IcrcBridgeOp::IcrcMintConfirmed { .. } => None,
@@ -134,7 +99,10 @@ impl Operation for IcrcBridgeOp {
     ) -> Option<OperationAction<Self>> {
         log::trace!("wrapped token burnt");
         let memo = event.memo();
-        Some(OperationAction::Create(Self::MintIcrcTokens(event), memo))
+        Some(OperationAction::Create(
+            IcrcBridgeOpImpl(IcrcBridgeOp::MintIcrcTokens(event)),
+            memo,
+        ))
     }
 
     async fn on_wrapped_token_minted(
@@ -144,7 +112,7 @@ impl Operation for IcrcBridgeOp {
         log::trace!("wrapped token minted");
         Some(OperationAction::Update {
             nonce: event.nonce,
-            update_to: IcrcBridgeOp::WrappedTokenMintConfirmed(event),
+            update_to: IcrcBridgeOpImpl(IcrcBridgeOp::WrappedTokenMintConfirmed(event)),
         })
     }
 
@@ -172,13 +140,13 @@ impl Operation for IcrcBridgeOp {
         let memo = event.memo();
 
         Some(OperationAction::Create(
-            IcrcBridgeOp::BurnIcrc2Tokens(icrc_burn),
+            Self(IcrcBridgeOp::BurnIcrc2Tokens(icrc_burn)),
             memo,
         ))
     }
 }
 
-impl IcrcBridgeOp {
+impl IcrcBridgeOpImpl {
     async fn burn_icrc_tokens(
         ctx: impl OperationContext,
         burn_info: Icrc2Burn,
@@ -254,7 +222,7 @@ impl IcrcBridgeOp {
 
         log::debug!("prepared mint order: {:?}", order);
 
-        Ok(Self::SignMintOrder {
+        Ok(IcrcBridgeOp::SignMintOrder {
             order,
             is_refund: false,
         })
@@ -270,12 +238,12 @@ impl IcrcBridgeOp {
 
         let should_send_by_canister = order.fee_payer != H160::zero();
         let next_op = if should_send_by_canister {
-            Self::SendMintTransaction {
+            IcrcBridgeOp::SendMintTransaction {
                 order: signed_mint_order,
                 is_refund,
             }
         } else {
-            Self::ConfirmMint {
+            IcrcBridgeOp::ConfirmMint {
                 order: signed_mint_order,
                 tx_hash: None,
                 is_refund,
@@ -292,7 +260,7 @@ impl IcrcBridgeOp {
     ) -> BftResult<IcrcBridgeOp> {
         let tx_hash = ctx.send_mint_transaction(&order).await?;
 
-        Ok(Self::ConfirmMint {
+        Ok(IcrcBridgeOp::ConfirmMint {
             order,
             tx_hash: Some(tx_hash),
             is_refund,
@@ -333,7 +301,7 @@ impl IcrcBridgeOp {
         match mint_result {
             Ok(Success { tx_id, .. }) => {
                 log::trace!("Finished icrc2 mint to principal: {}", recipient);
-                Ok(Self::IcrcMintConfirmed {
+                Ok(IcrcBridgeOp::IcrcMintConfirmed {
                     src_address: event.sender,
                     icrc_tx_id: tx_id,
                 })
@@ -385,7 +353,7 @@ impl IcrcBridgeOp {
 
                 log::debug!("prepared refund mint order: {:?}", order);
 
-                Ok(Self::SignMintOrder {
+                Ok(IcrcBridgeOp::SignMintOrder {
                     order,
                     is_refund: true,
                 })

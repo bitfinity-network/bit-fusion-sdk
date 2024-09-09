@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
+use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::{
-    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
-};
+use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 use candid::{CandidType, Decode, Deserialize};
-use did::{H160, H256};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
@@ -18,66 +18,15 @@ use serde::Serialize;
 use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
 use crate::core::rune_inputs::RuneInputProvider;
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandler};
-use crate::core::withdrawal::{DidTransaction, RuneWithdrawalPayload, Withdrawal};
-use crate::rune_info::RuneName;
+use crate::core::utxo_handler::UtxoHandler;
+use crate::core::withdrawal::{RuneWithdrawalPayloadImpl, Withdrawal};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
-pub enum RuneBridgeDepositOp {
-    /// Await inputs from the Rune deposit provider
-    AwaitInputs {
-        dst_address: H160,
-        dst_tokens: HashMap<RuneName, H160>,
-        requested_amounts: Option<HashMap<RuneName, u128>>,
-    },
-    /// Await confirmations for the deposit
-    AwaitConfirmations {
-        dst_address: H160,
-        utxo: Utxo,
-        runes_to_wrap: Vec<RuneToWrap>,
-    },
-    /// Sign the mint order
-    SignMintOrder(MintOrder),
-    /// Send the mint order to the bridge
-    SendMintOrder(SignedMintOrder),
-    /// Confirm the mint order
-    ConfirmMintOrder { order: SignedMintOrder, tx_id: H256 },
-    /// The mint order has been confirmed
-    MintOrderConfirmed { data: MintedEventData },
-}
+pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
 
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
-pub enum RuneBridgeWithdrawOp {
-    /// Create a withdrawal transaction
-    CreateTransaction { payload: RuneWithdrawalPayload },
-    /// Send the withdrawal transaction
-    SendTransaction {
-        from_address: H160,
-        transaction: DidTransaction,
-    },
-    /// The withdrawal transaction has been sent
-    TransactionSent {
-        from_address: H160,
-        transaction: DidTransaction,
-    },
-}
-
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
-#[allow(clippy::large_enum_variant)]
-pub enum RuneBridgeOp {
-    Deposit(RuneBridgeDepositOp),
-    Withdraw(RuneBridgeWithdrawOp),
-    /// The operation has been split into multiple operations
-    /// e.g. two runes deposit in a single call
-    OperationSplit {
-        wallet_address: H160,
-        new_operation_ids: Vec<OperationId>,
-    },
-}
-
-impl Operation for RuneBridgeOp {
+impl Operation for RuneBridgeOpImpl {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self {
+        match self.0 {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address,
                 dst_tokens,
@@ -160,7 +109,7 @@ impl Operation for RuneBridgeOp {
     }
 
     fn is_complete(&self) -> bool {
-        match self {
+        match self.0 {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs { .. }) => false,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitConfirmations { .. }) => false,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(_)) => false,
@@ -175,7 +124,7 @@ impl Operation for RuneBridgeOp {
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match self {
+        match &self.0 {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs { dst_address, .. }) => {
                 dst_address.clone()
             }
@@ -208,14 +157,16 @@ impl Operation for RuneBridgeOp {
     }
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
-        match self {
-            Self::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. })
-            | Self::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => Some(
+        match self.0 {
+            RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. })
+            | RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => Some(
                 TaskOptions::new()
                     .with_fixed_backoff_policy(2)
                     .with_max_retries_policy(10),
             ),
-            Self::Deposit(_) | Self::Withdraw(_) | Self::OperationSplit { .. } => Some(
+            RuneBridgeOp::Deposit(_)
+            | RuneBridgeOp::Withdraw(_)
+            | RuneBridgeOp::OperationSplit { .. } => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
@@ -234,7 +185,9 @@ impl Operation for RuneBridgeOp {
 
         Some(OperationAction::Update {
             nonce: event.nonce,
-            update_to: Self::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { data: event }),
+            update_to: Self(RuneBridgeOp::Deposit(
+                RuneBridgeDepositOp::MintOrderConfirmed { data: event },
+            )),
         })
     }
 
@@ -244,9 +197,11 @@ impl Operation for RuneBridgeOp {
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
         let memo = event.memo();
-        match RuneWithdrawalPayload::new(event, &get_rune_state().borrow()) {
+        match RuneWithdrawalPayloadImpl::new(event, &get_rune_state().borrow()) {
             Ok(payload) => Some(OperationAction::Create(
-                Self::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { payload }),
+                Self(RuneBridgeOp::Withdraw(
+                    RuneBridgeWithdrawOp::CreateTransaction { payload: payload.0 },
+                )),
                 memo,
             )),
             Err(err) => {
@@ -266,11 +221,11 @@ impl Operation for RuneBridgeOp {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event.user_data, RuneDepositRequestData) {
                     Ok(data) => Some(OperationAction::Create(
-                        Self::Deposit(RuneBridgeDepositOp::AwaitInputs {
+                        Self(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                             dst_address: data.dst_address,
                             dst_tokens: data.dst_tokens,
                             requested_amounts: data.amounts,
-                        }),
+                        })),
                         event.memo(),
                     )),
                     _ => {
@@ -293,17 +248,17 @@ impl Operation for RuneBridgeOp {
     }
 }
 
-impl RuneBridgeOp {
+impl RuneBridgeOpImpl {
     fn split(state: RuntimeState<Self>, wallet_address: H160, operations: Vec<Self>) -> Self {
         let mut state = state.borrow_mut();
         let ids = operations
             .into_iter()
             .map(|op| state.operations.new_operation(op, None))
             .collect();
-        Self::OperationSplit {
+        Self(RuneBridgeOp::OperationSplit {
             wallet_address,
             new_operation_ids: ids,
-        }
+        })
     }
 
     fn split_or_update(
@@ -397,11 +352,13 @@ impl RuneBridgeOp {
                 });
             }
 
-            operations.push(Self::Deposit(RuneBridgeDepositOp::AwaitConfirmations {
-                dst_address: dst_address.clone(),
-                utxo: input.utxo.clone(),
-                runes_to_wrap,
-            }));
+            operations.push(Self(RuneBridgeOp::Deposit(
+                RuneBridgeDepositOp::AwaitConfirmations {
+                    dst_address: dst_address.clone(),
+                    utxo: input.utxo.clone(),
+                    runes_to_wrap,
+                },
+            )));
         }
 
         Ok(Self::split_or_update(
@@ -430,7 +387,11 @@ impl RuneBridgeOp {
 
         let operations = mint_orders
             .into_iter()
-            .map(|mint_order| Self::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)))
+            .map(|mint_order| {
+                Self(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(
+                    mint_order,
+                )))
+            })
             .collect();
 
         Ok(Self::split_or_update(ctx, dst_address, operations))
@@ -446,7 +407,9 @@ impl RuneBridgeOp {
 
         let signed = mint_order.encode_and_sign(signer).await?;
 
-        Ok(Self::Deposit(RuneBridgeDepositOp::SendMintOrder(signed)))
+        Ok(Self(RuneBridgeOp::Deposit(
+            RuneBridgeDepositOp::SendMintOrder(signed),
+        )))
     }
 
     async fn send_mint_order(
@@ -454,10 +417,9 @@ impl RuneBridgeOp {
         order: SignedMintOrder,
     ) -> BftResult<Self> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
-        Ok(Self::Deposit(RuneBridgeDepositOp::ConfirmMintOrder {
-            order,
-            tx_id,
-        }))
+        Ok(Self(RuneBridgeOp::Deposit(
+            RuneBridgeDepositOp::ConfirmMintOrder { order, tx_id },
+        )))
     }
 
     async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BftResult<Self> {
@@ -471,10 +433,12 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("cannot create withdrawal transaction: {err:?}"))
             })?;
 
-        Ok(Self::Withdraw(RuneBridgeWithdrawOp::SendTransaction {
-            from_address,
-            transaction: transaction.into(),
-        }))
+        Ok(Self(RuneBridgeOp::Withdraw(
+            RuneBridgeWithdrawOp::SendTransaction {
+                from_address,
+                transaction: transaction.into(),
+            },
+        )))
     }
 
     async fn send_transaction(from_address: H160, transaction: DidTransaction) -> BftResult<Self> {
@@ -487,10 +451,12 @@ impl RuneBridgeOp {
                 Error::FailedToProgress(format!("failed to send transaction: {err:?}"))
             })?;
 
-        Ok(Self::Withdraw(RuneBridgeWithdrawOp::TransactionSent {
-            from_address,
-            transaction,
-        }))
+        Ok(Self(RuneBridgeOp::Withdraw(
+            RuneBridgeWithdrawOp::TransactionSent {
+                from_address,
+                transaction,
+            },
+        )))
     }
 }
 

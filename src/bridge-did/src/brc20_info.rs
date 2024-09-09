@@ -2,10 +2,11 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use bridge_did::id256::Id256;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::{Bound, Storable};
 use serde::Serialize;
+
+use crate::id256::Id256;
 
 /// Brc20Tick is a 4 bytes ASCII identifier for a BRC20 token.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CandidType, Serialize, Deserialize, Hash)]

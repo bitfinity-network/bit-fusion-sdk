@@ -1,4 +1,5 @@
 use bridge_did::error::Error;
+use bridge_did::runes::{RuneInfo, RuneToWrap};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::MockContext;
@@ -6,9 +7,8 @@ use ordinals::Rune;
 use snapbox::{assert_data_eq, str};
 
 use crate::core::utxo_handler::test::TestUtxoHandler;
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandlerError};
-use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp};
-use crate::rune_info::RuneInfo;
+use crate::core::utxo_handler::UtxoHandlerError;
+use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl};
 
 fn get_utxo() -> Utxo {
     Utxo {
@@ -42,7 +42,7 @@ fn get_to_wrap(count: usize) -> Vec<RuneToWrap> {
 #[tokio::test]
 async fn await_confirmations_utxo_not_found() {
     let utxo_handler = TestUtxoHandler::with_error(UtxoHandlerError::UtxoNotFound);
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         tests::test_state(),
         &utxo_handler,
         tests::sender(),
@@ -64,7 +64,7 @@ async fn await_confirmations_not_confirmed() {
         required_confirmations: 12,
         current_confirmations: 5,
     });
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         tests::test_state(),
         &utxo_handler,
         tests::sender(),
@@ -87,7 +87,7 @@ async fn await_confirmations_not_confirmed() {
 async fn await_confirmations_btc_adapter_not_available() {
     let utxo_handler =
         TestUtxoHandler::with_error(UtxoHandlerError::BtcAdapter("btc error".to_string()));
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         tests::test_state(),
         &utxo_handler,
         tests::sender(),
@@ -109,7 +109,7 @@ async fn await_confirmations_btc_adapter_not_available() {
 #[tokio::test]
 async fn await_confirmations_utxo_already_used() {
     let utxo_handler = TestUtxoHandler::already_used_utxo();
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         tests::test_state(),
         &utxo_handler,
         tests::sender(),
@@ -128,7 +128,7 @@ async fn await_confirmations_utxo_already_used() {
 #[tokio::test]
 async fn await_confirmations_one_mint_order() {
     let utxo_handler = TestUtxoHandler::ok();
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         tests::test_state(),
         &utxo_handler,
         tests::sender(),
@@ -143,7 +143,9 @@ async fn await_confirmations_one_mint_order() {
 
     assert!(matches!(
         operation,
-        RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder { .. })
+        RuneBridgeOpImpl(RuneBridgeOp::Deposit(
+            RuneBridgeDepositOp::SignMintOrder { .. }
+        ))
     ));
 }
 
@@ -154,7 +156,7 @@ async fn await_confirmations_multiple_mint_orders() {
     const COUNT: usize = 3;
     let utxo_handler = TestUtxoHandler::ok();
     let state = tests::test_state();
-    let result = RuneBridgeOp::await_confirmations(
+    let result = RuneBridgeOpImpl::await_confirmations(
         state.clone(),
         &utxo_handler,
         tests::sender(),
@@ -163,10 +165,10 @@ async fn await_confirmations_multiple_mint_orders() {
     )
     .await;
 
-    let Ok(RuneBridgeOp::OperationSplit {
+    let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
         new_operation_ids,
         wallet_address,
-    }) = result
+    })) = result
     else {
         panic!("Wrong result: {result:?}");
     };
@@ -177,7 +179,9 @@ async fn await_confirmations_multiple_mint_orders() {
         let operation = state.borrow().operations.get(operation_id).unwrap();
         assert!(matches!(
             operation,
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder { .. })
+            RuneBridgeOpImpl(RuneBridgeOp::Deposit(
+                RuneBridgeDepositOp::SignMintOrder { .. }
+            ))
         ));
     }
 
