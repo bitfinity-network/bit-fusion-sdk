@@ -94,12 +94,15 @@ build_canister() {
     mkdir -p "$WASM_DIR"
 
     # Generate the did file
-    cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
+#    cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
 
     echo "Building $canister_name Canister with features: $features"
 
     cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
     ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm" shrink
+
+    candid-extractor "$WASM_DIR/$output_wasm" > "$WASM_DIR/$did_file_name.did"
+
     gzip -k "$WASM_DIR/$output_wasm" --force
 }
 

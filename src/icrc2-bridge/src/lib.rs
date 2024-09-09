@@ -1,4 +1,5 @@
 use bridge_canister::BridgeCanister;
+use ic_canister::export_candid;
 use ic_metrics::Metrics;
 pub use state::SigningStrategy;
 
@@ -10,7 +11,8 @@ pub mod ops;
 pub mod state;
 pub mod tokens;
 
-pub fn idl() -> String {
+#[export_candid]
+fn idl() -> String {
     let bridge_canister_idl = Icrc2BridgeCanister::idl();
 
     let mut metrics_idl = <Icrc2BridgeCanister as Metrics>::get_idl();
