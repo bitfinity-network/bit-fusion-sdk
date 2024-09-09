@@ -99,7 +99,7 @@ build_canister() {
     echo "Building $canister_name Canister with features: $features"
 
     cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
-    ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm" shrink
+    ic-wasm "target/wasm32-unknown-unknown/release/icrc2_bridge.wasm" -o "$WASM_DIR/$output_wasm" shrink
 
     candid-extractor "$WASM_DIR/$output_wasm" > "$WASM_DIR/$did_file_name.did"
 
