@@ -3,10 +3,12 @@ pub mod memory;
 pub mod ops;
 pub mod state;
 
+use ic_canister::export_candid;
 use ic_metrics::Metrics;
 
 pub use crate::canister::Erc20Bridge;
 
+#[export_candid]
 pub fn idl() -> String {
     let signature_verification_idl = Erc20Bridge::idl();
     let mut metrics_idl = <Erc20Bridge as Metrics>::get_idl();

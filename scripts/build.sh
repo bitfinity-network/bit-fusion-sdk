@@ -89,21 +89,17 @@ build_canister() {
     local canister_name="$1"
     local features="$2"
     local output_wasm="$3"
-    local did_file_name="${4:-$canister_name}"
+    local did_file_name="${4:-$output_wasm}"
 
     mkdir -p "$WASM_DIR"
-
-    # Generate the did file
-#    cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
 
     echo "Building $canister_name Canister with features: $features"
 
     cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
-    ic-wasm "target/wasm32-unknown-unknown/release/icrc2_bridge.wasm" -o "$WASM_DIR/$output_wasm" shrink
+    ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm.wasm" shrink
+    candid-extractor "$WASM_DIR/$output_wasm.wasm" > "$WASM_DIR/$did_file_name.did"
 
-    candid-extractor "$WASM_DIR/$output_wasm" > "$WASM_DIR/$did_file_name.did"
-
-    gzip -k "$WASM_DIR/$output_wasm" --force
+    gzip -k "$WASM_DIR/$output_wasm.wasm" --force
 }
 
 # Function to determine which canisters to build based on input
@@ -130,11 +126,11 @@ build_requested_canisters() {
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        build_canister "icrc2-bridge" "export-api" "icrc2-bridge.wasm" "icrc2-bridge"
-        build_canister "erc20-bridge" "export-api" "erc20-bridge.wasm" "erc20-bridge"
-        build_canister "brc20-bridge" "export-api" "brc20-bridge.wasm" "brc20-bridge"
-        build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
-        build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
+        build_canister "icrc2_bridge" "export-api" "icrc2-bridge" "icrc2-bridge"
+        build_canister "erc20_bridge" "export-api" "erc20-bridge" "erc20-bridge"
+        build_canister "brc20_bridge" "export-api" "brc20-bridge" "brc20-bridge"
+        build_canister "btc_bridge" "export-api" "btc-bridge" "btc-bridge"
+        build_canister "rune_bridge" "export-api" "rune-bridge" "rune-bridge"
 
         # Build tools
         build_bridge_tool

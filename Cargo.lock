@@ -954,7 +954,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "brc20-bridge"
+name = "brc20_bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -1124,7 +1124,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 
 [[package]]
-name = "btc-bridge"
+name = "btc_bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -2281,7 +2281,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "erc20-bridge"
+name = "erc20_bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -6095,7 +6095,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "icrc2-bridge"
+name = "icrc2_bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -6220,15 +6220,15 @@ dependencies = [
  "bip39",
  "bitcoin 0.31.2",
  "bitcoincore-rpc",
- "brc20-bridge",
+ "brc20_bridge",
  "bridge-canister",
  "bridge-client",
  "bridge-did",
  "bridge-utils",
- "btc-bridge",
+ "btc_bridge",
  "candid",
  "did",
- "erc20-bridge",
+ "erc20_bridge",
  "eth-signer",
  "ethers-core",
  "evm-canister-client",
@@ -6251,13 +6251,13 @@ dependencies = [
  "ic-test-utils",
  "ic-utils 0.37.0",
  "icrc-client",
- "icrc2-bridge",
+ "icrc2_bridge",
  "once_cell",
  "ord-rs",
  "ordinals",
  "rand",
  "reqwest",
- "rune-bridge",
+ "rune_bridge",
  "rust_decimal",
  "serde",
  "serde_bytes",
@@ -8202,7 +8202,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 
 [[package]]
-name = "rune-bridge"
+name = "rune_bridge"
 version = "0.2.0"
 dependencies = [
  "async-trait",

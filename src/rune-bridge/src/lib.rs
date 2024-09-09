@@ -9,6 +9,7 @@ pub mod ops;
 pub mod state;
 pub mod task;
 
+use ic_canister::export_candid;
 use ic_metrics::Metrics;
 
 pub use crate::canister::RuneBridge;
@@ -17,6 +18,7 @@ const MAINNET_CHAIN_ID: u32 = 0;
 const TESTNET_CHAIN_ID: u32 = 1;
 const REGTEST_CHAIN_ID: u32 = 2;
 
+#[export_candid]
 pub fn idl() -> String {
     let btc_bridge_idl = RuneBridge::idl();
     let mut metrics_idl = <RuneBridge as Metrics>::get_idl();
