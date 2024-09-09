@@ -59,8 +59,10 @@ impl Icrc2BridgeCanister {
     }
 
     fn run_scheduler() {
-        let runtime = get_runtime();
-        runtime.borrow_mut().run();
+        ic::spawn(async {
+            let runtime = get_runtime();
+            runtime.borrow_mut().run().await;
+        })
     }
 
     #[query]

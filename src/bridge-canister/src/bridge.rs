@@ -16,6 +16,7 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::runtime::service::ServiceId;
 use crate::runtime::RuntimeState;
 
 /// Defines an operation that can be executed by the bridge.
@@ -68,6 +69,13 @@ pub trait OperationContext {
 
     /// Get signer for transactions, orders, etc...
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
+
+    /// Adds the given operation to the given service processing.
+    fn push_operation_to_service(
+        &self,
+        service: ServiceId,
+        operation_id: OperationId,
+    ) -> BftResult<()>;
 
     /// Send mint transaction with the given `order` to EVM.
     async fn send_mint_transaction(&self, order: &EncodedMintOrder) -> BftResult<H256> {

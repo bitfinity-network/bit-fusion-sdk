@@ -11,17 +11,22 @@ use crate::bridge::Operation;
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
 
+use super::service::Services;
+
 const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
+pub type SharedServices = Rc<RefCell<Services>>;
 
 pub type Timestamp = u64;
+
 /// Bridge Runtime state.
 pub struct State<Op: Operation> {
     pub config: SharedConfig,
     pub operations: OperationStore<StableMemory, Op>,
     pub collecting_logs_ts: Option<Timestamp>,
     pub refreshing_evm_params_ts: Option<Timestamp>,
+    pub services: SharedServices,
 }
 
 impl<Op: Operation> State<Op> {
@@ -32,12 +37,15 @@ impl<Op: Operation> State<Op> {
             operations: OperationStore::with_memory(memory, None),
             collecting_logs_ts: None,
             refreshing_evm_params_ts: None,
+            services: Default::default(),
         }
     }
 
     /// Checks if the EVM parameters should be refreshed.
     ///
-    /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `refreshing_evm_params_ts` is `None`.
+    /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp
+    /// is older than the `TASK_LOCK_TIMEOUT` duration,
+    /// or if the `refreshing_evm_params_ts` is `None`.
     pub fn should_refresh_evm_params(&self) -> bool {
         self.refreshing_evm_params_ts
             .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
@@ -46,7 +54,9 @@ impl<Op: Operation> State<Op> {
 
     /// Checks if the EVM logs should be collected.
     ///
-    /// The EVM logs are collected if the `collecting_logs_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `collecting_logs_ts` is `None`.
+    /// The EVM logs are collected if the `collecting_logs_ts` timestamp
+    /// is older than the `TASK_LOCK_TIMEOUT` duration,
+    /// or if the `collecting_logs_ts` is `None`.
     pub fn should_collect_evm_logs(&self) -> bool {
         self.collecting_logs_ts
             .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())

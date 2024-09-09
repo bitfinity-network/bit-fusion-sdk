@@ -15,8 +15,10 @@ use ic_stable_structures::StableBTreeMap;
 use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
+use jsonrpc_core::futures;
 
 use self::scheduler::{BridgeScheduler, BridgeTask, ServiceTask};
+use self::service::{DynService, ServiceId, ServiceOrder};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
@@ -61,7 +63,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
     }
 
     /// Run the scheduled tasks.
-    pub fn run(&mut self) {
+    pub async fn run(&mut self) {
         if self.state.borrow().should_collect_evm_logs() {
             self.state.borrow_mut().collecting_logs_ts = Some(ic::time());
 
@@ -78,16 +80,40 @@ impl<Op: Operation> BridgeRuntime<Op> {
             self.scheduler.append_task(refresh_evm_params);
         }
 
-        let task_execution_result = self.scheduler.run(self.state.clone());
+        self.run_services(self.list_services(ServiceOrder::BeforeOperations))
+            .await;
 
+        let task_execution_result = self.scheduler.run(self.state.clone());
         if let Err(err) = task_execution_result {
             log::error!("task execution failed: {err}",);
         }
+
+        self.run_services(self.list_services(ServiceOrder::AfterOperations))
+            .await;
     }
 
     /// Get the state.
     pub fn state(&self) -> &RuntimeState<Op> {
         &self.state
+    }
+
+    fn list_services(&self, order: ServiceOrder) -> Vec<DynService> {
+        let state = self.state.borrow();
+        let services = state.services.borrow();
+        services.services(order).values().cloned().collect()
+    }
+
+    async fn run_services(&self, services: Vec<DynService>) {
+        let mut futures = vec![];
+        for service in services {
+            let future = Box::pin(async move {
+                if let Err(e) = service.run().await {
+                    log::warn!("service returned an error: {e}");
+                }
+            });
+            futures.push(future);
+        }
+        futures::future::join_all(futures).await;
     }
 }
 
@@ -110,6 +136,17 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
 
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.borrow().config.borrow().get_signer()
+    }
+
+    fn push_operation_to_service(
+        &self,
+        service: ServiceId,
+        operation_id: OperationId,
+    ) -> BftResult<()> {
+        self.borrow()
+            .services
+            .borrow_mut()
+            .push_operation(service, operation_id)
     }
 }
 

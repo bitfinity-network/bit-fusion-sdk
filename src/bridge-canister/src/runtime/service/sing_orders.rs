@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 use bridge_did::{
     error::{BftResult, Error},
@@ -22,24 +22,26 @@ pub const MAX_MINT_ORDERS_IN_BATCH: usize = 16;
 
 pub struct SignMintOrdersService<H: MintOrderHandler> {
     order_handler: H,
-    orders: HashMap<OperationId, MintOrder>,
+    orders: RefCell<HashMap<OperationId, MintOrder>>,
 }
 
+#[async_trait::async_trait(?Send)]
 impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
-    async fn push_operation(&mut self, id: OperationId) -> BftResult<()> {
+    fn push_operation(&self, id: OperationId) -> BftResult<()> {
         let order = self
             .order_handler
             .get_order(id)
             .ok_or(Error::OperationNotFound(id))?;
 
-        self.orders.insert(id, order);
+        self.orders.borrow_mut().insert(id, order);
         Ok(())
     }
 
-    async fn run(&mut self) -> BftResult<()> {
-        let orders_number = self.orders.len().min(MAX_MINT_ORDERS_IN_BATCH);
+    async fn run(&self) -> BftResult<()> {
+        let orders_number = self.orders.borrow().len().min(MAX_MINT_ORDERS_IN_BATCH);
         let order_ops: Vec<(OperationId, MintOrder)> = self
             .orders
+            .borrow()
             .iter()
             .map(|(id, order)| (*id, order.clone()))
             .collect();
@@ -61,7 +63,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         };
 
         for order_op in order_ops {
-            self.orders.remove(&order_op.0);
+            self.orders.borrow_mut().remove(&order_op.0);
             self.order_handler
                 .set_signed_order(order_op.0, signed.clone());
         }

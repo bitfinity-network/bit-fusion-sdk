@@ -1,4 +1,5 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
@@ -14,6 +15,8 @@ use serde::Serialize;
 
 use crate::brc20_info::Brc20Tick;
 use crate::core::deposit::Brc20Deposit;
+
+pub const MINT_ORDER_SIGNING_SERVICE: ServiceId = 0;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct DepositRequest {
@@ -66,7 +69,7 @@ impl Operation for Brc20BridgeOp {
             }
             Self::Deposit(Brc20BridgeDepositOp::SignMintOrder(mint_order)) => {
                 log::debug!("Self::SignMintOrder {mint_order:?}");
-                Self::sign_mint_order(ctx, id.nonce(), mint_order).await
+                Self::sign_mint_order(ctx, id, mint_order).await
             }
             Self::Deposit(Brc20BridgeDepositOp::SendMintOrder(mint_order)) => {
                 log::debug!("Self::SendMintOrder {mint_order:?}");
@@ -250,20 +253,18 @@ impl Brc20BridgeOp {
     /// Sign the provided mint order
     async fn sign_mint_order(
         ctx: RuntimeState<Self>,
-        nonce: u32,
+        op_id: OperationId,
         mut mint_order: MintOrder,
     ) -> BftResult<Self> {
         // update nonce
-        mint_order.nonce = nonce;
+        mint_order.nonce = op_id.nonce();
 
-        let deposit = Brc20Deposit::get(ctx)
-            .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
-        let signed = deposit
-            .sign_mint_order(mint_order)
-            .await
+        ctx.push_operation_to_service(MINT_ORDER_SIGNING_SERVICE, op_id)
             .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
 
-        Ok(Self::Deposit(Brc20BridgeDepositOp::SendMintOrder(signed)))
+        Ok(Self::Deposit(Brc20BridgeDepositOp::SignMintOrder(
+            mint_order,
+        )))
     }
 
     /// Send the signed mint order to the bridge

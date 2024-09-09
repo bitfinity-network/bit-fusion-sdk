@@ -994,6 +994,7 @@ dependencies = [
 name = "bridge-canister"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "bridge-did",
  "bridge-utils",
  "candid",

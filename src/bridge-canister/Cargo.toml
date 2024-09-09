@@ -25,6 +25,7 @@ jsonrpc-core = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 ethers-core = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 ic-exports = { workspace = true }

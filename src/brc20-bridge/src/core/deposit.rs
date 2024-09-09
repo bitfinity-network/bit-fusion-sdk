@@ -342,21 +342,6 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         }
     }
 
-    pub async fn sign_mint_order(
-        &self,
-        mint_order: MintOrder,
-    ) -> Result<EncodedMintOrder, DepositError> {
-        let signer = self.runtime_state.get_signer().map_err(|err| {
-            DepositError::Unavailable(format!("cannot initialize signer: {err:?}"))
-        })?;
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| DepositError::Sign(format!("{err:?}")))?;
-
-        Ok(signed_mint_order)
-    }
-
     fn filter_out_used_utxos(
         &self,
         get_utxos_response: &mut GetUtxosResponse,

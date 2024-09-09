@@ -69,7 +69,10 @@ impl Erc20Bridge {
             ic::spawn(get_base_evm_state().refresh_base_evm_params());
         }
 
-        get_runtime().borrow_mut().run();
+        ic::spawn(async {
+            let runtime = get_runtime();
+            runtime.borrow_mut().run().await;
+        })
     }
 
     #[update]
@@ -270,7 +273,8 @@ thread_local! {
     pub static RUNTIME: SharedRuntime =
         Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static BASE_EVM_STATE: SharedEvmState = SharedEvmState::default();
+    pub static BASE_EVM_STATE: SharedEvmState =
+        SharedEvmState::default(get_runtime_state().borrow().services.clone());
 }
 
 pub fn get_runtime() -> SharedRuntime {

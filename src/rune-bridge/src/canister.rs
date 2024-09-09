@@ -15,6 +15,7 @@ use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     ecdsa_public_key, EcdsaPublicKeyArgument,
 };
+use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -54,8 +55,10 @@ impl RuneBridge {
     }
 
     fn run_scheduler() {
-        let runtime = get_runtime();
-        runtime.borrow_mut().run();
+        ic::spawn(async {
+            let runtime = get_runtime();
+            runtime.borrow_mut().run().await;
+        })
     }
 
     /// Returns the bitcoin address that a user has to use to deposit runes to be received on the given Ethereum address.
