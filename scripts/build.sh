@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 set -e
 set -x
@@ -16,7 +16,7 @@ EVM_FEATURES="export-api"
 
 # Function to print help instructions
 print_help() {
-    echo "Usage: $0 [all|icrc2-bridge|rune-bridge|btc-bridge|erc20-bridge]"
+    echo "Usage: $0 [all|all-canisters|icrc2-bridge|rune-bridge|btc-bridge|erc20-bridge]"
     echo "Examples:"
     echo "  $0                          # Build all canisters, download binaries and build tools (default)"
     echo "  $0 all                      # Build all canisters and download binaries and build tools"
@@ -111,7 +111,7 @@ build_requested_canisters() {
         exit 0
     fi
 
-    if [ "$1" = "all" ]; then
+    if [ "$1" = "all" ] || [ "$1" = "all-canisters" ]; then
         initialize_env
         # Download binaries only if "all" is specified
         echo "Getting ICRC-1 Binaries"
@@ -131,23 +131,26 @@ build_requested_canisters() {
         build_canister "btc_bridge" "export-api" "btc-bridge"
         build_canister "rune_bridge" "export-api" "rune-bridge" 
 
-        # Build tools
-        build_bridge_tool
-        build_bridge_deployer_tool
+        if [ "$1" = "all" ]; then
+            # Build tools
+            build_bridge_tool
+            build_bridge_deployer_tool
+        fi
     else
         for canister in "$@"; do
             case "$canister" in
             evm)
-                build_canister "evm_canister" "$EVM_FEATURES" "evm.wasm" "evm"
+                build_canister "evm_canister" "$EVM_FEATURES" "evm"
                 ;;
             evm_testnet)
-                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet.wasm" "evm_testnet"
+                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet"
                 ;;
             signature_verification)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             brc20-bridge | btc-bridge | rune-bridge | icrc2-bridge | erc20-bridge)
-                build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
+                canister_name="${canister//-/_}"
+                build_canister "${canister_name}" "export-api" "${canister}"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."
