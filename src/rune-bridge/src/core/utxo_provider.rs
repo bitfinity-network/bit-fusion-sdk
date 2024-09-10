@@ -217,8 +217,7 @@ mod tests {
         let s = Secp256k1::new();
         let public_key = PublicKey::new(s.generate_keypair(&mut rand::thread_rng()).1);
 
-        let address = Address::p2pkh(&public_key, Network::Bitcoin);
-        address
+        Address::p2pkh(&public_key, Network::Bitcoin)
     }
 
     fn mock_response(v: u32) -> GetUtxosResponse {
