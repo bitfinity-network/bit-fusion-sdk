@@ -3,18 +3,16 @@ use std::collections::HashMap;
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_did::order::MintOrder;
-use candid::CandidType;
+use bridge_did::order::{MintOrder, SignedOrder, SignedOrders};
 use did::keccak;
 use eth_signer::sign_strategy::TransactionSigner;
-use serde::{Deserialize, Serialize};
 
 use super::BridgeService;
 
 pub trait MintOrderHandler {
     fn get_order(&self, id: OperationId) -> Option<MintOrder>;
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
-    fn set_signed_order(&self, id: OperationId, signed: SignedOrders);
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrder);
 }
 
 pub const MAX_MINT_ORDERS_IN_BATCH: usize = 16;
@@ -48,7 +46,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         let mut orders_data = Vec::with_capacity(orders_number * MintOrder::ENCODED_DATA_SIZE);
         for order_op in &order_ops {
             let encoded_order = order_op.1.encode();
-            orders_data.extend_from_slice(&encoded_order.0);
+            orders_data.extend_from_slice(&encoded_order);
         }
 
         let signer = self.order_handler.get_signer()?;
@@ -56,15 +54,17 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         let signature = signer.sign_digest(digest.0 .0).await?;
         let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
 
-        let signed = SignedOrders {
+        let signed_orders = SignedOrders {
             orders_data,
             signature: signature_bytes.to_vec(),
         };
 
-        for order_op in order_ops {
+        for (idx, order_op) in order_ops.into_iter().enumerate() {
             self.orders.borrow_mut().remove(&order_op.0);
+            let signed_order = SignedOrder::new(signed_orders.clone(), idx)
+                .expect("index inside the signed orders list");
             self.order_handler
-                .set_signed_order(order_op.0, signed.clone());
+                .set_signed_order(order_op.0, signed_order);
         }
 
         Ok(())

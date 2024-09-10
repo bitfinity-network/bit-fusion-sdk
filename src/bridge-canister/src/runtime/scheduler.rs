@@ -14,7 +14,7 @@ use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
-use crate::bridge::{Operation, OperationAction, OperationContext};
+use crate::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use crate::runtime::state::config::ConfigStorage;
 
 pub type TasksStorage<Mem, Op> = StableBTreeMap<u64, InnerScheduledTask<BridgeTask<Op>>, Mem>;
@@ -63,30 +63,38 @@ impl<Op: Operation> BridgeTask<Op> {
         task_scheduler: DynScheduler<Op>,
     ) -> BftResult<()> {
         match self {
-            BridgeTask::Operation(id, _) => {
-                let Some(operation) = ctx.borrow().operations.get(id) else {
-                    log::warn!("Operation #{id} not found.");
-                    return Err(Error::OperationNotFound(id));
+            BridgeTask::Operation(op_id, _) => {
+                let Some(operation) = ctx.borrow().operations.get(op_id) else {
+                    log::warn!("Operation #{op_id} not found.");
+                    return Err(Error::OperationNotFound(op_id));
                 };
 
                 let ctx_clone = ctx.clone();
-                let next_step =
+                let progress =
                     operation
-                        .progress(id, ctx.clone())
+                        .progress(op_id, ctx.clone())
                         .await
                         .inspect_err(move |err| {
                             ctx_clone
                                 .borrow_mut()
                                 .operations
-                                .update_with_err(id, err.to_string())
+                                .update_with_err(op_id, err.to_string())
                         })?;
 
-                let scheduling_options = next_step.scheduling_options();
-                ctx.borrow_mut().operations.update(id, next_step.clone());
+                let new_op = match progress {
+                    OperationProgress::Progress(op) => op,
+                    OperationProgress::AddToService(service_id) => {
+                        ctx.push_operation_to_service(service_id, op_id)?;
+                        return Ok(());
+                    }
+                };
+
+                let scheduling_options = new_op.scheduling_options();
+                ctx.borrow_mut().operations.update(op_id, new_op.clone());
 
                 if let Some(options) = scheduling_options {
                     let scheduled_task =
-                        ScheduledTask::with_options(Self::Operation(id, next_step), options);
+                        ScheduledTask::with_options(Self::Operation(op_id, new_op), options);
                     task_scheduler.append_task(scheduled_task);
                 }
 
@@ -283,6 +291,7 @@ mod tests {
     use ic_storage::IcStorage;
 
     use super::*;
+    use crate::bridge::OperationProgress;
     use crate::runtime::state::config::ConfigStorage;
     use crate::runtime::BridgeRuntime;
 
@@ -311,12 +320,16 @@ mod tests {
     }
 
     impl Operation for TestOperation {
-        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
+        async fn progress(
+            self,
+            _id: OperationId,
+            _ctx: RuntimeState<Self>,
+        ) -> BftResult<OperationProgress<Self>> {
             if self.successful {
-                Ok(Self {
+                Ok(OperationProgress::Progress(Self {
                     successful_runs: self.successful_runs + 1,
                     successful: self.successful,
-                })
+                }))
             } else {
                 Err(Error::FailedToProgress(Self::ERR_MESSAGE.to_string()))
             }

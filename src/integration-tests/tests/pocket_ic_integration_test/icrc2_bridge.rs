@@ -7,7 +7,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
-use did::{H160, U256, U64};
+use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClientError;
@@ -205,50 +205,52 @@ async fn test_icrc2_token_canister_stopped() {
 
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
-    let minter_client = ctx.icrc_bridge_client(ADMIN);
-    let refund_mint_order = dbg!(minter_client
-        .get_operations_list(&john_address, None)
-        .await
-        .unwrap())
-    .last()
-    .unwrap()
-    .1
-    .get_signed_mint_order(&dbg!(base_token_id))
-    .expect("mint order prepared");
+    todo!("fix the checks");
 
-    let receipt = ctx
-        .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
-        .await
-        .unwrap();
+    // let minter_client = ctx.icrc_bridge_client(ADMIN);
+    // let refund_mint_order = dbg!(minter_client
+    //     .get_operations_list(&john_address, None)
+    //     .await
+    //     .unwrap())
+    // .last()
+    // .unwrap()
+    // .1
+    // .get_signed_mint_order(&dbg!(base_token_id))
+    // .expect("mint order prepared");
 
-    assert_eq!(
-        receipt.status,
-        Some(U64::one()),
-        "Refund transaction failed: {}",
-        String::from_utf8_lossy(&receipt.output.unwrap_or_default()),
-    );
+    // let receipt = ctx
+    //     .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
+    //     .await
+    //     .unwrap();
 
-    ctx.client
-        .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
-        .await
-        .unwrap();
+    // assert_eq!(
+    //     receipt.status,
+    //     Some(U64::one()),
+    //     "Refund transaction failed: {}",
+    //     String::from_utf8_lossy(&receipt.output.unwrap_or_default()),
+    // );
 
-    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+    // ctx.client
+    //     .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
+    //     .await
+    //     .unwrap();
 
-    // Check if the amount is refunded as wrapped token.
-    let base_balance = base_token_client
-        .icrc1_balance_of(john().into())
-        .await
-        .unwrap();
-    let wrapped_balance = ctx
-        .check_erc20_balance(&wrapped_token, &john_wallet, None)
-        .await
-        .unwrap();
-    assert_eq!(
-        base_balance,
-        ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 2 - amount
-    );
-    assert_eq!(wrapped_balance as u64, amount);
+    // ctx.advance_by_times(Duration::from_secs(2), 10).await;
+
+    // // Check if the amount is refunded as wrapped token.
+    // let base_balance = base_token_client
+    //     .icrc1_balance_of(john().into())
+    //     .await
+    //     .unwrap();
+    // let wrapped_balance = ctx
+    //     .check_erc20_balance(&wrapped_token, &john_wallet, None)
+    //     .await
+    //     .unwrap();
+    // assert_eq!(
+    //     base_balance,
+    //     ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE * 2 - amount
+    // );
+    // assert_eq!(wrapped_balance as u64, amount);
 }
 
 #[tokio::test]

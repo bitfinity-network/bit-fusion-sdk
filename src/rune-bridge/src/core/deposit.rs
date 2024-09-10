@@ -6,7 +6,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::id256::Id256;
-use bridge_did::order::{EncodedMintOrder, MintOrder};
+use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_did::runes::{RuneInfo, RuneName, RuneToWrap};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
@@ -77,11 +77,11 @@ pub struct MintOrderDetails {
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum MintOrderStatus {
     Created {
-        mint_order: EncodedMintOrder,
+        mint_order: SignedMintOrder,
         nonce: u32,
     },
     Sent {
-        mint_order: EncodedMintOrder,
+        mint_order: SignedMintOrder,
         nonce: u32,
         tx_id: H256,
     },

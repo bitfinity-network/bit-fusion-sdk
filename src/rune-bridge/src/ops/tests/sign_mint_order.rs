@@ -90,5 +90,5 @@ async fn returns_correct_operation_and_sets_nonce() {
         panic!("Unexpected resulting operation: {op:?}");
     };
 
-    assert_eq!(order.get_nonce(), NONCE);
+    assert_eq!(order.reader().get_nonce(), NONCE);
 }

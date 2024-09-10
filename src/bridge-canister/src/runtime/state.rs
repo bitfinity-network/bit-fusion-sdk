@@ -65,12 +65,15 @@ impl<Op: Operation> State<Op> {
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::error::BftResult;
+    use bridge_did::op_id::OperationId;
     use candid::CandidType;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::MemoryId;
     use serde::{Deserialize, Serialize};
 
     use super::*;
+    use crate::bridge::OperationProgress;
     use crate::memory::memory_by_id;
     use crate::runtime::{default_state, RuntimeState};
 
@@ -80,9 +83,9 @@ mod tests {
     impl Operation for TestOp {
         async fn progress(
             self,
-            _: bridge_did::op_id::OperationId,
+            _: OperationId,
             _: RuntimeState<Self>,
-        ) -> bridge_did::error::BftResult<Self> {
+        ) -> BftResult<OperationProgress<Self>> {
             unimplemented!()
         }
 

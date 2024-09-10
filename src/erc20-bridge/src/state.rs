@@ -123,9 +123,11 @@ impl OperationContext for SharedEvmState {
 
     fn push_operation_to_service(
         &self,
-        service: ServiceId,
-        operation_id: OperationId,
+        _service: ServiceId,
+        _operation_id: OperationId,
     ) -> BftResult<()> {
+        // Will be implemented when all bridges will work using services.
+        unimplemented!("erc20 bridge doesn't use services now");
     }
 }
 

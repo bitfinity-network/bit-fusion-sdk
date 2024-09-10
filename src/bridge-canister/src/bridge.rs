@@ -5,9 +5,7 @@ use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
-use bridge_utils::bft_events::{
-    self, self, BridgeEvent, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
-};
+use bridge_utils::bft_events::{self, BridgeEvent};
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use candid::CandidType;
@@ -25,7 +23,11 @@ pub trait Operation:
     Sized + CandidType + Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
     /// Execute the operation, and move it to next stage.
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self>;
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>>;
 
     /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
@@ -79,7 +81,7 @@ pub trait OperationContext {
     ) -> BftResult<()>;
 
     /// Send mint transaction with the given `order` to EVM.
-    async fn send_mint_transaction(&self, order: &EncodedMintOrder) -> BftResult<H256> {
+    async fn send_mint_transaction(&self, order: &SignedMintOrder) -> BftResult<H256> {
         let signer = self.get_signer()?;
         let sender = signer.get_address().await?;
         let bridge_contract = self.get_bridge_contract_address()?;
@@ -138,6 +140,13 @@ pub trait OperationContext {
             last_block_number: last_request_block,
         })
     }
+}
+
+/// Variants of operation progress.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OperationProgress<Op> {
+    Progress(Op),
+    AddToService(ServiceId),
 }
 
 /// Action to create or update an operation.

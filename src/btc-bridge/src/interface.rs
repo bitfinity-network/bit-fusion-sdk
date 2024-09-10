@@ -1,4 +1,4 @@
-use bridge_did::order::EncodedMintOrder;
+use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
@@ -25,7 +25,7 @@ pub enum Erc20MintStatus {
     /// The transaction is processed, ckBTC tokens are minted and mint order is created. But there
     /// was a problem sending the mint order to the EVM. The given signed mint order can be sent
     /// manually to the BftBridge ot mint wrapped tokens.
-    Signed(Box<EncodedMintOrder>),
+    Signed(Box<SignedMintOrder>),
     /// Mint order for wrapped tokens is successfully sent to the BftBridge.
     Minted {
         /// Amount of tokens minted.

@@ -1,4 +1,4 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::error::{BftResult, Error};
@@ -20,8 +20,12 @@ use crate::core::deposit::Brc20Deposit;
 pub struct Brc20BridgeOpImpl(pub Brc20BridgeOp);
 
 impl Operation for Brc20BridgeOpImpl {
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self.0 {
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>> {
+        let next_step = match self.0 {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitInputs(deposit)) => {
                 log::debug!("Self::AwaitInputs {deposit:?}");
                 Self::await_inputs(ctx, deposit).await
@@ -46,7 +50,9 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. }) => Err(
                 Error::FailedToProgress("MintOrderConfirmed task cannot be progressed".into()),
             ),
-        }
+        };
+
+        Ok(OperationProgress::Progress(next_step?))
     }
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
@@ -84,12 +90,12 @@ impl Operation for Brc20BridgeOpImpl {
                 ..
             })) => recipient.clone(),
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(signed_mint_order)) => {
-                signed_mint_order.get_recipient()
+                signed_mint_order.reader().get_recipient()
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder {
                 signed_mint_order,
                 ..
-            }) => signed_mint_order.get_recipient(),
+            }) => signed_mint_order.reader().get_recipient(),
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { data }) => {
                 data.recipient.clone()
             }

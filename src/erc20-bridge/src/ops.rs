@@ -1,4 +1,4 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::BftResult;
@@ -19,17 +19,23 @@ use crate::canister::{get_base_evm_config, get_base_evm_state};
 pub struct Erc20BridgeOpImpl(pub Erc20BridgeOp);
 
 impl Operation for Erc20BridgeOpImpl {
-    async fn progress(self, _id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
+    async fn progress(
+        self,
+        _id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>> {
         let stage = Erc20OpStageImpl(self.0.stage);
         let next_stage = match self.0.side {
             BridgeSide::Base => stage.progress(get_base_evm_state()).await?,
             BridgeSide::Wrapped => stage.progress(ctx).await?,
         };
 
-        Ok(Erc20BridgeOpImpl(Erc20BridgeOp {
-            side: self.0.side,
-            stage: next_stage.0,
-        }))
+        Ok(OperationProgress::Progress(Erc20BridgeOpImpl(
+            Erc20BridgeOp {
+                side: self.0.side,
+                stage: next_stage.0,
+            },
+        )))
     }
 
     fn is_complete(&self) -> bool {
@@ -49,6 +55,7 @@ impl Operation for Erc20BridgeOpImpl {
             }
             (BridgeSide::Base, Erc20OpStage::SendMintTransaction(order)) => {
                 order
+                    .reader()
                     .get_sender_id()
                     .to_evm_address()
                     .expect("evm address")
@@ -56,6 +63,7 @@ impl Operation for Erc20BridgeOpImpl {
             }
             (BridgeSide::Base, Erc20OpStage::ConfirmMint { order, .. }) => {
                 order
+                    .reader()
                     .get_sender_id()
                     .to_evm_address()
                     .expect("evm address")
@@ -71,9 +79,11 @@ impl Operation for Erc20BridgeOpImpl {
             // If deposit, use recipient address.
             (BridgeSide::Wrapped, Erc20OpStage::SignMintOrder(order)) => order.recipient.clone(),
             (BridgeSide::Wrapped, Erc20OpStage::SendMintTransaction(order)) => {
-                order.get_recipient()
+                order.reader().get_recipient()
             }
-            (BridgeSide::Wrapped, Erc20OpStage::ConfirmMint { order, .. }) => order.get_recipient(),
+            (BridgeSide::Wrapped, Erc20OpStage::ConfirmMint { order, .. }) => {
+                order.reader().get_recipient()
+            }
             (BridgeSide::Wrapped, Erc20OpStage::TokenMintConfirmed(event)) => {
                 event.recipient.clone()
             }

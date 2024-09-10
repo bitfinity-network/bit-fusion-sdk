@@ -318,6 +318,15 @@ impl Storable for SignedMintOrder {
 }
 
 impl SignedMintOrder {
+    pub fn reader(&self) -> EncodedOrderReader<'_> {
+        EncodedOrderReader(&self.0[..MintOrder::ENCODED_DATA_SIZE])
+    }
+}
+
+/// Reads typed data from encoded MintOrder.
+pub struct EncodedOrderReader<'a>(&'a [u8]);
+
+impl<'a> EncodedOrderReader<'a> {
     /// Returns mint amount.
     pub fn get_amount(&self) -> U256 {
         U256::from_big_endian(&self.0[..32])
@@ -399,6 +408,59 @@ pub struct SignedOrders {
     pub signature: Vec<u8>,
 }
 
+impl SignedOrders {
+    /// Returns number of orders in the batch.
+    pub fn orders_number(&self) -> usize {
+        self.orders_data.len() / MintOrder::ENCODED_DATA_SIZE
+    }
+
+    /// Read data of MintOrder with the given index.
+    pub fn reader(&self, order_idx: usize) -> Option<EncodedOrderReader<'_>> {
+        let data_start = order_idx * MintOrder::ENCODED_DATA_SIZE;
+        let data_end = data_start + MintOrder::ENCODED_DATA_SIZE;
+        if data_end > self.orders_data.len() {
+            return None;
+        }
+
+        Some(EncodedOrderReader(&self.orders_data[data_start..data_end]))
+    }
+}
+
+/// Signed mint orders batch with index of one specific order.
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+pub struct SignedOrder {
+    all_orders: SignedOrders,
+    idx: usize,
+}
+
+impl SignedOrder {
+    /// Creates a signed order and checks if idx inside the orders range.
+    pub fn new(all_orders: SignedOrders, idx: usize) -> Option<Self> {
+        if idx >= all_orders.orders_number() {
+            return None;
+        }
+
+        Some(Self { all_orders, idx })
+    }
+
+    /// Returnt reader of encoded order fields.
+    pub fn reader(&self) -> EncodedOrderReader<'_> {
+        self.all_orders
+            .reader(self.idx)
+            .expect("index should be less than orders number")
+    }
+
+    /// Returns all orders.
+    pub fn all_orders(&self) -> &SignedOrders {
+        &self.all_orders
+    }
+
+    /// Returns index of self inside all orders list.
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use did::{H160, U256};
@@ -433,22 +495,20 @@ mod tests {
         .unwrap();
         let signed_order = order.encode_and_sign(&signer).await.unwrap();
 
-        assert_eq!(order.amount, signed_order.get_amount());
-        assert_eq!(order.sender, signed_order.get_sender_id());
-        assert_eq!(order.src_token, signed_order.get_src_token_id());
-        assert_eq!(order.recipient, signed_order.get_recipient());
-        assert_eq!(order.dst_token, signed_order.get_dst_token());
-        assert_eq!(order.nonce, signed_order.get_nonce());
-        assert_eq!(order.sender_chain_id, signed_order.get_sender_chain_id());
-        assert_eq!(
-            order.recipient_chain_id,
-            signed_order.get_recipient_chain_id()
-        );
-        assert_eq!(order.name, signed_order.get_token_name());
-        assert_eq!(order.symbol, signed_order.get_token_symbol());
-        assert_eq!(order.decimals, signed_order.get_token_decimals());
-        assert_eq!(order.approve_spender, signed_order.get_approve_spender());
-        assert_eq!(order.approve_amount, signed_order.get_approve_amount());
-        assert_eq!(order.fee_payer, signed_order.get_fee_payer());
+        let reader = signed_order.reader();
+        assert_eq!(order.amount, reader.get_amount());
+        assert_eq!(order.sender, reader.get_sender_id());
+        assert_eq!(order.src_token, reader.get_src_token_id());
+        assert_eq!(order.recipient, reader.get_recipient());
+        assert_eq!(order.dst_token, reader.get_dst_token());
+        assert_eq!(order.nonce, reader.get_nonce());
+        assert_eq!(order.sender_chain_id, reader.get_sender_chain_id());
+        assert_eq!(order.recipient_chain_id, reader.get_recipient_chain_id());
+        assert_eq!(order.name, reader.get_token_name());
+        assert_eq!(order.symbol, reader.get_token_symbol());
+        assert_eq!(order.decimals, reader.get_token_decimals());
+        assert_eq!(order.approve_spender, reader.get_approve_spender());
+        assert_eq!(order.approve_amount, reader.get_approve_amount());
+        assert_eq!(order.fee_payer, reader.get_fee_payer());
     }
 }
