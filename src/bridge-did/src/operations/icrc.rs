@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::events::{BurntEventData, MintedEventData};
 use crate::id256::Id256;
-use crate::order::{MintOrder, SignedMintOrder};
+use crate::order::{MintOrder, SignedMintOrder, SignedOrders};
 use crate::reason::Icrc2Burn;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -16,7 +16,7 @@ pub enum IcrcBridgeOp {
         is_refund: bool,
     },
     SendMintTransaction {
-        order: SignedMintOrder,
+        order: SignedOrders,
         is_refund: bool,
     },
     ConfirmMint {

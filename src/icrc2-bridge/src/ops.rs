@@ -1,4 +1,5 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
@@ -10,6 +11,7 @@ use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
 use did::{H160, U256};
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::task::TaskOptions;
@@ -362,8 +364,48 @@ impl IcrcBridgeOpImpl {
     }
 }
 
+/// ICRC token related errors.
 pub enum ErrorCodes {
     IcrcMetadataRequestFailed = 0,
     IcrcBurnFailed = 1,
     IcrcMintFailed = 2,
+}
+
+pub struct IcrcMintOrderHandler {
+    state: RuntimeState<IcrcBridgeOpImpl>,
+}
+
+impl MintOrderHandler for IcrcMintOrderHandler {
+    fn get_order(&self, id: OperationId) -> Option<MintOrder> {
+        let op = self.state.borrow().operations.get(id)?;
+        let IcrcBridgeOp::SignMintOrder { order, .. } = op.0 else {
+            log::info!("Mint order handler failed to get MintOrder: unexpected state.");
+            return None;
+        };
+
+        Some(order)
+    }
+
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.state.get_signer()
+    }
+
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrders) {
+        let op = self.state.borrow().operations.get(id)?;
+        let IcrcBridgeOp::SignMintOrder { order, is_refund } = op.0 else {
+            log::info!("Mint order handler failed to set MintOrder: unexpected state.");
+            return None;
+        };
+
+        let new_op = IcrcBridgeOp::SendMintTransaction {
+            order: signed,
+            is_refund,
+        };
+        self.state
+            .borrow_mut()
+            .operations
+            .update(id, IcrcBridgeOpImpl(new_op));
+
+        Some(order)
+    }
 }
