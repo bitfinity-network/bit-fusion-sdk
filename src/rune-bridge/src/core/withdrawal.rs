@@ -98,6 +98,7 @@ impl Withdrawal<IcUtxoProvider> {
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
+        let cache_timeout = state_ref.utxo_cache_timeout();
         let signer = state_ref
             .btc_signer(&signing_strategy)
             .ok_or(WithdrawError::SignerNotInitialized)?;
@@ -108,7 +109,7 @@ impl Withdrawal<IcUtxoProvider> {
             state,
             network,
             signer,
-            utxo_provider: IcUtxoProvider::new(ic_network),
+            utxo_provider: IcUtxoProvider::new(ic_network, cache_timeout),
         })
     }
 

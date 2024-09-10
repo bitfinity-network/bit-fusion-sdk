@@ -12,6 +12,10 @@ use super::{DEFAULT_DEPOSIT_FEE, DEFAULT_INDEXER_CONSENSUS_THRESHOLD, DEFAULT_ME
 #[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
+
+    /// Specifies the period for which the result of BTC network requests would persist in the
+    /// canister cache. If set to None or 0, the cache will not be used.
+    pub btc_cache_timeout_secs: Option<u32>,
     pub min_confirmations: u32,
     pub indexer_urls: HashSet<String>,
     pub deposit_fee: u64,
@@ -38,6 +42,7 @@ impl Default for RuneBridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
             min_confirmations: 12,
             indexer_urls: HashSet::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
@@ -74,6 +79,7 @@ mod test {
     fn test_should_encode_and_decode_config() {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: Some(300),
             min_confirmations: 12,
             indexer_urls: vec![
                 "https://indexer1.com".to_string(),
@@ -97,6 +103,7 @@ mod test {
     fn test_should_encode_and_decode_config_with_empty_urls() {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: None,
             min_confirmations: 12,
             indexer_urls: HashSet::new(),
             deposit_fee: 100,

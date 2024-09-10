@@ -161,6 +161,7 @@ impl RunesContext {
 
         let rune_config = RuneBridgeConfig {
             network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
             min_confirmations: 1,
             indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
