@@ -22,7 +22,6 @@ use ic_canister::{
 };
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_cdk;
-use ic_exports::ic_kit::ic;
 use ic_exports::ledger::Subaccount;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -59,10 +58,8 @@ impl BtcBridge {
     }
 
     fn run_scheduler() {
-        ic::spawn(async {
-            let runtime = get_runtime();
-            runtime.borrow_mut().run().await;
-        })
+        let runtime = get_runtime();
+        runtime.borrow_mut().run();
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.

@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
@@ -7,6 +8,7 @@ use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BridgeEvent;
 use candid::{CandidType, Decode};
 use drop_guard::guard;
+use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
@@ -21,6 +23,56 @@ pub type TasksStorage<Mem, Op> = StableBTreeMap<u64, InnerScheduledTask<BridgeTa
 pub type BridgeScheduler<Mem, Op> =
     Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>, StableCell<u64, Mem>>;
 pub type DynScheduler<Op> = Box<dyn TaskScheduler<BridgeTask<Op>>>;
+
+/// Newtype for `Rc<Scheduler>`.
+#[derive(Clone)]
+pub struct SharedScheduler<Mem, Op>(Rc<BridgeScheduler<Mem, Op>>)
+where
+    Mem: Memory + 'static,
+    Op: Operation;
+
+impl<Mem, Op> SharedScheduler<Mem, Op>
+where
+    Mem: Memory + 'static,
+    Op: Operation,
+{
+    pub fn new(
+        tasks_storage: TasksStorage<Mem, Op>,
+        sequence: StableCell<u64, Mem>,
+    ) -> SharedScheduler<Mem, Op> {
+        Self(Rc::new(BridgeScheduler::new(tasks_storage, sequence)))
+    }
+
+    pub fn run(&self, state: RuntimeState<Op>) -> Result<usize, SchedulerError> {
+        self.0.run(state)
+    }
+}
+
+impl<Mem, Op> TaskScheduler<BridgeTask<Op>> for SharedScheduler<Mem, Op>
+where
+    Mem: Memory + 'static,
+    Op: Operation,
+{
+    fn append_task(&self, task: ScheduledTask<BridgeTask<Op>>) -> u64 {
+        self.0.append_task(task)
+    }
+
+    fn append_tasks(&self, tasks: Vec<ScheduledTask<BridgeTask<Op>>>) -> Vec<u64> {
+        self.0.append_tasks(tasks)
+    }
+
+    fn get_task(&self, task_id: u64) -> Option<InnerScheduledTask<BridgeTask<Op>>> {
+        self.0.get_task(task_id)
+    }
+
+    fn find_id(&self, filter: &dyn Fn(BridgeTask<Op>) -> bool) -> Option<u64> {
+        self.0.find_id(filter)
+    }
+
+    fn reschedule(&self, task_id: u64, options: ic_task_scheduler::task::TaskOptions) {
+        self.0.reschedule(task_id, options)
+    }
+}
 
 /// Logs errors that occur during task execution.
 ///

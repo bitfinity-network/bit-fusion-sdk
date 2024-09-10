@@ -70,10 +70,8 @@ impl Erc20Bridge {
             ic::spawn(get_base_evm_state().refresh_base_evm_params());
         }
 
-        ic::spawn(async {
-            let runtime = get_runtime();
-            runtime.borrow_mut().run().await;
-        })
+        let runtime = get_runtime();
+        runtime.borrow_mut().run();
     }
 
     #[update]

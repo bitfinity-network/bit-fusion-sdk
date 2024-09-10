@@ -17,7 +17,7 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
 use jsonrpc_core::futures;
 
-use self::scheduler::{BridgeScheduler, BridgeTask, ServiceTask};
+use self::scheduler::{BridgeTask, ServiceTask, SharedScheduler};
 use self::service::{DynService, ServiceId, ServiceOrder};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
@@ -35,7 +35,7 @@ pub type RuntimeState<Op> = Rc<RefCell<State<Op>>>;
 /// Stores a state, schedules tasks and executes them.
 pub struct BridgeRuntime<Op: Operation> {
     state: RuntimeState<Op>,
-    scheduler: BridgeScheduler<StableMemory, Op>,
+    scheduler: SharedScheduler<StableMemory, Op>,
 }
 
 impl<Op: Operation> BridgeRuntime<Op> {
@@ -46,7 +46,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
             .expect("Cannot create task sequence cell");
         Self {
             state: default_state(config),
-            scheduler: BridgeScheduler::new(tasks_storage, sequence),
+            scheduler: SharedScheduler::new(tasks_storage, sequence),
         }
     }
 
@@ -57,7 +57,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
     }
 
     /// Provides access to tasks scheduler.
-    pub fn schedule_operation(&mut self, id: OperationId, operation: Op) {
+    pub fn schedule_operation(&self, id: OperationId, operation: Op) {
         let options = operation.scheduling_options().unwrap_or_default();
         let scheduled_task =
             ScheduledTask::with_options(BridgeTask::Operation(id, operation), options);
@@ -65,7 +65,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
     }
 
     /// Run the scheduled tasks.
-    pub async fn run(&mut self) {
+    pub fn run(&mut self) {
         if self.state.borrow().should_collect_evm_logs() {
             self.state.borrow_mut().collecting_logs_ts = Some(ic::time());
 
@@ -82,16 +82,21 @@ impl<Op: Operation> BridgeRuntime<Op> {
             self.scheduler.append_task(refresh_evm_params);
         }
 
-        self.run_services(self.list_services(ServiceOrder::BeforeOperations))
-            .await;
+        let services_before_ops = self.list_services(ServiceOrder::BeforeOperations);
+        let services_after_ops = self.list_services(ServiceOrder::AfterOperations);
+        let scheduler = self.scheduler.clone();
+        let state = self.state.clone();
 
-        let task_execution_result = self.scheduler.run(self.state.clone());
-        if let Err(err) = task_execution_result {
-            log::error!("task execution failed: {err}",);
-        }
+        ic::spawn(async move {
+            Self::run_services(services_before_ops).await;
 
-        self.run_services(self.list_services(ServiceOrder::AfterOperations))
-            .await;
+            let task_execution_result = scheduler.run(state);
+            if let Err(err) = task_execution_result {
+                log::error!("task execution failed: {err}",);
+            }
+
+            Self::run_services(services_after_ops).await;
+        });
     }
 
     /// Get the state.
@@ -105,7 +110,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         services.services(order).values().cloned().collect()
     }
 
-    async fn run_services(&self, services: Vec<DynService>) {
+    async fn run_services(services: Vec<DynService>) {
         let mut futures = vec![];
         for service in services {
             let future = Box::pin(async move {
