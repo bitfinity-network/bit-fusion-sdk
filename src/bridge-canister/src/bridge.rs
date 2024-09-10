@@ -5,9 +5,8 @@ use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
-use bridge_utils::bft_events::{self, BridgeEvent};
 use bridge_utils::bft_events::{
-    self, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
+    self, self, BridgeEvent, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
 };
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;

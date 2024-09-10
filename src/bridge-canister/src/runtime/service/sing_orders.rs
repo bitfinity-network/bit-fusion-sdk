@@ -1,10 +1,9 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
-use bridge_did::{
-    error::{BftResult, Error},
-    op_id::OperationId,
-    order::MintOrder,
-};
+use bridge_did::error::{BftResult, Error};
+use bridge_did::op_id::OperationId;
+use bridge_did::order::MintOrder;
 use candid::CandidType;
 use did::keccak;
 use eth_signer::sign_strategy::TransactionSigner;

@@ -1,9 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
-use bridge_did::{
-    error::{BftResult, Error},
-    op_id::OperationId,
-};
+use bridge_did::error::{BftResult, Error};
+use bridge_did::op_id::OperationId;
 
 pub mod sing_orders;
 

@@ -7,11 +7,10 @@ use std::time::Duration;
 use ic_exports::ic_kit::ic;
 
 use self::config::ConfigStorage;
+use super::service::Services;
 use crate::bridge::Operation;
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
-
-use super::service::Services;
 
 const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
 
