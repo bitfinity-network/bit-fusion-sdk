@@ -30,7 +30,7 @@ ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-stable-structures = { workspace = true }
 icrc-client = { workspace = true }
-icrc2-bridge = { path = "../icrc2-bridge" }
+icrc2_bridge = { path = "../icrc2-bridge" }
 once_cell = { workspace = true }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
@@ -55,12 +55,12 @@ ic-state-machine-tests = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-brc20-bridge = { path = "../brc20-bridge" }
-btc-bridge = { path = "../btc-bridge" }
-erc20-bridge = { path = "../erc20-bridge" }
+brc20_bridge = { path = "../brc20-bridge" }
+btc_bridge = { path = "../btc-bridge" }
+erc20_bridge = { path = "../erc20-bridge" }
 ic-test-utils = { workspace = true }
 ic-utils = { workspace = true }
-rune-bridge = { path = "../rune-bridge" }
+rune_bridge = { path = "../rune-bridge" }
 serial_test = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }

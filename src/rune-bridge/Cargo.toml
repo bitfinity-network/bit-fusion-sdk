@@ -1,7 +1,10 @@
 [package]
-name = "rune-bridge"
+name = "rune_bridge"
 version.workspace = true
 edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
