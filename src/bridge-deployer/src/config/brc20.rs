@@ -46,7 +46,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<Brc20BridgeConfig> for brc20_bridge::state::Brc20BridgeConfig {
+impl From<Brc20BridgeConfig> for bridge_did::init::Brc20BridgeConfig {
     fn from(value: Brc20BridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),

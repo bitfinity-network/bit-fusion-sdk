@@ -6,7 +6,6 @@ pub mod key;
 pub mod ledger;
 pub mod memory;
 pub mod ops;
-pub mod rune_info;
 pub mod state;
 pub mod task;
 

@@ -3,11 +3,12 @@ use std::cell::RefCell;
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{EncodedMintOrder, MintOrder};
+use bridge_did::operations::BtcBridgeOp;
+use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_did::reason::BtcDeposit;
-use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use candid::{CandidType, Decode, Principal};
 use did::H160;
 use ic_canister::virtual_canister_call;
@@ -28,60 +29,29 @@ use crate::interface::{BtcBridgeError, BtcWithdrawError};
 use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub enum BtcBridgeOp {
-    // Deposit operations:
-    UpdateCkBtcBalance {
-        eth_address: H160,
-    },
-    CollectCkBtcBalance {
-        eth_address: H160,
-    },
-    TransferCkBtc {
-        eth_address: H160,
-        amount: u64,
-    },
-    CreateMintOrder {
-        eth_address: H160,
-        amount: u64,
-    },
-    MintErc20 {
-        eth_address: H160,
-        order: EncodedMintOrder,
-    },
-    ConfirmErc20Mint {
-        order: EncodedMintOrder,
-        eth_address: H160,
-    },
-    Erc20MintConfirmed(MintedEventData),
+pub struct BtcBridgeOpImpl(pub BtcBridgeOp);
 
-    // Withdraw operations:
-    WithdrawBtc(BurntEventData),
-    BtcWithdrawConfirmed {
-        eth_address: H160,
-    },
-}
-
-impl Operation for BtcBridgeOp {
+impl Operation for BtcBridgeOpImpl {
     async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self {
-            Self::UpdateCkBtcBalance { eth_address } => {
+        match self.0 {
+            BtcBridgeOp::UpdateCkBtcBalance { eth_address } => {
                 log::debug!("UpdateCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_minter = get_state().borrow().ck_btc_minter();
                 Self::update_ckbtc_balance(ckbtc_minter, &eth_address).await?;
 
-                Ok(Self::CollectCkBtcBalance { eth_address })
+                Ok(Self(BtcBridgeOp::CollectCkBtcBalance { eth_address }))
             }
-            Self::CollectCkBtcBalance { eth_address } => {
+            BtcBridgeOp::CollectCkBtcBalance { eth_address } => {
                 log::debug!("CollectCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_ledger = get_state().borrow().ck_btc_ledger();
                 let ckbtc_balance = Self::collect_ckbtc_balance(ckbtc_ledger, &eth_address).await?;
 
-                Ok(Self::TransferCkBtc {
+                Ok(Self(BtcBridgeOp::TransferCkBtc {
                     eth_address,
                     amount: ckbtc_balance,
-                })
+                }))
             }
-            Self::TransferCkBtc {
+            BtcBridgeOp::TransferCkBtc {
                 eth_address,
                 amount,
             } => {
@@ -96,89 +66,89 @@ impl Operation for BtcBridgeOp {
                     Self::transfer_ckbtc_to_bridge(ckbtc_ledger, &eth_address, amount, ckbtc_fee)
                         .await?;
 
-                Ok(Self::CreateMintOrder {
+                Ok(Self(BtcBridgeOp::CreateMintOrder {
                     eth_address,
                     amount: amount_minus_fee,
-                })
+                }))
             }
-            Self::CreateMintOrder {
+            BtcBridgeOp::CreateMintOrder {
                 eth_address,
                 amount,
             } => {
                 log::debug!("CreateMintOrder: Eth address {eth_address}, amount {amount}");
                 let mint_order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
-                Ok(Self::MintErc20 {
+                Ok(Self(BtcBridgeOp::MintErc20 {
                     order: mint_order,
                     eth_address,
-                })
+                }))
             }
-            Self::MintErc20 { eth_address, order } => {
+            BtcBridgeOp::MintErc20 { eth_address, order } => {
                 log::debug!("MintErc20: Eth address {eth_address}");
                 ctx.send_mint_transaction(&order).await?;
 
-                Ok(Self::ConfirmErc20Mint { order, eth_address })
+                Ok(Self(BtcBridgeOp::ConfirmErc20Mint { order, eth_address }))
             }
-            Self::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
+            BtcBridgeOp::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
                 "ConfirmErc20Mint task should progress only on the Minted EVM event".into(),
             )),
-            Self::Erc20MintConfirmed { .. } => Err(Error::FailedToProgress(
+            BtcBridgeOp::Erc20MintConfirmed { .. } => Err(Error::FailedToProgress(
                 "ConfirmMint task should not progress".into(),
             )),
-            Self::WithdrawBtc(event) => {
+            BtcBridgeOp::WithdrawBtc(event) => {
                 log::debug!("WithdrawBtc: Eth address {}", event.sender);
                 Self::withdraw_btc(&event).await?;
 
-                Ok(Self::BtcWithdrawConfirmed {
+                Ok(Self(BtcBridgeOp::BtcWithdrawConfirmed {
                     eth_address: event.sender,
-                })
+                }))
             }
-            Self::BtcWithdrawConfirmed { .. } => Err(Error::FailedToProgress(
+            BtcBridgeOp::BtcWithdrawConfirmed { .. } => Err(Error::FailedToProgress(
                 "ConfirmMint task should not progress".into(),
             )),
         }
     }
 
     fn is_complete(&self) -> bool {
-        match self {
-            Self::UpdateCkBtcBalance { .. } => false,
-            Self::CollectCkBtcBalance { .. } => false,
-            Self::TransferCkBtc { .. } => false,
-            Self::CreateMintOrder { .. } => false,
-            Self::MintErc20 { .. } => false,
-            Self::ConfirmErc20Mint { .. } => false,
-            Self::Erc20MintConfirmed { .. } => true,
-            Self::WithdrawBtc { .. } => false,
-            Self::BtcWithdrawConfirmed { .. } => true,
+        match self.0 {
+            BtcBridgeOp::UpdateCkBtcBalance { .. } => false,
+            BtcBridgeOp::CollectCkBtcBalance { .. } => false,
+            BtcBridgeOp::TransferCkBtc { .. } => false,
+            BtcBridgeOp::CreateMintOrder { .. } => false,
+            BtcBridgeOp::MintErc20 { .. } => false,
+            BtcBridgeOp::ConfirmErc20Mint { .. } => false,
+            BtcBridgeOp::Erc20MintConfirmed { .. } => true,
+            BtcBridgeOp::WithdrawBtc { .. } => false,
+            BtcBridgeOp::BtcWithdrawConfirmed { .. } => true,
         }
     }
 
     fn evm_wallet_address(&self) -> H160 {
-        match self {
-            Self::BtcWithdrawConfirmed { eth_address } => eth_address.clone(),
-            Self::CollectCkBtcBalance { eth_address } => eth_address.clone(),
-            Self::CreateMintOrder { eth_address, .. } => eth_address.clone(),
-            Self::ConfirmErc20Mint { eth_address, .. } => eth_address.clone(),
-            Self::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
-            Self::MintErc20 { eth_address, .. } => eth_address.clone(),
-            Self::TransferCkBtc { eth_address, .. } => eth_address.clone(),
-            Self::UpdateCkBtcBalance { eth_address } => eth_address.clone(),
-            Self::WithdrawBtc(BurntEventData { sender, .. }) => sender.clone(),
+        match &self.0 {
+            BtcBridgeOp::BtcWithdrawConfirmed { eth_address } => eth_address.clone(),
+            BtcBridgeOp::CollectCkBtcBalance { eth_address } => eth_address.clone(),
+            BtcBridgeOp::CreateMintOrder { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::ConfirmErc20Mint { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
+            BtcBridgeOp::MintErc20 { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::TransferCkBtc { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::UpdateCkBtcBalance { eth_address } => eth_address.clone(),
+            BtcBridgeOp::WithdrawBtc(BurntEventData { sender, .. }) => sender.clone(),
         }
     }
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
-        match self {
-            Self::UpdateCkBtcBalance { .. } => Some(
+        match self.0 {
+            BtcBridgeOp::UpdateCkBtcBalance { .. } => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_backoff_policy(BackoffPolicy::Fixed { secs: 5 }),
             ),
-            Self::CollectCkBtcBalance { .. }
-            | Self::MintErc20 { .. }
-            | Self::CreateMintOrder { .. }
-            | Self::TransferCkBtc { .. }
-            | Self::WithdrawBtc(_) => Some(
+            BtcBridgeOp::CollectCkBtcBalance { .. }
+            | BtcBridgeOp::MintErc20 { .. }
+            | BtcBridgeOp::CreateMintOrder { .. }
+            | BtcBridgeOp::TransferCkBtc { .. }
+            | BtcBridgeOp::WithdrawBtc(_) => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(3)
                     .with_backoff_policy(BackoffPolicy::Exponential {
@@ -186,9 +156,9 @@ impl Operation for BtcBridgeOp {
                         multiplier: 4,
                     }),
             ),
-            Self::BtcWithdrawConfirmed { .. }
-            | Self::ConfirmErc20Mint { .. }
-            | Self::Erc20MintConfirmed(_) => None,
+            BtcBridgeOp::BtcWithdrawConfirmed { .. }
+            | BtcBridgeOp::ConfirmErc20Mint { .. }
+            | BtcBridgeOp::Erc20MintConfirmed(_) => None,
         }
     }
 
@@ -199,7 +169,7 @@ impl Operation for BtcBridgeOp {
         log::trace!("wrapped token minted");
         Some(OperationAction::Update {
             nonce: event.nonce,
-            update_to: Self::Erc20MintConfirmed(event),
+            update_to: Self(BtcBridgeOp::Erc20MintConfirmed(event)),
         })
     }
 
@@ -209,7 +179,10 @@ impl Operation for BtcBridgeOp {
     ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
         log::trace!("wrapped token burnt");
         let memo = event.memo();
-        Some(OperationAction::Create(Self::WithdrawBtc(event), memo))
+        Some(OperationAction::Create(
+            Self(BtcBridgeOp::WithdrawBtc(event)),
+            memo,
+        ))
     }
 
     async fn on_minter_notification(
@@ -236,19 +209,19 @@ impl Operation for BtcBridgeOp {
         let memo = event.memo();
 
         Some(OperationAction::Create(
-            BtcBridgeOp::UpdateCkBtcBalance {
+            Self(BtcBridgeOp::UpdateCkBtcBalance {
                 eth_address: btc_deposit.recipient,
-            },
+            }),
             memo,
         ))
     }
 }
 
-impl BtcBridgeOp {
-    pub fn get_signed_mint_order(&self) -> Option<EncodedMintOrder> {
-        match self {
-            Self::ConfirmErc20Mint { order, .. } => Some(*order),
-            Self::MintErc20 { order, .. } => Some(*order),
+impl BtcBridgeOpImpl {
+    pub fn get_signed_mint_order(&self) -> Option<SignedMintOrder> {
+        match &self.0 {
+            BtcBridgeOp::ConfirmErc20Mint { order, .. } => Some(*order),
+            BtcBridgeOp::MintErc20 { order, .. } => Some(*order),
             _ => None,
         }
     }
@@ -381,7 +354,7 @@ impl BtcBridgeOp {
         eth_address: &H160,
         nonce: u32,
         amount: u64,
-    ) -> BftResult<EncodedMintOrder> {
+    ) -> BftResult<SignedMintOrder> {
         let state = get_state();
 
         log::debug!(
@@ -427,7 +400,7 @@ impl BtcBridgeOp {
         eth_address: H160,
         amount: u64,
         nonce: u32,
-    ) -> BftResult<EncodedMintOrder> {
+    ) -> BftResult<SignedMintOrder> {
         log::trace!("preparing mint order");
 
         let (signer, mint_order) = {

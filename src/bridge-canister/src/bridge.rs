@@ -1,9 +1,11 @@
 #![allow(async_fn_in_trait)]
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::EncodedMintOrder;
+use bridge_did::order::SignedMintOrder;
+use bridge_utils::bft_events::{self, BridgeEvent};
 use bridge_utils::bft_events::{
     self, BridgeEvent, BurntEventData, MintedEventData, NotifyMinterEventData,
 };

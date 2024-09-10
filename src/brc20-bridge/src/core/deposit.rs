@@ -5,6 +5,7 @@ use std::rc::Rc;
 use bitcoin::{Address, Network};
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
+use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
 use bridge_did::id256::Id256;
 use bridge_did::order::{EncodedMintOrder, MintOrder};
 use candid::{CandidType, Deserialize};
@@ -14,14 +15,13 @@ use rust_decimal::Decimal;
 use serde::Serialize;
 
 use super::index_provider::IcHttpClient;
-use crate::brc20_info::{Brc20Info, Brc20Tick};
 use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{BtcSignerType, KeyError};
 use crate::ledger::UtxoKey;
-use crate::ops::Brc20BridgeOp;
+use crate::ops::Brc20BridgeOpImpl;
 use crate::state::Brc20State;
 
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
@@ -115,7 +115,7 @@ pub(crate) struct Brc20Deposit<
     INDEX: Brc20IndexProvider = OrdIndexProvider<IcHttpClient>,
 > {
     brc20_state: Rc<RefCell<Brc20State>>,
-    runtime_state: RuntimeState<Brc20BridgeOp>,
+    runtime_state: RuntimeState<Brc20BridgeOpImpl>,
     network: Network,
     signer: BtcSignerType,
     utxo_provider: UTXO,
@@ -125,7 +125,7 @@ pub(crate) struct Brc20Deposit<
 impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     pub fn new(
         state: Rc<RefCell<Brc20State>>,
-        runtime_state: RuntimeState<Brc20BridgeOp>,
+        runtime_state: RuntimeState<Brc20BridgeOpImpl>,
     ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
 
@@ -159,7 +159,7 @@ impl Brc20Deposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
         })
     }
 
-    pub fn get(runtime_state: RuntimeState<Brc20BridgeOp>) -> Result<Self, DepositError> {
+    pub fn get(runtime_state: RuntimeState<Brc20BridgeOpImpl>) -> Result<Self, DepositError> {
         Self::new(get_brc20_state(), runtime_state)
     }
 }

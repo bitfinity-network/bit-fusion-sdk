@@ -31,4 +31,5 @@ serde = { workspace = true }
 tokio = { workspace = true }
 
 [build-dependencies]
-vergen = { workspace = true }
+anyhow = { workspace = true }
+vergen-gitcl = { workspace = true }

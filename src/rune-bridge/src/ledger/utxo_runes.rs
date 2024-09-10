@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
+use bridge_did::runes::RuneInfo;
 use ic_stable_structures::{Bound, Storable};
-
-use crate::rune_info::RuneInfo;
 
 /// Data structure to keep track rune information for a utxo.
 pub struct UtxoRunes(Vec<RuneInfo>);
@@ -49,10 +48,10 @@ impl Storable for UtxoRunes {
 #[cfg(test)]
 mod test {
 
+    use bridge_did::runes::RuneName;
     use ordinals::Rune;
 
     use super::*;
-    use crate::rune_info::RuneName;
 
     #[test]
     fn test_should_encode_and_decode_utxo_runes() {

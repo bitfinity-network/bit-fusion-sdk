@@ -45,9 +45,9 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
+use bridge_did::event_data::MinterNotificationType;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::MinterNotificationType;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
@@ -122,7 +122,7 @@ pub trait TestContext {
     /// Sends tx with notification to EVMc.
     async fn send_notification_tx(
         &self,
-        user: &Wallet<SigningKey>,
+        user: &Wallet<'_, SigningKey>,
         input: NotificationInput,
     ) -> Result<H256> {
         let address: H160 = user.address().into();
@@ -271,8 +271,9 @@ pub trait TestContext {
             .await?;
 
         let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
+
         raw_client
-            .update("set_bft_bridge_contract", (bridge_address.clone(),))
+            .update::<_, ()>("set_bft_bridge_contract", (bridge_address.clone(),))
             .await?;
 
         Ok(bridge_address)

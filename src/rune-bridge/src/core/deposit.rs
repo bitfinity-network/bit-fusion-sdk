@@ -4,10 +4,10 @@ use std::rc::Rc;
 
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
-use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::id256::Id256;
 use bridge_did::order::{EncodedMintOrder, MintOrder};
+use bridge_did::runes::{RuneInfo, RuneName, RuneToWrap};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
@@ -17,13 +17,12 @@ use super::index_provider::IcHttpClient;
 use crate::canister::{get_rune_state, get_runtime_state};
 use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandler, UtxoHandlerError};
+use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UnspentUtxoInfo;
-use crate::ops::RuneBridgeOp;
-use crate::rune_info::{RuneInfo, RuneName};
+use crate::ops::RuneBridgeOpImpl;
 use crate::state::RuneState;
 
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
@@ -117,7 +116,7 @@ pub(crate) struct RuneDeposit<
     INDEX: RuneIndexProvider = OrdIndexProvider<IcHttpClient>,
 > {
     rune_state: Rc<RefCell<RuneState>>,
-    runtime_state: RuntimeState<RuneBridgeOp>,
+    runtime_state: RuntimeState<RuneBridgeOpImpl>,
     network: Network,
     signer: BtcSignerType,
     utxo_provider: UTXO,
@@ -127,7 +126,7 @@ pub(crate) struct RuneDeposit<
 impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
     pub fn new(
         state: Rc<RefCell<RuneState>>,
-        runtime_state: RuntimeState<RuneBridgeOp>,
+        runtime_state: RuntimeState<RuneBridgeOpImpl>,
     ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
 
@@ -161,7 +160,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
         })
     }
 
-    pub fn get(runtime_state: RuntimeState<RuneBridgeOp>) -> Result<Self, DepositError> {
+    pub fn get(runtime_state: RuntimeState<RuneBridgeOpImpl>) -> Result<Self, DepositError> {
         Self::new(get_rune_state(), runtime_state)
     }
 }
@@ -384,21 +383,6 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
             approve_amount: Default::default(),
             fee_payer: H160::default(),
         }
-    }
-
-    pub async fn sign_mint_order(
-        &self,
-        mint_order: MintOrder,
-    ) -> Result<EncodedMintOrder, DepositError> {
-        let signer = self.runtime_state.get_signer().map_err(|err| {
-            DepositError::Unavailable(format!("cannot initialize signer: {err:?}"))
-        })?;
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| DepositError::Sign(format!("{err:?}")))?;
-
-        Ok(signed_mint_order)
     }
 
     fn filter_out_used_utxos(

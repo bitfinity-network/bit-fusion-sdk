@@ -2,11 +2,12 @@ use std::future::Future;
 use std::pin::Pin;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::{BridgeEvent, MinterNotificationType, NotifyMinterEventData};
+use bridge_utils::bft_events::BridgeEvent;
 use candid::{CandidType, Decode};
 use drop_guard::guard;
-use ic_stable_structures::StableBTreeMap;
+use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
 use ic_task_scheduler::SchedulerError;
@@ -16,8 +17,9 @@ use super::RuntimeState;
 use crate::bridge::{Operation, OperationAction, OperationContext};
 use crate::runtime::state::config::ConfigStorage;
 
-pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask<Op>>, Mem>;
-pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;
+pub type TasksStorage<Mem, Op> = StableBTreeMap<u64, InnerScheduledTask<BridgeTask<Op>>, Mem>;
+pub type BridgeScheduler<Mem, Op> =
+    Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>, StableCell<u64, Mem>>;
 pub type DynScheduler<Op> = Box<dyn TaskScheduler<BridgeTask<Op>>>;
 
 /// Logs errors that occur during task execution.
@@ -275,7 +277,7 @@ impl<Op: Operation> Task for BridgeTask<Op> {
 
 #[cfg(test)]
 mod tests {
-    use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+    use bridge_did::event_data::*;
     use did::H160;
     use ic_exports::ic_kit::MockContext;
     use ic_storage::IcStorage;

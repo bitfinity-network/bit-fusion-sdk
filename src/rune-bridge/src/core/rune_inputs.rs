@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
+use bridge_did::runes::{RuneInfo, RuneName};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::RejectionCode;
 use thiserror::Error;
 
 use crate::key::KeyError;
-use crate::rune_info::{RuneInfo, RuneName};
-
 #[derive(Debug, Clone, Default)]
 pub(crate) struct RuneInput {
     pub utxo: Utxo,

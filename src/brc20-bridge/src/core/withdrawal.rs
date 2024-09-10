@@ -2,15 +2,15 @@ use std::str::FromStr;
 
 use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::{Address, Transaction};
+use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
+use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
-use bridge_utils::bft_events::BurntEventData;
 use candid::types::{Serializer, Type};
 use candid::{CandidType, Deserialize};
 use did::H160;
 use ic_exports::ic_kit::ic;
 use serde::{Deserializer, Serialize};
 
-use crate::brc20_info::{Brc20Info, Brc20Tick};
 use crate::interface::WithdrawError;
 use crate::state::Brc20State;
 

@@ -8,6 +8,8 @@ use std::time::Duration;
 use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_canister::memory::MEMORY_MANAGER;
+use bridge_did::init::{RuneBridgeConfig, MIN_INDEXERS};
+use bridge_did::runes::{RuneInfo, RuneName};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
@@ -20,21 +22,12 @@ use ord_rs::wallet::LocalSigner;
 use ord_rs::Wallet;
 use ordinals::RuneId;
 
-pub use self::config::RuneBridgeConfig;
 use self::config::RuneBridgeConfigStorage;
 pub use self::master_key::MasterKey;
 use self::master_key::MasterKeyStorage;
 use crate::key::{BtcSignerType, IcBtcSigner};
 use crate::ledger::UtxoLedger;
-use crate::rune_info::{RuneInfo, RuneName};
 use crate::{MAINNET_CHAIN_ID, REGTEST_CHAIN_ID, TESTNET_CHAIN_ID};
-
-const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
-const DEFAULT_MEMPOOL_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60);
-const DEFAULT_INDEXER_CONSENSUS_THRESHOLD: u8 = 2;
-
-/// Minimum number of indexers required to start the bridge.
-const MIN_INDEXERS: usize = 2;
 
 pub struct RuneState {
     pub(crate) config: RuneBridgeConfigStorage<VirtualMemory<DefaultMemoryImpl>>,

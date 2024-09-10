@@ -26,13 +26,23 @@ fn main() -> anyhow::Result<()> {
         evm_version: Some(EvmVersion::Paris),
         ..Default::default()
     };
-    let mut paths = ProjectPathsConfig::dapptools(&root)?;
+
+    let root = foundry_compilers::utils::canonicalize(root)?;
+    let mut paths = ProjectPathsConfig::builder()
+        .sources(root.join("src"))
+        .artifacts(root.join("out"))
+        .build_infos(root.join("out").join("build-info"))
+        .lib(root.join("dependencies"))
+        .root(root.clone())
+        .build()?;
 
     let remappings_file = root.join(REMAPPINGS_FILE);
 
     if remappings_file.exists() {
         let remappings = parse_remappings_file(&remappings_file)?;
         paths.remappings.extend(remappings);
+    } else {
+        anyhow::bail!("remappings file doesn't exist, please check again");
     }
 
     let project = ProjectBuilder::<SolcCompiler>::new(Default::default())

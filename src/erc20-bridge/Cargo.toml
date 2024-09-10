@@ -27,4 +27,5 @@ log = { workspace = true }
 serde = { workspace = true }
 
 [build-dependencies]
-vergen = { workspace = true }
+anyhow = { workspace = true }
+vergen-gitcl = { workspace = true }

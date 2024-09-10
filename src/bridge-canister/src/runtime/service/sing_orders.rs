@@ -71,11 +71,3 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         Ok(())
     }
 }
-
-pub const SIGNATURE_LEN: usize = 65;
-
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
-pub struct SignedOrders {
-    pub orders_data: Vec<u8>,
-    pub signature: Vec<u8>,
-}

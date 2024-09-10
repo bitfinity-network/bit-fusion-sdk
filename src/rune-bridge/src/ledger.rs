@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
+use bridge_did::runes::RuneInfo;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::stable_structures::Memory;
@@ -19,7 +20,6 @@ pub use self::utxo_key::UtxoKey;
 use self::utxo_runes::UtxoRunes;
 use crate::key::{ic_dp_to_derivation_path, KeyError};
 use crate::memory::{DEPOSITED_UTXOS_MEMORY_ID, RUNE_INFO_BY_UTXO_MEMORY_ID, USED_UTXOS_MEMORY_ID};
-use crate::rune_info::RuneInfo;
 
 /// Information about the unspent utxo.
 #[derive(Debug, Clone)]
@@ -160,13 +160,13 @@ where
 mod tests {
     use std::str::FromStr;
 
+    use bridge_did::runes::RuneName;
     use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
     use ic_exports::ic_kit::MockContext;
     use ordinals::Rune;
 
     use super::*;
     use crate::canister::get_rune_state;
-    use crate::rune_info::RuneName;
 
     #[test]
     fn test_should_deposit_utxo() {

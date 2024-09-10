@@ -28,10 +28,10 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::BtcBridgeOp;
+use crate::ops::BtcBridgeOpImpl;
 use crate::state::{BtcConfig, State, WrappedTokenConfig};
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOp>>>;
+type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -97,7 +97,7 @@ impl BtcBridge {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, BtcBridgeOp)> {
+    ) -> Option<(OperationId, BtcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -105,7 +105,7 @@ impl BtcBridge {
     }
 
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOp)> {
+    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -217,7 +217,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<BtcBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<BtcBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

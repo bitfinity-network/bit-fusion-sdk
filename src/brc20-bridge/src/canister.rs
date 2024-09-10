@@ -5,7 +5,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{Brc20BridgeConfig, BridgeInitData};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
 use bridge_utils::common::Pagination;
@@ -23,8 +23,8 @@ use ic_storage::IcStorage;
 
 use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
-use crate::ops::Brc20BridgeOp;
-use crate::state::{Brc20BridgeConfig, Brc20State};
+use crate::ops::Brc20BridgeOpImpl;
+use crate::state::Brc20State;
 
 mod inspect;
 
@@ -74,7 +74,7 @@ impl Brc20Bridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, Brc20BridgeOp)> {
+    ) -> Vec<(OperationId, Brc20BridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -86,7 +86,7 @@ impl Brc20Bridge {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<Brc20BridgeOp>> {
+    ) -> Option<OperationLog<Brc20BridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
@@ -153,7 +153,7 @@ impl LogCanister for Brc20Bridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOp>>>;
+type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime =
@@ -166,7 +166,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<Brc20BridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<Brc20BridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

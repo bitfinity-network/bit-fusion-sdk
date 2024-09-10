@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::str::FromStr as _;
 
 use bitcoin::{Address, Amount};
+use bridge_did::runes::{RuneInfo, RuneName};
 use ordinals::RuneId;
 use reqwest::{Client, StatusCode};
-use rune_bridge::rune_info::{RuneInfo, RuneName};
 use serde::Deserialize;
 
 /// Ord service client

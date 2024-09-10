@@ -11,7 +11,7 @@ use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::StableBTreeMap;
+use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
@@ -25,7 +25,7 @@ use crate::bridge::{Operation, OperationContext};
 use crate::memory::{
     memory_by_id, StableMemory, CONFIG_MEMORY_ID, MEMO_OPERATION_MEMORY_ID,
     OPERATIONS_ID_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
-    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID, PENDING_TASKS_SEQUENCE_MEMORY_ID,
 };
 use crate::operation_store::OperationsMemory;
 
@@ -42,9 +42,11 @@ impl<Op: Operation> BridgeRuntime<Op> {
     /// Load the state from the stable memory, or initialize it with default values.
     pub fn default(config: SharedConfig) -> Self {
         let tasks_storage = StableBTreeMap::new(memory_by_id(PENDING_TASKS_MEMORY_ID));
+        let sequence = StableCell::new(memory_by_id(PENDING_TASKS_SEQUENCE_MEMORY_ID), 1_000_000)
+            .expect("Cannot create task sequence cell");
         Self {
             state: default_state(config),
-            scheduler: BridgeScheduler::new(tasks_storage),
+            scheduler: BridgeScheduler::new(tasks_storage, sequence),
         }
     }
 

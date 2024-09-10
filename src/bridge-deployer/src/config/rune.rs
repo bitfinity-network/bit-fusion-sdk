@@ -51,7 +51,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
+impl From<RuneBridgeConfig> for bridge_did::init::RuneBridgeConfig {
     fn from(value: RuneBridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),

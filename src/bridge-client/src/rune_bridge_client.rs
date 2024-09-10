@@ -1,8 +1,8 @@
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
+use bridge_did::operations::RuneBridgeOp;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
-use rune_bridge::ops::RuneBridgeOp;
 
 use crate::bridge_client::BridgeCanisterClient;
 

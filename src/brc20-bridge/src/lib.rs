@@ -1,4 +1,3 @@
-pub mod brc20_info;
 pub mod canister;
 pub mod constants;
 pub mod core;
