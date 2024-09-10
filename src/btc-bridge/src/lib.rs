@@ -12,11 +12,9 @@ const TESTNET_CHAIN_ID: u32 = 1;
 const REGTEST_CHAIN_ID: u32 = 2;
 
 #[cfg(target_family = "wasm")]
-#[export_candid]
+#[ic_canister::export_candid]
 pub fn idl() -> String {
-
     use bridge_canister::BridgeCanister;
-    use ic_canister::export_candid;
     use ic_metrics::Metrics;
 
     let btc_bridge_canister_idl = BtcBridge::idl();

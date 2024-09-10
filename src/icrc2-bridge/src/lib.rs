@@ -9,13 +9,11 @@ pub mod state;
 pub mod tokens;
 
 #[cfg(target_family = "wasm")]
-#[export_candid]
+#[ic_canister::export_candid]
 fn idl() -> String {
-
     use bridge_canister::BridgeCanister;
-    use ic_canister::export_candid;
     use ic_metrics::Metrics;
-    
+
     let bridge_canister_idl = Icrc2BridgeCanister::idl();
 
     let mut metrics_idl = <Icrc2BridgeCanister as Metrics>::get_idl();
