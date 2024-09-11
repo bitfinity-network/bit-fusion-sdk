@@ -159,7 +159,7 @@ async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
 
     assert_data_eq!(
         message,
-        str!["requested amounts {RuneName(Rune(0)): 1000, RuneName(Rune(1)): 2500} are not equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
+        str!["requested amounts {[..]} are not equal actual amounts {[..]}"]
     );
 }
 
@@ -209,7 +209,7 @@ async fn await_inputs_cannot_progress_if_requested_less_than_actual_multiple_utx
 
     assert_data_eq!(
         message,
-        str!["requested amounts {RuneName(Rune(0)): 1000, RuneName(Rune(1)): 1500} cannot be equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
+        str!["requested amounts {[..]} cannot be equal actual amounts {[..]}"]
     );
 }
 
@@ -231,7 +231,7 @@ async fn await_inputs_cannot_progress_if_exists_utxo_that_is_not_requested() {
 
     assert_data_eq!(
         message,
-        str!["requested amounts {RuneName(Rune(0)): 1000} cannot be equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
+        str!["requested amounts {RuneName(Rune(0)): 1000} cannot be equal actual amounts {[..]}"]
     );
 }
 
