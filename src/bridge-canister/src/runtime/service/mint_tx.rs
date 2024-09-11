@@ -1,20 +1,15 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
-use bridge_did::{
-    error::{BftResult, Error},
-    op_id::OperationId,
-    order::{OrderIdx, SignedOrder, SignedOrders},
-};
+use bridge_did::error::{BftResult, Error};
+use bridge_did::op_id::OperationId;
+use bridge_did::order::{OrderIdx, SignedOrder, SignedOrders};
 use bridge_utils::bft_events::{self};
 use did::H256;
 use eth_signer::sign_strategy::TransactionSigner;
 
-use crate::runtime::state::SharedConfig;
-
 use super::BridgeService;
+use crate::runtime::state::SharedConfig;
 
 /// Contains signed batch of mint orders and set of operations related to the batch.
 #[derive(Debug, Clone)]
