@@ -31,7 +31,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     // Address of feeCharge contract
     IFeeCharge public feeChargeContract;
 
-    // Operataion ID counter
+    // Operation ID counter
     uint32 public operationIDCounter;
 
     // Address of minter canister

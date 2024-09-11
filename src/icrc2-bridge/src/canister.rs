@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sing_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
@@ -23,7 +24,10 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::{IcrcBridgeOpImpl, IcrcMintOrderHandler, SIGN_MINT_ORDER_SERVICE_ID};
+use crate::ops::{
+    IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
+};
 use crate::state::IcrcState;
 
 #[cfg(feature = "export-api")]
@@ -206,8 +210,11 @@ fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());
     let state = runtime.state();
 
-    let handler = IcrcMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
-    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(handler));
+    let sign_orders_handler = IcrcMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
+
+    let mint_tx_handler = IcrcMintTxHandler::new(state.clone());
+    let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
     let services = state.borrow().services.clone();
     services.borrow_mut().add_service(
@@ -215,6 +222,12 @@ fn init_runtime() -> SharedRuntime {
         SIGN_MINT_ORDER_SERVICE_ID,
         sign_mint_orders_service,
     );
+    services.borrow_mut().add_service(
+        ServiceOrder::AfterOperations,
+        SEND_MINT_TX_SERVICE_ID,
+        mint_tx_service,
+    );
+
     Rc::new(RefCell::new(runtime))
 }
 

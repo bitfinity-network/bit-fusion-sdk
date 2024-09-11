@@ -48,7 +48,7 @@ impl Services {
             .get(&service_id)
             .or_else(|| self.after.get(&service_id))
         else {
-            log::warn!("Failed to push task to start service #{service_id}. Service not found.");
+            log::warn!("Failed to push task to service #{service_id}. Service not found.");
             return Err(Error::ServiceNotFound);
         };
 

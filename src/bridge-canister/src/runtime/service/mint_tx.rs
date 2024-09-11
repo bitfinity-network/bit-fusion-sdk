@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{OrderIdx, SignedOrder, SignedOrders};
+use bridge_did::order::{SignedOrder, SignedOrders};
 use bridge_utils::bft_events::{self};
 use did::H256;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -15,14 +15,14 @@ use crate::runtime::state::SharedConfig;
 #[derive(Debug, Clone)]
 pub struct MintOrderBatchInfo {
     orders_batch: SignedOrders,
-    related_operations: HashSet<(OperationId, OrderIdx)>,
+    related_operations: HashSet<OperationId>,
 }
 
-pub trait SignedMintOrderHandler {
+pub trait MintTxHandler {
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
     fn get_evm_config(&self) -> SharedConfig;
     fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder>;
-    fn mint_tx_sent(&self, id: OperationId, signed: SignedOrder, tx_hash: H256);
+    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256);
 }
 
 /// Service to send mint transaction with signed mint orders batch.
@@ -42,7 +42,7 @@ impl<H> SendMintTxService<H> {
 }
 
 #[async_trait::async_trait(?Send)]
-impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
+impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
     async fn run(&self) -> BftResult<()> {
         log::trace!("Running SendMintTxService");
 
@@ -110,13 +110,8 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
         };
 
         // Update state for all operations related with the orders batch.
-        for (op_id, order_idx) in sent_batch_info.related_operations {
-            let Some(order) = SignedOrder::new(sent_batch_info.orders_batch.clone(), order_idx)
-            else {
-                log::error!("Signed order idx not found in batch.");
-                continue;
-            };
-            self.handler.mint_tx_sent(op_id, order, tx_hash.into())
+        for op_id in sent_batch_info.related_operations {
+            self.handler.mint_tx_sent(op_id, tx_hash.into())
         }
 
         log::trace!("SendMintTxService run finished.");
@@ -132,7 +127,6 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
             )));
         };
 
-        let order_idx = order.idx();
         let orders_batch = order.into_inner();
         let digest = orders_batch.digest();
         self.orders_to_send
@@ -143,7 +137,7 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
                 related_operations: HashSet::new(),
             })
             .related_operations
-            .insert((op_id, order_idx));
+            .insert(op_id);
 
         Ok(())
     }
