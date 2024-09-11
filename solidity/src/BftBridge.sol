@@ -232,6 +232,15 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         );
     }
 
+    function batchMint(
+        bytes calldata encodedOrders,
+        bytes calldata signature,
+        uint32[] calldata ordersToProcess
+    ) external whenNotPaused {
+        // todo!
+        require(false);
+    }
+
     /// Getter function for block numbers
     function getDepositBlocks() external view returns (uint32[] memory blockNumbers) {
         blockNumbers = _lastUserBurns[msg.sender].getAll();

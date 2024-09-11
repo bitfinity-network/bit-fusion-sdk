@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use candid::CandidType;
 use did::transaction::Signature;
-use did::{H160, U256};
+use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ethers_core::utils::keccak256;
 use ic_stable_structures::{Bound, Storable};
@@ -424,18 +424,27 @@ impl SignedOrders {
 
         Some(EncodedOrderReader(&self.orders_data[data_start..data_end]))
     }
+
+    /// Returns digest of the orders data.
+    /// The digest can be used for signing.
+    pub fn digest(&self) -> H256 {
+        keccak256(&self.orders_data).into()
+    }
 }
+
+/// Index of order in orders batch.
+pub type OrderIdx = usize;
 
 /// Signed mint orders batch with index of one specific order.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub struct SignedOrder {
     all_orders: SignedOrders,
-    idx: usize,
+    idx: OrderIdx,
 }
 
 impl SignedOrder {
     /// Creates a signed order and checks if idx inside the orders range.
-    pub fn new(all_orders: SignedOrders, idx: usize) -> Option<Self> {
+    pub fn new(all_orders: SignedOrders, idx: OrderIdx) -> Option<Self> {
         if idx >= all_orders.orders_number() {
             return None;
         }
@@ -450,13 +459,18 @@ impl SignedOrder {
             .expect("index should be less than orders number")
     }
 
-    /// Returns all orders.
+    /// Borrows all orders.
     pub fn all_orders(&self) -> &SignedOrders {
         &self.all_orders
     }
 
+    /// Returns all orders.
+    pub fn into_inner(self) -> SignedOrders {
+        self.all_orders
+    }
+
     /// Returns index of self inside all orders list.
-    pub fn idx(&self) -> usize {
+    pub fn idx(&self) -> OrderIdx {
         self.idx
     }
 }

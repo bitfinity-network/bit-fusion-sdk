@@ -87,14 +87,8 @@ pub trait OperationContext {
         let bridge_contract = self.get_bridge_contract_address()?;
         let evm_params = self.get_evm_params()?;
 
-        let mut tx = bft_events::mint_transaction(
-            sender.0,
-            bridge_contract.0,
-            evm_params.nonce.into(),
-            evm_params.gas_price.clone().into(),
-            &order.0,
-            evm_params.chain_id as _,
-        );
+        let tx_params = evm_params.create_tx_params(sender, bridge_contract);
+        let mut tx = bft_events::mint_transaction(tx_params, &order.0);
 
         let signature = signer.sign_transaction(&(&tx).into()).await?;
         tx.r = signature.r.0;

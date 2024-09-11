@@ -152,14 +152,19 @@ impl TryFrom<Log> for BridgeEvent {
     }
 }
 
-pub fn mint_transaction(
-    sender: H160,
-    bridge: H160,
-    nonce: U256,
-    gas_price: U256,
-    mint_order_data: &[u8],
-    chain_id: u32,
-) -> Transaction {
+/// Parameters for EVM transaction.
+#[derive(Debug, Clone)]
+pub struct TxParams {
+    pub sender: H160,
+    pub bridge: H160,
+    pub nonce: U256,
+    pub gas_price: U256,
+    pub chain_id: u32,
+}
+
+/// Sends transaction with given params to call `mint` function
+/// in BftBridge contract.
+pub fn mint_transaction(params: TxParams, mint_order_data: &[u8]) -> Transaction {
     let data = BFTBridge::mintCall {
         encodedOrder: mint_order_data.to_vec().into(),
     }
@@ -167,14 +172,43 @@ pub fn mint_transaction(
 
     pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
     ethers_core::types::Transaction {
-        from: sender,
-        to: bridge.into(),
-        nonce,
+        from: params.sender,
+        to: params.bridge.into(),
+        nonce: params.nonce,
         value: U256::zero(),
         gas: DEFAULT_TX_GAS_LIMIT.into(),
-        gas_price: Some(gas_price),
+        gas_price: Some(params.gas_price),
         input: data.into(),
-        chain_id: Some(chain_id.into()),
+        chain_id: Some(params.chain_id.into()),
+        ..Default::default()
+    }
+}
+
+/// Sends transaction with given params to call `batchMint` function
+/// in BftBridge contract.
+pub fn batch_mint_transaction(
+    params: TxParams,
+    mint_orders_data: &[u8],
+    signature: &[u8],
+    orders_to_process: &[u32],
+) -> Transaction {
+    let data = BFTBridge::batchMintCall {
+        encodedOrders: mint_orders_data.to_vec().into(),
+        signature: signature.to_vec().into(),
+        ordersToProcess: orders_to_process.into(),
+    }
+    .abi_encode();
+
+    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
+    ethers_core::types::Transaction {
+        from: params.sender,
+        to: params.bridge.into(),
+        nonce: params.nonce,
+        value: U256::zero(),
+        gas: DEFAULT_TX_GAS_LIMIT.into(),
+        gas_price: Some(params.gas_price),
+        input: data.into(),
+        chain_id: Some(params.chain_id.into()),
         ..Default::default()
     }
 }

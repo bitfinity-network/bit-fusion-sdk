@@ -10,8 +10,13 @@ use eth_signer::sign_strategy::TransactionSigner;
 use super::BridgeService;
 
 pub trait MintOrderHandler {
-    fn get_order(&self, id: OperationId) -> Option<MintOrder>;
+    /// Get signer to sign mint orders batch.
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
+
+    /// Get mint order by the OperationId.
+    fn get_order(&self, id: OperationId) -> Option<MintOrder>;
+
+    /// Set signed mint orders data to the given operation.
     fn set_signed_order(&self, id: OperationId, signed: SignedOrder);
 }
 
