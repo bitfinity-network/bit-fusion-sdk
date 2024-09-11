@@ -17,9 +17,20 @@ pub trait MintOrderHandler {
 
 pub const MAX_MINT_ORDERS_IN_BATCH: usize = 16;
 
+/// Service to sign mint order batches.
 pub struct SignMintOrdersService<H: MintOrderHandler> {
     order_handler: H,
     orders: RefCell<HashMap<OperationId, MintOrder>>,
+}
+
+impl<H: MintOrderHandler> SignMintOrdersService<H> {
+    /// Creates new mint order signing service.
+    pub fn new(order_handler: H) -> Self {
+        Self {
+            order_handler,
+            orders: Default::default(),
+        }
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -36,6 +47,9 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
 
     async fn run(&self) -> BftResult<()> {
         let orders_number = self.orders.borrow().len().min(MAX_MINT_ORDERS_IN_BATCH);
+
+        log::trace!("Singing batch of {orders_number} mint orders.");
+
         let order_ops: Vec<(OperationId, MintOrder)> = self
             .orders
             .borrow()
@@ -54,6 +68,8 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         let signature = signer.sign_digest(digest.0 .0).await?;
         let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
 
+        log::trace!("Batch of {orders_number} mint orders signed");
+
         let signed_orders = SignedOrders {
             orders_data,
             signature: signature_bytes.to_vec(),
@@ -66,6 +82,8 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
             self.order_handler
                 .set_signed_order(order_op.0, signed_order);
         }
+
+        log::trace!("Operations updated for batch of {orders_number} mint orders");
 
         Ok(())
     }

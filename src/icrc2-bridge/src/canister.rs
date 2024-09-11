@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::sing_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -21,7 +23,7 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::IcrcBridgeOpImpl;
+use crate::ops::{IcrcBridgeOpImpl, IcrcMintOrderHandler, SIGN_MINT_ORDER_SERVICE_ID};
 use crate::state::IcrcState;
 
 #[cfg(feature = "export-api")]
@@ -200,9 +202,24 @@ fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
     Ok(())
 }
 
+fn init_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(ConfigStorage::get());
+    let state = runtime.state();
+
+    let handler = IcrcMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(handler));
+
+    let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::AfterOperations,
+        SIGN_MINT_ORDER_SERVICE_ID,
+        sign_mint_orders_service,
+    );
+    Rc::new(RefCell::new(runtime))
+}
+
 thread_local! {
-    pub static RUNTIME: SharedRuntime =
-        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    pub static RUNTIME: SharedRuntime = init_runtime();
 
     pub static ICRC_STATE: Rc<RefCell<IcrcState>> = Rc::default();
 }

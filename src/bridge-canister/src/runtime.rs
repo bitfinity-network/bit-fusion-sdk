@@ -104,6 +104,11 @@ impl<Op: Operation> BridgeRuntime<Op> {
         &self.state
     }
 
+    /// Get the state.
+    pub fn scheduler(&self) -> &SharedScheduler<StableMemory, Op> {
+        &self.scheduler
+    }
+
     fn list_services(&self, order: ServiceOrder) -> Vec<DynService> {
         let state = self.state.borrow();
         let services = state.services.borrow();

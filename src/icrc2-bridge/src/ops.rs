@@ -1,4 +1,6 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::memory::StableMemory;
+use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
@@ -15,7 +17,8 @@ use did::{H160, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
-use ic_task_scheduler::task::TaskOptions;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use serde::{Deserialize, Serialize};
@@ -340,8 +343,20 @@ pub enum ErrorCodes {
     IcrcMintFailed = 2,
 }
 
+/// Allows Signing service to handle MintOrders of ICRC bridge.
 pub struct IcrcMintOrderHandler {
     state: RuntimeState<IcrcBridgeOpImpl>,
+    scheduler: SharedScheduler<StableMemory, IcrcBridgeOpImpl>,
+}
+
+impl IcrcMintOrderHandler {
+    /// Creates new handler instance.
+    pub fn new(
+        state: RuntimeState<IcrcBridgeOpImpl>,
+        scheduler: SharedScheduler<StableMemory, IcrcBridgeOpImpl>,
+    ) -> Self {
+        Self { state, scheduler }
+    }
 }
 
 impl MintOrderHandler for IcrcMintOrderHandler {
@@ -374,9 +389,17 @@ impl MintOrderHandler for IcrcMintOrderHandler {
             order: signed,
             is_refund,
         };
+        let new_op = IcrcBridgeOpImpl(new_op);
+        let scheduling_options = new_op.scheduling_options();
         self.state
             .borrow_mut()
             .operations
-            .update(id, IcrcBridgeOpImpl(new_op));
+            .update(id, new_op.clone());
+
+        if let Some(options) = scheduling_options {
+            let scheduled_task =
+                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            self.scheduler.append_task(scheduled_task);
+        }
     }
 }
