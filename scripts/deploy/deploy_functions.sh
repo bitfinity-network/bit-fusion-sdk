@@ -335,7 +335,7 @@ start_dfx() {
 
 start_icx() {
   evm_id="$1"
-  killall icx-proxy
+  killall icx-proxy || true
   sleep 2
   # Start ICX Proxy
   dfx_local_port=$(dfx info replica-port)

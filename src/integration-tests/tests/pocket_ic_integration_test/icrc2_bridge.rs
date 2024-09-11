@@ -305,7 +305,7 @@ async fn test_canister_build_data() {
     let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
     let minter_client = ctx.icrc_bridge_client(ALICE);
     let build_data = minter_client.get_canister_build_data().await.unwrap();
-    assert!(build_data.pkg_name.contains("icrc2-bridge"));
+    assert!(build_data.pkg_name.contains("icrc2_bridge"));
 }
 
 #[tokio::test]

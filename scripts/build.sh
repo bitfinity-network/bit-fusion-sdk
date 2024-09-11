@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 set -e
 set -x
@@ -16,7 +16,7 @@ EVM_FEATURES="export-api"
 
 # Function to print help instructions
 print_help() {
-    echo "Usage: $0 [all|icrc2-bridge|rune-bridge|btc-bridge|erc20-bridge]"
+    echo "Usage: $0 [all|all-canisters|icrc2-bridge|rune-bridge|btc-bridge|erc20-bridge]"
     echo "Examples:"
     echo "  $0                          # Build all canisters, download binaries and build tools (default)"
     echo "  $0 all                      # Build all canisters and download binaries and build tools"
@@ -89,18 +89,16 @@ build_canister() {
     local canister_name="$1"
     local features="$2"
     local output_wasm="$3"
-    local did_file_name="${4:-$canister_name}"
 
     mkdir -p "$WASM_DIR"
-
-    # Generate the did file
-    cargo run -p "$canister_name" --features "$features" >"$WASM_DIR/$did_file_name.did"
 
     echo "Building $canister_name Canister with features: $features"
 
     cargo build --target wasm32-unknown-unknown --release --package "$canister_name" --features "$features"
-    ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm" shrink
-    gzip -k "$WASM_DIR/$output_wasm" --force
+    ic-wasm "target/wasm32-unknown-unknown/release/$canister_name.wasm" -o "$WASM_DIR/$output_wasm.wasm" shrink
+    candid-extractor "$WASM_DIR/$output_wasm.wasm" > "$WASM_DIR/$output_wasm.did"
+
+    gzip -k "$WASM_DIR/$output_wasm.wasm" --force
 }
 
 # Function to determine which canisters to build based on input
@@ -113,7 +111,7 @@ build_requested_canisters() {
         exit 0
     fi
 
-    if [ "$1" = "all" ]; then
+    if [ "$1" = "all" ] || [ "$1" = "all-canisters" ]; then
         initialize_env
         # Download binaries only if "all" is specified
         echo "Getting ICRC-1 Binaries"
@@ -127,29 +125,32 @@ build_requested_canisters() {
         script_dir=$(dirname $0)
         project_dir=$(realpath "${script_dir}/..")
 
-        build_canister "icrc2-bridge" "export-api" "icrc2-bridge.wasm" "icrc2-bridge"
-        build_canister "erc20-bridge" "export-api" "erc20-bridge.wasm" "erc20-bridge"
-        build_canister "brc20-bridge" "export-api" "brc20-bridge.wasm" "brc20-bridge"
-        build_canister "btc-bridge" "export-api" "btc-bridge.wasm" "btc-bridge"
-        build_canister "rune-bridge" "export-api" "rune-bridge.wasm" "rune-bridge"
+        build_canister "icrc2_bridge" "export-api" "icrc2-bridge"
+        build_canister "erc20_bridge" "export-api" "erc20-bridge"
+        build_canister "brc20_bridge" "export-api" "brc20-bridge"
+        build_canister "btc_bridge" "export-api" "btc-bridge"
+        build_canister "rune_bridge" "export-api" "rune-bridge" 
 
-        # Build tools
-        build_bridge_tool
-        build_bridge_deployer_tool
+        if [ "$1" = "all" ]; then
+            # Build tools
+            build_bridge_tool
+            build_bridge_deployer_tool
+        fi
     else
         for canister in "$@"; do
             case "$canister" in
             evm)
-                build_canister "evm_canister" "$EVM_FEATURES" "evm.wasm" "evm"
+                build_canister "evm_canister" "$EVM_FEATURES" "evm"
                 ;;
             evm_testnet)
-                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet.wasm" "evm_testnet"
+                build_canister "evm_canister" "$EVM_FEATURES,testnet" "evm_testnet"
                 ;;
             signature_verification)
                 build_canister "${canister}_canister" "export-api" "${canister}.wasm" "${canister}"
                 ;;
             brc20-bridge | btc-bridge | rune-bridge | icrc2-bridge | erc20-bridge)
-                build_canister "${canister}" "export-api" "${canister}.wasm" "${canister}"
+                canister_name="${canister//-/_}"
+                build_canister "${canister_name}" "export-api" "${canister}"
                 ;;
             *)
                 echo "Error: Unknown canister '$canister'."
