@@ -325,7 +325,7 @@ impl RuneBridgeOpImpl {
             let actual = inputs.rune_amounts();
             if actual != *requested {
                 let can_be_fixed = actual.iter().all(|(name, amount)| {
-                    requested.get(&name).cloned().unwrap_or_default() >= *amount
+                    requested.get(name).cloned().unwrap_or_default() >= *amount
                 });
                 return if can_be_fixed {
                     Err(Error::FailedToProgress(format!(

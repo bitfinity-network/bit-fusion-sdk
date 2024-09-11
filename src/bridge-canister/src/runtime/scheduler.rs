@@ -270,7 +270,10 @@ impl<Op: Operation> Task for BridgeTask<Op> {
             self_clone
                 .execute_inner(ctx, task_scheduler)
                 .await
-                .map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
+                .map_err(|e| match e {
+                    Error::CannotProgress(_) => SchedulerError::Unrecoverable(e.to_string()),
+                    _ => SchedulerError::TaskExecutionFailed(e.to_string()),
+                })
         })
     }
 }
@@ -281,6 +284,7 @@ mod tests {
     use did::H160;
     use ic_exports::ic_kit::MockContext;
     use ic_storage::IcStorage;
+    use snapbox::{assert_data_eq, str};
 
     use super::*;
     use crate::runtime::state::config::ConfigStorage;
@@ -290,6 +294,7 @@ mod tests {
     struct TestOperation {
         successful: bool,
         successful_runs: usize,
+        recoverable: bool,
     }
 
     impl TestOperation {
@@ -299,6 +304,7 @@ mod tests {
             Self {
                 successful: false,
                 successful_runs: 0,
+                recoverable: true,
             }
         }
 
@@ -306,6 +312,15 @@ mod tests {
             Self {
                 successful: true,
                 successful_runs: 0,
+                recoverable: true,
+            }
+        }
+
+        fn new_unrecoverable() -> Self {
+            Self {
+                successful: false,
+                successful_runs: 0,
+                recoverable: false,
             }
         }
     }
@@ -316,9 +331,12 @@ mod tests {
                 Ok(Self {
                     successful_runs: self.successful_runs + 1,
                     successful: self.successful,
+                    recoverable: self.recoverable,
                 })
-            } else {
+            } else if self.recoverable {
                 Err(Error::FailedToProgress(Self::ERR_MESSAGE.to_string()))
+            } else {
+                Err(Error::CannotProgress(Self::ERR_MESSAGE.to_string()))
             }
         }
 
@@ -334,21 +352,21 @@ mod tests {
             _ctx: RuntimeState<Self>,
             _event: MintedEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
 
         async fn on_wrapped_token_burnt(
             _ctx: RuntimeState<Self>,
             _event: BurntEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
 
         async fn on_minter_notification(
             _ctx: RuntimeState<Self>,
             _event: NotifyMinterEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
     }
 
@@ -418,9 +436,50 @@ mod tests {
                 log.log()[i].step_result.as_ref().unwrap(),
                 &TestOperation {
                     successful: true,
-                    successful_runs: i
+                    successful_runs: i,
+                    recoverable: true,
                 }
             );
         }
+    }
+
+    #[tokio::test]
+    async fn execute_correctly_converts_recoverable_error() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_err();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
+
+        let task = BridgeTask::Operation(id, op);
+        let err = task
+            .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, SchedulerError::TaskExecutionFailed(_)));
+
+        assert_data_eq!(err.to_string(), str!["TaskExecutionFailed: operation failed to progress: test error"])
+    }
+
+    #[tokio::test]
+    async fn execute_correctly_converts_unrecoverable_error() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_unrecoverable();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
+
+        let task = BridgeTask::Operation(id, op);
+        let err = task
+            .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, SchedulerError::Unrecoverable(_)));
+
+        assert_data_eq!(err.to_string(), str!["Unrecoverable task error: operation cannot progress: test error"])
     }
 }
