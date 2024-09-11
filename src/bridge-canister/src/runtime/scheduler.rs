@@ -460,7 +460,10 @@ mod tests {
 
         assert!(matches!(err, SchedulerError::TaskExecutionFailed(_)));
 
-        assert_data_eq!(err.to_string(), str!["TaskExecutionFailed: operation failed to progress: test error"])
+        assert_data_eq!(
+            err.to_string(),
+            str!["TaskExecutionFailed: operation failed to progress: test error"]
+        )
     }
 
     #[tokio::test]
@@ -480,6 +483,9 @@ mod tests {
 
         assert!(matches!(err, SchedulerError::Unrecoverable(_)));
 
-        assert_data_eq!(err.to_string(), str!["Unrecoverable task error: operation cannot progress: test error"])
+        assert_data_eq!(
+            err.to_string(),
+            str!["Unrecoverable task error: operation cannot progress: test error"]
+        )
     }
 }

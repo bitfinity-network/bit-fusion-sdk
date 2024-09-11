@@ -174,7 +174,7 @@ async fn await_inputs_cannot_progress_if_requested_less_than_actual_single_utxo(
         tests::dst_tokens(),
         Some([(RuneName::from_str("A").unwrap(), 500)].into()),
     )
-        .await;
+    .await;
     let Err(Error::CannotProgress(message)) = result else {
         panic!("Invalid result: {result:?}");
     };
@@ -199,10 +199,10 @@ async fn await_inputs_cannot_progress_if_requested_less_than_actual_multiple_utx
                 (RuneName::from_str("A").unwrap(), 1000),
                 (RuneName::from_str("B").unwrap(), 1500),
             ]
-                .into(),
+            .into(),
         ),
     )
-        .await;
+    .await;
     let Err(Error::CannotProgress(message)) = result else {
         panic!("Invalid result: {result:?}");
     };
@@ -222,14 +222,9 @@ async fn await_inputs_cannot_progress_if_exists_utxo_that_is_not_requested() {
         &provider,
         tests::sender(),
         tests::dst_tokens(),
-        Some(
-            [
-                (RuneName::from_str("A").unwrap(), 1000),
-            ]
-                .into(),
-        ),
+        Some([(RuneName::from_str("A").unwrap(), 1000)].into()),
     )
-        .await;
+    .await;
     let Err(Error::CannotProgress(message)) = result else {
         panic!("Invalid result: {result:?}");
     };
