@@ -51,6 +51,8 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
     }
 
     async fn run(&self) -> BftResult<()> {
+        log::trace!("Running SignMintOrdersService");
+
         let orders_number = self.orders.borrow().len().min(MAX_MINT_ORDERS_IN_BATCH);
 
         log::trace!("Singing batch of {orders_number} mint orders.");
@@ -89,6 +91,8 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         }
 
         log::trace!("Operations updated for batch of {orders_number} mint orders");
+
+        log::trace!("SignMintOrdersService run finished.");
 
         Ok(())
     }

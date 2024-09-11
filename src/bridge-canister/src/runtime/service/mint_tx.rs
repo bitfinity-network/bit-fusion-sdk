@@ -31,9 +31,21 @@ pub struct SendMintTxService<H> {
     orders_to_send: RefCell<HashMap<H256, MintOrderBatchInfo>>,
 }
 
+impl<H> SendMintTxService<H> {
+    /// Creates a new service with the given handler.
+    pub fn new(handler: H) -> Self {
+        Self {
+            handler,
+            orders_to_send: Default::default(),
+        }
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
     async fn run(&self) -> BftResult<()> {
+        log::trace!("Running SendMintTxService");
+
         let Some((digest, batch_info)) = self
             .orders_to_send
             .borrow()
@@ -61,6 +73,10 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
         let evm_params = config.borrow().get_evm_params()?;
         let tx_params = evm_params.create_tx_params(sender, bridge_contract);
 
+        log::trace!(
+            "Sending batchMint transaction with {} mint orders.",
+            batch_info.orders_batch.orders_number()
+        );
         let mut tx = bft_events::batch_mint_transaction(
             tx_params,
             &batch_info.orders_batch.orders_data,
@@ -79,6 +95,12 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
             Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
         })?;
 
+        log::trace!(
+            "The batchMint transaction with {} mint orders sent.",
+            batch_info.orders_batch.orders_number()
+        );
+
+        // Remove sent orders batch from service.
         let sent_batch_info = match self.orders_to_send.borrow_mut().remove(&digest) {
             Some(batch_info) => batch_info,
             None => {
@@ -87,6 +109,7 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
             }
         };
 
+        // Update state for all operations related with the orders batch.
         for (op_id, order_idx) in sent_batch_info.related_operations {
             let Some(order) = SignedOrder::new(sent_batch_info.orders_batch.clone(), order_idx)
             else {
@@ -95,6 +118,8 @@ impl<H: SignedMintOrderHandler> BridgeService for SendMintTxService<H> {
             };
             self.handler.mint_tx_sent(op_id, order, tx_hash.into())
         }
+
+        log::trace!("SendMintTxService run finished.");
 
         Ok(())
     }
