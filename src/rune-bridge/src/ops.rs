@@ -324,9 +324,18 @@ impl RuneBridgeOpImpl {
         if let Some(requested) = &requested_amounts {
             let actual = inputs.rune_amounts();
             if actual != *requested {
-                return Err(Error::FailedToProgress(format!(
-                    "requested amounts {requested:?} are not equal actual amounts {actual:?}"
-                )));
+                let can_be_fixed = actual.iter().all(|(name, amount)| {
+                    requested.get(&name).cloned().unwrap_or_default() >= *amount
+                });
+                return if can_be_fixed {
+                    Err(Error::FailedToProgress(format!(
+                        "requested amounts {requested:?} are not equal actual amounts {actual:?}"
+                    )))
+                } else {
+                    Err(Error::CannotProgress(format!(
+                        "requested amounts {requested:?} cannot be equal actual amounts {actual:?}"
+                    )))
+                };
             }
         }
 

@@ -125,30 +125,14 @@ async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
         &provider,
         tests::sender(),
         tests::dst_tokens(),
-        Some([(RuneName::from_str("B").unwrap(), 1000)].into()),
+        Some([(RuneName::from_str("A").unwrap(), 1500)].into()),
     )
     .await;
     let Err(Error::FailedToProgress(message)) = result else {
         panic!("Invalid result: {result:?}");
     };
 
-    assert_data_eq!(message, str!["requested amounts {RuneName(Rune(1)): 1000} are not equal actual amounts {RuneName(Rune(0)): 1000}"]);
-
-    let input = rune_input("A", 1000);
-    let provider = TestRuneInputProvider::with_input(input.clone());
-    let result = RuneBridgeOpImpl::await_inputs(
-        tests::test_state(),
-        &provider,
-        tests::sender(),
-        tests::dst_tokens(),
-        Some([(RuneName::from_str("A").unwrap(), 2000)].into()),
-    )
-    .await;
-    let Err(Error::FailedToProgress(message)) = result else {
-        panic!("Invalid result: {result:?}");
-    };
-
-    assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 2000} are not equal actual amounts {RuneName(Rune(0)): 1000}"])
+    assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 1500} are not equal actual amounts {RuneName(Rune(0)): 1000}"]);
 }
 
 #[tokio::test]
@@ -160,7 +144,13 @@ async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
         &provider,
         tests::sender(),
         tests::dst_tokens(),
-        Some([(RuneName::from_str("A").unwrap(), 1000)].into()),
+        Some(
+            [
+                (RuneName::from_str("A").unwrap(), 1000),
+                (RuneName::from_str("B").unwrap(), 2500),
+            ]
+            .into(),
+        ),
     )
     .await;
     let Err(Error::FailedToProgress(message)) = result else {
@@ -169,7 +159,84 @@ async fn await_inputs_returns_error_if_wrong_amounts_multiple_utxos() {
 
     assert_data_eq!(
         message,
-        str!["requested amounts {RuneName(Rune(0)): 1000} are not equal actual amounts [..]"]
+        str!["requested amounts {RuneName(Rune(0)): 1000, RuneName(Rune(1)): 2500} are not equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
+    );
+}
+
+#[tokio::test]
+async fn await_inputs_cannot_progress_if_requested_less_than_actual_single_utxo() {
+    let input = rune_input("A", 1000);
+    let provider = TestRuneInputProvider::with_input(input.clone());
+    let result = RuneBridgeOpImpl::await_inputs(
+        tests::test_state(),
+        &provider,
+        tests::sender(),
+        tests::dst_tokens(),
+        Some([(RuneName::from_str("A").unwrap(), 500)].into()),
+    )
+        .await;
+    let Err(Error::CannotProgress(message)) = result else {
+        panic!("Invalid result: {result:?}");
+    };
+
+    assert_data_eq!(
+        message,
+        str!["requested amounts {RuneName(Rune(0)): 500} cannot be equal actual amounts {RuneName(Rune(0)): 1000}"]
+    );
+}
+
+#[tokio::test]
+async fn await_inputs_cannot_progress_if_requested_less_than_actual_multiple_utxos() {
+    let inputs = [rune_input("A", 1000), rune_input("B", 2000)];
+    let provider = TestRuneInputProvider::with_inputs(&inputs);
+    let result = RuneBridgeOpImpl::await_inputs(
+        tests::test_state(),
+        &provider,
+        tests::sender(),
+        tests::dst_tokens(),
+        Some(
+            [
+                (RuneName::from_str("A").unwrap(), 1000),
+                (RuneName::from_str("B").unwrap(), 1500),
+            ]
+                .into(),
+        ),
+    )
+        .await;
+    let Err(Error::CannotProgress(message)) = result else {
+        panic!("Invalid result: {result:?}");
+    };
+
+    assert_data_eq!(
+        message,
+        str!["requested amounts {RuneName(Rune(0)): 1000, RuneName(Rune(1)): 1500} cannot be equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
+    );
+}
+
+#[tokio::test]
+async fn await_inputs_cannot_progress_if_exists_utxo_that_is_not_requested() {
+    let inputs = [rune_input("A", 1000), rune_input("B", 2000)];
+    let provider = TestRuneInputProvider::with_inputs(&inputs);
+    let result = RuneBridgeOpImpl::await_inputs(
+        tests::test_state(),
+        &provider,
+        tests::sender(),
+        tests::dst_tokens(),
+        Some(
+            [
+                (RuneName::from_str("A").unwrap(), 1000),
+            ]
+                .into(),
+        ),
+    )
+        .await;
+    let Err(Error::CannotProgress(message)) = result else {
+        panic!("Invalid result: {result:?}");
+    };
+
+    assert_data_eq!(
+        message,
+        str!["requested amounts {RuneName(Rune(0)): 1000} cannot be equal actual amounts {RuneName(Rune(1)): 2000, RuneName(Rune(0)): 1000}"]
     );
 }
 
