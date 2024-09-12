@@ -1,5 +1,6 @@
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
+pub mod rune;
 mod token;
 
 use std::fmt;
