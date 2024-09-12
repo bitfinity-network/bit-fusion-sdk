@@ -29,4 +29,7 @@ interface IFeeCharge {
     // Take the given amount of fee from the user.
     // Require the user to have enough native token balance and approval for senderID.
     function chargeFee(address from, address payable to, bytes32 senderID, uint256 amount) external;
+
+    /// Function to check if fee charge operation can be performed.
+    function canPayFee(address payer, bytes32 senderID, uint256 amount) external view returns (bool);
 }

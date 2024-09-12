@@ -82,12 +82,21 @@ impl<Op: Operation> BridgeRuntime<Op> {
             self.scheduler.append_task(refresh_evm_params);
         }
 
+        if !self.state.borrow().should_process_operations() {
+            return;
+        }
+
         let services_before_ops = self.list_services(ServiceOrder::BeforeOperations);
         let services_after_ops = self.list_services(ServiceOrder::AfterOperations);
         let scheduler = self.scheduler.clone();
         let state = self.state.clone();
+        state.borrow_mut().operations_run_ts = Some(ic::time());
 
         ic::spawn(async move {
+            let _guard = drop_guard::guard(state.clone(), |state| {
+                state.borrow_mut().operations_run_ts = None
+            });
+
             Self::run_services(services_before_ops).await;
 
             let task_execution_result = scheduler.run(state);

@@ -17,7 +17,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     using SafeERC20 for IERC20;
 
     // Additional gas amount for fee charge.
-    uint256 constant additionalGasFee = 50000;
+    uint256 constant additionalGasFee = 200000;
+
+    // Gas fee for batch mint operation.
+    uint256 constant COMMON_BATCH_MINT_GAS_FEE = 200000;
+
+    // Gas fee for mint order processing.
+    uint256 constant ORDER_BATCH_MINT_GAS_FEE = 50000;
 
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
@@ -43,6 +49,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     /// Controller AccessList for adding implementations
     mapping(address => bool) public controllerAccessList;
 
+    uint32 private constant MINT_ORDER_DATA_LEN = 269;
+
     struct MintOrderData {
         uint256 amount;
         bytes32 senderID;
@@ -54,6 +62,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         bytes16 symbol;
         uint8 decimals;
         uint32 senderChainID;
+        uint32 recipientChainID;
         address approveSpender;
         uint256 approveAmount;
         address feePayer;
@@ -187,16 +196,88 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         controllerAccessList[controller] = false;
     }
 
-    /// Main function to withdraw funds
+    /// Transfer funds to user according the signed encoded order.
     function mint(
         bytes calldata encodedOrder
     ) external whenNotPaused {
-        uint256 initGasLeft = gasleft();
-
-        MintOrderData memory order = _decodeAndValidateOrder(encodedOrder[:269]);
-
+        MintOrderData memory order = _decodeOrder(encodedOrder[:MINT_ORDER_DATA_LEN]);
+        _validateOrder(order);
         _checkMintOrderSignature(encodedOrder);
 
+        uint256 feeAmount = 0;
+        if (_isFeeRequired()) {
+            feeAmount = COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE ;
+        }
+
+        _mintInner(order, feeAmount);
+
+    }
+
+    /// Transfer funds to users according the signed encoded orders.
+    /// Returns `processedOrders` boolean array: 
+    /// `processedOrders[i] == true`, means `encodedOrders[i]` successfully processed.
+    function batchMint(
+        bytes calldata encodedOrders,
+        bytes calldata signature,
+        uint32[] calldata ordersToProcess
+    ) external whenNotPaused returns (bool[] memory) {
+        require(encodedOrders.length > 0, "Expected non-empty orders batch");
+        require(encodedOrders.length % MINT_ORDER_DATA_LEN == 0, "Incorrect mint orders batch encoding");
+        _checkMinterSignature(encodedOrders, signature);
+
+        uint32 ordersNumber = uint32(encodedOrders.length) / MINT_ORDER_DATA_LEN;
+        uint256 commonFeePerUser = COMMON_BATCH_MINT_GAS_FEE / uint256(ordersNumber);
+
+        bool[] memory orderIndexes = new bool[](ordersNumber);
+        if (ordersToProcess.length == 0) {
+            for(uint32 i = 0; i < ordersNumber; i++) {
+                orderIndexes[i] = true;
+            }
+        } else {
+            for(uint32 i = 0; i < ordersToProcess.length; i++) {
+                uint32 orderIndex = ordersToProcess[i];
+                orderIndexes[orderIndex] = true;
+            }
+        }
+
+        bool[] memory processedOrderIndexes = new bool[](ordersNumber);
+        for(uint32 i = 0; i < ordersNumber; i++) {
+            if (!orderIndexes[i]) {
+                // mint order shouldn't be processed.
+                continue;
+            }
+
+            uint32 orderStart = MINT_ORDER_DATA_LEN * i;
+            uint32 orderEnd = orderStart + MINT_ORDER_DATA_LEN;
+            MintOrderData memory order = _decodeOrder(encodedOrders[orderStart:orderEnd]);
+
+
+            // If user can't pay required fee, skip his order.
+            uint256 feeAmount = 0;
+            if (_isFeeRequired()) {
+                feeAmount = commonFeePerUser + ORDER_BATCH_MINT_GAS_FEE;
+                bool canPayFee = feeChargeContract.canPayFee(order.feePayer, order.senderID, feeAmount);
+                if (!canPayFee) {
+                    continue;
+                }
+            }
+
+            /// If order is invalid, skip it.
+            if (!_isOrderValid(order)) {
+                continue;
+            }
+
+            // Mint tokens according to the order.
+            _mintInner(order, feeAmount);
+
+            // Mark the order as processed.
+            processedOrderIndexes[i] = true;
+        }
+
+        return processedOrderIndexes;
+    }
+
+    function _mintInner(MintOrderData memory order, uint256 feeAmount) private {
         // Update token's metadata only if it is a wrapped token
         bool isTokenWrapped = _wrappedToBase[order.toERC20] == order.fromTokenID;
         // the token must be registered or the side must be base
@@ -214,31 +295,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
 
-        uint256 fee = 0;
-        if (
-            order.feePayer != address(0) && msg.sender == minterCanisterAddress
-                && address(feeChargeContract) != address(0)
-        ) {
-            uint256 gasConsumed = initGasLeft - gasleft();
-            uint256 gasFee = gasConsumed + additionalGasFee;
-            fee = gasFee * tx.gasprice;
-
-            feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, fee);
+        if (feeAmount != 0) {
+            feeChargeContract.chargeFee(order.feePayer, payable(minterCanisterAddress), order.senderID, feeAmount);
         }
 
         // Emit event
         emit MintTokenEvent(
-            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce, fee
+            order.amount, order.fromTokenID, order.senderID, order.toERC20, order.recipient, order.nonce, feeAmount
         );
-    }
-
-    function batchMint(
-        bytes calldata encodedOrders,
-        bytes calldata signature,
-        uint32[] calldata ordersToProcess
-    ) external whenNotPaused {
-        // todo!
-        require(false);
     }
 
     /// Getter function for block numbers
@@ -304,26 +368,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         return minterCanisterAddress;
     }
 
-    /// Function to decode and validate the order data
-    function _decodeAndValidateOrder(
-        bytes calldata encodedOrder
-    ) private view returns (MintOrderData memory order) {
-        // Decode order data
-        order.amount = uint256(bytes32(encodedOrder[:32]));
-        order.senderID = bytes32(encodedOrder[32:64]);
-        order.fromTokenID = bytes32(encodedOrder[64:96]);
-        order.recipient = address(bytes20(encodedOrder[96:116]));
-        order.toERC20 = address(bytes20(encodedOrder[116:136]));
-        order.nonce = uint32(bytes4(encodedOrder[136:140]));
-        order.senderChainID = uint32(bytes4(encodedOrder[140:144]));
-        uint32 recipientChainID = uint32(bytes4(encodedOrder[144:148]));
-        order.name = bytes32(encodedOrder[148:180]);
-        order.symbol = bytes16(encodedOrder[180:196]);
-        order.decimals = uint8(encodedOrder[196]);
-        order.approveSpender = address(bytes20(encodedOrder[197:217]));
-        order.approveAmount = uint256(bytes32(encodedOrder[217:249]));
-        order.feePayer = address(bytes20(encodedOrder[249:269]));
 
+    function _isFeeRequired() private view returns (bool) {
+        return minterCanisterAddress == msg.sender && address(feeChargeContract) != address(0);
+    }
+
+    /// Function to validate the mint order.
+    /// Reverts on failure.
+    function _validateOrder(MintOrderData memory order) private view {
         // Assert recipient address is not zero
         require(order.recipient != address(0), "Invalid destination address");
 
@@ -334,22 +386,80 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         require(!_isNonceUsed[order.senderID][order.nonce], "Invalid nonce");
 
         // Check if withdrawal is happening on the correct chain
-        require(block.chainid == recipientChainID, "Invalid chain ID");
+        require(block.chainid == order.recipientChainID, "Invalid chain ID");
 
         if (_wrappedToBase[order.toERC20] != bytes32(0)) {
             require(_baseToWrapped[order.fromTokenID] == order.toERC20, "SRC token and DST token must be a valid pair");
         }
     }
 
+    /// Function to check if the mint order is valid.
+    function _isOrderValid(MintOrderData memory order) private view returns (bool) {
+        // Check recipient address is not zero
+        if (order.recipient == address(0)) {
+            return false;
+        }
+
+        // Check if amount is greater than zero
+        if (order.amount == 0) {
+            return false;
+        }
+
+        // Check if nonce is not stored in the list
+        if (_isNonceUsed[order.senderID][order.nonce]) {
+            return false;
+        }
+
+        // Check if withdrawal is happening on the correct chain
+        if (block.chainid != order.recipientChainID) {
+            return false;
+        }
+
+        // Check if tokens are bridged.
+        if (_wrappedToBase[order.toERC20] != bytes32(0) && _baseToWrapped[order.fromTokenID] != order.toERC20) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _decodeOrder(
+        bytes calldata encodedOrder
+    ) private pure returns (MintOrderData memory order) {
+        // Decode order data
+        order.amount = uint256(bytes32(encodedOrder[:32]));
+        order.senderID = bytes32(encodedOrder[32:64]);
+        order.fromTokenID = bytes32(encodedOrder[64:96]);
+        order.recipient = address(bytes20(encodedOrder[96:116]));
+        order.toERC20 = address(bytes20(encodedOrder[116:136]));
+        order.nonce = uint32(bytes4(encodedOrder[136:140]));
+        order.senderChainID = uint32(bytes4(encodedOrder[140:144]));
+        order.recipientChainID = uint32(bytes4(encodedOrder[144:148]));
+        order.name = bytes32(encodedOrder[148:180]);
+        order.symbol = bytes16(encodedOrder[180:196]);
+        order.decimals = uint8(encodedOrder[196]);
+        order.approveSpender = address(bytes20(encodedOrder[197:217]));
+        order.approveAmount = uint256(bytes32(encodedOrder[217:249]));
+        order.feePayer = address(bytes20(encodedOrder[249:269]));
+    }    
+    
     /// Function to check encodedOrder signature
     function _checkMintOrderSignature(
         bytes calldata encodedOrder
     ) private view {
+        _checkMinterSignature(encodedOrder[:MINT_ORDER_DATA_LEN], encodedOrder[MINT_ORDER_DATA_LEN:]);
+    }
+
+    /// Function to check encodedOrder signature
+    function _checkMinterSignature(
+        bytes calldata data,
+        bytes calldata signature
+    ) private view {
         // Create a hash of the order data
-        bytes32 hash = keccak256(encodedOrder[:269]);
+        bytes32 hash = keccak256(data);
 
         // Recover signer from the signature
-        address signer = ECDSA.recover(hash, encodedOrder[269:]);
+        address signer = ECDSA.recover(hash, signature);
 
         // Check if signer is the minter canister
         require(signer == minterCanisterAddress, "Invalid signature");

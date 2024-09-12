@@ -13,6 +13,7 @@ use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
 
 const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
+const SCHEDULER_RUN_LOCK_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
 pub type SharedServices = Rc<RefCell<Services>>;
@@ -25,6 +26,7 @@ pub struct State<Op: Operation> {
     pub operations: OperationStore<StableMemory, Op>,
     pub collecting_logs_ts: Option<Timestamp>,
     pub refreshing_evm_params_ts: Option<Timestamp>,
+    pub operations_run_ts: Option<Timestamp>,
     pub services: SharedServices,
 }
 
@@ -36,6 +38,7 @@ impl<Op: Operation> State<Op> {
             operations: OperationStore::with_memory(memory, None),
             collecting_logs_ts: None,
             refreshing_evm_params_ts: None,
+            operations_run_ts: None,
             services: Default::default(),
         }
     }
@@ -59,6 +62,17 @@ impl<Op: Operation> State<Op> {
     pub fn should_collect_evm_logs(&self) -> bool {
         self.collecting_logs_ts
             .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
+            .unwrap_or(true)
+    }
+
+    /// Checks if the scheduled operations and services ready to run.
+    ///
+    /// The EVM logs are collected if the `operations_run_ts` timestamp
+    /// is older than the `OPERATIONS_RUN_TIMEOUT` duration,
+    /// or if the `operations_run_ts` is `None`.
+    pub fn should_process_operations(&self) -> bool {
+        self.operations_run_ts
+            .map(|ts| (ts + SCHEDULER_RUN_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
             .unwrap_or(true)
     }
 }

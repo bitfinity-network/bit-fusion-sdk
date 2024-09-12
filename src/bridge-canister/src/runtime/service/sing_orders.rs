@@ -54,6 +54,10 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         log::trace!("Running SignMintOrdersService");
 
         let orders_number = self.orders.borrow().len().min(MAX_MINT_ORDERS_IN_BATCH);
+        if orders_number == 0 {
+            log::trace!("No mint orders to sign.");
+            return Ok(());
+        }
 
         log::trace!("Singing batch of {orders_number} mint orders.");
 
