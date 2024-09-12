@@ -16,7 +16,7 @@ use ic_management_canister_types::CanisterSettingsArgsBuilder;
 use ic_state_machine_tests::StateMachine;
 use serde::de::DeserializeOwned;
 
-use crate::context::{TestCanisters, TestContext};
+use crate::context::{TestCanisters, TestContext, DEFAULT_GAS_PRICE};
 use crate::utils::error::TestError;
 use crate::utils::CHAIN_ID;
 
@@ -162,8 +162,8 @@ impl<'a> TestContext for &'a StateMachineContext {
             to,
             nonce,
             value: value.into(),
-            gas: 5_000_000u64.into(),
-            gas_price: Some(100_000u64.into()),
+            gas: 8_000_000u64.into(),
+            gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
             chain_id: CHAIN_ID,
