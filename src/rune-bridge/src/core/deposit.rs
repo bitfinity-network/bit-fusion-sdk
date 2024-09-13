@@ -138,6 +138,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
+        let cache_timeout = state_ref.utxo_cache_timeout();
         let indexer_urls = state_ref.indexer_urls();
         let signer = state_ref
             .btc_signer(&signer_strategy)
@@ -151,7 +152,7 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
             runtime_state,
             network,
             signer,
-            utxo_provider: IcUtxoProvider::new(ic_network),
+            utxo_provider: IcUtxoProvider::new(ic_network, cache_timeout),
             index_provider: OrdIndexProvider::new(
                 IcHttpClient {},
                 indexer_urls,

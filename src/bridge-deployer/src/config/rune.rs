@@ -11,6 +11,10 @@ pub struct RuneBridgeConfig {
     /// The network to use for the Bitcoin blockchain
     #[arg(long)]
     pub bitcoin_network: BitcoinNetwork,
+    /// Specifies the period for which the result of BTC network requests would persist in the
+    /// canister cache. If set to None or 0, the cache will not be used.
+    #[arg(long)]
+    pub btc_cache_timeout_secs: Option<u32>,
     /// The minimum number of confirmations required for a Bitcoin transaction
     /// to be considered final
     #[arg(long)]
@@ -55,6 +59,7 @@ impl From<RuneBridgeConfig> for bridge_did::init::RuneBridgeConfig {
     fn from(value: RuneBridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),
+            btc_cache_timeout_secs: value.btc_cache_timeout_secs,
             min_confirmations: value.min_confirmations,
             indexer_urls: value.indexer_urls.into_iter().collect(),
             deposit_fee: value.deposit_fee,
