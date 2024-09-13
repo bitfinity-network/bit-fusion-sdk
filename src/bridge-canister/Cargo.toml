@@ -27,4 +27,5 @@ serde = { workspace = true }
 
 [dev-dependencies]
 ic-exports = { workspace = true }
+snapbox = { workspace = true }
 tokio = { workspace = true }
