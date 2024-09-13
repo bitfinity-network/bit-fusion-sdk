@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
+use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -51,7 +51,9 @@ impl RunesSetup {
             network: BitcoinNetwork::Mainnet,
             btc_cache_timeout_secs: None,
             min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://indexer".to_string(),
+            }],
             deposit_fee: 0,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
