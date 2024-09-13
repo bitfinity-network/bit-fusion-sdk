@@ -1,3 +1,4 @@
+// pub mod btc;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
 pub mod rune;
@@ -23,6 +24,8 @@ use ic_exports::pocket_ic::PocketIc;
 use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
 use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+
+pub const MANAGEMENT_CANISTER_KEY_ID: &str = "test_key_1";
 
 const ADMIN: &str = "admin";
 const JOHN: &str = "john";

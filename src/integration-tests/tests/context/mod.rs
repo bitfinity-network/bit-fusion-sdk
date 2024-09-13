@@ -1,7 +1,7 @@
 mod evm_rpc_canister;
 pub mod stress;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
@@ -24,7 +24,8 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
-use ic_exports::ic_kit::mock_principals::alice;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_kit::mock_principals::{alice, bob};
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc1_ledger::{
@@ -36,6 +37,7 @@ use icrc_client::IcrcCanisterClient;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
+use crate::pocket_ic_integration_test::MANAGEMENT_CANISTER_KEY_ID;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
@@ -46,7 +48,7 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::event_data::MinterNotificationType;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
 
@@ -1054,11 +1056,46 @@ pub trait TestContext {
                 .await
                 .unwrap();
             }
+            CanisterType::RuneBridge => {
+                println!(
+                    "Installing Rune bridge canister with Principal {}",
+                    self.canisters().rune_bridge()
+                );
+                let init_args = BridgeInitData {
+                    evm_principal: bob(),
+                    signing_strategy: SigningStrategy::ManagementCanister {
+                        key_id: SigningKeyId::Custom(MANAGEMENT_CANISTER_KEY_ID.to_string()),
+                    },
+                    owner: self.admin(),
+                    log_settings: Default::default(),
+                };
+                let rune_config = RuneBridgeConfig {
+                    network: BitcoinNetwork::Mainnet,
+                    min_confirmations: 1,
+                    indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
+                    deposit_fee: 0,
+                    mempool_timeout: Duration::from_secs(60),
+                    indexer_consensus_threshold: 1,
+                };
+                let rune_bridge_principal = self.canisters().rune_bridge();
+                self
+                    .install_canister(
+                        rune_bridge_principal,
+                        wasm,
+                        (init_args, rune_config),
+                    )
+                    .await
+                    .unwrap();
+        
+                let rune_bridge_client = self.rune_bridge_client("admin");
+                rune_bridge_client.admin_configure_ecdsa().await.unwrap();
+            }
             CanisterType::BtcBridge => {
                 todo!()
             }
-            CanisterType::Brc20Bridge => {}
-            CanisterType::RuneBridge => {}
+            CanisterType::Brc20Bridge => {
+                todo!()
+            }
         }
     }
 
