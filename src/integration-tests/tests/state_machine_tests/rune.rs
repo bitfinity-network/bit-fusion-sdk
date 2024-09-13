@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::time::Duration;
 
 use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
