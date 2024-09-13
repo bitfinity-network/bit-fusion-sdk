@@ -29,7 +29,7 @@ use ic_bitcoin_canister_mock::PushUtxoToAddress;
 use ic_btc_interface::{
     GetUtxosRequest, GetUtxosResponse, Network, NetworkInRequest, OutPoint, Txid, Utxo,
 };
-use ic_canister_client::CanisterClient;
+use ic_canister_client::{CanisterClient, PocketIcClient};
 use ic_canisters_http_types::{HttpRequest, HttpResponse};
 use ic_ckbtc_kyt::{InitArg as KytInitArg, KytMode, LifecycleArg, SetApiKeyArg};
 use ic_ckbtc_minter::lifecycle::init::{InitArgs as CkbtcMinterInitArgs, MinterArg};
@@ -183,267 +183,262 @@ fn mainnet_bitcoin_canister_id() -> CanisterId {
     .unwrap()
 }
 
-// fn install_bitcoin_mock_canister(env: &PocketIc) {
-//     let args = Network::Mainnet;
-//     let cid = mainnet_bitcoin_canister_id();
-//     env.create_canister_with_cycles(Some(cid.into()), Cycles::new(0), None);
+async fn install_bitcoin_mock_canister(env: &PocketIcTestContext) {
+    let args = Network::Mainnet;
+    let cid = mainnet_bitcoin_canister_id();
+    // env.create_canister_with_cycles(Some(cid.into()), Cycles::new(0), None);
 
-//     env.install_existing_canister(cid, bitcoin_mock_wasm(), Encode!(&args).unwrap())
-//         .unwrap();
-// }
+    env.install_canister(cid.get().0, bitcoin_mock_wasm().await, (args,)).await
+        .unwrap();
+}
 
-// struct CkBtcSetup {
-//     pub context: PocketIcTestContext,
-//     pub caller: PrincipalId,
-//     pub kyt_provider: PrincipalId,
-//     pub bitcoin_id: CanisterId,
-//     pub ledger_id: CanisterId,
-//     pub minter_id: CanisterId,
-//     pub kyt_id: CanisterId,
-//     pub tip_height: AtomicU32,
-//     pub token_id: Id256,
-//     pub wrapped_token: H160,
-//     pub bft_bridge: H160,
-// }
+struct CkBtcSetup {
+    pub context: PocketIcTestContext,
+    pub caller: Principal,
+    pub kyt_provider: PrincipalId,
+    pub bitcoin_id: CanisterId,
+    pub ledger_id: Principal,
+    pub minter_id: Principal,
+    pub kyt_id: Principal,
+    pub tip_height: AtomicU32,
+    pub token_id: Id256,
+    pub wrapped_token: H160,
+    pub bft_bridge: H160,
+}
 
-// impl CkBtcSetup {}
+impl CkBtcSetup {
+    pub async fn new() -> Self {
+        let bitcoin_id = mainnet_bitcoin_canister_id();
+        let caller = PrincipalId::new_user_test_id(1).0;
 
-// impl CkBtcSetup {
-//     pub async fn new() -> Self {
-//         let bitcoin_id = mainnet_bitcoin_canister_id();
-//         let caller = PrincipalId::new_user_test_id(1);
+        let (env, ledger_id, minter_id, kyt_id, kyt_provider) = {
+                let env = PocketIcTestContext::new(&[]).await;
 
-//         let (env, ledger_id, minter_id, kyt_id, kyt_provider) = {
-//                 let env = PocketIcTestContext::new(&[]).await;
+                install_bitcoin_mock_canister(&env).await;
+                let ledger_id = env.create_canister().await.unwrap();
+                let minter_id = env.create_canister().await.unwrap();
+                let kyt_id = env.create_canister().await.unwrap();
 
-//                 install_bitcoin_mock_canister(&env.client);
-//                 let ledger_id = env.create_canister().await;
-//                 let minter_id =
-//                     env.create_canister_with_cycles(None, Cycles::new(100_000_000_000_000), None);
-//                 let kyt_id = env.create_canister().await;
+                env.install_canister(
+                    ledger_id,
+                    ledger_wasm().await,
+                    (LedgerArgument::Init(
+                        LedgerInitArgsBuilder::with_symbol_and_name("ckBTC", "ckBTC")
+                            .with_minting_account(minter_id)
+                            .with_transfer_fee(TRANSFER_FEE)
+                            .with_max_memo_length(CKBTC_LEDGER_MEMO_SIZE)
+                            .with_feature_flags(ic_icrc1_ledger::FeatureFlags { icrc2: true })
+                            .build()
+                    ),),
+                ).await
+                .expect("failed to install the ledger");
 
-//                 env.install_canister(
-//                     ledger_id,
-//                     ledger_wasm(),
-//                     (LedgerArgument::Init(
-//                         LedgerInitArgsBuilder::with_symbol_and_name("ckBTC", "ckBTC")
-//                             .with_minting_account(minter_id.get().0)
-//                             .with_transfer_fee(TRANSFER_FEE)
-//                             .with_max_memo_length(CKBTC_LEDGER_MEMO_SIZE)
-//                             .with_feature_flags(ic_icrc1_ledger::FeatureFlags { icrc2: true })
-//                             .build()
-//                     )),
-//                 )
-//                 .expect("failed to install the ledger");
+                env.install_canister(
+                    minter_id,
+                    minter_wasm().await,
+                    (MinterArg::Init(CkbtcMinterInitArgs {
+                        btc_network: ic_ckbtc_minter::lifecycle::init::BtcNetwork::Mainnet,
+                        ecdsa_key_name: "master_ecdsa_public_key".to_string(),
+                        retrieve_btc_min_amount: 100_000,
+                        ledger_id: CanisterId::unchecked_from_principal(ledger_id.into()),
+                        max_time_in_queue_nanos: 100,
+                        min_confirmations: Some(MIN_CONFIRMATIONS),
+                        mode: Mode::GeneralAvailability,
+                        kyt_fee: Some(KYT_FEE),
+                        kyt_principal: Some(CanisterId::unchecked_from_principal(kyt_id.into())),
+                    }),)).await
+                    .expect("failed to install the ckBTC minter");
 
-//                 env.install_existing_canister(
-//                     minter_id,
-//                     minter_wasm(),
-//                     Encode!(&MinterArg::Init(CkbtcMinterInitArgs {
-//                         btc_network: ic_ckbtc_minter::lifecycle::init::BtcNetwork::Mainnet,
-//                         ecdsa_key_name: "master_ecdsa_public_key".to_string(),
-//                         retrieve_btc_min_amount: 100_000,
-//                         ledger_id,
-//                         max_time_in_queue_nanos: 100,
-//                         min_confirmations: Some(MIN_CONFIRMATIONS),
-//                         mode: Mode::GeneralAvailability,
-//                         kyt_fee: Some(KYT_FEE),
-//                         kyt_principal: kyt_id.into(),
-//                     }))
-//                     .unwrap(),
-//                 )
-//                 .expect("failed to install the ckBTC minter");
+                let kyt_provider = PrincipalId::new_user_test_id(2);
 
-//                 let kyt_provider = PrincipalId::new_user_test_id(2);
+                env.install_canister(
+                    kyt_id,
+                    kyt_wasm().await,
+                    (LifecycleArg::InitArg(KytInitArg {
+                        minter_id: minter_id.into(),
+                        maintainers: vec![kyt_provider.into()],
+                        mode: KytMode::AcceptAll,
+                    }),)
+                ).await
+                .expect("failed to install the KYT canister");
 
-//                 env.install_existing_canister(
-//                     kyt_id,
-//                     kyt_wasm(),
-//                     Encode!(&LifecycleArg::InitArg(KytInitArg {
-//                         minter_id: minter_id.into(),
-//                         maintainers: vec![kyt_provider.into()],
-//                         mode: KytMode::AcceptAll,
-//                     }))
-//                     .unwrap(),
-//                 )
-//                 .expect("failed to install the KYT canister");
+                env.client.update_call(
+                    bitcoin_id.get().0,
+                    bitcoin_id.get().0,
+                    "set_fee_percentiles",
+                    Encode!(&(1..=100).map(|i| i * 100).collect::<Vec<u64>>()).unwrap(),
+                ).await
+                .expect("failed to set fee percentiles");
 
-//                 env.execute_ingress(
-//                     bitcoin_id,
-//                     "set_fee_percentiles",
-//                     Encode!(&(1..=100).map(|i| i * 100).collect::<Vec<u64>>()).unwrap(),
-//                 )
-//                 .expect("failed to set fee percentiles");
+                env.client.update_call(
+                    kyt_provider.0,
+                    kyt_id,
+                    "set_api_key",
+                    Encode!(&SetApiKeyArg {
+                        api_key: "api key".to_string(),
+                    })
+                    .unwrap(),
+                ).await
+                .expect("failed to set api key");
 
-//                 env.execute_ingress_as(
-//                     kyt_provider,
-//                     kyt_id,
-//                     "set_api_key",
-//                     Encode!(&SetApiKeyArg {
-//                         api_key: "api key".to_string(),
-//                     })
-//                     .unwrap(),
-//                 )
-//                 .expect("failed to set api key");
+                (env, ledger_id, minter_id, kyt_id, kyt_provider)
+            };
 
-//                 (env, ledger_id, minter_id, kyt_id, kyt_provider)
-//             }
+        let mut context = env;
+        context.canisters.set(CanisterType::Kyt, kyt_id.into());
+        context
+            .canisters
+            .set(CanisterType::CkBtcMinter, minter_id.into());
 
-//         let mut context = StateMachineContext::new(env);
-//         context.canisters.set(CanisterType::Kyt, kyt_id.into());
-//         context
-//             .canisters
-//             .set(CanisterType::CkBtcMinter, minter_id.into());
+        let canisters = [CanisterType::Signature, CanisterType::Evm];
+        for canister_type in canisters {
+            context.canisters.set(
+                canister_type,
+                (&context)
+                    .create_canister()
+                    .await
+                    .expect("failed to create a canister"),
+            );
+        }
 
-//         let canisters = [CanisterType::Signature, CanisterType::Evm];
-//         for canister_type in canisters {
-//             context.canisters.set(
-//                 canister_type,
-//                 (&context)
-//                     .create_canister()
-//                     .await
-//                     .expect("failed to create a canister"),
-//             );
-//         }
+        for canister_type in canisters {
+            (&context).install_default_canister(canister_type).await
+        }
 
-//         for canister_type in canisters {
-//             (&context).install_default_canister(canister_type).await
-//         }
+        let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
 
-//         let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
+        let bridge_config = BridgeInitData {
+            owner: (&context).admin(),
+            evm_principal: context.canisters.evm(),
+            signing_strategy: SigningStrategy::ManagementCanister {
+                key_id: SigningKeyId::Custom("master_ecdsa_public_key".into()),
+            },
+            log_settings: Some(LogCanisterSettings {
+                enable_console: Some(true),
+                in_memory_records: None,
+                log_filter: Some("trace".to_string()),
+                ..Default::default()
+            }),
+        };
 
-//         let bridge_config = BridgeInitData {
-//             owner: (&context).admin(),
-//             evm_principal: context.canisters.evm(),
-//             signing_strategy: SigningStrategy::ManagementCanister {
-//                 key_id: SigningKeyId::Custom("master_ecdsa_public_key".into()),
-//             },
-//             log_settings: Some(LogCanisterSettings {
-//                 enable_console: Some(true),
-//                 in_memory_records: None,
-//                 log_filter: Some("trace".to_string()),
-//                 ..Default::default()
-//             }),
-//         };
+        let btc_bridge = (&context).create_canister().await.unwrap();
+        (&context)
+            .install_canister(
+                btc_bridge,
+                get_btc_bridge_canister_bytecode().await,
+                (bridge_config,),
+            )
+            .await
+            .unwrap();
+        context.canisters.set(CanisterType::BtcBridge, btc_bridge);
+        println!("Btc bridge installed with id {btc_bridge}");
 
-//         let btc_bridge = (&context).create_canister().await.unwrap();
-//         (&context)
-//             .install_canister(
-//                 btc_bridge,
-//                 get_btc_bridge_canister_bytecode().await,
-//                 (bridge_config,),
-//             )
-//             .await
-//             .unwrap();
-//         context.canisters.set(CanisterType::BtcBridge, btc_bridge);
-//         println!("Btc bridge installed with id {btc_bridge}");
+        let btc_config = BtcConfig {
+            ck_btc_minter: minter_id.into(),
+            ck_btc_ledger: ledger_id.into(),
+            network: BitcoinNetwork::Mainnet,
+            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
+        };
 
-//         let btc_config = BtcConfig {
-//             ck_btc_minter: minter_id.into(),
-//             ck_btc_ledger: ledger_id.into(),
-//             network: BitcoinNetwork::Mainnet,
-//             ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
-//         };
+        // configure btc
+        let res: BftResult<()> = (&context)
+            .client(btc_bridge, "admin")
+            .update("admin_configure_btc", (btc_config,))
+            .await
+            .unwrap();
+        assert!(res.is_ok());
 
-//         // configure btc
-//         let res: BftResult<()> = (&context)
-//             .client(btc_bridge, "admin")
-//             .update("admin_configure_btc", (btc_config,))
-//             .await
-//             .unwrap();
-//         assert!(res.is_ok());
+        println!("Btc config OK");
+        for _ in 0..5 {
+            (&context).advance_time(Duration::from_secs(2)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
 
-//         println!("Btc config OK");
-//         for _ in 0..5 {
-//             (&context).advance_time(Duration::from_secs(2)).await;
-//             tokio::time::sleep(Duration::from_secs(2)).await;
-//         }
+        let btc_bridge_eth_address: BftResult<H160> = (&context)
+            .client(btc_bridge, "admin")
+            .update::<_, BftResult<H160>>("get_bridge_canister_evm_address", ())
+            .await
+            .unwrap();
 
-//         let btc_bridge_eth_address: BftResult<H160> = (&context)
-//             .client(btc_bridge, "admin")
-//             .update::<_, BftResult<H160>>("get_bridge_canister_evm_address", ())
-//             .await
-//             .unwrap();
+        let btc_bridge_eth_address =
+            btc_bridge_eth_address.expect("get_bridge_canister_evm_address error");
 
-//         let btc_bridge_eth_address =
-//             btc_bridge_eth_address.expect("get_bridge_canister_evm_address error");
+        println!("btc_bridge_eth_address {btc_bridge_eth_address}",);
 
-//         println!("btc_bridge_eth_address {btc_bridge_eth_address}",);
+        let client = (&context).evm_client("admin");
+        client
+            .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+            .await
+            .unwrap()
+            .unwrap();
 
-//         let client = (&context).evm_client("admin");
-//         client
-//             .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
-//             .await
-//             .unwrap()
-//             .unwrap();
+        let bft_bridge = (&context)
+            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address, None, true)
+            .await
+            .unwrap();
 
-//         let bft_bridge = (&context)
-//             .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address, None, true)
-//             .await
-//             .unwrap();
+        println!("bft_bridge {bft_bridge}",);
 
-//         println!("bft_bridge {bft_bridge}",);
+        // set bft bridge
+        (&context)
+            .client(btc_bridge, "admin")
+            .update::<_, ()>("set_bft_bridge_contract", (bft_bridge.clone(),))
+            .await
+            .unwrap();
 
-//         // set bft bridge
-//         (&context)
-//             .client(btc_bridge, "admin")
-//             .update::<_, ()>("set_bft_bridge_contract", (bft_bridge.clone(),))
-//             .await
-//             .unwrap();
+        let token_id = Id256::from(&Principal::from(ledger_id));
+        let token = (&context)
+            .create_wrapped_token(&wallet, &bft_bridge, token_id)
+            .await
+            .unwrap();
 
-//         let token_id = Id256::from(&Principal::from(ledger_id));
-//         let token = (&context)
-//             .create_wrapped_token(&wallet, &bft_bridge, token_id)
-//             .await
-//             .unwrap();
+        println!("wrapped token {token}",);
 
-//         println!("wrapped token {token}",);
+        let mut token_name = [0; 32];
+        token_name[0..7].copy_from_slice(b"wrapper");
+        let mut token_symbol = [0; 16];
+        token_symbol[0..3].copy_from_slice(b"WPT");
 
-//         let mut token_name = [0; 32];
-//         token_name[0..7].copy_from_slice(b"wrapper");
-//         let mut token_symbol = [0; 16];
-//         token_symbol[0..3].copy_from_slice(b"WPT");
+        let bft_config = WrappedTokenConfig {
+            token_address: token.clone(),
+            token_name,
+            token_symbol,
+            decimals: 0,
+        };
 
-//         let bft_config = WrappedTokenConfig {
-//             token_address: token.clone(),
-//             token_name,
-//             token_symbol,
-//             decimals: 0,
-//         };
+        let res: BftResult<()> = (&context)
+            .client(btc_bridge, "admin")
+            .update("admin_configure_wrapped_token", (bft_config,))
+            .await
+            .unwrap();
 
-//         let res: BftResult<()> = (&context)
-//             .client(btc_bridge, "admin")
-//             .update("admin_configure_wrapped_token", (bft_config,))
-//             .await
-//             .unwrap();
+        assert!(res.is_ok());
 
-//         assert!(res.is_ok());
+        println!("wrapped token configured");
 
-//         println!("wrapped token configured");
+        println!("Wait for setup to complete");
+        for _ in 0..15 {
+            (&context).advance_time(Duration::from_secs(10)).await;
+        }
 
-//         println!("Wait for setup to complete");
-//         for _ in 0..15 {
-//             (&context).advance_time(Duration::from_secs(10)).await;
-//         }
+        Self {
+            context,
+            kyt_provider,
+            caller,
+            bitcoin_id,
+            ledger_id,
+            minter_id,
+            kyt_id,
+            wrapped_token: token,
+            bft_bridge,
+            token_id,
+            tip_height: AtomicU32::default(),
+        }
+    }
 
-//         Self {
-//             context,
-//             kyt_provider,
-//             caller,
-//             bitcoin_id,
-//             ledger_id,
-//             minter_id,
-//             kyt_id,
-//             wrapped_token: token,
-//             bft_bridge,
-//             token_id,
-//             tip_height: AtomicU32::default(),
-//         }
-//     }
-
-//     pub fn env(&self) -> Arc<PocketIc> {
-//         self.context.client.clone()
-//     }
+    pub fn env(&self) -> Arc<PocketIc> {
+        self.context.client.clone()
+    }
 
 //     pub fn set_fee_percentiles(&self, fees: &Vec<u64>) {
 //         self.env()
@@ -455,16 +450,17 @@ fn mainnet_bitcoin_canister_id() -> CanisterId {
 //             .expect("failed to set fee percentiles");
 //     }
 
-//     pub fn set_tip_height(&self, tip_height: u32) {
-//         self.tip_height.store(tip_height, Ordering::Relaxed);
-//         self.env()
-//             .execute_ingress(
-//                 self.bitcoin_id,
-//                 "set_tip_height",
-//                 Encode!(&tip_height).unwrap(),
-//             )
-//             .expect("failed to set fee tip height");
-//     }
+    pub async fn set_tip_height(&self, tip_height: u32) {
+        self.tip_height.store(tip_height, Ordering::Relaxed);
+        self.env()
+            .update_call(
+                self.bitcoin_id.get().0,
+                self.bitcoin_id.get().0,
+                "set_tip_height",
+                Encode!(&tip_height).unwrap(),
+            ).await
+            .expect("failed to set fee tip height");
+    }
 
 //     pub fn advance_tip_height(&self, delta: u32) {
 //         let prev_value = self.tip_height.fetch_add(delta, Ordering::Relaxed);
@@ -493,50 +489,74 @@ fn mainnet_bitcoin_canister_id() -> CanisterId {
 //         );
 //     }
 
-//     pub fn get_btc_address_from_bridge(&self, account: impl Into<Account>) -> String {
-//         let account = account.into();
-//         Decode!(
-//             &assert_reply(
-//                 self.env()
-//                     .execute_ingress_as(
-//                         self.caller,
-//                         CanisterId::try_from(PrincipalId(self.context.canisters.btc_bridge()))
-//                             .unwrap(),
-//                         "get_btc_address",
-//                         Encode!(&GetBtcAddressArgs {
-//                             owner: Some(account.owner),
-//                             subaccount: account.subaccount,
-//                         })
-//                         .unwrap(),
-//                     )
-//                     .expect("failed to get btc address")
-//             ),
-//             String
-//         )
-//         .unwrap()
-//     }
+    pub async fn get_btc_address_from_bridge(&self, account: impl Into<Account>) -> String {
+        let account = account.into();
 
-//     pub fn get_btc_address(&self, account: impl Into<Account>) -> String {
-//         let account = account.into();
-//         Decode!(
-//             &assert_reply(
-//                 self.env()
-//                     .execute_ingress_as(
-//                         self.caller,
-//                         self.minter_id,
-//                         "get_btc_address",
-//                         Encode!(&GetBtcAddressArgs {
-//                             owner: Some(account.owner),
-//                             subaccount: account.subaccount,
-//                         })
-//                         .unwrap(),
-//                     )
-//                     .expect("failed to get btc address")
-//             ),
-//             String
-//         )
-//         .unwrap()
-//     }
+        // let caller_principal = Self::principal_of(caller);
+        let client = PocketIcClient::from_client(self.env(), self.context.canisters.btc_bridge(), self.caller);
+        client
+            .query::<_, String>(
+                "get_btc_address",
+                (GetBtcAddressArgs {
+                    owner: Some(account.owner),
+                    subaccount: account.subaccount,
+                },),
+            ).await
+            .expect("failed to get btc address")
+
+        // Decode!(
+        //     &assert_reply(
+        //         self.env()
+        //             .execute_ingress_as(
+        //                 self.caller,
+        //                 CanisterId::try_from(PrincipalId(self.context.canisters.btc_bridge()))
+        //                     .unwrap(),
+        //                 "get_btc_address",
+        //                 Encode!(&GetBtcAddressArgs {
+        //                     owner: Some(account.owner),
+        //                     subaccount: account.subaccount,
+        //                 })
+        //                 .unwrap(),
+        //             )
+        //             .expect("failed to get btc address")
+        //     ),
+        //     String
+        // )
+        // .unwrap()
+    }
+
+    pub async fn get_btc_address(&self, account: impl Into<Account>) -> String {
+        let account = account.into();
+
+        let client = PocketIcClient::from_client(self.env(), self.minter_id, self.caller);
+        client
+            .query::<_, String>(
+                "get_btc_address",
+                (GetBtcAddressArgs {
+                    owner: Some(account.owner),
+                    subaccount: account.subaccount,
+                },),
+            ).await.expect("failed to get btc address")
+
+        // Decode!(
+        //     &assert_reply(
+        //         self.env()
+        //             .execute_ingress_as(
+        //                 self.caller,
+        //                 self.minter_id,
+        //                 "get_btc_address",
+        //                 Encode!(&GetBtcAddressArgs {
+        //                     owner: Some(account.owner),
+        //                     subaccount: account.subaccount,
+        //                 })
+        //                 .unwrap(),
+        //             )
+        //             .expect("failed to get btc address")
+        //     ),
+        //     String
+        // )
+        // .unwrap()
+    }
 
 //     pub fn get_minter_info(&self) -> MinterInfo {
 //         Decode!(
@@ -1198,7 +1218,7 @@ fn mainnet_bitcoin_canister_id() -> CanisterId {
 
 //         (&self.context).advance_time(Duration::from_secs(2)).await;
 //     }
-// }
+}
 
 // #[tokio::test]
 // async fn update_balance_should_return_correct_confirmations() {
@@ -1354,30 +1374,29 @@ fn mainnet_bitcoin_canister_id() -> CanisterId {
 //     address.to_string()
 // }
 
-// #[tokio::test]
-// async fn test_get_btc_address_from_bridge() {
-//     let ckbtc = CkBtcSetup::new().await;
+#[tokio::test]
+async fn test_get_btc_address_from_bridge() {
+    let ckbtc = CkBtcSetup::new().await;
 
-//     let wallet = (&ckbtc.context)
-//         .new_wallet(u128::MAX)
-//         .await
-//         .expect("Failed to create a wallet");
+    let wallet = (&ckbtc.context)
+        .new_wallet(u128::MAX)
+        .await
+        .expect("Failed to create a wallet");
 
-//     ckbtc.set_tip_height(12);
-//     let caller_eth_address = wallet.address().0.into();
+    ckbtc.set_tip_height(12).await;
+    let caller_eth_address = wallet.address().0.into();
 
-//     let deposit_account = Account {
-//         owner: ckbtc.context.canisters.btc_bridge(),
-//         subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
-//     };
-//     let deposit_address = ckbtc.get_btc_address(deposit_account);
+    let deposit_account = Account {
+        owner: ckbtc.context.canisters.btc_bridge(),
+        subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+    };
+    let deposit_address = ckbtc.get_btc_address(deposit_account).await;
 
-//     let deposit_address_anonymous = ckbtc.get_btc_address_from_bridge(deposit_account);
+    let deposit_address_anonymous = ckbtc.get_btc_address_from_bridge(deposit_account).await;
 
-//     assert_eq!(deposit_address, deposit_address_anonymous);
+    assert_eq!(deposit_address, deposit_address_anonymous);
 
-//     ckbtc.async_drop().await;
-// }
+}
 
 // #[tokio::test]
 // async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
