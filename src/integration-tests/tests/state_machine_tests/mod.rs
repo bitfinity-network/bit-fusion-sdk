@@ -21,7 +21,6 @@ use crate::utils::error::TestError;
 use crate::utils::CHAIN_ID;
 
 mod btc;
-mod rune;
 
 pub struct StateMachineContext {
     env: Arc<StateMachine>,
