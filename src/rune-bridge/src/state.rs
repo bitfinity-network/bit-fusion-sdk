@@ -2,13 +2,13 @@ mod config;
 mod master_key;
 
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Duration;
 
 use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_canister::memory::MEMORY_MANAGER;
-use bridge_did::init::{RuneBridgeConfig, MIN_INDEXERS};
+use bridge_did::init::{IndexerType, RuneBridgeConfig, MIN_INDEXERS};
 use bridge_did::runes::{RuneInfo, RuneName};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
@@ -155,9 +155,9 @@ impl RuneState {
         self.config.get().deposit_fee
     }
 
-    /// Url of the `ord` indexer this canister rely on.
-    pub fn indexer_urls(&self) -> HashSet<String> {
-        self.config.get().indexer_urls.clone()
+    /// Configuration of the indexers
+    pub fn indexers_config(&self) -> Vec<IndexerType> {
+        self.config.get().indexers.clone()
     }
 
     /// Utxo ledger.
@@ -186,11 +186,10 @@ impl RuneState {
             panic!("Invalid configuration: {err}");
         }
 
-        config.indexer_urls = config
-            .indexer_urls
-            .iter()
-            .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
-            .collect();
+        config
+            .indexers
+            .iter_mut()
+            .for_each(|config| config.normalize());
 
         self.config.set(config);
     }
@@ -224,17 +223,14 @@ impl RuneState {
         Ok(())
     }
 
-    pub fn configure_indexers(&mut self, indexer_urls: HashSet<String>) {
-        if indexer_urls.len() < MIN_INDEXERS {
+    pub fn configure_indexers(&mut self, mut indexers: Vec<IndexerType>) {
+        if indexers.len() < MIN_INDEXERS {
             panic!("number of indexers must be at least {}", MIN_INDEXERS)
         }
 
-        self.config.with_borrow_mut(|config| {
-            config.indexer_urls = indexer_urls
-                .iter()
-                .map(|url| url.strip_suffix('/').unwrap_or(url).to_owned())
-                .collect();
-        });
+        indexers.iter_mut().for_each(|config| config.normalize());
+        self.config
+            .with_borrow_mut(move |config| config.indexers = indexers);
     }
 
     pub fn mempool_timeout(&self) -> Duration {
@@ -279,9 +275,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_validate_empty_indexer_urls() {
+    fn test_validate_empty_indexers() {
         let config = RuneBridgeConfig {
-            indexer_urls: HashSet::new(),
+            indexers: vec![],
             ..Default::default()
         };
         assert!(config.validate().is_err());
@@ -290,7 +286,9 @@ mod tests {
     #[test]
     fn test_validate_non_https_url() {
         let config = RuneBridgeConfig {
-            indexer_urls: HashSet::from_iter(vec!["http://url.com".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "http://url.com".to_string(),
+            }],
             ..Default::default()
         };
         assert!(config.validate().is_err());
@@ -299,7 +297,9 @@ mod tests {
     #[test]
     fn test_validate_success() {
         let config = RuneBridgeConfig {
-            indexer_urls: HashSet::from_iter(vec!["https://url.com".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://url.com".to_string(),
+            }],
             indexer_consensus_threshold: 1,
             ..Default::default()
         };
@@ -310,7 +310,9 @@ mod tests {
     fn test_configure_with_trailing_slash() {
         MockContext::new().inject();
         let config = RuneBridgeConfig {
-            indexer_urls: HashSet::from_iter(vec!["https://url.com/".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://url.com/".to_string(),
+            }],
             indexer_consensus_threshold: 1,
             ..Default::default()
         };
@@ -318,45 +320,63 @@ mod tests {
         state.configure(config);
 
         assert_eq!(
-            state.indexer_urls(),
-            HashSet::from_iter(vec![String::from("https://url.com")])
+            state.indexers_config(),
+            vec![IndexerType::OrdHttp {
+                url: "https://url.com".to_string()
+            }],
         );
     }
 
     #[test]
     fn test_configure_indexers_valid() {
         let mut state = RuneState::default();
-        let urls = vec![
-            "http://indexer1.com",
-            "http://indexer2.com",
-            "http://indexer3.com",
+        let indexers = vec![
+            IndexerType::OrdHttp {
+                url: "https://indexer1.com".to_string(),
+            },
+            IndexerType::OrdHttp {
+                url: "https://indexer2.com".to_string(),
+            },
+            IndexerType::OrdHttp {
+                url: "https://indexer3.com".to_string(),
+            },
         ];
-        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
 
-        state.configure_indexers(indexer_urls.clone());
+        state.configure_indexers(indexers.clone());
 
-        assert_eq!(state.config.get().indexer_urls, indexer_urls);
+        assert_eq!(state.config.get().indexers, indexers);
     }
 
     #[test]
     fn test_configure_indexers_strip_trailing_slash() {
         let mut state = RuneState::default();
-        let urls = vec![
-            "http://indexer1.com/",
-            "http://indexer2.com",
-            "http://indexer3.com/",
+        let indexers = vec![
+            IndexerType::OrdHttp {
+                url: "https://indexer1.com/".to_string(),
+            },
+            IndexerType::OrdHttp {
+                url: "https://indexer2.com/".to_string(),
+            },
+            IndexerType::OrdHttp {
+                url: "https://indexer3.com".to_string(),
+            },
         ];
-        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
 
-        state.configure_indexers(indexer_urls);
+        state.configure_indexers(indexers);
 
         assert_eq!(
-            state.config.get().indexer_urls,
-            HashSet::from([
-                "http://indexer1.com".to_string(),
-                "http://indexer2.com".to_string(),
-                "http://indexer3.com".to_string(),
-            ])
+            state.config.get().indexers,
+            vec![
+                IndexerType::OrdHttp {
+                    url: "https://indexer1.com".to_string(),
+                },
+                IndexerType::OrdHttp {
+                    url: "https://indexer2.com".to_string(),
+                },
+                IndexerType::OrdHttp {
+                    url: "https://indexer3.com".to_string(),
+                },
+            ]
         );
     }
 
@@ -364,30 +384,20 @@ mod tests {
     #[should_panic(expected = "number of indexers must be at least")]
     fn test_configure_indexers_too_few_indexers() {
         let mut state = RuneState::default();
-        let indexer_urls: HashSet<String> = HashSet::new();
+        let indexers = vec![];
 
-        state.configure_indexers(indexer_urls);
+        state.configure_indexers(indexers);
     }
 
     #[test]
     #[should_panic(expected = "number of indexers must be at least")]
     fn test_configure_indexers_fewer_than_urls() {
         let mut state = RuneState::default();
-        let urls = vec!["http://indexer1.com"];
-        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
+        let indexers = vec![IndexerType::OrdHttp {
+            url: "http://indexer1.com".to_string(),
+        }];
 
-        state.configure_indexers(indexer_urls);
-    }
-
-    #[test]
-    fn test_configure_indexers_more_than_urls() {
-        let mut state = RuneState::default();
-        let urls = vec!["http://indexer1.com", "http://indexer2.com"];
-        let indexer_urls: HashSet<String> = urls.into_iter().map(String::from).collect();
-
-        state.configure_indexers(indexer_urls.clone());
-
-        assert_eq!(state.config.get().indexer_urls, indexer_urls);
+        state.configure_indexers(indexers);
     }
 
     #[test]

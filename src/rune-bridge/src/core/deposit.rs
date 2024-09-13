@@ -16,9 +16,9 @@ use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
 use serde::Serialize;
 
-use super::index_provider::IcHttpClient;
+use super::index_provider::get_indexer;
 use crate::canister::{get_rune_state, get_runtime_state};
-use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
+use crate::core::index_provider::RuneIndexProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
 use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
@@ -140,23 +140,14 @@ impl RuneDeposit<IcUtxoProvider> {
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
         let cache_timeout = state_ref.utxo_cache_timeout();
-        let indexer_urls = state_ref.indexer_urls();
+
+        let indexer_configs = state_ref.indexers_config();
+        let indexers = indexer_configs.into_iter().map(get_indexer).collect();
+
         let signer = state_ref
             .btc_signer(&signer_strategy)
             .ok_or(DepositError::SignerNotInitialized)?;
         let consensus_threshold = state_ref.indexer_consensus_threshold();
-
-        let indexers = indexer_urls
-            .into_iter()
-            .map(|url| {
-                let result: Box<dyn RuneIndexProvider> = Box::new(OrdIndexProvider::new(
-                    IcHttpClient,
-                    url,
-                    consensus_threshold,
-                ));
-                result
-            })
-            .collect();
 
         drop(state_ref);
 

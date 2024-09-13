@@ -4,6 +4,7 @@ use std::future::Future;
 use std::str::FromStr as _;
 
 use async_trait::async_trait;
+use bridge_did::init::IndexerType;
 use bridge_did::runes::RuneName;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
@@ -25,6 +26,12 @@ pub(crate) trait RuneIndexProvider {
     ) -> Result<HashMap<RuneName, u128>, GetInputsError>;
     /// Get the list of all runes in the indexer
     async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, GetInputsError>;
+}
+
+pub(crate) fn get_indexer(indexer_type: IndexerType) -> Box<dyn RuneIndexProvider> {
+    match indexer_type {
+        IndexerType::OrdHttp { url } => Box::new(OrdIndexProvider::new(IcHttpClient, url)),
+    }
 }
 
 const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
@@ -99,21 +106,14 @@ struct RunesResponse {
 pub struct OrdIndexProvider<C: HttpClient + Sync> {
     client: C,
     url: String,
-    /// Minimum quantity of indexer nodes required to reach agreement on a
-    /// request
-    pub indexer_consensus_threshold: u8,
 }
 
 impl<C> OrdIndexProvider<C>
 where
     C: HttpClient + Sync,
 {
-    pub fn new(client: C, url: String, indexer_consensus_threshold: u8) -> Self {
-        Self {
-            client,
-            url,
-            indexer_consensus_threshold,
-        }
+    pub fn new(client: C, url: String) -> Self {
+        Self { client, url }
     }
 }
 
@@ -261,7 +261,7 @@ mod tests {
         );
 
         let client = MockHttpClient { runes };
-        let provider = OrdIndexProvider::new(client, "http://localhost:8080".into(), 1);
+        let provider = OrdIndexProvider::new(client, "http://localhost:8080".into());
 
         let runes = provider.get_rune_list().await.unwrap();
         assert_eq!(runes.len(), 3);
