@@ -3,8 +3,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
-use bridge_utils::evm_link::EvmLink;
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -158,6 +158,7 @@ impl LogCanister for BridgeCanisterExport {
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::evm_link::EvmLink;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, init};
     use ic_exports::ic_kit::{inject, MockContext};
@@ -203,7 +204,7 @@ mod tests {
     async fn init_canister() -> TestBridge {
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: bob(),
+            evm_link: EvmLink::Ic(bob()),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -228,7 +229,7 @@ mod tests {
     async fn init_rejects_anonymous_evm() {
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::anonymous(),
+            evm_link: EvmLink::Ic(bob()),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -242,7 +243,7 @@ mod tests {
     async fn init_rejects_management_evm() {
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::management_canister(),
+            evm_link: EvmLink::Ic(Principal::management_canister()),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
@@ -256,7 +257,7 @@ mod tests {
     async fn init_rejects_anonymous_owner() {
         let init_data = BridgeInitData {
             owner: Principal::anonymous(),
-            evm_principal: bob(),
+            evm_link: EvmLink::Ic(bob()),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },

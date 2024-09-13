@@ -2,12 +2,13 @@
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::bft_events::{self, BridgeEvent};
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::evm_link::EvmLink;
+use bridge_utils::evm_link::EvmLinkClient;
 use candid::CandidType;
 use did::{H160, H256};
 use eth_signer::sign_strategy::TransactionSigner;
@@ -90,7 +91,8 @@ pub trait OperationContext {
         tx.v = signature.v.0;
         tx.hash = tx.hash();
 
-        let client = self.get_evm_link().get_json_rpc_client();
+        let link = self.get_evm_link();
+        let client = link.get_json_rpc_client();
         let tx_hash = client
             .send_raw_transaction(tx)
             .await
@@ -102,7 +104,8 @@ pub trait OperationContext {
     async fn collect_evm_events(&self, max_logs_number: u64) -> BftResult<CollectedEvents> {
         log::trace!("collecting evm events");
 
-        let client = self.get_evm_link().get_json_rpc_client();
+        let link = self.get_evm_link();
+        let client = link.get_json_rpc_client();
         let evm_params = self.get_evm_params()?;
         let bridge_contract = self.get_bridge_contract_address()?;
 

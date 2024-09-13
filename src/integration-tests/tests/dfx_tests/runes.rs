@@ -7,6 +7,7 @@ use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::event_data::MinterNotificationType;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
@@ -146,7 +147,7 @@ impl RunesContext {
 
         let bridge = context.canisters().rune_bridge();
         let init_args = BridgeInitData {
-            evm_principal: context.canisters().evm(),
+            evm_link: EvmLink::Ic(context.canisters().evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },
