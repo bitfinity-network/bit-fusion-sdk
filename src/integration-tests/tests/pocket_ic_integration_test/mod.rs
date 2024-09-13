@@ -1,4 +1,4 @@
-// pub mod btc;
+pub mod btc;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
 pub mod rune;
