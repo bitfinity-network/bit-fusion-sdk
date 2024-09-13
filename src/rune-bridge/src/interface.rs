@@ -98,6 +98,11 @@ pub enum DepositError {
     /// Error while signing the mint order.
     Sign(String),
     Evm(String),
+    Other(String),
+    NoConsensus {
+        first_response: String,
+        another_response: String,
+    },
 }
 
 impl From<KeyError> for DepositError {
