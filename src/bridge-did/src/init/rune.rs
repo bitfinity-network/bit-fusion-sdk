@@ -12,7 +12,7 @@ use super::{DEFAULT_DEPOSIT_FEE, DEFAULT_INDEXER_CONSENSUS_THRESHOLD, DEFAULT_ME
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
     pub min_confirmations: u32,
-    pub indexer_urls: HashSet<String>,
+    pub indexers: Vec<IndexerType>,
     pub deposit_fee: u64,
     pub mempool_timeout: Duration,
     /// Minimum quantity of indexer nodes required to reach agreement on a
@@ -100,7 +100,6 @@ impl Storable for RuneBridgeConfig {
                 _ => panic!("invalid network"),
             },
             min_confirmations,
-            indexer_urls,
             deposit_fee,
             mempool_timeout,
             indexer_consensus_threshold,
@@ -113,7 +112,7 @@ impl Default for RuneBridgeConfig {
         Self {
             network: BitcoinNetwork::Regtest,
             min_confirmations: 12,
-            indexer_urls: HashSet::default(),
+            indexers: Default::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
             mempool_timeout: DEFAULT_MEMPOOL_TIMEOUT,
             indexer_consensus_threshold: DEFAULT_INDEXER_CONSENSUS_THRESHOLD,
@@ -123,19 +122,31 @@ impl Default for RuneBridgeConfig {
 
 impl RuneBridgeConfig {
     pub fn validate(&self) -> Result<(), String> {
-        if self.indexer_urls.is_empty() {
+        if self.indexers.is_empty() {
             return Err("Indexer url is empty".to_string());
         }
 
-        if self
-            .indexer_urls
-            .iter()
-            .any(|url| !url.starts_with("https"))
-        {
-            return Err("Indexer url must specify https url".to_string());
+        for indexer in &self.indexers {
+            indexer.validate()?;
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]
+pub enum IndexerType {
+    OrdHttp { url: String },
+}
+
+impl IndexerType {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Self::OrdHttp { url } if !url.starts_with("https") => {
+                Err("Indexer url must specify https url".to_string())
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -149,13 +160,17 @@ mod test {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
             min_confirmations: 12,
-            indexer_urls: vec![
-                "https://indexer1.com".to_string(),
-                "https://indexer2.com".to_string(),
-                "https://indexer3.com".to_string(),
-            ]
-            .into_iter()
-            .collect(),
+            indexers: vec![
+                IndexerType::OrdHttp {
+                    url: "https://indexer1.com".to_string(),
+                },
+                IndexerType::OrdHttp {
+                    url: "https://indexer2.com".to_string(),
+                },
+                IndexerType::OrdHttp {
+                    url: "https://indexer3.com".to_string(),
+                },
+            ],
             deposit_fee: 100,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 2,
@@ -172,7 +187,7 @@ mod test {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
             min_confirmations: 12,
-            indexer_urls: HashSet::new(),
+            indexers: vec![],
             deposit_fee: 100,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 2,
