@@ -206,7 +206,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         uint256 feeAmount = 0;
         if (_isFeeRequired()) {
-            feeAmount = COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE ;
+            feeAmount = (COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
         }
 
         _mintInner(order, feeAmount);
@@ -255,7 +255,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             // If user can't pay required fee, skip his order.
             uint256 feeAmount = 0;
             if (_isFeeRequired()) {
-                feeAmount = commonFeePerUser + ORDER_BATCH_MINT_GAS_FEE;
+                feeAmount = (commonFeePerUser + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
                 bool canPayFee = feeChargeContract.canPayFee(order.feePayer, order.senderID, feeAmount);
                 if (!canPayFee) {
                     continue;

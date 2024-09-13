@@ -466,18 +466,23 @@ async fn icrc2_token_bridge(
     .await
     .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+    ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
-    let operation = minter_client
+    let (id, operation) = minter_client
         .get_operations_list(&john_address, None)
         .await
         .unwrap()
         .last()
         .cloned()
-        .unwrap()
-        .1;
+        .unwrap();
 
-    assert!(IcrcBridgeOpImpl(operation).is_complete());
+    let operation = IcrcBridgeOpImpl(operation);
+
+    if !(operation.is_complete()) {
+        let _ = dbg!(minter_client.get_operation_log(id).await);
+    }
+
+    assert!(operation.is_complete());
 }
 
 #[tokio::test]
