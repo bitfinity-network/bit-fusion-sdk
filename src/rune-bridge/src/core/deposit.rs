@@ -139,6 +139,7 @@ impl RuneDeposit<IcUtxoProvider> {
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
+        let cache_timeout = state_ref.utxo_cache_timeout();
         let indexer_urls = state_ref.indexer_urls();
         let signer = state_ref
             .btc_signer(&signer_strategy)
@@ -164,7 +165,7 @@ impl RuneDeposit<IcUtxoProvider> {
             runtime_state,
             network,
             signer,
-            utxo_provider: IcUtxoProvider::new(ic_network),
+            utxo_provider: IcUtxoProvider::new(ic_network, cache_timeout),
             indexers,
             indexer_consensus_threshold: consensus_threshold,
         })

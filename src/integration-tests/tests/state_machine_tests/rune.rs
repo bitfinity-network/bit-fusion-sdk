@@ -49,6 +49,7 @@ impl RunesSetup {
         };
         let rune_config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: None,
             min_confirmations: 1,
             indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
             deposit_fee: 0,

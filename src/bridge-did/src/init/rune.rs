@@ -1,7 +1,8 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::time::Duration;
 
-use candid::CandidType;
+use candid::{CandidType, Decode, Encode};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_stable_structures::Storable;
 use serde::Deserialize;
@@ -11,6 +12,10 @@ use super::{DEFAULT_DEPOSIT_FEE, DEFAULT_INDEXER_CONSENSUS_THRESHOLD, DEFAULT_ME
 #[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]
 pub struct RuneBridgeConfig {
     pub network: BitcoinNetwork,
+
+    /// Specifies the period for which the result of BTC network requests would persist in the
+    /// canister cache. If set to None or 0, the cache will not be used.
+    pub btc_cache_timeout_secs: Option<u32>,
     pub min_confirmations: u32,
     pub indexers: Vec<IndexerType>,
     pub deposit_fee: u64,
@@ -21,6 +26,15 @@ pub struct RuneBridgeConfig {
 }
 
 impl Storable for RuneBridgeConfig {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let bytes = Encode!(self).expect("failed to encode rune config");
+        Cow::Owned(bytes)
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(&bytes, Self).expect("failed to decode rune config")
+    }
+
     const BOUND: ic_stable_structures::Bound = ic_stable_structures::Bound::Unbounded;
 
     /* Encoding
@@ -100,6 +114,7 @@ impl Storable for RuneBridgeConfig {
                 _ => panic!("invalid network"),
             },
             min_confirmations,
+            indexer_urls,
             deposit_fee,
             mempool_timeout,
             indexer_consensus_threshold,
@@ -111,6 +126,7 @@ impl Default for RuneBridgeConfig {
     fn default() -> Self {
         Self {
             network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
             min_confirmations: 12,
             indexers: Default::default(),
             deposit_fee: DEFAULT_DEPOSIT_FEE,
@@ -159,6 +175,7 @@ mod test {
     fn test_should_encode_and_decode_config() {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: Some(300),
             min_confirmations: 12,
             indexers: vec![
                 IndexerType::OrdHttp {
@@ -186,6 +203,7 @@ mod test {
     fn test_should_encode_and_decode_config_with_empty_urls() {
         let config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: None,
             min_confirmations: 12,
             indexers: vec![],
             deposit_fee: 100,
