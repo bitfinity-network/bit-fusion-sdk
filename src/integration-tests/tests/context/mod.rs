@@ -7,7 +7,7 @@ use std::time::Duration;
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::{SignedMintOrder, SignedOrder};
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
@@ -762,6 +762,26 @@ pub trait TestContext {
     ) -> Result<TransactionReceipt> {
         let input = BFTBridge::mintCall {
             encodedOrder: order.0.to_vec().into(),
+        }
+        .abi_encode();
+
+        self.call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)
+    }
+
+    /// Mints ERC-20 token with the order.
+    async fn batch_mint_erc_20_with_order(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+        order: SignedOrder,
+    ) -> Result<TransactionReceipt> {
+        let all_orders = order.all_orders().clone();
+        let input = BFTBridge::batchMintCall {
+            encodedOrders: all_orders.orders_data.into(),
+            signature: all_orders.signature.into(),
+            ordersToProcess: vec![order.idx() as u32],
         }
         .abi_encode();
 

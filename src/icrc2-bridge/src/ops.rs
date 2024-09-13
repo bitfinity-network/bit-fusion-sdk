@@ -382,15 +382,25 @@ impl MintOrderHandler for IcrcMintOrderHandler {
             return;
         };
 
-        let IcrcBridgeOp::SignMintOrder { is_refund, .. } = op.0 else {
+        let IcrcBridgeOp::SignMintOrder { is_refund, order } = op.0 else {
             log::info!("Mint order handler failed to set MintOrder: unexpected state.");
             return;
         };
 
-        let new_op = IcrcBridgeOp::SendMintTransaction {
-            order: signed,
-            is_refund,
+        let will_pay_fee = order.fee_payer != H160::zero();
+        let should_send_mint_tx = !is_refund && will_pay_fee;
+        let new_op = match should_send_mint_tx {
+            true => IcrcBridgeOp::SendMintTransaction {
+                order: signed,
+                is_refund,
+            },
+            false => IcrcBridgeOp::ConfirmMint {
+                order: signed,
+                is_refund,
+                tx_hash: None,
+            },
         };
+
         let new_op = IcrcBridgeOpImpl(new_op);
         let scheduling_options = new_op.scheduling_options();
         self.state
