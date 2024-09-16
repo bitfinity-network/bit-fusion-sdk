@@ -229,7 +229,7 @@ mod tests {
     async fn init_rejects_anonymous_evm() {
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_link: EvmLink::Ic(bob()),
+            evm_link: EvmLink::Ic(Principal::anonymous()),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
