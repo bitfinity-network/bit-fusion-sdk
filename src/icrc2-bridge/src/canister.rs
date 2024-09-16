@@ -111,6 +111,15 @@ impl Icrc2BridgeCanister {
             .get_operations_by_memo(&memo)
     }
 
+    /// Returns all memos for a given user_id.
+    #[query]
+    pub fn get_memos_by_user(&self, user_id: H160) -> Vec<Memo> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_memos_by_user(&user_id)
+    }
+
     /// Adds the provided principal to the whitelist.
     #[update]
     pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {

@@ -240,6 +240,20 @@ where
             .collect()
     }
 
+    /// Retrieve all memos for a given user_id in the store.
+    pub fn get_memos_by_user(&self, user_id: &H160) -> Vec<Memo> {
+        self.memo_operation_map
+            .iter()
+            .filter_map(|(memo, stored_user_id, _)| {
+                if stored_user_id == *user_id {
+                    Some(memo)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Update the payload of the operation with the given id. If no operation with the given ID
     /// is found, nothing is done (except an error message in the log).
     pub fn update(&mut self, operation_id: OperationId, payload: P) {
@@ -555,6 +569,19 @@ mod tests {
                 i as u32
             );
         }
+    }
+
+    #[test]
+    fn get_all_memos_by_user() {
+        let mut store = test_store(10);
+
+        for i in 0..10 {
+            store.new_operation(TestOp::new(5, 1), Some([i as u8; 32]));
+        }
+
+        let user_id = eth_address(5);
+        let memos = store.get_memos_by_user(&user_id);
+        assert_eq!(memos.len(), 10);
     }
 
     #[test]
