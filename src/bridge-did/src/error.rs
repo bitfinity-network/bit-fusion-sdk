@@ -30,6 +30,9 @@ pub enum Error {
     #[error("operation failed to progress: {0}")]
     FailedToProgress(String),
 
+    #[error("operation cannot progress: {0}")]
+    CannotProgress(String),
+
     #[error("unexpected anonymous principal")]
     AnonymousPrincipal,
 

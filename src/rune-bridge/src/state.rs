@@ -111,6 +111,10 @@ impl RuneState {
         self.config.get().network
     }
 
+    pub fn utxo_cache_timeout(&self) -> Duration {
+        Duration::from_secs(self.config.get().btc_cache_timeout_secs.unwrap_or(0) as u64)
+    }
+
     /// Returns BTC network the canister works with (BTC style).
     pub fn network(&self) -> Network {
         match self.config.get().network {

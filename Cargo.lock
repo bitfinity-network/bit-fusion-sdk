@@ -1012,6 +1012,7 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "serde",
+ "snapbox",
  "tokio",
 ]
 

@@ -161,6 +161,7 @@ impl RunesContext {
 
         let rune_config = RuneBridgeConfig {
             network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
             min_confirmations: 1,
             indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
             deposit_fee: 500_000,
@@ -352,62 +353,8 @@ impl RunesContext {
     }
 
     async fn deposit(&self, runes: &[RuneId], eth_address: &H160) -> Result<(), DepositError> {
-        let mut dst_tokens = HashMap::new();
-        for rune_id in runes {
-            let erc20_address = self.tokens.get(rune_id).expect("token not found");
-            let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
-
-            dst_tokens.insert(
-                RuneName::from_str(&rune_info.name).unwrap(),
-                erc20_address.clone(),
-            );
-        }
-
-        let client = self.inner.evm_client(ADMIN);
-        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
-        let nonce = client
-            .eth_get_transaction_count(self.eth_wallet.address().into(), BlockNumber::Latest)
-            .await
-            .unwrap()
-            .unwrap();
-
-        let data = RuneDepositRequestData {
-            dst_address: eth_address.clone(),
-            dst_tokens,
-            amounts: None,
-        };
-
-        let input = BFTBridge::notifyMinterCall {
-            notificationType: MinterNotificationType::DepositRequest as u32,
-            userData: Encode!(&data).unwrap().into(),
-            memo: alloy_sol_types::private::FixedBytes::ZERO,
-        }
-        .abi_encode();
-
-        let transaction = TransactionBuilder {
-            from: &self.eth_wallet.address().into(),
-            to: Some(self.bft_bridge_contract.clone()),
-            nonce,
-            value: Default::default(),
-            gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
-            input,
-            signature: SigningMethod::SigningKey(self.eth_wallet.signer()),
-            chain_id,
-        }
-        .calculate_hash_and_build()
-        .expect("failed to sign the transaction");
-
-        let tx_id = client
-            .send_raw_transaction(transaction)
-            .await
-            .unwrap()
-            .unwrap();
-        self.wait_for_tx_success(&tx_id).await;
-        eprintln!(
-            "Deposit notification sent by tx: 0x{}",
-            hex::encode(tx_id.0)
-        );
+        self.send_deposit_notification(runes, eth_address, None)
+            .await;
 
         const MAX_RETRIES: u32 = 20;
         let mut retry_count = 0;
@@ -447,6 +394,70 @@ impl RunesContext {
         println!("Successful {}/{}", successful_orders.len(), runes.len());
 
         Err(DepositError::NothingToDeposit)
+    }
+
+    async fn send_deposit_notification(
+        &self,
+        runes: &[RuneId],
+        wallet_address: &H160,
+        amounts: Option<HashMap<RuneName, u128>>,
+    ) {
+        let mut dst_tokens = HashMap::new();
+        for rune_id in runes {
+            let erc20_address = self.tokens.get(rune_id).expect("token not found");
+            let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
+
+            dst_tokens.insert(
+                RuneName::from_str(&rune_info.name).unwrap(),
+                erc20_address.clone(),
+            );
+        }
+
+        let client = self.inner.evm_client(ADMIN);
+        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let nonce = client
+            .eth_get_transaction_count(self.eth_wallet.address().into(), BlockNumber::Latest)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let data = RuneDepositRequestData {
+            dst_address: wallet_address.clone(),
+            dst_tokens,
+            amounts,
+        };
+
+        let input = BFTBridge::notifyMinterCall {
+            notificationType: MinterNotificationType::DepositRequest as u32,
+            userData: Encode!(&data).unwrap().into(),
+            memo: alloy_sol_types::private::FixedBytes::ZERO,
+        }
+        .abi_encode();
+
+        let transaction = TransactionBuilder {
+            from: &self.eth_wallet.address().into(),
+            to: Some(self.bft_bridge_contract.clone()),
+            nonce,
+            value: Default::default(),
+            gas: 5_000_000u64.into(),
+            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            input,
+            signature: SigningMethod::SigningKey(self.eth_wallet.signer()),
+            chain_id,
+        }
+        .calculate_hash_and_build()
+        .expect("failed to sign the transaction");
+
+        let tx_id = client
+            .send_raw_transaction(transaction)
+            .await
+            .unwrap()
+            .unwrap();
+        self.wait_for_tx_success(&tx_id).await;
+        eprintln!(
+            "Deposit notification sent by tx: 0x{}",
+            hex::encode(tx_id.0)
+        );
     }
 
     async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
@@ -841,6 +852,72 @@ async fn test_should_deposit_two_runes_in_two_tx() {
         after_balances[&bar_rune_id],
         before_balances[&bar_rune_id] + 200
     );
+
+    ctx.stop().await
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn bail_out_of_impossible_deposit() {
+    let rune_name = generate_rune_name();
+    let ctx = RunesContext::new(&[rune_name.clone()]).await;
+
+    let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
+    let rune_name = RuneName::from_str(&rune_name).unwrap();
+    // Mint one block in case there are some pending transactions
+    ctx.mint_blocks(1).await;
+    let address = ctx
+        .get_deposit_address(&ctx.eth_wallet.address().into())
+        .await;
+    ctx.send_runes(&address, &[(&rune_id, 10_000)]).await;
+    ctx.send_deposit_notification(
+        &[rune_id],
+        &ctx.eth_wallet.address().into(),
+        Some([(rune_name, 5000)].into()),
+    )
+    .await;
+
+    ctx.inner.advance_time(Duration::from_secs(10)).await;
+    ctx.inner.advance_by_times(Duration::from_secs(5), 3).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let client = ctx.inner.rune_bridge_client(ADMIN);
+    let operations = client
+        .get_operations_list(&ctx.eth_wallet.address().into())
+        .await
+        .unwrap();
+
+    assert_eq!(operations.len(), 1);
+    let operation_id = operations[0].0;
+
+    let log = client
+        .get_operation_log(operation_id)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let len = log.log().len();
+    // First entry in the log is the scheduling of the operation, so we skip it. There might be other
+    // errors, but none of them should be a `cannot progress` error, so we check it here.
+    for entry in log.log().iter().take(len.saturating_sub(1)).skip(1) {
+        assert!(!entry
+            .step_result
+            .clone()
+            .unwrap_err()
+            .to_string()
+            .contains("operation cannot progress"));
+    }
+
+    assert!(log
+        .log()
+        .last()
+        .unwrap()
+        .step_result
+        .clone()
+        .unwrap_err()
+        .to_string()
+        .contains("operation cannot progress"));
 
     ctx.stop().await
 }
