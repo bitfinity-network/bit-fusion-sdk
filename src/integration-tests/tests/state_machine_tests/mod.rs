@@ -162,7 +162,7 @@ impl<'a> TestContext for &'a StateMachineContext {
             to,
             nonce,
             value: value.into(),
-            gas: 8_000_000u64.into(),
+            gas: 9_000_000u64.into(),
             gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
