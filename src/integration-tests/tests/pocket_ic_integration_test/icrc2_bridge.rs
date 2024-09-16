@@ -590,40 +590,50 @@ async fn rescheduling_deposit_operation() {
     .await
     .unwrap();
 
+    // Stop token canister to make BurnIcrc operation fail.
+    ctx.client
+        .stop_canister(ctx.canisters().token_1(), Some(ctx.admin()))
+        .await
+        .unwrap();
+
     let mut num_tries = 0;
     const MAX_RETRIES: usize = 30;
     loop {
+        num_tries += 1;
+        if num_tries > MAX_RETRIES {
+            panic!("Deposit operation was not scheduled after {MAX_RETRIES} tries");
+        }
+        ctx.advance_time(Duration::from_secs(1)).await;
+
         let operations_list = bridge_client
             .get_operations_list(&john_wallet.address().into(), None)
             .await
             .unwrap();
-        if !operations_list.is_empty() {
-            ctx.client
-                .stop_canister(ctx.canisters.evm(), Some(ctx.admin()))
-                .await
-                .unwrap();
-            break;
-        } else {
-            num_tries += 1;
-            if num_tries > MAX_RETRIES {
-                panic!("Deposit operation was not scheduled after {MAX_RETRIES} tries");
-            }
 
-            ctx.advance_time(Duration::from_secs(1)).await;
-        }
+        // Loop until mint tx sent by bridge canister.
+        let Some(last_op) = operations_list.last() else {
+            continue;
+        };
+
+        let IcrcBridgeOp::BurnIcrc2Tokens { .. } = dbg!(last_op.clone().1) else {
+            continue;
+        };
+
+        break;
     }
 
     // Need to wait for all the operation retries to execute
     ctx.advance_by_times(Duration::from_secs(10), 60).await;
 
-    let base_token_client = ctx.icrc_token_1_client(JOHN);
-    let base_balance = base_token_client
-        .icrc1_balance_of(john().into())
+    // Resume token canister to make the following operations work.
+    ctx.client
+        .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
         .await
         .unwrap();
 
-    ctx.client
-        .start_canister(ctx.canisters.evm(), Some(ctx.admin()))
+    let base_token_client = ctx.icrc_token_1_client(JOHN);
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
         .await
         .unwrap();
 
@@ -648,10 +658,7 @@ async fn rescheduling_deposit_operation() {
         .await
         .unwrap();
 
-    assert_eq!(
-        base_balance,
-        ICRC1_INITIAL_BALANCE - amount - ICRC1_TRANSFER_FEE * 2
-    );
+    assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE);
     assert_eq!(wrapped_balance as u64, 0);
 
     let bridge_client = ctx.icrc_bridge_client(JOHN);
@@ -661,7 +668,7 @@ async fn rescheduling_deposit_operation() {
         .unwrap();
     let (operation_id, state) = &operations[0];
 
-    assert!(matches!(*state, IcrcBridgeOp::SendMintTransaction { .. }));
+    assert!(matches!(*state, IcrcBridgeOp::BurnIcrc2Tokens { .. }));
 
     ctx.reschedule_operation(*operation_id, &john_wallet, &bft_bridge)
         .await
