@@ -244,13 +244,7 @@ where
     pub fn get_memos_by_user(&self, user_id: &H160) -> Vec<Memo> {
         self.memo_operation_map
             .iter()
-            .filter_map(|(memo, stored_user_id, _)| {
-                if stored_user_id == *user_id {
-                    Some(memo)
-                } else {
-                    None
-                }
-            })
+            .filter_map(|(memo, stored_user_id, _)| (stored_user_id == *user_id).then_some(memo))
             .collect()
     }
 
