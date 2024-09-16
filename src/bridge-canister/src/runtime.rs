@@ -87,7 +87,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         }
 
         let services_before_ops = self.list_services(ServiceOrder::BeforeOperations);
-        let services_after_ops = self.list_services(ServiceOrder::AfterOperations);
+        let services_after_ops = self.list_services(ServiceOrder::ConcurrentWithOperations);
         let scheduler = self.scheduler.clone();
         let state = self.state.clone();
         state.borrow_mut().operations_run_ts = Some(ic::time());

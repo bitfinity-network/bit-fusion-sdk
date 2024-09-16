@@ -20,7 +20,7 @@ pub type ServiceId = u64;
 /// Describes when service should run.
 pub enum ServiceOrder {
     BeforeOperations,
-    AfterOperations,
+    ConcurrentWithOperations,
 }
 
 pub type DynService = Rc<dyn BridgeService>;
@@ -29,7 +29,7 @@ pub type DynService = Rc<dyn BridgeService>;
 #[derive(Default)]
 pub struct Services {
     before: HashMap<ServiceId, DynService>,
-    after: HashMap<ServiceId, DynService>,
+    concurrent: HashMap<ServiceId, DynService>,
 }
 
 impl Services {
@@ -46,7 +46,7 @@ impl Services {
         let Some(service) = self
             .before
             .get(&service_id)
-            .or_else(|| self.after.get(&service_id))
+            .or_else(|| self.concurrent.get(&service_id))
         else {
             log::warn!("Failed to push task to service #{service_id}. Service not found.");
             return Err(Error::ServiceNotFound);
@@ -60,14 +60,14 @@ impl Services {
     pub fn services(&self, order: ServiceOrder) -> &HashMap<ServiceId, DynService> {
         match order {
             ServiceOrder::BeforeOperations => &self.before,
-            ServiceOrder::AfterOperations => &self.after,
+            ServiceOrder::ConcurrentWithOperations => &self.concurrent,
         }
     }
 
     fn mut_services(&mut self, order: ServiceOrder) -> &mut HashMap<ServiceId, DynService> {
         match order {
             ServiceOrder::BeforeOperations => &mut self.before,
-            ServiceOrder::AfterOperations => &mut self.after,
+            ServiceOrder::ConcurrentWithOperations => &mut self.concurrent,
         }
     }
 }

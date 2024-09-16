@@ -218,12 +218,12 @@ fn init_runtime() -> SharedRuntime {
 
     let services = state.borrow().services.clone();
     services.borrow_mut().add_service(
-        ServiceOrder::AfterOperations,
+        ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
         sign_mint_orders_service,
     );
     services.borrow_mut().add_service(
-        ServiceOrder::AfterOperations,
+        ServiceOrder::ConcurrentWithOperations,
         SEND_MINT_TX_SERVICE_ID,
         mint_tx_service,
     );
