@@ -11,6 +11,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use bridge_did::error::BftResult;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::order::SignedMintOrder;
@@ -326,7 +327,7 @@ impl CkBtcSetup {
 
         let bridge_config = BridgeInitData {
             owner: (&context).admin(),
-            evm_principal: context.canisters.evm(),
+            evm_link: EvmLink::Ic(context.canisters.evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Custom("master_ecdsa_public_key".into()),
             },
