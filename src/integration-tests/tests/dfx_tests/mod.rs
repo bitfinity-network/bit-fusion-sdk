@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use alloy_sol_types::sol;
-use bridge_utils::evm_link::{EvmLink, RpcApi, RpcService};
+use bridge_did::evm_link::EvmLink;
+use bridge_utils::evm_link::{RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use eth_signer::ic_sign::SigningKeyId;

@@ -10,6 +10,7 @@ use brc20_bridge::ops::Brc20DepositRequestData;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::event_data::MinterNotificationType;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::{Brc20BridgeConfig, BridgeInitData};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
@@ -203,7 +204,7 @@ impl Brc20Context {
         let bridge = context.canisters().brc20_bridge();
 
         let init_args = BridgeInitData {
-            evm_principal: context.canisters().evm(),
+            evm_link: EvmLink::Ic(context.canisters().evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },

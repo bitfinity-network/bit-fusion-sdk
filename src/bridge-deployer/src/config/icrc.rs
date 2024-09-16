@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use bridge_did::init::BridgeInitData;
-use candid::Principal;
+use candid::{CandidType, Principal};
 use clap::Parser;
 use eth_signer::sign_strategy::SigningStrategy;
 use serde::{Deserialize, Serialize};
@@ -8,9 +10,12 @@ use super::{LogCanisterSettings, SigningKeyId};
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct InitBridgeConfig {
-    /// The principal of the EVM canister that is being deployed
+    /// Parameters of connecting to the EVM.
+    ///
+    /// If the value is an IC principal, direct connection to EVM canister will be used. Otherwise,
+    /// the value is considered to be an URL to the EVM HTTP RPC server.
     #[arg(long)]
-    pub evm_principal: Principal,
+    pub evm_link: EvmLink,
     /// The signing key ID to use for signing messages
     ///
     /// This key are fixed in the management canister depending on the environment
@@ -29,7 +34,7 @@ impl From<InitBridgeConfig> for BridgeInitData {
     fn from(value: InitBridgeConfig) -> Self {
         BridgeInitData {
             owner: value.owner,
-            evm_principal: value.evm_principal,
+            evm_link: value.evm_link.into(),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: value.signing_key_id.into(),
             },
@@ -48,6 +53,33 @@ impl From<InitBridgeConfig> for BridgeInitData {
                             .collect()
                     }),
                 }),
+        }
+    }
+}
+
+#[derive(CandidType, Debug, Serialize, Deserialize, Clone)]
+pub enum EvmLink {
+    /// Direct connection to EVM canister with inter-canister calls.
+    Ic(Principal),
+    /// Connection to an EVM with HTTP RPC calls.
+    Http(String),
+}
+
+impl From<EvmLink> for bridge_did::evm_link::EvmLink {
+    fn from(value: EvmLink) -> Self {
+        match value {
+            EvmLink::Ic(principal) => bridge_did::evm_link::EvmLink::Ic(principal),
+            EvmLink::Http(url) => bridge_did::evm_link::EvmLink::Http(url),
+        }
+    }
+}
+
+impl From<String> for EvmLink {
+    fn from(value: String) -> Self {
+        if let Ok(principal) = Principal::from_str(&value) {
+            Self::Ic(principal)
+        } else {
+            Self::Http(value)
         }
     }
 }

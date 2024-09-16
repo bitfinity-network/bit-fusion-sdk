@@ -1,14 +1,13 @@
-mod did;
-
 use std::future::Future;
 use std::pin::Pin;
 
+pub use bridge_did::evm_link::{
+    EthMainnetService, EthSepoliaService, L2MainnetService, RequestCostResult, RequestResult,
+    RpcApi, RpcService, Service,
+};
 use candid::Principal;
 use jsonrpc_core::{Request, Response};
 use num_traits::ToPrimitive;
-
-pub use self::did::{EthMainnetService, EthSepoliaService, L2MainnetService, RpcApi, RpcService};
-use self::did::{RequestCostResult, RequestResult, Service};
 
 /// Client for sending RPC requests to the EVM-RPC canister.
 #[derive(Debug, Clone)]
