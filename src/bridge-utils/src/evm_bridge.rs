@@ -1,3 +1,4 @@
+use bridge_did::evm_link::EvmLink;
 use candid::CandidType;
 use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
@@ -6,7 +7,6 @@ use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::bft_events::TxParams;
-use crate::evm_link::EvmLink;
 use crate::query::{batch_query, Query, QueryType, CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID};
 
 /// Information about EVM on a bridge side.

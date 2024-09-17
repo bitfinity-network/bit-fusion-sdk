@@ -6,9 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::evm_link::EvmLink;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{StableBTreeMap, StableCell};

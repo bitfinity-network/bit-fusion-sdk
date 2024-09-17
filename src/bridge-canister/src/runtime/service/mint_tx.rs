@@ -5,6 +5,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{SignedOrder, SignedOrders};
 use bridge_utils::bft_events::{self};
+use bridge_utils::evm_link::EvmLinkClient;
 use did::H256;
 use eth_signer::sign_strategy::TransactionSigner;
 
@@ -90,7 +91,8 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         tx.v = signature.v.0;
         tx.hash = tx.hash();
 
-        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let link = config.borrow().get_evm_link();
+        let client = link.get_json_rpc_client();
         let tx_hash = client.send_raw_transaction(tx).await.map_err(|e| {
             Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
         })?;

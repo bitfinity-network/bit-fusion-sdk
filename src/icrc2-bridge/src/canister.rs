@@ -251,6 +251,7 @@ pub fn get_icrc_state() -> Rc<RefCell<IcrcState>> {
 
 #[cfg(test)]
 mod test {
+    use bridge_did::evm_link::EvmLink;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
@@ -272,7 +273,7 @@ mod test {
 
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::from_slice(&[2; 20]),
+            evm_link: EvmLink::Ic(Principal::from_slice(&[2; 20])),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
