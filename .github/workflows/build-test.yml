@@ -57,6 +57,9 @@ jobs:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
 
+      - name: Install Just command runner
+        uses: extractions/setup-just@v1
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:

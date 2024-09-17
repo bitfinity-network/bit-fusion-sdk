@@ -26,9 +26,8 @@
     curl -L https://foundry.paradigm.xyz | bash
     ```
 
-- Install [local-ssl-proxy](https://github.com/cameronhunter/local-ssl-proxy) to run Dfx tests. Required since to make
-  calls to evm-rpc canister we require HTTPS.
-- Install SSL certificates to make local-ssl-proxy able to work.
+. Install [just](https://just.systems/) command runner.
+- Install SSL certificates to make the `local-ssl-proxy` in the docker images able to work.
 
     On Debian-based systems it should be enough to run
 
