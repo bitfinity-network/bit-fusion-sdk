@@ -1,35 +1,6 @@
-# This is the hash of a recent commit on the https://github.com/dfinity/ic repository.
-# It is used to identify the IC canisters to download.
-# To be updated periodically to use the latest version.
-# This commit is from: 2024-02-21
-IC_COMMIT_HASH:="85bd56a70e55b2cea75cae6405ae11243e5fdad8"
-
-# Formats the code
-[group('build')]
-fmt args="":
-  cargo fmt --all {{args}}
-
-
-# Formats the code using the nightly version of rustfmt
-[group('build')]
-fmt_nightly:
-  cargo +nightly fmt --all
-
-
-# Runs clippy on the code
-[group('build')]
-clippy args="":
-  cargo clippy --all-features --all-targets {{args}}
-
-
-# Runs fmt and clippy on the code. It fails if any of the checks fail
-[group('build')]
-check_code:
-    just fmt "--check"
-    just clippy "-- -D warnings"
-
 
 # Cleans the build artifacts
+[group('build')]
 [confirm("Are you sure you want to clean the build artifacts?")]
 clean:
   rm -rf {{WASM_DIR}}
