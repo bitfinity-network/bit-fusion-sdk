@@ -75,7 +75,7 @@ where
     incomplete_operations: CachedStableBTreeMap<OperationId, OperationLog<P>, M>,
     operations_log: StableBTreeMap<OperationId, OperationLog<P>, M>,
     address_operation_map: StableBTreeMap<H160, OperationIdList, M>,
-    memo_operation_map: StableMultimap<Memo, H160, OperationId, M>,
+    memo_operation_map: StableMultimap<H160, Memo, OperationId, M>,
     max_operation_log_size: u64,
 }
 
@@ -152,7 +152,7 @@ where
             .insert(wallet_address.0.into(), ids);
 
         if let Some(memo) = memo {
-            self.memo_operation_map.insert(&memo, &wallet_address, id);
+            self.memo_operation_map.insert(&wallet_address, &memo, id);
         }
 
         id
@@ -221,30 +221,16 @@ where
         user: &H160,
     ) -> Option<(OperationId, P)> {
         self.memo_operation_map
-            .get(memo, user)
+            .get(user, memo)
             .and_then(|id| self.get_with_id(id))
             .or(None)
     }
 
-    /// Retrieve operations for the given memo.
-    pub fn get_operations_by_memo(&self, memo: &Memo) -> Vec<(H160, OperationId, P)> {
-        self.memo_operation_map
-            .iter()
-            .filter_map(|(stored_memo, user, id)| {
-                if *memo == stored_memo {
-                    self.get_with_id(id).map(|(id, op)| (user, id, op))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// Retrieve all memos for a given user_id in the store.
-    pub fn get_memos_by_user(&self, user_id: &H160) -> Vec<Memo> {
+    pub fn get_memos_by_user_address(&self, user_id: &H160) -> Vec<Memo> {
         self.memo_operation_map
-            .iter()
-            .filter_map(|(memo, stored_user_id, _)| (stored_user_id == *user_id).then_some(memo))
+            .range(user_id)
+            .map(|(memo, _)| (memo))
             .collect()
     }
 
@@ -311,18 +297,18 @@ where
                 }
             }
 
-            if let Some(memo) = oldest.memo() {
-                self.memo_operation_map.remove_partial(memo);
-            }
+            // Clean up the memos
+            self.memo_operation_map
+                .remove_partial(oldest.wallet_address());
 
             let memos_to_remove: Vec<_> = self
                 .memo_operation_map
                 .iter()
-                .filter_map(|(memo, _, op_id)| (op_id == id).then_some(memo))
+                .filter_map(|(address, memo, op_id)| (op_id == id).then_some((address, memo)))
                 .collect();
 
-            for memo in memos_to_remove {
-                self.memo_operation_map.remove_partial(&memo);
+            for (user, memo) in memos_to_remove {
+                self.memo_operation_map.remove(&user, &memo);
             }
 
             log::trace!("Operation {id} and its associated memos removed from the store.");
@@ -574,7 +560,7 @@ mod tests {
         }
 
         let user_id = eth_address(5);
-        let memos = store.get_memos_by_user(&user_id);
+        let memos = store.get_memos_by_user_address(&user_id);
         assert_eq!(memos.len(), 10);
     }
 

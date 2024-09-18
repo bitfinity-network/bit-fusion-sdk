@@ -103,19 +103,11 @@ impl BtcBridge {
 
     /// Returns all memos for a given user_id.
     #[query]
-    pub fn get_memos_by_user(&self, user_id: H160) -> Vec<Memo> {
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_memos_by_user(&user_id)
-    }
-
-    #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_operations_by_memo(&memo)
+            .get_memos_by_user_address(&user_id)
     }
 
     #[update]
