@@ -30,7 +30,7 @@ dfx_stop:
 
 # Start docker, dfx and run the dfx tests
 [group('dfx')]
-dfx_test: docker_start dfx_start
+dfx_test: docker_start dfx_start dfx_start_proxy
   #!/usr/bin/env bash
   sleep 5
   ( 
