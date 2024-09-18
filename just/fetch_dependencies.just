@@ -9,8 +9,6 @@ IC_EVM_RPC_TAG:="release-2024-05-23"
 
 # This is the bitfinity evmc tag to download
 EVMC_TAG:="v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1"
-EVMC_EVM_TGZ:="evm-testnet-" + EVMC_TAG + ".tar.gz"
-EVMC_SIG_TGZ:="signature-verification-" + EVMC_TAG + ".tar.gz"
 
 
 # Fetch all dependencies
@@ -21,13 +19,13 @@ fetch_all_canisters: fetch_evmc_canisters fetch_ic_canisters
 # Fetch all required IC canister wasm and did files
 [group('fetch_dependencies')]
 fetch_ic_canisters: pre_build
-  curl --fail -o "{{WASM_DIR}}/icrc1-ledger.wasm.gz"    "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-icrc1-ledger.wasm.gz"
-  curl --fail -o "{{WASM_DIR}}/icrc1-ledger.did"        "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/rosetta-api/icrc1/ledger/ledger.did" 
-  curl --fail -o "{{WASM_DIR}}/ic-ckbtc-minter.wasm.gz" "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-ckbtc-minter.wasm.gz" 
-  curl --fail -o "{{WASM_DIR}}/ic-ckbtc-minter.did"     "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/bitcoin/ckbtc/minter/ckbtc_minter.did" 
-  curl --fail -o "{{WASM_DIR}}/ic-ckbtc-kyt.wasm.gz"    "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-ckbtc-kyt.wasm.gz" 
-  curl --fail -o "{{WASM_DIR}}/ic-ckbtc-kyt.did"        "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/bitcoin/ckbtc/kyt/kyt.did"
-  curl --fail -o "{{WASM_DIR}}/evm_rpc.wasm.gz"         "https://github.com/internet-computer-protocol/evm-rpc-canister/releases/download/{{IC_EVM_RPC_TAG}}/evm_rpc.wasm.gz"
+  curl --fail -L -o "{{WASM_DIR}}/icrc1-ledger.wasm.gz"    "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-icrc1-ledger.wasm.gz"
+  curl --fail -L -o "{{WASM_DIR}}/icrc1-ledger.did"        "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/rosetta-api/icrc1/ledger/ledger.did" 
+  curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-minter.wasm.gz" "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-ckbtc-minter.wasm.gz" 
+  curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-minter.did"     "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/bitcoin/ckbtc/minter/ckbtc_minter.did" 
+  curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-kyt.wasm.gz"    "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-ckbtc-kyt.wasm.gz" 
+  curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-kyt.did"        "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/bitcoin/ckbtc/kyt/kyt.did"
+  curl --fail -L -o "{{WASM_DIR}}/evm_rpc.wasm.gz"         "https://github.com/internet-computer-protocol/evm-rpc-canister/releases/download/{{IC_EVM_RPC_TAG}}/evm_rpc.wasm.gz"
 
   cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz {{WASM_DIR}}/ic-bitcoin-canister-mock.wasm.gz
 
@@ -49,8 +47,7 @@ fetch_evmc_private_canister artifact: pre_build
   owner="bitfinity-network"
   repo="evm-canister"
   GITHUB_API_TOKEN={{env("GH_API_TOKEN")}}
-  GH_API="https://api.github.com"
-  GH_REPO="$GH_API/repos/$owner/$repo"
+  GH_REPO="https://api.github.com/repos/$owner/$repo"
   GH_LATEST="$GH_REPO/releases/tags/{{EVMC_TAG}}"
   AUTH="Authorization: token $GITHUB_API_TOKEN"
   filename="{{artifact}}-{{EVMC_TAG}}.tar.gz"
