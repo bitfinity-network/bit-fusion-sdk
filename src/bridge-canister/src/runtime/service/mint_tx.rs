@@ -97,6 +97,12 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
             Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
         })?;
 
+        // Increase nonce after tx sending.
+        self.handler
+            .get_evm_config()
+            .borrow_mut()
+            .update_evm_params(|p| p.nonce += 1);
+
         log::trace!(
             "The batchMint transaction with {} mint orders sent.",
             batch_info.orders_batch.orders_number()
