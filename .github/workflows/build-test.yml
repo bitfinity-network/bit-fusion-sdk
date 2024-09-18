@@ -111,7 +111,7 @@ jobs:
           just build_all_canisters
 
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
-          just fetch_all_dependencies
+          just fetch_all_canisters
 
       - name: test
         if: ${{ !inputs.skip-test }}
