@@ -126,4 +126,5 @@ jobs:
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
-          ./scripts/tests/dfx_tests.sh --github-ci --docker
+          just dfx_test
+          # ./scripts/tests/dfx_tests.sh --github-ci --docker

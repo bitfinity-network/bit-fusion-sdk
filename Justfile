@@ -1,5 +1,7 @@
 import "./just/build.just"
 import "./just/code_check.just"
+import "./just/dfx.just"
+import "./just/docker.just"
 import "./just/fetch_dependencies.just"
 import "./just/test.just"
 

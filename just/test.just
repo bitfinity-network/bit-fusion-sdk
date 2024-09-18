@@ -21,9 +21,3 @@ integration_test:
 [group('test')]
 test_i686:
   cargo test --target i686-unknown-linux-gnu
-
-
-# Run all dfx tests 
-[group('test')]
-dfx_test: 
-  echo "Running tests on dfx... TODO"
