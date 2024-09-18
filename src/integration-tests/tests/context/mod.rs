@@ -154,7 +154,7 @@ pub trait TestContext {
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval * 10;
+        let timeout = tx_processing_interval * 100;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;

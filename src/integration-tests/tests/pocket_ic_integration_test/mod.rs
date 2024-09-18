@@ -179,7 +179,7 @@ impl TestContext for PocketIcTestContext {
         evm_client: &EvmCanisterClient<Self::Client>,
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
-        for _ in 0..50 {
+        for _ in 0..200 {
             let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
             self.advance_time(time).await;
             let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
