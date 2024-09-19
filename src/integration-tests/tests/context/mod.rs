@@ -556,7 +556,7 @@ pub trait TestContext {
             to,
             nonce,
             value: value.into(),
-            gas: 30_000_000u64.into(),
+            gas: 300_000_000u64.into(),
             gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
@@ -890,7 +890,7 @@ pub trait TestContext {
 
                 // Required to avoid transaction failing.
                 self.evm_client(self.admin_name())
-                    .admin_set_block_gas_limit(100_000_000_000)
+                    .admin_set_block_gas_limit(100_000_000_000_000)
                     .await
                     .unwrap()
                     .unwrap();
