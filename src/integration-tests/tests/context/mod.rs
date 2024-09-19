@@ -239,6 +239,11 @@ pub trait TestContext {
             )))?;
 
         if receipt.status != Some(U64::one()) {
+            let execution_result = evm_client
+                .get_tx_execution_result_by_hash(hash)
+                .await
+                .unwrap();
+            dbg!(execution_result);
             println!("tx status: {:?}", receipt.status);
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
