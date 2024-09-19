@@ -38,6 +38,11 @@ impl ContextWithBridges {
         // Deploy external EVM canister.
         let base_evm = ctx.canisters().external_evm();
         let base_evm_client = EvmCanisterClient::new(ctx.client(base_evm, ctx.admin_name()));
+        base_evm_client
+            .admin_set_block_gas_limit(100_000_000_000_000)
+            .await
+            .unwrap()
+            .unwrap();
 
         println!("Deployed external EVM canister: {}", base_evm);
         println!("Deployed EVM canister: {}", ctx.canisters().evm());
