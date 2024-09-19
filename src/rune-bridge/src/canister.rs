@@ -1,11 +1,10 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
+use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
@@ -139,12 +138,10 @@ impl RuneBridge {
     }
 
     #[update]
-    pub fn admin_configure_indexers(&self, indexer_urls: HashSet<String>) {
+    pub fn admin_configure_indexers(&self, indexers: Vec<IndexerType>) {
         inspect_configure_indexers(self.config());
 
-        get_rune_state()
-            .borrow_mut()
-            .configure_indexers(indexer_urls);
+        get_rune_state().borrow_mut().configure_indexers(indexers);
     }
 
     #[update]
