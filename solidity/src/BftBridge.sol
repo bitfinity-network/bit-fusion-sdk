@@ -36,7 +36,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     uint256 constant ORDER_BATCH_MINT_GAS_FEE = 50000;
 
     // Minimal amount of fee deposit to process mint order.
-    uint256 constant MIN_FEE_DEPOSIT_AMOUNT = COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE;
+    uint256 constant MIN_FEE_DEPOSIT_AMOUNT = 200000 + 50000;
 
     // Has a user's transaction nonce been used?
     mapping(bytes32 => mapping(uint32 => bool)) private _isNonceUsed;
