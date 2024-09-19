@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use candid::Principal;
 use did::H160;
@@ -39,7 +40,7 @@ impl RunesSetup {
 
         let bridge = (&context).create_canister().await.unwrap();
         let init_args = BridgeInitData {
-            evm_principal: bob(),
+            evm_link: EvmLink::Ic(bob()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Custom(KEY_ID.to_string()),
             },

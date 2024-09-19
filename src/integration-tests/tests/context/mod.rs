@@ -9,7 +9,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
-use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
+use bridge_utils::evm_link::address_to_icrc_subaccount;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
@@ -46,6 +46,7 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::event_data::MinterNotificationType;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
@@ -1169,7 +1170,7 @@ pub fn icrc_bridge_canister_init_data(
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_principal,
+        evm_link: EvmLink::Ic(evm_principal),
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),
@@ -1187,7 +1188,7 @@ pub fn erc20_bridge_canister_init_data(
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_principal,
+        evm_link: EvmLink::Ic(evm_principal),
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),

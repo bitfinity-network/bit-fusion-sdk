@@ -1,10 +1,41 @@
-#![allow(clippy::enum_variant_names, non_snake_case)]
+use std::fmt::{Display, Formatter};
 
-use candid::{self, CandidType, Deserialize, Principal};
+use candid::{CandidType, Deserialize, Principal};
 use ic_exports::ic_cdk;
-use ic_exports::ic_cdk::api::call::CallResult as Result;
+use ic_exports::ic_kit::CallResult;
 use serde::Serialize;
 use thiserror::Error;
+
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub enum EvmLink {
+    Http(String),
+    Ic(Principal),
+    EvmRpcCanister {
+        canister_id: Principal,
+        rpc_service: Vec<RpcService>,
+    },
+}
+
+impl Default for EvmLink {
+    fn default() -> Self {
+        EvmLink::Ic(Principal::anonymous())
+    }
+}
+
+impl Display for EvmLink {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvmLink::Http(url) => write!(f, "Http EVM link: {url}"),
+            EvmLink::Ic(principal) => write!(f, "Ic EVM link: {principal}"),
+            EvmLink::EvmRpcCanister {
+                canister_id: principal,
+                rpc_service,
+            } => {
+                write!(f, "EVM RPC link: {principal}, {rpc_service:?}")
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EthSepoliaService {
@@ -99,6 +130,7 @@ pub enum RejectionCode {
     CanisterReject,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Error, CandidType, Deserialize)]
 pub enum HttpOutcallError {
     #[error("IC error: {message} ({code})")]
@@ -159,7 +191,7 @@ impl Service {
         request: &str,
         max_response_size: u64,
         cycles: u128,
-    ) -> Result<(RequestResult,)> {
+    ) -> CallResult<(RequestResult,)> {
         ic_cdk::api::call::call_with_payment128(
             self.0,
             "request",
@@ -173,7 +205,7 @@ impl Service {
         rpc_service: &RpcService,
         request: &str,
         max_response_size: u64,
-    ) -> Result<(RequestCostResult,)> {
+    ) -> CallResult<(RequestCostResult,)> {
         ic_cdk::call(
             self.0,
             "requestCost",
