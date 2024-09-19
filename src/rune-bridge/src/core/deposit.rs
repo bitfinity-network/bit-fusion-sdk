@@ -539,7 +539,7 @@ mod tests {
         value: u8,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl RuneIndexProvider for TestIndexerProvider {
         async fn get_rune_amounts(
             &self,

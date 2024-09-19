@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::rune_inputs::GetInputsError;
 use crate::interface::{DepositError, OutputResponse};
 
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait RuneIndexProvider {
     /// Get amounts of all runes in the given UTXO.
     async fn get_rune_amounts(
@@ -103,24 +103,24 @@ struct RunesResponse {
 }
 
 /// Implementation of the `RuneIndexProvider` trait that uses the `HttpClient` to make requests to
-pub struct OrdIndexProvider<C: HttpClient + Sync> {
+pub struct OrdIndexProvider<C: HttpClient> {
     client: C,
     url: String,
 }
 
 impl<C> OrdIndexProvider<C>
 where
-    C: HttpClient + Sync,
+    C: HttpClient,
 {
     pub fn new(client: C, url: String) -> Self {
         Self { client, url }
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<C> RuneIndexProvider for OrdIndexProvider<C>
 where
-    C: HttpClient + Sync + Send,
+    C: HttpClient,
 {
     async fn get_rune_amounts(
         &self,
