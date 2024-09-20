@@ -80,7 +80,8 @@ async fn await_inputs_returns_error_if_provider_returns_indexer_error() {
 #[tokio::test]
 async fn await_inputs_returns_error_if_provider_returns_consensus_error() {
     let provider = TestRuneInputProvider::err(GetInputsError::IndexersDisagree {
-        indexer_responses: vec![("indexer_name".to_string(), "indexer_response".to_string())],
+        first_response: "response 1".to_string(),
+        another_response: "response 2".to_string(),
     });
     let result = RuneBridgeOpImpl::await_inputs(
         tests::test_state(),
@@ -96,9 +97,7 @@ async fn await_inputs_returns_error_if_provider_returns_consensus_error() {
 
     assert_data_eq!(
         message,
-        str![[
-            r#"failed to get deposit inputs: rune indexers returned different result for same request: [("indexer_name", "indexer_response")]"#
-        ]]
+        str!["failed to get deposit inputs: rune indexers returned different result for same request: response 1; response 2"]
     )
 }
 

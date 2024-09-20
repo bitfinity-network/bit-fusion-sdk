@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bridge_did::init::IndexerType;
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
@@ -61,7 +62,11 @@ impl From<RuneBridgeConfig> for bridge_did::init::RuneBridgeConfig {
             network: value.bitcoin_network.into(),
             btc_cache_timeout_secs: value.btc_cache_timeout_secs,
             min_confirmations: value.min_confirmations,
-            indexer_urls: value.indexer_urls.into_iter().collect(),
+            indexers: value
+                .indexer_urls
+                .into_iter()
+                .map(|url| IndexerType::OrdHttp { url })
+                .collect(),
             deposit_fee: value.deposit_fee,
             mempool_timeout: Duration::from_secs(value.mempool_timeout),
             indexer_consensus_threshold: value.indexer_consensus_threshold,

@@ -9,7 +9,7 @@ use bridge_client::BridgeCanisterClient;
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::{BridgeInitData, RuneBridgeConfig};
+use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
 use bridge_did::runes::RuneName;
@@ -164,7 +164,9 @@ impl RunesContext {
             network: BitcoinNetwork::Regtest,
             btc_cache_timeout_secs: None,
             min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8001".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://localhost:8001".to_string(),
+            }],
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
