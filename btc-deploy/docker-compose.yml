@@ -1,6 +1,6 @@
 services:
   bitcoind:
-    container_name: bitcoind
+    # container_name: bitcoind
     image: lncm/bitcoind:v26.0
     command: ["-txindex", "-debug=mempool", "-rpcport=18443"]
     ports:
@@ -17,7 +17,7 @@ services:
       retries: 5
 
   ordinals-api:
-    container_name: ordinals-api
+    # container_name: ordinals-api
     build:
       dockerfile: ordinals-api.dockerfile
       context: .
@@ -32,7 +32,7 @@ services:
       - "3099:3099"
 
   ordhook:
-    container_name: ordhook
+    # container_name: ordhook
     build:
       context: .
       dockerfile: ordhook.dockerfile
@@ -59,7 +59,7 @@ services:
   #       condition: service_started
 
   ord:
-    container_name: ord
+    # container_name: ord
     build:
       dockerfile: ord.dockerfile
       context: .
@@ -71,7 +71,7 @@ services:
       - "8001:8001"
 
   postgres:
-    container_name: postgres
+    # container_name: postgres
     image: "postgres:15"
     ports:
       - "5432:5432"
@@ -82,7 +82,7 @@ services:
       POSTGRES_PORT: 5432
 
   evm-rpc-canister-proxy:
-    container_name: evm-rpc-canister-proxy
+    # container_name: evm-rpc-canister-proxy
     build:
       dockerfile: evm-rpc-canister-proxy.dockerfile
       context: .
