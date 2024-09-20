@@ -61,10 +61,11 @@ services:
   #       condition: service_started
 
   ord:
+    image: ghcr.io/bitfinity-network/testing-ordinals-ord:latest
     # container_name: ord
-    build:
-      dockerfile: ord.dockerfile
-      context: .
+    # build:
+    #   dockerfile: ord.dockerfile
+    #   context: .
     depends_on:
       bitcoind:
         condition: service_healthy
