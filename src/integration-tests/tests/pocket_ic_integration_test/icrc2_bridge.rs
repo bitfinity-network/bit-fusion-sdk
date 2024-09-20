@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
+use bridge_canister::bridge::Operation;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::operations::IcrcBridgeOp;
@@ -13,6 +14,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
@@ -206,18 +208,29 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
     let minter_client = ctx.icrc_bridge_client(ADMIN);
-    let refund_mint_order = dbg!(minter_client
+    let operation = dbg!(minter_client
         .get_operations_list(&john_address, None)
         .await
         .unwrap())
     .last()
+    .cloned()
     .unwrap()
-    .1
-    .get_signed_mint_order(&dbg!(base_token_id))
-    .expect("mint order prepared");
+    .1;
+
+    let IcrcBridgeOp::ConfirmMint {
+        order,
+        tx_hash,
+        is_refund,
+    } = operation
+    else {
+        panic!("expected ConfirmMint operation state");
+    };
+
+    assert!(is_refund);
+    assert!(tx_hash.is_none());
 
     let receipt = ctx
-        .mint_erc_20_with_order(&john_wallet, &bft_bridge, refund_mint_order)
+        .batch_mint_erc_20_with_order(&john_wallet, &bft_bridge, order)
         .await
         .unwrap();
 
@@ -447,13 +460,29 @@ async fn icrc2_token_bridge(
         bft_bridge,
         wrapped_token,
         amount as _,
-        Some(john_address),
+        Some(john_address.clone()),
         None,
     )
     .await
     .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 10).await;
+    ctx.advance_by_times(Duration::from_secs(2), 20).await;
+
+    let (id, operation) = minter_client
+        .get_operations_list(&john_address, None)
+        .await
+        .unwrap()
+        .last()
+        .cloned()
+        .unwrap();
+
+    let operation = IcrcBridgeOpImpl(operation);
+
+    if !(operation.is_complete()) {
+        let _ = dbg!(minter_client.get_operation_log(id).await);
+    }
+
+    assert!(operation.is_complete());
 }
 
 #[tokio::test]
@@ -508,7 +537,7 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
             .unwrap()
             .unwrap();
 
-        assert!(bridge_balance_before_mint <= bridge_balance_after_mint);
+        assert!(dbg!(bridge_balance_before_mint.clone()) <= dbg!(bridge_balance_after_mint));
     }
 }
 
@@ -561,40 +590,50 @@ async fn rescheduling_deposit_operation() {
     .await
     .unwrap();
 
+    // Stop token canister to make BurnIcrc operation fail.
+    ctx.client
+        .stop_canister(ctx.canisters().token_1(), Some(ctx.admin()))
+        .await
+        .unwrap();
+
     let mut num_tries = 0;
     const MAX_RETRIES: usize = 30;
     loop {
+        num_tries += 1;
+        if num_tries > MAX_RETRIES {
+            panic!("Deposit operation was not scheduled after {MAX_RETRIES} tries");
+        }
+        ctx.advance_time(Duration::from_secs(1)).await;
+
         let operations_list = bridge_client
             .get_operations_list(&john_wallet.address().into(), None)
             .await
             .unwrap();
-        if !operations_list.is_empty() {
-            ctx.client
-                .stop_canister(ctx.canisters.evm(), Some(ctx.admin()))
-                .await
-                .unwrap();
-            break;
-        } else {
-            num_tries += 1;
-            if num_tries > MAX_RETRIES {
-                panic!("Deposit operation was not scheduled after {MAX_RETRIES} tries");
-            }
 
-            ctx.advance_time(Duration::from_secs(1)).await;
-        }
+        // Loop until mint tx sent by bridge canister.
+        let Some(last_op) = operations_list.last() else {
+            continue;
+        };
+
+        let IcrcBridgeOp::BurnIcrc2Tokens { .. } = dbg!(last_op.clone().1) else {
+            continue;
+        };
+
+        break;
     }
 
     // Need to wait for all the operation retries to execute
     ctx.advance_by_times(Duration::from_secs(10), 60).await;
 
-    let base_token_client = ctx.icrc_token_1_client(JOHN);
-    let base_balance = base_token_client
-        .icrc1_balance_of(john().into())
+    // Resume token canister to make the following operations work.
+    ctx.client
+        .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
         .await
         .unwrap();
 
-    ctx.client
-        .start_canister(ctx.canisters.evm(), Some(ctx.admin()))
+    let base_token_client = ctx.icrc_token_1_client(JOHN);
+    let base_balance = base_token_client
+        .icrc1_balance_of(john().into())
         .await
         .unwrap();
 
@@ -619,10 +658,7 @@ async fn rescheduling_deposit_operation() {
         .await
         .unwrap();
 
-    assert_eq!(
-        base_balance,
-        ICRC1_INITIAL_BALANCE - amount - ICRC1_TRANSFER_FEE * 2
-    );
+    assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE);
     assert_eq!(wrapped_balance as u64, 0);
 
     let bridge_client = ctx.icrc_bridge_client(JOHN);
@@ -632,7 +668,7 @@ async fn rescheduling_deposit_operation() {
         .unwrap();
     let (operation_id, state) = &operations[0];
 
-    assert!(matches!(*state, IcrcBridgeOp::SendMintTransaction { .. }));
+    assert!(matches!(*state, IcrcBridgeOp::BurnIcrc2Tokens { .. }));
 
     ctx.reschedule_operation(*operation_id, &john_wallet, &bft_bridge)
         .await

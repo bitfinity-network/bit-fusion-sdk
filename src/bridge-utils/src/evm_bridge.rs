@@ -6,6 +6,7 @@ use ethers_core::types::{BlockNumber, U256 as EthU256};
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
+use crate::bft_events::TxParams;
 use crate::query::{batch_query, Query, QueryType, CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID};
 
 /// Information about EVM on a bridge side.
@@ -32,6 +33,17 @@ impl EvmParams {
             next_block,
             nonce,
             gas_price,
+        }
+    }
+
+    /// Returns transaction parameters for the EVM.
+    pub fn create_tx_params(&self, sender: H160, bridge: H160) -> TxParams {
+        TxParams {
+            sender: sender.0,
+            bridge: bridge.0,
+            nonce: self.nonce.into(),
+            gas_price: self.gas_price.0,
+            chain_id: self.chain_id,
         }
     }
 

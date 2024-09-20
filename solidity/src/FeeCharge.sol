@@ -89,4 +89,25 @@ contract FeeCharge is IFeeCharge {
         _userBalance[from] = newBalance;
         to.transfer(amount);
     }
+
+    /// Function to check if fee charge operation can be performed.
+    function canPayFee(address payer, bytes32 senderID, uint256 amount) external view returns (bool) {
+        /// Check if the msg.sender is able to charge fee.
+        if (!_canChargeFee[msg.sender]) {
+            return false;
+        }
+
+        /// Check if the payer have enough balance.
+        uint256 balance = _userBalance[payer];
+        if (balance < amount) {
+            return false;
+        }
+
+        /// Check if the payer approved fee charge for the senderID.
+        if (!_approvedIDs[payer][senderID]) {
+            return false;
+        }
+
+        return true;
+    }
 }

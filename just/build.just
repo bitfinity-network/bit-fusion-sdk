@@ -12,7 +12,7 @@ clean:
 build_solidity:
   cd solidity && forge soldeer install
   cd solidity && forge test -vv
-  cd solidity && forge build --force
+  cd solidity && forge build --force --sizes
 
 
 # Builds all canisters

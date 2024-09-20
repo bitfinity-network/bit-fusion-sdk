@@ -4,10 +4,12 @@ use std::time::Duration;
 
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::config::ConfigStorage;
-use bridge_canister::runtime::state::Timestamp;
+use bridge_canister::runtime::state::{SharedConfig, SharedServices, Timestamp};
 use bridge_did::error::{BftResult, Error};
 use bridge_did::evm_link::EvmLink;
+use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
 use candid::{CandidType, Principal};
 use drop_guard::guard;
@@ -22,14 +24,15 @@ pub const BASE_EVM_DATA_REFRESH_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Parameters of the Base EVM.
 pub struct BaseEvmState {
-    pub config: Rc<RefCell<ConfigStorage>>,
+    pub config: SharedConfig,
     pub nonce: StableCell<u32, StableMemory>,
     pub collecting_logs_ts: Option<Timestamp>,
     pub refreshing_evm_params_ts: Option<Timestamp>,
+    pub services: SharedServices,
 }
 
-impl Default for BaseEvmState {
-    fn default() -> Self {
+impl BaseEvmState {
+    fn default(services: SharedServices) -> Self {
         let config = ConfigStorage::default(memory_by_id(BASE_EVM_CONFIG_MEMORY_ID));
         Self {
             config: Rc::new(RefCell::new(config)),
@@ -37,11 +40,10 @@ impl Default for BaseEvmState {
                 .expect("failed to initialize nonce counter"),
             collecting_logs_ts: None,
             refreshing_evm_params_ts: None,
+            services,
         }
     }
-}
 
-impl BaseEvmState {
     /// Reset the state using the given settings.
     pub fn reset(&mut self, settings: BaseEvmSettings) {
         self.config.borrow_mut().update(|config| {
@@ -80,10 +82,14 @@ impl BaseEvmState {
 }
 
 /// Newtype for base EVM state
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct SharedEvmState(pub Rc<RefCell<BaseEvmState>>);
 
 impl SharedEvmState {
+    pub fn default(services: SharedServices) -> Self {
+        Self(Rc::new(RefCell::new(BaseEvmState::default(services))))
+    }
+
     pub async fn refresh_base_evm_params(self) {
         let _lock = guard(self.0.clone(), |s| s.borrow_mut().collecting_logs_ts = None);
         let config = self.0.borrow().config.clone();
@@ -113,6 +119,15 @@ impl OperationContext for SharedEvmState {
 
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.0.borrow().config.borrow().get_signer()
+    }
+
+    fn push_operation_to_service(
+        &self,
+        _service: ServiceId,
+        _operation_id: OperationId,
+    ) -> BftResult<()> {
+        // Will be implemented when all bridges will work using services.
+        unimplemented!("erc20 bridge doesn't use services now");
     }
 }
 

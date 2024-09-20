@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
@@ -32,8 +32,12 @@ use crate::state::State;
 pub struct BtcBridgeOpImpl(pub BtcBridgeOp);
 
 impl Operation for BtcBridgeOpImpl {
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self.0 {
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>> {
+        let next_step = match self.0 {
             BtcBridgeOp::UpdateCkBtcBalance { eth_address } => {
                 log::debug!("UpdateCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_minter = get_state().borrow().ck_btc_minter();
@@ -106,7 +110,9 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::BtcWithdrawConfirmed { .. } => Err(Error::FailedToProgress(
                 "ConfirmMint task should not progress".into(),
             )),
-        }
+        };
+
+        Ok(OperationProgress::Progress(next_step?))
     }
 
     fn is_complete(&self) -> bool {

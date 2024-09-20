@@ -7,7 +7,7 @@ use std::time::Duration;
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::{SignedMintOrder, SignedOrder};
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
@@ -154,7 +154,7 @@ pub trait TestContext {
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval * 10;
+        let timeout = tx_processing_interval * 100;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
@@ -239,6 +239,11 @@ pub trait TestContext {
             )))?;
 
         if receipt.status != Some(U64::one()) {
+            let execution_result = evm_client
+                .get_tx_execution_result_by_hash(hash)
+                .await
+                .unwrap();
+            dbg!(execution_result);
             println!("tx status: {:?}", receipt.status);
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
@@ -291,6 +296,8 @@ pub trait TestContext {
         let mut bridge_input = BFTBridge::BYTECODE.to_vec();
         let constructor = BFTBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
+
+        println!("bridge bytecode size: {}", BFTBridge::BYTECODE.len());
 
         let bridge_address = self
             .create_contract(wallet, bridge_input.clone())
@@ -556,7 +563,7 @@ pub trait TestContext {
             to,
             nonce,
             value: value.into(),
-            gas: 5_000_000u64.into(),
+            gas: 8_000_000u64.into(),
             gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
@@ -763,6 +770,26 @@ pub trait TestContext {
     ) -> Result<TransactionReceipt> {
         let input = BFTBridge::mintCall {
             encodedOrder: order.0.to_vec().into(),
+        }
+        .abi_encode();
+
+        self.call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)
+    }
+
+    /// Mints ERC-20 token with the order.
+    async fn batch_mint_erc_20_with_order(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+        order: SignedOrder,
+    ) -> Result<TransactionReceipt> {
+        let all_orders = order.all_orders().clone();
+        let input = BFTBridge::batchMintCall {
+            encodedOrders: all_orders.orders_data.into(),
+            signature: all_orders.signature.into(),
+            ordersToProcess: vec![order.idx() as u32],
         }
         .abi_encode();
 

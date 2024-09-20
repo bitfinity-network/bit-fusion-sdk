@@ -331,6 +331,7 @@ mod tests {
     use serde::Serialize;
 
     use super::*;
+    use crate::bridge::OperationProgress;
     use crate::runtime::RuntimeState;
 
     #[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType)]
@@ -359,7 +360,11 @@ mod tests {
             self.stage == COMPLETE
         }
 
-        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
+        async fn progress(
+            self,
+            _id: OperationId,
+            _ctx: RuntimeState<Self>,
+        ) -> BftResult<OperationProgress<Self>> {
             todo!()
         }
 

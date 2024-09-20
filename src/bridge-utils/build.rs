@@ -10,7 +10,7 @@ use foundry_compilers::{ProjectBuilder, ProjectPathsConfig};
 /// project.
 const SOLC_JOBS: usize = 10;
 /// Number of runs to perform when optimizing the contracts.
-const RUNS: usize = 20_000;
+const RUNS: usize = 2_000;
 
 fn main() -> anyhow::Result<()> {
     const ROOT_DIR: &str = "solidity";

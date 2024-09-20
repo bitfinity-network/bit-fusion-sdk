@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
@@ -25,8 +25,12 @@ use crate::core::withdrawal::{RuneWithdrawalPayloadImpl, Withdrawal};
 pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
 
 impl Operation for RuneBridgeOpImpl {
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        match self.0 {
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>> {
+        let next_step = match self.0 {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address,
                 dst_tokens,
@@ -105,7 +109,8 @@ impl Operation for RuneBridgeOpImpl {
                 log::debug!("RuneBridgeOp::OperationSplit {wallet_address} {new_operation_ids:?}");
                 Self::schedule_operation_split(ctx, new_operation_ids).await
             }
-        }
+        };
+        Ok(OperationProgress::Progress(next_step?))
     }
 
     fn is_complete(&self) -> bool {
@@ -135,10 +140,10 @@ impl Operation for RuneBridgeOpImpl {
                 mint_order.recipient.clone()
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
-                order.get_recipient()
+                order.reader().get_recipient()
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { order, .. }) => {
-                order.get_recipient()
+                order.reader().get_recipient()
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { data }) => {
                 data.recipient.clone()

@@ -994,12 +994,14 @@ dependencies = [
 name = "bridge-canister"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "bridge-did",
  "bridge-utils",
  "candid",
  "did",
  "drop_guard",
  "eth-signer",
+ "ethers-core",
  "hex",
  "ic-canister",
  "ic-exports",

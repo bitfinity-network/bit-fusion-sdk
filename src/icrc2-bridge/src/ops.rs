@@ -1,18 +1,26 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext};
+use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::memory::StableMemory;
+use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
+use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
+use bridge_canister::runtime::service::ServiceId;
+use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::IcrcBridgeOp;
-use bridge_did::order::{self, MintOrder, SignedMintOrder};
+use bridge_did::order::{self, MintOrder, SignedOrder};
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
-use did::{H160, U256};
+use did::{H160, H256, U256};
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
-use ic_task_scheduler::task::TaskOptions;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
 use serde::{Deserialize, Serialize};
@@ -21,20 +29,27 @@ use crate::constant::IC_CHAIN_ID;
 use crate::tokens::icrc1::{self, IcrcCanisterError};
 use crate::tokens::icrc2::{self, Success};
 
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct IcrcBridgeOpImpl(pub IcrcBridgeOp);
 
 impl Operation for IcrcBridgeOpImpl {
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self> {
-        let result = match self.0 {
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>> {
+        let next_step = match self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
             }
-            IcrcBridgeOp::SignMintOrder { order, is_refund } => {
-                Self::sign_mint_order(ctx, order, is_refund).await
+            IcrcBridgeOp::SignMintOrder { .. } => {
+                return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
-            IcrcBridgeOp::SendMintTransaction { order, is_refund } => {
-                Self::send_mint_tx(ctx, order, is_refund).await
+            IcrcBridgeOp::SendMintTransaction { .. } => {
+                return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
             IcrcBridgeOp::ConfirmMint { .. } => Err(Error::FailedToProgress(
                 "ConfirmMint task should progress only on the Minted EVM event".into(),
@@ -49,8 +64,8 @@ impl Operation for IcrcBridgeOpImpl {
                 "IcrcMintConfirmed task should not progress".into(),
             )),
         };
-        log::debug!("icrc task execution result: {result:?}");
-        result.map(Self)
+
+        Ok(OperationProgress::Progress(Self(next_step?)))
     }
 
     fn is_complete(&self) -> bool {
@@ -69,8 +84,8 @@ impl Operation for IcrcBridgeOpImpl {
         match &self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn) => burn.recipient_address.clone(),
             IcrcBridgeOp::SignMintOrder { order, .. } => order.recipient.clone(),
-            IcrcBridgeOp::SendMintTransaction { order, .. } => order.get_recipient(),
-            IcrcBridgeOp::ConfirmMint { order, .. } => order.get_recipient(),
+            IcrcBridgeOp::SendMintTransaction { order, .. } => order.reader().get_recipient(),
+            IcrcBridgeOp::ConfirmMint { order, .. } => order.reader().get_recipient(),
             IcrcBridgeOp::WrappedTokenMintConfirmed(event) => event.recipient.clone(),
             IcrcBridgeOp::MintIcrcTokens(event) => event.sender.clone(),
             IcrcBridgeOp::IcrcMintConfirmed { src_address, .. } => src_address.clone(),
@@ -228,45 +243,6 @@ impl IcrcBridgeOpImpl {
         })
     }
 
-    async fn sign_mint_order(
-        ctx: impl OperationContext,
-        order: MintOrder,
-        is_refund: bool,
-    ) -> BftResult<IcrcBridgeOp> {
-        let signer = ctx.get_signer()?;
-        let signed_mint_order = order.encode_and_sign(&signer).await?;
-
-        let should_send_by_canister = order.fee_payer != H160::zero();
-        let next_op = if should_send_by_canister {
-            IcrcBridgeOp::SendMintTransaction {
-                order: signed_mint_order,
-                is_refund,
-            }
-        } else {
-            IcrcBridgeOp::ConfirmMint {
-                order: signed_mint_order,
-                tx_hash: None,
-                is_refund,
-            }
-        };
-
-        Ok(next_op)
-    }
-
-    async fn send_mint_tx(
-        ctx: impl OperationContext,
-        order: SignedMintOrder,
-        is_refund: bool,
-    ) -> BftResult<IcrcBridgeOp> {
-        let tx_hash = ctx.send_mint_transaction(&order).await?;
-
-        Ok(IcrcBridgeOp::ConfirmMint {
-            order,
-            tx_hash: Some(tx_hash),
-            is_refund,
-        })
-    }
-
     async fn mint_icrc_tokens(
         ctx: impl OperationContext,
         event: BurntEventData,
@@ -362,8 +338,129 @@ impl IcrcBridgeOpImpl {
     }
 }
 
+/// ICRC token related errors.
 pub enum ErrorCodes {
     IcrcMetadataRequestFailed = 0,
     IcrcBurnFailed = 1,
     IcrcMintFailed = 2,
+}
+
+/// Allows Signing service to handle MintOrders of ICRC bridge.
+pub struct IcrcMintOrderHandler {
+    state: RuntimeState<IcrcBridgeOpImpl>,
+    scheduler: SharedScheduler<StableMemory, IcrcBridgeOpImpl>,
+}
+
+impl IcrcMintOrderHandler {
+    /// Creates new handler instance.
+    pub fn new(
+        state: RuntimeState<IcrcBridgeOpImpl>,
+        scheduler: SharedScheduler<StableMemory, IcrcBridgeOpImpl>,
+    ) -> Self {
+        Self { state, scheduler }
+    }
+}
+
+impl MintOrderHandler for IcrcMintOrderHandler {
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.state.get_signer()
+    }
+
+    fn get_order(&self, id: OperationId) -> Option<MintOrder> {
+        let op = self.state.borrow().operations.get(id)?;
+        let IcrcBridgeOp::SignMintOrder { order, .. } = op.0 else {
+            log::info!("Mint order handler failed to get MintOrder: unexpected state.");
+            return None;
+        };
+
+        Some(order)
+    }
+
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrder) {
+        let Some(op) = self.state.borrow().operations.get(id) else {
+            log::info!("Mint order handler failed to set MintOrder: operation not found.");
+            return;
+        };
+
+        let IcrcBridgeOp::SignMintOrder { is_refund, order } = op.0 else {
+            log::info!("Mint order handler failed to set MintOrder: unexpected state.");
+            return;
+        };
+
+        let will_pay_fee = order.fee_payer != H160::zero();
+        let should_send_mint_tx = !is_refund && will_pay_fee;
+        let new_op = match should_send_mint_tx {
+            true => IcrcBridgeOp::SendMintTransaction {
+                order: signed,
+                is_refund,
+            },
+            false => IcrcBridgeOp::ConfirmMint {
+                order: signed,
+                is_refund,
+                tx_hash: None,
+            },
+        };
+
+        let new_op = IcrcBridgeOpImpl(new_op);
+        let scheduling_options = new_op.scheduling_options();
+        self.state
+            .borrow_mut()
+            .operations
+            .update(id, new_op.clone());
+
+        if let Some(options) = scheduling_options {
+            let scheduled_task =
+                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            self.scheduler.append_task(scheduled_task);
+        }
+    }
+}
+
+/// Allows MintTxService to handle IcrcOperations.
+pub struct IcrcMintTxHandler {
+    state: RuntimeState<IcrcBridgeOpImpl>,
+}
+
+impl IcrcMintTxHandler {
+    /// Creates new handler instance.
+    pub fn new(state: RuntimeState<IcrcBridgeOpImpl>) -> Self {
+        Self { state }
+    }
+}
+
+impl MintTxHandler for IcrcMintTxHandler {
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.state.get_signer()
+    }
+
+    fn get_evm_config(&self) -> SharedConfig {
+        self.state.borrow().config.clone()
+    }
+
+    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder> {
+        let op = self.state.borrow().operations.get(id);
+        let Some(IcrcBridgeOp::SendMintTransaction { order, .. }) = op.map(|op| op.0) else {
+            log::info!("MintTxHandler failed to get mint order batch: unexpected operation state.");
+            return None;
+        };
+
+        Some(order)
+    }
+
+    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256) {
+        let op = self.state.borrow().operations.get(id);
+        let Some(IcrcBridgeOp::SendMintTransaction { order, is_refund }) = op.map(|op| op.0) else {
+            log::info!("MintTxHandler failed to update operation: unexpected operation state.");
+            return;
+        };
+
+        self.state.borrow_mut().operations.update(
+            id,
+            IcrcBridgeOpImpl(IcrcBridgeOp::ConfirmMint {
+                order,
+                tx_hash: Some(tx_hash),
+                is_refund,
+            }),
+        );
+    }
 }

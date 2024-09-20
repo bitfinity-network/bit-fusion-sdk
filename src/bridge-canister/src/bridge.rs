@@ -16,6 +16,7 @@ use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::runtime::service::ServiceId;
 use crate::runtime::RuntimeState;
 
 /// Defines an operation that can be executed by the bridge.
@@ -23,7 +24,11 @@ pub trait Operation:
     Sized + CandidType + Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
     /// Execute the operation, and move it to next stage.
-    async fn progress(self, id: OperationId, ctx: RuntimeState<Self>) -> BftResult<Self>;
+    async fn progress(
+        self,
+        id: OperationId,
+        ctx: RuntimeState<Self>,
+    ) -> BftResult<OperationProgress<Self>>;
 
     /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
@@ -69,6 +74,13 @@ pub trait OperationContext {
     /// Get signer for transactions, orders, etc...
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
 
+    /// Adds the given operation to the given service processing.
+    fn push_operation_to_service(
+        &self,
+        service: ServiceId,
+        operation_id: OperationId,
+    ) -> BftResult<()>;
+
     /// Send mint transaction with the given `order` to EVM.
     async fn send_mint_transaction(&self, order: &SignedMintOrder) -> BftResult<H256> {
         let signer = self.get_signer()?;
@@ -76,14 +88,8 @@ pub trait OperationContext {
         let bridge_contract = self.get_bridge_contract_address()?;
         let evm_params = self.get_evm_params()?;
 
-        let mut tx = bft_events::mint_transaction(
-            sender.0,
-            bridge_contract.0,
-            evm_params.nonce.into(),
-            evm_params.gas_price.clone().into(),
-            &order.0,
-            evm_params.chain_id as _,
-        );
+        let tx_params = evm_params.create_tx_params(sender, bridge_contract);
+        let mut tx = bft_events::mint_transaction(tx_params, &order.0);
 
         let signature = signer.sign_transaction(&(&tx).into()).await?;
         tx.r = signature.r.0;
@@ -131,6 +137,13 @@ pub trait OperationContext {
             last_block_number: last_request_block,
         })
     }
+}
+
+/// Variants of operation progress.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OperationProgress<Op> {
+    Progress(Op),
+    AddToService(ServiceId),
 }
 
 /// Action to create or update an operation.

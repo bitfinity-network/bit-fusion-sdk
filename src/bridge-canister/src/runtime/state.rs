@@ -7,21 +7,27 @@ use std::time::Duration;
 use ic_exports::ic_kit::ic;
 
 use self::config::ConfigStorage;
+use super::service::Services;
 use crate::bridge::Operation;
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
 
 const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
+const SCHEDULER_RUN_LOCK_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
+pub type SharedServices = Rc<RefCell<Services>>;
 
 pub type Timestamp = u64;
+
 /// Bridge Runtime state.
 pub struct State<Op: Operation> {
     pub config: SharedConfig,
     pub operations: OperationStore<StableMemory, Op>,
     pub collecting_logs_ts: Option<Timestamp>,
     pub refreshing_evm_params_ts: Option<Timestamp>,
+    pub operations_run_ts: Option<Timestamp>,
+    pub services: SharedServices,
 }
 
 impl<Op: Operation> State<Op> {
@@ -32,12 +38,16 @@ impl<Op: Operation> State<Op> {
             operations: OperationStore::with_memory(memory, None),
             collecting_logs_ts: None,
             refreshing_evm_params_ts: None,
+            operations_run_ts: None,
+            services: Default::default(),
         }
     }
 
     /// Checks if the EVM parameters should be refreshed.
     ///
-    /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `refreshing_evm_params_ts` is `None`.
+    /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp
+    /// is older than the `TASK_LOCK_TIMEOUT` duration,
+    /// or if the `refreshing_evm_params_ts` is `None`.
     pub fn should_refresh_evm_params(&self) -> bool {
         self.refreshing_evm_params_ts
             .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
@@ -46,22 +56,38 @@ impl<Op: Operation> State<Op> {
 
     /// Checks if the EVM logs should be collected.
     ///
-    /// The EVM logs are collected if the `collecting_logs_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `collecting_logs_ts` is `None`.
+    /// The EVM logs are collected if the `collecting_logs_ts` timestamp
+    /// is older than the `TASK_LOCK_TIMEOUT` duration,
+    /// or if the `collecting_logs_ts` is `None`.
     pub fn should_collect_evm_logs(&self) -> bool {
         self.collecting_logs_ts
             .map(|ts| (ts + SYS_TASK_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
+            .unwrap_or(true)
+    }
+
+    /// Checks if the scheduled operations and services ready to run.
+    ///
+    /// The EVM logs are collected if the `operations_run_ts` timestamp
+    /// is older than the `OPERATIONS_RUN_TIMEOUT` duration,
+    /// or if the `operations_run_ts` is `None`.
+    pub fn should_process_operations(&self) -> bool {
+        self.operations_run_ts
+            .map(|ts| (ts + SCHEDULER_RUN_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
             .unwrap_or(true)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use bridge_did::error::BftResult;
+    use bridge_did::op_id::OperationId;
     use candid::CandidType;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::MemoryId;
     use serde::{Deserialize, Serialize};
 
     use super::*;
+    use crate::bridge::OperationProgress;
     use crate::memory::memory_by_id;
     use crate::runtime::{default_state, RuntimeState};
 
@@ -71,9 +97,9 @@ mod tests {
     impl Operation for TestOp {
         async fn progress(
             self,
-            _: bridge_did::op_id::OperationId,
+            _: OperationId,
             _: RuntimeState<Self>,
-        ) -> bridge_did::error::BftResult<Self> {
+        ) -> BftResult<OperationProgress<Self>> {
             unimplemented!()
         }
 
