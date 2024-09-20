@@ -297,6 +297,8 @@ pub trait TestContext {
         let constructor = BFTBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
 
+        println!("bridge bytecode size: {}", BFTBridge::BYTECODE.len());
+
         let bridge_address = self
             .create_contract(wallet, bridge_input.clone())
             .await
