@@ -85,10 +85,11 @@ services:
       POSTGRES_PORT: 5432
 
   evm-rpc-canister-proxy:
+    image: ghcr.io/bitfinity-network/testing-local-ssl-proxy:latest
     # container_name: evm-rpc-canister-proxy
-    build:
-      dockerfile: evm-rpc-canister-proxy.dockerfile
-      context: .
+    # build:
+    #   dockerfile: evm-rpc-canister-proxy.dockerfile
+    #   context: .
     ports:
       - "8002:8002"
     extra_hosts:
