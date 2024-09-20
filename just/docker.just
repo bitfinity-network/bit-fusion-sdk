@@ -10,7 +10,7 @@ docker_pull:
 
 # Start all the docker containers defined in the compose file
 [group('docker')]
-docker_up: docker_down
+docker_up:
   docker compose -f "{{DOCKER_COMPOSE_FILE}}" up -d --build
   sleep 2
 

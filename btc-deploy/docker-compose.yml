@@ -47,15 +47,9 @@ services:
         condition: service_started
 
   # ordinals-explorer:
-  #   build:
-  #     context: .
-  #     dockerfile: ordinals-explorer.dockerfile
-  #   env_file:
-  #     - ./ordinals-explorer.env
+  #   image: ghcr.io/bitfinity-network/testing-hirosystems-ordinals-explorer:latest
   #   ports:
   #     - "8006:3001"
-  #   volumes:
-  #     - ./ordinals-explorer.env:/usr/src/ordinals-explorer/.env.production
   #   depends_on:
   #     ordinals-api:
   #       condition: service_started
