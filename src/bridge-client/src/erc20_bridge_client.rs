@@ -50,7 +50,7 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
         user_id: &H160,
     ) -> CanisterClientResult<Vec<Memo>> {
         self.client
-            .query("get_operations_by_memo", (user_id,))
+            .query("get_memos_by_user_address", (user_id,))
             .await
     }
 
