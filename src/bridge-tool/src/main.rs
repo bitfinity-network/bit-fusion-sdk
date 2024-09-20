@@ -485,7 +485,7 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
             to: None,
             nonce,
             value: 0u64.into(),
-            gas: 15_000_000u64.into(),
+            gas: 8_000_000u64.into(),
             gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
