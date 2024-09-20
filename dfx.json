@@ -23,13 +23,13 @@
     },
     "token": {
       "build": "",
-      "candid": ".artifact/icrc1.did",
+      "candid": ".artifact/icrc1-ledger.did",
       "wasm": ".artifact/icrc1-ledger.wasm.gz",
       "type": "custom"
     },
     "token2": {
       "build": "",
-      "candid": ".artifact/icrc1.did",
+      "candid": ".artifact/icrc1-ledger.did",
       "wasm": ".artifact/icrc1-ledger.wasm.gz",
       "type": "custom"
     },
