@@ -1,6 +1,5 @@
 services:
   bitcoind:
-    # container_name: bitcoind
     image: lncm/bitcoind:v26.0
     command: ["-txindex", "-debug=mempool", "-rpcport=18443"]
     ports:
@@ -18,10 +17,6 @@ services:
 
   ordinals-api:
     image: ghcr.io/bitfinity-network/testing-hirosystems-ordinals-api:latest
-    # container_name: ordinals-api
-    # build:
-    #   dockerfile: ordinals-api.dockerfile
-    #   context: .
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -34,14 +29,8 @@ services:
 
   ordhook:
     image: ghcr.io/bitfinity-network/testing-hirosystems-ordhook:latest
-    # container_name: ordhook
-    # build:
-    #   context: .
-    #   dockerfile: ordhook.dockerfile
     ports:
       - "20456:20456"
-    # volumes:
-    #   - ./Ordhook.toml:/Ordhook.toml
     depends_on:
       ordinals-api:
         condition: service_started
@@ -56,10 +45,6 @@ services:
 
   ord:
     image: ghcr.io/bitfinity-network/testing-ordinals-ord:latest
-    # container_name: ord
-    # build:
-    #   dockerfile: ord.dockerfile
-    #   context: .
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -68,7 +53,6 @@ services:
       - "8001:8001"
 
   postgres:
-    # container_name: postgres
     image: "postgres:15"
     ports:
       - "5432:5432"
@@ -80,10 +64,6 @@ services:
 
   evm-rpc-canister-proxy:
     image: ghcr.io/bitfinity-network/testing-local-ssl-proxy:latest
-    # container_name: evm-rpc-canister-proxy
-    # build:
-    #   dockerfile: evm-rpc-canister-proxy.dockerfile
-    #   context: .
     ports:
       - "8002:8002"
     extra_hosts:
