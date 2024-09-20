@@ -17,10 +17,11 @@ services:
       retries: 5
 
   ordinals-api:
+    image: ghcr.io/bitfinity-network/testing-hirosystems-ordinals-api:latest
     # container_name: ordinals-api
-    build:
-      dockerfile: ordinals-api.dockerfile
-      context: .
+    # build:
+    #   dockerfile: ordinals-api.dockerfile
+    #   context: .
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -32,14 +33,15 @@ services:
       - "3099:3099"
 
   ordhook:
+    image: ghcr.io/bitfinity-network/testing-hirosystems-ordhook:latest
     # container_name: ordhook
-    build:
-      context: .
-      dockerfile: ordhook.dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: ordhook.dockerfile
     ports:
       - "20456:20456"
-    volumes:
-      - ./Ordhook.toml:/Ordhook.toml
+    # volumes:
+    #   - ./Ordhook.toml:/Ordhook.toml
     depends_on:
       ordinals-api:
         condition: service_started
