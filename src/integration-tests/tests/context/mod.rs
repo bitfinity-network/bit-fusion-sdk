@@ -892,13 +892,6 @@ pub trait TestContext {
                 self.install_canister(self.canisters().evm(), wasm, (init_data,))
                     .await
                     .unwrap();
-
-                // Required to avoid transaction failing.
-                self.evm_client(self.admin_name())
-                    .admin_set_block_gas_limit(100_000_000_000_000)
-                    .await
-                    .unwrap()
-                    .unwrap();
             }
             CanisterType::ExternalEvm => {
                 println!(
