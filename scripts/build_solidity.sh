@@ -12,6 +12,6 @@ echo "forge test..."
 forge test -vv
 
 echo "forge build..."
-forge build --force
+forge build --force --sizes
 
 cd ..
