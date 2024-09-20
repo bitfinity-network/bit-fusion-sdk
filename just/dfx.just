@@ -30,15 +30,15 @@ dfx_stop:
 
 # Start docker, dfx and run the dfx tests
 [group('dfx')]
-dfx_test: docker_start dfx_start dfx_start_proxy
+dfx_test test_name="": docker_down docker_pull docker_up dfx_start dfx_start_proxy
   #!/usr/bin/env bash
   sleep 5
   ( 
     set +e
-    cargo test -p integration-tests --features dfx_tests
+    cargo test {{test_name}} -p integration-tests --features dfx_tests
   )
   TEST_RESULT=$?
-  just dfx_stop docker_stop
+  just dfx_stop docker_down
   exit $TEST_RESULT
 
 
