@@ -10,7 +10,7 @@ use ic_utils::interfaces::{ManagementCanister, WalletCanister};
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
-use crate::contracts::EvmNetwork;
+use crate::contracts::NetworkConfig;
 
 /// The default number of cycles to deposit to the canister
 const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
@@ -57,7 +57,7 @@ impl DeployCommands {
         &self,
         identity: PathBuf,
         ic_host: &str,
-        network: EvmNetwork,
+        network: NetworkConfig,
         pk: H256,
         deploy_bft: bool,
     ) -> anyhow::Result<()> {
