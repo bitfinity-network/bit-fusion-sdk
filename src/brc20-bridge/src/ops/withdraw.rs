@@ -137,6 +137,8 @@ impl Brc20BridgeWithdrawOp {
                 ))
             })?;
 
+        log::debug!("reveal UTXO landed at block {}", reveal_utxo.height);
+
         Ok(Brc20BridgeOp::Withdraw(Self::CreateTransferTx {
             payload,
             reveal_utxo,

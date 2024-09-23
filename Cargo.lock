@@ -7024,8 +7024,8 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ord-rs"
-version = "0.2.1"
-source = "git+https://github.com/bitfinity-network/ord-rs?tag=v0.2.1#4689a9593737a3200e349b50d2045f7facabd8fd"
+version = "0.3.0"
+source = "git+https://github.com/bitfinity-network/ord-rs?branch=taproot-payload-with-own-pubkey#3dc1f2b1cc1c079aab97b48f045f630de8e01d41"
 dependencies = [
  "async-trait",
  "bitcoin 0.31.2",
@@ -7033,7 +7033,6 @@ dependencies = [
  "hex",
  "log",
  "ordinals",
- "rand",
  "serde",
  "serde_json",
  "serde_with 3.9.0",

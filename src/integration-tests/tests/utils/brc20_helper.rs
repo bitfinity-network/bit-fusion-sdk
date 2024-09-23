@@ -10,7 +10,7 @@ use bitcoin::{
 };
 use brc20_bridge::brc20_info::Brc20Tick;
 use ord_rs::constants::POSTAGE;
-use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs, TaprootKeypair};
+use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs};
 use ord_rs::{Brc20, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo};
 
 use super::btc_rpc_client::BitcoinRpcClient;
@@ -144,18 +144,20 @@ impl<'a> Brc20Helper<'a> {
 
         let inputs = vec![input];
 
-        let commit_tx = builder.build_commit_transaction_with_fixed_fees(
-            bitcoin::Network::Regtest,
-            CreateCommitTransactionArgsV2 {
-                inputs: inputs.clone(),
-                inscription,
-                leftovers_recipient: self.address.clone(),
-                commit_fee: Amount::from_sat(1000),
-                reveal_fee: Amount::from_sat(1000),
-                txin_script_pubkey: self.address.script_pubkey(),
-                taproot_keypair: Some(TaprootKeypair::Random),
-            },
-        )?;
+        let commit_tx = builder
+            .build_commit_transaction_with_fixed_fees(
+                bitcoin::Network::Regtest,
+                CreateCommitTransactionArgsV2 {
+                    inputs: inputs.clone(),
+                    inscription,
+                    leftovers_recipient: self.address.clone(),
+                    commit_fee: Amount::from_sat(1000),
+                    reveal_fee: Amount::from_sat(1000),
+                    txin_script_pubkey: self.address.script_pubkey(),
+                    derivation_path: None,
+                },
+            )
+            .await?;
 
         println!("Commit transaction: {:?}", commit_tx.unsigned_tx);
 
@@ -165,6 +167,7 @@ impl<'a> Brc20Helper<'a> {
                 SignCommitTransactionArgs {
                     inputs,
                     txin_script_pubkey: self.address.script_pubkey(),
+                    derivation_path: None,
                 },
             )
             .await?;
@@ -189,6 +192,7 @@ impl<'a> Brc20Helper<'a> {
                 },
                 recipient_address: self.address.clone(),
                 redeem_script: commit_tx.redeem_script,
+                derivation_path: None,
             })
             .await?;
 

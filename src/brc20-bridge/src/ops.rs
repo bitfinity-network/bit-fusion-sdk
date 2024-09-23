@@ -114,7 +114,7 @@ impl Operation for Brc20BridgeOp {
         match self {
             Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => Some(
                 TaskOptions::new()
-                    .with_max_retries_policy(300)
+                    .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(10), // TODO: should be different between mainnet and regtest...
             ),
             Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. })

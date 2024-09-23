@@ -7,13 +7,17 @@ use bitcoin::address::Error as BitcoinAddressError;
 use bitcoin::bip32::{ChildNumber, DerivationPath, Error as Bip32Error, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
-use bitcoin::{Address, Network, PublicKey};
+use bitcoin::{Address, Network, PublicKey, XOnlyPublicKey};
 use candid::Principal;
 use did::H160;
+use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
 use ord_rs::wallet::LocalSigner;
-use ord_rs::BtcTxSigner;
-use schnorr::{ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId};
+use ord_rs::{BtcTxSigner, OrdError, OrdResult};
+use schnorr::{
+    ManagementCanisterSchnorrPublicKeyReply, ManagementCanisterSchnorrPublicKeyRequest,
+    ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId,
+};
 use thiserror::Error;
 
 use crate::state::{Brc20State, MasterKey};
@@ -32,6 +36,8 @@ pub enum KeyError {
     InvalidDerivationPath,
     #[error("invalid public key")]
     InvalidPublicKey,
+    #[error("ord error error: {0}")]
+    OrdError(#[from] ord_rs::OrdError),
     #[error("secp256 error: {0}")]
     Secp256(#[from] Secp256Error),
     #[error("signer not initialized")]
@@ -60,7 +66,7 @@ impl IcBtcSigner {
 
 #[async_trait]
 impl BtcTxSigner for IcBtcSigner {
-    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> PublicKey {
+    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> OrdResult<PublicKey> {
         let x_public_key = Xpub {
             network: self.network,
             depth: 0,
@@ -71,10 +77,10 @@ impl BtcTxSigner for IcBtcSigner {
         };
         let public_key = x_public_key
             .derive_pub(&Secp256k1::new(), derivation_path)
-            .expect("Failed to derive public key")
+            .map_err(|_| OrdError::Custom("Failed to derive public key".to_string()))?
             .public_key;
 
-        PublicKey::from(public_key)
+        Ok(PublicKey::from(public_key))
     }
 
     async fn sign_with_ecdsa(
@@ -94,6 +100,37 @@ impl BtcTxSigner for IcBtcSigner {
             .0;
 
         Signature::from_compact(&response.signature)
+    }
+
+    async fn schnorr_public_key(
+        &self,
+        derivation_path: &DerivationPath,
+    ) -> OrdResult<XOnlyPublicKey> {
+        let request = ManagementCanisterSchnorrPublicKeyRequest {
+            canister_id: None,
+            derivation_path: derivation_path_to_ic(derivation_path.clone()),
+            key_id: self.schnorr_key_id.clone(),
+        };
+
+        let (res,): (ManagementCanisterSchnorrPublicKeyReply,) = ic_cdk::call(
+            Principal::management_canister(),
+            "schnorr_public_key",
+            (request,),
+        )
+        .await
+        .map_err(|e| OrdError::Custom(format!("schnorr_public_key failed {}", e.1)))?;
+
+        log::debug!("Got schnorr public key: {:?}", res.public_key);
+
+        if res.public_key.len() != 33 {
+            return Err(OrdError::Custom("Invalid schnorr public key".to_string()));
+        }
+
+        let pubkey = &res.public_key[1..];
+        let public_key = XOnlyPublicKey::from_slice(pubkey)
+            .map_err(|_| OrdError::Custom("Invalid schnorr public key".to_string()))?;
+
+        Ok(public_key)
     }
 
     async fn sign_with_schnorr(
@@ -136,7 +173,7 @@ impl BtcSignerType {
         network: Network,
     ) -> KeyResult<Address> {
         let derivation_path = get_derivation_path(eth_address)?;
-        let public_key = self.ecdsa_public_key(&derivation_path).await;
+        let public_key = self.ecdsa_public_key(&derivation_path).await?;
 
         Address::p2wpkh(&public_key, network).map_err(KeyError::BitcoinAddress)
     }
@@ -144,7 +181,7 @@ impl BtcSignerType {
 
 #[async_trait]
 impl BtcTxSigner for BtcSignerType {
-    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> PublicKey {
+    async fn ecdsa_public_key(&self, derivation_path: &DerivationPath) -> OrdResult<PublicKey> {
         match self {
             BtcSignerType::Local(v) => v.ecdsa_public_key(derivation_path).await,
             BtcSignerType::Ic(v) => v.ecdsa_public_key(derivation_path).await,
@@ -159,6 +196,16 @@ impl BtcTxSigner for BtcSignerType {
         match self {
             BtcSignerType::Local(v) => v.sign_with_ecdsa(message, derivation_path).await,
             BtcSignerType::Ic(v) => v.sign_with_ecdsa(message, derivation_path).await,
+        }
+    }
+
+    async fn schnorr_public_key(
+        &self,
+        derivation_path: &DerivationPath,
+    ) -> OrdResult<XOnlyPublicKey> {
+        match self {
+            BtcSignerType::Local(v) => v.schnorr_public_key(derivation_path).await,
+            BtcSignerType::Ic(v) => v.schnorr_public_key(derivation_path).await,
         }
     }
 
