@@ -45,11 +45,13 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
             .await
     }
 
-    pub async fn get_operations_by_memo(
+    pub async fn get_memos_by_user_address(
         &self,
-        memo: Memo,
-    ) -> CanisterClientResult<Vec<(H160, OperationId, Erc20BridgeOp)>> {
-        self.client.query("get_operations_by_memo", (memo,)).await
+        user_id: &H160,
+    ) -> CanisterClientResult<Vec<Memo>> {
+        self.client
+            .query("get_memos_by_user_address", (user_id,))
+            .await
     }
 
     pub async fn set_base_bft_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {

@@ -280,14 +280,12 @@ async fn test_external_bridging() {
 
     assert_eq!(operation_id.as_u64(), expected_operation_id as u64);
 
-    // Let us try fetching the operation by memo
-    let operations = erc20_bridge_client
-        .get_operations_by_memo(memo)
+    let memos = erc20_bridge_client
+        .get_memos_by_user_address(&alice_address)
         .await
         .unwrap();
-    assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0].0, alice_address);
-    assert_eq!(operations[0].1.as_u64(), expected_operation_id as u64);
+    assert_eq!(memos.len(), 1);
+    assert_eq!(memos[0], memo);
 
     let balance = ctx
         .context

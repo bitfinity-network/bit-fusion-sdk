@@ -7,7 +7,7 @@ use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::init::{Brc20BridgeConfig, BridgeInitData};
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
@@ -88,6 +88,28 @@ impl Brc20Bridge {
             .borrow()
             .operations
             .get_log(operation_id)
+    }
+
+    /// Returns operation by memo
+    #[query]
+    pub fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: H160,
+    ) -> Option<(OperationId, Brc20BridgeOpImpl)> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_operation_by_memo_and_user(&memo, &user_id)
+    }
+
+    /// Returns all memos for a given user_id.
+    #[query]
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_memos_by_user_address(&user_id)
     }
 
     #[update]
