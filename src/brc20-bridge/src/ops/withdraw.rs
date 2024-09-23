@@ -129,7 +129,7 @@ impl Brc20BridgeWithdrawOp {
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
         let reveal_utxo = withdraw
-            .await_inscription_transactions(reveal_utxo)
+            .await_inscription_transactions(&payload.sender, reveal_utxo)
             .await
             .map_err(|err| {
                 Error::FailedToProgress(format!(
@@ -176,6 +176,10 @@ impl Brc20BridgeWithdrawOp {
             .send_transaction(tx.clone().into())
             .await
             .map_err(|err| Error::FailedToProgress(format!("cannot send transfer tx: {err:?}")))?;
+
+        // Mark the reveal UTXO as used
+        let outpoint = tx.0.input[0].previous_output;
+        withdraw.mark_reveal_utxo_as_used(&outpoint);
 
         Ok(Brc20BridgeOp::Withdraw(Self::TransferTxSent {
             from_address,

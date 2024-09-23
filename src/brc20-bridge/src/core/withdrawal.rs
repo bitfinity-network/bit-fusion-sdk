@@ -33,6 +33,7 @@ use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::interface::WithdrawError;
 use crate::key::{get_derivation_path, BtcSignerType};
+use crate::ledger::UtxoKey;
 use crate::state::Brc20State;
 
 pub struct Brc20Transactions {
@@ -112,7 +113,7 @@ impl Brc20WithdrawalPayload {
 }
 
 #[derive(Debug, Clone)]
-pub struct DidTransaction(Transaction);
+pub struct DidTransaction(pub Transaction);
 
 impl CandidType for DidTransaction {
     fn _ty() -> Type {
@@ -215,7 +216,6 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
     ) -> Result<Brc20Transactions, WithdrawError> {
         let Brc20WithdrawalPayload {
             sender,
-            dst_address,
             amount,
             brc20_info: Brc20Info { tick, decimals },
             ..
@@ -223,24 +223,12 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
         let fee_rate = self.get_fee_rate().await?;
         let funding_address = self.get_funding_address(&sender).await?;
-        let reveal_recipient_address = self.get_change_address().await?;
+        let reveal_recipient_address = funding_address.clone();
         log::debug!("funding address: {funding_address}; reveal recipient address: {reveal_recipient_address}");
         let amount = Self::convert_erc20_amount_to_brc20(amount, decimals)?;
 
         // get funding utxos, but filter out input utxos
-        let funding_utxos = self
-            .utxo_provider
-            .get_utxos(&funding_address)
-            .await
-            .map_err(|_| WithdrawError::NoInputs)?
-            .utxos;
-
-        let Ok(dst_address) = Address::from_str(&dst_address) else {
-            return Err(WithdrawError::InvalidRequest(format!(
-                "Failed to decode recipient address from string: {dst_address}"
-            )));
-        };
-        let dst_address = dst_address.assume_checked();
+        let funding_utxos = self.get_funding_utxos(&funding_address).await?;
 
         // make brc20 transfer inscription
         let derivation_path = get_derivation_path(&sender)?;
@@ -249,15 +237,15 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             create_commit_transaction,
             inputs: funding_tx_inputs,
         } = self
-            .build_commit_transaction(
-                &mut inscriber,
+            .build_commit_transaction(BuildCommitTransactionArgs {
+                inscriber: &mut inscriber,
                 funding_utxos,
                 tick,
                 amount,
-                funding_address.clone(),
+                wallet_address: funding_address.clone(),
                 fee_rate,
-                &derivation_path,
-            )
+                derivation_path: &derivation_path,
+            })
             .await?;
 
         let signed_commit_tx = inscriber
@@ -299,15 +287,6 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         );
         log::debug!("Reveal transaction: {reveal_transaction:?}");
 
-        // mark the funding utxos as used
-        {
-            let mut state = self.state.borrow_mut();
-            let ledger = state.ledger_mut();
-            for utxo in funding_tx_inputs {
-                ledger.mark_as_used(utxo.into(), dst_address.clone());
-            }
-        }
-
         // get the reveal utxo
         let reveal_utxo = RevealUtxo {
             txid: reveal_transaction.txid().as_raw_hash().into_32(),
@@ -320,6 +299,14 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             reveal_utxo.vout,
             reveal_utxo.value
         );
+
+        // store the reveal utxo in the ledger
+        {
+            let mut state_ref = self.state.borrow_mut();
+            state_ref
+                .ledger_mut()
+                .deposit_reveal(reveal_transaction.txid(), reveal_utxo.vout);
+        }
 
         Ok(Brc20Transactions {
             commit_tx: signed_commit_tx,
@@ -335,12 +322,21 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         Ok(())
     }
 
+    pub fn mark_reveal_utxo_as_used(&self, outpoint: &OutPoint) {
+        let mut state_ref = self.state.borrow_mut();
+        state_ref.ledger_mut().remove_reveal_utxo(&UtxoKey {
+            tx_id: outpoint.txid.clone().as_raw_hash().into_32(),
+            vout: outpoint.vout,
+        });
+    }
+
     /// Await inscription reveal transaction
     pub async fn await_inscription_transactions(
         &self,
+        sender_address: &H160,
         reveal_utxo: RevealUtxo,
     ) -> Result<Utxo, WithdrawError> {
-        let reveal_recipient_address = self.get_change_address().await?;
+        let reveal_recipient_address = self.get_funding_address(sender_address).await?;
         let txid = Txid::from_slice(&reveal_utxo.txid).unwrap();
         log::debug!("checking whether the reveal transaction {txid} is confirmed for address {reveal_recipient_address}");
         // get utxos for the reveal address
@@ -377,12 +373,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let fee_rate = self.get_fee_rate().await?;
 
         // get funding utxos, but filter out input utxos
-        let funding_utxos = self
-            .utxo_provider
-            .get_utxos(&funding_address)
-            .await
-            .map_err(|_| WithdrawError::NoInputs)?
-            .utxos;
+        let funding_utxos = self.get_funding_utxos(&funding_address).await?;
 
         let Ok(dst_address) = Address::from_str(&dst_address) else {
             return Err(WithdrawError::InvalidRequest(format!(
@@ -408,15 +399,11 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             self.build_unsigned_transfer_transaction(&reveal_utxo, &funding_utxos, dst_address)?;
 
         // get transaction input info
-        let inscription_dp = get_derivation_path(&H160::default())?;
-        let change_address = self.get_change_address().await?;
         let funding_dp = get_derivation_path(&sender)?;
         let tx_input_info = self.transfer_tx_input_info(
             &reveal_utxo,
             &funding_utxos,
-            &inscription_dp,
             &funding_dp,
-            &change_address,
             &funding_address,
         )?;
 
@@ -431,14 +418,17 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
     /// Build commit transaction
     async fn build_commit_transaction(
         &self,
-        inscriber: &mut OrdTransactionBuilder,
-        mut funding_utxos: Vec<Utxo>,
-        tick: Brc20Tick,
-        amount: u64,
-        wallet_address: Address,
-        fee_rate: FeeRate,
-        derivation_path: &DerivationPath,
+        args: BuildCommitTransactionArgs<'_>,
     ) -> Result<CommitTransaction, WithdrawError> {
+        let BuildCommitTransactionArgs {
+            inscriber,
+            mut funding_utxos,
+            tick,
+            amount,
+            wallet_address,
+            fee_rate,
+            derivation_path,
+        } = args;
         let mut input_count = 1;
         // sort the utxos by value; descending
         funding_utxos.sort_by(|a, b| b.value.cmp(&a.value));
@@ -568,9 +558,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         &self,
         reveal_utxo: &Utxo,
         funding_utxos: &[Utxo],
-        inscription_dp: &DerivationPath,
-        funding_dp: &DerivationPath,
-        change_address: &Address,
+        derivation_path: &DerivationPath,
         funding_address: &Address,
     ) -> Result<Vec<TxInputInfo>, WithdrawError> {
         let mut tx_input_info = Vec::with_capacity(funding_utxos.len() + 1);
@@ -582,9 +570,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             },
             tx_out: TxOut {
                 value: Amount::from_sat(reveal_utxo.value),
-                script_pubkey: change_address.script_pubkey(),
+                script_pubkey: funding_address.script_pubkey(),
             },
-            derivation_path: inscription_dp.clone(),
+            derivation_path: derivation_path.clone(),
         });
 
         for utxo in funding_utxos {
@@ -597,7 +585,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
                     value: Amount::from_sat(utxo.value),
                     script_pubkey: funding_address.script_pubkey(),
                 },
-                derivation_path: funding_dp.clone(),
+                derivation_path: derivation_path.clone(),
             });
         }
 
@@ -712,15 +700,29 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             .map_err(WithdrawError::from)
     }
 
-    /// Get the change address for the transaction.
+    /// Get utxos available for funding the transaction
     ///
-    /// The change address is the address that will receive the reveal tx from the inscription.
-    /// This is done in order to prevent spending the reveal transactions
-    async fn get_change_address(&self) -> Result<Address, WithdrawError> {
-        self.signer
-            .get_transit_address(&H160::default(), self.network)
+    /// It will discard utxos that are reveal utxos
+    async fn get_funding_utxos(&self, address: &Address) -> Result<Vec<Utxo>, WithdrawError> {
+        let utxos = self
+            .utxo_provider
+            .get_utxos(address)
             .await
-            .map_err(WithdrawError::from)
+            .map(|utxos| utxos.utxos)
+            .map_err(|_| WithdrawError::NoInputs)?;
+
+        let state_ref = self.state.borrow();
+        let ledger = state_ref.ledger();
+
+        Ok(utxos
+            .into_iter()
+            .filter(|utxo| {
+                !ledger.reveal_utxos_contains(&UtxoKey {
+                    tx_id: utxo.outpoint.txid.clone().try_into().unwrap(),
+                    vout: utxo.outpoint.vout,
+                })
+            })
+            .collect())
     }
 }
 
@@ -735,4 +737,14 @@ struct GetGreedyFundingUtxosArgs {
 struct CommitTransaction {
     create_commit_transaction: CreateCommitTransaction,
     inputs: Vec<ord_rs::Utxo>,
+}
+
+struct BuildCommitTransactionArgs<'a> {
+    inscriber: &'a mut OrdTransactionBuilder,
+    funding_utxos: Vec<Utxo>,
+    tick: Brc20Tick,
+    amount: u64,
+    wallet_address: Address,
+    fee_rate: FeeRate,
+    derivation_path: &'a DerivationPath,
 }

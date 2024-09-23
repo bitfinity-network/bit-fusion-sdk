@@ -112,6 +112,14 @@ impl Brc20BridgeDepositOp {
         let unsigned_mint_order =
             deposit.create_unsigned_mint_order(&dst_address, &dst_token, amount, brc20_info, nonce);
 
+        // mark utxos as used
+        deposit
+            .mark_utxos_as_used(&dst_address, &utxos)
+            .await
+            .map_err(|err| {
+                Error::FailedToProgress(format!("cannot mark utxos as used: {err:?}"))
+            })?;
+
         Ok(Brc20BridgeOp::Deposit(Self::SignMintOrder(
             unsigned_mint_order,
         )))

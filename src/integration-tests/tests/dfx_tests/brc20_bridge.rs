@@ -69,6 +69,10 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     assert_eq!(canister_balance, deposit_amount);
 
     // withdraw
+    let brc20_balance = ctx
+        .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
+        .await;
+
     ctx.send_btc(&deposit_address, Amount::from_sat(100_000_000)) // 1 BTC
         .await
         .expect("send btc failed");
@@ -89,7 +93,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let new_brc20_balance = ctx
         .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
         .await;
-    assert_eq!(new_brc20_balance, withdraw_amount);
+    assert_eq!(new_brc20_balance, withdraw_amount + brc20_balance);
 
     // check brc20 balance
     let new_erc20_balance = ctx.wrapped_balance(&brc20_tick, &ctx.eth_wallet).await;

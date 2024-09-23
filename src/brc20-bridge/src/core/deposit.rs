@@ -19,7 +19,7 @@ use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{BtcSignerType, KeyError};
+use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UtxoKey;
 use crate::ops::Brc20BridgeOp;
 use crate::state::Brc20State;
@@ -357,6 +357,24 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
+    pub async fn mark_utxos_as_used(
+        &self,
+        eth_address: &H160,
+        utxos: &[Utxo],
+    ) -> Result<(), DepositError> {
+        let address = self.get_transit_address(eth_address).await?;
+        let derivation_path = get_derivation_path_ic(eth_address);
+
+        let mut state_ref = self.brc20_state.borrow_mut();
+        let ledger = state_ref.ledger_mut();
+
+        for utxo in utxos {
+            ledger.mark_as_used(utxo.clone(), &address, derivation_path.clone());
+        }
+
+        Ok(())
+    }
+
     fn filter_out_used_utxos(
         &self,
         get_utxos_response: &mut GetUtxosResponse,
@@ -366,7 +384,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
 
         get_utxos_response
             .utxos
-            .retain(|utxo| !ledger.unspent_utxos_contains(&UtxoKey::from(&utxo.outpoint)));
+            .retain(|utxo| !ledger.used_utxo_contains(&UtxoKey::from(&utxo.outpoint)));
 
         Ok(())
     }
