@@ -153,11 +153,18 @@ impl SolidityContractDeployer<'_> {
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut command = Command::new("sh");
+        let command = command
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(custom_network) = &self.network.custom_network {
+            command.env("CUSTOM_URL", custom_network);
+        }
+
+        let output = command
             .output()
             .context("Failed to execute deploy-bft command")?;
 
@@ -241,13 +248,20 @@ impl SolidityContractDeployer<'_> {
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut command = Command::new("sh");
+        let command = command
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(custom_network) = &self.network.custom_network {
+            command.env("CUSTOM_URL", custom_network);
+        }
+
+        let output = command
             .output()
-            .context("Failed to execute deploy-bft command")?;
+            .context("Failed to execute deploy-fee-charge command")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
