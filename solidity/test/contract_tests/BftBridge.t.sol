@@ -3,7 +3,7 @@ pragma solidity ^0.8.7;
 
 import "forge-std/src/Test.sol";
 import "forge-std/src/console.sol";
-import "@openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
