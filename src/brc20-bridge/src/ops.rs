@@ -1,6 +1,7 @@
 mod deposit;
 mod withdraw;
 
+use bitcoin::Network;
 use bridge_canister::bridge::{Operation, OperationAction};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
@@ -112,11 +113,28 @@ impl Operation for Brc20BridgeOp {
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
         match self {
-            Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => Some(
-                TaskOptions::new()
-                    .with_max_retries_policy(10)
-                    .with_fixed_backoff_policy(10), // TODO: should be different between mainnet and regtest...
-            ),
+            Self::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => {
+                let network = {
+                    let state_ref = get_brc20_state();
+                    let network = state_ref.borrow().network();
+
+                    network
+                };
+
+                // On mainnet wait longer for Bitcoin transactions
+                match network {
+                    Network::Bitcoin => Some(
+                        TaskOptions::new()
+                            .with_max_retries_policy(20)
+                            .with_fixed_backoff_policy(300), // 10 blocks, each 5 minutes
+                    ),
+                    _ => Some(
+                        TaskOptions::new()
+                            .with_max_retries_policy(10)
+                            .with_fixed_backoff_policy(10),
+                    ),
+                }
+            }
             Self::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. })
             | Self::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { .. })

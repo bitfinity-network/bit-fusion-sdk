@@ -301,6 +301,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         res
     }
 
+    /// Create the unsigned mint order
     pub fn create_unsigned_mint_order(
         &self,
         dst_address: &H160,
@@ -342,6 +343,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         }
     }
 
+    /// Sign mint order
     pub async fn sign_mint_order(
         &self,
         mint_order: MintOrder,
@@ -357,6 +359,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
+    /// Mark utxos as used
     pub async fn mark_utxos_as_used(
         &self,
         eth_address: &H160,
@@ -375,6 +378,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(())
     }
 
+    /// Filter out used utxos from the response
     fn filter_out_used_utxos(
         &self,
         get_utxos_response: &mut GetUtxosResponse,
