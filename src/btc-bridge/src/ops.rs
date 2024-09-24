@@ -148,7 +148,7 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::UpdateCkBtcBalance { .. } => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
-                    .with_backoff_policy(BackoffPolicy::Fixed { secs: 5 }),
+                    .with_backoff_policy(BackoffPolicy::Fixed { secs: 60 }),
             ),
             BtcBridgeOp::CollectCkBtcBalance { .. }
             | BtcBridgeOp::MintErc20 { .. }

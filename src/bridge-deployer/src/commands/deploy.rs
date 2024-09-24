@@ -66,10 +66,8 @@ impl DeployCommands {
         debug!("WASM file read successfully");
 
         let identity = GenericIdentity::try_from(identity.as_ref())?;
-        debug!(
-            "Deploying with Principal : {}",
-            identity.sender().expect("No sender found")
-        );
+        let principal = identity.sender().expect("Invalid identity");
+        debug!("Deploying with Principal : {principal}",);
 
         let agent = ic_agent::Agent::builder()
             .with_url(ic_host)
@@ -82,9 +80,11 @@ impl DeployCommands {
         let wallet = WalletCanister::create(&agent, self.wallet_canister).await?;
 
         let canister_id = wallet
-            .wallet_create_canister(self.cycles, None, None, None, None)
+            .wallet_create_canister(self.cycles, Some(vec![principal]), None, None, None)
             .await?
             .canister_id;
+
+        eprintln!("Created canister: {canister_id}");
 
         let management_canister = ManagementCanister::create(&agent);
 

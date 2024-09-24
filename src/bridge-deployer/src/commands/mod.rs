@@ -235,7 +235,11 @@ impl BFTArgs {
             &self.controllers,
         )?;
 
+        eprintln!("Deployed bft contract: {bft_address}");
+
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_address))?;
+
+        eprintln!("Deployed fee charge contract: {expected_address}");
 
         Ok(bft_address)
     }
