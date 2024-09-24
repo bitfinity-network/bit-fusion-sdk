@@ -1,5 +1,4 @@
-use core::fmt;
-
+use bridge_did::evm_link::EvmLink;
 use candid::CandidType;
 use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
@@ -7,33 +6,8 @@ use ethers_core::types::{BlockNumber, U256 as EthU256};
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
-use crate::evm_link::EvmLink;
+use crate::bft_events::TxParams;
 use crate::query::{batch_query, Query, QueryType, CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID};
-
-/// Determined side of the bridge.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
-pub enum BridgeSide {
-    Base = 0,
-    Wrapped = 1,
-}
-
-impl BridgeSide {
-    pub fn other(self) -> Self {
-        match self {
-            Self::Base => Self::Wrapped,
-            Self::Wrapped => Self::Base,
-        }
-    }
-}
-
-impl fmt::Display for BridgeSide {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Base => write!(f, "Base"),
-            Self::Wrapped => write!(f, "Wrapped"),
-        }
-    }
-}
 
 /// Information about EVM on a bridge side.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -59,6 +33,17 @@ impl EvmParams {
             next_block,
             nonce,
             gas_price,
+        }
+    }
+
+    /// Returns transaction parameters for the EVM.
+    pub fn create_tx_params(&self, sender: H160, bridge: H160) -> TxParams {
+        TxParams {
+            sender: sender.0,
+            bridge: bridge.0,
+            nonce: self.nonce.into(),
+            gas_price: self.gas_price.0,
+            chain_id: self.chain_id,
         }
     }
 

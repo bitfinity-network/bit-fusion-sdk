@@ -32,7 +32,9 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function __TokenManager__init(bool _isWrappedSide) internal initializer onlyInitializing {
+    function __TokenManager__init(
+        bool _isWrappedSide
+    ) internal initializer onlyInitializing {
         isWrappedSide = _isWrappedSide;
     }
 
@@ -70,7 +72,9 @@ abstract contract TokenManager is Initializable {
     }
 
     /// tries to query token metadata
-    function getTokenMetadata(address token) internal view returns (TokenMetadata memory meta) {
+    function getTokenMetadata(
+        address token
+    ) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
         } catch { }
@@ -83,12 +87,16 @@ abstract contract TokenManager is Initializable {
     }
 
     /// Returns wrapped token for the given base token
-    function getWrappedToken(bytes32 baseTokenID) external view returns (address) {
+    function getWrappedToken(
+        bytes32 baseTokenID
+    ) external view returns (address) {
         return _baseToWrapped[baseTokenID];
     }
 
     /// Returns base token for the given wrapped token
-    function getBaseToken(address wrappedTokenAddress) external view returns (bytes32) {
+    function getBaseToken(
+        address wrappedTokenAddress
+    ) external view returns (bytes32) {
         return _wrappedToBase[wrappedTokenAddress];
     }
 

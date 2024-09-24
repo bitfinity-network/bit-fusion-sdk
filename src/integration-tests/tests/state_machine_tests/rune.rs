@@ -1,7 +1,7 @@
-use std::collections::HashSet;
 use std::time::Duration;
 
-use bridge_did::init::BridgeInitData;
+use bridge_did::evm_link::EvmLink;
+use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use candid::Principal;
 use did::H160;
 use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
@@ -11,7 +11,6 @@ use ic_exports::ic_kit::mock_principals::bob;
 use ic_management_canister_types::{EcdsaCurve, EcdsaKeyId};
 use ic_state_machine_tests::StateMachineBuilder;
 use rune_bridge::interface::GetAddressError;
-use rune_bridge::state::RuneBridgeConfig;
 
 use crate::context::TestContext;
 use crate::state_machine_tests::StateMachineContext;
@@ -41,7 +40,7 @@ impl RunesSetup {
 
         let bridge = (&context).create_canister().await.unwrap();
         let init_args = BridgeInitData {
-            evm_principal: bob(),
+            evm_link: EvmLink::Ic(bob()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Custom(KEY_ID.to_string()),
             },
@@ -50,8 +49,11 @@ impl RunesSetup {
         };
         let rune_config = RuneBridgeConfig {
             network: BitcoinNetwork::Mainnet,
+            btc_cache_timeout_secs: None,
             min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://indexer".to_string()]),
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://indexer".to_string(),
+            }],
             deposit_fee: 0,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,

@@ -1,24 +1,78 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::{BridgeEvent, MinterNotificationType, NotifyMinterEventData};
+use bridge_utils::bft_events::BridgeEvent;
 use candid::{CandidType, Decode};
 use drop_guard::guard;
-use ic_stable_structures::StableBTreeMap;
+use ic_stable_structures::stable_structures::Memory;
+use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
 use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
-use crate::bridge::{Operation, OperationAction, OperationContext};
+use crate::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
 use crate::runtime::state::config::ConfigStorage;
 
-pub type TasksStorage<Mem, Op> = StableBTreeMap<u32, InnerScheduledTask<BridgeTask<Op>>, Mem>;
-pub type BridgeScheduler<Mem, Op> = Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>>;
+pub type TasksStorage<Mem, Op> = StableBTreeMap<u64, InnerScheduledTask<BridgeTask<Op>>, Mem>;
+pub type BridgeScheduler<Mem, Op> =
+    Scheduler<BridgeTask<Op>, TasksStorage<Mem, Op>, StableCell<u64, Mem>>;
 pub type DynScheduler<Op> = Box<dyn TaskScheduler<BridgeTask<Op>>>;
+
+/// Newtype for `Rc<Scheduler>`.
+#[derive(Clone)]
+pub struct SharedScheduler<Mem, Op>(Rc<BridgeScheduler<Mem, Op>>)
+where
+    Mem: Memory + 'static,
+    Op: Operation;
+
+impl<Mem, Op> SharedScheduler<Mem, Op>
+where
+    Mem: Memory + 'static,
+    Op: Operation,
+{
+    pub fn new(
+        tasks_storage: TasksStorage<Mem, Op>,
+        sequence: StableCell<u64, Mem>,
+    ) -> SharedScheduler<Mem, Op> {
+        Self(Rc::new(BridgeScheduler::new(tasks_storage, sequence)))
+    }
+
+    pub fn run(&self, state: RuntimeState<Op>) -> Result<usize, SchedulerError> {
+        self.0.run(state)
+    }
+}
+
+impl<Mem, Op> TaskScheduler<BridgeTask<Op>> for SharedScheduler<Mem, Op>
+where
+    Mem: Memory + 'static,
+    Op: Operation,
+{
+    fn append_task(&self, task: ScheduledTask<BridgeTask<Op>>) -> u64 {
+        self.0.append_task(task)
+    }
+
+    fn append_tasks(&self, tasks: Vec<ScheduledTask<BridgeTask<Op>>>) -> Vec<u64> {
+        self.0.append_tasks(tasks)
+    }
+
+    fn get_task(&self, task_id: u64) -> Option<InnerScheduledTask<BridgeTask<Op>>> {
+        self.0.get_task(task_id)
+    }
+
+    fn find_id(&self, filter: &dyn Fn(BridgeTask<Op>) -> bool) -> Option<u64> {
+        self.0.find_id(filter)
+    }
+
+    fn reschedule(&self, task_id: u64, options: ic_task_scheduler::task::TaskOptions) {
+        self.0.reschedule(task_id, options)
+    }
+}
 
 /// Logs errors that occur during task execution.
 ///
@@ -61,30 +115,38 @@ impl<Op: Operation> BridgeTask<Op> {
         task_scheduler: DynScheduler<Op>,
     ) -> BftResult<()> {
         match self {
-            BridgeTask::Operation(id, _) => {
-                let Some(operation) = ctx.borrow().operations.get(id) else {
-                    log::warn!("Operation #{id} not found.");
-                    return Err(Error::OperationNotFound(id));
+            BridgeTask::Operation(op_id, _) => {
+                let Some(operation) = ctx.borrow().operations.get(op_id) else {
+                    log::warn!("Operation #{op_id} not found.");
+                    return Err(Error::OperationNotFound(op_id));
                 };
 
                 let ctx_clone = ctx.clone();
-                let next_step =
+                let progress =
                     operation
-                        .progress(id, ctx.clone())
+                        .progress(op_id, ctx.clone())
                         .await
                         .inspect_err(move |err| {
                             ctx_clone
                                 .borrow_mut()
                                 .operations
-                                .update_with_err(id, err.to_string())
+                                .update_with_err(op_id, err.to_string())
                         })?;
 
-                let scheduling_options = next_step.scheduling_options();
-                ctx.borrow_mut().operations.update(id, next_step.clone());
+                let new_op = match progress {
+                    OperationProgress::Progress(op) => op,
+                    OperationProgress::AddToService(service_id) => {
+                        ctx.push_operation_to_service(service_id, op_id)?;
+                        return Ok(());
+                    }
+                };
+
+                let scheduling_options = new_op.scheduling_options();
+                ctx.borrow_mut().operations.update(op_id, new_op.clone());
 
                 if let Some(options) = scheduling_options {
                     let scheduled_task =
-                        ScheduledTask::with_options(Self::Operation(id, next_step), options);
+                        ScheduledTask::with_options(Self::Operation(op_id, new_op), options);
                     task_scheduler.append_task(scheduled_task);
                 }
 
@@ -268,19 +330,24 @@ impl<Op: Operation> Task for BridgeTask<Op> {
             self_clone
                 .execute_inner(ctx, task_scheduler)
                 .await
-                .map_err(|e| SchedulerError::TaskExecutionFailed(e.to_string()))
+                .map_err(|e| match e {
+                    Error::CannotProgress(_) => SchedulerError::Unrecoverable(e.to_string()),
+                    _ => SchedulerError::TaskExecutionFailed(e.to_string()),
+                })
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bridge_utils::bft_events::{BurntEventData, MintedEventData, NotifyMinterEventData};
+    use bridge_did::event_data::*;
     use did::H160;
     use ic_exports::ic_kit::MockContext;
     use ic_storage::IcStorage;
+    use snapbox::{assert_data_eq, str};
 
     use super::*;
+    use crate::bridge::OperationProgress;
     use crate::runtime::state::config::ConfigStorage;
     use crate::runtime::BridgeRuntime;
 
@@ -288,6 +355,7 @@ mod tests {
     struct TestOperation {
         successful: bool,
         successful_runs: usize,
+        recoverable: bool,
     }
 
     impl TestOperation {
@@ -297,6 +365,7 @@ mod tests {
             Self {
                 successful: false,
                 successful_runs: 0,
+                recoverable: true,
             }
         }
 
@@ -304,19 +373,35 @@ mod tests {
             Self {
                 successful: true,
                 successful_runs: 0,
+                recoverable: true,
+            }
+        }
+
+        fn new_unrecoverable() -> Self {
+            Self {
+                successful: false,
+                successful_runs: 0,
+                recoverable: false,
             }
         }
     }
 
     impl Operation for TestOperation {
-        async fn progress(self, _id: OperationId, _ctx: RuntimeState<Self>) -> BftResult<Self> {
+        async fn progress(
+            self,
+            _id: OperationId,
+            _ctx: RuntimeState<Self>,
+        ) -> BftResult<OperationProgress<Self>> {
             if self.successful {
-                Ok(Self {
+                Ok(OperationProgress::Progress(Self {
                     successful_runs: self.successful_runs + 1,
                     successful: self.successful,
-                })
-            } else {
+                    recoverable: self.recoverable,
+                }))
+            } else if self.recoverable {
                 Err(Error::FailedToProgress(Self::ERR_MESSAGE.to_string()))
+            } else {
+                Err(Error::CannotProgress(Self::ERR_MESSAGE.to_string()))
             }
         }
 
@@ -332,21 +417,21 @@ mod tests {
             _ctx: RuntimeState<Self>,
             _event: MintedEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
 
         async fn on_wrapped_token_burnt(
             _ctx: RuntimeState<Self>,
             _event: BurntEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
 
         async fn on_minter_notification(
             _ctx: RuntimeState<Self>,
             _event: NotifyMinterEventData,
         ) -> Option<OperationAction<Self>> {
-            todo!()
+            unimplemented!()
         }
     }
 
@@ -416,9 +501,56 @@ mod tests {
                 log.log()[i].step_result.as_ref().unwrap(),
                 &TestOperation {
                     successful: true,
-                    successful_runs: i
+                    successful_runs: i,
+                    recoverable: true,
                 }
             );
         }
+    }
+
+    #[tokio::test]
+    async fn execute_correctly_converts_recoverable_error() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_err();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
+
+        let task = BridgeTask::Operation(id, op);
+        let err = task
+            .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, SchedulerError::TaskExecutionFailed(_)));
+
+        assert_data_eq!(
+            err.to_string(),
+            str!["TaskExecutionFailed: operation failed to progress: test error"]
+        )
+    }
+
+    #[tokio::test]
+    async fn execute_correctly_converts_unrecoverable_error() {
+        MockContext::new().inject();
+
+        let runtime: BridgeRuntime<TestOperation> = BridgeRuntime::default(ConfigStorage::get());
+        let ctx = runtime.state.clone();
+        let op = TestOperation::new_unrecoverable();
+        let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
+
+        let task = BridgeTask::Operation(id, op);
+        let err = task
+            .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, SchedulerError::Unrecoverable(_)));
+
+        assert_data_eq!(
+            err.to_string(),
+            str!["Unrecoverable task error: operation cannot progress: test error"]
+        )
     }
 }

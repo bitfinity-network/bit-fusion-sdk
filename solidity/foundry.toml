@@ -1,7 +1,7 @@
 [profile.default]
 src = 'src'
 out = 'out'
-libs = ['lib']
+libs = ['dependencies']
 ast = true
 ffi = true
 build_info = true
@@ -10,7 +10,7 @@ script = "script"
 force = true
 evm_version = 'paris'
 optimizer = true
-optimizer_runs = 20_000
+optimizer_runs = 2_000
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
@@ -24,3 +24,17 @@ quote_style = 'double'
 number_underscore = 'preserve'
 multiline_func_header = 'params_first'
 single_line_statement_blocks = "multi"
+
+
+[dependencies]
+"@openzeppelin-contracts-upgradeable" = "5.0.2"
+"@openzeppelin-contracts" = "5.0.2"
+forge-std = "1.9.2"
+
+[soldeer]
+# whether soldeer manages remappings
+remappings_generate = false
+# whether soldeer re-generates all remappings when installing, updating or uninstalling deps
+remappings_regenerate = false
+# whether to suffix the remapping with the version: `name-a.b.c`
+remappings_version = false

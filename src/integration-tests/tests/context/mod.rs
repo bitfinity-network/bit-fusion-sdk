@@ -7,9 +7,9 @@ use std::time::Duration;
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
+use bridge_did::order::{SignedMintOrder, SignedOrder};
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
-use bridge_utils::evm_link::{address_to_icrc_subaccount, EvmLink};
+use bridge_utils::evm_link::address_to_icrc_subaccount;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
@@ -45,9 +45,10 @@ pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
+use bridge_did::event_data::MinterNotificationType;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::MinterNotificationType;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
@@ -122,7 +123,7 @@ pub trait TestContext {
     /// Sends tx with notification to EVMc.
     async fn send_notification_tx(
         &self,
-        user: &Wallet<SigningKey>,
+        user: &Wallet<'_, SigningKey>,
         input: NotificationInput,
     ) -> Result<H256> {
         let address: H160 = user.address().into();
@@ -153,7 +154,7 @@ pub trait TestContext {
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
-        let timeout = tx_processing_interval * 10;
+        let timeout = tx_processing_interval * 100;
         let start = Instant::now();
         let mut time_passed = Duration::ZERO;
         let mut receipt = None;
@@ -238,6 +239,11 @@ pub trait TestContext {
             )))?;
 
         if receipt.status != Some(U64::one()) {
+            let execution_result = evm_client
+                .get_tx_execution_result_by_hash(hash)
+                .await
+                .unwrap();
+            dbg!(execution_result);
             println!("tx status: {:?}", receipt.status);
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
@@ -271,8 +277,9 @@ pub trait TestContext {
             .await?;
 
         let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
+
         raw_client
-            .update("set_bft_bridge_contract", (bridge_address.clone(),))
+            .update::<_, ()>("set_bft_bridge_contract", (bridge_address.clone(),))
             .await?;
 
         Ok(bridge_address)
@@ -289,6 +296,8 @@ pub trait TestContext {
         let mut bridge_input = BFTBridge::BYTECODE.to_vec();
         let constructor = BFTBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
+
+        println!("bridge bytecode size: {}", BFTBridge::BYTECODE.len());
 
         let bridge_address = self
             .create_contract(wallet, bridge_input.clone())
@@ -554,7 +563,7 @@ pub trait TestContext {
             to,
             nonce,
             value: value.into(),
-            gas: 5_000_000u64.into(),
+            gas: 8_000_000u64.into(),
             gas_price: Some(DEFAULT_GAS_PRICE.into()),
             input,
             signature: SigningMethod::SigningKey(wallet.signer()),
@@ -761,6 +770,26 @@ pub trait TestContext {
     ) -> Result<TransactionReceipt> {
         let input = BFTBridge::mintCall {
             encodedOrder: order.0.to_vec().into(),
+        }
+        .abi_encode();
+
+        self.call_contract(wallet, bridge, input, 0)
+            .await
+            .map(|(_, receipt)| receipt)
+    }
+
+    /// Mints ERC-20 token with the order.
+    async fn batch_mint_erc_20_with_order(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        bridge: &H160,
+        order: SignedOrder,
+    ) -> Result<TransactionReceipt> {
+        let all_orders = order.all_orders().clone();
+        let input = BFTBridge::batchMintCall {
+            encodedOrders: all_orders.orders_data.into(),
+            signature: all_orders.signature.into(),
+            ordersToProcess: vec![order.idx() as u32],
         }
         .abi_encode();
 
@@ -1168,7 +1197,7 @@ pub fn icrc_bridge_canister_init_data(
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_principal,
+        evm_link: EvmLink::Ic(evm_principal),
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),
@@ -1186,7 +1215,7 @@ pub fn erc20_bridge_canister_init_data(
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_principal,
+        evm_link: EvmLink::Ic(evm_principal),
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),

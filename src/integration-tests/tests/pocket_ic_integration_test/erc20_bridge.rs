@@ -3,11 +3,12 @@ use std::time::Duration;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_canister::bridge::Operation;
 use bridge_client::{BridgeCanisterClient, Erc20BridgeClient};
+use bridge_did::bridge_side::BridgeSide;
 use bridge_did::id256::Id256;
-use bridge_utils::evm_bridge::BridgeSide;
+use bridge_did::operations::Erc20OpStage;
 use bridge_utils::{BFTBridge, UUPSProxy};
 use did::{H160, U256, U64};
-use erc20_bridge::ops::Erc20OpStage;
+use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
@@ -279,14 +280,12 @@ async fn test_external_bridging() {
 
     assert_eq!(operation_id.as_u64(), expected_operation_id as u64);
 
-    // Let us try fetching the operation by memo
-    let operations = erc20_bridge_client
-        .get_operations_by_memo(memo)
+    let memos = erc20_bridge_client
+        .get_memos_by_user_address(&alice_address)
         .await
         .unwrap();
-    assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0].0, alice_address);
-    assert_eq!(operations[0].1.as_u64(), expected_operation_id as u64);
+    assert_eq!(memos.len(), 1);
+    assert_eq!(memos[0], memo);
 
     let balance = ctx
         .context
@@ -307,7 +306,8 @@ async fn test_external_bridging() {
         .last()
         .cloned()
         .unwrap();
-    assert!(operation.1.is_complete());
+    let operation = Erc20BridgeOpImpl(operation.1);
+    assert!(operation.is_complete());
 }
 
 #[tokio::test]
@@ -440,7 +440,8 @@ async fn native_token_deposit_increase_and_decrease() {
         .last()
         .cloned()
         .unwrap();
-    assert!(operation.1.is_complete());
+    let operation = Erc20BridgeOpImpl(operation.1);
+    assert!(operation.is_complete());
 
     // Check fee charged
     let native_balance_after_mint = ctx
@@ -521,14 +522,15 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // Check mint order is not removed
     let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
-    let operation = erc20_bridge_client
+    let (_, op) = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
         .last()
         .cloned()
         .unwrap();
-    let signed_order = operation.1.stage.get_signed_mint_order().unwrap();
+    let stage = Erc20OpStageImpl(op.stage);
+    let signed_order = stage.get_signed_mint_order().unwrap();
 
     ctx.context
         .mint_erc_20_with_order(&ctx.bob_wallet, &ctx.wrapped_bft_bridge, *signed_order)
@@ -540,14 +542,15 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await;
 
     // check the operation is complete after the successful mint
-    let operation = erc20_bridge_client
+    let (_, op) = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
         .unwrap()
         .last()
         .cloned()
         .unwrap();
-    assert!(operation.1.is_complete());
+    let stage = Erc20BridgeOpImpl(op);
+    assert!(stage.is_complete());
 
     // Check bridge canister balance not changed after user's transaction.
     let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client

@@ -24,8 +24,14 @@ pub enum Error {
     #[error("operation#{0} not found")]
     OperationNotFound(OperationId),
 
+    #[error("service not found")]
+    ServiceNotFound,
+
     #[error("operation failed to progress: {0}")]
     FailedToProgress(String),
+
+    #[error("operation cannot progress: {0}")]
+    CannotProgress(String),
 
     #[error("unexpected anonymous principal")]
     AnonymousPrincipal,

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bridge_did::init::IndexerType;
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,10 @@ pub struct RuneBridgeConfig {
     /// The network to use for the Bitcoin blockchain
     #[arg(long)]
     pub bitcoin_network: BitcoinNetwork,
+    /// Specifies the period for which the result of BTC network requests would persist in the
+    /// canister cache. If set to None or 0, the cache will not be used.
+    #[arg(long)]
+    pub btc_cache_timeout_secs: Option<u32>,
     /// The minimum number of confirmations required for a Bitcoin transaction
     /// to be considered final
     #[arg(long)]
@@ -51,12 +56,17 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<RuneBridgeConfig> for rune_bridge::state::RuneBridgeConfig {
+impl From<RuneBridgeConfig> for bridge_did::init::RuneBridgeConfig {
     fn from(value: RuneBridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),
+            btc_cache_timeout_secs: value.btc_cache_timeout_secs,
             min_confirmations: value.min_confirmations,
-            indexer_urls: value.indexer_urls.into_iter().collect(),
+            indexers: value
+                .indexer_urls
+                .into_iter()
+                .map(|url| IndexerType::OrdHttp { url })
+                .collect(),
             deposit_fee: value.deposit_fee,
             mempool_timeout: Duration::from_secs(value.mempool_timeout),
             indexer_consensus_threshold: value.indexer_consensus_threshold,

@@ -1,11 +1,10 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
@@ -22,8 +21,8 @@ use ic_storage::IcStorage;
 
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
 use crate::interface::GetAddressError;
-use crate::ops::RuneBridgeOp;
-use crate::state::{RuneBridgeConfig, RuneState};
+use crate::ops::RuneBridgeOpImpl;
+use crate::state::RuneState;
 
 mod inspect;
 
@@ -71,7 +70,7 @@ impl RuneBridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, RuneBridgeOp)> {
+    ) -> Vec<(OperationId, RuneBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -84,20 +83,20 @@ impl RuneBridge {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, RuneBridgeOp)> {
+    ) -> Option<(OperationId, RuneBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
             .get_operation_by_memo_and_user(&memo, &user_id)
     }
 
-    /// Returns operation by memo
+    /// Returns all memos for a given user_id.
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, RuneBridgeOp)> {
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_operations_by_memo(&memo)
+            .get_memos_by_user_address(&user_id)
     }
 
     /// Returns log of an operation by its ID.
@@ -105,7 +104,7 @@ impl RuneBridge {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<RuneBridgeOp>> {
+    ) -> Option<OperationLog<RuneBridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
@@ -139,12 +138,10 @@ impl RuneBridge {
     }
 
     #[update]
-    pub fn admin_configure_indexers(&self, indexer_urls: HashSet<String>) {
+    pub fn admin_configure_indexers(&self, indexers: Vec<IndexerType>) {
         inspect_configure_indexers(self.config());
 
-        get_rune_state()
-            .borrow_mut()
-            .configure_indexers(indexer_urls);
+        get_rune_state().borrow_mut().configure_indexers(indexers);
     }
 
     #[update]
@@ -179,7 +176,7 @@ impl LogCanister for RuneBridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOp>>>;
+type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime =
@@ -192,7 +189,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<RuneBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<RuneBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

@@ -3,9 +3,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use bridge_utils::evm_bridge::EvmParams;
-use bridge_utils::evm_link::EvmLink;
+use bridge_utils::evm_link::EvmLinkClient;
 use bridge_utils::query::{
     self, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
 };
@@ -32,20 +33,21 @@ impl ConfigStorage {
 
     /// Creates a new instance of config struct and stores it in the stable memory.
     pub fn init(&mut self, init_data: &BridgeInitData) {
-        if init_data.evm_principal == Principal::anonymous() {
-            log::error!("unexpected anonymous evm principal");
-            panic!("unexpected anonymous evm principal");
+        match init_data.evm_link {
+            EvmLink::Ic(principal) if principal == Principal::anonymous() => {
+                log::error!("unexpected anonymous evm principal");
+                panic!("unexpected anonymous evm principal");
+            }
+            EvmLink::Ic(principal) if principal == Principal::management_canister() => {
+                log::error!("unexpected management canister as evm principal");
+                panic!("unexpected management canister as evm principal");
+            }
+            _ => {}
         }
 
-        if init_data.evm_principal == Principal::management_canister() {
-            log::error!("unexpected management canister as evm principal");
-            panic!("unexpected management canister as evm principal");
-        }
-
-        let evm_link = EvmLink::Ic(init_data.evm_principal);
         let new_config = Config {
             owner: init_data.owner,
-            evm_link,
+            evm_link: init_data.evm_link.clone(),
             evm_params: None,
             bft_bridge_contract_address: None,
             signing_strategy: init_data.signing_strategy.clone(),
@@ -58,7 +60,8 @@ impl ConfigStorage {
     pub async fn init_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
         log::trace!("initializing evm params");
 
-        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let link = config.borrow().get_evm_link();
+        let client = link.get_json_rpc_client();
         let responses = query::batch_query(
             &client,
             &[
@@ -100,7 +103,8 @@ impl ConfigStorage {
     pub async fn refresh_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
         log::trace!("updating evm params");
 
-        let client = config.borrow().get_evm_link().get_json_rpc_client();
+        let link = config.borrow().get_evm_link();
+        let client = link.get_json_rpc_client();
         if config.borrow().get_evm_params().is_err() {
             ConfigStorage::init_evm_params(config.clone()).await?;
         };

@@ -15,7 +15,9 @@ contract FeeCharge is IFeeCharge {
 
     mapping(address => bool) private _canChargeFee;
 
-    constructor(address[] memory canChargeFee) {
+    constructor(
+        address[] memory canChargeFee
+    ) {
         uint256 length = canChargeFee.length;
         for (uint256 i = 0; i < length; i++) {
             address approved = canChargeFee[i];
@@ -26,7 +28,9 @@ contract FeeCharge is IFeeCharge {
     // Deposit `msg.value` amount of native token to user's address.
     // The deposit could be used to pay fees by the approvedSenderIDs.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(bytes32[] calldata approvedSenderIDs) external payable returns (uint256 balance) {
+    function nativeTokenDeposit(
+        bytes32[] calldata approvedSenderIDs
+    ) external payable returns (uint256 balance) {
         address to = msg.sender;
 
         // Add approved SpenderIDs
@@ -41,7 +45,9 @@ contract FeeCharge is IFeeCharge {
 
     // Withdraw the amount of native token to user's address.
     // Returns user's balance after the operation.
-    function nativeTokenWithdraw(uint256 amount) external payable returns (uint256 balance) {
+    function nativeTokenWithdraw(
+        uint256 amount
+    ) external payable returns (uint256 balance) {
         require(amount > 0, "failed to withdraw zero amount");
         address to = msg.sender;
 
@@ -53,7 +59,9 @@ contract FeeCharge is IFeeCharge {
     }
 
     // Returns user's native token deposit balance.
-    function nativeTokenBalance(address user) external view returns (uint256 balance) {
+    function nativeTokenBalance(
+        address user
+    ) external view returns (uint256 balance) {
         if (user == address(0)) {
             user = msg.sender;
         }
@@ -61,7 +69,9 @@ contract FeeCharge is IFeeCharge {
     }
 
     // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(bytes32[] calldata approvedSenderIDs) external {
+    function removeApprovedSenderIDs(
+        bytes32[] calldata approvedSenderIDs
+    ) external {
         for (uint256 i = 0; i < approvedSenderIDs.length; i++) {
             delete _approvedIDs[msg.sender][approvedSenderIDs[i]];
         }
@@ -78,5 +88,26 @@ contract FeeCharge is IFeeCharge {
         uint256 newBalance = balance - amount;
         _userBalance[from] = newBalance;
         to.transfer(amount);
+    }
+
+    /// Function to check if fee charge operation can be performed.
+    function canPayFee(address payer, bytes32 senderID, uint256 amount) external view returns (bool) {
+        /// Check if the msg.sender is able to charge fee.
+        if (!_canChargeFee[msg.sender]) {
+            return false;
+        }
+
+        /// Check if the payer have enough balance.
+        uint256 balance = _userBalance[payer];
+        if (balance < amount) {
+            return false;
+        }
+
+        /// Check if the payer approved fee charge for the senderID.
+        if (!_approvedIDs[payer][senderID]) {
+            return false;
+        }
+
+        return true;
     }
 }

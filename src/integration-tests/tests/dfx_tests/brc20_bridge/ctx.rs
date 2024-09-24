@@ -5,15 +5,17 @@ use std::time::Duration;
 use alloy_sol_types::SolCall;
 use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
-use brc20_bridge::brc20_info::Brc20Tick;
 use brc20_bridge::interface::{DepositError, GetAddressError};
-use brc20_bridge::ops::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20DepositRequestData};
-use brc20_bridge::state::{Brc20BridgeConfig, SchnorrKeyIds};
+use brc20_bridge::ops::Brc20DepositRequestData;
 use bridge_client::BridgeCanisterClient;
+use bridge_did::brc20_info::Brc20Tick;
+use bridge_did::event_data::MinterNotificationType;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
+use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::MinterNotificationType;
+use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -204,7 +206,7 @@ impl Brc20Context {
         let bridge = context.canisters().brc20_bridge();
 
         let init_args = BridgeInitData {
-            evm_principal: context.canisters().evm(),
+            evm_link: EvmLink::Ic(context.canisters().evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: SigningKeyId::Dfx,
             },

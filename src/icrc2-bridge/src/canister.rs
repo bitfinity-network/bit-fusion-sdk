@@ -1,6 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::mint_tx::SendMintTxService;
+use bridge_canister::runtime::service::sing_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -21,13 +24,16 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::IcrcBridgeOp;
+use crate::ops::{
+    IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
+};
 use crate::state::IcrcState;
 
 #[cfg(feature = "export-api")]
 mod inspect;
 
-pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOp>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<IcrcBridgeOpImpl>>>;
 
 /// A canister to transfer funds between IC token canisters and EVM canister contracts.
 #[derive(Canister, Clone)]
@@ -71,7 +77,7 @@ impl Icrc2BridgeCanister {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, IcrcBridgeOp)> {
+    ) -> Vec<(OperationId, IcrcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -84,7 +90,7 @@ impl Icrc2BridgeCanister {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, IcrcBridgeOp)> {
+    ) -> Option<(OperationId, IcrcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -96,19 +102,20 @@ impl Icrc2BridgeCanister {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<IcrcBridgeOp>> {
+    ) -> Option<OperationLog<IcrcBridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
             .get_log(operation_id)
     }
 
+    /// Returns all memos for a given user_id.
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, IcrcBridgeOp)> {
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_operations_by_memo(&memo)
+            .get_memos_by_user_address(&user_id)
     }
 
     /// Adds the provided principal to the whitelist.
@@ -200,9 +207,33 @@ fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
     Ok(())
 }
 
+fn init_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(ConfigStorage::get());
+    let state = runtime.state();
+
+    let sign_orders_handler = IcrcMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
+
+    let mint_tx_handler = IcrcMintTxHandler::new(state.clone());
+    let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
+
+    let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SIGN_MINT_ORDER_SERVICE_ID,
+        sign_mint_orders_service,
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SEND_MINT_TX_SERVICE_ID,
+        mint_tx_service,
+    );
+
+    Rc::new(RefCell::new(runtime))
+}
+
 thread_local! {
-    pub static RUNTIME: SharedRuntime =
-        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    pub static RUNTIME: SharedRuntime = init_runtime();
 
     pub static ICRC_STATE: Rc<RefCell<IcrcState>> = Rc::default();
 }
@@ -211,7 +242,7 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<IcrcBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<IcrcBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 
@@ -221,6 +252,7 @@ pub fn get_icrc_state() -> Rc<RefCell<IcrcState>> {
 
 #[cfg(test)]
 mod test {
+    use bridge_did::evm_link::EvmLink;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
@@ -242,7 +274,7 @@ mod test {
 
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::from_slice(&[2; 20]),
+            evm_link: EvmLink::Ic(Principal::from_slice(&[2; 20])),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },

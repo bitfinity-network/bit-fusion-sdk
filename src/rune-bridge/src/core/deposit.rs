@@ -1,29 +1,31 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::Debug;
+use std::future::Future;
 use std::rc::Rc;
 
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Network};
-use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::id256::Id256;
 use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::runes::{RuneInfo, RuneName, RuneToWrap};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
 use serde::Serialize;
 
-use super::index_provider::IcHttpClient;
+use super::index_provider::get_indexer;
 use crate::canister::{get_rune_state, get_runtime_state};
-use crate::core::index_provider::{OrdIndexProvider, RuneIndexProvider};
+use crate::core::index_provider::RuneIndexProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, RuneInputs};
-use crate::core::utxo_handler::{RuneToWrap, UtxoHandler, UtxoHandlerError};
+use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
 use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UnspentUtxoInfo;
-use crate::ops::RuneBridgeOp;
-use crate::rune_info::{RuneInfo, RuneName};
+use crate::ops::RuneBridgeOpImpl;
 use crate::state::RuneState;
 
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
@@ -112,22 +114,20 @@ impl RuneDepositPayload {
     }
 }
 
-pub(crate) struct RuneDeposit<
-    UTXO: UtxoProvider = IcUtxoProvider,
-    INDEX: RuneIndexProvider = OrdIndexProvider<IcHttpClient>,
-> {
+pub(crate) struct RuneDeposit<UTXO: UtxoProvider = IcUtxoProvider> {
     rune_state: Rc<RefCell<RuneState>>,
-    runtime_state: RuntimeState<RuneBridgeOp>,
+    runtime_state: RuntimeState<RuneBridgeOpImpl>,
     network: Network,
     signer: BtcSignerType,
     utxo_provider: UTXO,
-    index_provider: INDEX,
+    indexers: Vec<Box<dyn RuneIndexProvider>>,
+    indexer_consensus_threshold: u8,
 }
 
-impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
+impl RuneDeposit<IcUtxoProvider> {
     pub fn new(
         state: Rc<RefCell<RuneState>>,
-        runtime_state: RuntimeState<RuneBridgeOp>,
+        runtime_state: RuntimeState<RuneBridgeOpImpl>,
     ) -> Result<Self, DepositError> {
         let state_ref = state.borrow();
 
@@ -139,7 +139,11 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
-        let indexer_urls = state_ref.indexer_urls();
+        let cache_timeout = state_ref.utxo_cache_timeout();
+
+        let indexer_configs = state_ref.indexers_config();
+        let indexers = indexer_configs.into_iter().map(get_indexer).collect();
+
         let signer = state_ref
             .btc_signer(&signer_strategy)
             .ok_or(DepositError::SignerNotInitialized)?;
@@ -152,27 +156,29 @@ impl RuneDeposit<IcUtxoProvider, OrdIndexProvider<IcHttpClient>> {
             runtime_state,
             network,
             signer,
-            utxo_provider: IcUtxoProvider::new(ic_network),
-            index_provider: OrdIndexProvider::new(
-                IcHttpClient {},
-                indexer_urls,
-                consensus_threshold,
-            ),
+            utxo_provider: IcUtxoProvider::new(ic_network, cache_timeout),
+            indexers,
+            indexer_consensus_threshold: consensus_threshold,
         })
     }
 
-    pub fn get(runtime_state: RuntimeState<RuneBridgeOp>) -> Result<Self, DepositError> {
+    pub fn get(runtime_state: RuntimeState<RuneBridgeOpImpl>) -> Result<Self, DepositError> {
         Self::new(get_rune_state(), runtime_state)
     }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneInputProvider for RuneDeposit<UTXO, INDEX> {
+impl<UTXO: UtxoProvider> RuneInputProvider for RuneDeposit<UTXO> {
     async fn get_inputs(&self, dst_address: &H160) -> Result<RuneInputs, GetInputsError> {
         let transit_address = self.get_transit_address(dst_address).await?;
         let utxos = self.get_deposit_utxos(&transit_address).await?.utxos;
         let mut inputs = RuneInputs::default();
         for utxo in utxos {
-            let amounts = self.index_provider.get_rune_amounts(&utxo).await?;
+            let amounts = self
+                .get_indexer_consensus(|indexer| {
+                    let utxo = utxo.clone();
+                    async move { indexer.get_rune_amounts(&utxo).await }
+                })
+                .await?;
             if !amounts.is_empty() {
                 inputs.inputs.push(RuneInput {
                     utxo,
@@ -195,7 +201,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneInputProvider for RuneDep
     }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<UTXO, INDEX> {
+impl<UTXO: UtxoProvider> UtxoHandler for RuneDeposit<UTXO> {
     async fn check_confirmations(
         &self,
         dst_address: &H160,
@@ -267,7 +273,7 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> UtxoHandler for RuneDeposit<U
     }
 }
 
-impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
+impl<UTXO: UtxoProvider> RuneDeposit<UTXO> {
     pub async fn get_deposit_utxos(
         &self,
         transit_address: &Address,
@@ -314,7 +320,10 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         &self,
         rune_amounts: &HashMap<RuneName, u128>,
     ) -> Option<Vec<(RuneInfo, u128)>> {
-        let rune_list = self.index_provider.get_rune_list().await.ok()?;
+        let rune_list = self
+            .get_indexer_consensus(|indexer| async move { indexer.get_rune_list().await })
+            .await
+            .ok()?;
         let runes: HashMap<RuneName, RuneInfo> = rune_list
             .iter()
             .map(|(rune_id, spaced_rune, decimals)| {
@@ -343,6 +352,63 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         self.rune_state.borrow_mut().update_rune_list(runes);
 
         Some(infos)
+    }
+
+    async fn get_indexer_consensus<
+        'a,
+        T: Debug + PartialEq,
+        E: Error,
+        F: Future<Output = Result<T, E>> + 'a,
+    >(
+        &'a self,
+        request: impl Fn(&'a dyn RuneIndexProvider) -> F,
+    ) -> Result<T, GetInputsError> {
+        let consensus_threshold = self.indexer_consensus_threshold;
+        let mut first_result = None;
+        let mut requested = 0;
+        let mut received_responses = 0;
+        for indexer in &self.indexers {
+            let result = request(&**indexer).await;
+            requested += 1;
+            if let Ok(response) = result {
+                match first_result {
+                    None => first_result = Some(response),
+                    Some(ref r) => {
+                        received_responses += 1;
+                        if *r != response {
+                            return Err(GetInputsError::IndexersDisagree {
+                                first_response: format!("{r:?}"),
+                                another_response: format!("{response:?}"),
+                            });
+                        }
+                    }
+                }
+            } else {
+                log::warn!("Indexer responded with {result:?}");
+                if (self.indexers.len() as u8).saturating_sub(requested)
+                    < consensus_threshold.saturating_sub(received_responses)
+                {
+                    return Err(GetInputsError::InsufficientConsensus {
+                        received_responses: received_responses as usize,
+                        required_responses: consensus_threshold,
+                        checked_indexers: requested as usize,
+                    });
+                }
+            }
+        }
+
+        match first_result {
+            Some(v) => Ok(v),
+            None => {
+                // This means that `consensus_threshold` is 0 and none of the indexers are online
+                // or that there are not indexers configured
+                Err(GetInputsError::InsufficientConsensus {
+                    received_responses: 0,
+                    required_responses: consensus_threshold,
+                    checked_indexers: self.indexers.len(),
+                })
+            }
+        }
     }
 
     pub fn create_unsigned_mint_order(
@@ -386,21 +452,6 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
         }
     }
 
-    pub async fn sign_mint_order(
-        &self,
-        mint_order: MintOrder,
-    ) -> Result<SignedMintOrder, DepositError> {
-        let signer = self.runtime_state.get_signer().map_err(|err| {
-            DepositError::Unavailable(format!("cannot initialize signer: {err:?}"))
-        })?;
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| DepositError::Sign(format!("{err:?}")))?;
-
-        Ok(signed_mint_order)
-    }
-
     fn filter_out_used_utxos(
         &self,
         get_utxos_response: &mut GetUtxosResponse,
@@ -419,5 +470,273 @@ impl<UTXO: UtxoProvider, INDEX: RuneIndexProvider> RuneDeposit<UTXO, INDEX> {
     fn check_already_used_utxo(v: &UnspentUtxoInfo, utxo: &Utxo) -> bool {
         v.tx_input_info.outpoint.txid.as_byte_array()[..] == utxo.outpoint.txid
             && v.tx_input_info.outpoint.vout == utxo.outpoint.vout
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+    use std::sync::atomic::{AtomicU8, Ordering};
+
+    use async_trait::async_trait;
+    use bitcoin::secp256k1::Secp256k1;
+    use bitcoin::{FeeRate, PrivateKey, Transaction};
+    use bridge_canister::memory::{memory_by_id, StableMemory};
+    use bridge_canister::operation_store::OperationsMemory;
+    use bridge_canister::runtime::state::config::ConfigStorage;
+    use bridge_canister::runtime::state::{SharedConfig, State};
+    use ic_stable_structures::MemoryId;
+    use ord_rs::wallet::LocalSigner;
+    use ordinals::{RuneId, SpacedRune};
+
+    use super::*;
+    use crate::interface::WithdrawError;
+
+    fn op_memory() -> OperationsMemory<StableMemory> {
+        OperationsMemory {
+            id_counter: memory_by_id(MemoryId::new(1)),
+            incomplete_operations: memory_by_id(MemoryId::new(2)),
+            operations_log: memory_by_id(MemoryId::new(3)),
+            operations_map: memory_by_id(MemoryId::new(4)),
+            memo_operations_map: memory_by_id(MemoryId::new(5)),
+        }
+    }
+
+    fn config() -> SharedConfig {
+        Rc::new(RefCell::new(ConfigStorage::default(memory_by_id(
+            MemoryId::new(5),
+        ))))
+    }
+
+    fn test_state() -> RuntimeState<RuneBridgeOpImpl> {
+        Rc::new(RefCell::new(State::default(op_memory(), config())))
+    }
+
+    fn signer() -> BtcSignerType {
+        let s = Secp256k1::new();
+        let keypair = s.generate_keypair(&mut rand::thread_rng());
+        let signer = LocalSigner::new(PrivateKey::new(keypair.0, Network::Bitcoin));
+
+        BtcSignerType::Local(signer)
+    }
+
+    struct TestUtxoProvider;
+    impl UtxoProvider for TestUtxoProvider {
+        async fn get_utxos(&self, _address: &Address) -> Result<GetUtxosResponse, GetInputsError> {
+            unimplemented!()
+        }
+
+        async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError> {
+            unimplemented!()
+        }
+
+        async fn send_tx(&self, _transaction: &Transaction) -> Result<(), WithdrawError> {
+            unimplemented!()
+        }
+    }
+
+    struct TestIndexerProvider {
+        value: u8,
+    }
+
+    #[async_trait(?Send)]
+    impl RuneIndexProvider for TestIndexerProvider {
+        async fn get_rune_amounts(
+            &self,
+            _utxo: &Utxo,
+        ) -> Result<HashMap<RuneName, u128>, GetInputsError> {
+            Ok([(RuneName::from_str("A").unwrap(), self.value as u128)].into())
+        }
+
+        async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, GetInputsError> {
+            unimplemented!()
+        }
+    }
+
+    fn test_ctx(indexers_count: u8, consensus_threshold: u8) -> RuneDeposit<TestUtxoProvider> {
+        test_ctx_with_responses(
+            &(0..indexers_count).collect::<Vec<u8>>(),
+            consensus_threshold,
+        )
+    }
+
+    fn test_ctx_with_responses(
+        responses: &[u8],
+        consensus_threshold: u8,
+    ) -> RuneDeposit<TestUtxoProvider> {
+        let mut indexers: Vec<Box<dyn RuneIndexProvider>> = vec![];
+        for v in responses {
+            indexers.push(Box::new(TestIndexerProvider { value: *v }));
+        }
+
+        RuneDeposit {
+            rune_state: Rc::new(RefCell::new(Default::default())),
+            runtime_state: test_state(),
+            network: Network::Bitcoin,
+            signer: signer(),
+            utxo_provider: TestUtxoProvider,
+            indexers,
+            indexer_consensus_threshold: consensus_threshold,
+        }
+    }
+
+    #[tokio::test]
+    async fn get_consensus_single_indexer() {
+        let deposit = test_ctx(1, 1);
+        let result = deposit
+            .get_indexer_consensus(|_| async { Ok::<_, GetInputsError>(true) })
+            .await;
+        assert_eq!(result, Ok(true));
+    }
+
+    #[tokio::test]
+    async fn get_consensus_single_indexer_offline() {
+        let deposit = test_ctx(1, 1);
+        let result = deposit
+            .get_indexer_consensus(|_| async {
+                Err::<bool, _>(GetInputsError::IndexerError("offline".to_string()))
+            })
+            .await;
+        assert_eq!(
+            result,
+            Err(GetInputsError::InsufficientConsensus {
+                received_responses: 0,
+                required_responses: 1,
+                checked_indexers: 1,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn get_consensus_multiple_indexers_agree() {
+        let deposit = test_ctx(5, 5);
+        let result = deposit
+            .get_indexer_consensus(|_| async { Ok::<_, GetInputsError>(true) })
+            .await;
+        assert_eq!(result, Ok(true));
+    }
+
+    #[tokio::test]
+    async fn get_consensus_multiple_indexers_disagree() {
+        let deposit = test_ctx(5, 5);
+        let result = deposit
+            .get_indexer_consensus(|indexer| async {
+                indexer.get_rune_amounts(&Utxo::default()).await
+            })
+            .await;
+        assert!(matches!(
+            result,
+            Err(GetInputsError::IndexersDisagree { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn get_consensus_multiple_indexers_one_disagree() {
+        let deposit = test_ctx_with_responses(&[1, 2, 1], 3);
+        let result = deposit
+            .get_indexer_consensus(|indexer| async {
+                indexer.get_rune_amounts(&Utxo::default()).await
+            })
+            .await;
+        assert!(matches!(
+            result,
+            Err(GetInputsError::IndexersDisagree { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn get_consensus_multiple_indexers_disagree_under_threshold() {
+        let deposit = test_ctx_with_responses(&[1, 2, 1], 2);
+        let result = deposit
+            .get_indexer_consensus(|indexer| async {
+                indexer.get_rune_amounts(&Utxo::default()).await
+            })
+            .await;
+        assert!(matches!(
+            result,
+            Err(GetInputsError::IndexersDisagree { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn get_consensus_no_indexers() {
+        let deposit = test_ctx(0, 0);
+        let result = deposit
+            .get_indexer_consensus(|_| async { Ok::<_, GetInputsError>(true) })
+            .await;
+        assert_eq!(
+            result,
+            Err(GetInputsError::InsufficientConsensus {
+                received_responses: 0,
+                required_responses: 0,
+                checked_indexers: 0,
+            })
+        )
+    }
+
+    #[tokio::test]
+    async fn get_consensus_threshold_larger_than_no_of_indexers() {
+        let deposit = test_ctx(3, 5);
+        let result = deposit
+            .get_indexer_consensus(|_| async { Ok::<_, GetInputsError>(true) })
+            .await;
+        assert_eq!(result, Ok(true))
+    }
+
+    #[tokio::test]
+    async fn get_consensus_all_indexers_are_requested() {
+        let deposit = test_ctx_with_responses(&[1, 1, 1, 1, 2], 4);
+        let result = deposit
+            .get_indexer_consensus(|indexer| async {
+                indexer.get_rune_amounts(&Utxo::default()).await
+            })
+            .await;
+        assert!(matches!(
+            result,
+            Err(GetInputsError::IndexersDisagree { .. })
+        ))
+    }
+
+    #[tokio::test]
+    async fn get_consensus_threshold_achieved() {
+        const THRESHOLD: u8 = 3;
+        let deposit = test_ctx(5, THRESHOLD);
+        let no_of_requests = AtomicU8::new(0);
+        let result = deposit
+            .get_indexer_consensus(|_| async {
+                let count = no_of_requests.fetch_add(1, Ordering::Relaxed);
+                if count > THRESHOLD {
+                    Err(GetInputsError::IndexerError("inevitable".to_string()))
+                } else {
+                    Ok(true)
+                }
+            })
+            .await;
+        assert_eq!(result, Ok(true))
+    }
+
+    #[tokio::test]
+    async fn get_consensus_threshold_not_achieved() {
+        const THRESHOLD: u8 = 3;
+        let deposit = test_ctx(5, THRESHOLD);
+        let no_of_requests = AtomicU8::new(0);
+        let result = deposit
+            .get_indexer_consensus(|_| async {
+                let count = no_of_requests.fetch_add(1, Ordering::Relaxed);
+                if count > THRESHOLD - 1 {
+                    Err(GetInputsError::IndexerError("inevitable".to_string()))
+                } else {
+                    Ok(true)
+                }
+            })
+            .await;
+        assert_eq!(
+            result,
+            Err(GetInputsError::InsufficientConsensus {
+                received_responses: 2,
+                required_responses: THRESHOLD,
+                checked_indexers: 5,
+            })
+        );
     }
 }

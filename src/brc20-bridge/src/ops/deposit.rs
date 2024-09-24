@@ -1,54 +1,21 @@
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::operations::{Brc20BridgeDepositOp, DepositRequest};
 use bridge_did::order::{MintOrder, SignedMintOrder};
-use bridge_utils::bft_events::MintedEventData;
-use candid::{CandidType, Deserialize};
-use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
-use serde::Serialize;
 
-use super::Brc20BridgeOp;
-use crate::brc20_info::Brc20Tick;
+use super::{Brc20BridgeOp, Brc20BridgeOpImpl};
 use crate::core::deposit::Brc20Deposit;
 
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub struct DepositRequest {
-    pub amount: u128,
-    pub brc20_tick: Brc20Tick,
-    pub dst_address: H160,
-    pub dst_token: H160,
-}
+pub struct Brc20BridgeDepositOpImpl;
 
-/// BRC20 bridge deposit operations
-#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
-pub enum Brc20BridgeDepositOp {
-    /// Await for deposit inputs
-    AwaitInputs(DepositRequest),
-    /// Await for minimum IC confirmations
-    AwaitConfirmations {
-        deposit: DepositRequest,
-        utxos: Vec<Utxo>,
-    },
-    /// Sign the provided mint order
-    SignMintOrder(MintOrder),
-    /// Send the signed mint order to the bridge
-    SendMintOrder(SignedMintOrder),
-    /// Confirm the mint order
-    ConfirmMintOrder {
-        signed_mint_order: SignedMintOrder,
-        tx_id: H256,
-    },
-    /// Mint order confirmed status
-    MintOrderConfirmed { data: MintedEventData },
-}
-
-impl Brc20BridgeDepositOp {
+impl Brc20BridgeDepositOpImpl {
     /// Await for deposit inputs
     pub async fn await_inputs(
-        state: RuntimeState<Brc20BridgeOp>,
+        state: RuntimeState<Brc20BridgeOpImpl>,
         request: DepositRequest,
-    ) -> BftResult<Brc20BridgeOp> {
+    ) -> BftResult<Brc20BridgeOpImpl> {
         let deposit = Brc20Deposit::get(state.clone())
             .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
         let utxos = deposit
@@ -62,19 +29,22 @@ impl Brc20BridgeDepositOp {
             return Err(Error::FailedToProgress("no inputs".to_string()));
         }
 
-        Ok(Brc20BridgeOp::Deposit(Self::AwaitConfirmations {
-            deposit: request,
-            utxos,
-        }))
+        Ok(
+            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitConfirmations {
+                deposit: request,
+                utxos,
+            })
+            .into(),
+        )
     }
 
     /// Await for minimum IC confirmations
     pub async fn await_confirmations(
-        state: RuntimeState<Brc20BridgeOp>,
+        state: RuntimeState<Brc20BridgeOpImpl>,
         deposit_request: DepositRequest,
         utxos: Vec<Utxo>,
         nonce: u32,
-    ) -> BftResult<Brc20BridgeOp> {
+    ) -> BftResult<Brc20BridgeOpImpl> {
         let DepositRequest {
             amount,
             brc20_tick,
@@ -120,17 +90,15 @@ impl Brc20BridgeDepositOp {
                 Error::FailedToProgress(format!("cannot mark utxos as used: {err:?}"))
             })?;
 
-        Ok(Brc20BridgeOp::Deposit(Self::SignMintOrder(
-            unsigned_mint_order,
-        )))
+        Ok(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SignMintOrder(unsigned_mint_order)).into())
     }
 
     /// Sign the provided mint order
     pub async fn sign_mint_order(
-        ctx: RuntimeState<Brc20BridgeOp>,
+        ctx: RuntimeState<Brc20BridgeOpImpl>,
         nonce: u32,
         mut mint_order: MintOrder,
-    ) -> BftResult<Brc20BridgeOp> {
+    ) -> BftResult<Brc20BridgeOpImpl> {
         // update nonce
         mint_order.nonce = nonce;
 
@@ -141,21 +109,22 @@ impl Brc20BridgeDepositOp {
             .await
             .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
 
-        Ok(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(
-            signed,
-        )))
+        Ok(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(signed)).into())
     }
 
     /// Send the signed mint order to the bridge
     pub async fn send_mint_order(
-        ctx: RuntimeState<Brc20BridgeOp>,
+        ctx: RuntimeState<Brc20BridgeOpImpl>,
         order: SignedMintOrder,
-    ) -> BftResult<Brc20BridgeOp> {
+    ) -> BftResult<Brc20BridgeOpImpl> {
         let tx_id = ctx.send_mint_transaction(&order).await?;
 
-        Ok(Brc20BridgeOp::Deposit(Self::ConfirmMintOrder {
-            signed_mint_order: order,
-            tx_id,
-        }))
+        Ok(
+            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder {
+                signed_mint_order: order,
+                tx_id,
+            })
+            .into(),
+        )
     }
 }

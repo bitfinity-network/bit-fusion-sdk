@@ -1,4 +1,4 @@
-name: "Build and Deploy"
+name: 'Build and Deploy'
 
 on:
   workflow_call:
@@ -6,26 +6,26 @@ on:
       installation-method:
         required: true
         type: string
-        description: "installation method, can be any of create, reinstall, upgrade"
+        description: 'installation method, can be any of create, reinstall, upgrade'
       network:
         type: string
         required: false
-        description: "network where canister will be deployed to"
-        default: "ic"
+        description: 'network where canister will be deployed to'
+        default: 'ic'
       wallet:
         type: string
         required: false
-        description: "owner wallet for canister"
-        default: "4cfzs-sqaaa-aaaak-aegca-cai"
+        description: 'owner wallet for canister'
+        default: '4cfzs-sqaaa-aaaak-aegca-cai'
       chain_id:
         type: number
         required: false
-        description: "chain id"
+        description: 'chain id'
         default: 355113
       force_deploy:
         type: boolean
         required: false
-        description: "if true, force deploy ignoring main branch"
+        description: 'if true, force deploy ignoring main branch'
         default: false
 
     secrets:
@@ -57,6 +57,9 @@ jobs:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
 
+      - name: Install Just command runner
+        uses: extractions/setup-just@v1
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -75,47 +78,53 @@ jobs:
           shared-key: ${{ github.repository }}
           save-if: ${{ github.ref_type != 'tag' }}
 
+      - name: install ic-wasm
+        run: |
+          wget https://github.com/dfinity/ic-wasm/releases/download/0.8.1/ic-wasm-linux64 -O /usr/local/bin/ic-wasm
+          chmod +x /usr/local/bin/ic-wasm
+
+      - name: install candid-extractor
+        run: |
+          wget https://github.com/dfinity/cdk-rs/releases/download/candid-extractor-v0.1.4/candid-extractor-x86_64-unknown-linux-gnu.tar.gz -O /tmp/candid-extractor-x86_64-unknown-linux-gnu.tar.gz
+          tar -xvf /tmp/candid-extractor-x86_64-unknown-linux-gnu.tar.gz -C /usr/local/bin
+          chmod +x /usr/local/bin/candid-extractor
+
       - name: setup environment
         run: |
           export RUST_BACKTRACE="full"
-          cargo install ic-wasm
-          # TO BE FIXED: https://infinityswap.atlassian.net/browse/EPROD-958
-          cargo install icx-proxy --version 0.10.1
           sudo apt update
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates
           mkdir -p /usr/local/share/ca-certificates/
           sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
           sudo update-ca-certificates --fresh --verbose
 
-      - name: rustfmt
+      - name: build solidity contracts
         run: |
-          cargo fmt --all --check
+          just build_solidity
 
-      - name: clippy
+      - name: check rust code style
         run: |
-          cargo clippy --all-features --all-targets -- -D warnings
+          just check_code
 
-      - name: build
+      - name: build artifacts
         run: |
-          ./scripts/build_solidity.sh
-
-          export ETHEREUM_GENESIS_ACCOUNTS=${{ inputs.ethereum_genesis_accounts }}
-          ./scripts/build.sh
+          just build_all_canisters
 
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
-          ./scripts/get_dependencies.sh
+          just fetch_all_canisters
 
       - name: test
         if: ${{ !inputs.skip-test }}
         run: |
-          ./scripts/tests/tests.sh
+          just test_all
 
       - name: 32bits test
         if: ${{ !inputs.skip-test }}
         run: |
-          ./scripts/tests/tests_i686.sh
+          just test_i686
 
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
-          ./scripts/tests/dfx_tests.sh --github-ci --docker
+          just dfx_test
+          # ./scripts/tests/dfx_tests.sh --github-ci --docker

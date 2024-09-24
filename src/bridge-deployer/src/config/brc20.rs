@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use brc20_bridge::state::SchnorrKeyIds;
+use bridge_did::init::brc20::SchnorrKeyIds;
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<Brc20BridgeConfig> for brc20_bridge::state::Brc20BridgeConfig {
+impl From<Brc20BridgeConfig> for bridge_did::init::brc20::Brc20BridgeConfig {
     fn from(value: Brc20BridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),

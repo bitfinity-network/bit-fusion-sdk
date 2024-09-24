@@ -1,5 +1,3 @@
-pub mod schnorr;
-
 use std::cell::RefCell;
 
 use async_trait::async_trait;
@@ -8,16 +6,16 @@ use bitcoin::bip32::{ChildNumber, DerivationPath, Error as Bip32Error, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey, XOnlyPublicKey};
+use bridge_did::schnorr::{
+    ManagementCanisterSchnorrPublicKeyReply, ManagementCanisterSchnorrPublicKeyRequest,
+    ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId,
+};
 use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::{BtcTxSigner, OrdError, OrdResult};
-use schnorr::{
-    ManagementCanisterSchnorrPublicKeyReply, ManagementCanisterSchnorrPublicKeyRequest,
-    ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId,
-};
 use thiserror::Error;
 
 use crate::state::{Brc20State, MasterKey};

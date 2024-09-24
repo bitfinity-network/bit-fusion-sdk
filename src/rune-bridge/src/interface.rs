@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bridge_did::order::SignedMintOrder;
+use bridge_did::runes::RuneName;
 use candid::CandidType;
 use did::H256;
 use ordinals::Pile;
@@ -8,8 +9,6 @@ use serde::Deserialize;
 
 use crate::core::deposit::RuneDepositPayload;
 use crate::key::KeyError;
-use crate::rune_info::RuneName;
-
 #[derive(Debug, Clone, CandidType, Deserialize, PartialEq, Eq)]
 pub struct PendingUtxo {}
 
@@ -99,6 +98,11 @@ pub enum DepositError {
     /// Error while signing the mint order.
     Sign(String),
     Evm(String),
+    Other(String),
+    NoConsensus {
+        first_response: String,
+        another_response: String,
+    },
 }
 
 impl From<KeyError> for DepositError {

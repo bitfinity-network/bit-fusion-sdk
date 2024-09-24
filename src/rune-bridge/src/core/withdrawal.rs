@@ -2,13 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Amount, FeeRate, Network, OutPoint, Transaction, TxOut, Txid};
+use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
-use bridge_utils::bft_events::BurntEventData;
-use candid::types::{Serializer, Type};
-use candid::{CandidType, Deserialize};
+use bridge_did::runes::RuneWithdrawalPayload;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
@@ -16,26 +14,17 @@ use ord_rs::fees::{estimate_edict_transaction_fees, EstimateEdictTxFeesArgs};
 use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
 use ordinals::RuneId;
-use serde::{Deserializer, Serialize};
 
 use crate::canister::{get_rune_state, get_runtime_state};
 use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::WithdrawError;
 use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
-use crate::rune_info::RuneInfo;
 use crate::state::RuneState;
 
-#[derive(Debug, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuneWithdrawalPayload {
-    pub rune_info: RuneInfo,
-    pub amount: u128,
-    pub request_ts: u64,
-    pub sender: H160,
-    pub dst_address: String,
-}
+pub struct RuneWithdrawalPayloadImpl(pub RuneWithdrawalPayload);
 
-impl RuneWithdrawalPayload {
+impl RuneWithdrawalPayloadImpl {
     pub fn new(burnt_event_data: BurntEventData, state: &RuneState) -> Result<Self, WithdrawError> {
         let BurntEventData {
             recipient_id,
@@ -80,71 +69,13 @@ impl RuneWithdrawalPayload {
             )));
         };
 
-        Ok(Self {
+        Ok(Self(RuneWithdrawalPayload {
             rune_info,
             amount,
             request_ts: ic::time(),
             sender,
             dst_address: address.assume_checked().to_string(),
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DidTransaction(Transaction);
-
-impl CandidType for DidTransaction {
-    fn _ty() -> Type {
-        <Vec<u8> as CandidType>::_ty()
-    }
-
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::Error;
-        let mut bytes = vec![];
-        self.0.consensus_encode(&mut bytes).map_err(Error::custom)?;
-
-        bytes.idl_serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for DidTransaction {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes = <Vec<u8> as Deserialize<'de>>::deserialize(deserializer)?;
-        let tx =
-            Transaction::consensus_decode(&mut &bytes[..]).map_err(serde::de::Error::custom)?;
-
-        Ok(Self(tx))
-    }
-}
-
-impl Serialize for DidTransaction {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::Error;
-
-        let mut bytes = vec![];
-        self.0.consensus_encode(&mut bytes).map_err(Error::custom)?;
-        serializer.serialize_bytes(&bytes)
-    }
-}
-
-impl From<Transaction> for DidTransaction {
-    fn from(value: Transaction) -> Self {
-        Self(value)
-    }
-}
-
-impl From<DidTransaction> for Transaction {
-    fn from(value: DidTransaction) -> Self {
-        value.0
+        }))
     }
 }
 
@@ -167,6 +98,7 @@ impl Withdrawal<IcUtxoProvider> {
 
         let network = state_ref.network();
         let ic_network = state_ref.ic_btc_network();
+        let cache_timeout = state_ref.utxo_cache_timeout();
         let signer = state_ref
             .btc_signer(&signing_strategy)
             .ok_or(WithdrawError::SignerNotInitialized)?;
@@ -177,7 +109,7 @@ impl Withdrawal<IcUtxoProvider> {
             state,
             network,
             signer,
-            utxo_provider: IcUtxoProvider::new(ic_network),
+            utxo_provider: IcUtxoProvider::new(ic_network, cache_timeout),
         })
     }
 

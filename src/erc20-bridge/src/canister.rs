@@ -6,14 +6,15 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
+use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
 use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
-use bridge_utils::evm_bridge::BridgeSide;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -24,13 +25,13 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::{self, Erc20BridgeOp, Erc20OpStage};
+use crate::ops::{self, Erc20BridgeOpImpl};
 use crate::state::{BaseEvmSettings, SharedEvmState};
 
 #[cfg(feature = "export-api")]
 pub mod inspect;
 
-pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOp>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Erc20BridgeOpImpl>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct Erc20Bridge {
@@ -69,7 +70,8 @@ impl Erc20Bridge {
             ic::spawn(get_base_evm_state().refresh_base_evm_params());
         }
 
-        get_runtime().borrow_mut().run();
+        let runtime = get_runtime();
+        runtime.borrow_mut().run();
     }
 
     #[update]
@@ -89,7 +91,7 @@ impl Erc20Bridge {
         &self,
         wallet_address: H160,
         pagination: Option<Pagination>,
-    ) -> Vec<(OperationId, Erc20BridgeOp)> {
+    ) -> Vec<(OperationId, Erc20BridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
@@ -102,19 +104,20 @@ impl Erc20Bridge {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, Erc20BridgeOp)> {
+    ) -> Option<(OperationId, Erc20BridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
             .get_operation_by_memo_and_user(&memo, &user_id)
     }
 
+    /// Returns all memos for a given user_id.
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, Erc20BridgeOp)> {
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_operations_by_memo(&memo)
+            .get_memos_by_user_address(&user_id)
     }
 
     /// Returns log of an operation by its ID.
@@ -122,7 +125,7 @@ impl Erc20Bridge {
     pub fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> Option<OperationLog<Erc20BridgeOp>> {
+    ) -> Option<OperationLog<Erc20BridgeOpImpl>> {
         get_runtime_state()
             .borrow()
             .operations
@@ -216,10 +219,10 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
             })?;
 
             let op_id = OperationId::new(nonce as _);
-            let operation = Erc20BridgeOp {
+            let operation = Erc20BridgeOpImpl(Erc20BridgeOp {
                 side: BridgeSide::Wrapped,
                 stage: Erc20OpStage::SignMintOrder(order),
-            };
+            });
 
             let memo = event.memo();
 
@@ -251,10 +254,10 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
                 return Err(Error::OperationNotFound(OperationId::new(event.nonce as _)));
             };
 
-            let confirmed = Erc20BridgeOp {
+            let confirmed = Erc20BridgeOpImpl(Erc20BridgeOp {
                 side: BridgeSide::Base,
                 stage: Erc20OpStage::TokenMintConfirmed(event),
-            };
+            });
             get_runtime_state()
                 .borrow_mut()
                 .operations
@@ -270,14 +273,15 @@ thread_local! {
     pub static RUNTIME: SharedRuntime =
         Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
 
-    pub static BASE_EVM_STATE: SharedEvmState = SharedEvmState::default();
+    pub static BASE_EVM_STATE: SharedEvmState =
+        SharedEvmState::default(get_runtime_state().borrow().services.clone());
 }
 
 pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<Erc20BridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<Erc20BridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 

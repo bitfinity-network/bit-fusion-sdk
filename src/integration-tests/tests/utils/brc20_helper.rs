@@ -8,7 +8,7 @@ use bitcoin::{
     secp256k1, Address, Amount, OutPoint, PrivateKey, ScriptBuf, Sequence, Transaction, TxIn,
     TxOut, Txid, Witness,
 };
-use brc20_bridge::brc20_info::Brc20Tick;
+use bridge_did::brc20_info::Brc20Tick;
 use ord_rs::constants::POSTAGE;
 use ord_rs::wallet::{CreateCommitTransactionArgsV2, RevealTransactionArgs};
 use ord_rs::{Brc20, OrdTransactionBuilder, SignCommitTransactionArgs, Utxo};

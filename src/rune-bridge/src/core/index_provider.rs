@@ -1,8 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
 use std::str::FromStr as _;
 
+use async_trait::async_trait;
+use bridge_did::init::IndexerType;
+use bridge_did::runes::RuneName;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
@@ -13,8 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::rune_inputs::GetInputsError;
 use crate::interface::{DepositError, OutputResponse};
-use crate::rune_info::RuneName;
 
+#[async_trait(?Send)]
 pub(crate) trait RuneIndexProvider {
     /// Get amounts of all runes in the given UTXO.
     async fn get_rune_amounts(
@@ -22,7 +25,13 @@ pub(crate) trait RuneIndexProvider {
         utxo: &Utxo,
     ) -> Result<HashMap<RuneName, u128>, GetInputsError>;
     /// Get the list of all runes in the indexer
-    async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, DepositError>;
+    async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, GetInputsError>;
+}
+
+pub(crate) fn get_indexer(indexer_type: IndexerType) -> Box<dyn RuneIndexProvider> {
+    match indexer_type {
+        IndexerType::OrdHttp { url } => Box::new(OrdIndexProvider::new(IcHttpClient, url)),
+    }
 }
 
 const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
@@ -34,7 +43,7 @@ pub trait HttpClient {
         &self,
         url: &str,
         uri: &str,
-    ) -> impl Future<Output = Result<R, DepositError>>;
+    ) -> impl Future<Output = Result<R, DepositError>> + Send;
 }
 
 /// HTTP client implementation for the Internet Computer canisters.
@@ -96,73 +105,19 @@ struct RunesResponse {
 /// Implementation of the `RuneIndexProvider` trait that uses the `HttpClient` to make requests to
 pub struct OrdIndexProvider<C: HttpClient> {
     client: C,
-    indexer_urls: HashSet<String>,
-    /// Minimum quantity of indexer nodes required to reach agreement on a
-    /// request
-    pub indexer_consensus_threshold: u8,
+    url: String,
 }
 
 impl<C> OrdIndexProvider<C>
 where
     C: HttpClient,
 {
-    pub fn new(client: C, indexer_urls: HashSet<String>, indexer_consensus_threshold: u8) -> Self {
-        Self {
-            client,
-            indexer_urls,
-            indexer_consensus_threshold,
-        }
-    }
-
-    /// Get consensus response from the indexer.
-    ///
-    /// All indexers must return the same response for the same input, other
-    /// the function will return an error.
-    async fn get_consensus_response<T>(&self, uri: &str) -> Result<T, GetInputsError>
-    where
-        T: Clone + DeserializeOwned + PartialEq + Debug,
-    {
-        let mut failed_urls = Vec::with_capacity(self.indexer_urls.len());
-        let mut responses: Vec<(String, T)> = Vec::new();
-        let mut indexers_agree = true;
-
-        for url in &self.indexer_urls {
-            match self.client.http_request::<T>(url, uri).await {
-                Ok(response) => {
-                    if !responses.is_empty() && responses[0].1 != response {
-                        indexers_agree = false;
-                    }
-
-                    responses.push((url.clone(), response));
-                }
-                Err(e) => {
-                    log::warn!("Failed to get response from indexer {}: {:?}", url, e);
-                    failed_urls.push(url.clone());
-                }
-            }
-        }
-
-        if responses.len() < self.indexer_consensus_threshold as usize {
-            Err(GetInputsError::InsufficientConsensus {
-                received_responses: responses.len(),
-                required_responses: self.indexer_consensus_threshold,
-                checked_indexers: self.indexer_urls.len(),
-            })
-        } else if !indexers_agree {
-            // TODO: After https://infinityswap.atlassian.net/browse/EPROD-971 is done, return
-            // actual values here instead of formated response
-            Err(GetInputsError::IndexersDisagree {
-                indexer_responses: responses
-                    .into_iter()
-                    .map(|(url, response)| (url, format!("{response:?}")))
-                    .collect(),
-            })
-        } else {
-            Ok(responses.pop().expect("responses vector is empty").1)
-        }
+    pub fn new(client: C, url: String) -> Self {
+        Self { client, url }
     }
 }
 
+#[async_trait(?Send)]
 impl<C> RuneIndexProvider for OrdIndexProvider<C>
 where
     C: HttpClient,
@@ -175,7 +130,11 @@ where
         log::trace!("Requesting rune balances for utxo: {outpoint}",);
 
         let uri = format!("output/{outpoint}");
-        let response = self.get_consensus_response::<OutputResponse>(&uri).await?;
+        let response: OutputResponse = self
+            .client
+            .http_request(&self.url, &uri)
+            .await
+            .map_err(|err| GetInputsError::IndexerError(format!("{err:?}")))?;
 
         let amounts = response
             .runes
@@ -200,16 +159,17 @@ where
         Ok(amounts)
     }
 
-    async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, DepositError> {
+    async fn get_rune_list(&self) -> Result<Vec<(RuneId, SpacedRune, u8)>, GetInputsError> {
         let mut page = 0;
         let mut entries = vec![];
 
         loop {
             let uri = format!("runes/{page}");
             let response: RunesResponse = self
-                .get_consensus_response(&uri)
+                .client
+                .http_request(&self.url, &uri)
                 .await
-                .map_err(|err| DepositError::Unavailable(err.to_string()))?;
+                .map_err(|err| GetInputsError::IndexerError(format!("{err:?}")))?;
             entries.extend(response.entries);
 
             if let Some(next) = response.next {
@@ -301,11 +261,7 @@ mod tests {
         );
 
         let client = MockHttpClient { runes };
-        let provider = OrdIndexProvider::new(
-            client,
-            HashSet::from_iter(vec!["http://localhost:8080".into()]),
-            1,
-        );
+        let provider = OrdIndexProvider::new(client, "http://localhost:8080".into());
 
         let runes = provider.get_rune_list().await.unwrap();
         assert_eq!(runes.len(), 3);

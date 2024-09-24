@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
+use bridge_did::runes::{RuneInfo, RuneName};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_exports::ic_kit::RejectionCode;
 use thiserror::Error;
 
 use crate::key::KeyError;
-use crate::rune_info::{RuneInfo, RuneName};
-
 #[derive(Debug, Clone, Default)]
 pub(crate) struct RuneInput {
     pub utxo: Utxo,
@@ -42,9 +41,12 @@ pub(crate) enum GetInputsError {
     BtcAdapter(String),
     #[error("key error {0}")]
     KeyError(#[from] KeyError),
-    #[error("rune indexers returned different result for same request: {indexer_responses:?}")]
+    #[error("indexer responded with an error: {0}")]
+    IndexerError(String),
+    #[error("rune indexers returned different result for same request: {first_response}; {another_response}")]
     IndexersDisagree {
-        indexer_responses: Vec<(String, String)>,
+        first_response: String,
+        another_response: String,
     },
     #[error("insufficient consensus from rune indexers: {received_responses}/{required_responses} responses received, {checked_indexers} indexers checked")]
     InsufficientConsensus {

@@ -27,10 +27,10 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::BtcBridgeOp;
+use crate::ops::BtcBridgeOpImpl;
 use crate::state::{BtcConfig, State, WrappedTokenConfig};
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOp>>>;
+type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
@@ -94,19 +94,20 @@ impl BtcBridge {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, BtcBridgeOp)> {
+    ) -> Option<(OperationId, BtcBridgeOpImpl)> {
         get_runtime_state()
             .borrow()
             .operations
             .get_operation_by_memo_and_user(&memo, &user_id)
     }
 
+    /// Returns all memos for a given user_id.
     #[query]
-    pub fn get_operations_by_memo(&self, memo: Memo) -> Vec<(H160, OperationId, BtcBridgeOp)> {
+    pub fn get_memos_by_user_address(&self, user_id: H160) -> Vec<Memo> {
         get_runtime_state()
             .borrow()
             .operations
-            .get_operations_by_memo(&memo)
+            .get_memos_by_user_address(&user_id)
     }
 
     #[update]
@@ -214,12 +215,13 @@ pub fn get_runtime() -> SharedRuntime {
     RUNTIME.with(|r| r.clone())
 }
 
-pub fn get_runtime_state() -> RuntimeState<BtcBridgeOp> {
+pub fn get_runtime_state() -> RuntimeState<BtcBridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 
 #[cfg(test)]
 mod test {
+    use bridge_did::evm_link::EvmLink;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
@@ -241,7 +243,7 @@ mod test {
 
         let init_data = BridgeInitData {
             owner: owner(),
-            evm_principal: Principal::from_slice(&[2; 20]),
+            evm_link: EvmLink::Ic(Principal::from_slice(&[2; 20])),
             signing_strategy: SigningStrategy::Local {
                 private_key: [1u8; 32],
             },
