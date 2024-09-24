@@ -2,32 +2,6 @@ name: 'Build and Deploy'
 
 on:
   workflow_call:
-    inputs:
-      installation-method:
-        required: true
-        type: string
-        description: 'installation method, can be any of create, reinstall, upgrade'
-      network:
-        type: string
-        required: false
-        description: 'network where canister will be deployed to'
-        default: 'ic'
-      wallet:
-        type: string
-        required: false
-        description: 'owner wallet for canister'
-        default: '4cfzs-sqaaa-aaaak-aegca-cai'
-      chain_id:
-        type: number
-        required: false
-        description: 'chain id'
-        default: 355113
-      force_deploy:
-        type: boolean
-        required: false
-        description: 'if true, force deploy ignoring main branch'
-        default: false
-
     secrets:
       EVM_DEPLOYER:
         required: true
@@ -52,7 +26,7 @@ jobs:
           submodules: recursive
 
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.81.0
         with:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown, i686-unknown-linux-gnu
@@ -67,6 +41,8 @@ jobs:
 
       - name: Install dfx
         uses: dfinity/setup-dfx@main
+        with: 
+          dfx-version: "0.23.0"
 
       - name: Install Protobuf compiler
         uses: arduino/setup-protoc@v3
@@ -127,4 +103,3 @@ jobs:
         if: ${{ !inputs.skip-test }}
         run: |
           just dfx_test
-          # ./scripts/tests/dfx_tests.sh --github-ci --docker
