@@ -698,11 +698,11 @@ mod test {
         let address = Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
             .unwrap()
             .assume_checked();
-        // let's calculate the required fee for a transaction with 2 funding utxos
 
+        // let's calculate the required fee for a transaction with 2 funding utxos
         let fee = estimate_transaction_fees(
             ScriptType::P2WSH,
-            2 + 2,
+            2 + 1,
             fee_rate,
             &None,
             vec![TxOut {
@@ -755,7 +755,6 @@ mod test {
         };
 
         let state = Rc::new(RefCell::new(Brc20State::default()));
-
         let withdrawal = Withdrawal {
             state: state.clone(),
             utxo_provider: test_provider,
