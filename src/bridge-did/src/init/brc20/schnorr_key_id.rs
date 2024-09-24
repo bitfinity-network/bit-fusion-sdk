@@ -6,11 +6,8 @@ use crate::schnorr::{SchnorrAlgorithm, SchnorrKeyId};
 /// Schnorr key IDs
 #[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]
 pub enum SchnorrKeyIds {
-    #[allow(unused)]
     TestKeyLocalDevelopment,
-    #[allow(unused)]
     TestKey1,
-    #[allow(unused)]
     ProductionKey1,
 }
 

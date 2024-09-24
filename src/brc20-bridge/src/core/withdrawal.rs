@@ -293,9 +293,6 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let funding_address = self.get_funding_address(&sender).await?;
         let fee_rate = self.get_fee_rate().await?;
 
-        // get funding utxos, but filter out input utxos
-        let funding_utxos = self.get_funding_utxos(&funding_address).await?;
-
         let Ok(dst_address) = Address::from_str(&dst_address) else {
             return Err(WithdrawError::InvalidRequest(format!(
                 "Failed to decode recipient address from string: {dst_address}"
@@ -306,10 +303,10 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         // get greedy funding utxos
         let funding_utxos = self
             .get_greedy_funding_utxos(GetGreedyFundingUtxosArgs {
-                funding_utxos,
                 recipient_address: dst_address.clone(),
                 fee_rate,
             })
+            .await?
             .ok_or(WithdrawError::InsufficientFunds)?;
 
         log::info!("Funding utxos: {}", funding_utxos.len());
@@ -570,13 +567,17 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
     ///
     /// Returns the utxos that can fund the transaction with the minimum number of utxos.
     /// If the transaction cannot be funded with the minimum number of utxos, the function will return None.
-    fn get_greedy_funding_utxos(&self, mut args: GetGreedyFundingUtxosArgs) -> Option<Vec<Utxo>> {
+    async fn get_greedy_funding_utxos(
+        &self,
+        args: GetGreedyFundingUtxosArgs,
+    ) -> Result<Option<Vec<Utxo>>, WithdrawError> {
+        let mut funding_utxos = self.get_funding_utxos(&args.recipient_address).await?;
         let mut utxos_count = 1;
         // sort the utxos by value; descending
-        args.funding_utxos.sort_by(|a, b| b.value.cmp(&a.value));
+        funding_utxos.sort_by(|a, b| b.value.cmp(&a.value));
 
         // try to fund the transaction with the minimum number of utxos
-        while utxos_count <= args.funding_utxos.len() {
+        while utxos_count <= funding_utxos.len() {
             let required_fee = estimate_transaction_fees(
                 ScriptType::P2WSH,
                 utxos_count + 1,
@@ -589,19 +590,19 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             );
 
             // find the minimum number of utxos that can fund the transaction
-            let solution = &args.funding_utxos[0..utxos_count];
+            let solution = &funding_utxos[0..utxos_count];
             let solution_value =
                 Amount::from_sat(solution.iter().map(|utxo| utxo.value).sum::<u64>());
             if solution_value >= required_fee {
                 log::debug!("Found a funding solution with {utxos_count} utxos; required fee {required_fee}; fee funds: {solution_value}");
-                return Some(solution.to_vec());
+                return Ok(Some(solution.to_vec()));
             }
 
             // otherwise try with more utxos
             utxos_count += 1;
         }
 
-        None
+        Ok(None)
     }
 
     /// Convert the ERC20 amount to the BRC20 amount.
@@ -649,7 +650,6 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
 /// Arguments for the `get_greedy_funding_utxos` function.
 struct GetGreedyFundingUtxosArgs {
-    funding_utxos: Vec<Utxo>,
     recipient_address: Address,
     fee_rate: FeeRate,
 }
@@ -668,4 +668,208 @@ struct BuildCommitTransactionArgs<'a> {
     wallet_address: Address,
     fee_rate: FeeRate,
     derivation_path: &'a DerivationPath,
+}
+
+#[cfg(test)]
+mod test {
+
+    use bitcoin::PrivateKey;
+    use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Outpoint};
+    use ic_exports::ic_kit::MockContext;
+    use ord_rs::constants::POSTAGE;
+    use ord_rs::wallet::LocalSigner;
+
+    use super::*;
+
+    #[test]
+    fn test_should_convert_erc20_to_brc20() {
+        let amount = 10000000000000000000000;
+        let decimals = 18;
+
+        let brc20_amount =
+            Withdrawal::<IcUtxoProvider>::convert_erc20_amount_to_brc20(amount, decimals).unwrap();
+
+        assert_eq!(brc20_amount, 10_000);
+    }
+
+    #[tokio::test]
+    async fn test_should_get_greedy_funding_utxos() {
+        let fee_rate = FeeRate::from_sat_per_vb(1000).unwrap();
+        let address = Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
+            .unwrap()
+            .assume_checked();
+        // let's calculate the required fee for a transaction with 2 funding utxos
+
+        let fee = estimate_transaction_fees(
+            ScriptType::P2WSH,
+            2 + 2,
+            fee_rate,
+            &None,
+            vec![TxOut {
+                value: Amount::from_sat(POSTAGE),
+                script_pubkey: address.script_pubkey(),
+            }],
+        );
+
+        let first_utxo_value = (fee.to_sat() * 6).div_ceil(10); // 60% of the fee
+        let second_utxo_value = (fee.to_sat() * 4).div_ceil(10); // 40% of the fee
+
+        // let's create funding utxos
+        let funding_utxos = vec![
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![0; 32],
+                    vout: 0,
+                },
+                value: first_utxo_value,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![1; 32],
+                    vout: 0,
+                },
+                value: second_utxo_value,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![2; 32],
+                    vout: 0,
+                },
+                value: 10,
+                height: 0,
+            },
+            Utxo {
+                outpoint: Outpoint {
+                    txid: vec![3; 32],
+                    vout: 0,
+                },
+                value: 10,
+                height: 0,
+            },
+        ];
+
+        let test_provider = TestUtxoProvider {
+            utxos: funding_utxos.clone(),
+        };
+
+        let state = Rc::new(RefCell::new(Brc20State::default()));
+
+        let withdrawal = Withdrawal {
+            state: state.clone(),
+            utxo_provider: test_provider,
+            signer: BtcSignerType::Local(LocalSigner::new(PrivateKey::generate(Network::Regtest))),
+            network: Network::Regtest,
+        };
+
+        let greedy_funding_utxos = withdrawal
+            .get_greedy_funding_utxos(GetGreedyFundingUtxosArgs {
+                fee_rate,
+                recipient_address: Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
+                    .unwrap()
+                    .assume_checked(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(greedy_funding_utxos.len(), 2);
+        assert_eq!(greedy_funding_utxos[0].value, first_utxo_value);
+        assert_eq!(greedy_funding_utxos[1].value, second_utxo_value);
+    }
+
+    #[tokio::test]
+    async fn test_should_filter_out_reveal_utxos() {
+        MockContext::new().inject();
+
+        let test_provider = TestUtxoProvider {
+            utxos: vec![
+                Utxo {
+                    outpoint: Outpoint {
+                        txid: vec![1; 32],
+                        vout: 0,
+                    },
+                    value: 100_000,
+                    height: 1,
+                },
+                Utxo {
+                    outpoint: Outpoint {
+                        txid: vec![2; 32],
+                        vout: 0,
+                    },
+                    value: 100_000,
+                    height: 2,
+                },
+            ],
+        };
+
+        let state = Rc::new(RefCell::new(Brc20State::default()));
+
+        let withdrawal = Withdrawal {
+            state: state.clone(),
+            utxo_provider: test_provider,
+            signer: BtcSignerType::Local(LocalSigner::new(PrivateKey::generate(Network::Regtest))),
+            network: Network::Regtest,
+        };
+
+        // should return all utxos
+        let funding_utxos = withdrawal
+            .get_funding_utxos(
+                &Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
+                    .unwrap()
+                    .assume_checked(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(funding_utxos.len(), 2);
+
+        // put first utxo in reveal
+
+        {
+            let mut state_ref = state.borrow_mut();
+            state_ref
+                .ledger_mut()
+                .deposit_reveal(Txid::from_slice(&[1; 32]).unwrap(), 0);
+        }
+
+        // should return only the second utxo
+        let funding_utxos = withdrawal
+            .get_funding_utxos(
+                &Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
+                    .unwrap()
+                    .assume_checked(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(funding_utxos.len(), 1);
+        assert_eq!(funding_utxos[0].outpoint.txid, vec![2; 32]);
+    }
+
+    struct TestUtxoProvider {
+        utxos: Vec<Utxo>,
+    }
+
+    impl UtxoProvider for TestUtxoProvider {
+        async fn get_utxos(
+            &self,
+            _address: &Address,
+        ) -> Result<GetUtxosResponse, crate::interface::DepositError> {
+            Ok(GetUtxosResponse {
+                utxos: self.utxos.clone(),
+                tip_block_hash: vec![],
+                tip_height: 0,
+                next_page: None,
+            })
+        }
+
+        async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError> {
+            unimplemented!()
+        }
+
+        async fn send_tx(&self, _transaction: &Transaction) -> Result<(), WithdrawError> {
+            Ok(())
+        }
+    }
 }
