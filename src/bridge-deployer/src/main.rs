@@ -1,5 +1,6 @@
 use cli::Cli;
 
+mod canister_ids;
 mod cli;
 mod commands;
 mod config;
