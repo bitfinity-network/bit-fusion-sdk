@@ -3,8 +3,9 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "src/WrappedToken.sol";
 import "src/libraries/StringUtils.sol";
+import "src/interfaces/IWrappedTokenDeployer.sol";
+import "src/interfaces/IWrappedToken.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 abstract contract TokenManager is Initializable {
@@ -22,6 +23,9 @@ abstract contract TokenManager is Initializable {
     /// List of wrapped tokens.
     address[] private _wrappedTokenList;
 
+    /// Contract to deploy wrapped tokens.
+    IWrappedTokenDeployer private _tokenDeployer;
+
     /// Event for new wrapped token creation
     event WrappedTokenDeployedEvent(string name, string symbol, bytes32 baseTokenID, address wrappedERC20);
 
@@ -32,10 +36,9 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function __TokenManager__init(
-        bool _isWrappedSide
-    ) internal initializer onlyInitializing {
+    function __TokenManager__init(bool _isWrappedSide) internal initializer onlyInitializing {
         isWrappedSide = _isWrappedSide;
+        // TODO: set _tokenDeployer!
     }
 
     /// @notice Checks if the contract is on the base side
@@ -54,21 +57,20 @@ abstract contract TokenManager is Initializable {
         require(isWrappedSide, "Only for wrapped side");
         require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
-        // Create the new token
-        WrappedToken wrappedERC20 = new WrappedToken(name, symbol, decimals, address(this));
+        address wrappedERC20 = _tokenDeployer.deployERC20(name, symbol, decimals, address(this));
 
-        _baseToWrapped[baseTokenID] = address(wrappedERC20);
-        _wrappedToBase[address(wrappedERC20)] = baseTokenID;
-        _wrappedTokenList.push(address(wrappedERC20));
+        _baseToWrapped[baseTokenID] = wrappedERC20;
+        _wrappedToBase[wrappedERC20] = baseTokenID;
+        _wrappedTokenList.push(wrappedERC20);
 
-        emit WrappedTokenDeployedEvent(name, symbol, baseTokenID, address(wrappedERC20));
+        emit WrappedTokenDeployedEvent(name, symbol, baseTokenID, wrappedERC20);
 
-        return address(wrappedERC20);
+        return wrappedERC20;
     }
 
     /// Update token's metadata
     function updateTokenMetadata(address token, bytes32 name, bytes16 symbol, uint8 decimals) internal {
-        WrappedToken(token).setMetaData(name, symbol, decimals);
+        IWrappedToken(token).setMetaData(name, symbol, decimals);
     }
 
     /// tries to query token metadata
