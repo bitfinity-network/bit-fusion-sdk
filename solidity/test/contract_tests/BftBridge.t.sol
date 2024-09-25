@@ -80,6 +80,9 @@ contract BftBridgeTest is Test {
         // Cast the proxy to BFTBridge
         _baseBridge = BFTBridge(address(baseProxy));
 
+
+        deployCodeTo("WrappedTokenDeployer.sol", address(0x424242));
+
         vm.stopPrank();
     }
 

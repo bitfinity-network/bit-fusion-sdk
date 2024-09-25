@@ -38,7 +38,7 @@ abstract contract TokenManager is Initializable {
 
     function __TokenManager__init(bool _isWrappedSide) internal initializer onlyInitializing {
         isWrappedSide = _isWrappedSide;
-        // TODO: set _tokenDeployer!
+        _tokenDeployer = IWrappedTokenDeployer(address(0x424242));
     }
 
     /// @notice Checks if the contract is on the base side
