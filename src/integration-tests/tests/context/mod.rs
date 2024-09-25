@@ -261,8 +261,8 @@ pub trait TestContext {
     async fn initialize_bft_bridge(
         &self,
         caller: &str,
-        wrapped_token_deployer: H160,
         fee_charge_address: H160,
+        wrapped_token_deployer: H160,
     ) -> Result<H160> {
         let minter_canister_address = self.get_icrc_bridge_canister_evm_address(caller).await?;
 
