@@ -303,6 +303,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         // get greedy funding utxos
         let funding_utxos = self
             .get_greedy_funding_utxos(GetGreedyFundingUtxosArgs {
+                funding_address: funding_address.clone(),
                 recipient_address: dst_address.clone(),
                 fee_rate,
             })
@@ -571,7 +572,7 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         &self,
         args: GetGreedyFundingUtxosArgs,
     ) -> Result<Option<Vec<Utxo>>, WithdrawError> {
-        let mut funding_utxos = self.get_funding_utxos(&args.recipient_address).await?;
+        let mut funding_utxos = self.get_funding_utxos(&args.funding_address).await?;
         let mut utxos_count = 1;
         // sort the utxos by value; descending
         funding_utxos.sort_by(|a, b| b.value.cmp(&a.value));
@@ -650,23 +651,35 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
 
 /// Arguments for the `get_greedy_funding_utxos` function.
 struct GetGreedyFundingUtxosArgs {
+    /// The address that will be used to fund the transaction
+    funding_address: Address,
+    /// The address that will receive the funds
     recipient_address: Address,
+    /// The fee rate for the transaction
     fee_rate: FeeRate,
 }
 
 /// Commit transaction outputs
 struct CommitTransaction {
     create_commit_transaction: CreateCommitTransaction,
+    /// The funding utxos used to fund the transaction
     inputs: Vec<ord_rs::Utxo>,
 }
 
+/// Arguments for the `build_commit_transaction` function
 struct BuildCommitTransactionArgs<'a> {
     inscriber: &'a mut OrdTransactionBuilder,
+    /// The funding utxos
     funding_utxos: Vec<Utxo>,
+    /// The BRC20 tick
     tick: Brc20Tick,
+    /// The amount to transfer
     amount: u64,
+    /// The address that will be used to fund the transaction
     wallet_address: Address,
+    /// The fee rate for the transaction
     fee_rate: FeeRate,
+    /// The derivation path for the wallet
     derivation_path: &'a DerivationPath,
 }
 
@@ -764,6 +777,9 @@ mod test {
 
         let greedy_funding_utxos = withdrawal
             .get_greedy_funding_utxos(GetGreedyFundingUtxosArgs {
+                funding_address: Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
+                    .unwrap()
+                    .assume_checked(),
                 fee_rate,
                 recipient_address: Address::from_str("bc1quyc49rn6q9rmlk5rz96pqy8ug827xwvamqm0vh")
                     .unwrap()
