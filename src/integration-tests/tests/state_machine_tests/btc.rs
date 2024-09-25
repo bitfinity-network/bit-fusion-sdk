@@ -1533,7 +1533,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
             .is_ok());
     }
 
-    for _ in 0..100 {
+    for _ in 0..200 {
         ckbtc.advance_blocks(2);
         (&ckbtc.context)
             .advance_time(Duration::from_millis(50))
