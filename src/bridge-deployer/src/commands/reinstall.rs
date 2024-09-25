@@ -66,7 +66,7 @@ impl ReinstallCommands {
 
         let management_canister = ManagementCanister::create(&agent);
 
-        let arg = self.bridge_type.init_raw_arg()?;
+        let arg = self.bridge_type.init_raw_arg(network)?;
         trace!("Bridge configuration prepared");
 
         management_canister

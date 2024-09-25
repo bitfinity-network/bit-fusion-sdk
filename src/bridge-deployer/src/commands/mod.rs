@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use bridge_did::error::BftResult;
+use bridge_did::evm_link::EvmLink;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
 use deploy::DeployCommands;
@@ -85,21 +86,21 @@ pub enum Bridge {
 
 impl Bridge {
     /// Initialize the raw argument for the bridge
-    pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn init_raw_arg(&self, evm_network: EvmNetwork) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
             Bridge::Brc20 {
                 config: init,
                 brc20,
             } => {
                 trace!("Preparing BRC20 bridge configuration");
-                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                let init_data = init.clone().into_bridge_init_data(evm_network);
                 debug!("BRC20 Bridge Config : {:?}", init_data);
                 let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                let init_data = init.clone().into_bridge_init_data(evm_network);
                 debug!("Init Bridge Config : {:?}", init_data);
                 let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
@@ -107,23 +108,23 @@ impl Bridge {
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(config.clone());
+                let config = config.clone().into_bridge_init_data(evm_network);
                 debug!("ICRC Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
-                let init = bridge_did::init::BridgeInitData::from(init.clone());
+                let init = init.clone().into_bridge_init_data(evm_network);
 
                 // Workaround for not depending on the `erc-20` crate
                 #[derive(candid::CandidType)]
                 struct EvmSettings {
-                    pub evm_link: config::EvmLink,
+                    pub evm_link: EvmLink,
                     pub signing_strategy: SigningStrategy,
                 }
 
                 let erc = EvmSettings {
-                    evm_link: erc.evm_link.clone(),
+                    evm_link: crate::evm::evm_link(evm_network),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: erc.singing_key_id.clone().into(),
                     },
@@ -133,7 +134,7 @@ impl Bridge {
             }
             Bridge::Btc { config } => {
                 trace!("Preparing BTC bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(config.clone());
+                let config = config.clone().into_bridge_init_data(evm_network);
                 Encode!(&config)?
             }
         };

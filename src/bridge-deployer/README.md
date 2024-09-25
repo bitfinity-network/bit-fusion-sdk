@@ -35,7 +35,6 @@ The general syntax for using the Bridge Deployer is:
 ## Global Options
 
 - `--identity <IDENTITY_PATH>`: Path to the identity file
-- `--ic-host <IC_HOST>`: IC host URL (default: <http://localhost:8080>)
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
 - `--evm-network <EVM_NETWORK>`: EVM network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
 - `--deploy-bft`: Deploy the BFT bridge (default: false)
@@ -65,7 +64,6 @@ For the deployment, you will need to provide the wallet canister id as `--wallet
     rune \
   --identity path/to/identity.pem \
   --private-key <PRIVATE_KEY> \
-  --ic-host <http://localhost:8080> \
   --evm-network localhost \
   --admin <ADMIN_PRINCIPAL> \
   --min-confirmations 6 \
@@ -96,7 +94,6 @@ To reinstall a bridge, you will need to provide the canister id of the bridge to
     rune \
   --identity path/to/identity.pem \
   --private-key <PRIVATE_KEY> \
-  --ic-host <http://localhost:8080> \
   --evm-network localhost \
   --admin <ADMIN_PRINCIPAL> \
   --min-confirmations 6 \
@@ -131,7 +128,6 @@ Before deploying the BFT contract, make sure you have some funds in the wallet a
 ./bridge-deployer deploy <BRIDGE_TYPE> \
   --identity path/to/identity.pem \
   --private-key <PRIVATE_KEY> \
-  --ic-host <http://localhost:8080> \
   --evm-network localhost \
   --deploy-bft \
   --owner <BFT_OWNER_ADDRESS> \
