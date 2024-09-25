@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "src/BftBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
+import "src/WrappedTokenDeployer.sol";
 import "src/libraries/StringUtils.sol";
 
 contract BftBridgeTest is Test {
@@ -39,6 +40,8 @@ contract BftBridgeTest is Test {
     address _alice = vm.addr(_ALICE_KEY);
     address _bob = vm.addr(_BOB_KEY);
 
+    WrappedTokenDeployer _wrappedTokenDeployer;
+
     BFTBridge _wrappedBridge;
     BFTBridge _baseBridge;
 
@@ -51,12 +54,21 @@ contract BftBridgeTest is Test {
         vm.chainId(_CHAIN_ID);
         vm.startPrank(_owner);
 
+        _wrappedTokenDeployer = new WrappedTokenDeployer();
+
         // Encode the initialization call
         address[] memory initialControllers = new address[](0);
 
         // Encode the initialization call
-        bytes memory initializeData =
-            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), true, _owner, initialControllers);
+        bytes memory initializeData = abi.encodeWithSelector(
+            BFTBridge.initialize.selector,
+            _owner,
+            address(0),
+            address(_wrappedTokenDeployer),
+            true,
+            _owner,
+            initialControllers
+        );
 
         BFTBridge wrappedImpl = new BFTBridge();
 
@@ -68,8 +80,9 @@ contract BftBridgeTest is Test {
         _wrappedBridge = BFTBridge(address(wrappedProxy));
 
         // Encode the initialization call
-        bytes memory baseInitializeData =
-            abi.encodeWithSelector(BFTBridge.initialize.selector, _owner, address(0), false, _owner, initialControllers);
+        bytes memory baseInitializeData = abi.encodeWithSelector(
+            BFTBridge.initialize.selector, _owner, address(0), _wrappedTokenDeployer, false, _owner, initialControllers
+        );
 
         BFTBridge baseImpl = new BFTBridge();
 
@@ -79,9 +92,6 @@ contract BftBridgeTest is Test {
 
         // Cast the proxy to BFTBridge
         _baseBridge = BFTBridge(address(baseProxy));
-
-
-        deployCodeTo("WrappedTokenDeployer.sol", address(0x424242));
 
         vm.stopPrank();
     }

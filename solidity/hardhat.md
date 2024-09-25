@@ -43,6 +43,12 @@ npx hardhat deploy-bft --network <network> --minter-address <minter_address> --f
 npx hardhat deploy-fee-charge --network <network> --bridges <bridge_addresses> [--nonce <nonce>] [--expected-address <expected_address>]
 ```
 
+- Deploy WrappedTokenDeployer Contract:
+
+```bash
+npx hardhat deploy-wrapped-token-deployer --network <network> 
+```
+
 - Compute Fee Charge Address:
 
 ```bash

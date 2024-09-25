@@ -36,9 +36,12 @@ abstract contract TokenManager is Initializable {
         uint8 decimals;
     }
 
-    function __TokenManager__init(bool _isWrappedSide) internal initializer onlyInitializing {
+    function __TokenManager__init(
+        bool _isWrappedSide,
+        address wrappedTokenDeployer
+    ) internal initializer onlyInitializing {
         isWrappedSide = _isWrappedSide;
-        _tokenDeployer = IWrappedTokenDeployer(address(0x424242));
+        _tokenDeployer = IWrappedTokenDeployer(wrappedTokenDeployer);
     }
 
     /// @notice Checks if the contract is on the base side

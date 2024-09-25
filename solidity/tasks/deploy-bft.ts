@@ -18,12 +18,13 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 task("deploy-bft", "Deploys the BFT contract")
   .addParam("minterAddress", "The address of the minter")
   .addParam("feeChargeAddress", "The address of the fee charge")
+  .addParam("wrappedTokenDeployer", "The address of the wrapped token deployer")
   .addParam("isWrappedSide", "Is the wrapped side", undefined, boolean)
   .addOptionalParam("owner", "The owner of the contract")
   .addOptionalParam("controllers", "The controllers of the contract")
   .setAction(
     async (
-      { minterAddress, feeChargeAddress, isWrappedSide, owner, controllers },
+      { minterAddress, feeChargeAddress, wrappedTokenDeployer, isWrappedSide, owner, controllers },
       hre: HardhatRuntimeEnvironment,
     ) => {
       console.log("Compiling contract");
@@ -34,7 +35,7 @@ task("deploy-bft", "Deploys the BFT contract")
       let ownerAddress = owner || hre.ethers.ZeroAddress;
 
       // Validate the arguments that it are addresses
-      const addressesToValidate = [minterAddress, feeChargeAddress];
+      const addressesToValidate = [minterAddress, feeChargeAddress, wrappedTokenDeployer];
       if (owner) addressesToValidate.push(ownerAddress);
       if (controllers) addressesToValidate.push(...controllersArr);
 
@@ -58,6 +59,7 @@ task("deploy-bft", "Deploys the BFT contract")
       const bridge = await hre.upgrades.deployProxy(BFTBridge, [
         minterAddress,
         feeChargeAddress,
+        wrappedTokenDeployer,
         isWrappedSide,
         ownerAddress,
         controllersArr,
