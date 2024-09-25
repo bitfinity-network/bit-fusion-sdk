@@ -78,9 +78,11 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
         .expect("send btc failed");
     ctx.withdraw(&brc20_tick, withdraw_amount).await;
 
+    ctx.mint_blocks(100).await;
+
     for _ in 0..30 {
         ctx.inner.advance_time(Duration::from_secs(2)).await;
-        ctx.mint_blocks(1).await;
+        ctx.mint_blocks(10).await;
     }
 
     ctx.brc20
