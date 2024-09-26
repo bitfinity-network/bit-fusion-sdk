@@ -38,7 +38,7 @@ dfx_test test_name="": docker_down docker_pull docker_up dfx_start dfx_start_pro
     cargo test {{test_name}} -p integration-tests --features dfx_tests
   )
   TEST_RESULT=$?
-  [ $TEST_RESULT -eq 0 ] && just dfx_stop docker_down
+  just dfx_stop docker_down
   exit $TEST_RESULT
 
 
