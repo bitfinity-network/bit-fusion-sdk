@@ -1521,7 +1521,9 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     }
 
     ckbtc.advance_blocks(16);
-    (&ckbtc.context).advance_time(Duration::from_secs(30)).await;
+    (&ckbtc.context)
+        .advance_by_times(Duration::from_secs(1), 60)
+        .await;
 
     // deposit
     for wallet in &wallets {
@@ -1533,10 +1535,10 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
             .is_ok());
     }
 
-    for _ in 0..200 {
+    for _ in 0..100 {
         ckbtc.advance_blocks(2);
         (&ckbtc.context)
-            .advance_time(Duration::from_millis(50))
+            .advance_time(Duration::from_millis(100))
             .await;
     }
 
