@@ -10,6 +10,7 @@ use ic_utils::interfaces::{ManagementCanister, WalletCanister};
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
+use crate::canister_ids::CanisterIds;
 use crate::contracts::EvmNetwork;
 
 /// The default number of cycles to deposit to the canister
@@ -60,6 +61,7 @@ impl DeployCommands {
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
+        canister_ids: &mut CanisterIds,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let canister_wasm = std::fs::read(&self.wasm)?;
@@ -85,6 +87,9 @@ impl DeployCommands {
             .wallet_create_canister(self.cycles, None, None, None, None)
             .await?
             .canister_id;
+
+        // save to canister ids
+        canister_ids.set((&self.bridge_type).into(), canister_id);
 
         let management_canister = ManagementCanister::create(&agent);
 

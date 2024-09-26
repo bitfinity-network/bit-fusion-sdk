@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use candid::Principal;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 pub use self::canisters::Canister;
 pub use self::path::CanisterIdsPath;
@@ -36,9 +37,10 @@ impl CanisterIds {
         }
     }
 
-    /// Load the `canister_ids.json` file.
-    pub fn load(canister_ids_path: CanisterIdsPath) -> anyhow::Result<Self> {
+    /// Read the `canister_ids.json` file.
+    pub fn read(canister_ids_path: CanisterIdsPath) -> anyhow::Result<Self> {
         let path = canister_ids_path.path();
+        debug!("Reading canister IDs from file: {}", path.display());
 
         // load from json and set the network
         let content = std::fs::read_to_string(&path)?;
@@ -48,9 +50,15 @@ impl CanisterIds {
         Ok(canister_ids)
     }
 
-    /// Save the `canister_ids.json` file.
-    pub fn save(&self) -> anyhow::Result<()> {
+    /// Read the `canister_ids.json` file or return a default new instance.
+    pub fn read_or_default(canister_ids_path: CanisterIdsPath) -> Self {
+        Self::read(canister_ids_path.clone()).unwrap_or_else(|_| Self::new(canister_ids_path))
+    }
+
+    /// Write the `canister_ids.json` file.
+    pub fn write(&self) -> anyhow::Result<()> {
         let path = self.path.path();
+        debug!("Writing canister IDs to file: {}", path.display());
 
         let content = serde_json::to_string_pretty(self)?;
         std::fs::write(&path, content)?;
@@ -103,50 +111,50 @@ mod test {
         std::fs::write(tempfile.path(), content).unwrap();
 
         // deserialize
-        let canister_ids = CanisterIds::load(CanisterIdsPath::CustomPath(
+        let canister_ids = CanisterIds::read(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
-            EvmNetwork::Localhost,
+            EvmNetwork::Mainnet,
         ))
         .unwrap();
 
         assert_eq!(canister_ids.canisters.len(), 3);
         assert_eq!(
-            canister_ids.get(Canister::Brc20Bridge),
+            canister_ids.get(Canister::Brc20),
             Some(Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::BtcBridge),
+            canister_ids.get(Canister::Btc),
             Some(Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::Erc20Bridge),
+            canister_ids.get(Canister::Erc20),
             Some(Principal::from_text("vtxdn-caaaa-aaaal-ai5dq-cai").unwrap())
         );
-        assert!(canister_ids.get(Canister::Icrc2Bridge).is_none());
+        assert!(canister_ids.get(Canister::Icrc2).is_none());
     }
 
     #[test]
     fn test_should_add_bridges_and_serialize() {
         let tempfile = tempfile::NamedTempFile::new().unwrap();
-        let mut canister_ids = CanisterIds::new(CanisterIdsPath::CustomPath(
+        let mut canister_ids = CanisterIds::read_or_default(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
             EvmNetwork::Localhost,
         ));
 
         canister_ids.set(
-            Canister::Brc20Bridge,
+            Canister::Brc20,
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap(),
         );
 
         canister_ids.set(
-            Canister::BtcBridge,
+            Canister::Btc,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
         );
 
-        canister_ids.save().unwrap();
+        canister_ids.write().unwrap();
 
         // load and check
-        let canister_ids = CanisterIds::load(CanisterIdsPath::CustomPath(
+        let canister_ids = CanisterIds::read(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
             EvmNetwork::Localhost,
         ))
@@ -154,11 +162,11 @@ mod test {
 
         assert_eq!(canister_ids.canisters.len(), 2);
         assert_eq!(
-            canister_ids.get(Canister::Brc20Bridge),
+            canister_ids.get(Canister::Brc20),
             Some(Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::BtcBridge),
+            canister_ids.get(Canister::Btc),
             Some(Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap())
         );
     }
@@ -168,7 +176,7 @@ mod test {
         let mut canister_ids = CanisterIds::new(CanisterIdsPath::Localhost);
 
         canister_ids.set(
-            Canister::Brc20Bridge,
+            Canister::Brc20,
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap(),
         );
 
@@ -176,12 +184,12 @@ mod test {
         canister_ids.path = CanisterIdsPath::Mainnet;
 
         canister_ids.set(
-            Canister::Brc20Bridge,
+            Canister::Brc20,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
         );
 
         assert_eq!(
-            canister_ids.get(Canister::Brc20Bridge).unwrap(),
+            canister_ids.get(Canister::Brc20).unwrap(),
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap()
         );
 
@@ -189,7 +197,7 @@ mod test {
         canister_ids.path = CanisterIdsPath::Localhost;
 
         assert_eq!(
-            canister_ids.get(Canister::Brc20Bridge).unwrap(),
+            canister_ids.get(Canister::Brc20).unwrap(),
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap()
         );
     }

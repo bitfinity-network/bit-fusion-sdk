@@ -9,23 +9,23 @@ const ERC20_BRIDGE_NAME: &str = "erc20-bridge";
 const ICRC2_BRIDGE_NAME: &str = "icrc2-bridge";
 const RUNE_BRIDGE_NAME: &str = "rune-bridge";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Canister {
-    Brc20Bridge,
-    BtcBridge,
-    Erc20Bridge,
-    Icrc2Bridge,
-    RuneBridge,
+    Brc20,
+    Btc,
+    Erc20,
+    Icrc2,
+    Rune,
 }
 
 impl fmt::Display for Canister {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let canister = match self {
-            Canister::Brc20Bridge => BRC20_BRIDGE_NAME,
-            Canister::BtcBridge => BTC_BRIDGE_NAME,
-            Canister::Erc20Bridge => ERC20_BRIDGE_NAME,
-            Canister::Icrc2Bridge => ICRC2_BRIDGE_NAME,
-            Canister::RuneBridge => RUNE_BRIDGE_NAME,
+            Canister::Brc20 => BRC20_BRIDGE_NAME,
+            Canister::Btc => BTC_BRIDGE_NAME,
+            Canister::Erc20 => ERC20_BRIDGE_NAME,
+            Canister::Icrc2 => ICRC2_BRIDGE_NAME,
+            Canister::Rune => RUNE_BRIDGE_NAME,
         };
 
         write!(f, "{}", canister)
@@ -37,11 +37,11 @@ impl FromStr for Canister {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            BRC20_BRIDGE_NAME => Ok(Self::Brc20Bridge),
-            BTC_BRIDGE_NAME => Ok(Self::BtcBridge),
-            ERC20_BRIDGE_NAME => Ok(Self::Erc20Bridge),
-            ICRC2_BRIDGE_NAME => Ok(Self::Icrc2Bridge),
-            RUNE_BRIDGE_NAME => Ok(Self::RuneBridge),
+            BRC20_BRIDGE_NAME => Ok(Self::Brc20),
+            BTC_BRIDGE_NAME => Ok(Self::Btc),
+            ERC20_BRIDGE_NAME => Ok(Self::Erc20),
+            ICRC2_BRIDGE_NAME => Ok(Self::Icrc2),
+            RUNE_BRIDGE_NAME => Ok(Self::Rune),
             _ => Err("invalid canister"),
         }
     }
@@ -73,32 +73,20 @@ mod test {
 
     #[test]
     fn test_canister_display() {
-        assert_eq!(Canister::Brc20Bridge.to_string(), BRC20_BRIDGE_NAME);
-        assert_eq!(Canister::BtcBridge.to_string(), BTC_BRIDGE_NAME);
-        assert_eq!(Canister::Erc20Bridge.to_string(), ERC20_BRIDGE_NAME);
-        assert_eq!(Canister::Icrc2Bridge.to_string(), ICRC2_BRIDGE_NAME);
-        assert_eq!(Canister::RuneBridge.to_string(), RUNE_BRIDGE_NAME);
+        assert_eq!(Canister::Brc20.to_string(), BRC20_BRIDGE_NAME);
+        assert_eq!(Canister::Btc.to_string(), BTC_BRIDGE_NAME);
+        assert_eq!(Canister::Erc20.to_string(), ERC20_BRIDGE_NAME);
+        assert_eq!(Canister::Icrc2.to_string(), ICRC2_BRIDGE_NAME);
+        assert_eq!(Canister::Rune.to_string(), RUNE_BRIDGE_NAME);
     }
 
     #[test]
     fn test_canister_from_str() {
-        assert_eq!(
-            Canister::from_str(BRC20_BRIDGE_NAME),
-            Ok(Canister::Brc20Bridge)
-        );
-        assert_eq!(Canister::from_str(BTC_BRIDGE_NAME), Ok(Canister::BtcBridge));
-        assert_eq!(
-            Canister::from_str(ERC20_BRIDGE_NAME),
-            Ok(Canister::Erc20Bridge)
-        );
-        assert_eq!(
-            Canister::from_str(ICRC2_BRIDGE_NAME),
-            Ok(Canister::Icrc2Bridge)
-        );
-        assert_eq!(
-            Canister::from_str(RUNE_BRIDGE_NAME),
-            Ok(Canister::RuneBridge)
-        );
+        assert_eq!(Canister::from_str(BRC20_BRIDGE_NAME), Ok(Canister::Brc20));
+        assert_eq!(Canister::from_str(BTC_BRIDGE_NAME), Ok(Canister::Btc));
+        assert_eq!(Canister::from_str(ERC20_BRIDGE_NAME), Ok(Canister::Erc20));
+        assert_eq!(Canister::from_str(ICRC2_BRIDGE_NAME), Ok(Canister::Icrc2));
+        assert_eq!(Canister::from_str(RUNE_BRIDGE_NAME), Ok(Canister::Rune));
         assert_eq!(Canister::from_str("invalid"), Err("invalid canister"));
     }
 }

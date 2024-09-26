@@ -1,5 +1,6 @@
 use candid::Principal;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::contracts::EvmNetwork;
 
@@ -25,6 +26,7 @@ impl CanisterPrincipal {
 
     /// Set the principal ID of a canister based on the network type.
     pub fn set(&mut self, principal: Principal, network: EvmNetwork) {
+        debug!("Setting canister principal {principal} for network: {network:?}");
         match network {
             EvmNetwork::Localhost => self.local = Some(principal),
             EvmNetwork::Testnet => self.testnet = Some(principal),

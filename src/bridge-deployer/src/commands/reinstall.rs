@@ -10,6 +10,7 @@ use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
+use crate::canister_ids::CanisterIds;
 use crate::contracts::EvmNetwork;
 
 /// The reinstall command.
@@ -26,8 +27,11 @@ pub struct ReinstallCommands {
     #[command(subcommand)]
     bridge_type: Bridge,
 
+    /// The canister ID of the bridge to reinstall.
+    ///
+    /// If not provided, it will be fetched from the `canister_ids.json` file
     #[arg(long, value_name = "CANISTER_ID")]
-    canister_id: Principal,
+    canister_id: Option<Principal>,
 
     /// The path to the wasm file to deploy
     #[arg(long, value_name = "WASM_PATH")]
@@ -46,8 +50,19 @@ impl ReinstallCommands {
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
+        canister_ids: &CanisterIds,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
+
+        // get canister id
+        let canister = (&self.bridge_type).into();
+        let canister_id = match self.canister_id.or_else(|| canister_ids.get(canister)) {
+            Some(id) => id,
+            None => {
+                anyhow::bail!("Could not resolve canister id for {canister}");
+            }
+        };
+
         let canister_wasm = std::fs::read(&self.wasm)?;
         debug!("WASM file read successfully");
 
@@ -70,7 +85,7 @@ impl ReinstallCommands {
         trace!("Bridge configuration prepared");
 
         management_canister
-            .install(&self.canister_id, &canister_wasm)
+            .install(&canister_id, &canister_wasm)
             .with_raw_arg(arg)
             .with_mode(InstallMode::Reinstall)
             .call_and_wait()
@@ -81,7 +96,7 @@ impl ReinstallCommands {
         if deploy_bft {
             info!("Deploying BFT bridge");
             self.bft_args
-                .deploy_bft(network, self.canister_id, &self.bridge_type, pk, &agent)
+                .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
             info!("BFT bridge deployed successfully");
