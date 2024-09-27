@@ -3,6 +3,9 @@ mod inspect;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::mint_tx::SendMintTxService;
+use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -11,8 +14,6 @@ use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::SignedMintOrder;
-use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -27,7 +28,10 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::BtcBridgeOpImpl;
+use crate::ops::{
+    BtcBridgeOpImpl, BtcMintOrderHandler, BtcMintTxHandler, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
+};
 use crate::state::{BtcConfig, State, WrappedTokenConfig};
 
 type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
@@ -60,32 +64,6 @@ impl BtcBridge {
     fn run_scheduler() {
         let runtime = get_runtime();
         runtime.borrow_mut().run();
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    /// Offset, if set, defines the starting index of the page,
-    /// Count, if set, defines the number of elements in the page.
-    #[query]
-    pub fn list_mint_orders(
-        &self,
-        wallet_address: H160,
-        pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        Self::token_mint_orders(wallet_address, pagination)
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
-    #[query]
-    pub fn get_mint_order(
-        &self,
-        wallet_address: H160,
-        operation_id: u32,
-        pagination: Option<Pagination>,
-    ) -> Option<SignedMintOrder> {
-        Self::token_mint_orders(wallet_address, pagination)
-            .into_iter()
-            .find(|(nonce, _)| *nonce == operation_id)
-            .map(|(_, mint_order)| mint_order)
     }
 
     /// Returns operation by memo
@@ -142,29 +120,6 @@ impl BtcBridge {
         bridge_canister::build_data!()
     }
 
-    /// Get mint orders for the given wallet address and token;
-    /// if `offset` and `count` are provided, returns a page of mint orders.
-    fn token_mint_orders(
-        wallet_address: H160,
-        pagination: Option<Pagination>,
-    ) -> Vec<(u32, SignedMintOrder)> {
-        let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
-        let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, None)
-            .into_iter()
-            .filter_map(|(operation_id, operation)| {
-                operation
-                    .get_signed_mint_order()
-                    .map(|mint_order| (operation_id.nonce(), mint_order))
-            })
-            .skip(offset)
-            .take(count)
-            .collect()
-    }
-
     pub fn idl() -> Idl {
         generate_idl!()
     }
@@ -200,11 +155,35 @@ impl LogCanister for BtcBridge {
     }
 }
 
+fn init_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(ConfigStorage::get());
+    let state = runtime.state();
+
+    let sign_orders_handler = BtcMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
+
+    let mint_tx_handler = BtcMintTxHandler::new(state.clone());
+    let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
+
+    let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SIGN_MINT_ORDER_SERVICE_ID,
+        sign_mint_orders_service,
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SEND_MINT_TX_SERVICE_ID,
+        mint_tx_service,
+    );
+
+    Rc::new(RefCell::new(runtime))
+}
+
 thread_local! {
     pub static STATE: Rc<RefCell<State>> = Rc::default();
 
-    pub static RUNTIME: SharedRuntime =
-        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    pub static RUNTIME: SharedRuntime = init_runtime();
 }
 
 pub fn get_state() -> Rc<RefCell<State>> {

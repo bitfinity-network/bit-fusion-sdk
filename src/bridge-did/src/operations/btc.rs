@@ -1,9 +1,9 @@
 use candid::CandidType;
-use did::H160;
+use did::{H160, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::events::{BurntEventData, MintedEventData};
-use crate::order::SignedMintOrder;
+use crate::order::{MintOrder, SignedOrders};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum BtcBridgeOp {
@@ -22,13 +22,17 @@ pub enum BtcBridgeOp {
         eth_address: H160,
         amount: u64,
     },
+    SignMintOrder {
+        eth_address: H160,
+        order: MintOrder,
+    },
     MintErc20 {
         eth_address: H160,
-        order: SignedMintOrder,
+        order: SignedOrders,
     },
     ConfirmErc20Mint {
-        order: SignedMintOrder,
-        eth_address: H160,
+        order: SignedOrders,
+        tx_id: H256,
     },
     Erc20MintConfirmed(MintedEventData),
 

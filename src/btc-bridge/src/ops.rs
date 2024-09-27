@@ -1,13 +1,17 @@
+mod mint_order_handler;
+mod mint_tx_handler;
+
 use std::cell::RefCell;
 
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::MintOrder;
 use bridge_did::reason::BtcDeposit;
 use candid::{CandidType, Decode, Principal};
 use did::H160;
@@ -20,6 +24,8 @@ use ic_task_scheduler::task::TaskOptions;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
+pub use self::mint_order_handler::BtcMintOrderHandler;
+pub use self::mint_tx_handler::BtcMintTxHandler;
 use crate::canister::{eth_address_to_subaccount, get_state};
 use crate::ckbtc_client::{
     CkBtcLedgerClient, CkBtcMinterClient, RetrieveBtcError, RetrieveBtcOk, UpdateBalanceError,
@@ -27,6 +33,9 @@ use crate::ckbtc_client::{
 };
 use crate::interface::{BtcBridgeError, BtcWithdrawError};
 use crate::state::State;
+
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct BtcBridgeOpImpl(pub BtcBridgeOp);
@@ -80,18 +89,19 @@ impl Operation for BtcBridgeOpImpl {
                 amount,
             } => {
                 log::debug!("CreateMintOrder: Eth address {eth_address}, amount {amount}");
-                let mint_order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
+                let order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
-                Ok(Self(BtcBridgeOp::MintErc20 {
-                    order: mint_order,
-                    eth_address,
-                }))
+                Ok(Self(BtcBridgeOp::SignMintOrder { eth_address, order }))
+            }
+            BtcBridgeOp::SignMintOrder { eth_address, order } => {
+                log::debug!("BtcBridgeOp::SignMintOrder {eth_address} {order:?}");
+
+                return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
             BtcBridgeOp::MintErc20 { eth_address, order } => {
-                log::debug!("MintErc20: Eth address {eth_address}");
-                ctx.send_mint_transaction(&order).await?;
+                log::debug!("MintErc20: Eth address {eth_address}; {order:?}");
 
-                Ok(Self(BtcBridgeOp::ConfirmErc20Mint { order, eth_address }))
+                return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
             BtcBridgeOp::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
                 "ConfirmErc20Mint task should progress only on the Minted EVM event".into(),
@@ -121,6 +131,7 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::CollectCkBtcBalance { .. } => false,
             BtcBridgeOp::TransferCkBtc { .. } => false,
             BtcBridgeOp::CreateMintOrder { .. } => false,
+            BtcBridgeOp::SignMintOrder { .. } => false,
             BtcBridgeOp::MintErc20 { .. } => false,
             BtcBridgeOp::ConfirmErc20Mint { .. } => false,
             BtcBridgeOp::Erc20MintConfirmed { .. } => true,
@@ -134,9 +145,10 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::BtcWithdrawConfirmed { eth_address } => eth_address.clone(),
             BtcBridgeOp::CollectCkBtcBalance { eth_address } => eth_address.clone(),
             BtcBridgeOp::CreateMintOrder { eth_address, .. } => eth_address.clone(),
-            BtcBridgeOp::ConfirmErc20Mint { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::ConfirmErc20Mint { order, .. } => order.reader().get_recipient(),
             BtcBridgeOp::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
             BtcBridgeOp::MintErc20 { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::SignMintOrder { eth_address, .. } => eth_address.clone(),
             BtcBridgeOp::TransferCkBtc { eth_address, .. } => eth_address.clone(),
             BtcBridgeOp::UpdateCkBtcBalance { eth_address } => eth_address.clone(),
             BtcBridgeOp::WithdrawBtc(BurntEventData { sender, .. }) => sender.clone(),
@@ -151,8 +163,9 @@ impl Operation for BtcBridgeOpImpl {
                     .with_backoff_policy(BackoffPolicy::Fixed { secs: 5 }),
             ),
             BtcBridgeOp::CollectCkBtcBalance { .. }
-            | BtcBridgeOp::MintErc20 { .. }
             | BtcBridgeOp::CreateMintOrder { .. }
+            | BtcBridgeOp::MintErc20 { .. }
+            | BtcBridgeOp::SignMintOrder { .. }
             | BtcBridgeOp::TransferCkBtc { .. }
             | BtcBridgeOp::WithdrawBtc(_) => Some(
                 TaskOptions::new()
@@ -224,14 +237,6 @@ impl Operation for BtcBridgeOpImpl {
 }
 
 impl BtcBridgeOpImpl {
-    pub fn get_signed_mint_order(&self) -> Option<SignedMintOrder> {
-        match &self.0 {
-            BtcBridgeOp::ConfirmErc20Mint { order, .. } => Some(*order),
-            BtcBridgeOp::MintErc20 { order, .. } => Some(*order),
-            _ => None,
-        }
-    }
-
     async fn update_ckbtc_balance(ckbtc_minter: Principal, eth_address: &H160) -> BftResult<()> {
         let self_id = ic::id();
         let subaccount = eth_address_to_subaccount(eth_address);
@@ -360,7 +365,7 @@ impl BtcBridgeOpImpl {
         eth_address: &H160,
         nonce: u32,
         amount: u64,
-    ) -> BftResult<SignedMintOrder> {
+    ) -> BftResult<MintOrder> {
         let state = get_state();
 
         log::debug!(
@@ -406,46 +411,35 @@ impl BtcBridgeOpImpl {
         eth_address: H160,
         amount: u64,
         nonce: u32,
-    ) -> BftResult<SignedMintOrder> {
+    ) -> BftResult<MintOrder> {
         log::trace!("preparing mint order");
 
-        let (signer, mint_order) = {
-            let state_ref = state.borrow();
+        let state_ref = state.borrow();
 
-            let sender_chain_id = state_ref.btc_chain_id();
-            let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
-            let src_token = (&state_ref.ck_btc_ledger()).into();
+        let sender_chain_id = state_ref.btc_chain_id();
+        let sender = Id256::from_evm_address(&eth_address, sender_chain_id);
+        let src_token = (&state_ref.ck_btc_ledger()).into();
 
-            let recipient_chain_id = ctx.get_evm_params()?.chain_id;
+        let recipient_chain_id = ctx.get_evm_params()?.chain_id;
 
-            let mint_order = MintOrder {
-                amount: amount.into(),
-                sender,
-                src_token,
-                recipient: eth_address,
-                dst_token: state_ref.token_address().clone(),
-                nonce,
-                sender_chain_id,
-                recipient_chain_id,
-                name: state_ref.token_name(),
-                symbol: state_ref.token_symbol(),
-                decimals: state_ref.decimals(),
-                approve_spender: Default::default(),
-                approve_amount: Default::default(),
-                fee_payer: H160::zero(),
-            };
-
-            let signer = ctx.get_signer()?;
-
-            (signer, mint_order)
+        let mint_order = MintOrder {
+            amount: amount.into(),
+            sender,
+            src_token,
+            recipient: eth_address,
+            dst_token: state_ref.token_address().clone(),
+            nonce,
+            sender_chain_id,
+            recipient_chain_id,
+            name: state_ref.token_name(),
+            symbol: state_ref.token_symbol(),
+            decimals: state_ref.decimals(),
+            approve_spender: Default::default(),
+            approve_amount: Default::default(),
+            fee_payer: H160::zero(),
         };
 
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| BtcBridgeError::Sign(format!("{err:?}")))?;
-
-        Ok(signed_mint_order)
+        Ok(mint_order)
     }
 
     /// Get the withdrawal account for the ckbtc minter.
