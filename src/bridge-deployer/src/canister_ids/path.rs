@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use crate::contracts::EvmNetwork;
 
-const PROJECT_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 const LOCAL_DIR: &str = ".dfx/local/";
 const TESTNET_DIR: &str = ".dfx/testnet/";
 const FILENAME: &str = "canister_ids.json";
@@ -28,7 +27,7 @@ impl CanisterIdsPath {
 
     /// Get the default path of the `canister_ids.json` file, based on network type
     fn default_path(&self) -> PathBuf {
-        let mut path = PathBuf::from(PROJECT_ROOT);
+        let mut path = PathBuf::from("./");
 
         match self {
             Self::Localhost => {
@@ -85,7 +84,7 @@ mod test {
         let canister_ids_path = CanisterIdsPath::Localhost;
         let path = canister_ids_path.path();
 
-        let expected = PathBuf::from(PROJECT_ROOT).join(LOCAL_DIR).join(FILENAME);
+        let expected = PathBuf::from("./").join(LOCAL_DIR).join(FILENAME);
 
         assert_eq!(path, expected);
     }
@@ -95,7 +94,7 @@ mod test {
         let canister_ids_path = CanisterIdsPath::Testnet;
         let path = canister_ids_path.path();
 
-        let expected = PathBuf::from(PROJECT_ROOT).join(TESTNET_DIR).join(FILENAME);
+        let expected = PathBuf::from("./").join(TESTNET_DIR).join(FILENAME);
 
         assert_eq!(path, expected);
     }
@@ -105,7 +104,7 @@ mod test {
         let canister_ids_path = CanisterIdsPath::Mainnet;
         let path = canister_ids_path.path();
 
-        let expected = PathBuf::from(PROJECT_ROOT).join(FILENAME);
+        let expected = PathBuf::from("./").join(FILENAME);
 
         assert_eq!(path, expected);
     }

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, trace};
 use upgrade::UpgradeCommands;
 
-use crate::canister_ids::{Canister, CanisterIds};
+use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::config;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
 mod deploy;
@@ -154,14 +154,14 @@ impl Bridge {
     }
 }
 
-impl From<&Bridge> for Canister {
+impl From<&Bridge> for CanisterType {
     fn from(value: &Bridge) -> Self {
         match value {
-            Bridge::Brc20 { .. } => Canister::Brc20,
-            Bridge::Rune { .. } => Canister::Rune,
-            Bridge::Icrc { .. } => Canister::Icrc2,
-            Bridge::Erc20 { .. } => Canister::Erc20,
-            Bridge::Btc { .. } => Canister::Btc,
+            Bridge::Brc20 { .. } => CanisterType::Brc20,
+            Bridge::Rune { .. } => CanisterType::Rune,
+            Bridge::Icrc { .. } => CanisterType::Icrc2,
+            Bridge::Erc20 { .. } => CanisterType::Erc20,
+            Bridge::Btc { .. } => CanisterType::Btc,
         }
     }
 }
@@ -181,17 +181,31 @@ impl Commands {
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
-        canister_ids: &mut CanisterIds,
+        canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, network, pk, deploy_bft, canister_ids)
+                    .deploy_canister(
+                        identity,
+                        ic_host,
+                        network,
+                        pk,
+                        deploy_bft,
+                        canister_ids_path,
+                    )
                     .await?
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, pk, deploy_bft, canister_ids)
+                    .reinstall_canister(
+                        identity,
+                        ic_host,
+                        network,
+                        pk,
+                        deploy_bft,
+                        canister_ids_path,
+                    )
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,

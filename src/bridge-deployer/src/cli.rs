@@ -5,7 +5,7 @@ use ethereum_types::H256;
 use tracing::level_filters::LevelFilter;
 use tracing::{debug, info, trace, Level};
 
-use crate::canister_ids::{CanisterIds, CanisterIdsPath};
+use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
 use crate::contracts::EvmNetwork;
 
@@ -72,7 +72,7 @@ pub struct Cli {
 
     /// Custom path to the canister_ids.json file.
     ///
-    /// If not provided, the default path is used.
+    /// If not provided, the default path for the provided evm network is used.
     #[arg(
         long,
         value_name = "CANISTER_IDS_PATH",
@@ -108,7 +108,6 @@ impl Cli {
             .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
             .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
         debug!("Canister ids path: {}", canister_ids_path.path().display());
-        let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
         trace!("Executing command: {:?}", command);
         command
@@ -118,12 +117,9 @@ impl Cli {
                 evm_network,
                 private_key,
                 deploy_bft,
-                &mut canister_ids,
+                canister_ids_path,
             )
             .await?;
-
-        // write canister ids file
-        canister_ids.write()?;
 
         Ok(())
     }

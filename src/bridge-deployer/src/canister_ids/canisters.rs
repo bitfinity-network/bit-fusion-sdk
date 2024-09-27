@@ -9,8 +9,9 @@ const ERC20_BRIDGE_NAME: &str = "erc20-bridge";
 const ICRC2_BRIDGE_NAME: &str = "icrc2-bridge";
 const RUNE_BRIDGE_NAME: &str = "rune-bridge";
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum Canister {
+/// Canister type to set the principal for
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanisterType {
     Brc20,
     Btc,
     Erc20,
@@ -18,21 +19,21 @@ pub enum Canister {
     Rune,
 }
 
-impl fmt::Display for Canister {
+impl fmt::Display for CanisterType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let canister = match self {
-            Canister::Brc20 => BRC20_BRIDGE_NAME,
-            Canister::Btc => BTC_BRIDGE_NAME,
-            Canister::Erc20 => ERC20_BRIDGE_NAME,
-            Canister::Icrc2 => ICRC2_BRIDGE_NAME,
-            Canister::Rune => RUNE_BRIDGE_NAME,
+            CanisterType::Brc20 => BRC20_BRIDGE_NAME,
+            CanisterType::Btc => BTC_BRIDGE_NAME,
+            CanisterType::Erc20 => ERC20_BRIDGE_NAME,
+            CanisterType::Icrc2 => ICRC2_BRIDGE_NAME,
+            CanisterType::Rune => RUNE_BRIDGE_NAME,
         };
 
         write!(f, "{}", canister)
     }
 }
 
-impl FromStr for Canister {
+impl FromStr for CanisterType {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -47,46 +48,56 @@ impl FromStr for Canister {
     }
 }
 
-impl Serialize for Canister {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.to_string().as_str())
-    }
-}
-
-impl<'a> Deserialize<'a> for Canister {
-    fn deserialize<D>(deserializer: D) -> Result<Canister, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        let canister = String::deserialize(deserializer)?;
-
-        Self::from_str(canister.as_str()).map_err(serde::de::Error::custom)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_canister_display() {
-        assert_eq!(Canister::Brc20.to_string(), BRC20_BRIDGE_NAME);
-        assert_eq!(Canister::Btc.to_string(), BTC_BRIDGE_NAME);
-        assert_eq!(Canister::Erc20.to_string(), ERC20_BRIDGE_NAME);
-        assert_eq!(Canister::Icrc2.to_string(), ICRC2_BRIDGE_NAME);
-        assert_eq!(Canister::Rune.to_string(), RUNE_BRIDGE_NAME);
+        assert_eq!(CanisterType::Brc20.to_string(), BRC20_BRIDGE_NAME);
+        assert_eq!(CanisterType::Btc.to_string(), BTC_BRIDGE_NAME);
+        assert_eq!(CanisterType::Erc20.to_string(), ERC20_BRIDGE_NAME);
+        assert_eq!(CanisterType::Icrc2.to_string(), ICRC2_BRIDGE_NAME);
+        assert_eq!(CanisterType::Rune.to_string(), RUNE_BRIDGE_NAME);
     }
 
     #[test]
     fn test_canister_from_str() {
-        assert_eq!(Canister::from_str(BRC20_BRIDGE_NAME), Ok(Canister::Brc20));
-        assert_eq!(Canister::from_str(BTC_BRIDGE_NAME), Ok(Canister::Btc));
-        assert_eq!(Canister::from_str(ERC20_BRIDGE_NAME), Ok(Canister::Erc20));
-        assert_eq!(Canister::from_str(ICRC2_BRIDGE_NAME), Ok(Canister::Icrc2));
-        assert_eq!(Canister::from_str(RUNE_BRIDGE_NAME), Ok(Canister::Rune));
-        assert_eq!(Canister::from_str("invalid"), Err("invalid canister"));
+        assert_eq!(
+            CanisterType::from_str(BRC20_BRIDGE_NAME),
+            Ok(CanisterType::Brc20)
+        );
+        assert_eq!(
+            CanisterType::from_str(BTC_BRIDGE_NAME),
+            Ok(CanisterType::Btc)
+        );
+        assert_eq!(
+            CanisterType::from_str(ERC20_BRIDGE_NAME),
+            Ok(CanisterType::Erc20)
+        );
+        assert_eq!(
+            CanisterType::from_str(ICRC2_BRIDGE_NAME),
+            Ok(CanisterType::Icrc2)
+        );
+        assert_eq!(
+            CanisterType::from_str(RUNE_BRIDGE_NAME),
+            Ok(CanisterType::Rune)
+        );
+        assert_eq!(CanisterType::from_str("invalid"), Err("invalid canister"));
+    }
+
+    #[test]
+    fn test_should_serialize() {
+        let canister = CanisterType::Brc20;
+        let serialized = serde_json::to_string(&canister).unwrap();
+        assert_eq!(serialized, format!("\"{}\"", BRC20_BRIDGE_NAME));
+    }
+
+    #[test]
+    fn test_should_deserialize() {
+        let canister = CanisterType::Brc20;
+        let serialized = "\"brc20-bridge\"";
+        let deserialized: CanisterType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, canister);
     }
 }

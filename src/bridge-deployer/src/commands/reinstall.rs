@@ -10,7 +10,7 @@ use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
-use crate::canister_ids::CanisterIds;
+use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::contracts::EvmNetwork;
 
 /// The reinstall command.
@@ -50,9 +50,11 @@ impl ReinstallCommands {
         network: EvmNetwork,
         pk: H256,
         deploy_bft: bool,
-        canister_ids: &CanisterIds,
+        canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
+
+        let canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
         // get canister id
         let canister = (&self.bridge_type).into();

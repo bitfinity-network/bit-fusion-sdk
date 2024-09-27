@@ -1,38 +1,29 @@
 //! A module to perform I/O operations on the `canister_ids.json` file.
 
 mod canisters;
+mod db;
 mod path;
 mod principals;
 
-use std::collections::HashMap;
-
 use candid::Principal;
-use serde::{Deserialize, Serialize};
+use db::CanistersDb;
 use tracing::debug;
 
-pub use self::canisters::Canister;
+pub use self::canisters::CanisterType;
 pub use self::path::CanisterIdsPath;
-use self::principals::CanisterPrincipal;
 
 /// A struct to map canister names to their principal IDs, which are serialized into file `canister_ids.json`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CanisterIds {
-    #[serde(flatten)]
-    canisters: HashMap<Canister, CanisterPrincipal>,
-    #[serde(skip, default = "default_canister_ids")]
+    canisters: CanistersDb,
     path: CanisterIdsPath,
-}
-
-/// Default canister IDs path.
-fn default_canister_ids() -> CanisterIdsPath {
-    CanisterIdsPath::Localhost
 }
 
 impl CanisterIds {
     /// Creates a new `CanisterIds` instance.
     pub fn new(canister_ids_path: CanisterIdsPath) -> Self {
         Self {
-            canisters: HashMap::new(),
+            canisters: CanistersDb::default(),
             path: canister_ids_path,
         }
     }
@@ -44,10 +35,12 @@ impl CanisterIds {
 
         // load from json and set the network
         let content = std::fs::read_to_string(&path)?;
-        let mut canister_ids: Self = serde_json::from_str(&content)?;
-        canister_ids.path = canister_ids_path;
+        let canisters: CanistersDb = serde_json::from_str(&content)?;
 
-        Ok(canister_ids)
+        let mut canisters_ids = Self::new(canister_ids_path);
+        canisters_ids.canisters = canisters;
+
+        Ok(canisters_ids)
     }
 
     /// Read the `canister_ids.json` file or return a default new instance.
@@ -60,28 +53,22 @@ impl CanisterIds {
         let path = self.path.path();
         debug!("Writing canister IDs to file: {}", path.display());
 
-        let content = serde_json::to_string_pretty(self)?;
+        let content = serde_json::to_string_pretty(&self.canisters)?;
         std::fs::write(&path, content)?;
 
         Ok(())
     }
 
     /// Get the principal ID of a canister based on the network type.
-    pub fn get(&self, canister: Canister) -> Option<Principal> {
-        self.canisters
-            .get(&canister)
-            .and_then(|canister| canister.get((&self.path).into()))
-            .copied()
+    pub fn get(&self, canister: CanisterType) -> Option<Principal> {
+        self.canisters.get(canister, (&self.path).into())
     }
 
     /// set a new canister principal to the map.
     ///
     /// If the entry already exists, it will be updated.
-    pub fn set(&mut self, canister: Canister, principal: Principal) {
-        self.canisters
-            .entry(canister)
-            .and_modify(|canister_data| canister_data.set(principal, (&self.path).into()))
-            .or_insert_with(|| CanisterPrincipal::new(principal, (&self.path).into()));
+    pub fn set(&mut self, canister: CanisterType, principal: Principal) {
+        self.canisters.set(canister, principal, (&self.path).into());
     }
 }
 
@@ -119,18 +106,18 @@ mod test {
 
         assert_eq!(canister_ids.canisters.len(), 3);
         assert_eq!(
-            canister_ids.get(Canister::Brc20),
+            canister_ids.get(CanisterType::Brc20),
             Some(Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::Btc),
+            canister_ids.get(CanisterType::Btc),
             Some(Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::Erc20),
+            canister_ids.get(CanisterType::Erc20),
             Some(Principal::from_text("vtxdn-caaaa-aaaal-ai5dq-cai").unwrap())
         );
-        assert!(canister_ids.get(Canister::Icrc2).is_none());
+        assert!(canister_ids.get(CanisterType::Icrc2).is_none());
     }
 
     #[test]
@@ -142,12 +129,12 @@ mod test {
         ));
 
         canister_ids.set(
-            Canister::Brc20,
+            CanisterType::Brc20,
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap(),
         );
 
         canister_ids.set(
-            Canister::Btc,
+            CanisterType::Btc,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
         );
 
@@ -162,11 +149,11 @@ mod test {
 
         assert_eq!(canister_ids.canisters.len(), 2);
         assert_eq!(
-            canister_ids.get(Canister::Brc20),
+            canister_ids.get(CanisterType::Brc20),
             Some(Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap())
         );
         assert_eq!(
-            canister_ids.get(Canister::Btc),
+            canister_ids.get(CanisterType::Btc),
             Some(Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap())
         );
     }
@@ -176,7 +163,7 @@ mod test {
         let mut canister_ids = CanisterIds::new(CanisterIdsPath::Localhost);
 
         canister_ids.set(
-            Canister::Brc20,
+            CanisterType::Brc20,
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap(),
         );
 
@@ -184,12 +171,12 @@ mod test {
         canister_ids.path = CanisterIdsPath::Mainnet;
 
         canister_ids.set(
-            Canister::Brc20,
+            CanisterType::Brc20,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
         );
 
         assert_eq!(
-            canister_ids.get(Canister::Brc20).unwrap(),
+            canister_ids.get(CanisterType::Brc20).unwrap(),
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap()
         );
 
@@ -197,7 +184,7 @@ mod test {
         canister_ids.path = CanisterIdsPath::Localhost;
 
         assert_eq!(
-            canister_ids.get(Canister::Brc20).unwrap(),
+            canister_ids.get(CanisterType::Brc20).unwrap(),
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap()
         );
     }
