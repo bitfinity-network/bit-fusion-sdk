@@ -7,6 +7,7 @@ Bridge Deployer is a CLI tool for deploying and managing various types of bridge
 - Rust
 - Node.js
 - Yarn
+- dfx (only for **local** deployment)
 
 ## Installation
 

@@ -7,7 +7,6 @@ use candid::Principal;
 
 use crate::contracts::EvmNetwork;
 
-const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 const MAINNET_PRINCIPAL: &str = "i3jjb-wqaaa-aaaaa-qadrq-cai";
 const TESTNET_PRINCIPAL: &str = "4fe7g-7iaaa-aaaak-aegcq-cai";
 
@@ -65,10 +64,9 @@ fn dfx_info_port(service: &str) -> u16 {
 /// Returns the local EVM principal
 fn local_evm_principal() -> String {
     let principal = Command::new("dfx")
-        .args(["canister", "id", "evm_rpc"])
-        .current_dir(CARGO_MANIFEST_DIR)
+        .args(["canister", "id", "evm_testnet"])
         .output()
-        .expect("Failed to get evm_rpc canister id")
+        .expect("Failed to get evm_testnet canister id")
         .stdout
         .iter()
         .map(|&b| b as char)
