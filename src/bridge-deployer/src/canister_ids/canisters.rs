@@ -10,7 +10,7 @@ const ICRC2_BRIDGE_NAME: &str = "icrc2-bridge";
 const RUNE_BRIDGE_NAME: &str = "rune-bridge";
 
 /// Canister type to set the principal for
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CanisterType {
     Brc20,
     Btc,
@@ -45,6 +45,26 @@ impl FromStr for CanisterType {
             RUNE_BRIDGE_NAME => Ok(Self::Rune),
             _ => Err("invalid canister"),
         }
+    }
+}
+
+impl Serialize for CanisterType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'a> Deserialize<'a> for CanisterType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        let canister = String::deserialize(deserializer)?;
+
+        Self::from_str(canister.as_str()).map_err(serde::de::Error::custom)
     }
 }
 
