@@ -94,7 +94,7 @@ impl Bridge {
                 trace!("Preparing BRC20 bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("BRC20 Bridge Config : {:?}", init_data);
-                let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
+                let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {

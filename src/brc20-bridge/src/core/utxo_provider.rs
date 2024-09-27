@@ -8,8 +8,6 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{
 
 use crate::interface::{DepositError, WithdrawError};
 
-// TODO: remove on withdrawal
-#[allow(dead_code)]
 pub(crate) trait UtxoProvider {
     async fn get_utxos(&self, address: &Address) -> Result<GetUtxosResponse, DepositError>;
     async fn get_fee_rate(&self) -> Result<FeeRate, WithdrawError>;

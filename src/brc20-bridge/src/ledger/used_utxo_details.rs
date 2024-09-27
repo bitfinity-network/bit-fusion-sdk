@@ -1,7 +1,5 @@
 use std::borrow::Cow;
-use std::str::FromStr as _;
 
-use bitcoin::{Address, Network};
 use candid::{CandidType, Decode, Encode};
 use ic_stable_structures::{Bound, Storable};
 use serde::Deserialize;
@@ -17,13 +15,6 @@ pub struct UsedUtxoDetails {
 
 impl UsedUtxoDetails {
     const MAX_BITCOIN_ADDRESS_SIZE: u32 = 96;
-
-    /// Returns the owner address of the utxo.
-    pub fn owner_address(&self, network: Network) -> Result<Address, Box<dyn std::error::Error>> {
-        Address::from_str(self.owner_address.as_str())?
-            .require_network(network)
-            .map_err(|e| e.into())
-    }
 }
 
 impl Storable for UsedUtxoDetails {
@@ -45,7 +36,9 @@ impl Storable for UsedUtxoDetails {
 #[cfg(test)]
 mod test {
 
-    use bitcoin::PublicKey;
+    use std::str::FromStr as _;
+
+    use bitcoin::{Address, Network, PublicKey};
 
     use super::*;
 

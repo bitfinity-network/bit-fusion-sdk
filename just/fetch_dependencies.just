@@ -8,7 +8,7 @@ IC_COMMIT_HASH:="85bd56a70e55b2cea75cae6405ae11243e5fdad8"
 IC_EVM_RPC_TAG:="release-2024-05-23"
 
 # This is the bitfinity evmc tag to download
-EVMC_TAG:="v0.2.0-2207-g78d7fc4a-377-g5b755d89-27-g9646de62-1-g5d5fb9b1"
+EVMC_TAG:="v0.2.0_0311c78f"
 
 
 # Fetch all dependencies
@@ -50,7 +50,7 @@ fetch_evmc_private_canister artifact: pre_build
   GH_REPO="https://api.github.com/repos/$owner/$repo"
   GH_LATEST="$GH_REPO/releases/tags/{{EVMC_TAG}}"
   AUTH="Authorization: token $GITHUB_API_TOKEN"
-  filename="{{artifact}}-{{EVMC_TAG}}.tar.gz"
+  filename="{{artifact}}.tar.gz"
   output="{{WASM_DIR}}/{{artifact}}.tar.gz"
 
   # Read asset id. This is required to download the asset file from a private repository
