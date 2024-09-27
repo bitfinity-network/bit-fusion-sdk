@@ -2,7 +2,7 @@ use bridge_canister::bridge::{Operation, OperationAction, OperationContext, Oper
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
-use bridge_canister::runtime::service::sign_order::MintOrderHandler;
+use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;

@@ -5,7 +5,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 
 pub mod mint_tx;
-pub mod sign_order;
+pub mod sign_orders;
 
 // The async-trait macro is necessary to make the trait object safe.
 #[async_trait::async_trait(?Send)]
