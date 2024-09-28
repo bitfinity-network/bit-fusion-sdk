@@ -117,7 +117,7 @@ mod test {
     fn test_should_deserialize() {
         let canister = CanisterType::Brc20;
         let serialized = "\"brc20-bridge\"";
-        let deserialized: CanisterType = serde_json::from_str(&serialized).unwrap();
+        let deserialized: CanisterType = serde_json::from_str(serialized).unwrap();
         assert_eq!(deserialized, canister);
     }
 }
