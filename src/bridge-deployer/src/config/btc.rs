@@ -12,13 +12,13 @@ pub struct BtcBridgeConnection {
     #[arg(long)]
     network: BtcNetwork,
     /// ckBTC ledger canister principal.
-    #[arg(long)]
+    #[arg(long, required_if_eq("network", "regtest"))]
     ledger: Option<Principal>,
     /// ckBTC minter canister principal.
-    #[arg(long)]
+    #[arg(long, required_if_eq("network", "regtest"))]
     minter: Option<Principal>,
     /// ckBTC ledger fee in satoshi.
-    #[arg(long)]
+    #[arg(long, required_if_eq("network", "regtest"))]
     fee: Option<u64>,
 }
 
@@ -42,30 +42,20 @@ impl From<BtcNetwork> for BitcoinNetwork {
 impl From<BtcBridgeConnection> for BitcoinConnection {
     fn from(value: BtcBridgeConnection) -> Self {
         if value.ledger.is_some() {
-            let ledger = value.ledger.expect(
-                "either all or none of the `ledger`, `minter`, `fee` arguments must be provided",
-            );
-            let minter = value.minter.expect(
-                "either all or none of the `ledger`, `minter`, `fee` arguments must be provided",
-            );
-            let fee = value.fee.expect(
-                "either all or none of the `ledger`, `minter`, `fee` arguments must be provided",
-            );
+            let ledger = value.ledger.expect("ledger principal is not specified");
+            let minter = value.minter.expect("ledger principal is not specified");
+            let fee = value.fee.expect("fee is not specified");
             BitcoinConnection::Custom {
                 network: value.network.into(),
                 ckbtc_minter: minter,
                 ckbtc_ledger: ledger,
                 ledger_fee: fee,
             }
-        } else if value.minter.is_some() || value.fee.is_some() {
-            panic!(
-                "either all or none of the `ledger`, `minter`, `fee` arguments must be provided",
-            );
         } else {
             match value.network {
                 BtcNetwork::Mainnet => BitcoinConnection::Mainnet,
                 BtcNetwork::Testnet => BitcoinConnection::Testnet,
-                BtcNetwork::Regtest => panic!("you must provide `ledger`, `minter` and `fee` arguments for regtest connection"),
+                BtcNetwork::Regtest => panic!("invalid parameters"),
             }
         }
     }
