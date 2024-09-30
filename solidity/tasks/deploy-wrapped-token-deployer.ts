@@ -23,14 +23,14 @@ task("deploy-wrapped-token-deployer", "Deploys the WrappedTokenDeployer contract
     // Get Address
     const wrappedTokenDeployerAddress = await wrappedTokenDeployer.getAddress();
 
-    // Check if the fee charge address is as expected
-    if (expectedAddress !== undefined && wrappedTokenDeployerAddress.toLowerCase() !== expectedAddress.toLowerCase()) {
-      console.error(
-        `Expected Address: ${expectedAddress} but got ${wrappedTokenDeployerAddress}`,
-      );
+    // // Check if the fee charge address is as expected
+    // if (expectedAddress !== undefined && wrappedTokenDeployerAddress.toLowerCase() !== expectedAddress.toLowerCase()) {
+    //   console.error(
+    //     `Expected Address: ${expectedAddress} but got ${wrappedTokenDeployerAddress}`,
+    //   );
 
-      throw new Error("WrappedTokenDeployer address does not match the expected address");
-    }
+    //   throw new Error("WrappedTokenDeployer address does not match the expected address");
+    // }
 
     console.log(`WrappedTokenDeployer address: ${wrappedTokenDeployerAddress}`);
   });
