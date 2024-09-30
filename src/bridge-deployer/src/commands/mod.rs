@@ -135,7 +135,7 @@ impl Bridge {
                 }
 
                 let erc = EvmSettings {
-                    evm_link: crate::evm::evm_link(evm_network),
+                    evm_link: crate::evm::evm_link(evm_network, erc.evm),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: erc.singing_key_id.clone().into(),
                     },
