@@ -210,14 +210,16 @@ impl BFTArgs {
     ) -> anyhow::Result<H160> {
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
-        let expected_nonce = contract_deployer.get_nonce().await? + 2;
-
-        let expected_address = contract_deployer.compute_fee_charge_address(expected_nonce)?;
+        let expected_nonce = contract_deployer.get_nonce().await? + 3;
+        let expected_fee_charge_address =
+            contract_deployer.compute_fee_charge_address(expected_nonce)?;
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
 
         // Sleep for 1 second to allow the canister to be created
         tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let wrapped_token_deployer = contract_deployer.deploy_wrapped_token_deployer()?;
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
@@ -229,13 +231,14 @@ impl BFTArgs {
 
         let bft_address = contract_deployer.deploy_bft(
             &minter_address.into(),
-            &expected_address,
+            &expected_fee_charge_address,
+            &wrapped_token_deployer,
             is_wrapped_side,
             self.owner,
             &self.controllers,
         )?;
 
-        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_address))?;
+        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
         Ok(bft_address)
     }

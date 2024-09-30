@@ -260,8 +260,19 @@ impl Brc20Context {
             .unwrap()
             .unwrap();
 
+        let wrapped_token_deployer = context
+            .initialize_wrapped_token_deployer_contract(&wallet)
+            .await
+            .unwrap();
+
         let bft_bridge = context
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address.unwrap(), None, true)
+            .initialize_bft_bridge_with_minter(
+                &wallet,
+                btc_bridge_eth_address.unwrap(),
+                None,
+                wrapped_token_deployer,
+                true,
+            )
             .await
             .unwrap();
 

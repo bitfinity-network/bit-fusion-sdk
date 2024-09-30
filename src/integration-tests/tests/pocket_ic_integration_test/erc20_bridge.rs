@@ -94,12 +94,20 @@ impl ContextWithBridges {
             .unwrap();
         ctx.advance_time(Duration::from_secs(2)).await;
 
+        // Deploy wrapped token deployer contracts
+        let base_wrapped_token_deployer = H160::default(); // We should not deploy wrapped tokens on base evm.
+        let wrapped_wrapped_token_deployer = ctx
+            .initialize_wrapped_token_deployer_contract(&bob_wallet)
+            .await
+            .unwrap();
+
         // Deploy the BFTBridge contract on the external EVM.
         let base_bft_bridge = create_bft_bridge(
             &ctx,
             &bob_wallet,
             BridgeSide::Base,
             expected_fee_charge_address.into(),
+            base_wrapped_token_deployer,
             erc20_bridge_address.clone(),
         )
         .await;
@@ -113,6 +121,7 @@ impl ContextWithBridges {
             &bob_wallet,
             BridgeSide::Wrapped,
             expected_fee_charge_address.into(),
+            wrapped_wrapped_token_deployer,
             erc20_bridge_address.clone(),
         )
         .await;
@@ -611,6 +620,7 @@ async fn create_bft_bridge(
     wallet: &Wallet<'static, SigningKey>,
     side: BridgeSide,
     fee_charge: H160,
+    wrapped_token_deployer: H160,
     minter_address: H160,
 ) -> H160 {
     let is_wrapped = match side {
@@ -637,6 +647,7 @@ async fn create_bft_bridge(
     let init_data = BFTBridge::initializeCall {
         minterAddress: minter_address.into(),
         feeChargeAddress: fee_charge.into(),
+        wrappedTokenDeployer: wrapped_token_deployer.into(),
         isWrappedSide: is_wrapped,
         owner: [0; 20].into(),
         controllers: vec![],
