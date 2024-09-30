@@ -80,7 +80,6 @@ tokio = { version = "1.36", features = ["macros", "rt"] }
 tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-trycmd = "0.15"
 vergen-gitcl = { version = "1", default-features = false, features = [
     "build",
     "cargo",
