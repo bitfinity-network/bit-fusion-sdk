@@ -4,8 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [features]
-default = ["export-api"]
+default = ["export-api", "runes"]
 export-api = []
+runes = ["bridge-did/runes"]
 
 [dependencies]
 async-trait = { workspace = true }

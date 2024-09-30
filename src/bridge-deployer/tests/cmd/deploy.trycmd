@@ -1,0 +1,22 @@
+```trycmd
+$ bridge-deployer deploy --deploy-bft --use-bft 0xef780bd741260c9c6e01c36f02ad824d4d9d71f6 btc --evm-link link --signing-key-id dfx --owner ul7vc-nqaaa-aaaam-adjkq-cai
+? 2
+error: the argument '--deploy-bft' cannot be used with '--use-bft <ADDRESS>'
+
+Usage: bridge-deployer --identity <IDENTITY_PATH> --private-key <PRIVATE_KEY> deploy --wasm <WASM_PATH> --wallet-canister <WALLET_CANISTER> --deploy-bft <COMMAND>
+
+For more information, try '--help'.
+
+$ bridge-deployer deploy btc --evm-link link --signing-key-id dfx --owner ul7vc-nqaaa-aaaam-adjkq-cai
+? 2
+error: the following required arguments were not provided:
+  --wasm <WASM_PATH>
+  --wallet-canister <WALLET_CANISTER>
+  --deploy-bft
+  --use-bft <ADDRESS>
+
+Usage: bridge-deployer --identity <IDENTITY_PATH> --private-key <PRIVATE_KEY> deploy --wasm <WASM_PATH> --wallet-canister <WALLET_CANISTER> --deploy-bft --use-bft <ADDRESS> <COMMAND>
+
+For more information, try '--help'.
+
+```
