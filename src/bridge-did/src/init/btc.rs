@@ -25,6 +25,16 @@ pub enum BitcoinConnection {
     },
 }
 
+// https://internetcomputer.org/docs/current/developer-docs/multi-chain/chain-key-tokens/ckbtc/overview#how-it-works
+
+const MAINNET_CKBTC_MINTER: &str = "mqygn-kiaaa-aaaar-qaadq-cai";
+const TESTNET_CKBTC_MINTER: &str = "ml52i-qqaaa-aaaar-qaaba-cai";
+
+const MAINNET_CKBTC_LEDGER: &str = "mxzaz-hqaaa-aaaar-qaada-cai";
+const TESTNET_CKBTC_LEDGER: &str = "mc6ru-gyaaa-aaaar-qaaaq-cai";
+
+const CKBTC_TRANSFER_FEE: u64 = 10;
+
 impl BitcoinConnection {
     pub fn network(&self) -> BitcoinNetwork {
         match self {
@@ -35,32 +45,24 @@ impl BitcoinConnection {
     }
     pub fn ckbtc_minter(&self) -> Principal {
         match self {
-            BitcoinConnection::Mainnet => {
-                Principal::from_text("mqygn-kiaaa-aaaar-qaadq-cai").unwrap()
-            }
-            BitcoinConnection::Testnet => {
-                Principal::from_text("ml52i-qqaaa-aaaar-qaaba-cai").unwrap()
-            }
+            BitcoinConnection::Mainnet => Principal::from_text(MAINNET_CKBTC_MINTER).unwrap(),
+            BitcoinConnection::Testnet => Principal::from_text(TESTNET_CKBTC_MINTER).unwrap(),
             BitcoinConnection::Custom { ckbtc_minter, .. } => *ckbtc_minter,
         }
     }
 
     pub fn ckbtc_ledger(&self) -> Principal {
         match self {
-            BitcoinConnection::Mainnet => {
-                Principal::from_text("mxzaz-hqaaa-aaaar-qaada-cai").unwrap()
-            }
-            BitcoinConnection::Testnet => {
-                Principal::from_text("mc6ru-gyaaa-aaaar-qaaaq-cai").unwrap()
-            }
+            BitcoinConnection::Mainnet => Principal::from_text(MAINNET_CKBTC_LEDGER).unwrap(),
+            BitcoinConnection::Testnet => Principal::from_text(TESTNET_CKBTC_LEDGER).unwrap(),
             BitcoinConnection::Custom { ckbtc_ledger, .. } => *ckbtc_ledger,
         }
     }
 
     pub fn ledger_fee(&self) -> u64 {
         match self {
-            BitcoinConnection::Mainnet => 10,
-            BitcoinConnection::Testnet => 10,
+            BitcoinConnection::Mainnet => CKBTC_TRANSFER_FEE,
+            BitcoinConnection::Testnet => CKBTC_TRANSFER_FEE,
             BitcoinConnection::Custom { ledger_fee, .. } => *ledger_fee,
         }
     }
