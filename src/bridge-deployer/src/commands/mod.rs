@@ -84,6 +84,17 @@ pub enum Bridge {
 }
 
 impl Bridge {
+    /// Returns the kind of bridge
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Bridge::Brc20 { .. } => "brc20-bridge",
+            Bridge::Btc { .. } => "btc-bridge",
+            Bridge::Erc20 { .. } => "erc20-bridge",
+            Bridge::Icrc { .. } => "icrc2-bridge",
+            Bridge::Rune { .. } => "rune-bridge",
+        }
+    }
+
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
