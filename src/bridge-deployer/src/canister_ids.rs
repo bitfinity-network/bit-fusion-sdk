@@ -53,6 +53,13 @@ impl CanisterIds {
         let path = self.path.path();
         debug!("Writing canister IDs to file: {}", path.display());
 
+        // create parent directories if not exists
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+
         let content = serde_json::to_string_pretty(&self.canisters)?;
         std::fs::write(&path, content)?;
 

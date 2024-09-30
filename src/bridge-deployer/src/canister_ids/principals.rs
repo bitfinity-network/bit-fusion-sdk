@@ -11,8 +11,6 @@ pub struct CanisterPrincipal {
     ic: Option<Principal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     local: Option<Principal>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    testnet: Option<Principal>,
 }
 
 impl CanisterPrincipal {
@@ -29,8 +27,7 @@ impl CanisterPrincipal {
         debug!("Setting canister principal {principal} for network: {network:?}");
         match network {
             EvmNetwork::Localhost => self.local = Some(principal),
-            EvmNetwork::Testnet => self.testnet = Some(principal),
-            EvmNetwork::Mainnet => self.ic = Some(principal),
+            EvmNetwork::Mainnet | EvmNetwork::Testnet => self.ic = Some(principal),
         }
     }
 
@@ -38,8 +35,7 @@ impl CanisterPrincipal {
     pub fn get(&self, network: EvmNetwork) -> Option<&Principal> {
         match network {
             EvmNetwork::Localhost => self.local.as_ref(),
-            EvmNetwork::Testnet => self.testnet.as_ref(),
-            EvmNetwork::Mainnet => self.ic.as_ref(),
+            EvmNetwork::Mainnet | EvmNetwork::Testnet => self.ic.as_ref(),
         }
     }
 }
@@ -56,19 +52,16 @@ mod test {
         let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Localhost);
 
         assert_eq!(canister_principal.local, Some(principal));
-        assert_eq!(canister_principal.testnet, None);
         assert_eq!(canister_principal.ic, None);
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
         let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Testnet);
         assert_eq!(canister_principal.local, None);
-        assert_eq!(canister_principal.testnet, Some(principal));
-        assert_eq!(canister_principal.ic, None);
+        assert_eq!(canister_principal.ic, Some(principal));
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
         let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Mainnet);
         assert_eq!(canister_principal.local, None);
-        assert_eq!(canister_principal.testnet, None);
         assert_eq!(canister_principal.ic, Some(principal));
     }
 
@@ -82,7 +75,6 @@ mod test {
         canister_principal.set(other_principal, EvmNetwork::Testnet);
 
         assert_eq!(canister_principal.local, Some(principal));
-        assert_eq!(canister_principal.testnet, Some(other_principal));
-        assert_eq!(canister_principal.ic, None);
+        assert_eq!(canister_principal.ic, Some(other_principal));
     }
 }
