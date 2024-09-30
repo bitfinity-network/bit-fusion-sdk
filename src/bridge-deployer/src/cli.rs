@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
 use tracing::level_filters::LevelFilter;
-use tracing::{debug, info, trace, Level};
+use tracing::{debug, trace, Level};
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_subscriber::{filter, Layer as _};
 
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
@@ -57,7 +60,8 @@ pub struct Cli {
     /// -vv     Warnings
     /// -vvv    Info
     /// -vvvv   Debug
-    /// -vvvvv  Traces (warning: very verbose!)
+    /// -vvvvv  Debug with other libraries
+    /// -vvvvvv  Traces (warning: very verbose!)
     #[arg(short, long, action = ArgAction::Count, global = true, default_value_t = 3, verbatim_doc_comment, help_heading = "Display")]
     verbosity: u8,
 
@@ -100,7 +104,7 @@ impl Cli {
             ..
         } = cli;
 
-        info!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
+        println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("IC host: {}", ic_host);
 
         // load canister ids file
@@ -133,7 +137,7 @@ impl Cli {
                 0 => Level::ERROR,
                 1 => Level::WARN,
                 2 => Level::INFO,
-                3 => Level::DEBUG,
+                3 | 4 => Level::DEBUG,
                 _ => Level::TRACE,
             };
 
@@ -143,11 +147,39 @@ impl Cli {
 
     /// Initializes tracing with the appropriate log level based on the verbosity setting.
     pub fn init_tracing(&self) {
-        let directive = self.level();
-        tracing_subscriber::fmt()
-            .with_max_level(directive)
-            .with_target(true)
+        let stdout_logger = tracing_subscriber::fmt::layer()
+            .compact()
             .with_ansi(true)
-            .init();
+            .with_span_events(FmtSpan::CLOSE)
+            .with_writer(std::io::stdout);
+
+        let registry = tracing_subscriber::registry().with(
+            stdout_logger
+                .with_filter(self.level())
+                .with_filter(filter::filter_fn(self.source_filter())),
+        );
+
+        tracing::subscriber::set_global_default(registry).expect("failed to set global default");
+    }
+
+    /// Returns a filter function that filters out log messages based on the verbosity level.
+    fn source_filter(&self) -> impl Fn(&tracing::Metadata<'_>) -> bool {
+        if self.verbosity - 1 > 3 {
+            Self::filter_none
+        } else {
+            Self::filter_deployer_only
+        }
+    }
+
+    #[inline]
+    /// Filters out log messages that are not from the deployer.
+    fn filter_deployer_only(metadata: &tracing::Metadata) -> bool {
+        metadata.target().starts_with("bridge_deployer")
+    }
+
+    #[inline]
+    /// Filters out no log messages.
+    fn filter_none(_metadata: &tracing::Metadata) -> bool {
+        true
     }
 }

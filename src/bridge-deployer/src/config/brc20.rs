@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bridge_did::init::brc20::SchnorrKeyIds;
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
@@ -46,7 +47,7 @@ impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
     }
 }
 
-impl From<Brc20BridgeConfig> for bridge_did::init::Brc20BridgeConfig {
+impl From<Brc20BridgeConfig> for bridge_did::init::brc20::Brc20BridgeConfig {
     fn from(value: Brc20BridgeConfig) -> Self {
         Self {
             network: value.bitcoin_network.into(),
@@ -55,6 +56,7 @@ impl From<Brc20BridgeConfig> for bridge_did::init::Brc20BridgeConfig {
             deposit_fee: value.deposit_fee,
             mempool_timeout: Duration::from_secs(value.mempool_timeout),
             indexer_consensus_threshold: value.indexer_consensus_threshold,
+            schnorr_key_id: SchnorrKeyIds::ProductionKey1,
         }
     }
 }

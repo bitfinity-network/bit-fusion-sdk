@@ -44,6 +44,7 @@ impl Id256 {
     pub const PRINCIPAL_MARK: u8 = 0;
     pub const EVM_ADDRESS_MARK: u8 = 1;
     pub const BTC_TX_MARK: u8 = 2;
+    pub const BRC20_TICK_MARK: u8 = 3;
 
     /// Creates unique identifier for contract.
     /// Chain id required to make identifiers unique across all chains.
@@ -74,6 +75,27 @@ impl Id256 {
 
         let address = H160::from_slice(&self.0[5..25]);
         Ok((chain_id, address))
+    }
+
+    /// Convert ID256 into BRC20 tick.
+    pub fn to_brc20_tick(&self) -> BftResult<[u8; 4]> {
+        if self.0[0] != Self::BRC20_TICK_MARK {
+            return Err(Error::Serialization(
+                "wrong brc20 tick mark in Id256".into(),
+            ));
+        }
+
+        Ok(self.0[1..5].try_into().expect("we have exactly 4 bytes"))
+    }
+
+    /// Creates unique identifier for BRC20 token.
+    pub fn from_brc20_tick(tick: [u8; 4]) -> Self {
+        let mut buf = [0u8; Self::BYTE_SIZE];
+
+        buf[0] = Self::BRC20_TICK_MARK;
+        buf[1..][..4].copy_from_slice(&tick);
+
+        Self(buf)
     }
 
     /// Creates Self from bytes.
@@ -150,7 +172,10 @@ impl TryFrom<&[u8]> for Id256 {
         })?;
 
         match inner[0] {
-            Self::PRINCIPAL_MARK | Self::EVM_ADDRESS_MARK | Self::BTC_TX_MARK => Ok(Self(inner)),
+            Self::PRINCIPAL_MARK
+            | Self::EVM_ADDRESS_MARK
+            | Self::BTC_TX_MARK
+            | Self::BRC20_TICK_MARK => Ok(Self(inner)),
             _ => Err(Error::Serialization(
                 "wrong Id256 mark in first byte".into(),
             )),
@@ -272,6 +297,13 @@ mod tests {
                 "wrong evm address mark in Id256".into()
             ))
         );
+    }
+
+    #[test]
+    fn test_should_convert_id256_to_brc20() {
+        let tick = [b'o', b'r', b'd', b'i'];
+        let id = Id256::from_brc20_tick(tick);
+        assert_eq!(id.to_brc20_tick().unwrap(), tick);
     }
 
     #[test]

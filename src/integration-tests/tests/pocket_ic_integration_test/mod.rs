@@ -231,8 +231,17 @@ async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H16
     let expected_fee_charge_address =
         ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
 
+    let wrapped_token_deployer = ctx
+        .initialize_wrapped_token_deployer_contract(&john_wallet)
+        .await
+        .unwrap();
+
     let bft_bridge = ctx
-        .initialize_bft_bridge(ADMIN, expected_fee_charge_address.into())
+        .initialize_bft_bridge(
+            ADMIN,
+            expected_fee_charge_address.into(),
+            wrapped_token_deployer,
+        )
         .await
         .unwrap();
 
