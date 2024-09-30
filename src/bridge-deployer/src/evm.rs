@@ -27,7 +27,7 @@ pub fn evm_link(evm_network: EvmNetwork, evm_principal: Option<Principal>) -> Ev
             dfx_webserver_port(),
             evm_principal
                 .map(|principal| principal.to_text())
-                .unwrap_or_else(|| local_evm_principal())
+                .unwrap_or_else(local_evm_principal)
         )),
         EvmNetwork::Mainnet => EvmLink::Ic(evm_principal.unwrap_or_else(|| {
             Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
