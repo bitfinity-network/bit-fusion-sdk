@@ -6,15 +6,15 @@ use crate::contracts::EvmNetwork;
 
 /// A struct to represent the principal IDs of a canister.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct CanisterPrincipal {
+pub struct CanisterPrincipals {
     #[serde(skip_serializing_if = "Option::is_none")]
     ic: Option<Principal>,
     #[serde(skip_serializing_if = "Option::is_none")]
     local: Option<Principal>,
 }
 
-impl CanisterPrincipal {
-    /// Creates a new `CanisterPrincipal` instance.
+impl CanisterPrincipals {
+    /// Creates a new `CanisterPrincipals` instance.
     pub fn new(principal: Principal, network: EvmNetwork) -> Self {
         let mut instance = Self::default();
         instance.set(principal, network);
@@ -49,18 +49,18 @@ mod test {
     #[test]
     fn test_canister_principal() {
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Localhost);
+        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Localhost);
 
         assert_eq!(canister_principal.local, Some(principal));
         assert_eq!(canister_principal.ic, None);
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Testnet);
+        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Testnet);
         assert_eq!(canister_principal.local, None);
         assert_eq!(canister_principal.ic, Some(principal));
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipal::new(principal, EvmNetwork::Mainnet);
+        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Mainnet);
         assert_eq!(canister_principal.local, None);
         assert_eq!(canister_principal.ic, Some(principal));
     }
@@ -68,7 +68,7 @@ mod test {
     #[test]
     fn test_should_set() {
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let mut canister_principal = CanisterPrincipal::default();
+        let mut canister_principal = CanisterPrincipals::default();
         canister_principal.set(principal, EvmNetwork::Localhost);
 
         let other_principal = Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap();

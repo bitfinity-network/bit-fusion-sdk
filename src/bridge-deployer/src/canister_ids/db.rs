@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use candid::Principal;
 use serde::{Deserialize, Serialize};
 
-use super::principals::CanisterPrincipal;
+use super::principals::CanisterPrincipals;
 use super::CanisterType;
 use crate::contracts::EvmNetwork;
 
@@ -11,7 +11,7 @@ use crate::contracts::EvmNetwork;
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CanistersDb {
     #[serde(flatten)]
-    canisters: HashMap<CanisterType, CanisterPrincipal>,
+    canisters: HashMap<CanisterType, CanisterPrincipals>,
 }
 
 impl CanistersDb {
@@ -30,7 +30,7 @@ impl CanistersDb {
         self.canisters
             .entry(canister)
             .and_modify(|canister_data| canister_data.set(principal, network))
-            .or_insert_with(|| CanisterPrincipal::new(principal, network));
+            .or_insert_with(|| CanisterPrincipals::new(principal, network));
     }
 
     #[cfg(test)]
