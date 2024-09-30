@@ -1,10 +1,9 @@
-mod brc20;
+pub mod brc20;
 mod bridge_data;
 mod rune;
 
 use std::time::Duration;
 
-pub use brc20::*;
 pub use bridge_data::*;
 pub use rune::*;
 

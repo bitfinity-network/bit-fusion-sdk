@@ -4,7 +4,7 @@ use std::time::Duration;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_did::id256::Id256;
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
+use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -27,6 +27,8 @@ const IDENTITY_PATH: &str = "src/bridge-tool/identity.pem";
 enum CliCommand {
     /// Create bft bridge contract.
     DeployBftBridge(DeployBftArgs),
+    /// Create WrappedTokenDeployer contract.
+    DeployWrappedTokenDeployer(DeployWrappedTokenDeployerArgs),
     /// Create wrapper token contract.
     CreateToken(CreateTokenArgs),
     /// Create a new ETH wallet and mint native tokens to it.
@@ -105,10 +107,33 @@ struct DeployBftArgs {
     #[arg(long)]
     fee_charge_address: Option<String>,
 
+    /// ETH address of the WrappedTokenDeployer contract.
+    #[arg(long)]
+    wrapped_token_deployer_address: String,
+
     /// IsWrappedSide
     #[arg(long, default_value_t = false)]
     is_wrapped_side: bool,
 
+    /// Evm Principal
+    #[arg(long)]
+    evm: Principal,
+
+    /// IC host
+    #[arg(long)]
+    ic_host: Option<String>,
+
+    /// Hex-encoded PK to use to sign transaction. If not set, a random wallet will be created.
+    #[arg(long)]
+    wallet: Option<String>,
+
+    /// Identity Path
+    #[arg(long)]
+    identity_path: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+struct DeployWrappedTokenDeployerArgs {
     /// Evm Principal
     #[arg(long)]
     evm: Principal,
@@ -256,6 +281,7 @@ struct WalletAddressArgs {
 async fn main() {
     match CliCommand::parse() {
         CliCommand::DeployBftBridge(args) => deploy_bft_bridge(args).await,
+        CliCommand::DeployWrappedTokenDeployer(args) => deploy_wrapped_token_deployer(args).await,
         CliCommand::CreateToken(args) => create_token(args).await,
         CliCommand::CreateWallet(args) => create_wallet(args).await,
         CliCommand::BurnWrapped(args) => burn_wrapped(args).await,
@@ -463,10 +489,15 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
         .map(|address_str| {
             H160::from_slice(
                 &hex::decode(address_str.trim_start_matches("0x"))
-                    .expect("failed to parse minter address"),
+                    .expect("failed to parse fee charge address address"),
             )
         })
         .unwrap_or_default();
+
+    let wrapped_token_deployer = H160::from_slice(
+        &hex::decode(args.wrapped_token_deployer_address.trim_start_matches("0x"))
+            .expect("failed to parse wrapped token deployer address"),
+    );
 
     async fn deploy_contract(
         client: &EvmCanisterClient<IcAgentClient>,
@@ -516,6 +547,7 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     let init_data = BFTBridge::initializeCall {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
+        wrappedTokenDeployer: wrapped_token_deployer.0.into(),
         isWrappedSide: args.is_wrapped_side,
         owner: [0; 20].into(),
         controllers: vec![],
@@ -537,6 +569,56 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     println!("Implementation address: {bft_contract_address:#x}");
     println!("Proxy address: {bft_proxy_address:#x}");
     println!("{bft_proxy_address:#x}");
+}
+
+async fn deploy_wrapped_token_deployer(args: DeployWrappedTokenDeployerArgs) {
+    let identity = args.identity_path.as_deref().unwrap_or(IDENTITY_PATH);
+    let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
+    let client = EvmCanisterClient::new(
+        IcAgentClient::with_identity(args.evm, identity, host, None)
+            .await
+            .expect("failed to create evm client"),
+    );
+
+    let some_wallet = args.wallet.clone();
+    let wallet = get_wallet(&some_wallet, &client).await;
+    let did_from: did::H160 = wallet.address().into();
+
+    let deploy_tx_input = WrappedTokenDeployer::BYTECODE.to_vec();
+
+    let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+    let nonce = client
+        .account_basic(did_from.clone())
+        .await
+        .expect("failed to basic account")
+        .nonce;
+
+    let create_contract_tx = TransactionBuilder {
+        from: &did_from,
+        input: deploy_tx_input,
+        nonce,
+        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        to: None,
+        value: U256::zero(),
+        gas: 4_000_000_u64.into(),
+        signature: SigningMethod::SigningKey(wallet.signer()),
+        chain_id,
+    }
+    .calculate_hash_and_build()
+    .expect("failed to build transaction");
+
+    let hash = client
+        .send_raw_transaction(create_contract_tx)
+        .await
+        .expect("Failed to send raw transaction")
+        .expect("Failed to execute crate BFT contract transaction");
+    let receipt = wait_for_tx_success(&client, hash).await;
+    let wrapped_token_deployer_contract_address = receipt
+        .contract_address
+        .expect("Receipt did not contain contract address");
+
+    eprintln!("Created WrappedTokenDeployer contract");
+    println!("{wrapped_token_deployer_contract_address:#x}");
 }
 
 async fn deploy_fee_charge(args: DeployFeeChargeArgs) {

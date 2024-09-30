@@ -19,7 +19,7 @@ use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{BtcSignerType, KeyError};
+use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UtxoKey;
 use crate::ops::Brc20BridgeOpImpl;
 use crate::state::Brc20State;
@@ -301,6 +301,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         res
     }
 
+    /// Create the unsigned mint order
     pub fn create_unsigned_mint_order(
         &self,
         dst_address: &H160,
@@ -313,7 +314,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
 
         let sender_chain_id = state_ref.btc_chain_id();
         let sender = Id256::from_evm_address(dst_address, sender_chain_id);
-        let src_token = Id256::from(brc20_info.tick);
+        let src_token = Id256::from_brc20_tick(brc20_info.tick.inner());
 
         let recipient_chain_id = self
             .runtime_state
@@ -342,6 +343,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         }
     }
 
+    /// Sign mint order
     pub async fn sign_mint_order(
         &self,
         mint_order: MintOrder,
@@ -357,6 +359,26 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         Ok(signed_mint_order)
     }
 
+    /// Mark utxos as used
+    pub async fn mark_utxos_as_used(
+        &self,
+        eth_address: &H160,
+        utxos: &[Utxo],
+    ) -> Result<(), DepositError> {
+        let address = self.get_transit_address(eth_address).await?;
+        let derivation_path = get_derivation_path_ic(eth_address);
+
+        let mut state_ref = self.brc20_state.borrow_mut();
+        let ledger = state_ref.ledger_mut();
+
+        for utxo in utxos {
+            ledger.mark_as_used(utxo.clone(), &address, derivation_path.clone());
+        }
+
+        Ok(())
+    }
+
+    /// Filter out used utxos from the response
     fn filter_out_used_utxos(
         &self,
         get_utxos_response: &mut GetUtxosResponse,
@@ -366,7 +388,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
 
         get_utxos_response
             .utxos
-            .retain(|utxo| !ledger.unspent_utxos_contains(&UtxoKey::from(&utxo.outpoint)));
+            .retain(|utxo| !ledger.used_utxo_contains(&UtxoKey::from(&utxo.outpoint)));
 
         Ok(())
     }

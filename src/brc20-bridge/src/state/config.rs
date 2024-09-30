@@ -1,4 +1,4 @@
-use bridge_did::init::Brc20BridgeConfig;
+use bridge_did::init::brc20::Brc20BridgeConfig;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{CellStructure, MemoryId, MemoryManager, StableCell};
 

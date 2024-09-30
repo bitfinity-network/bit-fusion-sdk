@@ -85,6 +85,17 @@ pub enum Bridge {
 }
 
 impl Bridge {
+    /// Returns the kind of bridge
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Bridge::Brc20 { .. } => "brc20-bridge",
+            Bridge::Btc { .. } => "btc-bridge",
+            Bridge::Erc20 { .. } => "erc20-bridge",
+            Bridge::Icrc { .. } => "icrc2-bridge",
+            Bridge::Rune { .. } => "rune-bridge",
+        }
+    }
+
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self, evm_network: EvmNetwork) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
@@ -95,7 +106,7 @@ impl Bridge {
                 trace!("Preparing BRC20 bridge configuration");
                 let init_data = init.clone().into_bridge_init_data(evm_network);
                 debug!("BRC20 Bridge Config : {:?}", init_data);
-                let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
+                let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
@@ -211,14 +222,16 @@ impl BFTArgs {
     ) -> anyhow::Result<H160> {
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
-        let expected_nonce = contract_deployer.get_nonce().await? + 2;
-
-        let expected_address = contract_deployer.compute_fee_charge_address(expected_nonce)?;
+        let expected_nonce = contract_deployer.get_nonce().await? + 3;
+        let expected_fee_charge_address =
+            contract_deployer.compute_fee_charge_address(expected_nonce)?;
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
 
         // Sleep for 1 second to allow the canister to be created
         tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let wrapped_token_deployer = contract_deployer.deploy_wrapped_token_deployer()?;
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
@@ -230,13 +243,14 @@ impl BFTArgs {
 
         let bft_address = contract_deployer.deploy_bft(
             &minter_address.into(),
-            &expected_address,
+            &expected_fee_charge_address,
+            &wrapped_token_deployer,
             is_wrapped_side,
             self.owner,
             &self.controllers,
         )?;
 
-        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_address))?;
+        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
         Ok(bft_address)
     }

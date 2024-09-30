@@ -44,6 +44,10 @@ impl UpgradeCommands {
             .await?;
 
         info!("Canister upgraded successfully");
+        println!(
+            "Canister {canister_id} upgraded successfully",
+            canister_id = self.canister_id
+        );
 
         Ok(())
     }

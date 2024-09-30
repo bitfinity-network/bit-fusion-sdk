@@ -72,8 +72,14 @@ impl<B: BaseTokens> StressTestState<B> {
     pub async fn run(base_tokens: B, config: StressTestConfig) -> Result<StressTestStats> {
         let admin_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
 
+        let wrapped_token_deployer = base_tokens
+            .ctx()
+            .initialize_wrapped_token_deployer_contract(&admin_wallet)
+            .await
+            .unwrap();
+
         let expected_fee_charge_address =
-            ethers_core::utils::get_contract_address(admin_wallet.address(), 2);
+            ethers_core::utils::get_contract_address(admin_wallet.address(), 3);
 
         println!("Initializing BftBridge contract");
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;
@@ -96,6 +102,7 @@ impl<B: BaseTokens> StressTestState<B> {
                 &admin_wallet,
                 bridge_canister_address,
                 Some(expected_fee_charge_address.into()),
+                wrapped_token_deployer,
                 true,
             )
             .await?;

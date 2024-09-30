@@ -80,16 +80,24 @@ impl ReinstallCommands {
 
         if deploy_bft {
             info!("Deploying BFT bridge");
-            self.bft_args
+            let bft_bridge_addr = self
+                .bft_args
                 .deploy_bft(network, self.canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
-            info!("BFT bridge deployed successfully");
+            info!("BFT bridge deployed successfully with address: {bft_bridge_addr}");
+            println!("BFT bridge deployed with address: {bft_bridge_addr}");
         }
 
         info!(
-            "Canister reinstalled successfully with ID: {:?}",
+            "Canister reinstalled successfully with ID: {}",
             self.canister_id
+        );
+
+        println!(
+            "Canister {canister_type} reinstalled with ID {canister_id}",
+            canister_type = self.bridge_type.kind(),
+            canister_id = self.canister_id
         );
         Ok(())
     }

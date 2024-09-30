@@ -11,6 +11,7 @@ dotenv.config();
 import "./tasks/deploy-bft";
 import "./tasks/fee-charge-address";
 import "./tasks/deploy-fee-charge";
+import "./tasks/deploy-wrapped-token-deployer";
 import "./tasks/upgrade-bft";
 import "./tasks/pause-unpause";
 
