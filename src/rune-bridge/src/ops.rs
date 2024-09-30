@@ -34,7 +34,7 @@ pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
 impl Operation for RuneBridgeOpImpl {
     async fn progress(
         self,
-        _id: OperationId,
+        id: OperationId,
         ctx: RuntimeState<Self>,
     ) -> BftResult<OperationProgress<Self>> {
         let next_step = match self.0 {
@@ -78,8 +78,19 @@ impl Operation for RuneBridgeOpImpl {
                 )
                 .await
             }
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)) => {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mut mint_order)) => {
                 log::debug!("RuneBridgeOp::SignMintOrder {mint_order:?}");
+                // set mint order nonce to new operation id
+                mint_order.nonce = id.nonce();
+                log::debug!(
+                    "RuneBridgeOp::SignMintOrder nonce updated to {}",
+                    mint_order.nonce
+                );
+                let new_op = RuneBridgeOpImpl(RuneBridgeOp::Deposit(
+                    RuneBridgeDepositOp::SignMintOrder(mint_order),
+                ));
+                // update the mint order
+                ctx.borrow_mut().operations.update(id, new_op.clone());
 
                 return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }

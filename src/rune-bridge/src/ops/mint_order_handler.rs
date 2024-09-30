@@ -37,7 +37,7 @@ impl MintOrderHandler for RuneMintOrderHandler {
     fn get_order(&self, id: OperationId) -> Option<MintOrder> {
         let op = self.state.borrow().operations.get(id)?;
         let RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(order)) = op.0 else {
-            log::info!(
+            log::error!(
                 "Mint order handler failed to get MintOrder: unexpected state for operation {id}"
             );
             return None;
@@ -56,7 +56,7 @@ impl MintOrderHandler for RuneMintOrderHandler {
             &op.0,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(_)),
         ) {
-            log::info!(
+            log::error!(
                 "Mint order handler failed to set MintOrder: unexpected state for operation {id}"
             );
             return;
