@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use bridge_did::error::BftResult;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
@@ -239,7 +240,8 @@ impl BFTArgs {
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
-            .await??;
+            .await?
+            .context("failed to get the bridge canister address")?;
 
         info!("Minter address: {:x}", minter_address);
 
