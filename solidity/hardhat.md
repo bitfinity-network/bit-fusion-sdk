@@ -57,6 +57,12 @@ npx hardhat deploy-fee-charge --network <network> --bridges <bridge_addresses> [
 npx hardhat deploy-wrapped-token-deployer --network <network> 
 ```
 
+- Deploy WrappedToken contract:
+
+```bash
+npx hardhat deploy-wrapped-token --network <network> --wrapped-token-deployer <address> --name <name> --symbol <symbol> --decimals <decimals> --owner <address>
+```
+
 - Compute Fee Charge Address:
 
 ```bash
