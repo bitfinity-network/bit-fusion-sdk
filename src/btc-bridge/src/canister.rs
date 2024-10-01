@@ -8,6 +8,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::BftResult;
+use bridge_did::init::btc::WrappedTokenConfig;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
@@ -28,7 +29,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
 use crate::ops::BtcBridgeOpImpl;
-use crate::state::{BtcConfig, State, WrappedTokenConfig};
+use crate::state::{BtcConfig, State};
 
 type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 

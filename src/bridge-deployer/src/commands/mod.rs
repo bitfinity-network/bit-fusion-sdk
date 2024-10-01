@@ -209,6 +209,11 @@ pub struct BFTArgs {
     controllers: Option<Vec<H160>>,
 }
 
+pub struct BftDeployedContracts {
+    pub bft_bridge: H160,
+    pub wrapped_token_deployer: H160,
+}
+
 impl BFTArgs {
     /// Deploy the BFT contract
     pub async fn deploy_bft(
@@ -218,7 +223,7 @@ impl BFTArgs {
         bridge: &Bridge,
         pk: H256,
         agent: &Agent,
-    ) -> anyhow::Result<H160> {
+    ) -> anyhow::Result<BftDeployedContracts> {
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
         let expected_nonce = contract_deployer.get_nonce().await? + 3;
@@ -251,7 +256,10 @@ impl BFTArgs {
 
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
-        Ok(bft_address)
+        Ok(BftDeployedContracts {
+            bft_bridge: bft_address,
+            wrapped_token_deployer,
+        })
     }
 }
 

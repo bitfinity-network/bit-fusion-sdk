@@ -4,16 +4,20 @@ This document provides comprehensive information about the Hardhat tasks availab
 
 ## Table of Contents
 
-1. [Setup](#setup)
-2. [Available Tasks](#available-tasks)
-3. [BFT Contract Upgrade Process](#bft-contract-upgrade-process)
-   - [OpenZeppelin UUPS Proxy Pattern](#openzeppelin-uups-proxy-pattern)
-   - [Upgrade Methods](#upgrade-methods)
-   - [Upgrade Considerations](#upgrade-considerations)
-4. [Usage Examples](#usage-examples)
-5. [Best Practices and Notes](#best-practices-and-notes)
-6. [Troubleshooting](#troubleshooting)
-7. [Additional Resources](#additional-resources)
+- [BitFusion SDK Hardhat Tasks and Contract Upgrade Guide](#bitfusion-sdk-hardhat-tasks-and-contract-upgrade-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Setup](#setup)
+  - [Available Tasks](#available-tasks)
+  - [BFT Contract Upgrade Process](#bft-contract-upgrade-process)
+    - [OpenZeppelin UUPS Proxy Pattern](#openzeppelin-uups-proxy-pattern)
+    - [Upgrade Methods](#upgrade-methods)
+      - [Controlled Upgrade (Step-by-Step)](#controlled-upgrade-step-by-step)
+      - [One-Go Upgrade](#one-go-upgrade)
+    - [Upgrade Considerations](#upgrade-considerations)
+  - [Usage Examples](#usage-examples)
+  - [Best Practices and Notes](#best-practices-and-notes)
+  - [Troubleshooting](#troubleshooting)
+  - [Additional Resources](#additional-resources)
 
 ## Setup
 
@@ -21,11 +25,15 @@ This document provides comprehensive information about the Hardhat tasks availab
 2. Clone the repository and navigate to the project directory.
 3. Install dependencies:
 
+   ```sh
    yarn install
+   ```
 
 4. Create a `.env` file in the root directory with your environment variables:
 
+   ```env
    PRIVATE_KEY=your_private_key
+   ```
 
 5. Configure your hardhat config file with appropriate network settings.
 

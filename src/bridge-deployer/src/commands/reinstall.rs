@@ -10,6 +10,7 @@ use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
+use crate::commands::BftDeployedContracts;
 use crate::contracts::EvmNetwork;
 
 /// The reinstall command.
@@ -80,13 +81,16 @@ impl ReinstallCommands {
 
         if deploy_bft {
             info!("Deploying BFT bridge");
-            let bft_bridge_addr = self
+            let BftDeployedContracts {
+                bft_bridge,
+                wrapped_token_deployer,
+            } = self
                 .bft_args
                 .deploy_bft(network, self.canister_id, &self.bridge_type, pk, &agent)
                 .await?;
 
-            info!("BFT bridge deployed successfully with address: {bft_bridge_addr}");
-            println!("BFT bridge deployed with address: {bft_bridge_addr}");
+            info!("BFT bridge deployed successfully with address: {bft_bridge}; Wrapped token deployer deployed successfully with address: {wrapped_token_deployer}");
+            println!("BFT bridge deployed with address: {bft_bridge}; Wrapped token deployer deployed with address: {wrapped_token_deployer}");
         }
 
         info!(
