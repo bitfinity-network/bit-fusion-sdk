@@ -14,6 +14,8 @@ use bridge_did::error::BftResult;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
+use bridge_did::order::SignedOrders;
+use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
@@ -64,6 +66,32 @@ impl BtcBridge {
     fn run_scheduler() {
         let runtime = get_runtime();
         runtime.borrow_mut().run();
+    }
+
+    /// Returns `(nonce, mint_order)` pairs for the given sender id.
+    /// Offset, if set, defines the starting index of the page,
+    /// Count, if set, defines the number of elements in the page.
+    #[query]
+    pub fn list_mint_orders(
+        &self,
+        wallet_address: H160,
+        pagination: Option<Pagination>,
+    ) -> Vec<(u32, SignedOrders)> {
+        Self::token_mint_orders(wallet_address, pagination)
+    }
+
+    /// Returns `(nonce, mint_order)` pairs for the given sender id and operation_id.
+    #[query]
+    pub fn get_mint_order(
+        &self,
+        wallet_address: H160,
+        operation_id: u32,
+        pagination: Option<Pagination>,
+    ) -> Option<SignedOrders> {
+        Self::token_mint_orders(wallet_address, pagination)
+            .into_iter()
+            .find(|(nonce, _)| *nonce == operation_id)
+            .map(|(_, mint_order)| mint_order)
     }
 
     /// Returns operation by memo
@@ -118,6 +146,29 @@ impl BtcBridge {
     #[query]
     fn get_canister_build_data(&self) -> BuildData {
         bridge_canister::build_data!()
+    }
+
+    /// Get mint orders for the given wallet address and token;
+    /// if `offset` and `count` are provided, returns a page of mint orders.
+    fn token_mint_orders(
+        wallet_address: H160,
+        pagination: Option<Pagination>,
+    ) -> Vec<(u32, SignedOrders)> {
+        let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
+        let count = pagination.as_ref().map(|p| p.count).unwrap_or(usize::MAX);
+        get_runtime_state()
+            .borrow()
+            .operations
+            .get_for_address(&wallet_address, None)
+            .into_iter()
+            .filter_map(|(operation_id, operation)| {
+                operation
+                    .get_signed_mint_order()
+                    .map(|mint_order| (operation_id.nonce(), mint_order))
+            })
+            .skip(offset)
+            .take(count)
+            .collect()
     }
 
     pub fn idl() -> Idl {

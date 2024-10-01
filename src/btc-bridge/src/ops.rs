@@ -11,7 +11,7 @@ use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
-use bridge_did::order::MintOrder;
+use bridge_did::order::{MintOrder, SignedOrders};
 use bridge_did::reason::BtcDeposit;
 use candid::{CandidType, Decode, Principal};
 use did::H160;
@@ -91,15 +91,15 @@ impl Operation for BtcBridgeOpImpl {
                 log::debug!("CreateMintOrder: Eth address {eth_address}, amount {amount}");
                 let order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
-                Ok(Self(BtcBridgeOp::SignMintOrder { eth_address, order }))
+                Ok(Self(BtcBridgeOp::SignMintOrder { order }))
             }
-            BtcBridgeOp::SignMintOrder { eth_address, order } => {
-                log::debug!("BtcBridgeOp::SignMintOrder {eth_address} {order:?}");
+            BtcBridgeOp::SignMintOrder { order } => {
+                log::debug!("BtcBridgeOp::SignMintOrder  {order:?}");
 
                 return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
-            BtcBridgeOp::MintErc20 { eth_address, order } => {
-                log::debug!("MintErc20: Eth address {eth_address}; {order:?}");
+            BtcBridgeOp::MintErc20 { order } => {
+                log::debug!("MintErc20: {order:?}");
 
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
@@ -147,8 +147,8 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::CreateMintOrder { eth_address, .. } => eth_address.clone(),
             BtcBridgeOp::ConfirmErc20Mint { order, .. } => order.reader().get_recipient(),
             BtcBridgeOp::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
-            BtcBridgeOp::MintErc20 { eth_address, .. } => eth_address.clone(),
-            BtcBridgeOp::SignMintOrder { eth_address, .. } => eth_address.clone(),
+            BtcBridgeOp::MintErc20 { order } => order.reader().get_recipient(),
+            BtcBridgeOp::SignMintOrder { order } => order.recipient.clone(),
             BtcBridgeOp::TransferCkBtc { eth_address, .. } => eth_address.clone(),
             BtcBridgeOp::UpdateCkBtcBalance { eth_address } => eth_address.clone(),
             BtcBridgeOp::WithdrawBtc(BurntEventData { sender, .. }) => sender.clone(),
@@ -513,5 +513,13 @@ impl BtcBridgeOpImpl {
         log::trace!("Withdrawal of {amount} btc to {address} requested");
 
         Ok(result)
+    }
+
+    pub fn get_signed_mint_order(&self) -> Option<SignedOrders> {
+        match &self.0 {
+            BtcBridgeOp::ConfirmErc20Mint { order, .. } => Some(order.clone()),
+            BtcBridgeOp::MintErc20 { order, .. } => Some(order.clone()),
+            _ => None,
+        }
     }
 }
