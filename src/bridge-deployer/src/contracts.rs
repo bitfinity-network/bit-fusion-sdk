@@ -2,7 +2,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use clap::ValueEnum;
+use clap::{Parser, ValueEnum};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
@@ -11,6 +11,37 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, H160};
 use ethers_core::utils::hex::ToHexExt;
 use tracing::{debug, info};
+
+const LOCALHOST_URL: &str = "http://127.0.0.1:8545";
+const TESTNET_URL: &str = "https://testnet.bitfinity.network";
+const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
+
+#[derive(Debug, Clone, Parser)]
+pub struct NetworkConfig {
+    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    #[clap(value_enum, long, conflicts_with = "custom_network")]
+    evm_network: EvmNetwork,
+    /// Custom network URL
+    ///
+    /// Note: this option is ignored if `evm_network` is set.
+    custom_network: Option<String>,
+}
+
+impl std::fmt::Display for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.custom_network.is_some() {
+            write!(f, "custom")?;
+        }
+
+        let network = match self.evm_network {
+            EvmNetwork::Localhost => "localhost",
+            EvmNetwork::Testnet => "testnet",
+            EvmNetwork::Mainnet => "mainnet",
+        };
+
+        write!(f, "{network}")
+    }
+}
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
 #[strum(serialize_all = "snake_case")]
@@ -21,7 +52,7 @@ pub enum EvmNetwork {
 }
 
 pub struct SolidityContractDeployer<'a> {
-    network: EvmNetwork,
+    network: NetworkConfig,
     wallet: Wallet<'a, SigningKey>,
 }
 
@@ -36,17 +67,22 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: EvmNetwork, pk: H256) -> Self {
+    pub fn new(network: NetworkConfig, pk: H256) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
 
         Self { network, wallet }
     }
 
-    pub fn get_network_url(&self) -> &'static str {
-        match self.network {
-            EvmNetwork::Localhost => "http://127.0.0.1:8545",
-            EvmNetwork::Testnet => "https://testnet.bitfinity.network",
-            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network",
+    pub fn get_network_url(&self) -> &str {
+        if let Some(custom_network) = &self.network.custom_network {
+            std::env::set_var("CUSTOM_URL", custom_network);
+            custom_network
+        } else {
+            match self.network.evm_network {
+                EvmNetwork::Localhost => LOCALHOST_URL,
+                EvmNetwork::Testnet => TESTNET_URL,
+                EvmNetwork::Mainnet => MAINNET_URL,
+            }
         }
     }
 
@@ -122,11 +158,18 @@ impl SolidityContractDeployer<'_> {
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut command = Command::new("sh");
+        let command = command
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(custom_network) = &self.network.custom_network {
+            command.env("CUSTOM_URL", custom_network);
+        }
+
+        let output = command
             .output()
             .context("Failed to execute deploy-bft command")?;
 
@@ -275,13 +318,20 @@ impl SolidityContractDeployer<'_> {
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut command = Command::new("sh");
+        let command = command
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(custom_network) = &self.network.custom_network {
+            command.env("CUSTOM_URL", custom_network);
+        }
+
+        let output = command
             .output()
-            .context("Failed to execute deploy-bft command")?;
+            .context("Failed to execute deploy-fee-charge command")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

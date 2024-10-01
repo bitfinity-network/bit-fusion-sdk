@@ -9,7 +9,7 @@ use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
 
 use crate::commands::Commands;
-use crate::contracts::EvmNetwork;
+use crate::contracts::NetworkConfig;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
@@ -45,13 +45,8 @@ pub struct Cli {
     deploy_bft: bool,
 
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
-    #[arg(
-        long,
-        value_name = "EVM_NETWORK",
-        default_value = "localhost",
-        help_heading = "Bridge Contract Args"
-    )]
-    evm_network: EvmNetwork,
+    #[command(flatten)]
+    network: NetworkConfig,
 
     /// Set the minimum log level.
     ///
@@ -87,7 +82,7 @@ impl Cli {
             private_key,
             ic_host,
             deploy_bft,
-            evm_network,
+            network: evm_network,
             command,
             ..
         } = cli;

@@ -10,7 +10,7 @@ use ic_utils::interfaces::ManagementCanister;
 use tracing::{debug, info, trace};
 
 use super::{BFTArgs, Bridge};
-use crate::contracts::EvmNetwork;
+use crate::contracts::NetworkConfig;
 
 /// The reinstall command.
 ///
@@ -43,7 +43,7 @@ impl ReinstallCommands {
         &self,
         identity: PathBuf,
         ic_host: &str,
-        network: EvmNetwork,
+        network: NetworkConfig,
         pk: H256,
         deploy_bft: bool,
     ) -> anyhow::Result<()> {
