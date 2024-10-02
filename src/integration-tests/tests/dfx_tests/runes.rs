@@ -195,7 +195,7 @@ impl RunesContext {
 
         let client = context.evm_client(ADMIN);
         client
-            .mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .admin_mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
