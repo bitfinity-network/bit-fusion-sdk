@@ -32,6 +32,7 @@ pub fn get_workspace_root_dir() -> PathBuf {
 
 pub const EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS: Duration = Duration::from_millis(500);
 pub const CHAIN_ID: u64 = 355113;
+pub const EXTERNAL_EVM_CHAIN_ID: u64 = 533115;
 
 /// Re-usable function to prepare the evm canister
 pub fn new_evm_init_data(

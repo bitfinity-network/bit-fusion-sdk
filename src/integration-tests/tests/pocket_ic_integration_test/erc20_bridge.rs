@@ -7,7 +7,7 @@ use bridge_did::bridge_side::BridgeSide;
 use bridge_did::id256::Id256;
 use bridge_did::operations::Erc20OpStage;
 use bridge_utils::{BFTBridge, UUPSProxy};
-use did::{H160, U256, U64};
+use did::{H160, U256};
 use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -15,8 +15,10 @@ use evm_canister_client::EvmCanisterClient;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
+use crate::context::stress::erc20;
+use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext};
-use crate::pocket_ic_integration_test::{TestWTM, ADMIN};
+use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::CHAIN_ID;
 
 pub struct ContextWithBridges {
@@ -64,7 +66,7 @@ impl ContextWithBridges {
             .await
             .unwrap()
             .unwrap();
-        ctx.evm_client(ADMIN)
+        ctx.evm_client(ctx.admin_name())
             .mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
             .unwrap()
@@ -73,7 +75,7 @@ impl ContextWithBridges {
 
         // get evm bridge canister address
         let erc20_bridge_client =
-            Erc20BridgeClient::new(ctx.client(ctx.canisters().erc20_bridge(), ADMIN));
+            Erc20BridgeClient::new(ctx.client(ctx.canisters().erc20_bridge(), ctx.admin_name()));
         let erc20_bridge_address = erc20_bridge_client
             .get_bridge_canister_evm_address()
             .await
@@ -82,7 +84,7 @@ impl ContextWithBridges {
 
         // mint native tokens for the erc20-bridge on both EVMs
         println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
-        ctx.evm_client(ADMIN)
+        ctx.evm_client(ctx.admin_name())
             .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
@@ -147,36 +149,10 @@ impl ContextWithBridges {
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
         // Deploy ERC-20 token on external EVM.
-        let mut erc20_input = TestWTM::BYTECODE.to_vec();
-        let constructor = TestWTM::constructorCall {
-            initialSupply: U256::from(u64::MAX).into(),
-        }
-        .abi_encode();
-        erc20_input.extend_from_slice(&constructor);
-
-        let nonce = base_evm_client
-            .account_basic(bob_address.clone())
+        let base_token_address = ctx
+            .deploy_test_wtm_token_on_evm(&base_evm_client, &bob_wallet, u64::MAX.into())
             .await
-            .unwrap()
-            .nonce;
-        let tx = ctx.signed_transaction(&bob_wallet, None, nonce, 0, erc20_input);
-        let base_token_address = {
-            let hash = base_evm_client
-                .send_raw_transaction(tx)
-                .await
-                .unwrap()
-                .unwrap();
-
-            let receipt = ctx
-                .wait_transaction_receipt_on_evm(&base_evm_client, &hash)
-                .await
-                .unwrap()
-                .unwrap();
-
-            assert_eq!(receipt.status, Some(U64::one()));
-
-            receipt.contract_address.unwrap()
-        };
+            .unwrap();
 
         // Deploy Wrapped token on first EVM for the ERC-20 from previous step.
         let token_id = Id256::from_evm_address(&base_token_address, CHAIN_ID as _);
@@ -225,7 +201,7 @@ async fn test_external_bridging() {
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
 
     // Check mint operation complete
-    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+    let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
 
     let amount = 1000_u128;
 
@@ -418,7 +394,7 @@ async fn native_token_deposit_increase_and_decrease() {
         .advance_by_times(Duration::from_secs(2), 20)
         .await;
 
-    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+    let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
 
     let mint_op = erc20_bridge_client
         .get_operations_list(&alice_address, None)
@@ -530,7 +506,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await;
 
     // Check mint order is not removed
-    let erc20_bridge_client = ctx.context.erc_bridge_client(ADMIN);
+    let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
     let (_, op) = erc20_bridge_client
         .get_operations_list(&alice_address, None)
         .await
@@ -617,6 +593,26 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
         erc20_bridge_balance_after_deposit,
         init_erc20_bridge_balance + native_token_deposit.into()
     );
+}
+
+#[tokio::test]
+async fn erc20_bridge_stress_test() {
+    let context = PocketIcTestContext::new(&[
+        CanisterType::Evm,
+        CanisterType::ExternalEvm,
+        CanisterType::Signature,
+        CanisterType::Erc20Bridge,
+    ])
+    .await;
+
+    let config = StressTestConfig {
+        users_number: 2,
+        user_deposits_per_token: 4,
+        init_user_balance: 2u64.pow(30).into(),
+        operation_amount: 2u64.pow(20).into(),
+    };
+
+    erc20::stress_test_erc20_bridge_with_ctx(context, 2, config).await;
 }
 
 async fn create_bft_bridge(

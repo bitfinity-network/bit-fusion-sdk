@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
+use bridge_did::id256::Id256;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{evm_link, BFTBridge};
 use candid::{Encode, Nat, Principal};
@@ -71,9 +72,13 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         &self.tokens
     }
 
-    fn user_id256(&self, user_id: Self::UserId) -> bridge_did::id256::Id256 {
+    fn user_id256(&self, user_id: Self::UserId) -> Id256 {
         let principal = self.ctx.principal_by_caller_name(&user_id);
         (&principal).into()
+    }
+
+    fn token_id256(&self, token_id: Self::TokenId) -> Id256 {
+        (&token_id).into()
     }
 
     fn next_memo(&self) -> [u8; 32] {
