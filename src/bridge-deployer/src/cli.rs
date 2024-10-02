@@ -38,12 +38,6 @@ pub struct Cli {
     )]
     ic_host: String,
 
-    /// Deploy the BFT bridge.
-    ///
-    /// Default: true
-    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
-    deploy_bft: bool,
-
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[arg(
         long,
@@ -86,7 +80,6 @@ impl Cli {
             identity,
             private_key,
             ic_host,
-            deploy_bft,
             evm_network,
             command,
             ..
@@ -97,13 +90,7 @@ impl Cli {
 
         trace!("Executing command: {:?}", command);
         command
-            .run(
-                identity.to_path_buf(),
-                &ic_host,
-                evm_network,
-                private_key,
-                deploy_bft,
-            )
+            .run(identity.to_path_buf(), &ic_host, evm_network, private_key)
             .await?;
 
         Ok(())

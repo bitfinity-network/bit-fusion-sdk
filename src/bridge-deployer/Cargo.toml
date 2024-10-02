@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 clap = { workspace = true, features = ["env"] }

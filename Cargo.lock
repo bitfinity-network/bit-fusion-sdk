@@ -1028,6 +1028,7 @@ name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-client",
  "bridge-did",
  "candid",
  "clap 4.5.18",
