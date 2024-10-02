@@ -52,15 +52,12 @@ impl MintOrderHandler for BtcMintOrderHandler {
             return;
         };
 
-        let BtcBridgeOp::SignMintOrder { eth_address, .. } = op.0 else {
+        if !matches!(op.0, BtcBridgeOp::SignMintOrder { .. }) {
             log::info!("Mint order handler failed to set MintOrder: unexpected state.");
             return;
-        };
+        }
 
-        let new_op = BtcBridgeOpImpl(BtcBridgeOp::MintErc20 {
-            order: signed,
-            eth_address,
-        });
+        let new_op = BtcBridgeOpImpl(BtcBridgeOp::MintErc20 { order: signed });
         let scheduling_options = new_op.scheduling_options();
         self.state
             .borrow_mut()
