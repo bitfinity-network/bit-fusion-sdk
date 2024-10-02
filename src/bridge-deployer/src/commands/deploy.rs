@@ -87,8 +87,8 @@ impl DeployCommands {
             )
             .await?;
 
-        info!("BFT bridge deployed successfully with {bft_bridge_addr}");
-        println!("BFT bridge deployed with address {bft_bridge_addr}");
+        info!("BFT bridge deployed successfully with {bft_address}");
+        println!("BFT bridge deployed with address {bft_address}");
 
         deployer.configure_minter(bft_address).await?;
 
@@ -96,7 +96,8 @@ impl DeployCommands {
 
         println!(
             "Canister {canister_type} deployed with ID {canister_id}",
-            canister_type = self.bridge_type.kind()
+            canister_type = self.bridge_type.kind(),
+            canister_id = deployer.bridge_principal(),
         );
 
         Ok(())

@@ -75,11 +75,10 @@ impl ReinstallCommands {
             )
             .await?;
 
-        info!("BFT bridge deployed successfully with address: {bft_bridge_addr}");
-        println!("BFT bridge deployed with address: {bft_bridge_addr}");
+        info!("BFT bridge deployed successfully with address: {bft_address}");
+        println!("BFT bridge deployed with address: {bft_address}");
 
         deployer.configure_minter(bft_address).await?;
-
 
         info!(
             "Canister reinstalled successfully with ID: {}",
