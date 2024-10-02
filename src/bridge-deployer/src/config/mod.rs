@@ -7,10 +7,12 @@ use eth_signer::sign_strategy;
 use serde::{Deserialize, Serialize};
 
 mod brc20;
+mod btc;
 mod erc;
 mod icrc;
 mod rune;
 
+pub use btc::*;
 pub use erc::*;
 pub use icrc::*;
 pub use rune::*;

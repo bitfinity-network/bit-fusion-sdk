@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::evm_link::EvmLink;
 
 /// Bridge canister initialization data.
-#[derive(Debug, Deserialize, CandidType, Clone)]
+#[derive(Debug, Deserialize, CandidType, Clone, PartialEq, Eq)]
 pub struct BridgeInitData {
     /// Principal of canister's owner.
     pub owner: Principal,

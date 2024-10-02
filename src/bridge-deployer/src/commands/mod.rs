@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use bridge_did::error::BftResult;
+use bridge_did::init::BtcBridgeConfig;
 use candid::{Encode, Principal};
 use clap::{Parser, Subcommand};
 use deploy::DeployCommands;
@@ -60,6 +61,8 @@ pub enum Bridge {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+        #[command(flatten, next_help_heading = "CkBTC connection")]
+        connection: config::BtcBridgeConnection,
     },
     Erc20 {
         /// The configuration to use
@@ -143,9 +146,14 @@ impl Bridge {
 
                 Encode!(&init, &erc)?
             }
-            Bridge::Btc { config } => {
+            Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(config.clone());
+                let connection = bridge_did::init::BitcoinConnection::from(connection.clone());
+                let init_data = bridge_did::init::BridgeInitData::from(config.clone());
+                let config = BtcBridgeConfig {
+                    network: connection,
+                    init_data,
+                };
                 Encode!(&config)?
             }
         };
