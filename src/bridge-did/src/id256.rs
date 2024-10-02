@@ -211,6 +211,12 @@ impl From<Principal> for Id256 {
     }
 }
 
+impl From<(u32, H160)> for Id256 {
+    fn from((chain_id, addr): (u32, H160)) -> Self {
+        Self::from_evm_address(&addr, chain_id)
+    }
+}
+
 impl TryFrom<Id256> for Principal {
     type Error = Error;
 

@@ -1,5 +1,6 @@
 #![allow(async_fn_in_trait)]
 
+pub mod erc20;
 pub mod icrc;
 
 use std::time::Duration;
@@ -23,12 +24,13 @@ pub struct StressTestConfig {
 }
 
 pub trait BaseTokens {
-    type TokenId: Into<Id256> + Clone + Send + Sync;
+    type TokenId: Clone + Send + Sync;
     type UserId: Clone + Send + Sync;
 
     fn ctx(&self) -> &(impl TestContext + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
     fn user_id256(&self, user_id: Self::UserId) -> Id256;
+    fn token_id256(&self, token_id: Self::TokenId) -> Id256;
     fn next_memo(&self) -> [u8; 32];
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
@@ -122,9 +124,10 @@ impl<B: BaseTokens> StressTestState<B> {
         println!("Creating wrapped tokens");
         let mut wrapped_tokens = Vec::with_capacity(base_tokens.ids().len());
         for base_id in base_tokens.ids() {
+            let token_id256 = base_tokens.token_id256(base_id.clone());
             let wrapped_address = base_tokens
                 .ctx()
-                .create_wrapped_token(&admin_wallet, &bft_bridge, base_id.clone().into())
+                .create_wrapped_token(&admin_wallet, &bft_bridge, token_id256)
                 .await?;
             wrapped_tokens.push(wrapped_address);
         }
@@ -310,7 +313,8 @@ impl<B: BaseTokens> StressTestState<B> {
     }
 
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<()> {
-        let base_token_id: Id256 = self.base_tokens.ids()[token_idx].clone().into();
+        let token_id = self.base_tokens.ids()[token_idx].clone();
+        let base_token_id: Id256 = self.base_tokens.token_id256(token_id);
         let user_id256 = self.base_tokens.user_id256(self.users[user_idx].1.clone());
 
         let input = BFTBridge::burnCall {
