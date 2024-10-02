@@ -13,6 +13,7 @@ fmt_nightly:
 # Runs clippy on the code
 [group('code_check')]
 clippy args="":
+  export PROTOC_INCLUDE=${PWD}/proto
   cargo clippy --all-features --all-targets {{args}}
 
 
