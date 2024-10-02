@@ -74,7 +74,7 @@ impl DeployCommands {
         let deployer =
             BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
         deployer
-            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install)
+            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
             .await?;
         let bft_address = self
             .bft_args

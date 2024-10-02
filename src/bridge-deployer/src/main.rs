@@ -5,6 +5,7 @@ mod cli;
 mod commands;
 mod config;
 mod contracts;
+mod evm;
 
 #[tokio::main]
 async fn main() {

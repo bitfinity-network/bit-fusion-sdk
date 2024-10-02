@@ -28,16 +28,6 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// Ths is the host of the IC.
-    #[arg(
-        short,
-        long,
-        value_name = "IC_HOST",
-        default_value = "http://localhost:4943",
-        help_heading = "IC Host"
-    )]
-    ic_host: String,
-
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[arg(
         long,
@@ -79,11 +69,13 @@ impl Cli {
         let Cli {
             identity,
             private_key,
-            ic_host,
             evm_network,
             command,
             ..
         } = cli;
+
+        // derive arguments
+        let ic_host = crate::evm::ic_host(evm_network);
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("IC host: {}", ic_host);

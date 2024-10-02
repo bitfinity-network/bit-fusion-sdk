@@ -59,7 +59,12 @@ impl ReinstallCommands {
 
         let deployer = BridgeDeployer::new(agent.clone(), self.canister_id);
         deployer
-            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Reinstall)
+            .install_wasm(
+                &self.wasm,
+                &self.bridge_type,
+                InstallMode::Reinstall,
+                network,
+            )
             .await?;
 
         info!("Canister installed successfully");
