@@ -4,10 +4,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bridge_did::error::BftResult;
+use bridge_did::op_id::OperationId;
 use ic_exports::ic_kit::ic;
 
 use self::config::ConfigStorage;
-use super::service::Services;
+use super::service::{ServiceId, Services};
 use crate::bridge::Operation;
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
@@ -74,6 +76,17 @@ impl<Op: Operation> State<Op> {
         self.operations_run_ts
             .map(|ts| (ts + SCHEDULER_RUN_LOCK_TIMEOUT.as_nanos() as u64) <= ic::time())
             .unwrap_or(true)
+    }
+
+    /// Adds the given operation to the given service processing.
+    pub fn push_operation_to_service(
+        &self,
+        service: ServiceId,
+        operation_id: OperationId,
+    ) -> BftResult<()> {
+        self.services
+            .borrow_mut()
+            .push_operation(service, operation_id)
     }
 }
 

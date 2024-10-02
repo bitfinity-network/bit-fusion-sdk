@@ -12,6 +12,7 @@ default = []
 export-api = []
 
 [dependencies]
+async-trait = { workspace = true }
 bridge-canister = { path = "../bridge-canister" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
@@ -28,6 +29,7 @@ ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
+futures = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }

@@ -1,8 +1,6 @@
 use bridge_canister::bridge::OperationContext;
-use bridge_canister::runtime::service::ServiceId;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::evm_link::EvmLink;
-use bridge_did::op_id::OperationId;
 use bridge_did::order::SignedMintOrder;
 use bridge_utils::evm_bridge::EvmParams;
 use did::{H160, H256};
@@ -52,14 +50,6 @@ impl OperationContext for TestOperationContext {
 
     async fn send_mint_transaction(&self, _order: &SignedMintOrder) -> BftResult<H256> {
         self.result.clone()
-    }
-
-    fn push_operation_to_service(
-        &self,
-        _service: ServiceId,
-        _operation_id: OperationId,
-    ) -> BftResult<()> {
-        unimplemented!()
     }
 }
 

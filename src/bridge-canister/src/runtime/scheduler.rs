@@ -136,7 +136,7 @@ impl<Op: Operation> BridgeTask<Op> {
                 let new_op = match progress {
                     OperationProgress::Progress(op) => op,
                     OperationProgress::AddToService(service_id) => {
-                        ctx.push_operation_to_service(service_id, op_id)?;
+                        ctx.borrow().push_operation_to_service(service_id, op_id)?;
                         return Ok(());
                     }
                 };

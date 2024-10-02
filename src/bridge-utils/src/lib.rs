@@ -28,3 +28,9 @@ sol! {
     WrappedToken,
     "../../solidity/out/WrappedToken.sol/WrappedToken.json"
 }
+
+sol! {
+    #[derive(Debug)]
+    WrappedTokenDeployer,
+    "../../solidity/out/WrappedTokenDeployer.sol/WrappedTokenDeployer.json"
+}
