@@ -65,6 +65,7 @@ impl SolidityContractDeployer<'_> {
         &self,
         minter_address: &H160,
         fee_charge_address: &H160,
+        wrapped_token_deployer_address: &H160,
         is_wrapped_side: bool,
         owner: Option<H160>,
         controllers: &Option<Vec<H160>>,
@@ -74,6 +75,8 @@ impl SolidityContractDeployer<'_> {
         let network = self.network.to_string();
         let minter_address = minter_address.encode_hex_with_prefix();
         let fee_charge_address = fee_charge_address.encode_hex_with_prefix();
+        let wrapped_token_deployer_address =
+            wrapped_token_deployer_address.encode_hex_with_prefix();
         let is_wrapped_side = is_wrapped_side.to_string();
         let owner = owner.map(|o| o.encode_hex_with_prefix());
         let controllers = controllers.as_ref().map(|c| {
@@ -91,6 +94,8 @@ impl SolidityContractDeployer<'_> {
             &minter_address,
             "--fee-charge-address",
             &fee_charge_address,
+            "--wrapped-token-deployer-address",
+            &wrapped_token_deployer_address,
             "--is-wrapped-side",
             &is_wrapped_side,
         ];
@@ -150,6 +155,71 @@ impl SolidityContractDeployer<'_> {
             .context("Failed to extract BFT proxy address")?;
 
         let address = H160::from_str(proxy_address).context("Invalid BFT proxy address")?;
+        Ok(address)
+    }
+
+    /// Deploys WrappedTokenDeployer contract
+    pub fn deploy_wrapped_token_deployer(&self) -> Result<H160> {
+        info!("Deploying WrappedTokenDeployer contract");
+        let network = self.network.to_string();
+
+        let args = [
+            "hardhat",
+            "deploy-wrapped-token-deployer",
+            "--network",
+            &network,
+        ];
+
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join("solidity");
+
+        let dir = dir.display();
+        info!("Deploying Fee Charge contract in {}", dir);
+
+        debug!(
+            "Executing command: sh -c cd {} && npx {}",
+            dir,
+            args.join(" ")
+        );
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .context("Failed to execute deploy-wrapped-token-deployer command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            eprintln!(
+                "deploy-wrapped-token-deployer command failed. Stdout:\n{}\nStderr:\n{}",
+                stdout, stderr
+            );
+
+            return Err(anyhow::anyhow!(
+                "deploy-wrapped-token-deployer command failed"
+            ));
+        } else {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("deploy-wrapped-token-deployer command output:\n{}", stdout);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Extract the fee charge address from the output
+        let wrapped_token_deployer_address = stdout
+            .lines()
+            .find(|line| line.starts_with("WrappedTokenDeployer address:"))
+            .and_then(|line| line.split(':').nth(1))
+            .map(str::trim)
+            .context("Failed to extract WrappedTokenDeployer address")?;
+
+        let address = H160::from_str(wrapped_token_deployer_address)
+            .context("Invalid WrappedTokenDeployer address")?;
+
         Ok(address)
     }
 

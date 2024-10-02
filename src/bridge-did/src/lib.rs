@@ -7,6 +7,7 @@ pub mod op_id;
 pub mod operation_log;
 pub mod order;
 pub mod reason;
+pub mod schnorr;
 
 pub mod brc20_info;
 pub mod bridge_side;

@@ -126,13 +126,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     function initialize(
         address minterAddress,
         address feeChargeAddress,
+        address wrappedTokenDeployer,
         bool isWrappedSide,
         address owner,
         address[] memory controllers
     ) public initializer {
         minterCanisterAddress = minterAddress;
         feeChargeContract = IFeeCharge(feeChargeAddress);
-        __TokenManager__init(isWrappedSide);
+        __TokenManager__init(isWrappedSide, wrappedTokenDeployer);
 
         // Set the owner
         address newOwner = owner != address(0) ? owner : msg.sender;
@@ -242,11 +243,11 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         bool[] memory orderIndexes = new bool[](ordersNumber);
         if (ordersToProcess.length == 0) {
-            for(uint32 i = 0; i < ordersNumber; i++) {
+            for (uint32 i = 0; i < ordersNumber; i++) {
                 orderIndexes[i] = true;
             }
         } else {
-            for(uint32 i = 0; i < ordersToProcess.length; i++) {
+            for (uint32 i = 0; i < ordersToProcess.length; i++) {
                 uint32 orderIndex = ordersToProcess[i];
                 orderIndexes[orderIndex] = true;
             }
@@ -254,9 +255,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         uint8[] memory processedOrderIndexes = new uint8[](ordersNumber);
         uint32 processedOrdersNumber = 0;
-        for(uint32 i = 0; i < ordersNumber; i++) {
+        for (uint32 i = 0; i < ordersNumber; i++) {
             if (!orderIndexes[i]) {
-                processedOrderIndexes[i] = MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED; 
+                processedOrderIndexes[i] = MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED;
                 continue;
             }
 
@@ -264,12 +265,11 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             uint32 orderEnd = orderStart + MINT_ORDER_DATA_LEN;
             MintOrderData memory order = _decodeOrder(encodedOrders[orderStart:orderEnd]);
 
-
             // If user can't pay required fee, skip his order.
             if (_isFeeRequired()) {
                 bool canPayFee = feeChargeContract.canPayFee(order.feePayer, order.senderID, MIN_FEE_DEPOSIT_AMOUNT);
                 if (!canPayFee) {
-                    processedOrderIndexes[i] = MINT_ERROR_CODE_INSUFFICIENT_FEE_DEPOSIT; 
+                    processedOrderIndexes[i] = MINT_ERROR_CODE_INSUFFICIENT_FEE_DEPOSIT;
                     continue;
                 }
             }
@@ -277,7 +277,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
             /// If order is invalid, skip it.
             uint8 orderValidationResult = _isOrderValid(order);
             if (orderValidationResult != MINT_ERROR_CODE_OK) {
-                processedOrderIndexes[i] = orderValidationResult; 
+                processedOrderIndexes[i] = orderValidationResult;
                 continue;
             }
 
@@ -290,11 +290,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         }
 
         // Charge fee for successfully processed orders and emit Minted event for each.
-        uint256 feePerUser = (COMMON_BATCH_MINT_GAS_FEE / processedOrdersNumber + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
-        for(uint32 i = 0; i < ordersNumber; i++) {
+        uint256 feePerUser =
+            (COMMON_BATCH_MINT_GAS_FEE / processedOrdersNumber + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
+        for (uint32 i = 0; i < ordersNumber; i++) {
             if (processedOrderIndexes[i] == MINT_ERROR_CODE_OK) {
                 // Array indexes inlined to soleve StackTooDeep problem.
-                MintOrderData memory order = _decodeOrder(encodedOrders[MINT_ORDER_DATA_LEN * i : MINT_ORDER_DATA_LEN * i + MINT_ORDER_DATA_LEN]);
+                MintOrderData memory order =
+                    _decodeOrder(encodedOrders[MINT_ORDER_DATA_LEN * i:MINT_ORDER_DATA_LEN * i + MINT_ORDER_DATA_LEN]);
                 if (_isFeeRequired()) {
                     _chargeFee(order.feePayer, order.senderID, feePerUser);
                 }
@@ -305,7 +307,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         return processedOrderIndexes;
     }
 
-    function _mintInner(MintOrderData memory order) private {
+    function _mintInner(
+        MintOrderData memory order
+    ) private {
         // Update token's metadata only if it is a wrapped token
         bool isTokenWrapped = _wrappedToBase[order.toERC20] == order.fromTokenID;
         // the token must be registered or the side must be base
@@ -322,7 +326,6 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         if (order.approveSpender != address(0) && order.approveAmount != 0 && isTokenWrapped) {
             WrappedToken(order.toERC20).approveByOwner(order.recipient, order.approveSpender, order.approveAmount);
         }
-
     }
 
     /// Charge fee from the user.
@@ -402,14 +405,15 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         return minterCanisterAddress;
     }
 
-
     function _isFeeRequired() private view returns (bool) {
         return minterCanisterAddress == msg.sender && address(feeChargeContract) != address(0);
     }
 
     /// Function to validate the mint order.
     /// Reverts on failure.
-    function _validateOrder(MintOrderData memory order) private view {
+    function _validateOrder(
+        MintOrderData memory order
+    ) private view {
         // Assert recipient address is not zero
         require(order.recipient != address(0), "Invalid destination address");
 
@@ -428,7 +432,9 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Function to check if the mint order is valid.
-    function _isOrderValid(MintOrderData memory order) private view returns (uint8) {
+    function _isOrderValid(
+        MintOrderData memory order
+    ) private view returns (uint8) {
         // Check recipient address is not zero
         if (order.recipient == address(0)) {
             return MINT_ERROR_CODE_ZERO_RECIPIENT;
@@ -462,13 +468,13 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     ) private pure returns (address) {
         return address(bytes20(encodedOrder[249:269]));
     }
-    
+
     function _decodeOrderSenderID(
         bytes calldata encodedOrder
     ) private pure returns (bytes32) {
         return bytes32(encodedOrder[32:64]);
     }
-    
+
     function _decodeOrder(
         bytes calldata encodedOrder
     ) private pure returns (MintOrderData memory order) {
@@ -487,8 +493,8 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         order.approveSpender = address(bytes20(encodedOrder[197:217]));
         order.approveAmount = uint256(bytes32(encodedOrder[217:249]));
         order.feePayer = _decodeOrderFeePayer(encodedOrder);
-    }    
-    
+    }
+
     /// Function to check encodedOrder signature
     function _checkMintOrderSignature(
         bytes calldata encodedOrder
@@ -497,10 +503,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Function to check encodedOrder signature
-    function _checkMinterSignature(
-        bytes calldata data,
-        bytes calldata signature
-    ) private view {
+    function _checkMinterSignature(bytes calldata data, bytes calldata signature) private view {
         // Create a hash of the order data
         bytes32 hash = keccak256(data);
 

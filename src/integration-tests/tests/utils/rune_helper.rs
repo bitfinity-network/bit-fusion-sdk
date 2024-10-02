@@ -94,23 +94,27 @@ impl<'a> RuneHelper<'a> {
 
         let inputs = vec![utxo];
         // make commit tx
-        let commit_tx = builder.build_commit_transaction_with_fixed_fees(
-            bitcoin::Network::Regtest,
-            CreateCommitTransactionArgsV2 {
-                inputs: inputs.clone(),
-                inscription: dummy_inscription,
-                leftovers_recipient: self.address.clone(),
-                commit_fee: Amount::from_sat(1000),
-                reveal_fee: Amount::from_sat(1000),
-                txin_script_pubkey: self.address.script_pubkey(),
-            },
-        )?;
+        let commit_tx = builder
+            .build_commit_transaction_with_fixed_fees(
+                bitcoin::Network::Regtest,
+                CreateCommitTransactionArgsV2 {
+                    inputs: inputs.clone(),
+                    inscription: dummy_inscription,
+                    leftovers_recipient: self.address.clone(),
+                    commit_fee: Amount::from_sat(1000),
+                    reveal_fee: Amount::from_sat(1000),
+                    txin_script_pubkey: self.address.script_pubkey(),
+                    derivation_path: None,
+                },
+            )
+            .await?;
         let signed_commit_tx = builder
             .sign_commit_transaction(
                 commit_tx.unsigned_tx,
                 SignCommitTransactionArgs {
                     inputs,
                     txin_script_pubkey: self.address.script_pubkey(),
+                    derivation_path: None,
                 },
             )
             .await?;
@@ -148,6 +152,7 @@ impl<'a> RuneHelper<'a> {
                     pointer: Some(1),
                     ..Default::default()
                 },
+                derivation_path: None,
             })
             .await?;
 

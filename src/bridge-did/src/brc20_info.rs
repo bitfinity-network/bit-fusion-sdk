@@ -30,21 +30,21 @@ impl Brc20Tick {
     }
 }
 
+impl From<[u8; 4]> for Brc20Tick {
+    fn from(tick: [u8; 4]) -> Self {
+        Brc20Tick(tick)
+    }
+}
+
 impl From<Id256> for Brc20Tick {
     fn from(id: Id256) -> Self {
-        let mut tick = [0u8; 4];
-        tick.copy_from_slice(&id.0[0..4]);
-
-        Brc20Tick(tick)
+        Brc20Tick(id.to_brc20_tick().expect("unexpected id256"))
     }
 }
 
 impl From<Brc20Tick> for Id256 {
     fn from(tick: Brc20Tick) -> Self {
-        let mut id = [0u8; 32];
-        id[0..4].copy_from_slice(&tick.0);
-
-        Id256(id)
+        Id256::from_brc20_tick(tick.inner())
     }
 }
 

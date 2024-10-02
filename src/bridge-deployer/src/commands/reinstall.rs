@@ -61,6 +61,9 @@ impl ReinstallCommands {
         deployer
             .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Reinstall)
             .await?;
+
+        info!("Canister installed successfully");
+
         let bft_address = self
             .bft_args
             .deploy_bft(
@@ -72,9 +75,22 @@ impl ReinstallCommands {
             )
             .await?;
 
+        info!("BFT bridge deployed successfully with address: {bft_bridge_addr}");
+        println!("BFT bridge deployed with address: {bft_bridge_addr}");
+
         deployer.configure_minter(bft_address).await?;
 
-        info!("Canister deployed successfully");
+
+        info!(
+            "Canister reinstalled successfully with ID: {}",
+            self.canister_id
+        );
+
+        println!(
+            "Canister {canister_type} reinstalled with ID {canister_id}",
+            canister_type = self.bridge_type.kind(),
+            canister_id = self.canister_id
+        );
 
         Ok(())
     }

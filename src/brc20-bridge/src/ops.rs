@@ -1,4 +1,8 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+mod deposit;
+mod withdraw;
+
+use bitcoin::Network;
+use bridge_canister::bridge::{Operation, OperationAction, OperationProgress};
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::error::{BftResult, Error};
@@ -6,18 +10,29 @@ use bridge_did::event_data::{
     BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
 };
 use bridge_did::op_id::OperationId;
-use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp, DepositRequest};
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::operations::{
+    Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest,
+};
+use bridge_did::order::MintOrder;
 use candid::{CandidType, Decode, Deserialize};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
+use withdraw::Brc20BridgeWithdrawOpImpl;
 
-use crate::core::deposit::Brc20Deposit;
+pub use self::deposit::Brc20BridgeDepositOpImpl;
+use crate::canister::get_brc20_state;
+use crate::core::withdrawal::new_withdraw_payload;
 
-#[derive(Debug, CandidType, Serialize, Deserialize, Clone)]
-pub struct Brc20BridgeOpImpl(pub Brc20BridgeOp);
+/// BRC20 bridge operations
+#[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
+pub struct Brc20BridgeOpImpl(Brc20BridgeOp);
+
+impl From<Brc20BridgeOp> for Brc20BridgeOpImpl {
+    fn from(op: Brc20BridgeOp) -> Self {
+        Self(op)
+    }
+}
 
 impl Operation for Brc20BridgeOpImpl {
     async fn progress(
@@ -27,20 +42,20 @@ impl Operation for Brc20BridgeOpImpl {
     ) -> BftResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitInputs(deposit)) => {
-                log::debug!("Self::AwaitInputs {deposit:?}");
-                Self::await_inputs(ctx, deposit).await
+                log::debug!("Brc20BridgeDepositOp::AwaitInputs {deposit:?}");
+                Brc20BridgeDepositOpImpl::await_inputs(ctx, deposit).await
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitConfirmations { deposit, utxos }) => {
-                log::debug!("Self::AwaitConfirmations {deposit:?} {utxos:?}");
-                Self::await_confirmations(ctx, deposit, utxos, id.nonce()).await
+                log::debug!("Brc20BridgeDepositOp::AwaitConfirmations {deposit:?} {utxos:?}");
+                Brc20BridgeDepositOpImpl::await_confirmations(ctx, deposit, utxos, id.nonce()).await
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SignMintOrder(mint_order)) => {
-                log::debug!("Self::SignMintOrder {mint_order:?}");
-                Self::sign_mint_order(ctx, id.nonce(), mint_order).await
+                log::debug!("Brc20BridgeDepositOp::SignMintOrder {mint_order:?}");
+                Brc20BridgeDepositOpImpl::sign_mint_order(ctx, id.nonce(), mint_order).await
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(mint_order)) => {
-                log::debug!("Self::SendMintOrder {mint_order:?}");
-                Self::send_mint_order(ctx, mint_order).await
+                log::debug!("Brc20BridgeDepositOp::SendMintOrder {mint_order:?}");
+                Brc20BridgeDepositOpImpl::send_mint_order(ctx, mint_order).await
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => {
                 Err(Error::FailedToProgress(
@@ -50,14 +65,102 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. }) => Err(
                 Error::FailedToProgress("MintOrderConfirmed task cannot be progressed".into()),
             ),
-        };
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)) => {
+                log::debug!("Brc20BridgeDepositOp::CreateInscriptionTxs {payload:?}");
+                Brc20BridgeWithdrawOpImpl::create_inscription_txs(payload).await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx {
+                payload,
+                commit_tx,
+                reveal_tx,
+                reveal_utxo,
+            }) => {
+                log::debug!(
+                    "Brc20BridgeDepositOp::SendCommitTx {payload:?} {commit_tx:?} {reveal_tx:?} {reveal_utxo:?}"
+                );
+                Brc20BridgeWithdrawOpImpl::send_commit_transaction(
+                    payload,
+                    commit_tx,
+                    reveal_tx,
+                    reveal_utxo,
+                )
+                .await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx {
+                payload,
+                reveal_tx,
+                reveal_utxo,
+            }) => {
+                log::debug!(
+                    "Brc20BridgeDepositOp::SendRevealTx {payload:?} {reveal_tx:?} {reveal_utxo:?}"
+                );
+                Brc20BridgeWithdrawOpImpl::send_reveal_transaction(payload, reveal_tx, reveal_utxo)
+                    .await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs {
+                payload,
+                reveal_utxo,
+            }) => {
+                log::debug!(
+                    "Brc20BridgeDepositOp::AwaitInscriptionTxs {reveal_utxo:?} {payload:?} "
+                );
+                Brc20BridgeWithdrawOpImpl::await_inscription_transactions(payload, reveal_utxo)
+                    .await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx {
+                payload,
+                reveal_utxo,
+            }) => {
+                log::debug!("Brc20BridgeDepositOp::CreateTransferTx {payload:?} {reveal_utxo:?}");
+                Brc20BridgeWithdrawOpImpl::create_transfer_transaction(payload, reveal_utxo).await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { from_address, tx }) => {
+                log::debug!("Brc20BridgeDepositOp::SendTransferTx {from_address:?} {tx:?}");
+                Brc20BridgeWithdrawOpImpl::send_transfer_transaction(from_address, tx).await
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent { .. }) => Err(
+                Error::FailedToProgress("TransferTxSent task cannot be progressed".into()),
+            ),
+        }?;
 
-        Ok(OperationProgress::Progress(next_step?))
+        Ok(OperationProgress::Progress(next_step))
     }
 
     fn scheduling_options(&self) -> Option<ic_task_scheduler::task::TaskOptions> {
         match self.0 {
-            Brc20BridgeOp::Deposit(_) => Some(
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => {
+                let network = {
+                    let state_ref = get_brc20_state();
+                    let network = state_ref.borrow().network();
+
+                    network
+                };
+
+                // On mainnet wait longer for Bitcoin transactions
+                match network {
+                    Network::Bitcoin => Some(
+                        TaskOptions::new()
+                            .with_max_retries_policy(20)
+                            .with_fixed_backoff_policy(300), // 10 blocks, each 5 minutes
+                    ),
+                    _ => Some(
+                        TaskOptions::new()
+                            .with_max_retries_policy(10)
+                            .with_fixed_backoff_policy(10),
+                    ),
+                }
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. })
+            | Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. })
+            | Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { .. })
+            | Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx { .. })
+            | Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs { .. }) => Some(
+                TaskOptions::new()
+                    .with_fixed_backoff_policy(2)
+                    .with_max_retries_policy(10),
+            ),
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent { .. })
+            | Brc20BridgeOp::Deposit(_) => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
@@ -73,6 +176,13 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder { .. }) => false,
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => false,
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. }) => true,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { .. }) => false,
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent { .. }) => true,
         }
     }
 
@@ -99,6 +209,27 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { data }) => {
                 data.recipient.clone()
             }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)) => {
+                payload.sender.clone()
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { payload, .. }) => {
+                payload.sender.clone()
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendRevealTx { payload, .. }) => {
+                payload.sender.clone()
+            }
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::AwaitInscriptionTxs {
+                payload, ..
+            }) => payload.sender.clone(),
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateTransferTx {
+                payload, ..
+            }) => payload.sender.clone(),
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx {
+                from_address, ..
+            }) => from_address.clone(),
+            Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent {
+                from_address, ..
+            }) => from_address.clone(),
         }
     }
 
@@ -124,7 +255,18 @@ impl Operation for Brc20BridgeOpImpl {
         event: BurntEventData,
     ) -> Option<OperationAction<Self>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
-        todo!("withdraw");
+        let memo = event.memo();
+        match new_withdraw_payload(event, &get_brc20_state().borrow()) {
+            Ok(payload) => Some(OperationAction::Create(
+                Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload))
+                    .into(),
+                memo,
+            )),
+            Err(err) => {
+                log::warn!("Invalid withdrawal data: {err:?}");
+                None
+            }
+        }
     }
 
     async fn on_minter_notification(
@@ -154,113 +296,6 @@ impl Operation for Brc20BridgeOpImpl {
     }
 }
 
-impl Brc20BridgeOpImpl {
-    /// Await for deposit inputs
-    async fn await_inputs(state: RuntimeState<Self>, request: DepositRequest) -> BftResult<Self> {
-        let deposit = Brc20Deposit::get(state.clone())
-            .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
-        let utxos = deposit
-            .get_inputs(&request.dst_address)
-            .await
-            .map_err(|err| {
-                Error::FailedToProgress(format!("cannot find deposit inputs: {err:?}"))
-            })?;
-
-        if utxos.is_empty() {
-            return Err(Error::FailedToProgress("no inputs".to_string()));
-        }
-
-        Ok(Self(Brc20BridgeOp::Deposit(
-            Brc20BridgeDepositOp::AwaitConfirmations {
-                deposit: request,
-                utxos,
-            },
-        )))
-    }
-
-    /// Await for minimum IC confirmations
-    async fn await_confirmations(
-        state: RuntimeState<Self>,
-        deposit_request: DepositRequest,
-        utxos: Vec<Utxo>,
-        nonce: u32,
-    ) -> BftResult<Self> {
-        let DepositRequest {
-            amount,
-            brc20_tick,
-            dst_address,
-            dst_token,
-        } = deposit_request;
-
-        let deposit = Brc20Deposit::get(state.clone())
-            .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
-        deposit
-            .check_confirmations(&dst_address, &utxos)
-            .await
-            .map_err(|err| Error::FailedToProgress(format!("inputs are not confirmed: {err:?}")))?;
-
-        // check balance
-        let brc20_balance = deposit
-            .get_brc20_balance(&dst_address, &brc20_tick)
-            .await
-            .map_err(|err| Error::FailedToProgress(format!("cannot get brc20 balance: {err:?}")))?;
-
-        let brc20_info =
-            deposit
-                .get_brc20_info(&brc20_tick)
-                .await
-                .ok_or(Error::FailedToProgress(format!(
-                    "cannot get brc20 info for {brc20_tick}"
-                )))?;
-
-        if amount > brc20_balance {
-            return Err(Error::FailedToProgress(format!(
-                "requested amount {amount} is bigger than actual balance {brc20_balance}"
-            )));
-        }
-
-        let unsigned_mint_order =
-            deposit.create_unsigned_mint_order(&dst_address, &dst_token, amount, brc20_info, nonce);
-
-        Ok(Self(Brc20BridgeOp::Deposit(
-            Brc20BridgeDepositOp::SignMintOrder(unsigned_mint_order),
-        )))
-    }
-
-    /// Sign the provided mint order
-    async fn sign_mint_order(
-        ctx: RuntimeState<Self>,
-        nonce: u32,
-        mut mint_order: MintOrder,
-    ) -> BftResult<Self> {
-        // update nonce
-        mint_order.nonce = nonce;
-
-        let deposit = Brc20Deposit::get(ctx)
-            .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
-        let signed = deposit
-            .sign_mint_order(mint_order)
-            .await
-            .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
-
-        Ok(Self(Brc20BridgeOp::Deposit(
-            Brc20BridgeDepositOp::SendMintOrder(signed),
-        )))
-    }
-
-    /// Send the signed mint order to the bridge
-    async fn send_mint_order(ctx: RuntimeState<Self>, order: SignedMintOrder) -> BftResult<Self> {
-        let tx_id = ctx.send_mint_transaction(&order).await?;
-
-        Ok(Self(Brc20BridgeOp::Deposit(
-            Brc20BridgeDepositOp::ConfirmMintOrder {
-                signed_mint_order: order,
-                tx_id,
-            },
-        )))
-    }
-}
-
 pub enum Brc20MinterNotification {
     Deposit(Brc20DepositRequestData),
 }
@@ -278,7 +313,7 @@ impl Brc20MinterNotification {
         match event_data.notification_type {
             MinterNotificationType::DepositRequest => {
                 match Decode!(&event_data.user_data, Brc20DepositRequestData) {
-                    Ok(payload) => Some(Self::Deposit(payload)),
+                    Ok(payload) => Some(Brc20MinterNotification::Deposit(payload)),
                     Err(err) => {
                         log::warn!("Failed to decode deposit request event data: {err:?}");
                         None

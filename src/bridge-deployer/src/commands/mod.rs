@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use bridge_did::error::BftResult;
+use bridge_did::init::BtcBridgeConfig;
 use candid::{Encode, Principal};
 use clap::{Args, Subcommand};
 use deploy::DeployCommands;
@@ -59,6 +61,8 @@ pub enum Bridge {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+        #[command(flatten, next_help_heading = "CkBTC connection")]
+        connection: config::BtcBridgeConnection,
     },
     Erc20 {
         /// The configuration to use
@@ -84,6 +88,17 @@ pub enum Bridge {
 }
 
 impl Bridge {
+    /// Returns the kind of bridge
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Bridge::Brc20 { .. } => "brc20-bridge",
+            Bridge::Btc { .. } => "btc-bridge",
+            Bridge::Erc20 { .. } => "erc20-bridge",
+            Bridge::Icrc { .. } => "icrc2-bridge",
+            Bridge::Rune { .. } => "rune-bridge",
+        }
+    }
+
     /// Initialize the raw argument for the bridge
     pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
@@ -94,7 +109,7 @@ impl Bridge {
                 trace!("Preparing BRC20 bridge configuration");
                 let init_data = bridge_did::init::BridgeInitData::from(init.clone());
                 debug!("BRC20 Bridge Config : {:?}", init_data);
-                let brc20_config = bridge_did::init::Brc20BridgeConfig::from(brc20.clone());
+                let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
@@ -131,9 +146,14 @@ impl Bridge {
 
                 Encode!(&init, &erc)?
             }
-            Bridge::Btc { config } => {
+            Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(config.clone());
+                let connection = bridge_did::init::BitcoinConnection::from(connection.clone());
+                let init_data = bridge_did::init::BridgeInitData::from(config.clone());
+                let config = BtcBridgeConfig {
+                    network: connection,
+                    init_data,
+                };
                 Encode!(&config)?
             }
         };
@@ -235,18 +255,21 @@ impl BFTArgs {
 
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
-        let expected_nonce = contract_deployer.get_nonce().await? + 2;
-
-        let expected_address = contract_deployer.compute_fee_charge_address(expected_nonce)?;
+        let expected_nonce = contract_deployer.get_nonce().await? + 3;
+        let expected_fee_charge_address =
+            contract_deployer.compute_fee_charge_address(expected_nonce)?;
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
 
         // Sleep for 1 second to allow the canister to be created
         tokio::time::sleep(Duration::from_secs(5)).await;
 
+        let wrapped_token_deployer = contract_deployer.deploy_wrapped_token_deployer()?;
+
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
-            .await??;
+            .await?
+            .context("failed to get the bridge canister address")?;
 
         info!("Minter address: {:x}", minter_address);
 
@@ -254,13 +277,14 @@ impl BFTArgs {
 
         let bft_address = contract_deployer.deploy_bft(
             &minter_address.into(),
-            &expected_address,
+            &expected_fee_charge_address,
+            &wrapped_token_deployer,
             is_wrapped_side,
             self.owner,
             &self.controllers,
         )?;
 
-        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_address))?;
+        contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
         info!("BFT bridge deployed successfully. Contract address: {bft_address}");
 

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use bitcoin::hashes::sha256d::Hash;
+use bitcoin::secp256k1::ThirtyTwoByteHash;
 use bitcoin::OutPoint;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use ic_stable_structures::{Bound, Storable};
@@ -57,6 +58,15 @@ impl From<&Outpoint> for UtxoKey {
         Self {
             tx_id: value.txid.clone().try_into().expect("invalid tx id"),
             vout: value.vout,
+        }
+    }
+}
+
+impl From<ord_rs::Utxo> for UtxoKey {
+    fn from(value: ord_rs::Utxo) -> Self {
+        Self {
+            tx_id: value.id.as_raw_hash().into_32(),
+            vout: value.index,
         }
     }
 }

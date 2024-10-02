@@ -1,7 +1,7 @@
 [[dependencies]]
 name = "@openzeppelin-contracts"
 version = "5.0.2"
-source = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin/contracts/5_0_2_14-03-2024_06:11:59_contracts.zip"
+source = "https://soldeer-revisions.s3.amazonaws.com/@openzeppelin-contracts/5_0_2_14-03-2024_06:11:59_contracts.zip"
 checksum = "8bc4f0acc7c187771b878d46f7de4bfad1acad2eb5d096d9d05d34035853f5c3"
 integrity = "55881f6114aa36158566ef52b486d9d96b217c3e47d0e24bbd4994a8cfb5ee7c"
 

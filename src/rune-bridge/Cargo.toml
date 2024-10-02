@@ -28,7 +28,7 @@ ic-stable-structures = { workspace = true }
 ic-storage = { workspace = true }
 ic-task-scheduler = { workspace = true }
 log = { workspace = true }
-ord-rs = { workspace = true, features = ["rune"] }
+ord-rs = { workspace = true, features = ["rune"], default-features = false }
 ordinals = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
