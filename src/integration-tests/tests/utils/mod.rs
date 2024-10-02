@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use alloy_sol_types::sol;
 use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
@@ -30,9 +31,14 @@ pub fn get_workspace_root_dir() -> PathBuf {
         .to_path_buf()
 }
 
+sol! {
+    #[derive(Debug)]
+    TestWTM,
+    "../../solidity/out/TestWTM.sol/WatermelonToken.json"
+}
+
 pub const EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS: Duration = Duration::from_millis(500);
 pub const CHAIN_ID: u64 = 355113;
-pub const EXTERNAL_EVM_CHAIN_ID: u64 = 533115;
 
 /// Re-usable function to prepare the evm canister
 pub fn new_evm_init_data(

@@ -6,7 +6,6 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-use alloy_sol_types::sol;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
@@ -24,13 +23,6 @@ use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 const ADMIN: &str = "admin";
 const JOHN: &str = "john";
 const ALICE: &str = "alice";
-
-sol! {
-    #[sol(abi=true)]
-    #[derive(Debug)]
-    TestWTM,
-    "../../solidity/out/TestWTM.sol/WatermelonToken.json"
-}
 
 #[derive(Clone)]
 pub struct PocketIcTestContext {

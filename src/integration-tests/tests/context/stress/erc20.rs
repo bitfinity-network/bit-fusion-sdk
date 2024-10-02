@@ -1,18 +1,21 @@
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
+
 use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
-use did::{H160, U256, U64};
+use bridge_utils::BFTBridge;
+use did::{TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use ic_exports::ic_cdk::println;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
 use crate::context::TestContext;
-use crate::dfx_tests::TestWTM::{self};
 use crate::utils::error::Result;
-use crate::utils::EXTERNAL_EVM_CHAIN_ID;
+use crate::utils::{TestWTM, CHAIN_ID};
 
 static MEMO_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -31,11 +34,19 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
         let external_evm_client = ctx.external_evm_client(ctx.admin_name());
         let contracts_deployer = Wallet::new(&mut rand::thread_rng());
         let deployer_address = contracts_deployer.address();
-        external_evm_client
+        let tx_hash = external_evm_client
             .mint_native_tokens(deployer_address.into(), u128::MAX.into())
             .await
             .unwrap()
+            .unwrap()
+            .0;
+
+        let mint_tx_receipt = ctx
+            .wait_transaction_receipt_on_evm(&external_evm_client, &tx_hash)
+            .await
+            .unwrap()
             .unwrap();
+        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
 
         let mut tokens = Vec::with_capacity(base_tokens_number);
         for _ in 0..base_tokens_number {
@@ -51,6 +62,9 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
         }
 
         println!("Icrc token canisters created");
+
+        // wait to allow bridge canister to query evm params from external EVM.
+        ctx.advance_by_times(Duration::from_millis(500), 10).await;
 
         let bft_bridge = Self::init_bft_bridge_contract(&ctx).await;
 
@@ -94,6 +108,38 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
 
         addr
     }
+
+    async fn wait_tx_success(&self, tx_hash: &H256) -> Result<TransactionReceipt> {
+        let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let mut retries = 0;
+        let receipt = loop {
+            if retries > 10 {
+                return Err(crate::utils::error::TestError::Generic(
+                    "failed to get tx receipt".into(),
+                ));
+            }
+
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let Some(receipt) = evm_client
+                .eth_get_transaction_receipt(tx_hash.clone())
+                .await??
+            else {
+                retries += 1;
+                continue;
+            };
+
+            break receipt;
+        };
+
+        if receipt.status != Some(U64::one()) {
+            let output = receipt.output.unwrap_or_default();
+            let output_str = String::from_utf8_lossy(&output);
+            println!("tx failed with ouptput: {output_str}");
+            return Err(crate::utils::error::TestError::Generic("tx failed".into()));
+        }
+
+        Ok(receipt)
+    }
 }
 
 impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
@@ -109,11 +155,11 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
     }
 
     fn user_id256(&self, user_id: Self::UserId) -> Id256 {
-        Id256::from_evm_address(&user_id, EXTERNAL_EVM_CHAIN_ID as _)
+        Id256::from_evm_address(&user_id, CHAIN_ID as _)
     }
 
     fn token_id256(&self, token_id: Self::TokenId) -> Id256 {
-        Id256::from_evm_address(&token_id, EXTERNAL_EVM_CHAIN_ID as _)
+        Id256::from_evm_address(&token_id, CHAIN_ID as _)
     }
 
     fn next_memo(&self) -> [u8; 32] {
@@ -124,7 +170,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
     }
 
     async fn bridge_canister_evm_address(&self) -> Result<H160> {
-        let client = self.ctx.icrc_bridge_client(self.ctx.admin_name());
+        let client = self.ctx.erc20_bridge_client(self.ctx.admin_name());
         let address = client.get_bridge_canister_evm_address().await??;
         Ok(address)
     }
@@ -132,6 +178,23 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
     async fn new_user(&self) -> Result<Self::UserId> {
         let wallet = OwnedWallet::new(&mut rand::thread_rng());
         let address = wallet.address();
+
+        let client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let tx_hash = client
+            .mint_native_tokens(address.into(), u128::MAX.into())
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
+
+        let mint_tx_receipt = self
+            .ctx
+            .wait_transaction_receipt_on_evm(&client, &tx_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+
         self.users.write().await.insert(address.into(), wallet);
         Ok(address.into())
     }
@@ -190,18 +253,48 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let recipient_id = self.user_id256(to_wallet.address().into());
         let memo = self.next_memo();
 
-        self.ctx
-            .burn_base_erc_20_tokens(
+        println!("approving tokens for bridge");
+        let input = TestWTM::approveCall {
+            spender: self.bft_bridge.clone().into(),
+            value: info.amount.clone().into(),
+        }
+        .abi_encode();
+
+        let tx_hash = self
+            .ctx
+            .call_contract_without_waiting_on_evm(
                 &evm_client,
                 &sender_wallet,
                 &token_address,
-                &to_token_id.0,
-                recipient_id,
-                &self.bft_bridge,
-                info.amount.0.as_u128(),
-                Some(memo),
+                input,
+                0,
             )
             .await?;
+
+        self.wait_tx_success(&tx_hash).await?;
+
+        println!("burning tokens for bridge");
+        let input = BFTBridge::burnCall {
+            amount: info.amount.clone().into(),
+            fromERC20: token_address.clone().into(),
+            toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id.0),
+            recipientID: recipient_id.0.into(),
+            memo: memo.into(),
+        }
+        .abi_encode();
+
+        let tx_hash = self
+            .ctx
+            .call_contract_without_waiting_on_evm(
+                &evm_client,
+                &sender_wallet,
+                &self.bft_bridge,
+                input,
+                0,
+            )
+            .await?;
+
+        self.wait_tx_success(&tx_hash).await?;
 
         Ok(info.amount.clone())
     }

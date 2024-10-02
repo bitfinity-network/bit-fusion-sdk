@@ -36,11 +36,10 @@ use icrc_client::IcrcCanisterClient;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
-use crate::dfx_tests::TestWTM;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
-use crate::utils::{wasm::*, EXTERNAL_EVM_CHAIN_ID};
-use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
+use crate::utils::wasm::*;
+use crate::utils::{TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 
@@ -303,12 +302,6 @@ pub trait TestContext {
             )
             .await?;
 
-        let raw_client = self.client(self.canisters().icrc2_bridge(), self.admin_name());
-
-        raw_client
-            .update::<_, ()>("set_bft_bridge_contract", (bridge_address.clone(),))
-            .await?;
-
         Ok(bridge_address)
     }
 
@@ -476,7 +469,7 @@ pub trait TestContext {
         }
 
         let decoded_output =
-            BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), true)
+            BFTBridge::burnCall::abi_decode_returns(&dbg!(receipt.output.clone()).unwrap(), true)
                 .unwrap();
 
         let operation_id = decoded_output._0;
@@ -678,6 +671,19 @@ pub trait TestContext {
         amount: u128,
     ) -> Result<H256> {
         let evm_client = self.evm_client(self.admin_name());
+        self.call_contract_without_waiting_on_evm(&evm_client, wallet, contract, input, amount)
+            .await
+    }
+
+    /// Calls contract in the evm_client without waiting for it's receipt.
+    async fn call_contract_without_waiting_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+        contract: &H160,
+        input: Vec<u8>,
+        amount: u128,
+    ) -> Result<H256> {
         let from: H160 = wallet.address().into();
         let nonce = evm_client.account_basic(from.clone()).await?.nonce;
 
@@ -976,7 +982,6 @@ pub trait TestContext {
                     signature_canister,
                     self.admin(),
                     Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
-                    CHAIN_ID,
                 );
                 self.install_canister(self.canisters().evm(), wasm, (init_data,))
                     .await
@@ -992,7 +997,6 @@ pub trait TestContext {
                     signature_canister,
                     self.admin(),
                     Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
-                    EXTERNAL_EVM_CHAIN_ID,
                 );
                 self.install_canister(self.canisters().external_evm(), wasm, (init_data,))
                     .await
@@ -1187,7 +1191,6 @@ pub trait TestContext {
             self.canisters().signature_verification(),
             self.admin(),
             transaction_processing_interval,
-            CHAIN_ID,
         );
         let wasm = get_evm_testnet_canister_bytecode().await;
         self.reinstall_canister(self.canisters().evm(), wasm, (init_data,))
@@ -1319,13 +1322,12 @@ pub fn evm_canister_init_data(
     signature_verification_principal: Principal,
     owner: Principal,
     transaction_processing_interval: Option<Duration>,
-    chain_id: u64,
 ) -> EvmCanisterInitData {
     #[allow(deprecated)]
     EvmCanisterInitData {
         signature_verification_principal,
         min_gas_price: 10_u64.into(),
-        chain_id,
+        chain_id: CHAIN_ID,
         log_settings: Some(ic_log::LogSettings {
             enable_console: true,
             in_memory_records: None,

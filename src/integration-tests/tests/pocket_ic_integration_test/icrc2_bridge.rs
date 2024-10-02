@@ -868,8 +868,8 @@ pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>,
         .await
         .unwrap();
 
-    let minter_canister_address = ctx
-        .icrc_bridge_client(ADMIN)
+    let icrc_bridge_client = &ctx.icrc_bridge_client(ADMIN);
+    let minter_canister_address = icrc_bridge_client
         .get_bridge_canister_evm_address()
         .await
         .unwrap()
@@ -880,6 +880,11 @@ pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>,
             Some(expected_fee_charge_address.into()),
             wrapped_token_deployer,
         )
+        .await
+        .unwrap();
+
+    icrc_bridge_client
+        .set_bft_bridge_contract(&bft_bridge)
         .await
         .unwrap();
 

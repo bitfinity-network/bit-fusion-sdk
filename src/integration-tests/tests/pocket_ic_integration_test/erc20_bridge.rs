@@ -15,8 +15,7 @@ use evm_canister_client::EvmCanisterClient;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
-use crate::context::stress::erc20;
-use crate::context::stress::StressTestConfig;
+use crate::context::stress::{erc20, StressTestConfig};
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::ADMIN;
 use crate::utils::CHAIN_ID;
