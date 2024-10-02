@@ -10,7 +10,7 @@ use bridge_did::operation_log::Memo;
 use bridge_did::order::{SignedMintOrder, SignedOrders};
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
-use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken};
+use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -258,7 +258,12 @@ pub trait TestContext {
     }
 
     /// Crates BFTBridge contract in EVMc and registered it in minter canister
-    async fn initialize_bft_bridge(&self, caller: &str, fee_charge_address: H160) -> Result<H160> {
+    async fn initialize_bft_bridge(
+        &self,
+        caller: &str,
+        fee_charge_address: H160,
+        wrapped_token_deployer: H160,
+    ) -> Result<H160> {
         let minter_canister_address = self.get_icrc_bridge_canister_evm_address(caller).await?;
 
         let client = self.evm_client(self.admin_name());
@@ -272,6 +277,7 @@ pub trait TestContext {
                 &self.new_wallet(u64::MAX.into()).await?,
                 minter_canister_address,
                 Some(fee_charge_address),
+                wrapped_token_deployer,
                 true,
             )
             .await?;
@@ -291,6 +297,7 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
+        wrapped_token_deployer: H160,
         is_wrapped: bool,
     ) -> Result<H160> {
         let mut bridge_input = BFTBridge::BYTECODE.to_vec();
@@ -307,6 +314,7 @@ pub trait TestContext {
         let init_data = BFTBridge::initializeCall {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
+            wrappedTokenDeployer: wrapped_token_deployer.into(),
             isWrappedSide: is_wrapped,
             owner: [0; 20].into(),
             controllers: vec![],
@@ -364,6 +372,29 @@ pub trait TestContext {
             .unwrap();
 
         Ok(fee_charge_address)
+    }
+
+    async fn initialize_wrapped_token_deployer_contract(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+    ) -> Result<H160> {
+        let evm = self.evm_client(self.admin_name());
+        self.initialize_wrapped_token_deployer_contract_on_evm(&evm, wallet)
+            .await
+    }
+
+    async fn initialize_wrapped_token_deployer_contract_on_evm(
+        &self,
+        evm: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+    ) -> Result<H160> {
+        let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
+        let wrapped_token_deployer_address = self
+            .create_contract_on_evm(evm, wallet, wrapped_token_deployer_input.clone())
+            .await
+            .unwrap();
+
+        Ok(wrapped_token_deployer_address)
     }
 
     #[allow(clippy::too_many_arguments)]

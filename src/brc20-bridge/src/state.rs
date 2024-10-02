@@ -9,7 +9,8 @@ use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_canister::memory::MEMORY_MANAGER;
 use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
-use bridge_did::init::Brc20BridgeConfig;
+use bridge_did::init::brc20::Brc20BridgeConfig;
+use bridge_did::schnorr::{SchnorrAlgorithm, SchnorrKeyId};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
@@ -117,14 +118,24 @@ impl Brc20State {
         self.master_key.get().clone()
     }
 
+    /// Schnorr key ID of the canister.
+    fn schnorr_key_id(&self) -> SchnorrKeyId {
+        self.config
+            .get()
+            .schnorr_key_id
+            .to_key_id(SchnorrAlgorithm::Bip340Secp256k1)
+    }
+
     pub fn btc_signer(&self, signing_strategy: &SigningStrategy) -> Option<BtcSignerType> {
         Some(match signing_strategy {
             SigningStrategy::Local { private_key } => BtcSignerType::Local(LocalSigner::new(
                 PrivateKey::from_slice(private_key, self.network()).expect("invalid private key"),
             )),
-            SigningStrategy::ManagementCanister { .. } => {
-                BtcSignerType::Ic(IcBtcSigner::new(self.master_key()?, self.network()))
-            }
+            SigningStrategy::ManagementCanister { .. } => BtcSignerType::Ic(IcBtcSigner::new(
+                self.master_key()?,
+                self.network(),
+                self.schnorr_key_id(),
+            )),
         })
     }
 

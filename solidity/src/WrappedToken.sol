@@ -3,9 +3,10 @@
 pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "src/interfaces/IWrappedToken.sol";
 
 // Custom token contract based on ERC 20,
-contract WrappedToken is ERC20 {
+contract WrappedToken is ERC20, IWrappedToken {
     address public immutable owner;
     string private _name;
     string private _symbol;

@@ -13,12 +13,12 @@ use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BitcoinConnection, BridgeInitData, BtcBridgeConfig};
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BFTBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::state::{BtcConfig, WrappedTokenConfig};
+use btc_bridge::state::WrappedTokenConfig;
 use candid::{Decode, Encode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::ic_sign::SigningKeyId;
@@ -325,7 +325,7 @@ impl CkBtcSetup {
 
         let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
 
-        let bridge_config = BridgeInitData {
+        let init_data = BridgeInitData {
             owner: (&context).admin(),
             evm_link: EvmLink::Ic(context.canisters.evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
@@ -337,6 +337,15 @@ impl CkBtcSetup {
                 log_filter: Some("trace".to_string()),
                 ..Default::default()
             }),
+        };
+        let bridge_config = BtcBridgeConfig {
+            network: BitcoinConnection::Custom {
+                ckbtc_minter: minter_id.into(),
+                ckbtc_ledger: ledger_id.into(),
+                network: BitcoinNetwork::Mainnet,
+                ledger_fee: CKBTC_LEDGER_FEE,
+            },
+            init_data,
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();
@@ -351,22 +360,6 @@ impl CkBtcSetup {
         context.canisters.set(CanisterType::BtcBridge, btc_bridge);
         println!("Btc bridge installed with id {btc_bridge}");
 
-        let btc_config = BtcConfig {
-            ck_btc_minter: minter_id.into(),
-            ck_btc_ledger: ledger_id.into(),
-            network: BitcoinNetwork::Mainnet,
-            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
-        };
-
-        // configure btc
-        let res: BftResult<()> = (&context)
-            .client(btc_bridge, "admin")
-            .update("admin_configure_btc", (btc_config,))
-            .await
-            .unwrap();
-        assert!(res.is_ok());
-
-        println!("Btc config OK");
         for _ in 0..5 {
             (&context).advance_time(Duration::from_secs(2)).await;
             tokio::time::sleep(Duration::from_secs(2)).await;
@@ -390,8 +383,19 @@ impl CkBtcSetup {
             .unwrap()
             .unwrap();
 
+        let wrapped_token_deployer = (&context)
+            .initialize_wrapped_token_deployer_contract(&wallet)
+            .await
+            .unwrap();
+
         let bft_bridge = (&context)
-            .initialize_bft_bridge_with_minter(&wallet, btc_bridge_eth_address, None, true)
+            .initialize_bft_bridge_with_minter(
+                &wallet,
+                btc_bridge_eth_address,
+                None,
+                wrapped_token_deployer,
+                true,
+            )
             .await
             .unwrap();
 
@@ -1510,7 +1514,9 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     }
 
     ckbtc.advance_blocks(16);
-    (&ckbtc.context).advance_time(Duration::from_secs(30)).await;
+    (&ckbtc.context)
+        .advance_by_times(Duration::from_secs(1), 60)
+        .await;
 
     // deposit
     for wallet in &wallets {
@@ -1525,7 +1531,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     for _ in 0..100 {
         ckbtc.advance_blocks(2);
         (&ckbtc.context)
-            .advance_time(Duration::from_millis(50))
+            .advance_time(Duration::from_millis(100))
             .await;
     }
 
