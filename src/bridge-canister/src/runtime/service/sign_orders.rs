@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{MintOrder, SignedOrder, SignedOrders};
+use bridge_did::order::{MintOrder, SignedOrders, SignedOrdersData};
 use did::keccak;
 use eth_signer::sign_strategy::TransactionSigner;
 
@@ -17,7 +17,7 @@ pub trait MintOrderHandler {
     fn get_order(&self, id: OperationId) -> Option<MintOrder>;
 
     /// Set signed mint orders data to the given operation.
-    fn set_signed_order(&self, id: OperationId, signed: SignedOrder);
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrders);
 }
 
 pub const MAX_MINT_ORDERS_IN_BATCH: usize = 16;
@@ -81,14 +81,14 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
 
         log::trace!("Batch of {orders_number} mint orders signed");
 
-        let signed_orders = SignedOrders {
+        let signed_orders = SignedOrdersData {
             orders_data,
             signature: signature_bytes.to_vec(),
         };
 
         for (idx, order_op) in order_ops.into_iter().enumerate() {
             self.orders.borrow_mut().remove(&order_op.0);
-            let signed_order = SignedOrder::new(signed_orders.clone(), idx)
+            let signed_order = SignedOrders::new(signed_orders.clone(), idx)
                 .expect("index inside the signed orders list");
             self.order_handler
                 .set_signed_order(order_op.0, signed_order);

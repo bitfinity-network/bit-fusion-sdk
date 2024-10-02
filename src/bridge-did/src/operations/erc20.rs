@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::bridge_side::BridgeSide;
 use crate::events::MintedEventData;
-use crate::order::{MintOrder, SignedOrder};
+use crate::order::{MintOrder, SignedOrders};
 
 /// Erc20 bridge operation.
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -20,9 +20,9 @@ pub struct Erc20BridgeOp {
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum Erc20OpStage {
     SignMintOrder(MintOrder),
-    SendMintTransaction(SignedOrder),
+    SendMintTransaction(SignedOrders),
     ConfirmMint {
-        order: SignedOrder,
+        order: SignedOrders,
         tx_hash: Option<H256>,
     },
     TokenMintConfirmed(MintedEventData),
