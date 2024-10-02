@@ -1,10 +1,12 @@
 pub mod brc20;
 mod bridge_data;
+mod btc;
 mod rune;
 
 use std::time::Duration;
 
 pub use bridge_data::*;
+pub use btc::*;
 pub use rune::*;
 
 pub const DEFAULT_DEPOSIT_FEE: u64 = 100_000;
