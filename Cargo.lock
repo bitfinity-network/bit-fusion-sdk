@@ -1028,6 +1028,7 @@ name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bridge-client",
  "bridge-did",
  "candid",
  "clap 4.5.18",
@@ -2284,6 +2285,7 @@ name = "erc20_bridge"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bridge-canister",
  "bridge-did",
  "bridge-utils",
@@ -2291,6 +2293,7 @@ dependencies = [
  "did",
  "drop_guard",
  "eth-signer",
+ "futures",
  "ic-canister",
  "ic-exports",
  "ic-log",

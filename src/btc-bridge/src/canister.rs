@@ -8,7 +8,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::BftResult;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::BtcBridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedMintOrder;
@@ -28,7 +28,7 @@ use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
 use crate::ops::BtcBridgeOpImpl;
-use crate::state::{BtcConfig, State, WrappedTokenConfig};
+use crate::state::{State, WrappedTokenConfig};
 
 type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 
@@ -48,7 +48,9 @@ impl BridgeCanister for BtcBridge {
 
 impl BtcBridge {
     #[init]
-    pub fn init(&mut self, init_data: BridgeInitData) {
+    pub fn init(&mut self, config: BtcBridgeConfig) {
+        let BtcBridgeConfig { network, init_data } = config;
+        get_state().borrow_mut().configure_btc(network);
         self.init_bridge(init_data, Self::run_scheduler);
     }
 
@@ -116,15 +118,6 @@ impl BtcBridge {
         virtual_canister_call!(ck_btc_minter, "get_btc_address", (args,), String)
             .await
             .unwrap()
-    }
-
-    #[update]
-    pub fn admin_configure_btc(&self, config: BtcConfig) -> BftResult<()> {
-        Self::inspect_caller_is_owner()?;
-
-        get_state().borrow_mut().configure_btc(config);
-
-        Ok(())
     }
 
     #[update]
@@ -222,6 +215,7 @@ pub fn get_runtime_state() -> RuntimeState<BtcBridgeOpImpl> {
 #[cfg(test)]
 mod test {
     use bridge_did::evm_link::EvmLink;
+    use bridge_did::init::{BitcoinConnection, BridgeInitData};
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};
@@ -249,7 +243,11 @@ mod test {
             },
             log_settings: None,
         };
-        canister_call!(canister.init(init_data), ()).await.unwrap();
+        let config = BtcBridgeConfig {
+            network: BitcoinConnection::Mainnet,
+            init_data,
+        };
+        canister_call!(canister.init(config), ()).await.unwrap();
         canister
     }
 

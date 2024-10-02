@@ -18,7 +18,7 @@ use ic_task_scheduler::task::ScheduledTask;
 use jsonrpc_core::futures;
 
 use self::scheduler::{BridgeTask, ServiceTask, SharedScheduler};
-use self::service::{DynService, ServiceId, ServiceOrder};
+use self::service::{DynService, ServiceOrder};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
@@ -157,17 +157,6 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
 
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.borrow().config.borrow().get_signer()
-    }
-
-    fn push_operation_to_service(
-        &self,
-        service: ServiceId,
-        operation_id: OperationId,
-    ) -> BftResult<()> {
-        self.borrow()
-            .services
-            .borrow_mut()
-            .push_operation(service, operation_id)
     }
 }
 

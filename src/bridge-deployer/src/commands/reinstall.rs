@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use candid::Principal;
 use clap::Parser;
 use ethereum_types::H256;
-use ic_agent::Identity;
+use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use ic_utils::interfaces::ManagementCanister;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 use super::{BFTArgs, Bridge};
+use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::contracts::EvmNetwork;
 
@@ -49,7 +49,6 @@ impl ReinstallCommands {
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
-        deploy_bft: bool,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
@@ -65,46 +64,44 @@ impl ReinstallCommands {
             }
         };
 
-        let canister_wasm = std::fs::read(&self.wasm)?;
-        debug!("WASM file read successfully");
-
         let identity = GenericIdentity::try_from(identity.as_ref())?;
-        debug!(
-            "Deploying with Principal : {}",
-            identity.sender().expect("No sender found")
-        );
+        let caller = identity.sender().expect("No sender found");
+        debug!("Deploying with Principal: {caller}",);
 
-        let agent = ic_agent::Agent::builder()
+        let agent = Agent::builder()
             .with_url(ic_host)
             .with_identity(identity)
             .build()?;
 
         super::fetch_root_key(ic_host, &agent).await?;
 
-        let management_canister = ManagementCanister::create(&agent);
-
-        let arg = self.bridge_type.init_raw_arg()?;
-        trace!("Bridge configuration prepared");
-
-        management_canister
-            .install(&canister_id, &canister_wasm)
-            .with_raw_arg(arg)
-            .with_mode(InstallMode::Reinstall)
-            .call_and_wait()
+        let deployer = BridgeDeployer::new(agent.clone(), canister_id);
+        deployer
+            .install_wasm(
+                &self.wasm,
+                &self.bridge_type,
+                InstallMode::Reinstall,
+                network,
+            )
             .await?;
 
         info!("Canister installed successfully");
 
-        if deploy_bft {
-            info!("Deploying BFT bridge");
-            let bft_bridge_addr = self
-                .bft_args
-                .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
-                .await?;
+        let bft_address = self
+            .bft_args
+            .deploy_bft(
+                network,
+                deployer.bridge_principal(),
+                &self.bridge_type,
+                pk,
+                &agent,
+            )
+            .await?;
 
-            info!("BFT bridge deployed successfully with address: {bft_bridge_addr}");
-            println!("BFT bridge deployed with address: {bft_bridge_addr}");
-        }
+        info!("BFT bridge deployed successfully with address: {bft_address}");
+        println!("BFT bridge deployed with address: {bft_address}");
+
+        deployer.configure_minter(bft_address).await?;
 
         info!("Canister reinstalled successfully with ID: {}", canister_id);
 
@@ -112,6 +109,7 @@ impl ReinstallCommands {
             "Canister {canister_type} reinstalled with ID {canister_id}",
             canister_type = self.bridge_type.kind(),
         );
+
         Ok(())
     }
 }

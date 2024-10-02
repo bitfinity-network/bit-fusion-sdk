@@ -134,3 +134,19 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
             .await
     }
 }
+
+pub struct GenericBridgeClient<C> {
+    client: C,
+}
+
+impl<C: CanisterClient> GenericBridgeClient<C> {
+    pub fn new(client: C) -> Self {
+        Self { client }
+    }
+}
+
+impl<C: CanisterClient> BridgeCanisterClient<C> for GenericBridgeClient<C> {
+    fn client(&self) -> &C {
+        &self.client
+    }
+}
