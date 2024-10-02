@@ -1,17 +1,17 @@
 [workspace]
 members = [
-  "src/brc20-bridge",
-  "src/bridge-canister",
-  "src/bridge-client",
-  "src/bridge-deployer",
-  "src/bridge-did",
-  "src/bridge-tool",
-  "src/bridge-utils",
-  "src/integration-tests",
-  "src/icrc2-bridge",
-  "src/erc20-bridge",
-  "src/btc-bridge",
-  "src/rune-bridge",
+    "src/brc20-bridge",
+    "src/bridge-canister",
+    "src/bridge-client",
+    "src/bridge-deployer",
+    "src/bridge-did",
+    "src/bridge-tool",
+    "src/bridge-utils",
+    "src/integration-tests",
+    "src/icrc2-bridge",
+    "src/erc20-bridge",
+    "src/btc-bridge",
+    "src/rune-bridge",
 ]
 
 resolver = "2"

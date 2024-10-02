@@ -386,20 +386,24 @@ impl RunesContext {
                 .await
                 .expect("canister call failed");
 
-            if !response.is_empty() {
-                for (op_id, op) in &response {
-                    if matches!(
-                        op,
-                        RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. })
-                    ) {
-                        successful_orders.insert(*op_id);
-                    }
+            for (op_id, op) in &response {
+                if matches!(
+                    op,
+                    RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. })
+                ) {
+                    successful_orders.insert(*op_id);
+                    println!(
+                        "Deposit confirmed: {op_id}; successful_orders: {}/{}",
+                        successful_orders.len(),
+                        runes.len()
+                    );
                 }
             }
 
             println!("Deposit response: {response:?}");
 
-            if successful_orders.len() == runes.len() {
+            // since we use batched, one is enough
+            if !successful_orders.is_empty() {
                 return Ok(());
             }
         }

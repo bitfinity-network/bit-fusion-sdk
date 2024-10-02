@@ -3,7 +3,7 @@ use did::{H160, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::events::{BurntEventData, MintedEventData};
-use crate::order::{MintOrder, SignedOrder};
+use crate::order::{MintOrder, SignedOrders};
 use crate::reason::Icrc2Burn;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -15,11 +15,11 @@ pub enum IcrcBridgeOp {
         is_refund: bool,
     },
     SendMintTransaction {
-        order: SignedOrder,
+        order: SignedOrders,
         is_refund: bool,
     },
     ConfirmMint {
-        order: SignedOrder,
+        order: SignedOrders,
         tx_hash: Option<H256>,
         is_refund: bool,
     },

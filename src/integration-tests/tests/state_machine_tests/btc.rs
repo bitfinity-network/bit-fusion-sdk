@@ -13,12 +13,12 @@ use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::btc::{BitcoinConnection, WrappedTokenConfig};
+use bridge_did::init::{BridgeInitData, BtcBridgeConfig};
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BFTBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::state::{BtcConfig, WrappedTokenConfig};
 use candid::{Decode, Encode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::ic_sign::SigningKeyId;
@@ -325,7 +325,7 @@ impl CkBtcSetup {
 
         let wallet = (&context).new_wallet(u128::MAX).await.unwrap();
 
-        let bridge_config = BridgeInitData {
+        let init_data = BridgeInitData {
             owner: (&context).admin(),
             evm_link: EvmLink::Ic(context.canisters.evm()),
             signing_strategy: SigningStrategy::ManagementCanister {
@@ -337,6 +337,15 @@ impl CkBtcSetup {
                 log_filter: Some("trace".to_string()),
                 ..Default::default()
             }),
+        };
+        let bridge_config = BtcBridgeConfig {
+            network: BitcoinConnection::Custom {
+                ckbtc_minter: minter_id.into(),
+                ckbtc_ledger: ledger_id.into(),
+                network: BitcoinNetwork::Mainnet,
+                ledger_fee: CKBTC_LEDGER_FEE,
+            },
+            init_data,
         };
 
         let btc_bridge = (&context).create_canister().await.unwrap();
@@ -351,22 +360,6 @@ impl CkBtcSetup {
         context.canisters.set(CanisterType::BtcBridge, btc_bridge);
         println!("Btc bridge installed with id {btc_bridge}");
 
-        let btc_config = BtcConfig {
-            ck_btc_minter: minter_id.into(),
-            ck_btc_ledger: ledger_id.into(),
-            network: BitcoinNetwork::Mainnet,
-            ck_btc_ledger_fee: CKBTC_LEDGER_FEE,
-        };
-
-        // configure btc
-        let res: BftResult<()> = (&context)
-            .client(btc_bridge, "admin")
-            .update("admin_configure_btc", (btc_config,))
-            .await
-            .unwrap();
-        assert!(res.is_ok());
-
-        println!("Btc config OK");
         for _ in 0..5 {
             (&context).advance_time(Duration::from_secs(2)).await;
             tokio::time::sleep(Duration::from_secs(2)).await;

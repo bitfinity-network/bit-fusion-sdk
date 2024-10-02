@@ -2,7 +2,7 @@ use bridge_canister::bridge::{Operation, OperationAction, OperationContext, Oper
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
-use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
+use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
@@ -11,7 +11,7 @@ use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventD
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::IcrcBridgeOp;
-use bridge_did::order::{self, MintOrder, SignedOrder};
+use bridge_did::order::{self, MintOrder, SignedOrders};
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Decode, Nat};
@@ -376,7 +376,7 @@ impl MintOrderHandler for IcrcMintOrderHandler {
         Some(order)
     }
 
-    fn set_signed_order(&self, id: OperationId, signed: SignedOrder) {
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrders) {
         let Some(op) = self.state.borrow().operations.get(id) else {
             log::info!("Mint order handler failed to set MintOrder: operation not found.");
             return;
@@ -437,7 +437,7 @@ impl MintTxHandler for IcrcMintTxHandler {
         self.state.borrow().config.clone()
     }
 
-    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder> {
+    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders> {
         let op = self.state.borrow().operations.get(id);
         let Some(IcrcBridgeOp::SendMintTransaction { order, .. }) = op.map(|op| op.0) else {
             log::info!("MintTxHandler failed to get mint order batch: unexpected operation state.");

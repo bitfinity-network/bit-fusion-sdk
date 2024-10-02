@@ -2,6 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::bridge::OperationContext;
+use bridge_canister::runtime::service::mint_tx::SendMintTxService;
+use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -25,8 +28,11 @@ use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
 use ic_storage::IcStorage;
 
-use crate::ops::{self, Erc20BridgeOpImpl};
-use crate::state::{BaseEvmSettings, SharedEvmState};
+use crate::ops::{
+    self, Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
+};
+use crate::state::{BaseEvmSettings, SharedBaseEvmState};
 
 #[cfg(feature = "export-api")]
 pub mod inspect;
@@ -269,12 +275,47 @@ fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
     Ok(())
 }
 
-thread_local! {
-    pub static RUNTIME: SharedRuntime =
-        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+fn init_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(ConfigStorage::get());
+    let state = runtime.state();
+    let base_evm_config = get_base_evm_config();
+    let scheduler = runtime.scheduler().clone();
 
-    pub static BASE_EVM_STATE: SharedEvmState =
-        SharedEvmState::default(get_runtime_state().borrow().services.clone());
+    // Init operation handlers
+    let base_handler = Erc20OrderHandler::new(state.clone(), base_evm_config, scheduler.clone());
+    let wrapped_config = state.borrow().config.clone();
+    let wrapped_handler = Erc20OrderHandler::new(state.clone(), wrapped_config, scheduler.clone());
+
+    // Init mint order signing service
+    let base_sign_service = SignMintOrdersService::new(base_handler.clone());
+    let wrapped_sign_service = SignMintOrdersService::new(wrapped_handler.clone());
+    let sign_service = Erc20ServiceSelector::new(base_sign_service, wrapped_sign_service);
+
+    // Init mint tx service
+    let base_mint_tx_service = SendMintTxService::new(base_handler);
+    let wrapped_mint_tx_service = SendMintTxService::new(wrapped_handler);
+    let send_mint_tx_service =
+        Erc20ServiceSelector::new(base_mint_tx_service, wrapped_mint_tx_service);
+
+    let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SIGN_MINT_ORDER_SERVICE_ID,
+        Rc::new(sign_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SEND_MINT_TX_SERVICE_ID,
+        Rc::new(send_mint_tx_service),
+    );
+
+    Rc::new(RefCell::new(runtime))
+}
+
+thread_local! {
+    pub static RUNTIME: SharedRuntime = init_runtime();
+
+    pub static BASE_EVM_STATE: SharedBaseEvmState = SharedBaseEvmState::default();
 }
 
 pub fn get_runtime() -> SharedRuntime {
@@ -285,7 +326,7 @@ pub fn get_runtime_state() -> RuntimeState<Erc20BridgeOpImpl> {
     get_runtime().borrow().state().clone()
 }
 
-pub fn get_base_evm_state() -> SharedEvmState {
+pub fn get_base_evm_state() -> SharedBaseEvmState {
     BASE_EVM_STATE.with(|s| s.clone())
 }
 

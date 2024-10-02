@@ -8,6 +8,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
 
+use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
 use crate::contracts::EvmNetwork;
 
@@ -27,22 +28,6 @@ pub struct Cli {
     /// This must be provided in all the commands except for the `upgrade` command.
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
-
-    /// Ths is the host of the IC.
-    #[arg(
-        short,
-        long,
-        value_name = "IC_HOST",
-        default_value = "http://localhost:4943",
-        help_heading = "IC Host"
-    )]
-    ic_host: String,
-
-    /// Deploy the BFT bridge.
-    ///
-    /// Default: true
-    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
-    deploy_bft: bool,
 
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[arg(
@@ -72,6 +57,16 @@ pub struct Cli {
         help_heading = "Display"
     )]
     quiet: bool,
+
+    /// Custom path to the canister_ids.json file.
+    ///
+    /// If not provided, the default path for the provided evm network is used.
+    #[arg(
+        long,
+        value_name = "CANISTER_IDS_PATH",
+        help_heading = "Path to Canister IDs"
+    )]
+    canister_ids: Option<PathBuf>,
 }
 
 impl Cli {
@@ -85,15 +80,23 @@ impl Cli {
         let Cli {
             identity,
             private_key,
-            ic_host,
-            deploy_bft,
             evm_network,
             command,
+            canister_ids,
             ..
         } = cli;
 
+        // derive arguments
+        let ic_host = crate::evm::ic_host(evm_network);
+
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("IC host: {}", ic_host);
+
+        // load canister ids file
+        let canister_ids_path = canister_ids
+            .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
+            .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
+        debug!("Canister ids path: {}", canister_ids_path.path().display());
 
         trace!("Executing command: {:?}", command);
         command
@@ -102,7 +105,7 @@ impl Cli {
                 &ic_host,
                 evm_network,
                 private_key,
-                deploy_bft,
+                canister_ids_path,
             )
             .await?;
 

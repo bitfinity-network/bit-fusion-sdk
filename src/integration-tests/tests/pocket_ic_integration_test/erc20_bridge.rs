@@ -542,7 +542,11 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     let signed_order = stage.get_signed_mint_order().unwrap();
 
     ctx.context
-        .mint_erc_20_with_order(&ctx.bob_wallet, &ctx.wrapped_bft_bridge, *signed_order)
+        .batch_mint_erc_20_with_order(
+            &ctx.bob_wallet,
+            &ctx.wrapped_bft_bridge,
+            signed_order.clone(),
+        )
         .await
         .unwrap();
 
