@@ -401,8 +401,8 @@ impl<'a> EncodedOrderReader<'a> {
 /// Length of ECDSA signature in bytes.
 pub const SIGNATURE_LEN: usize = 65;
 
-/// Signed data of several encoded mint orders.
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+/// Encoded signed orders data
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct SignedOrdersData {
     pub orders_data: Vec<u8>,
     pub signature: Vec<u8>,
@@ -436,7 +436,7 @@ impl SignedOrdersData {
 pub type OrderIdx = usize;
 
 /// Signed mint orders batch with index of one specific order.
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct SignedOrders {
     all_orders: SignedOrdersData,
     idx: OrderIdx,

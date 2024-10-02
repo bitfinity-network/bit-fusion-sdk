@@ -1,25 +1,32 @@
+mod mint_order_handler;
+mod mint_tx_handler;
+
 use std::collections::HashMap;
 
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationAction, OperationProgress};
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
-use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 use candid::{CandidType, Decode, Deserialize};
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
 
+pub use self::mint_order_handler::RuneMintOrderHandler;
+pub use self::mint_tx_handler::RuneMintTxHandler;
 use crate::canister::{get_rune_state, get_runtime};
 use crate::core::deposit::RuneDeposit;
 use crate::core::rune_inputs::RuneInputProvider;
 use crate::core::utxo_handler::UtxoHandler;
 use crate::core::withdrawal::{RuneWithdrawalPayloadImpl, Withdrawal};
+
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
 pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
@@ -71,14 +78,26 @@ impl Operation for RuneBridgeOpImpl {
                 )
                 .await
             }
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mint_order)) => {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(mut mint_order)) => {
                 log::debug!("RuneBridgeOp::SignMintOrder {mint_order:?}");
-                let signer = ctx.get_signer()?;
-                Self::sign_mint_order(&signer, id.nonce(), mint_order).await
+                // set mint order nonce to new operation id
+                mint_order.nonce = id.nonce();
+                log::debug!(
+                    "RuneBridgeOp::SignMintOrder nonce updated to {}",
+                    mint_order.nonce
+                );
+                let new_op = RuneBridgeOpImpl(RuneBridgeOp::Deposit(
+                    RuneBridgeDepositOp::SignMintOrder(mint_order),
+                ));
+                // update the mint order
+                ctx.borrow_mut().operations.update(id, new_op.clone());
+
+                return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
                 log::debug!("RuneBridgeOp::SendMintOrder {order:?}");
-                Self::send_mint_order(&ctx, order).await
+
+                return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => {
                 Err(Error::FailedToProgress(
@@ -409,31 +428,6 @@ impl RuneBridgeOpImpl {
             .collect();
 
         Ok(Self::split_or_update(ctx, dst_address, operations))
-    }
-
-    async fn sign_mint_order(
-        signer: &impl TransactionSigner,
-        nonce: u32,
-        mut mint_order: MintOrder,
-    ) -> BftResult<Self> {
-        // update nonce
-        mint_order.nonce = nonce;
-
-        let signed = mint_order.encode_and_sign(signer).await?;
-
-        Ok(Self(RuneBridgeOp::Deposit(
-            RuneBridgeDepositOp::SendMintOrder(signed),
-        )))
-    }
-
-    async fn send_mint_order(
-        ctx: &impl OperationContext,
-        order: SignedMintOrder,
-    ) -> BftResult<Self> {
-        let tx_id = ctx.send_mint_transaction(&order).await?;
-        Ok(Self(RuneBridgeOp::Deposit(
-            RuneBridgeDepositOp::ConfirmMintOrder { order, tx_id },
-        )))
     }
 
     async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BftResult<Self> {
