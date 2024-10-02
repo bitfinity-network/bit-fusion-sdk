@@ -46,7 +46,7 @@ impl BridgeDeployer {
         config: &Bridge,
         mode: InstallMode,
         network: EvmNetwork,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Principal> {
         let canister_wasm = std::fs::read(wasm_path)?;
         debug!(
             "WASM file read successfully. File size: {}",
@@ -69,7 +69,7 @@ impl BridgeDeployer {
             canister_id
         );
 
-        Ok(())
+        Ok(canister_id)
     }
 
     pub async fn configure_minter(&self, bft_address: H160) -> anyhow::Result<()> {

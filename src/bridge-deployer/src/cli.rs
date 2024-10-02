@@ -8,6 +8,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
 
+use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
 use crate::contracts::EvmNetwork;
 
@@ -56,6 +57,16 @@ pub struct Cli {
         help_heading = "Display"
     )]
     quiet: bool,
+
+    /// Custom path to the canister_ids.json file.
+    ///
+    /// If not provided, the default path for the provided evm network is used.
+    #[arg(
+        long,
+        value_name = "CANISTER_IDS_PATH",
+        help_heading = "Path to Canister IDs"
+    )]
+    canister_ids: Option<PathBuf>,
 }
 
 impl Cli {
@@ -71,6 +82,7 @@ impl Cli {
             private_key,
             evm_network,
             command,
+            canister_ids,
             ..
         } = cli;
 
@@ -80,9 +92,21 @@ impl Cli {
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("IC host: {}", ic_host);
 
+        // load canister ids file
+        let canister_ids_path = canister_ids
+            .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
+            .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
+        debug!("Canister ids path: {}", canister_ids_path.path().display());
+
         trace!("Executing command: {:?}", command);
         command
-            .run(identity.to_path_buf(), &ic_host, evm_network, private_key)
+            .run(
+                identity.to_path_buf(),
+                &ic_host,
+                evm_network,
+                private_key,
+                canister_ids_path,
+            )
             .await?;
 
         Ok(())

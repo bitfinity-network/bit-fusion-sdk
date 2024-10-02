@@ -10,6 +10,7 @@ use tracing::{debug, info};
 
 use super::{BFTArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
+use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::contracts::EvmNetwork;
 
 /// The default number of cycles to deposit to the canister
@@ -59,7 +60,11 @@ impl DeployCommands {
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
+        canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
+        info!("Starting canister deployment");
+        let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
+
         let identity = GenericIdentity::try_from(identity.as_ref())?;
         let caller = identity.sender().expect("No sender found");
         debug!("Deploying with Principal : {caller}",);
@@ -73,9 +78,14 @@ impl DeployCommands {
 
         let deployer =
             BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
-        deployer
+        let canister_id = deployer
             .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
             .await?;
+
+        println!("Canister deployed with ID {canister_id}",);
+
+        canister_ids.set((&self.bridge_type).into(), canister_id);
+
         let bft_address = self
             .bft_args
             .deploy_bft(
@@ -91,6 +101,9 @@ impl DeployCommands {
         println!("BFT bridge deployed with address {bft_address}");
 
         deployer.configure_minter(bft_address).await?;
+
+        // write canister ids file
+        canister_ids.write()?;
 
         info!("Canister deployed successfully");
 

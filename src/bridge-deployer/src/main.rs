@@ -1,6 +1,7 @@
 use cli::Cli;
 
 mod bridge_deployer;
+mod canister_ids;
 mod cli;
 mod commands;
 mod config;
