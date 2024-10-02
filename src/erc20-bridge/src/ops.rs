@@ -1,19 +1,30 @@
 use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::memory::StableMemory;
+use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
+use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
+use bridge_canister::runtime::service::{BridgeService, ServiceId};
+use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::bridge_side::BridgeSide;
-use bridge_did::error::BftResult;
+use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
-use bridge_did::order::{MintOrder, SignedMintOrder};
+use bridge_did::order::{MintOrder, SignedOrder};
 use bridge_utils::evm_bridge::EvmParams;
 use candid::CandidType;
 use did::{H160, U256};
-use ic_task_scheduler::task::TaskOptions;
+use eth_signer::sign_strategy::TransactionSigner;
+use ic_task_scheduler::scheduler::TaskScheduler;
+use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::{Deserialize, Serialize};
 
-use crate::canister::{get_base_evm_config, get_base_evm_state};
+use crate::canister::{get_base_evm_config, get_base_evm_state, get_runtime_state};
+
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOpImpl(pub Erc20BridgeOp);
@@ -22,20 +33,24 @@ impl Operation for Erc20BridgeOpImpl {
     async fn progress(
         self,
         _id: OperationId,
-        ctx: RuntimeState<Self>,
+        _ctx: RuntimeState<Self>,
     ) -> BftResult<OperationProgress<Self>> {
         let stage = Erc20OpStageImpl(self.0.stage);
         let next_stage = match self.0.side {
-            BridgeSide::Base => stage.progress(get_base_evm_state()).await?,
-            BridgeSide::Wrapped => stage.progress(ctx).await?,
+            BridgeSide::Base => stage.progress().await?,
+            BridgeSide::Wrapped => stage.progress().await?,
         };
 
-        Ok(OperationProgress::Progress(Erc20BridgeOpImpl(
-            Erc20BridgeOp {
-                side: self.0.side,
-                stage: next_stage.0,
-            },
-        )))
+        let progress = match next_stage {
+            OperationProgress::Progress(stage) => {
+                OperationProgress::Progress(Self(Erc20BridgeOp {
+                    side: self.0.side,
+                    stage: stage.0,
+                }))
+            }
+            OperationProgress::AddToService(op_id) => OperationProgress::AddToService(op_id),
+        };
+        Ok(progress)
     }
 
     fn is_complete(&self) -> bool {
@@ -163,7 +178,7 @@ pub struct Erc20OpStageImpl(pub Erc20OpStage);
 
 impl Erc20OpStageImpl {
     /// Returns signed mint order if the stage contains it.
-    pub fn get_signed_mint_order(&self) -> Option<&SignedMintOrder> {
+    pub fn get_signed_mint_order(&self) -> Option<&SignedOrder> {
         match &self.0 {
             Erc20OpStage::SignMintOrder(_) => None,
             Erc20OpStage::SendMintTransaction(order) => Some(order),
@@ -172,10 +187,14 @@ impl Erc20OpStageImpl {
         }
     }
 
-    async fn progress(self, ctx: impl OperationContext) -> BftResult<Self> {
+    async fn progress(self) -> BftResult<OperationProgress<Self>> {
         match self.0 {
-            Erc20OpStage::SignMintOrder(order) => Self::sign_mint_order(ctx, order).await,
-            Erc20OpStage::SendMintTransaction(order) => Self::send_mint_tx(ctx, order).await,
+            Erc20OpStage::SignMintOrder(_) => {
+                Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID))
+            }
+            Erc20OpStage::SendMintTransaction(_) => {
+                Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID))
+            }
             Erc20OpStage::ConfirmMint { .. } => Err(bridge_did::error::Error::FailedToProgress(
                 "Erc20OpStage::ConfirmMint should progress by the event".into(),
             )),
@@ -183,36 +202,6 @@ impl Erc20OpStageImpl {
                 "Erc20OpStage::TokenMintConfirmed should not progress".into(),
             )),
         }
-    }
-
-    async fn sign_mint_order(ctx: impl OperationContext, order: MintOrder) -> BftResult<Self> {
-        log::trace!("signing mint order: {order:?}");
-
-        let signer = ctx.get_signer()?;
-        let signed_mint_order = order.encode_and_sign(&signer).await?;
-
-        let should_send_by_canister = order.fee_payer != H160::zero();
-        let next_op = if should_send_by_canister {
-            Erc20OpStage::SendMintTransaction(signed_mint_order)
-        } else {
-            Erc20OpStage::ConfirmMint {
-                order: signed_mint_order,
-                tx_hash: None,
-            }
-        };
-
-        Ok(Self(next_op))
-    }
-
-    async fn send_mint_tx(ctx: impl OperationContext, order: SignedMintOrder) -> BftResult<Self> {
-        log::trace!("sending mint transaction");
-
-        let tx_hash = ctx.send_mint_transaction(&order).await?;
-
-        Ok(Self(Erc20OpStage::ConfirmMint {
-            order,
-            tx_hash: Some(tx_hash),
-        }))
     }
 }
 
@@ -259,4 +248,157 @@ pub fn mint_order_from_burnt_event(
     };
 
     Some(order)
+}
+
+/// Select base or wrapped service based on operation side.
+pub struct Erc20ServiceSelector<S> {
+    base: S,
+    wrapped: S,
+}
+
+impl<S> Erc20ServiceSelector<S> {
+    pub fn new(base: S, wrapped: S) -> Self {
+        Self { base, wrapped }
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl<S: BridgeService> BridgeService for Erc20ServiceSelector<S> {
+    async fn run(&self) -> BftResult<()> {
+        let (base_result, wrapped_result) = futures::join!(self.base.run(), self.wrapped.run());
+        base_result?;
+        wrapped_result?;
+        Ok(())
+    }
+
+    fn push_operation(&self, id: OperationId) -> BftResult<()> {
+        let Some(op) = get_runtime_state().borrow().operations.get(id) else {
+            log::warn!("Attempt to add unexisting operataion to mint order sign service");
+            return Err(Error::OperationNotFound(id));
+        };
+
+        match op.0.side {
+            BridgeSide::Base => self.base.push_operation(id),
+            BridgeSide::Wrapped => self.wrapped.push_operation(id),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Erc20OrderHandler {
+    state: RuntimeState<Erc20BridgeOpImpl>,
+    config: SharedConfig,
+    scheduler: SharedScheduler<StableMemory, Erc20BridgeOpImpl>,
+}
+
+impl Erc20OrderHandler {
+    pub fn new(
+        state: RuntimeState<Erc20BridgeOpImpl>,
+        config: SharedConfig,
+        scheduler: SharedScheduler<StableMemory, Erc20BridgeOpImpl>,
+    ) -> Self {
+        Self {
+            state,
+            config,
+            scheduler,
+        }
+    }
+}
+
+impl MintOrderHandler for Erc20OrderHandler {
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.config.borrow().get_signer()
+    }
+
+    fn get_order(&self, id: OperationId) -> Option<MintOrder> {
+        let op = self.state.borrow().operations.get(id)?;
+        let Erc20OpStage::SignMintOrder(order) = op.0.stage else {
+            log::info!("Mint order handler failed to get MintOrder: unexpected state.");
+            return None;
+        };
+
+        Some(order)
+    }
+
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrder) {
+        let Some(op) = self.state.borrow().operations.get(id) else {
+            log::info!("Mint order handler failed to set MintOrder: operation not found.");
+            return;
+        };
+
+        let Erc20OpStage::SignMintOrder(order) = op.0.stage else {
+            log::info!("Mint order handler failed to set MintOrder: unexpected state.");
+            return;
+        };
+
+        let should_send_mint_tx = order.fee_payer != H160::zero();
+        let new_stage = match should_send_mint_tx {
+            true => Erc20OpStage::SendMintTransaction(signed),
+            false => Erc20OpStage::ConfirmMint {
+                order: signed,
+                tx_hash: None,
+            },
+        };
+
+        let new_op = Erc20BridgeOpImpl(Erc20BridgeOp {
+            side: op.0.side,
+            stage: new_stage,
+        });
+        let scheduling_options = new_op.scheduling_options();
+        self.state
+            .borrow_mut()
+            .operations
+            .update(id, new_op.clone());
+
+        if let Some(options) = scheduling_options {
+            let scheduled_task =
+                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            self.scheduler.append_task(scheduled_task);
+        }
+    }
+}
+
+impl MintTxHandler for Erc20OrderHandler {
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.config.borrow().get_signer()
+    }
+
+    fn get_evm_config(&self) -> SharedConfig {
+        self.config.clone()
+    }
+
+    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder> {
+        let Some(op) = self.state.borrow().operations.get(id) else {
+            log::info!("Mint order handler failed to get MintOrder: operation not found.");
+            return None;
+        };
+        let Erc20OpStage::SendMintTransaction(order) = op.0.stage else {
+            log::info!("MintTxHandler failed to get mint order batch: unexpected operation state.");
+            return None;
+        };
+
+        Some(order)
+    }
+
+    fn mint_tx_sent(&self, id: OperationId, tx_hash: did::H256) {
+        let Some(op) = self.state.borrow().operations.get(id) else {
+            log::info!("MintTxHandler failed to update operation: not found.");
+            return;
+        };
+        let Erc20OpStage::SendMintTransaction(order) = op.0.stage else {
+            log::info!("MintTxHandler failed to update operation: unexpected state.");
+            return;
+        };
+
+        self.state.borrow_mut().operations.update(
+            id,
+            Erc20BridgeOpImpl(Erc20BridgeOp {
+                side: op.0.side,
+                stage: Erc20OpStage::ConfirmMint {
+                    order,
+                    tx_hash: Some(tx_hash),
+                },
+            }),
+        );
+    }
 }
