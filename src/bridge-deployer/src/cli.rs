@@ -28,12 +28,6 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// Deploy the BFT bridge.
-    ///
-    /// Default: true
-    #[arg(long, default_value = "false", help_heading = "Bridge Contract Args")]
-    deploy_bft: bool,
-
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[arg(
         long,
@@ -75,7 +69,6 @@ impl Cli {
         let Cli {
             identity,
             private_key,
-            deploy_bft,
             evm_network,
             command,
             ..
@@ -89,13 +82,7 @@ impl Cli {
 
         trace!("Executing command: {:?}", command);
         command
-            .run(
-                identity.to_path_buf(),
-                &ic_host,
-                evm_network,
-                private_key,
-                deploy_bft,
-            )
+            .run(identity.to_path_buf(), &ic_host, evm_network, private_key)
             .await?;
 
         Ok(())

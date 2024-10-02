@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use candid::Principal;
 use clap::Parser;
 use ethereum_types::H256;
-use ic_agent::Identity;
+use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use ic_utils::interfaces::{ManagementCanister, WalletCanister};
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 use super::{BFTArgs, Bridge};
+use crate::bridge_deployer::BridgeDeployer;
 use crate::contracts::EvmNetwork;
 
 /// The default number of cycles to deposit to the canister
@@ -47,7 +47,7 @@ pub struct DeployCommands {
     wallet_canister: Principal,
 
     /// These are extra arguments for the BFT bridge.
-    #[command(flatten, next_help_heading = "Bridge Contract Args")]
+    #[command(flatten, next_help_heading = "BFT Bridge deployment")]
     bft_args: BFTArgs,
 }
 
@@ -59,63 +59,45 @@ impl DeployCommands {
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
-        deploy_bft: bool,
     ) -> anyhow::Result<()> {
-        info!("Starting canister deployment");
-        let canister_wasm = std::fs::read(&self.wasm)?;
-        debug!("WASM file read successfully");
-
         let identity = GenericIdentity::try_from(identity.as_ref())?;
-        debug!(
-            "Deploying with Principal : {}",
-            identity.sender().expect("No sender found")
-        );
+        let caller = identity.sender().expect("No sender found");
+        debug!("Deploying with Principal : {caller}",);
 
-        let agent = ic_agent::Agent::builder()
+        let agent = Agent::builder()
             .with_url(ic_host)
             .with_identity(identity)
             .build()?;
 
         super::fetch_root_key(ic_host, &agent).await?;
 
-        info!("Using  wallet canister ID: {}", self.wallet_canister);
-        let wallet = WalletCanister::create(&agent, self.wallet_canister).await?;
-
-        let canister_id = wallet
-            .wallet_create_canister(self.cycles, None, None, None, None)
-            .await?
-            .canister_id;
-
-        let management_canister = ManagementCanister::create(&agent);
-
-        let arg = self.bridge_type.init_raw_arg(network)?;
-        trace!("Bridge configuration prepared");
-
-        management_canister
-            .install(&canister_id, &canister_wasm)
-            .with_mode(InstallMode::Install)
-            .with_raw_arg(arg)
-            .call_and_wait()
+        let deployer =
+            BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
+        deployer
+            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
+            .await?;
+        let bft_address = self
+            .bft_args
+            .deploy_bft(
+                network,
+                deployer.bridge_principal(),
+                &self.bridge_type,
+                pk,
+                &agent,
+            )
             .await?;
 
-        info!("Canister installed successfully with ID: {}", canister_id);
+        info!("BFT bridge deployed successfully with {bft_address}");
+        println!("BFT bridge deployed with address {bft_address}");
 
-        if deploy_bft {
-            info!("Deploying BFT bridge");
-            let bft_bridge_addr = self
-                .bft_args
-                .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
-                .await?;
-
-            info!("BFT bridge deployed successfully with {bft_bridge_addr}");
-            println!("BFT bridge deployed with address {bft_bridge_addr}");
-        }
+        deployer.configure_minter(bft_address).await?;
 
         info!("Canister deployed successfully");
 
         println!(
             "Canister {canister_type} deployed with ID {canister_id}",
-            canister_type = self.bridge_type.kind()
+            canister_type = self.bridge_type.kind(),
+            canister_id = deployer.bridge_principal(),
         );
 
         Ok(())

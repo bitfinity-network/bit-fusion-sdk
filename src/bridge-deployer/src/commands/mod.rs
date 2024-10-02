@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
+use bridge_did::init::BtcBridgeConfig;
 use candid::{Encode, Principal};
-use clap::{Parser, Subcommand};
+use clap::{Args, Subcommand};
 use deploy::DeployCommands;
 use eth_signer::sign_strategy::SigningStrategy;
 use ethereum_types::{H160, H256};
@@ -60,6 +62,8 @@ pub enum Bridge {
         /// The configuration to use
         #[command(flatten)]
         config: config::InitBridgeConfig,
+        #[command(flatten, next_help_heading = "CkBTC connection")]
+        connection: config::BtcBridgeConnection,
     },
     Erc20 {
         /// The configuration to use
@@ -143,9 +147,14 @@ impl Bridge {
 
                 Encode!(&init, &erc)?
             }
-            Bridge::Btc { config } => {
+            Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let config = config.clone().into_bridge_init_data(evm_network);
+                let connection = bridge_did::init::BitcoinConnection::from(connection.clone());
+                let init_data = config.clone().into_bridge_init_data(evm_network);
+                let config = BtcBridgeConfig {
+                    network: connection,
+                    init_data,
+                };
                 Encode!(&config)?
             }
         };
@@ -179,17 +188,16 @@ impl Commands {
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
-        deploy_bft: bool,
     ) -> anyhow::Result<()> {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, network, pk, deploy_bft)
+                    .deploy_canister(identity, ic_host, network, pk)
                     .await?
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, pk, deploy_bft)
+                    .reinstall_canister(identity, ic_host, network, pk)
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
@@ -199,15 +207,35 @@ impl Commands {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 pub struct BFTArgs {
-    /// The address of the owner of the contract.
-    #[arg(long, value_name = "OWNER")]
+    /// Deploy and configure new BFT bridge contract (together with FeeCharge contract)
+    ///
+    /// This argument cannot be used together with `--use-bft`.
+    #[arg(
+        long,
+        conflicts_with = "existing",
+        required_unless_present = "existing"
+    )]
+    deploy_bft: bool,
+
+    /// The address of the owner of the contract. Must be used with `--deploy-bft`.
+    #[arg(long, value_name = "OWNER", requires = "deploy_bft")]
     owner: Option<H160>,
 
-    /// The list of controllers for the contract.
-    #[arg(long, value_name = "CONTROLLERS")]
+    /// The list of controllers for the contract. Must be used with `--deploy-bft`.
+    #[arg(long, value_name = "CONTROLLERS", requires = "deploy_bft")]
     controllers: Option<Vec<H160>>,
+
+    /// Configure existing BFT bridge contract to work with the deployed bridge.
+    ///
+    /// This argument cannot be used together with `--deploy-bft`.
+    #[arg(
+        long = "use-bft",
+        required_unless_present = "deploy_bft",
+        value_name = "ADDRESS"
+    )]
+    existing: Option<H160>,
 }
 
 impl BFTArgs {
@@ -220,6 +248,12 @@ impl BFTArgs {
         pk: H256,
         agent: &Agent,
     ) -> anyhow::Result<H160> {
+        if let Some(address) = self.existing {
+            return Ok(address);
+        }
+
+        info!("Deploying BFT bridge");
+
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
         let expected_nonce = contract_deployer.get_nonce().await? + 3;
@@ -235,7 +269,8 @@ impl BFTArgs {
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
-            .await??;
+            .await?
+            .context("failed to get the bridge canister address")?;
 
         info!("Minter address: {:x}", minter_address);
 
@@ -251,6 +286,8 @@ impl BFTArgs {
         )?;
 
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
+
+        info!("BFT bridge deployed successfully. Contract address: {bft_address}");
 
         Ok(bft_address)
     }

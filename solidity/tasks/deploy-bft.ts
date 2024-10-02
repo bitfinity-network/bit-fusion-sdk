@@ -18,13 +18,13 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 task("deploy-bft", "Deploys the BFT contract")
   .addParam("minterAddress", "The address of the minter")
   .addParam("feeChargeAddress", "The address of the fee charge")
-  .addParam("wrappedTokenDeployer", "The address of the wrapped token deployer")
+  .addParam("wrappedTokenDeployerAddress", "The address of the wrapped token deployer")
   .addParam("isWrappedSide", "Is the wrapped side", undefined, boolean)
   .addOptionalParam("owner", "The owner of the contract")
   .addOptionalParam("controllers", "The controllers of the contract")
   .setAction(
     async (
-      { minterAddress, feeChargeAddress, wrappedTokenDeployer, isWrappedSide, owner, controllers },
+      { minterAddress, feeChargeAddress, wrappedTokenDeployerAddress, isWrappedSide, owner, controllers },
       hre: HardhatRuntimeEnvironment,
     ) => {
       console.log("Compiling contract");
@@ -35,12 +35,12 @@ task("deploy-bft", "Deploys the BFT contract")
       let ownerAddress = owner || hre.ethers.ZeroAddress;
 
       // Validate the arguments that it are addresses
-      const addressesToValidate = [minterAddress, feeChargeAddress, wrappedTokenDeployer];
+      const addressesToValidate = [minterAddress, feeChargeAddress, wrappedTokenDeployerAddress];
       if (owner) addressesToValidate.push(ownerAddress);
       if (controllers) addressesToValidate.push(...controllersArr);
 
       // Validate the arguments that it is address
-      for (const address of [minterAddress, feeChargeAddress, ownerAddress, ...controllersArr]) {
+      for (const address of addressesToValidate) {
         if (!hre.ethers.isAddress(address)) {
           throw new Error(`Invalid address: ${address}`);
         }
@@ -55,11 +55,11 @@ task("deploy-bft", "Deploys the BFT contract")
 
       const BFTBridge = await hre.ethers.getContractFactory("BFTBridge");
 
-      console.log("Deploying BFT contract");
+
       const bridge = await hre.upgrades.deployProxy(BFTBridge, [
         minterAddress,
         feeChargeAddress,
-        wrappedTokenDeployer,
+        wrappedTokenDeployerAddress,
         isWrappedSide,
         ownerAddress,
         controllersArr,

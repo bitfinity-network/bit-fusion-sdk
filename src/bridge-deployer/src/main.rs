@@ -1,5 +1,6 @@
 use cli::Cli;
 
+mod bridge_deployer;
 mod cli;
 mod commands;
 mod config;
