@@ -19,7 +19,7 @@ use upgrade::UpgradeCommands;
 
 use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::config;
-use crate::contracts::{EvmNetwork, SolidityContractDeployer};
+use crate::contracts::{NetworkConfig, SolidityContractDeployer};
 mod deploy;
 mod reinstall;
 mod upgrade;
@@ -215,7 +215,7 @@ impl Commands {
         &self,
         identity: PathBuf,
         ic_host: &str,
-        network: EvmNetwork,
+        network: NetworkConfig,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
@@ -272,7 +272,7 @@ impl BFTArgs {
     /// Deploy the BFT contract
     pub async fn deploy_bft(
         &self,
-        network: EvmNetwork,
+        network: NetworkConfig,
         canister_id: Principal,
         bridge: &Bridge,
         pk: H256,

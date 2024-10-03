@@ -10,7 +10,7 @@ use tracing_subscriber::{filter, Layer as _};
 
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
-use crate::contracts::EvmNetwork;
+use crate::contracts::NetworkConfig;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]

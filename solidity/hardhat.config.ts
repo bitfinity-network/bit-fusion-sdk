@@ -22,6 +22,8 @@ const TESTNET_URL = "https://testnet.bitfinity.network"
 
 const DEPLOYER_PRIVATE_KEY = process.env.PRIVATE_KEY || "";
 
+const CUSTOM_URL = process.env.CUSTOM_URL || "";
+
 
 const config: HardhatUserConfig = {
   networks: {
@@ -35,6 +37,10 @@ const config: HardhatUserConfig = {
     },
     testnet: {
       url: TESTNET_URL,
+      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
+    },
+    custom: {
+      url: CUSTOM_URL,
       accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
     }
   },
