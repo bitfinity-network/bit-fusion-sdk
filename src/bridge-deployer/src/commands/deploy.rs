@@ -94,6 +94,7 @@ impl DeployCommands {
                 &self.bridge_type,
                 pk,
                 &agent,
+                false,
             )
             .await?;
 
@@ -101,6 +102,16 @@ impl DeployCommands {
         println!("BFT bridge deployed with address {bft_address}");
 
         deployer.configure_minter(bft_address).await?;
+
+        self.bridge_type
+            .finalize(
+                &self.bft_args,
+                network,
+                deployer.bridge_principal(),
+                pk,
+                &agent,
+            )
+            .await?;
 
         // write canister ids file
         canister_ids.write()?;

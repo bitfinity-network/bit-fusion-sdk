@@ -29,7 +29,7 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    /// EVM network to deploy the contract to
     #[arg(
         long,
         value_name = "EVM_NETWORK",

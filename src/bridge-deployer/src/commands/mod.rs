@@ -71,7 +71,7 @@ pub enum Bridge {
         #[command(flatten)]
         init: config::InitBridgeConfig,
         /// Extra configuration for the ERC20 bridge
-        #[command(name = "erc", flatten)]
+        #[command(name = "erc", flatten, next_help_heading = "Base EVM")]
         erc: config::BaseEvmSettingsConfig,
     },
     Icrc {
@@ -130,6 +130,7 @@ impl Bridge {
             }
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
+                let signing_strategy = init.signing_key_id.into();
                 let init = init.clone().into_bridge_init_data(evm_network);
 
                 // Workaround for not depending on the `erc-20` crate
@@ -140,10 +141,8 @@ impl Bridge {
                 }
 
                 let erc = EvmSettings {
-                    evm_link: crate::evm::evm_link(evm_network, erc.evm),
-                    signing_strategy: SigningStrategy::ManagementCanister {
-                        key_id: erc.singing_key_id.clone().into(),
-                    },
+                    evm_link: erc.clone().into(),
+                    signing_strategy,
                 };
 
                 Encode!(&init, &erc)?
@@ -163,14 +162,31 @@ impl Bridge {
         Ok(arg)
     }
 
-    /// Returns if the bridge is wrapped side or not
-    pub fn is_wrapped_side(&self) -> bool {
+    pub async fn finalize(
+        &self,
+        bft_args: &BFTArgs,
+        wrapped_network: EvmNetwork,
+        bridge_principal: Principal,
+        pk: H256,
+        agent: &Agent,
+    ) -> anyhow::Result<()> {
         match self {
-            Bridge::Brc20 { .. } => true,
-            Bridge::Rune { .. } => true,
-            Bridge::Icrc { .. } => true,
-            Bridge::Erc20 { .. } => false,
-            Bridge::Btc { .. } => true,
+            Self::Erc20 { erc, .. } => {
+                let network = if let Some(url) = &erc.base_evm_url {
+                    EvmNetwork::Localhost
+                } else {
+                    let principal = erc.base_evm_principal.expect("evm principal is not set");
+                    EvmNetwork::Localhost
+                };
+
+                let bft_address = bft_args
+                    .deploy_bft(network, bridge_principal, &self, pk, &agent, false)
+                    .await?;
+
+                println!("Base BFT bridge deployed with address {bft_address}");
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 }
@@ -261,6 +277,7 @@ impl BFTArgs {
         bridge: &Bridge,
         pk: H256,
         agent: &Agent,
+        is_wrapped_side: bool,
     ) -> anyhow::Result<H160> {
         if let Some(address) = self.existing {
             return Ok(address);
@@ -287,8 +304,6 @@ impl BFTArgs {
             .context("failed to get the bridge canister address")?;
 
         info!("Minter address: {:x}", minter_address);
-
-        let is_wrapped_side = bridge.is_wrapped_side();
 
         let bft_address = contract_deployer.deploy_bft(
             &minter_address.into(),

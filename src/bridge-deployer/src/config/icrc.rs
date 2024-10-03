@@ -1,7 +1,6 @@
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use clap::Parser;
-use eth_signer::sign_strategy::SigningStrategy;
 use serde::{Deserialize, Serialize};
 
 use super::{LogCanisterSettings, SigningKeyId};
@@ -32,9 +31,7 @@ impl InitBridgeConfig {
         BridgeInitData {
             owner: self.owner,
             evm_link: crate::evm::evm_link(evm_network, self.evm),
-            signing_strategy: SigningStrategy::ManagementCanister {
-                key_id: self.signing_key_id.into(),
-            },
+            signing_strategy: self.signing_key_id.into(),
             log_settings: self.log_settings.map(|v| ic_log::did::LogCanisterSettings {
                 enable_console: v.enable_console,
                 in_memory_records: v.in_memory_records,

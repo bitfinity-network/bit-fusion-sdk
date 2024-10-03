@@ -95,6 +95,7 @@ impl ReinstallCommands {
                 &self.bridge_type,
                 pk,
                 &agent,
+                false,
             )
             .await?;
 
