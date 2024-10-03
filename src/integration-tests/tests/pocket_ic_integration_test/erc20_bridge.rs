@@ -45,7 +45,7 @@ impl ContextWithBridges {
         let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
         let deployer_address = fee_charge_deployer.address();
         base_evm_client
-            .mint_native_tokens(deployer_address.into(), u64::MAX.into())
+            .admin_mint_native_tokens(deployer_address.into(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
@@ -60,12 +60,12 @@ impl ContextWithBridges {
 
         // Mint native tokens for bob in both evms
         base_evm_client
-            .mint_native_tokens(bob_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
         ctx.evm_client(ADMIN)
-            .mint_native_tokens(bob_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
@@ -83,12 +83,12 @@ impl ContextWithBridges {
         // mint native tokens for the erc20-bridge on both EVMs
         println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
         ctx.evm_client(ADMIN)
-            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
         base_evm_client
-            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
