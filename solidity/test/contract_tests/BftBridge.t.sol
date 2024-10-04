@@ -180,6 +180,208 @@ contract BftBridgeTest is Test {
         _wrappedBridge.mint(encodedOrder);
     }
 
+    // batch tests
+
+    function testBatchMintSuccess() public {
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        bytes32 base_token_id_2 = _createIdFromPrincipal(abi.encodePacked(uint8(2)));
+        address token2 = _wrappedBridge.deployERC20("Gabibbo", "GAB", 10, base_token_id_2);
+        MintOrder memory order_2 = _createDefaultMintOrder(base_token_id_2, token2, 1);
+
+        MintOrder[] memory orders = new MintOrder[](2);
+        orders[0] = order_1;
+        orders[1] = order_2;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](2);
+        ordersToProcess[0] = 0;
+        ordersToProcess[1] = 1;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        address recipient = order_1.recipient;
+        uint256 amount = order_1.amount;
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_OK());
+        assertEq(processedOrders[1], _wrappedBridge.MINT_ERROR_CODE_OK());
+
+        assertEq(WrappedToken(token1).balanceOf(recipient), amount);
+        assertEq(WrappedToken(token2).balanceOf(recipient), amount);
+    }
+
+    function testBatchMintProcessOnlyIfRequested() public {
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        bytes32 base_token_id_2 = _createIdFromPrincipal(abi.encodePacked(uint8(2)));
+        address token2 = _wrappedBridge.deployERC20("Gabibbo", "GAB", 10, base_token_id_2);
+        MintOrder memory order_2 = _createDefaultMintOrder(base_token_id_2, token2, 1);
+
+        MintOrder[] memory orders = new MintOrder[](2);
+        orders[0] = order_1;
+        orders[1] = order_2;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        address recipient = order_1.recipient;
+        uint256 amount = order_1.amount;
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_OK());
+        assertEq(processedOrders[1], _wrappedBridge.MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED());
+
+        assertEq(WrappedToken(token1).balanceOf(recipient), amount);
+        assertEq(WrappedToken(token2).balanceOf(recipient), 0);
+    }
+
+    function testBatchMintInvalidChainID() public {
+        MintOrder memory order = _createDefaultMintOrder();
+        order.recipientChainID = 31000;
+
+        MintOrder[] memory orders = new MintOrder[](1);
+        orders[0] = order;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_UNEXPECTED_RECIPIENT_CHAIN_ID());
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), 0);
+    }
+
+    function testBatchMintInvalidRecipient() public {
+        MintOrder memory order = _createDefaultMintOrder();
+        order.recipient = address(0);
+
+        MintOrder[] memory orders = new MintOrder[](1);
+        orders[0] = order;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_ZERO_RECIPIENT());
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), 0);
+    }
+
+    function testBatchMintInvalidAmount() public {
+        MintOrder memory order = _createDefaultMintOrder();
+        order.amount = 0;
+
+        MintOrder[] memory orders = new MintOrder[](1);
+        orders[0] = order;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_ZERO_AMOUNT());
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), 0);
+    }
+
+    function testBatchMintUsedNonce() public {
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        bytes32 base_token_id_2 = _createIdFromPrincipal(abi.encodePacked(uint8(2)));
+        address token2 = _wrappedBridge.deployERC20("Gabibbo", "GAB", 10, base_token_id_2);
+        MintOrder memory order_2 = _createDefaultMintOrder(base_token_id_2, token2, 0);
+
+        MintOrder[] memory orders = new MintOrder[](2);
+        orders[0] = order_1;
+        orders[1] = order_2;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](2);
+        ordersToProcess[0] = 0;
+        ordersToProcess[1] = 1;
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_OK());
+        assertEq(processedOrders[1], _wrappedBridge.MINT_ERROR_CODE_USED_NONCE());
+
+        assertEq(WrappedToken(order_2.toERC20).balanceOf(order_2.recipient), 0);
+    }
+
+    function testBatchMintInvalidPair() public {
+        MintOrder memory order = _createDefaultMintOrder();
+        order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+
+        MintOrder[] memory orders = new MintOrder[](1);
+        orders[0] = order;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_TOKENS_NOT_BRIDGED());
+
+        assertEq(WrappedToken(order.toERC20).balanceOf(order.recipient), 0);
+    }
+
+    function testBatchMintInvalidSignature() public {
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        bytes32 base_token_id_2 = _createIdFromPrincipal(abi.encodePacked(uint8(2)));
+        address token2 = _wrappedBridge.deployERC20("Gabibbo", "GAB", 10, base_token_id_2);
+        MintOrder memory order_2 = _createDefaultMintOrder(base_token_id_2, token2, 1);
+
+        MintOrder[] memory orders = new MintOrder[](2);
+        orders[0] = order_1;
+        orders[1] = order_2;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = new bytes(0);
+
+        uint32[] memory ordersToProcess = new uint32[](2);
+        ordersToProcess[0] = 0;
+        ordersToProcess[1] = 1;
+
+        vm.expectRevert();
+        _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+    }
+
+    function testBatchMintInvalidOrderLength() public {
+        bytes memory badEncodedOrder = abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4));
+
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        MintOrder[] memory orders = new MintOrder[](1);
+        orders[0] = order_1;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](1);
+        ordersToProcess[0] = 0;
+
+        vm.expectRevert();
+        _wrappedBridge.batchMint(badEncodedOrder, signature, ordersToProcess);
+    }
+
     function testGetWrappedToken() public {
         bytes32 base_token_id = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         address wrapped_address = _wrappedBridge.deployERC20("Token", "TKN", 18, base_token_id);
@@ -582,17 +784,32 @@ contract BftBridgeTest is Test {
     }
 
     function _createDefaultMintOrder() private returns (MintOrder memory order) {
+        return _createDefaultMintOrder(0);
+    }
+
+    function _createDefaultMintOrder(
+        uint32 nonce
+    ) private returns (MintOrder memory order) {
+        bytes32 fromTokenId = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
+        address toErc20 = _wrappedBridge.deployERC20("Token", "TKN", 18, fromTokenId);
+
+        return _createDefaultMintOrder(fromTokenId, toErc20, nonce);
+    }
+
+    function _createDefaultMintOrder(
+        bytes32 fromTokenId,
+        address toERC20,
+        uint32 nonce
+    ) private view returns (MintOrder memory order) {
         order.amount = 1000;
         order.senderID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3)));
-        order.fromTokenID = _createIdFromPrincipal(abi.encodePacked(uint8(1), uint8(2), uint8(3), uint8(4)));
+        order.fromTokenID = fromTokenId;
         order.recipient = _alice;
-        order.toERC20 = _wrappedBridge.deployERC20("Token", "TKN", 18, order.fromTokenID);
-        order.nonce = 0;
+        order.toERC20 = toERC20;
+        order.nonce = nonce;
         order.senderChainID = 0;
         order.recipientChainID = _CHAIN_ID;
-        // order.name = _bridge.truncateUTF8("Token");
         order.name = StringUtils.truncateUTF8("Token");
-        // order.symbol = bytes16(_bridge.truncateUTF8("Token"));
         order.symbol = bytes16(StringUtils.truncateUTF8("Token"));
         order.decimals = 18;
         order.approveSpender = address(0);
@@ -660,6 +877,49 @@ contract BftBridgeTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hash);
 
         return abi.encodePacked(encodedOrder, r, s, v);
+    }
+
+    function _batchMintOrders(
+        MintOrder[] memory orders
+    ) private pure returns (bytes memory) {
+        bytes memory encodedOrders;
+        for (uint256 i = 0; i < orders.length; i += 1) {
+            bytes memory orderData = _encodeOrder(orders[i]);
+            encodedOrders = abi.encodePacked(encodedOrders, orderData);
+        }
+
+        return abi.encodePacked(encodedOrders);
+    }
+
+    function _encodeOrder(
+        MintOrder memory order
+    ) private pure returns (bytes memory) {
+        return abi.encodePacked(
+            order.amount,
+            order.senderID,
+            order.fromTokenID,
+            order.recipient,
+            order.toERC20,
+            order.nonce,
+            order.senderChainID,
+            order.recipientChainID,
+            order.name,
+            order.symbol,
+            order.decimals,
+            order.approveSpender,
+            order.approveAmount,
+            address(0)
+        );
+    }
+
+    function _batchMintOrdersSignature(
+        bytes memory encodedOrders,
+        uint256 privateKey
+    ) private pure returns (bytes memory) {
+        bytes32 hash = keccak256(encodedOrders);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hash);
+
+        return abi.encodePacked(r, s, v);
     }
 
     function _createIdFromPrincipal(
