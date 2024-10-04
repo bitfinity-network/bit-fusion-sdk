@@ -85,30 +85,30 @@ impl SolidityContractDeployer<'_> {
                 .collect::<Vec<String>>()
                 .join(",")
         });
-        let mut args = vec![
-            "hardhat",
-            "deploy-bft",
-            "--network",
-            &network,
-            "--minter-address",
-            &minter_address,
-            "--fee-charge-address",
-            &fee_charge_address,
-            "--wrapped-token-deployer-address",
-            &wrapped_token_deployer_address,
-            "--is-wrapped-side",
-            &is_wrapped_side,
+
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join("solidity");
+        let binding = dir.display().to_string();
+        let dir = binding.as_str();
+        info!("Deploying Fee Charge contract in {}", dir);
+        let pk = self.wallet.signer().to_bytes().encode_hex_with_prefix();
+
+        let sender = self.wallet.address().encode_hex_with_prefix();
+        let args = [
+            "script",
+            "--target-contract",
+            "DeployBFTBridge",
+            "--broadcast",
+            "-v",
+            dir,
+            "--rpc-url",
+            self.get_network_url(),
+            "--private-key",
+            &pk,
+            "--sender",
+            &sender,
         ];
-
-        if let Some(ref owner) = owner {
-            args.push("--owner");
-            args.push(owner);
-        }
-
-        if let Some(ref controllers) = controllers {
-            args.push("--controllers");
-            args.push(controllers);
-        }
 
         let dir = std::env::current_dir()
             .context("Failed to get current directory")?
@@ -117,16 +117,31 @@ impl SolidityContractDeployer<'_> {
         info!("Deploying Fee Charge contract in {}", dir);
 
         debug!(
-            "Executing command: sh -c cd {} && npx {}",
+            "Executing command: sh -c cd {} && forge {}",
             dir,
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut sh = Command::new("sh");
+        let command = sh
             .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env("MINTER_ADDRESS", &minter_address)
+            .env("FEE_CHARGE_ADDRESS", &fee_charge_address)
+            .env("IS_WRAPPED_SIDE", &is_wrapped_side)
+            .env("WRAPPED_TOKEN_DEPLOYER", &wrapped_token_deployer_address)
+            .arg(format!("cd {} && forge {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(owner) = owner {
+            command.env("OWNER", &owner);
+        }
+
+        if let Some(controllers) = &controllers {
+            command.env("CONTROLLERS", controllers);
+        }
+
+        let output = command
             .output()
             .context("Failed to execute deploy-bft command")?;
 

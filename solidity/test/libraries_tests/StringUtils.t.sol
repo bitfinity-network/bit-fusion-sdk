@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "forge-std/src/Test.sol";
-import "forge-std/src/console.sol";
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
 import "src/libraries/StringUtils.sol";
 
 contract StringUtilsTest is Test {
@@ -39,26 +39,45 @@ contract StringUtilsTest is Test {
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8("12345678901234567890123456789012");
-            assertEq(bytes32ToString(result), "12345678901234567890123456789012");
+            bytes32 result = StringUtils.truncateUTF8(
+                "12345678901234567890123456789012"
+            );
+            assertEq(
+                bytes32ToString(result),
+                "12345678901234567890123456789012"
+            );
         }
         {
-            bytes32 result = StringUtils.truncateUTF8(unicode"1234567890123456789012345678901ї");
-            assertEq(bytes32ToString(result), unicode"1234567890123456789012345678901");
+            bytes32 result = StringUtils.truncateUTF8(
+                unicode"1234567890123456789012345678901ї"
+            );
+            assertEq(
+                bytes32ToString(result),
+                unicode"1234567890123456789012345678901"
+            );
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(unicode"123456789012345678901234567890ї");
-            assertEq(bytes32ToString(result), unicode"123456789012345678901234567890");
+            bytes32 result = StringUtils.truncateUTF8(
+                unicode"123456789012345678901234567890ї"
+            );
+            assertEq(
+                bytes32ToString(result),
+                unicode"123456789012345678901234567890"
+            );
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(unicode"123456789012345678ї");
+            bytes32 result = StringUtils.truncateUTF8(
+                unicode"123456789012345678ї"
+            );
             assertEq(bytes32ToString(result), unicode"123456789012345678ї");
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(unicode"12345678901234567890її1");
+            bytes32 result = StringUtils.truncateUTF8(
+                unicode"12345678901234567890її1"
+            );
             assertEq(bytes32ToString(result), unicode"12345678901234567890її1");
         }
 
