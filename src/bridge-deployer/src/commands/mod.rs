@@ -211,7 +211,7 @@ impl Commands {
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, pk, canister_ids_path)
+                    .reinstall_canister(identity, ic_host, network, canister_ids_path)
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
@@ -223,16 +223,6 @@ impl Commands {
 
 #[derive(Debug, Args)]
 pub struct BFTArgs {
-    /// Deploy and configure new BFT bridge contract (together with FeeCharge contract)
-    ///
-    /// This argument cannot be used together with `--use-bft`.
-    #[arg(
-        long,
-        conflicts_with = "existing",
-        required_unless_present = "existing"
-    )]
-    deploy_bft: bool,
-
     /// The address of the owner of the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "OWNER", requires = "deploy_bft")]
     owner: Option<H160>,
@@ -240,26 +230,6 @@ pub struct BFTArgs {
     /// The list of controllers for the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "CONTROLLERS", requires = "deploy_bft")]
     controllers: Option<Vec<H160>>,
-
-    /// Configure existing BFT bridge contract to work with the deployed bridge.
-    ///
-    /// This argument cannot be used together with `--deploy-bft`.
-    #[arg(
-        long = "use-bft",
-        required_unless_present = "deploy_bft",
-        value_name = "ADDRESS"
-    )]
-    existing_bft_bridge: Option<H160>,
-
-    /// Configure existing Wrapped token deployer bridge contract to work with the deployed bridge.
-    ///
-    /// This argument cannot be used together with `--deploy-bft`.
-    #[arg(
-        long = "use-token-deployer",
-        required_unless_present = "deploy_bft",
-        value_name = "ADDRESS"
-    )]
-    existing_wrapped_token_deployer: Option<H160>,
 }
 
 pub struct BftDeployedContracts {
@@ -277,16 +247,6 @@ impl BFTArgs {
         pk: H256,
         agent: &Agent,
     ) -> anyhow::Result<BftDeployedContracts> {
-        if let (Some(bft_bridge), Some(wrapped_token_deployer)) = (
-            self.existing_bft_bridge,
-            self.existing_wrapped_token_deployer,
-        ) {
-            return Ok(BftDeployedContracts {
-                bft_bridge,
-                wrapped_token_deployer,
-            });
-        }
-
         info!("Deploying BFT bridge");
 
         let contract_deployer = SolidityContractDeployer::new(network, pk);
