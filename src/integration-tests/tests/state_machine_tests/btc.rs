@@ -13,12 +13,12 @@ use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::{BitcoinConnection, BridgeInitData, BtcBridgeConfig};
+use bridge_did::init::btc::{BitcoinConnection, WrappedTokenConfig};
+use bridge_did::init::{BridgeInitData, BtcBridgeConfig};
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BFTBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
-use btc_bridge::state::WrappedTokenConfig;
 use candid::{Decode, Encode, Nat, Principal};
 use did::{H160, U256};
 use eth_signer::ic_sign::SigningKeyId;
@@ -378,7 +378,7 @@ impl CkBtcSetup {
 
         let client = (&context).evm_client("admin");
         client
-            .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();

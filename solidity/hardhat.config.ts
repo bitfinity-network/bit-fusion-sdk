@@ -1,26 +1,24 @@
-
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-foundry";
-import "@openzeppelin/hardhat-upgrades";
+import { HardhatUserConfig } from 'hardhat/config';
+import '@nomicfoundation/hardhat-toolbox';
+import '@nomicfoundation/hardhat-foundry';
+import '@openzeppelin/hardhat-upgrades';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-
 /// Tasks that are used to interact with the BFT contract
-import "./tasks/deploy-bft";
-import "./tasks/fee-charge-address";
-import "./tasks/deploy-fee-charge";
-import "./tasks/deploy-wrapped-token-deployer";
-import "./tasks/upgrade-bft";
-import "./tasks/pause-unpause";
+import './tasks/deploy-bft';
+import './tasks/fee-charge-address';
+import './tasks/deploy-fee-charge';
+import './tasks/deploy-wrapped-token';
+import './tasks/deploy-wrapped-token-deployer';
+import './tasks/upgrade-bft';
+import './tasks/pause-unpause';
 
+const MAINNET_URL = 'https://mainnet.bitfinity.network';
 
-const MAINNET_URL = "https://mainnet.bitfinity.network"
+const TESTNET_URL = 'https://testnet.bitfinity.network';
 
-const TESTNET_URL = "https://testnet.bitfinity.network"
-
-const DEPLOYER_PRIVATE_KEY = process.env.PRIVATE_KEY || "";
+const DEPLOYER_PRIVATE_KEY = process.env.PRIVATE_KEY || '';
 
 const CUSTOM_URL = process.env.CUSTOM_URL || "";
 
@@ -28,12 +26,12 @@ const CUSTOM_URL = process.env.CUSTOM_URL || "";
 const config: HardhatUserConfig = {
   networks: {
     localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
+      url: 'http://127.0.0.1:8545',
+      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
     },
     mainnet: {
       url: MAINNET_URL,
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
+      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
     },
     testnet: {
       url: TESTNET_URL,
@@ -49,17 +47,15 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
+        runs: 200,
       },
       outputSelection: {
         '*': {
           '*': ['storageLayout'],
         },
       },
-    }
-  }
-}
-
-
+    },
+  },
+};
 
 export default config;

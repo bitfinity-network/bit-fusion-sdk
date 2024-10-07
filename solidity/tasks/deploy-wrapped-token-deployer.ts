@@ -4,8 +4,8 @@ import { task } from 'hardhat/config';
 
 task(
   'deploy-wrapped-token-deployer',
-  'Deploys the WrappedTokenDeployer contract'
-).setAction(async ({ }, hre) => {
+  'Deploys the WrappedTokenDeployer contract',
+).setAction(async ({}, hre) => {
   const { network } = hre.hardhatArguments;
 
   console.log('Compiling contract');
@@ -17,7 +17,7 @@ task(
   }
 
   const WrappedTokenDeployer = await hre.ethers.getContractFactory(
-    'WrappedTokenDeployer'
+    'WrappedTokenDeployer',
   );
   const wrappedTokenDeployer = await WrappedTokenDeployer.deploy();
 

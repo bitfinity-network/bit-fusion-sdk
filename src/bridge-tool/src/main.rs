@@ -405,7 +405,7 @@ async fn create_new_wallet(client: &EvmCanisterClient<IcAgentClient>) -> Wallet<
 
 async fn mint_tokens(client: &EvmCanisterClient<IcAgentClient>, wallet: &Wallet<'_, SigningKey>) {
     let res = client
-        .mint_native_tokens(wallet.address().into(), u128::MAX.into())
+        .admin_mint_native_tokens(wallet.address().into(), u128::MAX.into())
         .await
         .expect("Failed to send mint native tokens request")
         .expect("Mint native tokens request failed");

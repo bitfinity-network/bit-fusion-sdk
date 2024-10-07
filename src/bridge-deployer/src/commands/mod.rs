@@ -150,7 +150,7 @@ impl Bridge {
             }
             Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let connection = bridge_did::init::BitcoinConnection::from(connection.clone());
+                let connection = bridge_did::init::btc::BitcoinConnection::from(connection.clone());
                 let init_data = config.clone().into_bridge_init_data(evm_network);
                 let config = BtcBridgeConfig {
                     network: connection,
@@ -279,7 +279,22 @@ pub struct BFTArgs {
         required_unless_present = "deploy_bft",
         value_name = "ADDRESS"
     )]
-    existing: Option<H160>,
+    existing_bft_bridge: Option<H160>,
+
+    /// Configure existing Wrapped token deployer bridge contract to work with the deployed bridge.
+    ///
+    /// This argument cannot be used together with `--deploy-bft`.
+    #[arg(
+        long = "use-token-deployer",
+        required_unless_present = "deploy_bft",
+        value_name = "ADDRESS"
+    )]
+    existing_wrapped_token_deployer: Option<H160>,
+}
+
+pub struct BftDeployedContracts {
+    pub bft_bridge: H160,
+    pub wrapped_token_deployer: H160,
 }
 
 impl BFTArgs {
@@ -291,9 +306,15 @@ impl BFTArgs {
         pk: H256,
         agent: &Agent,
         is_wrapped_side: bool,
-    ) -> anyhow::Result<H160> {
-        if let Some(address) = self.existing {
-            return Ok(address);
+    ) -> anyhow::Result<BftDeployedContracts> {
+        if let (Some(bft_bridge), Some(wrapped_token_deployer)) = (
+            self.existing_bft_bridge,
+            self.existing_wrapped_token_deployer,
+        ) {
+            return Ok(BftDeployedContracts {
+                bft_bridge,
+                wrapped_token_deployer,
+            });
         }
 
         info!("Deploying BFT bridge");
@@ -333,7 +354,10 @@ impl BFTArgs {
 
         info!("BFT bridge deployed successfully. Contract address: {bft_address}");
 
-        Ok(bft_address)
+        Ok(BftDeployedContracts {
+            bft_bridge: bft_address,
+            wrapped_token_deployer,
+        })
     }
 }
 

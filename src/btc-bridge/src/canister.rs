@@ -11,6 +11,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::error::BftResult;
+use bridge_did::init::btc::WrappedTokenConfig;
 use bridge_did::init::BtcBridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
@@ -34,7 +35,7 @@ use crate::ops::{
     BtcBridgeOpImpl, BtcMintOrderHandler, BtcMintTxHandler, SEND_MINT_TX_SERVICE_ID,
     SIGN_MINT_ORDER_SERVICE_ID,
 };
-use crate::state::{State, WrappedTokenConfig};
+use crate::state::State;
 
 type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 
@@ -245,7 +246,8 @@ pub fn get_runtime_state() -> RuntimeState<BtcBridgeOpImpl> {
 #[cfg(test)]
 mod test {
     use bridge_did::evm_link::EvmLink;
-    use bridge_did::init::{BitcoinConnection, BridgeInitData};
+    use bridge_did::init::btc::BitcoinConnection;
+    use bridge_did::init::BridgeInitData;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, Canister};

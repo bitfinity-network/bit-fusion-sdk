@@ -87,7 +87,7 @@ impl<B: BaseTokens> StressTestState<B> {
         base_tokens
             .ctx()
             .evm_client(base_tokens.ctx().admin_name())
-            .mint_native_tokens(bridge_canister_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(bridge_canister_address.clone(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();

@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
-use candid::Principal;
+use bridge_did::init::btc::WrappedTokenConfig;
+use candid::{Encode, Principal};
 use clap::Parser;
-use ethereum_types::H256;
+use ethereum_types::{H160, H256};
 use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
@@ -11,10 +12,18 @@ use tracing::{debug, info};
 use super::{BFTArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
-use crate::contracts::EvmNetwork;
+use crate::commands::BftDeployedContracts;
+use crate::contracts::{EvmNetwork, SolidityContractDeployer};
 
 /// The default number of cycles to deposit to the canister
 const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
+
+const BTC_ERC20_NAME: [u8; 32] = [
+    b'B', b'i', b't', b'c', b'o', b'i', b'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
+];
+const BTC_ERC20_SYMBOL: [u8; 16] = [b'B', b'T', b'C', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const BTC_ERC20_DECIMALS: u8 = 10;
 
 /// The deploy command.
 ///
@@ -84,23 +93,36 @@ impl DeployCommands {
 
         println!("Canister deployed with ID {canister_id}",);
 
-        canister_ids.set((&self.bridge_type).into(), canister_id);
-
-        let bft_address = self
+        info!("Deploying BFT bridge");
+        let BftDeployedContracts {
+            bft_bridge,
+            wrapped_token_deployer,
+        } = self
             .bft_args
-            .deploy_bft(
-                network.into(),
-                deployer.bridge_principal(),
-                pk,
-                &agent,
-                true,
-            )
+            .deploy_bft(network.into(), canister_id, &self.bridge_type, pk, &agent, true)
             .await?;
 
-        info!("BFT bridge deployed successfully with {bft_address}");
-        println!("BFT bridge deployed with address {bft_address}");
+        info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
+        println!("BFT bridge deployed with address {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
 
-        deployer.configure_minter(bft_address).await?;
+        // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
+        if matches!(&self.bridge_type, Bridge::Btc { .. }) {
+            info!("Deploying wrapped BTC contract");
+            let wrapped_btc_addr = self.deploy_wrapped_btc(network, pk, &wrapped_token_deployer)?;
+
+            info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr}");
+            println!("Wrapped BTC contract deployed with address {wrapped_btc_addr}");
+
+            info!("Configuring BTC wrapped token on the BTC bridge");
+            self.configure_btc_wrapped_token(&agent, &canister_id, wrapped_btc_addr)
+                .await?;
+        }
+
+        // set principal in canister ids
+        canister_ids.set((&self.bridge_type).into(), canister_id);
+
+        // configure minter
+        deployer.configure_minter(bft_bridge).await?;
 
         self.bridge_type
             .finalize(
@@ -122,6 +144,48 @@ impl DeployCommands {
             canister_type = self.bridge_type.kind(),
             canister_id = deployer.bridge_principal(),
         );
+
+        Ok(())
+    }
+
+    /// Deploys the wrapped BTC contract.
+    fn deploy_wrapped_btc(
+        &self,
+        network: EvmNetwork,
+        pk: H256,
+        wrapped_token_deployer: &H160,
+    ) -> anyhow::Result<H160> {
+        let contract_deployer = SolidityContractDeployer::new(network, pk);
+
+        contract_deployer.deploy_wrapped_token(
+            wrapped_token_deployer,
+            String::from_utf8_lossy(&BTC_ERC20_NAME).as_ref(),
+            String::from_utf8_lossy(&BTC_ERC20_SYMBOL).as_ref(),
+            BTC_ERC20_DECIMALS,
+        )
+    }
+
+    /// Configure BTC wrapped token on the BTC bridge
+    async fn configure_btc_wrapped_token(
+        &self,
+        agent: &ic_agent::Agent,
+        principal: &Principal,
+        wrapped_token: H160,
+    ) -> anyhow::Result<()> {
+        let config = WrappedTokenConfig {
+            token_address: wrapped_token.into(),
+            token_name: BTC_ERC20_NAME,
+            token_symbol: BTC_ERC20_SYMBOL,
+            decimals: BTC_ERC20_DECIMALS,
+        };
+
+        let args = Encode!(&config)?;
+
+        agent
+            .update(principal, "admin_configure_wrapped_token")
+            .with_arg(args)
+            .call_and_wait()
+            .await?;
 
         Ok(())
     }

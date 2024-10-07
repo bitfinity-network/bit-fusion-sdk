@@ -373,6 +373,86 @@ impl SolidityContractDeployer<'_> {
         Ok(address)
     }
 
+    /// Deploy wrapped ERC20 on the wrapped token deployer contract
+    pub fn deploy_wrapped_token(
+        &self,
+        wrapped_token_deployer: &H160,
+        name: &str,
+        symbol: &str,
+        decimals: u8,
+    ) -> Result<H160> {
+        let owner = self.wallet.address();
+        let network = self.network.to_string();
+        let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
+        let owner = owner.encode_hex_with_prefix();
+        let decimals = decimals.to_string();
+
+        let args = vec![
+            "hardhat",
+            "deploy-wrapped-token",
+            "--network",
+            &network,
+            "--wrapped-token-deployer",
+            &wrapped_token_deployer,
+            "--name",
+            name,
+            "--symbol",
+            symbol,
+            "--decimals",
+            &decimals,
+            "--owner",
+            &owner,
+        ];
+
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")?
+            .join("solidity");
+
+        let dir = dir.display();
+        info!("Deploying ERC20 contract in {dir}");
+
+        debug!(
+            "Executing command: sh -c cd {dir} && npx {}",
+            args.join(" ")
+        );
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .context("Failed to execute deploy-wrapped-token command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            eprintln!(
+                "deploy-wrapped-token command failed. Stdout:\n{}\nStderr:\n{}",
+                stdout, stderr
+            );
+
+            return Err(anyhow::anyhow!("deploy-wrapped-token command failed"));
+        } else {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("deploy-wrapped-token command output:\n{}", stdout);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Extract the fee charge address from the output
+        let fee_charge_address = stdout
+            .lines()
+            .find(|line| line.starts_with("ERC20 deployed at:"))
+            .and_then(|line| line.split(':').nth(1))
+            .map(str::trim)
+            .context("Failed to extract ERC20 address")?;
+
+        let address = H160::from_str(fee_charge_address).context("Invalid ERC20 address")?;
+
+        Ok(address)
+    }
+
     /// Computes the address of the fee charge contract based on the deployer's address and the given nonce.
     ///
     /// # Arguments

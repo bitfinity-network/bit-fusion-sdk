@@ -11,6 +11,7 @@ use tracing::{debug, info};
 use super::{BFTArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
+use crate::commands::BftDeployedContracts;
 use crate::contracts::EvmNetwork;
 
 /// The reinstall command.
@@ -87,7 +88,7 @@ impl ReinstallCommands {
 
         info!("Canister installed successfully");
 
-        let bft_address = self
+        let BftDeployedContracts { bft_bridge, .. } = self
             .bft_args
             .deploy_bft(
                 network.into(),
@@ -98,10 +99,10 @@ impl ReinstallCommands {
             )
             .await?;
 
-        info!("BFT bridge deployed successfully with address: {bft_address}");
-        println!("BFT bridge deployed with address: {bft_address}");
+        info!("BFT bridge deployed successfully with address: {bft_bridge}");
+        println!("BFT bridge deployed with address: {bft_bridge}");
 
-        deployer.configure_minter(bft_address).await?;
+        deployer.configure_minter(bft_bridge).await?;
 
         info!("Canister reinstalled successfully with ID: {}", canister_id);
 
