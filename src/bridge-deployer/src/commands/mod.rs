@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Context;
+use bridge_client::Erc20BridgeClient;
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BtcBridgeConfig;
@@ -19,7 +20,7 @@ use upgrade::UpgradeCommands;
 
 use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::config;
-use crate::contracts::{NetworkConfig, SolidityContractDeployer};
+use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
 mod deploy;
 mod reinstall;
 mod upgrade;
@@ -173,17 +174,30 @@ impl Bridge {
         match self {
             Self::Erc20 { erc, .. } => {
                 let network = if let Some(url) = &erc.base_evm_url {
-                    EvmNetwork::Localhost
+                    NetworkConfig {
+                        custom_network: Some(url.clone()),
+                        evm_network: EvmNetwork::Localhost,
+                    }
                 } else {
-                    let principal = erc.base_evm_principal.expect("evm principal is not set");
-                    EvmNetwork::Localhost
+                    wrapped_network.into()
                 };
 
                 let bft_address = bft_args
-                    .deploy_bft(network, bridge_principal, &self, pk, &agent, false)
+                    .deploy_bft(network, bridge_principal, pk, &agent, false)
                     .await?;
 
                 println!("Base BFT bridge deployed with address {bft_address}");
+
+                let client = Erc20BridgeClient::new(IcAgentClient::with_agent(
+                    bridge_principal,
+                    agent.clone(),
+                ));
+                client
+                    .set_base_bft_bridge_contract(&bft_address.into())
+                    .await?;
+
+                println!("Bridge canister configured with base BFT bridge contract address");
+
                 Ok(())
             }
             _ => Ok(()),
@@ -215,7 +229,7 @@ impl Commands {
         &self,
         identity: PathBuf,
         ic_host: &str,
-        network: NetworkConfig,
+        network: EvmNetwork,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
@@ -274,7 +288,6 @@ impl BFTArgs {
         &self,
         network: NetworkConfig,
         canister_id: Principal,
-        bridge: &Bridge,
         pk: H256,
         agent: &Agent,
         is_wrapped_side: bool,
@@ -287,9 +300,11 @@ impl BFTArgs {
 
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
-        let expected_nonce = contract_deployer.get_nonce().await? + 3;
+        let expected_nonce = contract_deployer.get_nonce().await? + 2;
+        println!("Expected nonce: {expected_nonce}");
         let expected_fee_charge_address =
             contract_deployer.compute_fee_charge_address(expected_nonce)?;
+        println!("Expected address: {expected_fee_charge_address}");
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
 

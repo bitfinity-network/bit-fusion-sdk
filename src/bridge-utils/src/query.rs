@@ -56,6 +56,7 @@ pub async fn batch_query(
         .iter()
         .map(QueryType::to_method_call)
         .collect::<Vec<_>>();
+    log::trace!("Sending rpc query: {calls:?}");
     let request = Request::Batch(calls);
     let Response::Batch(responses) = client.request(request).await? else {
         return Err(anyhow!("Unexpected response format"));

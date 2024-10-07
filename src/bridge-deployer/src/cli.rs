@@ -10,7 +10,7 @@ use tracing_subscriber::{filter, Layer as _};
 
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
-use crate::contracts::NetworkConfig;
+use crate::contracts::EvmNetwork;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
@@ -103,7 +103,7 @@ impl Cli {
             .run(
                 identity.to_path_buf(),
                 &ic_host,
-                evm_network,
+                evm_network.into(),
                 private_key,
                 canister_ids_path,
             )

@@ -178,8 +178,8 @@ async fn process_base_evm_logs() {
         .await;
     let collected = match collect_result {
         Ok(c) => c,
-        Err(_) => {
-            log::warn!("failed to collect base EVM events");
+        Err(err) => {
+            log::warn!("failed to collect base EVM events: {err}");
             return;
         }
     };

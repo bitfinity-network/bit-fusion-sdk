@@ -28,16 +28,17 @@ pub struct InitBridgeConfig {
 impl InitBridgeConfig {
     /// Converts the `InitBridgeConfig` into a `BridgeInitData` struct.
     pub fn into_bridge_init_data(self, evm_network: EvmNetwork) -> BridgeInitData {
+        let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
             owner: self.owner,
             evm_link: crate::evm::evm_link(evm_network, self.evm),
             signing_strategy: self.signing_key_id.into(),
-            log_settings: self.log_settings.map(|v| ic_log::did::LogCanisterSettings {
-                enable_console: v.enable_console,
-                in_memory_records: v.in_memory_records,
-                max_record_length: v.max_record_length,
-                log_filter: v.log_filter,
-                acl: v.acl.map(|v| {
+            log_settings: Some(ic_log::did::LogCanisterSettings {
+                enable_console: log_settings.enable_console,
+                in_memory_records: log_settings.in_memory_records,
+                max_record_length: log_settings.max_record_length,
+                log_filter: log_settings.log_filter,
+                acl: log_settings.acl.map(|v| {
                     v.iter()
                         .map(|(principal, perm)| {
                             (*principal, ic_log::did::LoggerPermission::from(*perm))
@@ -46,5 +47,15 @@ impl InitBridgeConfig {
                 }),
             }),
         }
+    }
+}
+
+fn default_log_settings() -> LogCanisterSettings {
+    LogCanisterSettings {
+        enable_console: Some(true),
+        in_memory_records: Some(10_000),
+        max_record_length: Some(4096),
+        log_filter: Some("trace,ic_task_scheduler=off".into()),
+        acl: None,
     }
 }

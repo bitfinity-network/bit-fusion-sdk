@@ -183,6 +183,10 @@ impl ServiceTask {
             }
             ServiceTask::RefreshEvmParams => {
                 let _lock = guard(ctx.clone(), |s| {
+                    log::trace!(
+                        "Releasing refresh EVM params lock with ts: {:?}",
+                        s.borrow().refreshing_evm_params_ts
+                    );
                     s.borrow_mut().refreshing_evm_params_ts = None
                 });
                 let config = ctx.borrow().config.clone();
@@ -331,8 +335,14 @@ impl<Op: Operation> Task for BridgeTask<Op> {
                 .execute_inner(ctx, task_scheduler)
                 .await
                 .map_err(|e| match e {
-                    Error::CannotProgress(_) => SchedulerError::Unrecoverable(e.to_string()),
-                    _ => SchedulerError::TaskExecutionFailed(e.to_string()),
+                    Error::CannotProgress(_) => {
+                        log::trace!("Unrecoverable error during task execution: {e}");
+                        SchedulerError::Unrecoverable(e.to_string())
+                    }
+                    _ => {
+                        log::trace!("Error during task execution: {e}");
+                        SchedulerError::TaskExecutionFailed(e.to_string())
+                    }
                 })
         })
     }

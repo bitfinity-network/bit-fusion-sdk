@@ -22,13 +22,7 @@ pub fn ic_host(evm_network: EvmNetwork) -> String {
 /// Returns the EVM link based on the EVM network.
 pub fn evm_link(evm_network: EvmNetwork, evm_principal: Option<Principal>) -> EvmLink {
     match evm_network {
-        EvmNetwork::Localhost => EvmLink::Http(format!(
-            "http://127.0.0.1:{}/?canisterId={}",
-            dfx_webserver_port(),
-            evm_principal
-                .map(|principal| principal.to_text())
-                .unwrap_or_else(local_evm_principal)
-        )),
+        EvmNetwork::Localhost => EvmLink::Ic(evm_principal.unwrap_or_else(local_evm_principal)),
         EvmNetwork::Mainnet => EvmLink::Ic(evm_principal.unwrap_or_else(|| {
             Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
         })),
@@ -64,7 +58,7 @@ fn dfx_info_port(service: &str) -> u16 {
 }
 
 /// Returns the local EVM principal
-fn local_evm_principal() -> String {
+fn local_evm_principal() -> Principal {
     let principal = Command::new("dfx")
         .args(["canister", "id", "evm_testnet"])
         .output()
@@ -77,7 +71,5 @@ fn local_evm_principal() -> String {
         .to_string();
 
     // Verify the principal
-    Principal::from_text(&principal)
-        .expect("Invalid principal")
-        .to_text()
+    Principal::from_text(&principal).expect("Invalid principal")
 }

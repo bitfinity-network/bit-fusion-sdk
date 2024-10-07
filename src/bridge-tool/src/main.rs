@@ -418,7 +418,7 @@ async fn mint_tokens(client: &EvmCanisterClient<IcAgentClient>, wallet: &Wallet<
     );
 }
 
-const MAX_TX_TIMEOUT_SEC: u64 = 6;
+const MAX_TX_TIMEOUT_SEC: u64 = 60;
 
 async fn wait_for_tx_success(
     client: &EvmCanisterClient<IcAgentClient>,
@@ -447,7 +447,7 @@ async fn wait_for_tx_success(
                 return receipt;
             }
         } else {
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(1000)).await;
         }
     }
 

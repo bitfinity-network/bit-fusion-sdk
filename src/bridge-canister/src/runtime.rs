@@ -76,6 +76,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
 
         if self.state.borrow().should_refresh_evm_params() {
             self.state.borrow_mut().refreshing_evm_params_ts = Some(ic::time());
+            log::trace!("Setting refresh EVM params lock with ts: {}", ic::time());
 
             let task = scheduler::BridgeTask::Service(ServiceTask::RefreshEvmParams);
             let refresh_evm_params = ScheduledTask::new(task);

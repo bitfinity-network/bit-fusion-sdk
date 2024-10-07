@@ -2,7 +2,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
-use clap::{Parser, ValueEnum};
+use clap::{Args, ValueEnum};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
@@ -16,21 +16,20 @@ const LOCALHOST_URL: &str = "http://127.0.0.1:8545";
 const TESTNET_URL: &str = "https://testnet.bitfinity.network";
 const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Args)]
+#[group(required = true, multiple = false)]
 pub struct NetworkConfig {
     /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
-    #[clap(value_enum, long, conflicts_with = "custom_network")]
-    evm_network: EvmNetwork,
+    #[clap(value_enum, long)]
+    pub evm_network: EvmNetwork,
     /// Custom network URL
-    ///
-    /// Note: this option is ignored if `evm_network` is set.
-    custom_network: Option<String>,
+    pub custom_network: Option<String>,
 }
 
 impl std::fmt::Display for NetworkConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.custom_network.is_some() {
-            write!(f, "custom")?;
+            return write!(f, "custom");
         }
 
         let network = match self.evm_network {
@@ -40,6 +39,15 @@ impl std::fmt::Display for NetworkConfig {
         };
 
         write!(f, "{network}")
+    }
+}
+
+impl From<EvmNetwork> for NetworkConfig {
+    fn from(value: EvmNetwork) -> Self {
+        Self {
+            evm_network: value,
+            custom_network: None,
+        }
     }
 }
 
@@ -75,7 +83,6 @@ impl SolidityContractDeployer<'_> {
 
     pub fn get_network_url(&self) -> &str {
         if let Some(custom_network) = &self.network.custom_network {
-            std::env::set_var("CUSTOM_URL", custom_network);
             custom_network
         } else {
             match self.network.evm_network {
@@ -150,7 +157,6 @@ impl SolidityContractDeployer<'_> {
             .context("Failed to get current directory")?
             .join("solidity");
         let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
 
         debug!(
             "Executing command: sh -c cd {} && npx {}",
@@ -218,7 +224,6 @@ impl SolidityContractDeployer<'_> {
             .join("solidity");
 
         let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
 
         debug!(
             "Executing command: sh -c cd {} && npx {}",
@@ -226,11 +231,18 @@ impl SolidityContractDeployer<'_> {
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut command = Command::new("sh");
+        let command = command
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(custom_network) = &self.network.custom_network {
+            command.env("CUSTOM_URL", custom_network);
+        }
+
+        let output = command
             .output()
             .context("Failed to execute deploy-wrapped-token-deployer command")?;
 
@@ -310,7 +322,6 @@ impl SolidityContractDeployer<'_> {
             .join("solidity");
 
         let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
 
         debug!(
             "Executing command: sh -c cd {} && npx {}",
@@ -386,12 +397,16 @@ impl SolidityContractDeployer<'_> {
     pub async fn get_nonce(&self) -> Result<u64> {
         let url = self.get_network_url();
 
+        debug!("Requesting nonce with EVM url: {url}");
+
         let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
 
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)
             .await?;
+
+        info!("Got nonce value: {nonce}");
 
         Ok(nonce)
     }

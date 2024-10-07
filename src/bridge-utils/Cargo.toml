@@ -9,7 +9,7 @@ anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 did = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client", "http-outcall"] }
+ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client", "http-outcall", "sanitize-http-outcall"] }
 ethers-core = { workspace = true }
 hex = { workspace = true }
 ic-canister-client = { workspace = true }

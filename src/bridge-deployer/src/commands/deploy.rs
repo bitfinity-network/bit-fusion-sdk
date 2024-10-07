@@ -89,12 +89,11 @@ impl DeployCommands {
         let bft_address = self
             .bft_args
             .deploy_bft(
-                network,
+                network.into(),
                 deployer.bridge_principal(),
-                &self.bridge_type,
                 pk,
                 &agent,
-                false,
+                true,
             )
             .await?;
 
