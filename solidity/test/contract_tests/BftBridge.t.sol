@@ -212,6 +212,34 @@ contract BftBridgeTest is Test {
         assertEq(WrappedToken(token2).balanceOf(recipient), amount);
     }
 
+    function testBatchMintProcessAllIfToProcessIsZero() public {
+        bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
+        address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
+        MintOrder memory order_1 = _createDefaultMintOrder(base_token_id_1, token1, 0);
+
+        bytes32 base_token_id_2 = _createIdFromPrincipal(abi.encodePacked(uint8(2)));
+        address token2 = _wrappedBridge.deployERC20("Gabibbo", "GAB", 10, base_token_id_2);
+        MintOrder memory order_2 = _createDefaultMintOrder(base_token_id_2, token2, 1);
+
+        MintOrder[] memory orders = new MintOrder[](2);
+        orders[0] = order_1;
+        orders[1] = order_2;
+        bytes memory encodedOrders = _batchMintOrders(orders);
+        bytes memory signature = _batchMintOrdersSignature(encodedOrders, _OWNER_KEY);
+
+        uint32[] memory ordersToProcess = new uint32[](0);
+        uint8[] memory processedOrders = _wrappedBridge.batchMint(encodedOrders, signature, ordersToProcess);
+
+        address recipient = order_1.recipient;
+        uint256 amount = order_1.amount;
+
+        assertEq(processedOrders[0], _wrappedBridge.MINT_ERROR_CODE_OK());
+        assertEq(processedOrders[1], _wrappedBridge.MINT_ERROR_CODE_OK());
+
+        assertEq(WrappedToken(token1).balanceOf(recipient), amount);
+        assertEq(WrappedToken(token2).balanceOf(recipient), amount);
+    }
+
     function testBatchMintProcessOnlyIfRequested() public {
         bytes32 base_token_id_1 = _createIdFromPrincipal(abi.encodePacked(uint8(1)));
         address token1 = _wrappedBridge.deployERC20("WholaLottaLove", "LEDZEP", 21, base_token_id_1);
