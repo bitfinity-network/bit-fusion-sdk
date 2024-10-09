@@ -17,14 +17,14 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     using SafeERC20 for IERC20;
 
     // Error codes:
-    uint8 constant MINT_ERROR_CODE_OK = 0;
-    uint8 constant MINT_ERROR_CODE_INSUFFICIENT_FEE_DEPOSIT = 1;
-    uint8 constant MINT_ERROR_CODE_ZERO_AMOUNT = 2;
-    uint8 constant MINT_ERROR_CODE_USED_NONCE = 3;
-    uint8 constant MINT_ERROR_CODE_ZERO_RECIPIENT = 4;
-    uint8 constant MINT_ERROR_CODE_UNEXPECTED_RECIPIENT_CHAIN_ID = 5;
-    uint8 constant MINT_ERROR_CODE_TOKENS_NOT_BRIDGED = 6;
-    uint8 constant MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED = 7;
+    uint8 public constant MINT_ERROR_CODE_OK = 0;
+    uint8 public constant MINT_ERROR_CODE_INSUFFICIENT_FEE_DEPOSIT = 1;
+    uint8 public constant MINT_ERROR_CODE_ZERO_AMOUNT = 2;
+    uint8 public constant MINT_ERROR_CODE_USED_NONCE = 3;
+    uint8 public constant MINT_ERROR_CODE_ZERO_RECIPIENT = 4;
+    uint8 public constant MINT_ERROR_CODE_UNEXPECTED_RECIPIENT_CHAIN_ID = 5;
+    uint8 public constant MINT_ERROR_CODE_TOKENS_NOT_BRIDGED = 6;
+    uint8 public constant MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED = 7;
 
     // Additional gas amount for fee charge.
     uint256 constant additionalGasFee = 200000;
@@ -290,8 +290,10 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         }
 
         // Charge fee for successfully processed orders and emit Minted event for each.
-        uint256 feePerUser =
-            (COMMON_BATCH_MINT_GAS_FEE / processedOrdersNumber + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
+        uint256 feePerUser = 0;
+        if (processedOrdersNumber > 0) {
+            feePerUser = ((COMMON_BATCH_MINT_GAS_FEE / processedOrdersNumber) + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
+        }
         for (uint32 i = 0; i < ordersNumber; i++) {
             if (processedOrderIndexes[i] == MINT_ERROR_CODE_OK) {
                 // Array indexes inlined to soleve StackTooDeep problem.

@@ -185,7 +185,7 @@ pub trait TestContext {
         };
         let client = self.evm_client(self.admin_name());
         client
-            .mint_native_tokens(wallet.address().into(), balance.into())
+            .admin_mint_native_tokens(wallet.address().into(), balance.into())
             .await??;
 
         self.advance_time(Duration::from_secs(2)).await;
@@ -268,7 +268,7 @@ pub trait TestContext {
 
         let client = self.evm_client(self.admin_name());
         client
-            .mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
+            .admin_mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
             .await??;
         self.advance_time(Duration::from_secs(2)).await;
 

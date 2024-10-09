@@ -8,7 +8,7 @@ IC_COMMIT_HASH:="85bd56a70e55b2cea75cae6405ae11243e5fdad8"
 IC_EVM_RPC_TAG:="release-2024-05-23"
 
 # This is the bitfinity evmc tag to download
-EVMC_TAG:="v0.2.0_0311c78f"
+EVMC_TAG:="v0.2.0_2068bd15"
 
 
 # Fetch all dependencies
@@ -33,8 +33,8 @@ fetch_ic_canisters: pre_build
 # Fetch evmc and signature-verification canister wasm and did files
 [group('fetch_dependencies')]
 fetch_evmc_canisters: pre_build
-  just fetch_evmc_private_canister evm-testnet
-  just fetch_evmc_private_canister signature-verification
+  just fetch_evmc_private_canister evm_testnet
+  just fetch_evmc_private_canister signature_verification
 
 
 # Fetch the release artifact ID from github API and download the canister wasm and did files

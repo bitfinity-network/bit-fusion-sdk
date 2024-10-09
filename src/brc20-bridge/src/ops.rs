@@ -1,8 +1,11 @@
 mod deposit;
+mod mint_order_handler;
+mod mint_tx_handler;
 mod withdraw;
 
 use bitcoin::Network;
 use bridge_canister::bridge::{Operation, OperationAction, OperationProgress};
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::error::{BftResult, Error};
@@ -21,8 +24,13 @@ use serde::Serialize;
 use withdraw::Brc20BridgeWithdrawOpImpl;
 
 pub use self::deposit::Brc20BridgeDepositOpImpl;
+pub use self::mint_order_handler::Brc20MintOrderHandler;
+pub use self::mint_tx_handler::Brc20MintTxHandler;
 use crate::canister::get_brc20_state;
 use crate::core::withdrawal::new_withdraw_payload;
+
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
 
 /// BRC20 bridge operations
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -51,11 +59,12 @@ impl Operation for Brc20BridgeOpImpl {
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SignMintOrder(mint_order)) => {
                 log::debug!("Brc20BridgeDepositOp::SignMintOrder {mint_order:?}");
-                Brc20BridgeDepositOpImpl::sign_mint_order(ctx, id.nonce(), mint_order).await
+
+                return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(mint_order)) => {
                 log::debug!("Brc20BridgeDepositOp::SendMintOrder {mint_order:?}");
-                Brc20BridgeDepositOpImpl::send_mint_order(ctx, mint_order).await
+                return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => {
                 Err(Error::FailedToProgress(
@@ -203,7 +212,7 @@ impl Operation for Brc20BridgeOpImpl {
                 signed_mint_order.reader().get_recipient()
             }
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder {
-                signed_mint_order,
+                orders: signed_mint_order,
                 ..
             }) => signed_mint_order.reader().get_recipient(),
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { data }) => {

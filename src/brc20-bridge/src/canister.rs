@@ -2,6 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::mint_tx::SendMintTxService;
+use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
@@ -23,7 +26,10 @@ use ic_storage::IcStorage;
 
 use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
-use crate::ops::Brc20BridgeOpImpl;
+use crate::ops::{
+    Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
+};
 use crate::state::Brc20State;
 
 mod inspect;
@@ -160,6 +166,32 @@ pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     Subaccount(subaccount)
 }
 
+fn init_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(ConfigStorage::get());
+    let state = runtime.state();
+
+    let sign_orders_handler =
+        Brc20MintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
+
+    let mint_tx_handler = Brc20MintTxHandler::new(state.clone());
+    let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
+
+    let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SIGN_MINT_ORDER_SERVICE_ID,
+        sign_mint_orders_service,
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::ConcurrentWithOperations,
+        SEND_MINT_TX_SERVICE_ID,
+        mint_tx_service,
+    );
+
+    Rc::new(RefCell::new(runtime))
+}
+
 impl Metrics for Brc20Bridge {
     fn metrics(&self) -> Rc<RefCell<MetricsStorage>> {
         use ic_storage::IcStorage;
@@ -176,8 +208,7 @@ impl LogCanister for Brc20Bridge {
 type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
 
 thread_local! {
-    pub static RUNTIME: SharedRuntime =
-        Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    pub static RUNTIME: SharedRuntime = init_runtime();
 
     pub static BRC20_STATE: Rc<RefCell<Brc20State>> = Rc::default();
 }

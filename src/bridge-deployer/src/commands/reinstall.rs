@@ -2,13 +2,13 @@ use std::path::PathBuf;
 
 use candid::Principal;
 use clap::Parser;
-use ethereum_types::H256;
+use ethereum_types::H160;
 use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
 use tracing::{debug, info};
 
-use super::{BFTArgs, Bridge};
+use super::Bridge;
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::contracts::EvmNetwork;
@@ -37,9 +37,9 @@ pub struct ReinstallCommands {
     #[arg(long, value_name = "WASM_PATH")]
     wasm: PathBuf,
 
-    /// These are extra arguments for the BFT bridge.
-    #[command(flatten, next_help_heading = "Bridge Contract Args")]
-    bft_args: BFTArgs,
+    /// Existing BFT bridge contract address to work with the deployed bridge.
+    #[arg(long = "bft-bridge", value_name = "ADDRESS")]
+    bft_bridge: H160,
 }
 
 impl ReinstallCommands {
@@ -48,7 +48,6 @@ impl ReinstallCommands {
         identity: PathBuf,
         ic_host: &str,
         network: EvmNetwork,
-        pk: H256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
@@ -87,21 +86,7 @@ impl ReinstallCommands {
 
         info!("Canister installed successfully");
 
-        let bft_address = self
-            .bft_args
-            .deploy_bft(
-                network,
-                deployer.bridge_principal(),
-                &self.bridge_type,
-                pk,
-                &agent,
-            )
-            .await?;
-
-        info!("BFT bridge deployed successfully with address: {bft_address}");
-        println!("BFT bridge deployed with address: {bft_address}");
-
-        deployer.configure_minter(bft_address).await?;
+        deployer.configure_minter(self.bft_bridge).await?;
 
         info!("Canister reinstalled successfully with ID: {}", canister_id);
 
