@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::brc20_info::{Brc20Info, Brc20Tick};
 use crate::events::MintedEventData;
-use crate::order::{MintOrder, SignedMintOrder};
+use crate::order::{MintOrder, SignedOrders};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct DepositRequest {
@@ -40,12 +40,9 @@ pub enum Brc20BridgeDepositOp {
     /// Sign the provided mint order
     SignMintOrder(MintOrder),
     /// Send the signed mint order to the bridge
-    SendMintOrder(SignedMintOrder),
+    SendMintOrder(SignedOrders),
     /// Confirm the mint order
-    ConfirmMintOrder {
-        signed_mint_order: SignedMintOrder,
-        tx_id: H256,
-    },
+    ConfirmMintOrder { orders: SignedOrders, tx_id: H256 },
     /// Mint order confirmed status
     MintOrderConfirmed { data: MintedEventData },
 }

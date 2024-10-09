@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use bitcoin::{Address, Network};
-use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
 use bridge_did::id256::Id256;
@@ -341,22 +340,6 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
             approve_amount: Default::default(),
             fee_payer: H160::default(),
         }
-    }
-
-    /// Sign mint order
-    pub async fn sign_mint_order(
-        &self,
-        mint_order: MintOrder,
-    ) -> Result<SignedMintOrder, DepositError> {
-        let signer = self.runtime_state.get_signer().map_err(|err| {
-            DepositError::Unavailable(format!("cannot initialize signer: {err:?}"))
-        })?;
-        let signed_mint_order = mint_order
-            .encode_and_sign(&signer)
-            .await
-            .map_err(|err| DepositError::Sign(format!("{err:?}")))?;
-
-        Ok(signed_mint_order)
     }
 
     /// Mark utxos as used
