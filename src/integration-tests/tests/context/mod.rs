@@ -7,7 +7,7 @@ use std::time::Duration;
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_did::order::{SignedMintOrder, SignedOrders};
+use bridge_did::order::SignedOrders;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
@@ -790,23 +790,6 @@ pub trait TestContext {
 
         client.icrc2_approve(approve_args).await?.unwrap();
         Ok(())
-    }
-
-    /// Mints ERC-20 token with the order.
-    async fn mint_erc_20_with_order(
-        &self,
-        wallet: &Wallet<'_, SigningKey>,
-        bridge: &H160,
-        order: SignedMintOrder,
-    ) -> Result<TransactionReceipt> {
-        let input = BFTBridge::mintCall {
-            encodedOrder: order.0.to_vec().into(),
-        }
-        .abi_encode();
-
-        self.call_contract(wallet, bridge, input, 0)
-            .await
-            .map(|(_, receipt)| receipt)
     }
 
     /// Mints ERC-20 token with the order.
