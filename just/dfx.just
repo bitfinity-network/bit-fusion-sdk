@@ -33,13 +33,14 @@ dfx_stop:
 dfx_test test_name="": docker_down docker_pull docker_up dfx_start dfx_start_proxy
   #!/usr/bin/env bash
   sleep 5
-  ( 
-    set +e
-    cargo test {{test_name}} -p integration-tests --features dfx_tests
-  )
-  TEST_RESULT=$?
-  just dfx_stop docker_down
-  exit $TEST_RESULT
+
+  cleanup() {
+    just dfx_stop docker_down
+  }  
+  trap cleanup EXIT INT TERM
+
+  cargo test {{test_name}} -p integration-tests --features dfx_tests
+
 
 
 [private]
