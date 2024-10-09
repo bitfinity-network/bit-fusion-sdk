@@ -12,6 +12,8 @@ use ethers_core::types::{BlockNumber, H160};
 use ethers_core::utils::hex::ToHexExt;
 use tracing::{debug, info};
 
+use crate::evm::local_evm_http_address;
+
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
 #[strum(serialize_all = "snake_case")]
 pub enum EvmNetwork {
@@ -42,11 +44,11 @@ impl SolidityContractDeployer<'_> {
         Self { network, wallet }
     }
 
-    pub fn get_network_url(&self) -> &'static str {
+    pub fn get_network_url(&self) -> String {
         match self.network {
-            EvmNetwork::Localhost => "http://127.0.0.1:8545",
-            EvmNetwork::Testnet => "https://testnet.bitfinity.network",
-            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network",
+            EvmNetwork::Localhost => local_evm_http_address(None),
+            EvmNetwork::Testnet => "https://testnet.bitfinity.network".to_owned(),
+            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network".to_owned(),
         }
     }
 
@@ -416,7 +418,7 @@ impl SolidityContractDeployer<'_> {
     pub async fn get_nonce(&self) -> Result<u64> {
         let url = self.get_network_url();
 
-        let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
+        let client = EthJsonRpcClient::new(ReqwestClient::new(url));
 
         let address = self.wallet.address();
         let nonce = client

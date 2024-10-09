@@ -22,13 +22,7 @@ pub fn ic_host(evm_network: EvmNetwork) -> String {
 /// Returns the EVM link based on the EVM network.
 pub fn evm_link(evm_network: EvmNetwork, evm_principal: Option<Principal>) -> EvmLink {
     match evm_network {
-        EvmNetwork::Localhost => EvmLink::Http(format!(
-            "http://127.0.0.1:{}/?canisterId={}",
-            dfx_webserver_port(),
-            evm_principal
-                .map(|principal| principal.to_text())
-                .unwrap_or_else(local_evm_principal)
-        )),
+        EvmNetwork::Localhost => EvmLink::Http(local_evm_http_address(evm_principal)),
         EvmNetwork::Mainnet => EvmLink::Ic(evm_principal.unwrap_or_else(|| {
             Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
         })),
@@ -36,6 +30,17 @@ pub fn evm_link(evm_network: EvmNetwork, evm_principal: Option<Principal>) -> Ev
             Principal::from_text(TESTNET_PRINCIPAL).expect("Invalid principal")
         })),
     }
+}
+
+/// Returns the local evm http address
+pub fn local_evm_http_address(evm_principal: Option<Principal>) -> String {
+    format!(
+        "http://127.0.0.1:{}/?canisterId={}",
+        dfx_webserver_port(),
+        evm_principal
+            .map(|principal| principal.to_text())
+            .unwrap_or_else(local_evm_principal)
+    )
 }
 
 /// Returns local dfx replica port
