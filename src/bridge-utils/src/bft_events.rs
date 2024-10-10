@@ -162,28 +162,6 @@ pub struct TxParams {
     pub chain_id: u32,
 }
 
-/// Sends transaction with given params to call `mint` function
-/// in BftBridge contract.
-pub fn mint_transaction(params: TxParams, mint_order_data: &[u8]) -> Transaction {
-    let data = BFTBridge::mintCall {
-        encodedOrder: mint_order_data.to_vec().into(),
-    }
-    .abi_encode();
-
-    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
-    ethers_core::types::Transaction {
-        from: params.sender,
-        to: params.bridge.into(),
-        nonce: params.nonce,
-        value: U256::zero(),
-        gas: DEFAULT_TX_GAS_LIMIT.into(),
-        gas_price: Some(params.gas_price),
-        input: data.into(),
-        chain_id: Some(params.chain_id.into()),
-        ..Default::default()
-    }
-}
-
 /// Sends transaction with given params to call `batchMint` function
 /// in BftBridge contract.
 pub fn batch_mint_transaction(
