@@ -31,7 +31,7 @@ pub struct Erc20BaseTokens<Ctx> {
 
 impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
-        let external_evm_client = ctx.external_evm_client(ctx.admin_name());
+        let external_evm_clien = ctx.external_evm_client(ctx.admin_name());
         let contracts_deployer = Wallet::new(&mut rand::thread_rng());
         let deployer_address = contracts_deployer.address();
         let tx_hash = external_evm_client
