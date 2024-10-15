@@ -16,14 +16,23 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
         Self { client }
     }
 
-    /// Returns list of operations for the given parameters.
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
+    /// If `count` is `None`, it returns all operations.
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,
+        min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> CanisterClientResult<Vec<(OperationId, IcrcBridgeOp)>> {
         self.client
-            .query("get_operations_list", (wallet_address, pagination))
+            .query(
+                "get_operations_list",
+                (wallet_address, min_included_id, pagination),
+            )
             .await
     }
 

@@ -209,7 +209,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     let minter_client = ctx.icrc_bridge_client(ADMIN);
     let operation = dbg!(minter_client
-        .get_operations_list(&john_address, None)
+        .get_operations_list(&john_address, None, None)
         .await
         .unwrap())
     .last()
@@ -469,7 +469,7 @@ async fn icrc2_token_bridge(
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
     let (id, operation) = minter_client
-        .get_operations_list(&john_address, None)
+        .get_operations_list(&john_address, None, None)
         .await
         .unwrap()
         .last()
@@ -606,7 +606,7 @@ async fn rescheduling_deposit_operation() {
         ctx.advance_time(Duration::from_secs(1)).await;
 
         let operations_list = bridge_client
-            .get_operations_list(&john_wallet.address().into(), None)
+            .get_operations_list(&john_wallet.address().into(), None, None)
             .await
             .unwrap();
 
@@ -640,7 +640,7 @@ async fn rescheduling_deposit_operation() {
     ctx.advance_by_times(Duration::from_secs(2), 5).await;
 
     let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None)
+        .get_operations_list(&john_wallet.address().into(), None, None)
         .await
         .unwrap();
     let (operation_id, _) = &operations[0];
@@ -663,7 +663,7 @@ async fn rescheduling_deposit_operation() {
 
     let bridge_client = ctx.icrc_bridge_client(JOHN);
     let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None)
+        .get_operations_list(&john_wallet.address().into(), None, None)
         .await
         .unwrap();
     let (operation_id, state) = &operations[0];
@@ -677,7 +677,7 @@ async fn rescheduling_deposit_operation() {
     ctx.advance_by_times(Duration::from_secs(2), 25).await;
 
     let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None)
+        .get_operations_list(&john_wallet.address().into(), None, None)
         .await
         .unwrap();
     let (_, state) = &operations[0];
@@ -709,7 +709,7 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
         let bridge_client = ctx.icrc_bridge_client(JOHN);
         while !spam_stopper.is_cancelled() {
             let operations = bridge_client
-                .get_operations_list(&wallet.address().into(), None)
+                .get_operations_list(&wallet.address().into(), None, None)
                 .await
                 .unwrap();
             for (id, _) in &operations {

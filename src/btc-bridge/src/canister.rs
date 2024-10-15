@@ -153,7 +153,7 @@ impl BtcBridge {
         get_runtime_state()
             .borrow()
             .operations
-            .get_for_address(&wallet_address, None)
+            .get_for_address(&wallet_address, None, None)
             .into_iter()
             .filter_map(|(operation_id, operation)| {
                 operation
