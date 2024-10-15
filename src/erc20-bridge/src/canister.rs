@@ -104,10 +104,11 @@ impl Erc20Bridge {
         min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, Erc20BridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, min_included_id, pagination)
+        get_runtime_state().borrow().operations.get_for_address(
+            &wallet_address,
+            min_included_id,
+            pagination,
+        )
     }
 
     /// Returns operation by memo and user.

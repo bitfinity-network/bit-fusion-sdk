@@ -434,7 +434,12 @@ mod tests {
         }
 
         for i in (COUNT - LIMIT)..COUNT {
-            assert_eq!(store.get_for_address(&eth_address(i as u8), None, None).len(), 1,);
+            assert_eq!(
+                store
+                    .get_for_address(&eth_address(i as u8), None, None)
+                    .len(),
+                1,
+            );
         }
     }
 
@@ -452,18 +457,18 @@ mod tests {
         assert_eq!(store.operations_log.len(), COUNT);
 
         // No offset, with count
-        let page = store.get_for_address(&eth_address(0),None, Some(Pagination::new(0, 10)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(0, 10)));
         assert_eq!(page.len(), 10);
         // No offset with count > total
-        let page = store.get_for_address(&eth_address(0), None,Some(Pagination::new(0, 120)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(0, 120)));
         assert_eq!(page.len() as u64, COUNT);
 
         // Offset with count
-        let page = store.get_for_address(&eth_address(0), None,Some(Pagination::new(20, 15)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(20, 15)));
         assert_eq!(page.len(), 15);
 
         // Offset with count beyond total
-        let page = store.get_for_address(&eth_address(0), None,Some(Pagination::new(100, 10)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(100, 10)));
         assert!(page.is_empty());
     }
 
@@ -483,7 +488,7 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), None,Some(Pagination::new(0, 10)))
+                .get_for_address(&eth_address(42), None, Some(Pagination::new(0, 10)))
                 .len(),
             LIMIT as usize
         );
@@ -507,7 +512,11 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), None, Some(Pagination::new(0, COUNT as usize)))
+                .get_for_address(
+                    &eth_address(42),
+                    None,
+                    Some(Pagination::new(0, COUNT as usize))
+                )
                 .len(),
             COUNT as usize
         );

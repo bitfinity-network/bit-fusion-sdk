@@ -82,10 +82,11 @@ impl Icrc2BridgeCanister {
         min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, IcrcBridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, min_included_id, pagination)
+        get_runtime_state().borrow().operations.get_for_address(
+            &wallet_address,
+            min_included_id,
+            pagination,
+        )
     }
 
     #[query]

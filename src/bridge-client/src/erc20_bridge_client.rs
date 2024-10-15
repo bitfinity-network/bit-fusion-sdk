@@ -29,7 +29,10 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
         pagination: Option<Pagination>,
     ) -> CanisterClientResult<Vec<(OperationId, Erc20BridgeOp)>> {
         self.client
-            .query("get_operations_list", (wallet_address, min_included_id, pagination))
+            .query(
+                "get_operations_list",
+                (wallet_address, min_included_id, pagination),
+            )
             .await
     }
 
