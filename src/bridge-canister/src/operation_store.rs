@@ -546,25 +546,41 @@ mod tests {
         assert_eq!(page[79].0, OperationId::new(99));
 
         // No offset, with count
-        let page = store.get_for_address(&eth_address(0), min_included_id, Some(Pagination::new(0, 10)));
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(0, 10)),
+        );
         assert_eq!(page.len(), 10);
         assert_eq!(page[0].0, OperationId::new(20));
         assert_eq!(page[9].0, OperationId::new(29));
 
         // No offset with count > total
-        let page = store.get_for_address(&eth_address(0), min_included_id, Some(Pagination::new(0, 120)));
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(0, 120)),
+        );
         assert_eq!(page.len(), 80);
         assert_eq!(page[0].0, OperationId::new(20));
         assert_eq!(page[79].0, OperationId::new(99));
 
         // Offset with count
-        let page = store.get_for_address(&eth_address(0), min_included_id, Some(Pagination::new(10, 20)));
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(10, 20)),
+        );
         assert_eq!(page.len(), 20);
         assert_eq!(page[0].0, OperationId::new(30));
         assert_eq!(page[19].0, OperationId::new(49));
 
         // Offset with count beyond total
-        let page = store.get_for_address(&eth_address(0), min_included_id, Some(Pagination::new(100, 10)));
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(100, 10)),
+        );
         assert!(page.is_empty());
     }
 
