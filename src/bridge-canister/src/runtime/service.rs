@@ -4,6 +4,7 @@ use std::rc::Rc;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 
+pub mod fetch_logs;
 pub mod mint_tx;
 pub mod sign_orders;
 
