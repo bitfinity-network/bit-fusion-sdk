@@ -190,7 +190,7 @@ where
     }
 
     /// Retrieves all operations for the given ETH wallet address whose
-    /// id is greater than or equal to `min_included_id`.
+    /// id is greater than or equal to `min_included_id` if provided.
     /// The operations are then paginated with the given `pagination` parameters,
     /// starting from `offset` returning a max of `count` items
     /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
