@@ -210,24 +210,6 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         controllerAccessList[controller] = false;
     }
 
-    /// Transfer funds to user according the signed encoded order.
-    function mint(
-        bytes calldata encodedOrder
-    ) external whenNotPaused {
-        MintOrderData memory order = _decodeOrder(encodedOrder[:MINT_ORDER_DATA_LEN]);
-        _validateOrder(order);
-        _checkMintOrderSignature(encodedOrder);
-
-        uint256 feeAmount = 0;
-        if (_isFeeRequired()) {
-            feeAmount = (COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
-        }
-
-        _mintInner(order);
-        _chargeFee(order.feePayer, order.senderID, feeAmount);
-        _emitMintedEvent(order, feeAmount);
-    }
-
     /// Transfer funds to users according the signed encoded orders.
     /// Returns `processedOrders` array of error codes for each mint order;
     function batchMint(
