@@ -11,10 +11,7 @@ contract DeployWrappedTokenDeployer is Script {
         WrappedTokenDeployer wrappedTokenDeployer = new WrappedTokenDeployer();
         address wrappedTokenDeployerAddress = address(wrappedTokenDeployer);
 
-        console.log(
-            "WrappedTokenDeployer address:",
-            wrappedTokenDeployerAddress
-        );
+        console.log("WrappedTokenDeployer address:", wrappedTokenDeployerAddress);
 
         vm.stopBroadcast();
     }

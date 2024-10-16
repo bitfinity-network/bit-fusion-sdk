@@ -39,45 +39,26 @@ contract StringUtilsTest is Test {
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(
-                "12345678901234567890123456789012"
-            );
-            assertEq(
-                bytes32ToString(result),
-                "12345678901234567890123456789012"
-            );
+            bytes32 result = StringUtils.truncateUTF8("12345678901234567890123456789012");
+            assertEq(bytes32ToString(result), "12345678901234567890123456789012");
         }
         {
-            bytes32 result = StringUtils.truncateUTF8(
-                unicode"1234567890123456789012345678901ї"
-            );
-            assertEq(
-                bytes32ToString(result),
-                unicode"1234567890123456789012345678901"
-            );
+            bytes32 result = StringUtils.truncateUTF8(unicode"1234567890123456789012345678901ї");
+            assertEq(bytes32ToString(result), unicode"1234567890123456789012345678901");
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(
-                unicode"123456789012345678901234567890ї"
-            );
-            assertEq(
-                bytes32ToString(result),
-                unicode"123456789012345678901234567890"
-            );
+            bytes32 result = StringUtils.truncateUTF8(unicode"123456789012345678901234567890ї");
+            assertEq(bytes32ToString(result), unicode"123456789012345678901234567890");
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(
-                unicode"123456789012345678ї"
-            );
+            bytes32 result = StringUtils.truncateUTF8(unicode"123456789012345678ї");
             assertEq(bytes32ToString(result), unicode"123456789012345678ї");
         }
 
         {
-            bytes32 result = StringUtils.truncateUTF8(
-                unicode"12345678901234567890її1"
-            );
+            bytes32 result = StringUtils.truncateUTF8(unicode"12345678901234567890її1");
             assertEq(bytes32ToString(result), unicode"12345678901234567890її1");
         }
 

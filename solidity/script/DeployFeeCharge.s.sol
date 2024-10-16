@@ -14,9 +14,7 @@ contract DeployFeeCharge is Script {
         FeeCharge feeCharge = new FeeCharge(bridges);
         address feeChargeAddress = address(feeCharge);
 
-        if (
-            expectedAddress != address(0) && feeChargeAddress != expectedAddress
-        ) {
+        if (expectedAddress != address(0) && feeChargeAddress != expectedAddress) {
             revert("Fee charge address does not match the expected address");
         }
 
