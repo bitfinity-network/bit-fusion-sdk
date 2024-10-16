@@ -2,6 +2,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use candid::Principal;
 use clap::ValueEnum;
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
@@ -10,7 +11,12 @@ use ethereum_types::H256;
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, H160};
 use ethers_core::utils::hex::ToHexExt;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
+
+use crate::evm::dfx_webserver_port;
+
+const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
+const LOCALHOST_URL_ENV_VAR: &str = "LOCALHOST_URL";
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
 #[strum(serialize_all = "snake_case")]
@@ -22,7 +28,9 @@ pub enum EvmNetwork {
 
 pub struct SolidityContractDeployer<'a> {
     network: EvmNetwork,
+    evm_localhost_url: Option<String>,
     wallet: Wallet<'a, SigningKey>,
+    private_key: H256,
 }
 
 impl SolidityContractDeployer<'_> {
@@ -36,17 +44,27 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: EvmNetwork, pk: H256) -> Self {
+    pub fn new(network: EvmNetwork, pk: H256, evm_localhost_url: Option<String>) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
 
-        Self { network, wallet }
+        Self {
+            network,
+            wallet,
+            evm_localhost_url,
+            private_key: pk,
+        }
     }
 
-    pub fn get_network_url(&self) -> &'static str {
+    pub fn get_network_url(&self, evm: Principal) -> String {
         match self.network {
-            EvmNetwork::Localhost => "http://127.0.0.1:8545",
-            EvmNetwork::Testnet => "https://testnet.bitfinity.network",
-            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network",
+            EvmNetwork::Localhost => {
+                format!(
+                    "http://127.0.0.1:{dfx_port}/?canisterId={evm}",
+                    dfx_port = dfx_webserver_port()
+                )
+            }
+            EvmNetwork::Testnet => "https://testnet.bitfinity.network".to_string(),
+            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network".to_string(),
         }
     }
 
@@ -125,6 +143,11 @@ impl SolidityContractDeployer<'_> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
+            .env(
+                LOCALHOST_URL_ENV_VAR,
+                self.evm_localhost_url.as_deref().unwrap_or(""),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -133,7 +156,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            eprintln!(
+            error!(
                 "deploy-bft command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
             );
@@ -141,7 +164,7 @@ impl SolidityContractDeployer<'_> {
             return Err(anyhow::anyhow!("deploy-bft command failed"));
         } else {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("deploy-bft command output:\n{}", stdout);
+            debug!("deploy-bft command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -186,6 +209,11 @@ impl SolidityContractDeployer<'_> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
+            .env(
+                LOCALHOST_URL_ENV_VAR,
+                self.evm_localhost_url.as_deref().unwrap_or(""),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -194,7 +222,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            eprintln!(
+            error!(
                 "deploy-wrapped-token-deployer command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
             );
@@ -204,7 +232,7 @@ impl SolidityContractDeployer<'_> {
             ));
         } else {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("deploy-wrapped-token-deployer command output:\n{}", stdout);
+            debug!("deploy-wrapped-token-deployer command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -278,6 +306,11 @@ impl SolidityContractDeployer<'_> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
+            .env(
+                LOCALHOST_URL_ENV_VAR,
+                self.evm_localhost_url.as_deref().unwrap_or(""),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -286,7 +319,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            eprintln!(
+            error!(
                 "deploy-fee-charge command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
             );
@@ -294,7 +327,7 @@ impl SolidityContractDeployer<'_> {
             return Err(anyhow::anyhow!("deploy-fee-charge command failed"));
         } else {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("deploy-fee-charge command output:\n{}", stdout);
+            debug!("deploy-fee-charge command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -358,6 +391,11 @@ impl SolidityContractDeployer<'_> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
+            .env(
+                LOCALHOST_URL_ENV_VAR,
+                self.evm_localhost_url.as_deref().unwrap_or(""),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -366,7 +404,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            eprintln!(
+            error!(
                 "deploy-wrapped-token command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
             );
@@ -374,7 +412,7 @@ impl SolidityContractDeployer<'_> {
             return Err(anyhow::anyhow!("deploy-wrapped-token command failed"));
         } else {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("deploy-wrapped-token command output:\n{}", stdout);
+            debug!("deploy-wrapped-token command output:\n{}", stdout);
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -413,8 +451,8 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// The nonce of the deployer's address.
-    pub async fn get_nonce(&self) -> Result<u64> {
-        let url = self.get_network_url();
+    pub async fn get_nonce(&self, evm: Principal) -> Result<u64> {
+        let url = self.get_network_url(evm);
 
         let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
 
@@ -424,5 +462,10 @@ impl SolidityContractDeployer<'_> {
             .await?;
 
         Ok(nonce)
+    }
+
+    /// Returns the private key as a string.
+    fn private_key_str(&self) -> String {
+        hex::encode(self.private_key.as_bytes())
     }
 }

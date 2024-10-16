@@ -1,0 +1,8 @@
+```
+$ bridge-deployer --silent --evm-network localhost --evm $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $WASM_PATH --wallet-canister $WALLET_CANISTER erc20 --owner $ADMIN_PRINCIPAL --signing-key-id dfx
+Starting Bitfinity Deployer v[..]
+Canister deployed with ID [..]
+BFT bridge deployed with address [..]; wrapped_token_deployer: [..]
+Canister Rune deployed with ID [..]
+
+```

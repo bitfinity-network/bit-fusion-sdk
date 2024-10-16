@@ -21,20 +21,37 @@ pub fn ic_host(evm_network: EvmNetwork) -> String {
 
 /// Returns the EVM link based on the EVM network.
 pub fn evm_link(evm_network: EvmNetwork, evm_principal: Option<Principal>) -> EvmLink {
+    let principal = evm_principal_or_default(evm_network, evm_principal);
+
     match evm_network {
         EvmNetwork::Localhost => EvmLink::Http(format!(
             "http://127.0.0.1:{}/?canisterId={}",
             dfx_webserver_port(),
-            evm_principal
-                .map(|principal| principal.to_text())
-                .unwrap_or_else(local_evm_principal)
+            principal
         )),
-        EvmNetwork::Mainnet => EvmLink::Ic(evm_principal.unwrap_or_else(|| {
-            Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
-        })),
-        EvmNetwork::Testnet => EvmLink::Ic(evm_principal.unwrap_or_else(|| {
-            Principal::from_text(TESTNET_PRINCIPAL).expect("Invalid principal")
-        })),
+        EvmNetwork::Mainnet => EvmLink::Ic(principal),
+        EvmNetwork::Testnet => EvmLink::Ic(principal),
+    }
+}
+
+/// Get the EVM principal or default based on the EVM network.
+pub fn evm_principal_or_default(
+    evm_network: EvmNetwork,
+    evm_principal: Option<Principal>,
+) -> Principal {
+    match evm_principal {
+        Some(principal) => principal,
+        None => match evm_network {
+            EvmNetwork::Localhost => {
+                Principal::from_text(&local_evm_principal()).expect("Invalid principal")
+            }
+            EvmNetwork::Mainnet => {
+                Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
+            }
+            EvmNetwork::Testnet => {
+                Principal::from_text(TESTNET_PRINCIPAL).expect("Invalid principal")
+            }
+        },
     }
 }
 
@@ -44,7 +61,7 @@ fn dfx_replica_port() -> u16 {
 }
 
 /// Returns local dfx replica port
-fn dfx_webserver_port() -> u16 {
+pub fn dfx_webserver_port() -> u16 {
     dfx_info_port("webserver-port")
 }
 
@@ -64,7 +81,7 @@ fn dfx_info_port(service: &str) -> u16 {
 }
 
 /// Returns the local EVM principal
-fn local_evm_principal() -> String {
+pub fn local_evm_principal() -> String {
     let principal = Command::new("dfx")
         .args(["canister", "id", "evm_testnet"])
         .output()

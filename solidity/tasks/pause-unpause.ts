@@ -13,6 +13,14 @@ task('pause', 'Pauses the contract')
       throw new Error('Please specify a network');
     }
 
+    if (
+      network === 'localhost' &&
+      process.env.LOCALHOST_URL &&
+      'url' in hre.network.config
+    ) {
+      hre.network.config.url = process.env.LOCALHOST_URL;
+    }
+
     const [deployer] = await hre.ethers.getSigners();
     const contract = await hre.ethers.getContractAt(
       'BFTBridge',

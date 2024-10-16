@@ -2,6 +2,7 @@ mod evm_rpc_canister;
 pub mod stress;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
@@ -889,6 +890,11 @@ pub trait TestContext {
         args: impl ArgumentEncoder + Send,
     ) -> Result<()>;
 
+    /// Returns the path to the wasm file for the given canister type.
+    async fn get_wasm_path(&self, canister_type: CanisterType) -> PathBuf {
+        canister_type.default_canister_wasm_path().await
+    }
+
     /// Installs code to test context's canister with the given type.
     /// If the canister depends on not-created canister, Principal::anonymous() is used.
     async fn install_default_canister(&self, canister_type: CanisterType) {
@@ -1524,6 +1530,26 @@ impl CanisterType {
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
+        }
+    }
+
+    pub async fn default_canister_wasm_path(&self) -> PathBuf {
+        match self {
+            CanisterType::Brc20Bridge => get_brc20_bridge_canister_wasm_path().await,
+            CanisterType::Btc => get_btc_canister_wasm_path().await,
+            CanisterType::BtcBridge => get_btc_bridge_canister_wasm_path().await,
+            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_wasm_path().await,
+            CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_wasm_path().await,
+            CanisterType::Evm => get_evm_testnet_canister_wasm_path().await,
+            CanisterType::EvmRpcCanister => get_evm_rpc_canister_wasm_path().await,
+            CanisterType::ExternalEvm => get_evm_testnet_canister_wasm_path().await,
+            CanisterType::Icrc1Ledger => get_icrc1_token_canister_wasm_path().await,
+            CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_wasm_path().await,
+            CanisterType::Kyt => get_kyt_canister_wasm_path().await,
+            CanisterType::RuneBridge => get_rune_bridge_canister_wasm_path().await,
+            CanisterType::Signature => get_signature_verification_canister_wasm_path().await,
+            CanisterType::Token1 => get_icrc1_token_canister_wasm_path().await,
+            CanisterType::Token2 => get_icrc1_token_canister_wasm_path().await,
         }
     }
 }

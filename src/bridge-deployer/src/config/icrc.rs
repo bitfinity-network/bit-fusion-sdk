@@ -18,9 +18,6 @@ pub struct InitBridgeConfig {
     /// Owner of the bridge canister
     #[arg(long)]
     pub owner: Principal,
-    /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
-    #[arg(long)]
-    pub evm: Option<Principal>,
     /// Log settings for the canister
     #[command(flatten, next_help_heading = "Log Settings for the canister")]
     pub log_settings: Option<LogCanisterSettings>,
@@ -28,10 +25,10 @@ pub struct InitBridgeConfig {
 
 impl InitBridgeConfig {
     /// Converts the `InitBridgeConfig` into a `BridgeInitData` struct.
-    pub fn into_bridge_init_data(self, evm_network: EvmNetwork) -> BridgeInitData {
+    pub fn into_bridge_init_data(self, evm_network: EvmNetwork, evm: Principal) -> BridgeInitData {
         BridgeInitData {
             owner: self.owner,
-            evm_link: crate::evm::evm_link(evm_network, self.evm),
+            evm_link: crate::evm::evm_link(evm_network, Some(evm)),
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: self.signing_key_id.into(),
             },

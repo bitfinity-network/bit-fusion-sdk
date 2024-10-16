@@ -16,6 +16,14 @@ task('deploy-fee-charge', 'Deploys the fee charge contract')
       throw new Error('Please specify a network');
     }
 
+    if (
+      network === 'localhost' &&
+      process.env.LOCALHOST_URL &&
+      'url' in hre.network.config
+    ) {
+      hre.network.config.url = process.env.LOCALHOST_URL;
+    }
+
     let bridgesArr: string[] = bridges ? bridges.split(',') : [];
 
     if (bridgesArr.length === 0) {
