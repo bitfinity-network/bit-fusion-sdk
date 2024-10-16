@@ -43,6 +43,7 @@ impl SolidityContractDeployer<'_> {
         Self { network, wallet }
     }
 
+    /// Returns the network URL based on the selected network.
     pub fn get_network_url(&self) -> &'static str {
         match self.network {
             EvmNetwork::Localhost => "http://127.0.0.1:8545",
@@ -51,19 +52,20 @@ impl SolidityContractDeployer<'_> {
         }
     }
 
+    /// Returns the path to the solidity directory.
     pub fn solidity_dir(&self) -> PathBuf {
-        let dir = std::env::current_dir()
+        std::env::current_dir()
             .context("Failed to get current directory")
             .expect("Failed to get current directory")
-            .join("solidity");
-
-        dir
+            .join("solidity")
     }
 
+    /// Returns the private key of the deployer.
     pub fn pk(&self) -> String {
         self.wallet.signer().to_bytes().encode_hex_with_prefix()
     }
 
+    /// Returns the address of the deployer.
     pub fn sender(&self) -> String {
         self.wallet.address().encode_hex_with_prefix()
     }
@@ -75,6 +77,8 @@ impl SolidityContractDeployer<'_> {
     /// * `minter_address` - The address of the minter contract.
     /// * `fee_charge_address` - The address of the fee charge contract.
     /// * `is_wrapped_side` - A boolean indicating whether the BFT contract is for the wrapped side.
+    /// * `owner` - An optional owner address for the BFT contract.
+    /// * `controllers` - An optional list of controller addresses for the BFT contract.
     ///
     /// # Returns
     ///
@@ -267,7 +271,6 @@ impl SolidityContractDeployer<'_> {
     /// # Arguments
     ///
     /// * `bridges` - A list of bridge addresses to be associated with the Fee Charge contract.
-    /// * `nonce` - The nonce to use for computing the contract address.
     /// * `expected_address` - An optional expected address for the deployed Fee Charge contract.
     ///
     /// # Returns
@@ -376,43 +379,55 @@ impl SolidityContractDeployer<'_> {
         decimals: u8,
     ) -> Result<H160> {
         let owner = self.wallet.address();
-        let network = self.network.to_string();
+
         let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
         let owner = owner.encode_hex_with_prefix();
         let decimals = decimals.to_string();
 
-        let args = vec![
-            "hardhat",
-            "deploy-wrapped-token",
-            "--network",
-            &network,
-            "--wrapped-token-deployer",
-            &wrapped_token_deployer,
-            "--name",
-            name,
-            "--symbol",
-            symbol,
-            "--decimals",
-            &decimals,
-            "--owner",
-            &owner,
+        let pk = self.pk();
+        let sender = self.sender();
+
+        let solidity_dir = self.solidity_dir();
+        let script_dir = solidity_dir.join("script").join("DeployWrappedToken.s.sol");
+
+        let args = [
+            "forge",
+            "script",
+            "--broadcast",
+            "-v",
+            script_dir.to_str().expect("Invalid solidity dir"),
+            "--rpc-url",
+            self.get_network_url(),
+            "--private-key",
+            &pk,
+            "--sender",
+            &sender,
         ];
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-
-        let dir = dir.display();
-        info!("Deploying ERC20 contract in {dir}");
+        info!(
+            "Deploying Wrapped ERC20 contract in {}",
+            solidity_dir.display()
+        );
 
         debug!(
-            "Executing command: sh -c cd {dir} && npx {}",
+            "Executing command: sh -c cd {} && {}",
+            solidity_dir.display(),
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut sh = Command::new("sh");
+        let output = sh
             .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env("WRAPPED_TOKEN_DEPLOYER", &wrapped_token_deployer)
+            .env("NAME", name)
+            .env("SYMBOL", symbol)
+            .env("DECIMALS", &decimals)
+            .env("OWNER", &owner)
+            .arg(format!(
+                "cd {} && {} 2>&1",
+                solidity_dir.display(),
+                args.join(" ")
+            ))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
