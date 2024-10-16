@@ -39,24 +39,6 @@ pub trait Operation:
     fn scheduling_options(&self) -> Option<TaskOptions> {
         Some(TaskOptions::default())
     }
-
-    /// Action to perform when a WrappedToken is minted.
-    async fn on_wrapped_token_minted(
-        ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>>;
-
-    /// Action to perform when a WrappedToken is burnt.
-    async fn on_wrapped_token_burnt(
-        ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>>;
-
-    /// Action to perform on notification from BftBridge contract.
-    async fn on_minter_notification(
-        ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>>;
 }
 
 /// Context for an operation execution.

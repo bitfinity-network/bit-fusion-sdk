@@ -1,11 +1,11 @@
 use std::fmt::{Display, Formatter};
 
 use alloy_sol_types::sol;
-use candid::CandidType;
+use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
 use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
-use crate::operation_log::Memo;
+use crate::{op_id::OperationId, operation_log::Memo};
 
 sol! {
     #[derive(Debug, Serialize, Deserialize)]
@@ -143,6 +143,15 @@ impl NotifyMinterEventData {
         } else {
             None
         }
+    }
+
+    /// Tries to decode the notification into rescheduling operation id.
+    pub fn try_decode_reschedule_operation_id(&self) -> Option<OperationId> {
+        if self.notification_type != MinterNotificationType::RescheduleOperation {
+            return None;
+        }
+
+        Decode!(&self.user_data, OperationId).ok()
     }
 }
 

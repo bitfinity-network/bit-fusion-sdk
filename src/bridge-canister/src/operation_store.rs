@@ -8,6 +8,7 @@ use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
+use ethers_core::utils::rlp::PayloadInfo;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
     BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, MultimapStructure,
@@ -262,6 +263,21 @@ where
         self.incomplete_operations.insert(operation_id, log);
     }
 
+    pub fn update_by_nonce(&mut self, dst_address: &H160, nonce: u32, payload: P) {
+        let Some((op_id, _)) = self
+            .get_for_address(dst_address, None)
+            .into_iter()
+            .find(|(operation_id, _)| operation_id.nonce() == nonce)
+        else {
+            log::error!(
+                "Cannot update operation with nonce {nonce} and address {dst_address}: not found"
+            );
+            return;
+        };
+
+        self.update(op_id, payload)
+    }
+
     fn move_to_log(&mut self, operation_id: OperationId, log: OperationLog<P>) {
         self.incomplete_operations.remove(&operation_id);
         self.operations_log.insert(operation_id, log);
@@ -364,27 +380,6 @@ mod tests {
 
         fn evm_wallet_address(&self) -> H160 {
             eth_address(self.addr as _)
-        }
-
-        async fn on_wrapped_token_minted(
-            _ctx: RuntimeState<Self>,
-            _event: MintedEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
-            None
-        }
-
-        async fn on_wrapped_token_burnt(
-            _ctx: RuntimeState<Self>,
-            _event: BurntEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
-            None
-        }
-
-        async fn on_minter_notification(
-            _ctx: RuntimeState<Self>,
-            _event: NotifyMinterEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
-            None
         }
     }
 

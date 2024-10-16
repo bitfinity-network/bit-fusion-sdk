@@ -5,10 +5,12 @@ pub mod state;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::BftResult;
+use bridge_did::event_data::{MinterNotificationType, NotifyMinterEventData};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
+use candid::Decode;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{StableBTreeMap, StableCell};
@@ -17,7 +19,7 @@ use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
 use jsonrpc_core::futures;
 
-use self::scheduler::{BridgeTask, ServiceTask, SharedScheduler};
+use self::scheduler::{BridgeTask, SharedScheduler};
 use self::service::{DynService, ServiceOrder};
 use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
@@ -57,31 +59,15 @@ impl<Op: Operation> BridgeRuntime<Op> {
     }
 
     /// Provides access to tasks scheduler.
-    pub fn schedule_operation(&self, id: OperationId, operation: Op) {
+    pub fn schedule_operation(&self, op_id: OperationId, operation: Op) {
         let options = operation.scheduling_options().unwrap_or_default();
         let scheduled_task =
-            ScheduledTask::with_options(BridgeTask::Operation(id, operation), options);
+            ScheduledTask::with_options(BridgeTask::new(op_id, operation), options);
         self.scheduler.append_task(scheduled_task);
     }
 
     /// Run the scheduled tasks.
     pub fn run(&mut self) {
-        if self.state.borrow().should_collect_evm_logs() {
-            self.state.borrow_mut().collecting_logs_ts = Some(ic::time());
-
-            let task = scheduler::BridgeTask::Service(ServiceTask::CollectEvmLogs);
-            let collect_logs = ScheduledTask::new(task);
-            self.scheduler.append_task(collect_logs);
-        }
-
-        if self.state.borrow().should_refresh_evm_params() {
-            self.state.borrow_mut().refreshing_evm_params_ts = Some(ic::time());
-
-            let task = scheduler::BridgeTask::Service(ServiceTask::RefreshEvmParams);
-            let refresh_evm_params = ScheduledTask::new(task);
-            self.scheduler.append_task(refresh_evm_params);
-        }
-
         if !self.state.borrow().should_process_operations() {
             return;
         }
@@ -136,23 +122,48 @@ impl<Op: Operation> BridgeRuntime<Op> {
         }
         futures::future::join_all(futures).await;
     }
+
+    /// Re-schedule operation according to the event and returns true on success.
+    pub fn reschedule_operation(&self, operation_id: OperationId) {
+        let Some(operation) = self.state.borrow().operations.get(operation_id) else {
+            log::warn!(
+                "Reschedule of operation #{operation_id} is requested but it does not exist"
+            );
+            return;
+        };
+
+        let Some(task_options) = operation.scheduling_options() else {
+            log::info!("Reschedule of operation #{operation_id} is requested but no scheduling is required for this operation");
+            return;
+        };
+
+        let current_task_id = self.scheduler.find_id(&|task| task.op_id == operation_id);
+        match current_task_id {
+            Some(task_id) => {
+                self.scheduler.reschedule(task_id, task_options.clone());
+                log::trace!("Updated schedule for operation #{operation_id} task #{task_id} to {task_options:?}");
+            }
+            None => {
+                let task_id = self
+                    .scheduler
+                    .append_task((BridgeTask::new(operation_id, operation), task_options).into());
+                log::trace!("Restarted operation #{operation_id} with task id #{task_id}");
+            }
+        }
+    }
 }
 
 impl<Op: Operation> OperationContext for RuntimeState<Op> {
     fn get_evm_link(&self) -> EvmLink {
-        self.borrow().config.borrow().get_evm_link()
+        self.borrow().config.get_evm_link()
     }
 
     fn get_bridge_contract_address(&self) -> BftResult<did::H160> {
-        self.borrow()
-            .config
-            .borrow()
-            .get_bft_bridge_contract()
-            .ok_or_else(|| Error::Initialization("bft bridge contract not initialized".into()))
+        self.borrow().config.get_bridge_contract_address()
     }
 
     fn get_evm_params(&self) -> BftResult<EvmParams> {
-        self.borrow().config.borrow().get_evm_params()
+        self.borrow().config.get_evm_params()
     }
 
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
