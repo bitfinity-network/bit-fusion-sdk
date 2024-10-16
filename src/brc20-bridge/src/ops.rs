@@ -1,4 +1,5 @@
 mod deposit;
+mod events_handler;
 mod mint_order_handler;
 mod mint_tx_handler;
 mod withdraw;
@@ -24,13 +25,15 @@ use serde::Serialize;
 use withdraw::Brc20BridgeWithdrawOpImpl;
 
 pub use self::deposit::Brc20BridgeDepositOpImpl;
+pub use self::events_handler::Brc20BftEventsHandler;
 pub use self::mint_order_handler::Brc20MintOrderHandler;
 pub use self::mint_tx_handler::Brc20MintTxHandler;
 use crate::canister::get_brc20_state;
 use crate::core::withdrawal::new_withdraw_payload;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 2;
 
 /// BRC20 bridge operations
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -239,68 +242,6 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent {
                 from_address, ..
             }) => from_address.clone(),
-        }
-    }
-
-    async fn on_wrapped_token_minted(
-        _ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!(
-            "on_wrapped_token_minted nonce {nonce} {event:?}",
-            nonce = event.nonce
-        );
-
-        Some(OperationAction::Update {
-            nonce: event.nonce,
-            update_to: Self(Brc20BridgeOp::Deposit(
-                Brc20BridgeDepositOp::MintOrderConfirmed { data: event },
-            )),
-        })
-    }
-
-    async fn on_wrapped_token_burnt(
-        _ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!("on_wrapped_token_burnt {event:?}");
-        let memo = event.memo();
-        match new_withdraw_payload(event, &get_brc20_state().borrow()) {
-            Ok(payload) => Some(OperationAction::Create(
-                Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload))
-                    .into(),
-                memo,
-            )),
-            Err(err) => {
-                log::warn!("Invalid withdrawal data: {err:?}");
-                None
-            }
-        }
-    }
-
-    async fn on_minter_notification(
-        _ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!("on_minter_notification {event:?}");
-        let memo = event.memo();
-        if let Some(notification) = Brc20MinterNotification::decode(event.clone()) {
-            match notification {
-                Brc20MinterNotification::Deposit(payload) => Some(OperationAction::Create(
-                    Self(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitInputs(
-                        DepositRequest {
-                            amount: payload.amount,
-                            brc20_tick: payload.brc20_tick,
-                            dst_address: payload.dst_address,
-                            dst_token: payload.dst_token,
-                        },
-                    ))),
-                    memo,
-                )),
-            }
-        } else {
-            log::warn!("Invalid minter notification: {event:?}");
-            None
         }
     }
 }

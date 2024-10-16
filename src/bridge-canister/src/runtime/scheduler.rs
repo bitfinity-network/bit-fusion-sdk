@@ -3,10 +3,8 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
-use bridge_utils::bft_events::BridgeEvent;
-use candid::{CandidType, Decode};
+use candid::CandidType;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
@@ -15,8 +13,7 @@ use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
-use crate::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
-use crate::runtime::state::config::ConfigStorage;
+use crate::bridge::{Operation, OperationProgress};
 
 pub type TasksStorage<Mem, Op> = StableBTreeMap<u64, InnerScheduledTask<BridgeTask<Op>>, Mem>;
 pub type BridgeScheduler<Mem, Op> =
@@ -100,11 +97,15 @@ pub fn log_task_execution_error<Op: Operation>(task: InnerScheduledTask<BridgeTa
 /// Task type used by `BridgeRuntime`.
 #[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
 pub struct BridgeTask<Op> {
-    op_id: OperationId,
-    operation: Op,
+    pub op_id: OperationId,
+    pub operation: Op,
 }
 
 impl<Op: Operation> BridgeTask<Op> {
+    pub fn new(op_id: OperationId, operation: Op) -> Self {
+        Self { op_id, operation }
+    }
+
     async fn execute_inner(
         self,
         ctx: RuntimeState<Op>,
@@ -250,27 +251,6 @@ mod tests {
         fn evm_wallet_address(&self) -> H160 {
             H160::from_slice(&[1; 20])
         }
-
-        async fn on_wrapped_token_minted(
-            _ctx: RuntimeState<Self>,
-            _event: MintedEventData,
-        ) -> Option<OperationAction<Self>> {
-            unimplemented!()
-        }
-
-        async fn on_wrapped_token_burnt(
-            _ctx: RuntimeState<Self>,
-            _event: BurntEventData,
-        ) -> Option<OperationAction<Self>> {
-            unimplemented!()
-        }
-
-        async fn on_minter_notification(
-            _ctx: RuntimeState<Self>,
-            _event: NotifyMinterEventData,
-        ) -> Option<OperationAction<Self>> {
-            unimplemented!()
-        }
     }
 
     #[tokio::test]
@@ -285,10 +265,7 @@ mod tests {
         const COUNT: usize = 5;
         for _ in 0..COUNT {
             let op = ctx.borrow().operations.get(id).unwrap();
-            let task = BridgeTask {
-                op_id: id,
-                operation: op,
-            };
+            let task = BridgeTask::new(id, op);
             task.execute_inner(ctx.clone(), Box::new(runtime.scheduler.clone()))
                 .await
                 .unwrap_err();
@@ -323,10 +300,7 @@ mod tests {
         const COUNT: usize = 5;
         for _ in 0..COUNT {
             let op = ctx.borrow().operations.get(id).unwrap();
-            let task = BridgeTask {
-                op_id: id,
-                operation: op,
-            };
+            let task = BridgeTask::new(id, op);
             task.execute_inner(ctx.clone(), Box::new(runtime.scheduler.clone()))
                 .await
                 .unwrap();
@@ -361,10 +335,7 @@ mod tests {
         let op = TestOperation::new_err();
         let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
 
-        let task = BridgeTask {
-            op_id: id,
-            operation: op,
-        };
+        let task = BridgeTask::new(id, op);
         let err = task
             .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
             .await
@@ -387,7 +358,7 @@ mod tests {
         let op = TestOperation::new_unrecoverable();
         let id = ctx.borrow_mut().operations.new_operation(op.clone(), None);
 
-        let task = BridgeTask::Operation(id, op);
+        let task = BridgeTask::new(id, op);
         let err = task
             .execute(ctx.clone(), Box::new(runtime.scheduler.clone()))
             .await
