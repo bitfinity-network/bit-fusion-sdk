@@ -6,11 +6,10 @@ import "src/FeeCharge.sol";
 
 contract DeployFeeCharge is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address[] memory bridges = vm.envAddress("BRIDGES", ",");
         address expectedAddress = vm.envAddress("EXPECTED_ADDRESS");
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         FeeCharge feeCharge = new FeeCharge(bridges);
         address feeChargeAddress = address(feeCharge);

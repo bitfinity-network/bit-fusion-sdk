@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
@@ -50,6 +51,23 @@ impl SolidityContractDeployer<'_> {
         }
     }
 
+    pub fn solidity_dir(&self) -> PathBuf {
+        let dir = std::env::current_dir()
+            .context("Failed to get current directory")
+            .expect("Failed to get current directory")
+            .join("solidity");
+
+        dir
+    }
+
+    pub fn pk(&self) -> String {
+        self.wallet.signer().to_bytes().encode_hex_with_prefix()
+    }
+
+    pub fn sender(&self) -> String {
+        self.wallet.address().encode_hex_with_prefix()
+    }
+
     /// Deploys the BFT contract with the given parameters.
     ///
     /// # Arguments
@@ -72,7 +90,6 @@ impl SolidityContractDeployer<'_> {
     ) -> Result<H160> {
         info!("Deploying BFT contract");
 
-        let network = self.network.to_string();
         let minter_address = minter_address.encode_hex_with_prefix();
         let fee_charge_address = fee_charge_address.encode_hex_with_prefix();
         let wrapped_token_deployer_address =
@@ -85,23 +102,23 @@ impl SolidityContractDeployer<'_> {
                 .collect::<Vec<String>>()
                 .join(",")
         });
+        let dir = self
+            .solidity_dir()
+            .join("script")
+            .join("DeployBFTBridge.sol");
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-        let binding = dir.display().to_string();
-        let dir = binding.as_str();
-        info!("Deploying Fee Charge contract in {}", dir);
-        let pk = self.wallet.signer().to_bytes().encode_hex_with_prefix();
+        info!("Deploying BFT contract in {}", dir.display());
+        let pk = self.pk();
+        let sender = self.sender();
 
-        let sender = self.wallet.address().encode_hex_with_prefix();
         let args = [
+            "forge",
             "script",
             "--target-contract",
             "DeployBFTBridge",
             "--broadcast",
             "-v",
-            dir,
+            dir.to_str().expect("Invalid solidity dir"),
             "--rpc-url",
             self.get_network_url(),
             "--private-key",
@@ -110,15 +127,11 @@ impl SolidityContractDeployer<'_> {
             &sender,
         ];
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
+        info!("Deploying BFT contract in {}", dir.display());
 
         debug!(
-            "Executing command: sh -c cd {} && forge {}",
-            dir,
+            "Executing command: sh -c cd {} &&  {}",
+            dir.display(),
             args.join(" ")
         );
 
@@ -129,7 +142,7 @@ impl SolidityContractDeployer<'_> {
             .env("FEE_CHARGE_ADDRESS", &fee_charge_address)
             .env("IS_WRAPPED_SIDE", &is_wrapped_side)
             .env("WRAPPED_TOKEN_DEPLOYER", &wrapped_token_deployer_address)
-            .arg(format!("cd {} && forge {} 2>&1", dir, args.join(" ")))
+            .arg(format!("cd {} && {} 2>&1", dir.display(), args.join(" ")))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -164,7 +177,7 @@ impl SolidityContractDeployer<'_> {
         // Extract the proxy address from the output
         let proxy_address = stdout
             .lines()
-            .find(|line| line.starts_with("BFT deployed to:"))
+            .find(|line| line.starts_with("Proxy address:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract BFT proxy address")?;
@@ -175,32 +188,43 @@ impl SolidityContractDeployer<'_> {
 
     /// Deploys WrappedTokenDeployer contract
     pub fn deploy_wrapped_token_deployer(&self) -> Result<H160> {
+        const WRAPPED_TOKEN_DEPLOYER_SCRIPT: &str = "DeployWrappedTokenDeployer.s.sol";
         info!("Deploying WrappedTokenDeployer contract");
-        let network = self.network.to_string();
+
+        let solidity_dir = self.solidity_dir();
+        let dir = solidity_dir
+            .join("script")
+            .join(WRAPPED_TOKEN_DEPLOYER_SCRIPT);
+
+        let script_dir = dir.to_str().expect("Invalid solidity dir");
 
         let args = [
-            "hardhat",
-            "deploy-wrapped-token-deployer",
-            "--network",
-            &network,
+            "forge",
+            "script",
+            "broadcast",
+            "-v",
+            script_dir,
+            "--rpc-url",
+            self.get_network_url(),
+            "--private-key",
+            &self.pk(),
+            "--sender",
+            &self.sender(),
         ];
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
-
         debug!(
-            "Executing command: sh -c cd {} && npx {}",
-            dir,
+            "Executing command: sh -c cd {} && {}",
+            solidity_dir.display(),
             args.join(" ")
         );
 
         let output = Command::new("sh")
             .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .arg(format!(
+                "cd {} && {}",
+                solidity_dir.display(),
+                args.join(" ")
+            ))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -260,43 +284,59 @@ impl SolidityContractDeployer<'_> {
             .map(H160::encode_hex_upper_with_prefix)
             .collect::<Vec<String>>()
             .join(",");
-        let network = self.network.to_string();
+
         let expected_address = expected_address.map(|addr| addr.encode_hex_upper_with_prefix());
 
-        let mut args = vec![
-            "hardhat",
-            "deploy-fee-charge",
-            "--network",
-            &network,
-            "--bridges",
-            &bridges,
+        let pk = self.pk();
+        let sender = self.sender();
+
+        let solidity_dir = self.solidity_dir();
+        let script_dir = solidity_dir.join("script").join("DeployFeeCharge.s.sol");
+
+        let args = [
+            "forge",
+            "script",
+            "--broadcast",
+            "-v",
+            script_dir.to_str().expect("Invalid solidity dir"),
+            "--rpc-url",
+            self.get_network_url(),
+            "--private-key",
+            &pk,
+            "--sender",
+            &sender,
         ];
 
-        if let Some(ref addr) = expected_address {
-            args.push("--expected-address");
-            args.push(addr)
-        }
-
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
+        info!(
+            "Deploying Fee Charge contract in {}",
+            solidity_dir.display()
+        );
 
         debug!(
-            "Executing command: sh -c cd {} && npx {}",
-            dir,
+            "Executing command: sh -c cd {} && {}",
+            solidity_dir.display(),
             args.join(" ")
         );
 
-        let output = Command::new("sh")
+        let mut sh = Command::new("sh");
+        let command = sh
             .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
+            .env("BRIDGES", &bridges)
+            .arg(format!(
+                "cd {} && {} 2>&1",
+                solidity_dir.display(),
+                args.join(" ")
+            ))
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        if let Some(expected_address) = expected_address {
+            command.env("EXPECTED_ADDRESS", &expected_address);
+        }
+
+        let output = command
             .output()
-            .context("Failed to execute deploy-bft command")?;
+            .context("Failed to execute deploy-fee-charge command")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

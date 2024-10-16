@@ -224,11 +224,11 @@ impl Commands {
 #[derive(Debug, Args)]
 pub struct BFTArgs {
     /// The address of the owner of the contract. Must be used with `--deploy-bft`.
-    #[arg(long, value_name = "OWNER", requires = "deploy_bft")]
+    #[arg(long, value_name = "OWNER")]
     owner: Option<H160>,
 
     /// The list of controllers for the contract. Must be used with `--deploy-bft`.
-    #[arg(long, value_name = "CONTROLLERS", requires = "deploy_bft")]
+    #[arg(long, value_name = "CONTROLLERS")]
     controllers: Option<Vec<H160>>,
 }
 
