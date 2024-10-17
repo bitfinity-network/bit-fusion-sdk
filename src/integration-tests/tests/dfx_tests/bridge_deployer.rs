@@ -105,6 +105,8 @@ test_deploy!(
     "rune_bridge.trycmd"
 );
 
+/// Change the current working directory to the workspace root
+/// And clean the openzeppelin folder
 fn init_workspace() -> anyhow::Result<PathBuf> {
     let cmd_output = Command::new("cargo")
         .args(["metadata", "--format-version=1"])
@@ -131,6 +133,7 @@ fn init_workspace() -> anyhow::Result<PathBuf> {
     Ok(PathBuf::from(path))
 }
 
+/// Restore the manifest directory as the current working directory
 fn restore_manifest_dir() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     std::env::set_current_dir(&manifest_dir).expect("failed to change cwd");
