@@ -6,6 +6,7 @@ use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedOrders, SignedOrdersData};
 use did::keccak;
 use eth_signer::sign_strategy::TransactionSigner;
+use ethers_core::types::RecoveryMessage;
 
 use super::BridgeService;
 
@@ -75,11 +76,20 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         }
 
         let signer = self.order_handler.get_signer()?;
+        let signing_address = signer.get_address().await.unwrap();
         let digest = keccak::keccak_hash(&orders_data);
         let signature = signer.sign_digest(digest.0 .0).await?;
-        let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
+        let signature = ethers_core::types::Signature::from(signature);
+        let signing_address1 = signature
+            .recover(RecoveryMessage::Data(orders_data.clone()))
+            .expect("failed to recover address");
+        let signature_bytes: [u8; 65] = signature.into();
 
-        log::trace!("Batch of {orders_number} mint orders signed");
+        log::trace!(
+            "Batch of {orders_number} mint orders signed with signing address 0x{} or 0x{}",
+            hex::encode(&signing_address.0),
+            hex::encode(&signing_address1)
+        );
 
         let signed_orders = SignedOrdersData {
             orders_data,
