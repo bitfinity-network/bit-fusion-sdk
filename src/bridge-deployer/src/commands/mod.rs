@@ -282,7 +282,7 @@ impl BFTArgs {
 
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
-        info!("BFT bridge deployed successfully. Contract address: {bft_address}");
+        info!("BFT bridge deployed successfully. Contract address: {bft_address:x}");
 
         Ok(BftDeployedContracts {
             bft_bridge: bft_address,
