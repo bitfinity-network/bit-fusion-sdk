@@ -94,6 +94,8 @@ impl SolidityContractDeployer<'_> {
     ) -> Result<H160> {
         info!("Deploying BFT contract");
 
+        const BFT_SCRIPT: &str = "DeployBFT.s.sol";
+
         let minter_address = minter_address.encode_hex_with_prefix();
         let fee_charge_address = fee_charge_address.encode_hex_with_prefix();
         let wrapped_token_deployer_address =
@@ -106,32 +108,26 @@ impl SolidityContractDeployer<'_> {
                 .collect::<Vec<String>>()
                 .join(",")
         });
-        let dir = self
-            .solidity_dir()
-            .join("script")
-            .join("DeployBFTBridge.sol");
+        let dir = self.solidity_dir();
+        let script_dir = dir.join("script").join(BFT_SCRIPT);
 
-        info!("Deploying BFT contract in {}", dir.display());
         let pk = self.pk();
         let sender = self.sender();
 
         let args = [
             "forge",
             "script",
-            "--target-contract",
-            "DeployBFTBridge",
             "--broadcast",
             "-v",
-            dir.to_str().expect("Invalid solidity dir"),
+            script_dir.to_str().expect("Invalid solidity dir"),
             "--rpc-url",
             self.get_network_url(),
             "--private-key",
             &pk,
             "--sender",
             &sender,
+            "--slow", // Use slow mode to avoid nonce issues (this sends transactions sequentially)
         ];
-
-        info!("Deploying BFT contract in {}", dir.display());
 
         debug!(
             "Executing command: sh -c cd {} &&  {}",
@@ -181,7 +177,7 @@ impl SolidityContractDeployer<'_> {
         // Extract the proxy address from the output
         let proxy_address = stdout
             .lines()
-            .find(|line| line.starts_with("Proxy address:"))
+            .find(|line| line.contains("Proxy address:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract BFT proxy address")?;
@@ -205,7 +201,7 @@ impl SolidityContractDeployer<'_> {
         let args = [
             "forge",
             "script",
-            "broadcast",
+            "--broadcast",
             "-v",
             script_dir,
             "--rpc-url",
@@ -255,7 +251,7 @@ impl SolidityContractDeployer<'_> {
         // Extract the fee charge address from the output
         let wrapped_token_deployer_address = stdout
             .lines()
-            .find(|line| line.starts_with("WrappedTokenDeployer address:"))
+            .find(|line| line.contains("WrappedTokenDeployer address:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract WrappedTokenDeployer address")?;
@@ -282,6 +278,8 @@ impl SolidityContractDeployer<'_> {
         expected_address: Option<H160>,
     ) -> Result<H160> {
         info!("Deploying Fee Charge contract");
+
+        const FEE_CHARGE_SCRIPT: &str = "DeployFeeCharge.s.sol";
         let bridges = bridges
             .iter()
             .map(H160::encode_hex_upper_with_prefix)
@@ -294,7 +292,7 @@ impl SolidityContractDeployer<'_> {
         let sender = self.sender();
 
         let solidity_dir = self.solidity_dir();
-        let script_dir = solidity_dir.join("script").join("DeployFeeCharge.s.sol");
+        let script_dir = solidity_dir.join("script").join(FEE_CHARGE_SCRIPT);
 
         let args = [
             "forge",
@@ -360,7 +358,7 @@ impl SolidityContractDeployer<'_> {
         // Extract the fee charge address from the output
         let fee_charge_address = stdout
             .lines()
-            .find(|line| line.starts_with("Fee charge address:"))
+            .find(|line| line.contains("Fee charge address:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract Fee Charge address")?;
@@ -378,8 +376,11 @@ impl SolidityContractDeployer<'_> {
         symbol: &str,
         decimals: u8,
     ) -> Result<H160> {
-        let owner = self.wallet.address();
+        info!("Deploying Wrapped ERC20 contract");
 
+        const WRAPPED_TOKEN_SCRIPT: &str = "DeployWrappedToken.s.sol";
+
+        let owner = self.wallet.address();
         let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
         let owner = owner.encode_hex_with_prefix();
         let decimals = decimals.to_string();
@@ -388,7 +389,7 @@ impl SolidityContractDeployer<'_> {
         let sender = self.sender();
 
         let solidity_dir = self.solidity_dir();
-        let script_dir = solidity_dir.join("script").join("DeployWrappedToken.s.sol");
+        let script_dir = solidity_dir.join("script").join(WRAPPED_TOKEN_SCRIPT);
 
         let args = [
             "forge",
@@ -452,7 +453,7 @@ impl SolidityContractDeployer<'_> {
         // Extract the fee charge address from the output
         let fee_charge_address = stdout
             .lines()
-            .find(|line| line.starts_with("ERC20 deployed at:"))
+            .find(|line| line.contains("ERC20 deployed at:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract ERC20 address")?;
