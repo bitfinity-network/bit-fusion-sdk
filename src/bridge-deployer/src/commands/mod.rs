@@ -344,8 +344,13 @@ impl BFTArgs {
             H160::default()
         };
 
+        let evm_address_method = if is_wrapped_side {
+            "get_bridge_canister_evm_address"
+        } else {
+            "get_bridge_canister_base_evm_address"
+        };
         let minter_address = canister_client
-            .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())
+            .update::<_, BftResult<did::H160>>(evm_address_method, ())
             .await?
             .context("failed to get the bridge canister address")?;
 

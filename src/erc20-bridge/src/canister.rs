@@ -22,6 +22,7 @@ use candid::Principal;
 use did::build::BuildData;
 use did::H160;
 use drop_guard::guard;
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
@@ -136,6 +137,14 @@ impl Erc20Bridge {
             .borrow()
             .operations
             .get_log(operation_id)
+    }
+
+    #[query]
+    pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
+        let signer = get_base_evm_config().borrow().get_signer()?;
+        signer.get_address().await.map_err(|e| {
+            Error::Initialization(format!("failed to get bridge canister address: {e}"))
+        })
     }
 
     /// Returns the build data of the canister
