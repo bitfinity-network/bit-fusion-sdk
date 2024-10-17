@@ -156,6 +156,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            error!("deploy-bft command failed: {}", args.join(" "));
             error!(
                 "deploy-bft command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
@@ -222,6 +223,10 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            error!(
+                "deploy-wrapped-token-deployer command failed: {}",
+                args.join(" ")
+            );
             error!(
                 "deploy-wrapped-token-deployer command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
@@ -319,6 +324,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            error!("deploy-fee-charge command failed: {}", args.join(" "));
             error!(
                 "deploy-fee-charge command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr
@@ -404,6 +410,7 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
+            error!("deploy-wrapped-token command failed: {}", args.join(" "));
             error!(
                 "deploy-wrapped-token command failed. Stdout:\n{}\nStderr:\n{}",
                 stdout, stderr

@@ -33,7 +33,7 @@ impl InitBridgeConfig {
                 key_id: self.signing_key_id.into(),
             },
             log_settings: self.log_settings.map(|v| ic_log::did::LogCanisterSettings {
-                enable_console: v.enable_console,
+                enable_console: Some(v.enable_console),
                 in_memory_records: v.in_memory_records,
                 max_record_length: v.max_record_length,
                 log_filter: v.log_filter,

@@ -1,12 +1,11 @@
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
+use std::process::Command;
 
 use candid::Principal;
 use eth_signer::{Signer as _, Wallet};
 
-use crate::{
-    context::{CanisterType, TestContext as _},
-    dfx_tests::DfxTestContext,
-};
+use crate::context::{CanisterType, TestContext as _};
+use crate::dfx_tests::DfxTestContext;
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
@@ -49,17 +48,30 @@ impl CommonCliArgs {
 }
 
 pub struct DeployCliArgs {
-    pub wasm_path: PathBuf,
+    pub brc20_bridge: PathBuf,
+    pub btc_bridge: PathBuf,
+    pub erc20_bridge: PathBuf,
+    pub icrc2_bridge: PathBuf,
+    pub rune_bridge: PathBuf,
     pub wallet_canister: String,
 }
 
 impl DeployCliArgs {
-    pub async fn new(ctx: &DfxTestContext, canister: CanisterType) -> Self {
-        let wasm_path = ctx.get_wasm_path(canister).await;
+    pub async fn new(ctx: &DfxTestContext) -> Self {
+        let brc20_bridge_wasm_path = ctx.get_wasm_path(CanisterType::Brc20Bridge).await;
+        let btc_bridge_wasm_path = ctx.get_wasm_path(CanisterType::BtcBridge).await;
+        let icrc2_bridge_wasm_path = ctx.get_wasm_path(CanisterType::Icrc2Bridge).await;
+        let rune_bridge_wasm_path = ctx.get_wasm_path(CanisterType::RuneBridge).await;
+        let erc_20_bridge_wasm_path = ctx.get_wasm_path(CanisterType::Erc20Bridge).await;
+
         let wallet_canister = Self::wallet_canister().to_text();
 
         Self {
-            wasm_path,
+            brc20_bridge: brc20_bridge_wasm_path,
+            btc_bridge: btc_bridge_wasm_path,
+            erc20_bridge: erc_20_bridge_wasm_path,
+            icrc2_bridge: icrc2_bridge_wasm_path,
+            rune_bridge: rune_bridge_wasm_path,
             wallet_canister,
         }
     }

@@ -62,7 +62,7 @@ impl From<LoggerPermission> for ic_log::did::LoggerPermission {
 pub struct LogCanisterSettings {
     #[arg(long)]
     /// Display logs in the console
-    pub enable_console: Option<bool>,
+    pub enable_console: bool,
     #[arg(long)]
     /// The number of records to keep in memory
     pub in_memory_records: Option<usize>,
