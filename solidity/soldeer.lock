@@ -18,3 +18,10 @@ version = "1.9.2"
 source = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_2_06-08-2024_17:31:25_forge-std-1.9.2.zip"
 checksum = "20fd008c7c69b6c737cc0284469d1c76497107bc3e004d8381f6d8781cb27980"
 integrity = "f49457fb6591f0dfd8b59e02e6eb4508a115ef08a86b0803feb0a3939d82d783"
+
+[[dependencies]]
+name = "openzeppelin-foundry-upgrades"
+version = "0.3.6"
+source = "https://soldeer-revisions.s3.amazonaws.com/openzeppelin-foundry-upgrades/0_3_6_24-09-2024_19:23:05_openzeppelin-foundry-upgrades.zip"
+checksum = "b1d80d9d925e1ac56dfaba7ec59fc6223073c846e71510e963ab1756ccc49ca7"
+integrity = "4c86e7d43ff517365dfb29362a1abc41f9556b65b97b753b1d2a1e0c6e63f513"
