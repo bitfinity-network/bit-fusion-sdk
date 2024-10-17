@@ -71,7 +71,13 @@ impl ConfigStorage {
             ],
         )
         .await
-        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
+        .map_err(|e| {
+            log::error!("failed to query evm params: {e}");
+
+            Error::EvmRequestFailed(format!("failed to query evm params: {e}"))
+        })?;
+
+        log::trace!("initializing evm params responses: {responses:?}");
 
         let gas_price: U256 = responses
             .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))

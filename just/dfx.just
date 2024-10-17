@@ -35,6 +35,7 @@ dfx_test test_name="": docker_down docker_pull docker_up dfx_start dfx_start_pro
   sleep 5
   ( 
     set +e
+    rm -rf solidity/.openzeppelin
     cargo test {{test_name}} -p integration-tests --features dfx_tests
   )
   TEST_RESULT=$?

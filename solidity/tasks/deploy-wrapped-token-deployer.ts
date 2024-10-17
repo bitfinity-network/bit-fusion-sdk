@@ -16,6 +16,14 @@ task(
     throw new Error('Please specify a network');
   }
 
+  if (
+    network === 'localhost' &&
+    process.env.LOCALHOST_URL &&
+    'url' in hre.network.config
+  ) {
+    hre.network.config.url = process.env.LOCALHOST_URL;
+  }
+
   const WrappedTokenDeployer = await hre.ethers.getContractFactory(
     'WrappedTokenDeployer',
   );

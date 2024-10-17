@@ -6,6 +6,7 @@ use clap::Parser;
 use ethereum_types::{H160, H256};
 use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
+use ic_canister_client::CanisterClient as _;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
 use tracing::{debug, info};
 
@@ -14,6 +15,7 @@ use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::commands::BftDeployedContracts;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
+use crate::evm::dfx_webserver_port;
 
 /// The default number of cycles to deposit to the canister
 const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
@@ -68,6 +70,7 @@ impl DeployCommands {
         identity: PathBuf,
         ic_host: &str,
         network: EvmNetwork,
+        evm: Principal,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
@@ -88,9 +91,34 @@ impl DeployCommands {
         let deployer =
             BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
         let canister_id = deployer
-            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
+            .install_wasm(
+                &self.wasm,
+                &self.bridge_type,
+                InstallMode::Install,
+                network,
+                evm,
+            )
             .await?;
 
+        // wait for canister to come up
+        let canister_client =
+            ic_canister_client::IcAgentClient::with_agent(canister_id, agent.clone());
+        let t_start = std::time::Instant::now();
+        while t_start.elapsed() < std::time::Duration::from_secs(60) {
+            if matches!(
+                canister_client
+                    .update::<_, bridge_did::error::BftResult<did::H160>>(
+                        "get_bridge_canister_evm_address",
+                        (),
+                    )
+                    .await,
+                Ok(Ok(_))
+            ) {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
         println!("Canister deployed with ID {canister_id}",);
 
         info!("Deploying BFT bridge");
@@ -99,7 +127,7 @@ impl DeployCommands {
             wrapped_token_deployer,
         } = self
             .bft_args
-            .deploy_bft(network, canister_id, &self.bridge_type, pk, &agent)
+            .deploy_bft(network, evm, canister_id, &self.bridge_type, pk, &agent)
             .await?;
 
         info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
@@ -108,7 +136,8 @@ impl DeployCommands {
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
         if matches!(&self.bridge_type, Bridge::Btc { .. }) {
             info!("Deploying wrapped BTC contract");
-            let wrapped_btc_addr = self.deploy_wrapped_btc(network, pk, &wrapped_token_deployer)?;
+            let wrapped_btc_addr =
+                self.deploy_wrapped_btc(network, evm, pk, &wrapped_token_deployer)?;
 
             info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr}");
             println!("Wrapped BTC contract deployed with address {wrapped_btc_addr}");
@@ -142,10 +171,18 @@ impl DeployCommands {
     fn deploy_wrapped_btc(
         &self,
         network: EvmNetwork,
+        evm: Principal,
         pk: H256,
         wrapped_token_deployer: &H160,
     ) -> anyhow::Result<H160> {
-        let contract_deployer = SolidityContractDeployer::new(network, pk);
+        let evm_localhost_url = match network {
+            EvmNetwork::Localhost => Some(format!(
+                "http://127.0.0.1:{}/?canisterId={evm}",
+                dfx_webserver_port(),
+            )),
+            _ => None,
+        };
+        let contract_deployer = SolidityContractDeployer::new(network, pk, evm_localhost_url);
 
         contract_deployer.deploy_wrapped_token(
             wrapped_token_deployer,
