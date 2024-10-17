@@ -186,14 +186,14 @@ impl Bridge {
                     .deploy_bft(network, bridge_principal, pk, &agent, false)
                     .await?;
 
-                println!("Base BFT bridge deployed with address {bft_address}");
+                println!("Base BFT bridge deployed with address {bft_address:?}");
 
                 let client = Erc20BridgeClient::new(IcAgentClient::with_agent(
                     bridge_principal,
                     agent.clone(),
                 ));
                 client
-                    .set_base_bft_bridge_contract(&bft_address.into())
+                    .set_base_bft_bridge_contract(&bft_address.bft_bridge.into())
                     .await?;
 
                 println!("Bridge canister configured with base BFT bridge contract address");
@@ -258,8 +258,8 @@ pub struct BFTArgs {
     /// This argument cannot be used together with `--use-bft`.
     #[arg(
         long,
-        conflicts_with = "existing",
-        required_unless_present = "existing"
+        conflicts_with = "existing_bft_bridge",
+        required_unless_present = "existing_bft_bridge"
     )]
     deploy_bft: bool,
 
@@ -292,6 +292,7 @@ pub struct BFTArgs {
     existing_wrapped_token_deployer: Option<H160>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BftDeployedContracts {
     pub bft_bridge: H160,
     pub wrapped_token_deployer: H160,
@@ -321,7 +322,12 @@ impl BFTArgs {
 
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
-        let expected_nonce = contract_deployer.get_nonce().await? + 2;
+        let nonce_increment = match is_wrapped_side {
+            true => 3,
+            false => 2, // we don't deploy token deployer for base EVM
+        };
+        let expected_nonce = contract_deployer.get_nonce().await? + nonce_increment;
+
         println!("Expected nonce: {expected_nonce}");
         let expected_fee_charge_address =
             contract_deployer.compute_fee_charge_address(expected_nonce)?;
@@ -332,7 +338,11 @@ impl BFTArgs {
         // Sleep for 1 second to allow the canister to be created
         tokio::time::sleep(Duration::from_secs(5)).await;
 
-        let wrapped_token_deployer = contract_deployer.deploy_wrapped_token_deployer()?;
+        let wrapped_token_deployer = if is_wrapped_side {
+            contract_deployer.deploy_wrapped_token_deployer()?
+        } else {
+            H160::default()
+        };
 
         let minter_address = canister_client
             .update::<_, BftResult<did::H160>>("get_bridge_canister_evm_address", ())

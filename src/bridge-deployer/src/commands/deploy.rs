@@ -99,7 +99,7 @@ impl DeployCommands {
             wrapped_token_deployer,
         } = self
             .bft_args
-            .deploy_bft(network.into(), canister_id, &self.bridge_type, pk, &agent, true)
+            .deploy_bft(network.into(), canister_id, pk, &agent, true)
             .await?;
 
         info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
@@ -155,7 +155,7 @@ impl DeployCommands {
         pk: H256,
         wrapped_token_deployer: &H160,
     ) -> anyhow::Result<H160> {
-        let contract_deployer = SolidityContractDeployer::new(network, pk);
+        let contract_deployer = SolidityContractDeployer::new(network.into(), pk);
 
         contract_deployer.deploy_wrapped_token(
             wrapped_token_deployer,
