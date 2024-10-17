@@ -120,7 +120,7 @@ pub trait OperationContext {
         let events = BridgeEvent::collect(
             &client,
             evm_params.next_block,
-            last_chain_block,
+            last_request_block,
             bridge_contract.0,
         )
         .await?;
