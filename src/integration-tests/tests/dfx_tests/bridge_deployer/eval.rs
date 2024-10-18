@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use lazy_regex::{lazy_regex, Lazy, Regex};
@@ -20,13 +19,7 @@ static VAR_REGEX: Lazy<Regex> = lazy_regex!(r"\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?")
 /// - `p` - The path to the directory containing the trycmd files
 /// - `output_dir` - The directory to write the evaluated trycmd files
 /// - `glob` - The glob pattern to match the trycmd files
-pub fn eval_trycmd<'a, V>(
-    vars: V,
-    vars_by_file: &HashMap<&str, HashMap<&str, String>>,
-    p: &Path,
-    output_dir: &Path,
-    glob: &str,
-) -> anyhow::Result<()>
+pub fn eval_trycmd<'a, V>(vars: V, p: &Path, output_dir: &Path, glob: &str) -> anyhow::Result<()>
 where
     V: std::iter::IntoIterator<Item = (&'a str, String)>,
 {
@@ -48,19 +41,7 @@ where
             // read file
             let content = std::fs::read_to_string(&path)?;
             // replace vars
-            let mut content = replace_vars(&content, &vars);
-
-            let file_vars = vars_by_file
-                .get(filename)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            if !file_vars.is_empty() {
-                content = replace_vars(&content, file_vars.as_slice());
-                println!("{content}");
-            }
+            let content = replace_vars(&content, &vars);
 
             // get out file path
             let basename = path
@@ -83,59 +64,15 @@ where
 fn replace_vars(content: &str, vars: &[(&str, String)]) -> String {
     VAR_REGEX
         .replace_all(content, |caps: &lazy_regex::Captures| {
-            let as_is = caps.get(0).unwrap().as_str().to_string();
             let var_name = caps.get(1).unwrap().as_str();
-            vars.iter()
+            match vars
+                .iter()
                 .find(|(name, _)| name == &var_name)
                 .map(|(_, value)| value.to_string())
-                .unwrap_or(as_is)
+            {
+                Some(value) => value,
+                None => panic!("Variable `{var_name}` not found"),
+            }
         })
         .to_string()
-}
-
-/// A macro to create a [`HashMap<&str, HashMap<&str, String>>`] from a list of variables
-///
-/// The syntax is: `vars_by_file! { "file_name" => { "VAR_NAME" => "value", "VAR_NAME2" => "value" }, "file_name_2" => { ... } }`
-///
-/// ### Example
-///
-/// ```rust
-/// let vars = vars_by_file! { "foo" => { "WASM" => "foo.wasm", "PATH" => "/tmp" }, "bar" => { "WASM" => "bar.wasm" } };
-/// let foo_vars = vars.get("foo").unwrap();
-///
-/// assert_eq!(foo_vars.get("WASM").unwrap().as_str(), "foo.wasm");
-/// assert_eq!(foo_vars.get("PATH").unwrap().as_str(), "/tmp");
-/// let bar_vars = vars.get("bar").unwrap();
-/// assert_eq!(bar_vars.get("WASM").unwrap().as_str(), "bar.wasm");
-/// ```
-#[macro_export]
-macro_rules! vars_by_file {
-    ($($file:expr => { $($var:expr => $val:expr),* $(,)? }),* $(,)?) => {
-        {
-            let mut map = std::collections::HashMap::new();
-            $(
-                let mut vars = std::collections::HashMap::new();
-                $(
-                    vars.insert($var, $val.to_string());
-                )*
-                map.insert($file, vars);
-            )*
-            map
-        }
-    };
-}
-
-#[cfg(test)]
-mod test {
-
-    #[test]
-    fn test_macro_vars_by_file() {
-        let vars = vars_by_file! { "foo" => { "WASM" => "foo.wasm", "PATH" => "/tmp" }, "bar" => { "WASM" => "bar.wasm" } };
-        let foo_vars = vars.get("foo").unwrap();
-
-        assert_eq!(foo_vars.get("WASM").unwrap().as_str(), "foo.wasm");
-        assert_eq!(foo_vars.get("PATH").unwrap().as_str(), "/tmp");
-        let bar_vars = vars.get("bar").unwrap();
-        assert_eq!(bar_vars.get("WASM").unwrap().as_str(), "bar.wasm");
-    }
 }

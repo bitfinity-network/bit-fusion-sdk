@@ -1,12 +1,14 @@
 mod evm_rpc_canister;
 pub mod stress;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
+use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
+use bridge_did::init::btc::BitcoinConnection;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedOrders;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
@@ -25,6 +27,7 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_kit::mock_principals::alice;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -48,7 +51,7 @@ use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::evm_link::EvmLink;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, BtcBridgeConfig, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
 
@@ -1103,10 +1106,52 @@ pub trait TestContext {
                 .unwrap();
             }
             CanisterType::BtcBridge => {
-                todo!()
+                println!(
+                    "Installing default BTC bridge canister with Principal {}",
+                    self.canisters().btc_bridge()
+                );
+                let init_data = btc_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                    self.canisters().ck_btc_minter(),
+                    self.canisters().icrc1_ledger(),
+                );
+
+                self.install_canister(self.canisters().btc_bridge(), wasm, (init_data,))
+                    .await
+                    .unwrap();
             }
-            CanisterType::Brc20Bridge => {}
-            CanisterType::RuneBridge => {}
+            CanisterType::Brc20Bridge => {
+                println!(
+                    "Installing default BRC20 bridge canister with Principal {}",
+                    self.canisters().brc20_bridge()
+                );
+                let init_data = brc20_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                );
+
+                self.install_canister(self.canisters().brc20_bridge(), wasm, init_data)
+                    .await
+                    .unwrap();
+            }
+            CanisterType::RuneBridge => {
+                println!(
+                    "Installing default Rune bridge canister with Principal {}",
+                    self.canisters().rune_bridge()
+                );
+                let init_data = rune_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                );
+
+                self.install_canister(self.canisters().rune_bridge(), wasm, init_data)
+                    .await
+                    .unwrap();
+            }
         }
     }
 
@@ -1244,6 +1289,72 @@ pub fn erc20_bridge_canister_init_data(
             ..Default::default()
         }),
     }
+}
+
+pub fn btc_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+    ckbtc_minter: Principal,
+    ckbtc_ledger: Principal,
+) -> BtcBridgeConfig {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    BtcBridgeConfig {
+        init_data,
+        network: BitcoinConnection::Custom {
+            network: BitcoinNetwork::Regtest,
+            ckbtc_minter,
+            ckbtc_ledger,
+            ledger_fee: 1_000,
+        },
+    }
+}
+
+pub fn rune_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> (BridgeInitData, RuneBridgeConfig) {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    (
+        init_data,
+        RuneBridgeConfig {
+            network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
+            min_confirmations: 1,
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://localhost:8001".to_string(),
+            }],
+            deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
+        },
+    )
+}
+
+pub fn brc20_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> (BridgeInitData, Brc20BridgeConfig) {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    (
+        init_data,
+        Brc20BridgeConfig {
+            network: BitcoinNetwork::Regtest,
+            min_confirmations: 1,
+            indexer_urls: vec!["https://localhost:8001".to_string()]
+                .into_iter()
+                .collect::<HashSet<String>>(),
+            schnorr_key_id: SchnorrKeyIds::TestKey1,
+            deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
+        },
+    )
 }
 
 pub fn evm_canister_init_data(
@@ -1471,12 +1582,30 @@ impl CanisterType {
 
     /// Bridge deployer test set
     /// EVM, SignatureVerification, Icrc1Ledger (ckbtc ledger), CkBtcMinter, Kyt
-    pub const BRIDGE_DEPLOYER_TEST_SET: [CanisterType; 5] = [
+    pub const BRIDGE_DEPLOYER_INSTALL_TEST_SET: [CanisterType; 5] = [
         CanisterType::Evm,
         CanisterType::Signature,
         CanisterType::Kyt,
         CanisterType::Icrc1Ledger,
         CanisterType::CkBtcMinter,
+    ];
+
+    /// Bridge deployer upgrade test
+    ///
+    /// includes all of them
+    pub const BRIDGE_DEPLOYER_UPGRADE_TEST_SET: [CanisterType; 12] = [
+        CanisterType::Evm,
+        CanisterType::Signature,
+        CanisterType::EvmRpcCanister,
+        CanisterType::ExternalEvm,
+        CanisterType::Kyt,
+        CanisterType::Icrc1Ledger,
+        CanisterType::CkBtcMinter,
+        CanisterType::Icrc2Bridge,
+        CanisterType::Erc20Bridge,
+        CanisterType::BtcBridge,
+        CanisterType::RuneBridge,
+        CanisterType::Brc20Bridge,
     ];
 
     /// EVM, SignatureVerification, Icrc2Bridge and Token1.

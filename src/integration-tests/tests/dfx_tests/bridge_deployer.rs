@@ -9,11 +9,10 @@ use tempfile::TempDir;
 
 use super::DfxTestContext;
 use crate::context::{CanisterType, TestContext};
-use crate::vars_by_file;
 
-async fn setup() -> DfxTestContext {
+async fn setup(canister_set: &[CanisterType]) -> DfxTestContext {
     restore_manifest_dir();
-    DfxTestContext::new(&CanisterType::BRIDGE_DEPLOYER_TEST_SET).await
+    DfxTestContext::new(canister_set).await
 }
 
 macro_rules! test_deploy {
@@ -22,7 +21,7 @@ macro_rules! test_deploy {
         #[serial_test::serial]
         #[cfg(feature = "dfx_tests")]
         async fn $test_name() {
-            let ctx = setup().await;
+            let ctx = setup(&CanisterType::BRIDGE_DEPLOYER_INSTALL_TEST_SET).await;
 
             let CommonCliArgs {
                 evm: evm_principal,
@@ -31,7 +30,11 @@ macro_rules! test_deploy {
             } = CommonCliArgs::new(&ctx).await;
 
             let DeployCliArgs {
-                $bridge_name: bridge_name,
+                brc20_bridge,
+                btc_bridge,
+                erc20_bridge,
+                icrc2_bridge,
+                rune_bridge,
                 wallet_canister,
                 ..
             } = DeployCliArgs::new(&ctx).await;
@@ -54,10 +57,12 @@ macro_rules! test_deploy {
                     ("EVM_PRINCIPAL", evm_principal.to_string()),
                     ("CKBTC_LEDGER", ckbtc_ledger.to_string()),
                     ("CKBTC_MINTER", ckbtc_minter.to_string()),
+                    ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
+                    ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
+                    ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
+                    ("ICRC2_BRIDGE_WASM_PATH", icrc2_bridge.display().to_string()),
+                    ("RUNE_BRIDGE_WASM_PATH", rune_bridge.display().to_string()),
                 ],
-                &vars_by_file! {
-                    $trycmd_file => { "WASM_PATH" => bridge_name.display() },
-                },
                 Path::new("./tests/bridge_deployer/deploy"),
                 trycmd_output_dir.path(),
                 $trycmd_file,
@@ -104,6 +109,75 @@ test_deploy!(
     test_should_deploy_rune_bridge,
     "rune_bridge.trycmd"
 );
+
+#[tokio::test]
+#[serial_test::serial]
+#[cfg(feature = "dfx_tests")]
+async fn test_should_update_bridge() {
+    let ctx = setup(&CanisterType::BRIDGE_DEPLOYER_UPGRADE_TEST_SET).await;
+
+    let CommonCliArgs {
+        evm: evm_principal,
+        private_key,
+        identity_path,
+    } = CommonCliArgs::new(&ctx).await;
+
+    let DeployCliArgs {
+        brc20_bridge,
+        btc_bridge,
+        erc20_bridge,
+        icrc2_bridge,
+        rune_bridge,
+        ..
+    } = DeployCliArgs::new(&ctx).await;
+
+    let admin_principal = ctx.admin().to_text();
+
+    let brc20_bridge_id = ctx.canisters().brc20_bridge().to_text();
+    let btc_bridge_id = ctx.canisters().btc_bridge().to_text();
+    let erc20_bridge_id = ctx.canisters().erc20_bridge().to_text();
+    let icrc2_bridge_id = ctx.canisters().icrc2_bridge().to_text();
+    let rune_bridge_id = ctx.canisters().rune_bridge().to_text();
+
+    // get the output dir for evaluated trycmd files
+    let trycmd_output_dir = TempDir::new().expect("failed to create temp file");
+
+    // eval the trycmd files
+    eval::eval_trycmd(
+        [
+            ("IDENTITY_PATH", identity_path.display().to_string()),
+            ("PRIVATE_KEY", private_key.to_string()),
+            ("ADMIN_PRINCIPAL", admin_principal.to_string()),
+            ("EVM_PRINCIPAL", evm_principal.to_string()),
+            ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
+            ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
+            ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
+            ("ICRC2_BRIDGE_WASM_PATH", icrc2_bridge.display().to_string()),
+            ("RUNE_BRIDGE_WASM_PATH", rune_bridge.display().to_string()),
+            ("BRC20_BRIDGE_ID", brc20_bridge_id.to_string()),
+            ("BTC_BRIDGE_ID", btc_bridge_id.to_string()),
+            ("ERC20_BRIDGE_ID", erc20_bridge_id.to_string()),
+            ("ICRC2_BRIDGE_ID", icrc2_bridge_id.to_string()),
+            ("RUNE_BRIDGE_ID", rune_bridge_id.to_string()),
+        ],
+        Path::new("./tests/bridge_deployer/upgrade"),
+        trycmd_output_dir.path(),
+        "*.trycmd",
+    )
+    .expect("failed to eval trycmd files");
+
+    // change cwd to workspace root
+    init_workspace().expect("failed to get workspace root");
+
+    let case = format!("{}/*.eval.trycmd", trycmd_output_dir.path().display());
+    trycmd::TestCases::new().case(&case).run();
+
+    // restore the manifest dir
+    // otherwise other tests may start in the wrong directory
+    restore_manifest_dir();
+
+    trycmd_output_dir.close().expect("failed to close temp dir");
+}
 
 /// Change the current working directory to the workspace root
 /// And clean the openzeppelin folder
