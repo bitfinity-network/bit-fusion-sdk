@@ -203,8 +203,7 @@ pub async fn get_path_to_file(file_name: &str) -> PathBuf {
 }
 
 pub async fn get_wasm_path(file_name: &str) -> PathBuf {
-    let path = get_path_to_file(file_name).await;
-    path
+    get_path_to_file(file_name).await
 }
 
 async fn check_file_exists(path: &Path) -> bool {

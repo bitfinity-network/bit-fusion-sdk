@@ -295,7 +295,7 @@ fn init_workspace() -> anyhow::Result<PathBuf> {
         .and_then(|x| x.as_str())
         .ok_or_else(|| anyhow::anyhow!("Failed to get workspace root"))?;
 
-    std::env::set_current_dir(&path).expect("failed to change cwd");
+    std::env::set_current_dir(path).expect("failed to change cwd");
 
     // delete `.openzeppelin`; this is necessary because the `openzeppelin` folder
     // causes some complaints when running the tests with a 'contract not found error'
