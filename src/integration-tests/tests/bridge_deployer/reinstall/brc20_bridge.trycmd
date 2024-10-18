@@ -1,0 +1,6 @@
+```
+$ bridge-deployer -v --evm-network localhost --evm $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH reinstall --bft-bridge $BFT_BRIDGE --canister-id $BRC20_BRIDGE_ID --wasm $BRC20_BRIDGE_WASM_PATH brc20 --owner $ADMIN_PRINCIPAL --min-confirmations 6 --indexer-urls "https://indexer1.com,https://indexer2.com,https://indexer3.com" --deposit-fee 1000000 --mempool-timeout 3600 --signing-key-id dfx --bitcoin-network regtest --indexer-consensus-threshold 3 --enable-console --log-filter trace
+Starting Bitfinity Deployer v[..]
+Canister brc20-bridge reinstalled with ID [..]
+
+```

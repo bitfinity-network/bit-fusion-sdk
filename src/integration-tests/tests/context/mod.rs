@@ -1580,34 +1580,6 @@ impl CanisterType {
     /// EVM and SignatureVerification.
     pub const EVM_TEST_SET: [CanisterType; 2] = [CanisterType::Evm, CanisterType::Signature];
 
-    /// Bridge deployer test set
-    /// EVM, SignatureVerification, Icrc1Ledger (ckbtc ledger), CkBtcMinter, Kyt
-    pub const BRIDGE_DEPLOYER_INSTALL_TEST_SET: [CanisterType; 5] = [
-        CanisterType::Evm,
-        CanisterType::Signature,
-        CanisterType::Kyt,
-        CanisterType::Icrc1Ledger,
-        CanisterType::CkBtcMinter,
-    ];
-
-    /// Bridge deployer upgrade test
-    ///
-    /// includes all of them
-    pub const BRIDGE_DEPLOYER_UPGRADE_TEST_SET: [CanisterType; 12] = [
-        CanisterType::Evm,
-        CanisterType::Signature,
-        CanisterType::EvmRpcCanister,
-        CanisterType::ExternalEvm,
-        CanisterType::Kyt,
-        CanisterType::Icrc1Ledger,
-        CanisterType::CkBtcMinter,
-        CanisterType::Icrc2Bridge,
-        CanisterType::Erc20Bridge,
-        CanisterType::BtcBridge,
-        CanisterType::RuneBridge,
-        CanisterType::Brc20Bridge,
-    ];
-
     /// EVM, SignatureVerification, Icrc2Bridge and Token1.
     pub const ICRC2_MINTER_TEST_SET: [CanisterType; 4] = [
         CanisterType::Evm,

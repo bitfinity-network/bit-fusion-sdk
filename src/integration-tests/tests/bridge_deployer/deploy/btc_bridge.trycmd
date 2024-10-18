@@ -3,6 +3,6 @@ $ bridge-deployer -v --evm-network localhost --evm $EVM_PRINCIPAL --private-key 
 Starting Bitfinity Deployer v[..]
 Canister deployed with ID [..]
 BFT bridge deployed with address [..]; wrapped_token_deployer: [..]
-Canister rune-bridge deployed with ID [..]
+Canister btc-bridge deployed with ID [..]
 
 ```
