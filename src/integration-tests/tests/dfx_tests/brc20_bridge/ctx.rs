@@ -10,23 +10,17 @@ use brc20_bridge::ops::Brc20DepositRequestData;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::event_data::MinterNotificationType;
-use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
-use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
-use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_log::did::LogCanisterSettings;
 use ord_rs::Utxo;
 use tokio::time::Instant;
 
@@ -36,7 +30,6 @@ use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::token_amount::TokenAmount;
-use crate::utils::wasm::get_brc20_bridge_canister_bytecode;
 
 /// Maximum supply of the BRC20 token
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
@@ -204,40 +197,6 @@ impl Brc20Context {
             .unwrap();
 
         let bridge = context.canisters().brc20_bridge();
-
-        let init_args = BridgeInitData {
-            evm_link: EvmLink::Ic(context.canisters().evm()),
-            signing_strategy: SigningStrategy::ManagementCanister {
-                key_id: SigningKeyId::Dfx,
-            },
-            owner: context.admin(),
-            log_settings: Some(LogCanisterSettings {
-                enable_console: Some(true),
-                in_memory_records: None,
-                log_filter: Some("trace".to_string()),
-                ..Default::default()
-            }),
-        };
-
-        // configure brc20
-        let brc20_args = Brc20BridgeConfig {
-            network: BitcoinNetwork::Regtest,
-            min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
-            deposit_fee: 500_000,
-            mempool_timeout: Duration::from_secs(60),
-            indexer_consensus_threshold: 1,
-            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
-        };
-
-        context
-            .install_canister(
-                bridge,
-                get_brc20_bridge_canister_bytecode().await,
-                (init_args, brc20_args),
-            )
-            .await
-            .unwrap();
 
         let _: () = context
             .client(bridge, ADMIN)

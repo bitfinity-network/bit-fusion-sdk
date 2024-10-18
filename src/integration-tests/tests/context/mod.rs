@@ -1346,13 +1346,11 @@ pub fn brc20_bridge_canister_init_data(
         Brc20BridgeConfig {
             network: BitcoinNetwork::Regtest,
             min_confirmations: 1,
-            indexer_urls: vec!["https://localhost:8001".to_string()]
-                .into_iter()
-                .collect::<HashSet<String>>(),
-            schnorr_key_id: SchnorrKeyIds::TestKey1,
+            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
+            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
         },
     )
 }
