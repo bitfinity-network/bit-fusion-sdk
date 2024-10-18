@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::ServiceOrder;
@@ -27,8 +28,8 @@ use ic_storage::IcStorage;
 use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
 use crate::ops::{
-    Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler, SEND_MINT_TX_SERVICE_ID,
-    SIGN_MINT_ORDER_SERVICE_ID,
+    Brc20BftEventsHandler, Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler,
+    FETCH_BFT_EVENTS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::Brc20State;
 
@@ -167,17 +168,27 @@ pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
 }
 
 fn init_runtime() -> SharedRuntime {
-    let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state();
+    let runtime = Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    let state = runtime.borrow().state().clone();
+    let config = state.borrow().config.clone();
 
     let sign_orders_handler =
-        Brc20MintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+        Brc20MintOrderHandler::new(state.clone(), runtime.borrow().scheduler().clone());
     let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
 
     let mint_tx_handler = Brc20MintTxHandler::new(state.clone());
     let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
+    let bft_events_handler = Brc20BftEventsHandler::new(runtime.clone());
+    let fetch_bft_events_service =
+        Rc::new(FetchBftBridgeEventsService::new(bft_events_handler, config));
+
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_BFT_EVENTS_SERVICE_ID,
+        fetch_bft_events_service,
+    );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
@@ -189,7 +200,7 @@ fn init_runtime() -> SharedRuntime {
         mint_tx_service,
     );
 
-    Rc::new(RefCell::new(runtime))
+    runtime
 }
 
 impl Metrics for Brc20Bridge {
@@ -205,7 +216,7 @@ impl LogCanister for Brc20Bridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime = init_runtime();

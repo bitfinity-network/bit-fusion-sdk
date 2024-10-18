@@ -1,9 +1,10 @@
+mod events_handler;
 mod mint_order_handler;
 mod mint_tx_handler;
 
 use std::cell::RefCell;
 
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
@@ -12,8 +13,7 @@ use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::order::{MintOrder, SignedOrders};
-use bridge_did::reason::BtcDeposit;
-use candid::{CandidType, Decode, Principal};
+use candid::{CandidType, Principal};
 use did::H160;
 use ic_canister::virtual_canister_call;
 use ic_exports::ic_kit::ic;
@@ -24,6 +24,7 @@ use ic_task_scheduler::task::TaskOptions;
 use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
+pub use self::events_handler::BtcEventsHandler;
 pub use self::mint_order_handler::BtcMintOrderHandler;
 pub use self::mint_tx_handler::BtcMintTxHandler;
 use crate::canister::{eth_address_to_subaccount, get_state};
@@ -179,60 +180,6 @@ impl Operation for BtcBridgeOpImpl {
             | BtcBridgeOp::ConfirmErc20Mint { .. }
             | BtcBridgeOp::Erc20MintConfirmed(_) => None,
         }
-    }
-
-    async fn on_wrapped_token_minted(
-        _ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
-        log::trace!("wrapped token minted");
-        Some(OperationAction::Update {
-            nonce: event.nonce,
-            update_to: Self(BtcBridgeOp::Erc20MintConfirmed(event)),
-        })
-    }
-
-    async fn on_wrapped_token_burnt(
-        _ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
-        log::trace!("wrapped token burnt");
-        let memo = event.memo();
-        Some(OperationAction::Create(
-            Self(BtcBridgeOp::WithdrawBtc(event)),
-            memo,
-        ))
-    }
-
-    async fn on_minter_notification(
-        _ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<bridge_canister::bridge::OperationAction<Self>> {
-        log::trace!(
-            "got minter notification with type: {}",
-            event.notification_type
-        );
-        let mut btc_deposit = match Decode!(&event.user_data, BtcDeposit) {
-            Ok(icrc_burn) => icrc_burn,
-            Err(e) => {
-                log::warn!("failed to decode BftBridge notification into BtcDeposit: {e}");
-                return None;
-            }
-        };
-
-        // Approve tokens only if the burner owns recipient wallet.
-        if event.tx_sender != btc_deposit.recipient {
-            btc_deposit.approve_after_mint = None;
-        }
-
-        let memo = event.memo();
-
-        Some(OperationAction::Create(
-            Self(BtcBridgeOp::UpdateCkBtcBalance {
-                eth_address: btc_deposit.recipient,
-            }),
-            memo,
-        ))
     }
 }
 

@@ -4,13 +4,17 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use bridge_did::error::BftResult;
+use bridge_did::error::{BftResult, Error};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
+use bridge_utils::evm_bridge::EvmParams;
+use did::H160;
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
 
 use self::config::ConfigStorage;
 use super::service::{ServiceId, Services};
-use crate::bridge::Operation;
+use crate::bridge::{Operation, OperationContext};
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
 
@@ -90,6 +94,26 @@ impl<Op: Operation> State<Op> {
     }
 }
 
+impl OperationContext for SharedConfig {
+    fn get_evm_link(&self) -> EvmLink {
+        self.borrow().get_evm_link()
+    }
+
+    fn get_bridge_contract_address(&self) -> BftResult<H160> {
+        self.borrow().get_bft_bridge_contract().ok_or_else(|| {
+            Error::Initialization("bft bridge contract expected to be initialized".to_string())
+        })
+    }
+
+    fn get_evm_params(&self) -> BftResult<EvmParams> {
+        self.borrow().get_evm_params()
+    }
+
+    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+        self.borrow().get_signer()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bridge_did::error::BftResult;
@@ -121,27 +145,6 @@ mod tests {
         }
 
         fn evm_wallet_address(&self) -> did::H160 {
-            unimplemented!()
-        }
-
-        async fn on_wrapped_token_minted(
-            _ctx: RuntimeState<Self>,
-            _event: bridge_did::event_data::MintedEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
-            unimplemented!()
-        }
-
-        async fn on_wrapped_token_burnt(
-            _ctx: RuntimeState<Self>,
-            _event: bridge_did::event_data::BurntEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
-            unimplemented!()
-        }
-
-        async fn on_minter_notification(
-            _ctx: RuntimeState<Self>,
-            _event: bridge_did::event_data::NotifyMinterEventData,
-        ) -> Option<crate::bridge::OperationAction<Self>> {
             unimplemented!()
         }
     }

@@ -65,8 +65,7 @@ impl MintOrderHandler for BtcMintOrderHandler {
             .update(id, new_op.clone());
 
         if let Some(options) = scheduling_options {
-            let scheduled_task =
-                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            let scheduled_task = ScheduledTask::with_options(BridgeTask::new(id, new_op), options);
             self.scheduler.append_task(scheduled_task);
         }
     }

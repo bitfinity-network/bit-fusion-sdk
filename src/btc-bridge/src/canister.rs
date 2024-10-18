@@ -37,7 +37,7 @@ use crate::ops::{
 };
 use crate::state::State;
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<BtcBridgeOpImpl>>>;
 
 #[derive(Canister, Clone, Debug)]
 pub struct BtcBridge {
