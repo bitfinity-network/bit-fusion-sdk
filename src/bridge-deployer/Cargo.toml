@@ -14,6 +14,7 @@ eth-signer = { workspace = true, features = ["ic_sign"] }
 ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
+hex = { workspace = true }
 ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
@@ -29,3 +30,6 @@ tracing-subscriber = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[features]
+dfx_tests = []

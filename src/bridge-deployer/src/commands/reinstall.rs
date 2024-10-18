@@ -48,6 +48,7 @@ impl ReinstallCommands {
         identity: PathBuf,
         ic_host: &str,
         network: EvmNetwork,
+        evm: Principal,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
@@ -81,6 +82,7 @@ impl ReinstallCommands {
                 &self.bridge_type,
                 InstallMode::Reinstall,
                 network,
+                evm,
             )
             .await?;
 

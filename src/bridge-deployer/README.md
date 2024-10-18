@@ -60,21 +60,22 @@ For the deployment, you will need to provide the wallet canister id as `--wallet
 ```bash
 ./bridge-deployer
   -vvv \
+  --evm-network localhost \
+  --private-key <PRIVATE_KEY> \
+  --identity path/to/identity.pem \
+  --evm <EVM_PRINCIPAL> \
   deploy \
   --wasm path/to/rune_bridge.wasm \
-    rune \
-  --identity path/to/identity.pem \
-  --private-key <PRIVATE_KEY> \
-  --evm-network localhost \
-  --admin <ADMIN_PRINCIPAL> \
+  --wallet-canister <WALLET_CANISTER> \
+  rune \
+  --owner <ADMIN_PRINCIPAL> \
   --min-confirmations 6 \
-  --no-of-indexers 3 \
   --indexer-urls <https://indexer1.com,https://indexer2.com,https://indexer3.com> \
   --deposit-fee 1000000 \
   --mempool-timeout 3600 \
   --signing-key-id dfx \
-  --wallet-canister <WALLET_CANISTER> \
-  --evm-principal <EVM_PRINCIPAL>
+  --bitcoin-network <bitcoin_network> \
+  --indexer-consensus-threshold 3
 ```
 
 For the other bridge types, the command is similar to the one above, with the necessary arguments for the specific bridge type. Check the help command for more information on the arguments required for each bridge type.
