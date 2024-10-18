@@ -5,14 +5,12 @@ mod mint_tx_handler;
 mod withdraw;
 
 use bitcoin::Network;
-use bridge_canister::bridge::{Operation, OperationAction, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::{
-    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
-};
+use bridge_did::event_data::{MinterNotificationType, NotifyMinterEventData};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{
     Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest,
@@ -29,7 +27,6 @@ pub use self::events_handler::Brc20BftEventsHandler;
 pub use self::mint_order_handler::Brc20MintOrderHandler;
 pub use self::mint_tx_handler::Brc20MintTxHandler;
 use crate::canister::get_brc20_state;
-use crate::core::withdrawal::new_withdraw_payload;
 
 pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;

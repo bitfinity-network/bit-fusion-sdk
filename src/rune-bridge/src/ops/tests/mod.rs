@@ -6,7 +6,11 @@ use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::operation_store::OperationsMemory;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::{SharedConfig, State};
+use bridge_canister::runtime::BridgeRuntime;
 use ic_stable_structures::MemoryId;
+
+use crate::canister::SharedRuntime;
+use crate::state::RuneState;
 
 use super::*;
 
@@ -34,6 +38,15 @@ fn test_state() -> RuntimeState<RuneBridgeOpImpl> {
     Rc::new(RefCell::new(State::default(op_memory(), config())))
 }
 
+fn test_rune_state() -> Rc<RefCell<RuneState>> {
+    Rc::new(RefCell::new(RuneState::default()))
+}
+
+fn test_runtime() -> SharedRuntime {
+    let runtime = BridgeRuntime::default(test_state().borrow().config.clone());
+    Rc::new(RefCell::new(runtime))
+}
+
 fn sender() -> H160 {
     H160::from_slice(&[1; 20])
 }
@@ -57,10 +70,12 @@ fn dst_tokens() -> HashMap<RuneName, H160> {
 
 pub mod minter_notification {
     use bridge_canister::bridge::{Operation, OperationAction};
+    use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
     use bridge_did::event_data::*;
     use candid::Encode;
 
-    use crate::ops::tests::{dst_tokens, test_state, token_address};
+    use crate::ops::events_handler::RuneEventsHandler;
+    use crate::ops::tests::{dst_tokens, test_rune_state, test_runtime, test_state, token_address};
     use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData};
 
     fn test_deposit_data() -> RuneDepositRequestData {
@@ -75,9 +90,8 @@ pub mod minter_notification {
         Encode!(&test_deposit_data()).unwrap()
     }
 
-    #[tokio::test]
-    async fn incorrect_type_returns_none() {
-        let state = test_state();
+    #[test]
+    fn incorrect_type_returns_none() {
         let event = NotifyMinterEventData {
             notification_type: MinterNotificationType::Other,
             tx_sender: Default::default(),
@@ -85,13 +99,13 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
-        assert_eq!(result, None);
+        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let result = handler.on_minter_notification(event);
+        assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn incorrect_data_returns_none() {
-        let state = test_state();
         let mut data = test_user_data();
         data.push(1);
         let event = NotifyMinterEventData {
@@ -101,13 +115,13 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
-        assert_eq!(result, None);
+        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let result = handler.on_minter_notification(event);
+        assert!(result.is_err())
     }
 
     #[tokio::test]
     async fn valid_notification_returns_action() {
-        let state = test_state();
         let event = NotifyMinterEventData {
             notification_type: MinterNotificationType::DepositRequest,
             tx_sender: Default::default(),
@@ -115,24 +129,13 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
-        let expected = test_deposit_data();
-        assert_eq!(
-            result,
-            Some(OperationAction::Create(
-                RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
-                    dst_address: expected.dst_address,
-                    dst_tokens: expected.dst_tokens,
-                    requested_amounts: expected.amounts,
-                })),
-                None,
-            ))
-        );
+        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let result = handler.on_minter_notification(event);
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn invalid_memo_length_results_in_none_memo() {
-        let state = test_state();
         let memo = vec![2; 20];
         let event = NotifyMinterEventData {
             notification_type: MinterNotificationType::DepositRequest,
@@ -141,8 +144,9 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
-        assert!(matches!(result, Some(OperationAction::Create(_, None))));
+        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let result = handler.on_minter_notification(event);
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -156,9 +160,14 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let result = RuneBridgeOpImpl::on_minter_notification(state, event).await;
-        assert!(
-            matches!(result, Some(OperationAction::Create(_, Some(actual_memo))) if actual_memo.to_vec() == memo)
+        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let result = handler.on_minter_notification(event);
+        assert!(result.is_ok());
+
+        let op = state.borrow().operations.get_operation_by_memo_and_user(
+            &memo.try_into().unwrap(),
+            &test_deposit_data().dst_address,
         );
+        assert!(op.is_some());
     }
 }

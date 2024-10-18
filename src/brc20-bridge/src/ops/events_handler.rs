@@ -1,15 +1,14 @@
-use bridge_canister::runtime::{service::fetch_logs::BftBridgeEventHandler, RuntimeState};
-use bridge_did::{
-    error::BftResult,
-    event_data::{BurntEventData, MintedEventData, NotifyMinterEventData},
-    operations::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest},
+use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::RuntimeState;
+use bridge_did::error::BftResult;
+use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_did::operations::{
+    Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest,
 };
 
-use crate::{
-    canister::{get_brc20_state, SharedRuntime},
-    core::withdrawal,
-    ops::{Brc20BridgeOpImpl, Brc20MinterNotification},
-};
+use crate::canister::{get_brc20_state, SharedRuntime};
+use crate::core::withdrawal;
+use crate::ops::{Brc20BridgeOpImpl, Brc20MinterNotification};
 
 pub struct Brc20BftEventsHandler {
     runtime: SharedRuntime,
@@ -51,14 +50,16 @@ impl BftBridgeEventHandler for Brc20BftEventsHandler {
         let memo = event.memo();
         match withdrawal::new_withdraw_payload(event, &get_brc20_state().borrow()) {
             Ok(payload) => {
-                let operation =
-                    Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload))
-                        .into();
+                let operation = Brc20BridgeOpImpl(Brc20BridgeOp::Withdraw(
+                    Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload),
+                ));
 
-                self.state()
+                let op_id = self
+                    .state()
                     .borrow_mut()
                     .operations
-                    .new_operation(operation, memo);
+                    .new_operation(operation.clone(), memo);
+                self.runtime.borrow().schedule_operation(op_id, operation);
             }
             Err(err) => {
                 let msg = format!("Invalid withdrawal data: {err:?}");
@@ -82,19 +83,21 @@ impl BftBridgeEventHandler for Brc20BftEventsHandler {
         if let Some(notification) = Brc20MinterNotification::decode(event.clone()) {
             match notification {
                 Brc20MinterNotification::Deposit(payload) => {
-                    let operation =
-                        Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitInputs(DepositRequest {
+                    let operation = Brc20BridgeOpImpl(Brc20BridgeOp::Deposit(
+                        Brc20BridgeDepositOp::AwaitInputs(DepositRequest {
                             amount: payload.amount,
                             brc20_tick: payload.brc20_tick,
                             dst_address: payload.dst_address,
                             dst_token: payload.dst_token,
-                        }))
-                        .into();
+                        }),
+                    ));
 
-                    self.state()
+                    let op_id = self
+                        .state()
                         .borrow_mut()
                         .operations
-                        .new_operation(operation, memo);
+                        .new_operation(operation.clone(), memo);
+                    self.runtime.borrow().schedule_operation(op_id, operation);
                 }
             }
         } else {

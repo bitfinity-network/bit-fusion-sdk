@@ -5,7 +5,8 @@ use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
 use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
-use crate::{op_id::OperationId, operation_log::Memo};
+use crate::op_id::OperationId;
+use crate::operation_log::Memo;
 
 sol! {
     #[derive(Debug, Serialize, Deserialize)]

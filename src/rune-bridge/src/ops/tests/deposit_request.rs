@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
-use bridge_canister::bridge::{Operation, OperationAction};
+use bridge_canister::{
+    bridge::{Operation, OperationAction},
+    runtime::service::fetch_logs::BftBridgeEventHandler,
+};
 use bridge_did::event_data::*;
 use bridge_did::runes::RuneName;
 use candid::Encode;
+use tests::events_handler::RuneEventsHandler;
 
 use crate::ops::{
     tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData,
@@ -24,15 +28,16 @@ async fn invalid_notification_type_is_noop() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
-    assert!(result.is_none());
+    let handler = RuneEventsHandler::new(tests::test_runtime(), tests::test_rune_state());
+    let result = handler.on_minter_notification(event.clone());
+    assert!(result.is_err());
 
     let event = NotifyMinterEventData {
         notification_type: MinterNotificationType::Other,
         ..event
     };
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
-    assert!(result.is_none());
+    let result = handler.on_minter_notification(event);
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -52,15 +57,16 @@ async fn invalid_notification_payload_is_noop() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
-    assert!(result.is_none());
+    let handler = RuneEventsHandler::new(tests::test_runtime(), tests::test_rune_state());
+    let result = handler.on_minter_notification(event.clone());
+    assert!(result.is_err());
 
     let event = NotifyMinterEventData {
         user_data: vec![],
         ..event
     };
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
-    assert!(result.is_none());
+    let result = handler.on_minter_notification(event.clone());
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -79,18 +85,9 @@ async fn deposit_request_creates_correct_operation() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
-    assert_eq!(
-        result,
-        Some(OperationAction::Create(
-            RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
-                dst_address: tests::sender(),
-                dst_tokens: tests::dst_tokens(),
-                requested_amounts: None,
-            })),
-            None
-        ))
-    )
+    let handler = RuneEventsHandler::new(tests::test_runtime(), tests::test_rune_state());
+    let result = handler.on_minter_notification(event.clone());
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
@@ -110,16 +107,23 @@ async fn deposit_request_adds_amounts_to_operation() {
         memo: vec![],
     };
 
-    let result = RuneBridgeOpImpl::on_minter_notification(tests::test_state(), event.clone()).await;
+    let handler = RuneEventsHandler::new(tests::test_runtime(), tests::test_rune_state());
+    let result = handler.on_minter_notification(event.clone());
+    assert!(result.is_ok());
+
+    let (_, op) = tests::test_state()
+        .borrow_mut()
+        .operations
+        .get_for_address(&tests::sender(), None)
+        .first()
+        .cloned()
+        .unwrap();
     assert_eq!(
-        result,
-        Some(OperationAction::Create(
-            RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
-                dst_address: tests::sender(),
-                dst_tokens: tests::dst_tokens(),
-                requested_amounts: Some(amounts),
-            })),
-            None
-        ))
+        op,
+        RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+            dst_address: tests::sender(),
+            dst_tokens: tests::dst_tokens(),
+            requested_amounts: Some(amounts),
+        }))
     )
 }

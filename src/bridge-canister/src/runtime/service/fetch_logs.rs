@@ -1,13 +1,11 @@
-use bridge_did::{
-    error::{BftResult, Error},
-    event_data::{BurntEventData, MintedEventData, NotifyMinterEventData},
-    op_id::OperationId,
-};
+use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_did::op_id::OperationId;
 use bridge_utils::bft_events::BridgeEvent;
 
-use crate::{bridge::OperationContext, runtime::state::SharedConfig};
-
 use super::BridgeService;
+use crate::bridge::OperationContext;
+use crate::runtime::state::SharedConfig;
 
 pub trait BftBridgeEventHandler {
     /// Action to perform when a WrappedToken is minted.

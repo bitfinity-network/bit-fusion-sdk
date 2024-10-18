@@ -179,7 +179,6 @@ impl<Op: Operation> Task for BridgeTask<Op> {
 
 #[cfg(test)]
 mod tests {
-    use bridge_did::event_data::*;
     use did::H160;
     use ic_exports::ic_kit::MockContext;
     use ic_storage::IcStorage;

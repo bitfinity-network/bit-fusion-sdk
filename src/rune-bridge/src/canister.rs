@@ -182,7 +182,7 @@ impl LogCanister for RuneBridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
 
 fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());

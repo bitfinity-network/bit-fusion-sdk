@@ -1,4 +1,4 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
@@ -7,14 +7,14 @@ use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::order::{self, MintOrder, SignedOrders};
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
-use candid::{CandidType, Decode, Nat};
+use candid::{CandidType, Nat};
 use did::{H160, H256, U256};
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::RejectionCode;
@@ -28,6 +28,8 @@ use serde::{Deserialize, Serialize};
 use crate::constant::IC_CHAIN_ID;
 use crate::tokens::icrc1::{self, IcrcCanisterError};
 use crate::tokens::icrc2::{self, Success};
+
+mod events_handler;
 
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
 pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
@@ -106,58 +108,6 @@ impl Operation for IcrcBridgeOpImpl {
                     }),
             ),
         }
-    }
-
-    async fn on_wrapped_token_burnt(
-        _ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token burnt");
-        let memo = event.memo();
-        Some(OperationAction::Create(
-            IcrcBridgeOpImpl(IcrcBridgeOp::MintIcrcTokens(event)),
-            memo,
-        ))
-    }
-
-    async fn on_wrapped_token_minted(
-        _ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token minted");
-        Some(OperationAction::Update {
-            nonce: event.nonce,
-            update_to: IcrcBridgeOpImpl(IcrcBridgeOp::WrappedTokenMintConfirmed(event)),
-        })
-    }
-
-    async fn on_minter_notification(
-        _ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::trace!(
-            "got minter notification with type: {}",
-            event.notification_type
-        );
-        let mut icrc_burn = match Decode!(&event.user_data, Icrc2Burn) {
-            Ok(icrc_burn) => icrc_burn,
-            Err(e) => {
-                log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
-                return None;
-            }
-        };
-
-        // Approve tokens only if the burner owns recipient wallet.
-        if event.tx_sender != icrc_burn.recipient_address {
-            icrc_burn.approve_after_mint = None;
-        }
-
-        let memo = event.memo();
-
-        Some(OperationAction::Create(
-            Self(IcrcBridgeOp::BurnIcrc2Tokens(icrc_burn)),
-            memo,
-        ))
     }
 }
 
@@ -409,8 +359,7 @@ impl MintOrderHandler for IcrcMintOrderHandler {
             .update(id, new_op.clone());
 
         if let Some(options) = scheduling_options {
-            let scheduled_task =
-                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            let scheduled_task = ScheduledTask::with_options(BridgeTask::new(id, new_op), options);
             self.scheduler.append_task(scheduled_task);
         }
     }

@@ -6,11 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_did::error::BftResult;
-use bridge_did::event_data::{MinterNotificationType, NotifyMinterEventData};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
-use candid::Decode;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{StableBTreeMap, StableCell};
@@ -58,7 +56,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         f(&mut state);
     }
 
-    /// Provides access to tasks scheduler.
+    /// Schedules operation with the given ID according to it's schedulling options.
     pub fn schedule_operation(&self, op_id: OperationId, operation: Op) {
         let options = operation.scheduling_options().unwrap_or_default();
         let scheduled_task =

@@ -8,7 +8,6 @@ use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::{CandidType, Decode, Deserialize, Encode};
 use did::H160;
-use ethers_core::utils::rlp::PayloadInfo;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{
     BTreeMapStructure, Bound, CachedStableBTreeMap, CellStructure, MultimapStructure,
@@ -335,7 +334,6 @@ where
 #[cfg(test)]
 mod tests {
     use bridge_did::error::BftResult;
-    use bridge_did::event_data::*;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::VectorMemory;
     use serde::Serialize;
