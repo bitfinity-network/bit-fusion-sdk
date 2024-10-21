@@ -29,10 +29,11 @@ use crate::constant::IC_CHAIN_ID;
 use crate::tokens::icrc1::{self, IcrcCanisterError};
 use crate::tokens::icrc2::{self, Success};
 
-mod events_handler;
+pub mod events_handler;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 2;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct IcrcBridgeOpImpl(pub IcrcBridgeOp);
