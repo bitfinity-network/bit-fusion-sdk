@@ -5,6 +5,7 @@ use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
@@ -28,7 +29,8 @@ use crate::memory::NONCE_COUNTER_MEMORY_ID;
 use crate::ops::events_handler::Erc20EventsHandler;
 use crate::ops::{
     Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, FETCH_BASE_LOGS_SERVICE_ID,
-    FETCH_WRAPPED_LOGS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
+    FETCH_WRAPPED_LOGS_SERVICE_ID, REFRESH_BASE_PARAMS_SERVICE_ID,
+    REFRESH_WRAPPED_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::{BaseEvmSettings, SharedBaseEvmState};
 
@@ -160,6 +162,10 @@ fn init_runtime() -> SharedRuntime {
     let scheduler = runtime.scheduler().clone();
     let runtime = Rc::new(RefCell::new(runtime));
 
+    // Init refresh_evm_params services
+    let refresh_base_params_service = RefreshEvmParamsService::new(base_config.clone());
+    let refresh_wrapped_params_service = RefreshEvmParamsService::new(wrapped_config.clone());
+
     // Init event listener services
     let base_event_handler = Erc20EventsHandler::new(
         get_mint_order_nonce_counter(),
@@ -197,6 +203,16 @@ fn init_runtime() -> SharedRuntime {
         Erc20ServiceSelector::new(base_mint_tx_service, wrapped_mint_tx_service);
 
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_BASE_PARAMS_SERVICE_ID,
+        Rc::new(refresh_base_params_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_WRAPPED_PARAMS_SERVICE_ID,
+        Rc::new(refresh_wrapped_params_service),
+    );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
         FETCH_BASE_LOGS_SERVICE_ID,

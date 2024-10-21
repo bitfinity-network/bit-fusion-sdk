@@ -20,6 +20,7 @@ pub trait BftBridgeEventHandler<Op> {
     fn on_minter_notification(&self, event: NotifyMinterEventData) -> Option<OperationAction<Op>>;
 }
 
+/// Service to fetch logs from evm and process it using event handler H.
 pub struct FetchBftBridgeEventsService<Op: Operation, H> {
     handler: H,
     runtime: SharedRuntime<Op>,

@@ -28,9 +28,10 @@ pub use self::mint_order_handler::Brc20MintOrderHandler;
 pub use self::mint_tx_handler::Brc20MintTxHandler;
 use crate::canister::get_brc20_state;
 
-pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 2;
+pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
 /// BRC20 bridge operations
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]

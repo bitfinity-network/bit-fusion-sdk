@@ -5,6 +5,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -29,7 +30,8 @@ use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
 use crate::ops::{
     Brc20BftEventsHandler, Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler,
-    FETCH_BFT_EVENTS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
+    FETCH_BFT_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
+    SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::Brc20State;
 
@@ -172,6 +174,8 @@ fn init_runtime() -> SharedRuntime {
     let state = runtime.borrow().state().clone();
     let config = state.borrow().config.clone();
 
+    let refresh_params_service = RefreshEvmParamsService::new(config.clone());
+
     let sign_orders_handler =
         Brc20MintOrderHandler::new(state.clone(), runtime.borrow().scheduler().clone());
     let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
@@ -187,6 +191,11 @@ fn init_runtime() -> SharedRuntime {
     ));
 
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_PARAMS_SERVICE_ID,
+        Rc::new(refresh_params_service),
+    );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
         FETCH_BFT_EVENTS_SERVICE_ID,

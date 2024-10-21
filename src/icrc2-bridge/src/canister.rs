@@ -4,6 +4,7 @@ use std::rc::Rc;
 use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
@@ -28,7 +29,7 @@ use ic_storage::IcStorage;
 use crate::ops::events_handler::IcrcEventsHandler;
 use crate::ops::{
     IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, FETCH_BFT_EVENTS_SERVICE_ID,
-    SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
+    REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::IcrcState;
 
@@ -216,6 +217,8 @@ fn init_runtime() -> SharedRuntime {
     let runtime = Rc::new(RefCell::new(runtime));
     let config = state.borrow().config.clone();
 
+    let refresh_params_service = RefreshEvmParamsService::new(config.clone());
+
     let fetch_bft_events_service =
         FetchBftBridgeEventsService::new(IcrcEventsHandler, runtime.clone(), config);
 
@@ -226,6 +229,11 @@ fn init_runtime() -> SharedRuntime {
     let mint_tx_service = SendMintTxService::new(mint_tx_handler);
 
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_PARAMS_SERVICE_ID,
+        Rc::new(refresh_params_service),
+    );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
         FETCH_BFT_EVENTS_SERVICE_ID,
