@@ -1,10 +1,12 @@
 use cli::Cli;
 
 mod bridge_deployer;
+mod canister_ids;
 mod cli;
 mod commands;
 mod config;
 mod contracts;
+mod evm;
 
 #[tokio::main]
 async fn main() {

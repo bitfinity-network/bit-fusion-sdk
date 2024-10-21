@@ -1,4 +1,4 @@
-use bridge_did::init::BitcoinConnection;
+use bridge_did::init::btc::BitcoinConnection;
 use candid::{Deserialize, Principal};
 use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;

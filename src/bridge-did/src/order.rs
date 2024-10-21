@@ -401,14 +401,14 @@ impl<'a> EncodedOrderReader<'a> {
 /// Length of ECDSA signature in bytes.
 pub const SIGNATURE_LEN: usize = 65;
 
-/// Signed data of several encoded mint orders.
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
-pub struct SignedOrders {
+/// Encoded signed orders data
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub struct SignedOrdersData {
     pub orders_data: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
-impl SignedOrders {
+impl SignedOrdersData {
     /// Returns number of orders in the batch.
     pub fn orders_number(&self) -> usize {
         self.orders_data.len() / MintOrder::ENCODED_DATA_SIZE
@@ -436,15 +436,15 @@ impl SignedOrders {
 pub type OrderIdx = usize;
 
 /// Signed mint orders batch with index of one specific order.
-#[derive(Debug, Clone, Serialize, Deserialize, CandidType)]
-pub struct SignedOrder {
-    all_orders: SignedOrders,
+#[derive(Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
+pub struct SignedOrders {
+    all_orders: SignedOrdersData,
     idx: OrderIdx,
 }
 
-impl SignedOrder {
+impl SignedOrders {
     /// Creates a signed order and checks if idx inside the orders range.
-    pub fn new(all_orders: SignedOrders, idx: OrderIdx) -> Option<Self> {
+    pub fn new(all_orders: SignedOrdersData, idx: OrderIdx) -> Option<Self> {
         if idx >= all_orders.orders_number() {
             return None;
         }
@@ -460,12 +460,12 @@ impl SignedOrder {
     }
 
     /// Borrows all orders.
-    pub fn all_orders(&self) -> &SignedOrders {
+    pub fn all_orders(&self) -> &SignedOrdersData {
         &self.all_orders
     }
 
     /// Returns all orders.
-    pub fn into_inner(self) -> SignedOrders {
+    pub fn into_inner(self) -> SignedOrdersData {
         self.all_orders
     }
 

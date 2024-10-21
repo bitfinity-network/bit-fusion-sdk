@@ -2,7 +2,7 @@ use bridge_canister::bridge::{Operation, OperationAction, OperationContext, Oper
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
-use bridge_canister::runtime::service::sing_orders::MintOrderHandler;
+use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::{BridgeService, ServiceId};
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
@@ -12,7 +12,7 @@ use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
-use bridge_did::order::{MintOrder, SignedOrder};
+use bridge_did::order::{MintOrder, SignedOrders};
 use bridge_utils::evm_bridge::EvmParams;
 use candid::CandidType;
 use did::{H160, U256};
@@ -178,7 +178,7 @@ pub struct Erc20OpStageImpl(pub Erc20OpStage);
 
 impl Erc20OpStageImpl {
     /// Returns signed mint order if the stage contains it.
-    pub fn get_signed_mint_order(&self) -> Option<&SignedOrder> {
+    pub fn get_signed_mint_order(&self) -> Option<&SignedOrders> {
         match &self.0 {
             Erc20OpStage::SignMintOrder(_) => None,
             Erc20OpStage::SendMintTransaction(order) => Some(order),
@@ -320,7 +320,7 @@ impl MintOrderHandler for Erc20OrderHandler {
         Some(order)
     }
 
-    fn set_signed_order(&self, id: OperationId, signed: SignedOrder) {
+    fn set_signed_order(&self, id: OperationId, signed: SignedOrders) {
         let Some(op) = self.state.borrow().operations.get(id) else {
             log::info!("Mint order handler failed to set MintOrder: operation not found.");
             return;
@@ -367,7 +367,7 @@ impl MintTxHandler for Erc20OrderHandler {
         self.config.clone()
     }
 
-    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder> {
+    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders> {
         let Some(op) = self.state.borrow().operations.get(id) else {
             log::info!("Mint order handler failed to get MintOrder: operation not found.");
             return None;

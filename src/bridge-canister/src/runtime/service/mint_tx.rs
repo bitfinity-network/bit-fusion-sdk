@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
-use bridge_did::order::{SignedOrder, SignedOrders};
+use bridge_did::order::{SignedOrders, SignedOrdersData};
 use bridge_utils::bft_events::{self};
 use bridge_utils::evm_link::EvmLinkClient;
 use did::H256;
@@ -15,14 +15,14 @@ use crate::runtime::state::SharedConfig;
 /// Contains signed batch of mint orders and set of operations related to the batch.
 #[derive(Debug, Clone)]
 pub struct MintOrderBatchInfo {
-    orders_batch: SignedOrders,
+    orders_batch: SignedOrdersData,
     related_operations: HashSet<OperationId>,
 }
 
 pub trait MintTxHandler {
     fn get_signer(&self) -> BftResult<impl TransactionSigner>;
     fn get_evm_config(&self) -> SharedConfig;
-    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrder>;
+    fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders>;
     fn mint_tx_sent(&self, id: OperationId, tx_hash: H256);
 }
 

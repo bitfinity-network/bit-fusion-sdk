@@ -31,11 +31,11 @@ pub struct Erc20BaseTokens<Ctx> {
 
 impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
-        let external_evm_clien = ctx.external_evm_client(ctx.admin_name());
+        let external_evm_client = ctx.external_evm_client(ctx.admin_name());
         let contracts_deployer = Wallet::new(&mut rand::thread_rng());
         let deployer_address = contracts_deployer.address();
         let tx_hash = external_evm_client
-            .mint_native_tokens(deployer_address.into(), u128::MAX.into())
+            .admin_mint_native_tokens(deployer_address.into(), u128::MAX.into())
             .await
             .unwrap()
             .unwrap()
@@ -181,7 +181,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
         let client = self.ctx.external_evm_client(self.ctx.admin_name());
         let tx_hash = client
-            .mint_native_tokens(address.into(), u128::MAX.into())
+            .admin_mint_native_tokens(address.into(), u128::MAX.into())
             .await
             .unwrap()
             .unwrap()

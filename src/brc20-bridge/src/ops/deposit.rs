@@ -1,8 +1,6 @@
-use bridge_canister::bridge::OperationContext;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::operations::{Brc20BridgeDepositOp, DepositRequest};
-use bridge_did::order::{MintOrder, SignedMintOrder};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 
 use super::{Brc20BridgeOp, Brc20BridgeOpImpl};
@@ -91,40 +89,5 @@ impl Brc20BridgeDepositOpImpl {
             })?;
 
         Ok(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SignMintOrder(unsigned_mint_order)).into())
-    }
-
-    /// Sign the provided mint order
-    pub async fn sign_mint_order(
-        ctx: RuntimeState<Brc20BridgeOpImpl>,
-        nonce: u32,
-        mut mint_order: MintOrder,
-    ) -> BftResult<Brc20BridgeOpImpl> {
-        // update nonce
-        mint_order.nonce = nonce;
-
-        let deposit = Brc20Deposit::get(ctx)
-            .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
-        let signed = deposit
-            .sign_mint_order(mint_order)
-            .await
-            .map_err(|err| Error::FailedToProgress(format!("cannot sign mint order: {err:?}")))?;
-
-        Ok(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(signed)).into())
-    }
-
-    /// Send the signed mint order to the bridge
-    pub async fn send_mint_order(
-        ctx: RuntimeState<Brc20BridgeOpImpl>,
-        order: SignedMintOrder,
-    ) -> BftResult<Brc20BridgeOpImpl> {
-        let tx_id = ctx.send_mint_transaction(&order).await?;
-
-        Ok(
-            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder {
-                signed_mint_order: order,
-                tx_id,
-            })
-            .into(),
-        )
     }
 }

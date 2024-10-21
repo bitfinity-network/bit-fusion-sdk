@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::events::MintedEventData;
 use crate::op_id::OperationId;
-use crate::order::{MintOrder, SignedMintOrder};
+use crate::order::{MintOrder, SignedOrders};
 use crate::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
@@ -27,9 +27,9 @@ pub enum RuneBridgeDepositOp {
     /// Sign the mint order
     SignMintOrder(MintOrder),
     /// Send the mint order to the bridge
-    SendMintOrder(SignedMintOrder),
+    SendMintOrder(SignedOrders),
     /// Confirm the mint order
-    ConfirmMintOrder { order: SignedMintOrder, tx_id: H256 },
+    ConfirmMintOrder { order: SignedOrders, tx_id: H256 },
     /// The mint order has been confirmed
     MintOrderConfirmed { data: MintedEventData },
 }

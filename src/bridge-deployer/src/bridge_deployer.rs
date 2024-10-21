@@ -11,6 +11,7 @@ use ic_utils::interfaces::{ManagementCanister, WalletCanister};
 use tracing::{debug, info};
 
 use crate::commands::Bridge;
+use crate::contracts::EvmNetwork;
 
 pub struct BridgeDeployer {
     client: GenericBridgeClient<IcAgentClient>,
@@ -44,7 +45,8 @@ impl BridgeDeployer {
         wasm_path: &PathBuf,
         config: &Bridge,
         mode: InstallMode,
-    ) -> anyhow::Result<()> {
+        network: EvmNetwork,
+    ) -> anyhow::Result<Principal> {
         let canister_wasm = std::fs::read(wasm_path)?;
         debug!(
             "WASM file read successfully. File size: {}",
@@ -53,7 +55,7 @@ impl BridgeDeployer {
 
         let canister_id = self.client.client().canister_id;
         let management_canister = ManagementCanister::create(&self.agent);
-        let arg = config.init_raw_arg()?;
+        let arg = config.init_raw_arg(network)?;
 
         management_canister
             .install(&canister_id, &canister_wasm)
@@ -67,7 +69,7 @@ impl BridgeDeployer {
             canister_id
         );
 
-        Ok(())
+        Ok(canister_id)
     }
 
     pub async fn configure_minter(&self, bft_address: H160) -> anyhow::Result<()> {

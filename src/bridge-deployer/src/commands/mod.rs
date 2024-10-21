@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use bridge_did::error::BftResult;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BtcBridgeConfig;
 use candid::{Encode, Principal};
 use clap::{Args, Subcommand};
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, trace};
 use upgrade::UpgradeCommands;
 
+use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::config;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
 mod deploy;
@@ -100,21 +102,21 @@ impl Bridge {
     }
 
     /// Initialize the raw argument for the bridge
-    pub fn init_raw_arg(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn init_raw_arg(&self, evm_network: EvmNetwork) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
             Bridge::Brc20 {
                 config: init,
                 brc20,
             } => {
                 trace!("Preparing BRC20 bridge configuration");
-                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                let init_data = init.clone().into_bridge_init_data(evm_network);
                 debug!("BRC20 Bridge Config : {:?}", init_data);
                 let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let init_data = bridge_did::init::BridgeInitData::from(init.clone());
+                let init_data = init.clone().into_bridge_init_data(evm_network);
                 debug!("Init Bridge Config : {:?}", init_data);
                 let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
@@ -122,23 +124,23 @@ impl Bridge {
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
-                let config = bridge_did::init::BridgeInitData::from(config.clone());
+                let config = config.clone().into_bridge_init_data(evm_network);
                 debug!("ICRC Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
-                let init = bridge_did::init::BridgeInitData::from(init.clone());
+                let init = init.clone().into_bridge_init_data(evm_network);
 
                 // Workaround for not depending on the `erc-20` crate
                 #[derive(candid::CandidType)]
                 struct EvmSettings {
-                    pub evm_link: config::EvmLink,
+                    pub evm_link: EvmLink,
                     pub signing_strategy: SigningStrategy,
                 }
 
                 let erc = EvmSettings {
-                    evm_link: erc.evm_link.clone(),
+                    evm_link: crate::evm::evm_link(evm_network, erc.evm),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: erc.singing_key_id.clone().into(),
                     },
@@ -148,8 +150,8 @@ impl Bridge {
             }
             Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let connection = bridge_did::init::BitcoinConnection::from(connection.clone());
-                let init_data = bridge_did::init::BridgeInitData::from(config.clone());
+                let connection = bridge_did::init::btc::BitcoinConnection::from(connection.clone());
+                let init_data = config.clone().into_bridge_init_data(evm_network);
                 let config = BtcBridgeConfig {
                     network: connection,
                     init_data,
@@ -173,6 +175,18 @@ impl Bridge {
     }
 }
 
+impl From<&Bridge> for CanisterType {
+    fn from(value: &Bridge) -> Self {
+        match value {
+            Bridge::Brc20 { .. } => CanisterType::Brc20,
+            Bridge::Rune { .. } => CanisterType::Rune,
+            Bridge::Icrc { .. } => CanisterType::Icrc2,
+            Bridge::Erc20 { .. } => CanisterType::Erc20,
+            Bridge::Btc { .. } => CanisterType::Btc,
+        }
+    }
+}
+
 impl Commands {
     /// Runs the specified command for the bridge deployer.
     ///
@@ -187,16 +201,17 @@ impl Commands {
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
+        canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, network, pk)
+                    .deploy_canister(identity, ic_host, network, pk, canister_ids_path)
                     .await?
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, pk)
+                    .reinstall_canister(identity, ic_host, network, canister_ids_path)
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
@@ -208,16 +223,6 @@ impl Commands {
 
 #[derive(Debug, Args)]
 pub struct BFTArgs {
-    /// Deploy and configure new BFT bridge contract (together with FeeCharge contract)
-    ///
-    /// This argument cannot be used together with `--use-bft`.
-    #[arg(
-        long,
-        conflicts_with = "existing",
-        required_unless_present = "existing"
-    )]
-    deploy_bft: bool,
-
     /// The address of the owner of the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "OWNER", requires = "deploy_bft")]
     owner: Option<H160>,
@@ -225,16 +230,11 @@ pub struct BFTArgs {
     /// The list of controllers for the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "CONTROLLERS", requires = "deploy_bft")]
     controllers: Option<Vec<H160>>,
+}
 
-    /// Configure existing BFT bridge contract to work with the deployed bridge.
-    ///
-    /// This argument cannot be used together with `--deploy-bft`.
-    #[arg(
-        long = "use-bft",
-        required_unless_present = "deploy_bft",
-        value_name = "ADDRESS"
-    )]
-    existing: Option<H160>,
+pub struct BftDeployedContracts {
+    pub bft_bridge: H160,
+    pub wrapped_token_deployer: H160,
 }
 
 impl BFTArgs {
@@ -246,11 +246,7 @@ impl BFTArgs {
         bridge: &Bridge,
         pk: H256,
         agent: &Agent,
-    ) -> anyhow::Result<H160> {
-        if let Some(address) = self.existing {
-            return Ok(address);
-        }
-
+    ) -> anyhow::Result<BftDeployedContracts> {
         info!("Deploying BFT bridge");
 
         let contract_deployer = SolidityContractDeployer::new(network, pk);
@@ -288,7 +284,10 @@ impl BFTArgs {
 
         info!("BFT bridge deployed successfully. Contract address: {bft_address}");
 
-        Ok(bft_address)
+        Ok(BftDeployedContracts {
+            bft_bridge: bft_address,
+            wrapped_token_deployer,
+        })
     }
 }
 
