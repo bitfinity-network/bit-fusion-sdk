@@ -1,9 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::bridge::OperationAction;
 use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
-use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::{
     BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
 };
@@ -11,46 +10,38 @@ use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdr
 use candid::Decode;
 
 use super::RuneBridgeOpImpl;
-use crate::canister::SharedRuntime;
 use crate::core::withdrawal::RuneWithdrawalPayloadImpl;
 use crate::ops::RuneDepositRequestData;
 use crate::state::RuneState;
 
 pub struct RuneEventsHandler {
-    runtime: SharedRuntime,
     rune_state: Rc<RefCell<RuneState>>,
 }
 
 impl RuneEventsHandler {
-    pub fn new(runtime: SharedRuntime, rune_state: Rc<RefCell<RuneState>>) -> Self {
-        Self {
-            runtime,
-            rune_state,
-        }
-    }
-
-    fn state(&self) -> RuntimeState<RuneBridgeOpImpl> {
-        self.runtime.borrow().state().clone()
+    pub fn new(rune_state: Rc<RefCell<RuneState>>) -> Self {
+        Self { rune_state }
     }
 }
 
-impl BftBridgeEventHandler for RuneEventsHandler {
-    fn on_wrapped_token_minted(&self, event: MintedEventData) -> BftResult<()> {
+impl BftBridgeEventHandler<RuneBridgeOpImpl> for RuneEventsHandler {
+    fn on_wrapped_token_minted(
+        &self,
+        event: MintedEventData,
+    ) -> Option<OperationAction<RuneBridgeOpImpl>> {
         let nonce = event.nonce;
-        let dst_address = event.recipient.clone();
         log::debug!("on_wrapped_token_minted nonce {nonce} {event:?}",);
-        let operation = RuneBridgeOpImpl(RuneBridgeOp::Deposit(
+
+        let update_to = RuneBridgeOpImpl(RuneBridgeOp::Deposit(
             RuneBridgeDepositOp::MintOrderConfirmed { data: event },
         ));
-        self.state()
-            .borrow_mut()
-            .operations
-            .update_by_nonce(&dst_address, nonce, operation);
-
-        Ok(())
+        Some(OperationAction::Update { nonce, update_to })
     }
 
-    fn on_wrapped_token_burnt(&self, event: BurntEventData) -> BftResult<()> {
+    fn on_wrapped_token_burnt(
+        &self,
+        event: BurntEventData,
+    ) -> Option<OperationAction<RuneBridgeOpImpl>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
         let memo = event.memo();
         match RuneWithdrawalPayloadImpl::new(event, &self.rune_state.borrow()) {
@@ -58,30 +49,20 @@ impl BftBridgeEventHandler for RuneEventsHandler {
                 let operation = RuneBridgeOpImpl(RuneBridgeOp::Withdraw(
                     RuneBridgeWithdrawOp::CreateTransaction { payload: payload.0 },
                 ));
-                let op_id = self
-                    .state()
-                    .borrow_mut()
-                    .operations
-                    .new_operation(operation.clone(), memo);
-                self.runtime.borrow().schedule_operation(op_id, operation);
+                Some(OperationAction::Create(operation, memo))
             }
             Err(err) => {
-                return Err(Error::FailedToProgress(format!(
-                    "Invalid withdrawal data: {err:?}"
-                )));
+                log::warn!("Invalid withdrawal data: {err:?}");
+                None
             }
         }
-
-        Ok(())
     }
 
-    fn on_minter_notification(&self, event: NotifyMinterEventData) -> BftResult<()> {
+    fn on_minter_notification(
+        &self,
+        event: NotifyMinterEventData,
+    ) -> Option<OperationAction<RuneBridgeOpImpl>> {
         log::debug!("on_minter_notification {event:?}");
-
-        if let Some(operation_id) = event.try_decode_reschedule_operation_id() {
-            self.runtime.borrow().reschedule_operation(operation_id);
-            return Ok(());
-        }
 
         match event.notification_type {
             MinterNotificationType::DepositRequest => {
@@ -94,29 +75,24 @@ impl BftBridgeEventHandler for RuneEventsHandler {
                                 requested_amounts: data.amounts,
                             },
                         ));
-                        let op_id = self
-                            .state()
-                            .borrow_mut()
-                            .operations
-                            .new_operation(operation.clone(), event.memo());
-                        self.runtime.borrow().schedule_operation(op_id, operation);
+                        Some(OperationAction::Create(operation, event.memo()))
                     }
                     _ => {
-                        return Err(Error::Serialization(format!(
+                        log::warn!(
                             "Invalid encoded deposit request: {}",
                             hex::encode(&event.user_data)
-                        )));
+                        );
+                        None
                     }
                 }
             }
             _ => {
-                return Err(Error::Serialization(format!(
+                log::warn!(
                     "Unsupported minter notification type: {:?}",
                     event.notification_type
-                )));
+                );
+                None
             }
         }
-
-        Ok(())
     }
 }
