@@ -30,6 +30,7 @@ use crate::memory::{
 use crate::operation_store::OperationsMemory;
 
 pub type RuntimeState<Op> = Rc<RefCell<State<Op>>>;
+pub type SharedRuntime<Op> = Rc<RefCell<BridgeRuntime<Op>>>;
 
 /// Bridge Runtime.
 /// Stores a state, schedules tasks and executes them.

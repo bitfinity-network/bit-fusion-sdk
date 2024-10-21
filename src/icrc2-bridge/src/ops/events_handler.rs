@@ -1,72 +1,50 @@
-use bridge_canister::runtime::{service::fetch_logs::BftBridgeEventHandler, RuntimeState};
+use bridge_canister::{
+    bridge::OperationAction, runtime::service::fetch_logs::BftBridgeEventHandler,
+};
 use bridge_did::{
-    error::{BftResult, Error},
     event_data::{BurntEventData, MintedEventData, NotifyMinterEventData},
     operations::IcrcBridgeOp,
     reason::Icrc2Burn,
 };
 use candid::Decode;
 
-use crate::canister::SharedRuntime;
-
 use super::IcrcBridgeOpImpl;
 
-pub struct IcrcEventsHandler {
-    runtime: SharedRuntime,
-}
+pub struct IcrcEventsHandler;
 
-impl IcrcEventsHandler {
-    pub fn new(runtime: SharedRuntime) -> Self {
-        Self { runtime }
-    }
-
-    fn state(&self) -> RuntimeState<IcrcBridgeOpImpl> {
-        self.runtime.borrow().state().clone()
-    }
-}
-
-impl BftBridgeEventHandler for IcrcEventsHandler {
-    fn on_wrapped_token_minted(&self, event: MintedEventData) -> BftResult<()> {
+impl BftBridgeEventHandler<IcrcBridgeOpImpl> for IcrcEventsHandler {
+    fn on_wrapped_token_minted(
+        &self,
+        event: MintedEventData,
+    ) -> Option<OperationAction<IcrcBridgeOpImpl>> {
         log::trace!("wrapped token minted");
-        let dst_address = event.recipient.clone();
         let nonce = event.nonce;
-        let operation = IcrcBridgeOpImpl(IcrcBridgeOp::WrappedTokenMintConfirmed(event));
-        self.state()
-            .borrow_mut()
-            .operations
-            .update_by_nonce(&dst_address, nonce, operation);
-
-        Ok(())
+        let update_to = IcrcBridgeOpImpl(IcrcBridgeOp::WrappedTokenMintConfirmed(event));
+        Some(OperationAction::Update { nonce, update_to })
     }
 
-    fn on_wrapped_token_burnt(&self, event: BurntEventData) -> BftResult<()> {
+    fn on_wrapped_token_burnt(
+        &self,
+        event: BurntEventData,
+    ) -> Option<OperationAction<IcrcBridgeOpImpl>> {
         log::trace!("wrapped token burnt");
         let memo = event.memo();
         let operation = IcrcBridgeOpImpl(IcrcBridgeOp::MintIcrcTokens(event));
 
-        let op_id = self
-            .state()
-            .borrow_mut()
-            .operations
-            .new_operation(operation.clone(), memo);
-        self.runtime.borrow().schedule_operation(op_id, operation);
-
-        Ok(())
+        Some(OperationAction::Create(operation, memo))
     }
 
-    fn on_minter_notification(&self, event: NotifyMinterEventData) -> BftResult<()> {
+    fn on_minter_notification(
+        &self,
+        event: NotifyMinterEventData,
+    ) -> Option<OperationAction<IcrcBridgeOpImpl>> {
         log::debug!("on_minter_notification {event:?}");
-
-        if let Some(operation_id) = event.try_decode_reschedule_operation_id() {
-            self.runtime.borrow().reschedule_operation(operation_id);
-            return Ok(());
-        }
 
         let mut icrc_burn = match Decode!(&event.user_data, Icrc2Burn) {
             Ok(icrc_burn) => icrc_burn,
             Err(e) => {
-                let msg = format!("failed to decode BftBridge notification into Icrc2Burn: {e}");
-                return Err(Error::Serialization(msg));
+                log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
+                return None;
             }
         };
 
@@ -76,15 +54,7 @@ impl BftBridgeEventHandler for IcrcEventsHandler {
         }
 
         let memo = event.memo();
-
         let operation = IcrcBridgeOpImpl(IcrcBridgeOp::BurnIcrc2Tokens(icrc_burn));
-        let op_id = self
-            .state()
-            .borrow_mut()
-            .operations
-            .new_operation(operation.clone(), memo);
-        self.runtime.borrow().schedule_operation(op_id, operation);
-
-        Ok(())
+        Some(OperationAction::Create(operation, memo))
     }
 }
