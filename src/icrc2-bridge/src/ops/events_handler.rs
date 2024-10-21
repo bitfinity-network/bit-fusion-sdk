@@ -1,11 +1,8 @@
-use bridge_canister::{
-    bridge::OperationAction, runtime::service::fetch_logs::BftBridgeEventHandler,
-};
-use bridge_did::{
-    event_data::{BurntEventData, MintedEventData, NotifyMinterEventData},
-    operations::IcrcBridgeOp,
-    reason::Icrc2Burn,
-};
+use bridge_canister::bridge::OperationAction;
+use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
+use bridge_did::operations::IcrcBridgeOp;
+use bridge_did::reason::Icrc2Burn;
 use candid::Decode;
 
 use super::IcrcBridgeOpImpl;

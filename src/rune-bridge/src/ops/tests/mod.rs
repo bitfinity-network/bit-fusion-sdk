@@ -9,10 +9,9 @@ use bridge_canister::runtime::state::{SharedConfig, State};
 use bridge_canister::runtime::BridgeRuntime;
 use ic_stable_structures::MemoryId;
 
+use super::*;
 use crate::canister::SharedRuntime;
 use crate::state::RuneState;
-
-use super::*;
 
 mod await_confirmations;
 mod await_inputs;

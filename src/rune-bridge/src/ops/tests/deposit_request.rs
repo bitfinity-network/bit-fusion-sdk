@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use bridge_canister::{
-    bridge::{Operation, OperationAction},
-    runtime::service::fetch_logs::BftBridgeEventHandler,
-};
+use bridge_canister::bridge::{Operation, OperationAction};
+use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
 use bridge_did::event_data::*;
 use bridge_did::runes::RuneName;
 use candid::Encode;

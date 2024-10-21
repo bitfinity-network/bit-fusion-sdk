@@ -1,19 +1,20 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use bridge_canister::runtime::{service::fetch_logs::BftBridgeEventHandler, RuntimeState};
-use bridge_did::{
-    error::{BftResult, Error},
-    event_data::{BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData},
-    operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp},
+use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::RuntimeState;
+use bridge_did::error::{BftResult, Error};
+use bridge_did::event_data::{
+    BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
 };
+use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
 use candid::Decode;
 
-use crate::{
-    canister::SharedRuntime, core::withdrawal::RuneWithdrawalPayloadImpl,
-    ops::RuneDepositRequestData, state::RuneState,
-};
-
 use super::RuneBridgeOpImpl;
+use crate::canister::SharedRuntime;
+use crate::core::withdrawal::RuneWithdrawalPayloadImpl;
+use crate::ops::RuneDepositRequestData;
+use crate::state::RuneState;
 
 pub struct RuneEventsHandler {
     runtime: SharedRuntime,
