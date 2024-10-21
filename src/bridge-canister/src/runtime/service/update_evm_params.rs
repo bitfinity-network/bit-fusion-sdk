@@ -1,8 +1,9 @@
-use bridge_did::{error::BftResult, op_id::OperationId};
-
-use crate::runtime::state::{config::ConfigStorage, SharedConfig};
+use bridge_did::error::BftResult;
+use bridge_did::op_id::OperationId;
 
 use super::BridgeService;
+use crate::runtime::state::config::ConfigStorage;
+use crate::runtime::state::SharedConfig;
 
 /// Service to refresh EVM params in the given config.
 pub struct RefreshEvmParamsService {
