@@ -35,8 +35,9 @@ use crate::ckbtc_client::{
 use crate::interface::{BtcBridgeError, BtcWithdrawError};
 use crate::state::State;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 2;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct BtcBridgeOpImpl(pub BtcBridgeOp);
