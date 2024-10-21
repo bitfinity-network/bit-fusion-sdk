@@ -21,10 +21,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::canister::get_runtime_state;
 
-mod events_handler;
+pub mod events_handler;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BASE_LOGS_SERVICE_ID: ServiceId = 0;
+pub const FETCH_WRAPPED_LOGS_SERVICE_ID: ServiceId = 1;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOpImpl(pub Erc20BridgeOp);

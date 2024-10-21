@@ -1,7 +1,5 @@
 use bridge_canister::bridge::OperationAction;
 use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
-use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::reason::BtcDeposit;

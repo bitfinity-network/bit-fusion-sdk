@@ -26,6 +26,8 @@ pub struct Erc20EventsHandler {
 }
 
 impl Erc20EventsHandler {
+    /// Creates new events handler instance, which listens `src_evm` and
+    /// create operations for `dst_evm`.
     pub fn new(
         nonce_counter: SharedNonceCounter,
         side: BridgeSide,

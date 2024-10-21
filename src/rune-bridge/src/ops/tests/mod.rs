@@ -6,11 +6,9 @@ use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::operation_store::OperationsMemory;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::{SharedConfig, State};
-use bridge_canister::runtime::BridgeRuntime;
 use ic_stable_structures::MemoryId;
 
 use super::*;
-use crate::canister::SharedRuntime;
 use crate::state::RuneState;
 
 mod await_confirmations;
@@ -41,11 +39,6 @@ fn test_rune_state() -> Rc<RefCell<RuneState>> {
     Rc::new(RefCell::new(RuneState::default()))
 }
 
-fn test_runtime() -> SharedRuntime {
-    let runtime = BridgeRuntime::default(test_state().borrow().config.clone());
-    Rc::new(RefCell::new(runtime))
-}
-
 fn sender() -> H160 {
     H160::from_slice(&[1; 20])
 }
@@ -68,14 +61,14 @@ fn dst_tokens() -> HashMap<RuneName, H160> {
 }
 
 pub mod minter_notification {
-    use bridge_canister::bridge::{Operation, OperationAction};
+    use bridge_canister::bridge::OperationAction;
     use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
     use bridge_did::event_data::*;
     use candid::Encode;
 
     use crate::ops::events_handler::RuneEventsHandler;
-    use crate::ops::tests::{dst_tokens, test_rune_state, test_runtime, test_state, token_address};
-    use crate::ops::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData};
+    use crate::ops::tests::{dst_tokens, test_rune_state, token_address};
+    use crate::ops::RuneDepositRequestData;
 
     fn test_deposit_data() -> RuneDepositRequestData {
         RuneDepositRequestData {
@@ -98,9 +91,9 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_err());
+        assert!(result.is_none());
     }
 
     #[tokio::test]
@@ -114,9 +107,9 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_err())
+        assert!(result.is_none())
     }
 
     #[tokio::test]
@@ -128,9 +121,9 @@ pub mod minter_notification {
             memo: vec![],
         };
 
-        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_ok());
+        assert!(result.is_none());
     }
 
     #[tokio::test]
@@ -143,14 +136,13 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_ok());
+        assert!(matches!(result, Some(OperationAction::Create(_, None))));
     }
 
     #[tokio::test]
     async fn valid_memo_is_preserved() {
-        let state = test_state();
         let memo = vec![2; 32];
         let event = NotifyMinterEventData {
             notification_type: MinterNotificationType::DepositRequest,
@@ -159,14 +151,10 @@ pub mod minter_notification {
             memo: memo.clone(),
         };
 
-        let handler = RuneEventsHandler::new(test_runtime(), test_rune_state());
+        let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_ok());
-
-        let op = state.borrow().operations.get_operation_by_memo_and_user(
-            &memo.try_into().unwrap(),
-            &test_deposit_data().dst_address,
+        assert!(
+            matches!(result, Some(OperationAction::Create(_, Some(actual_memo))) if actual_memo.to_vec() == memo)
         );
-        assert!(op.is_some());
     }
 }

@@ -1,26 +1,25 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use bridge_canister::bridge::OperationAction;
 use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
-use bridge_canister::runtime::RuntimeState;
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::operations::{
     Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest,
 };
 
-use crate::canister::{get_brc20_state, SharedRuntime};
 use crate::core::withdrawal;
 use crate::ops::{Brc20BridgeOpImpl, Brc20MinterNotification};
+use crate::state::Brc20State;
 
+/// Decsribes event processing logic.
 pub struct Brc20BftEventsHandler {
-    runtime: SharedRuntime,
+    brc20_state: Rc<RefCell<Brc20State>>,
 }
 
 impl Brc20BftEventsHandler {
-    pub fn new(runtime: SharedRuntime) -> Self {
-        Self { runtime }
-    }
-
-    fn state(&self) -> RuntimeState<Brc20BridgeOpImpl> {
-        self.runtime.borrow().state().clone()
+    pub fn new(brc20_state: Rc<RefCell<Brc20State>>) -> Self {
+        Self { brc20_state }
     }
 }
 
@@ -48,7 +47,7 @@ impl BftBridgeEventHandler<Brc20BridgeOpImpl> for Brc20BftEventsHandler {
     ) -> Option<OperationAction<Brc20BridgeOpImpl>> {
         log::debug!("on_wrapped_token_burnt {event:?}");
         let memo = event.memo();
-        let op = match withdrawal::new_withdraw_payload(event, &get_brc20_state().borrow()) {
+        let op = match withdrawal::new_withdraw_payload(event, &self.brc20_state.borrow()) {
             Ok(payload) => Brc20BridgeOpImpl(Brc20BridgeOp::Withdraw(
                 Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload),
             )),

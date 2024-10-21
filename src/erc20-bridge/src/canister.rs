@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::ServiceOrder;
@@ -9,6 +10,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
+use bridge_did::bridge_side::BridgeSide;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
@@ -23,9 +25,10 @@ use ic_stable_structures::StableCell;
 use ic_storage::IcStorage;
 
 use crate::memory::NONCE_COUNTER_MEMORY_ID;
+use crate::ops::events_handler::Erc20EventsHandler;
 use crate::ops::{
-    Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, SEND_MINT_TX_SERVICE_ID,
-    SIGN_MINT_ORDER_SERVICE_ID,
+    Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, FETCH_BASE_LOGS_SERVICE_ID,
+    FETCH_WRAPPED_LOGS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::{BaseEvmSettings, SharedBaseEvmState};
 
@@ -151,13 +154,35 @@ impl LogCanister for Erc20Bridge {
 
 fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state();
-    let base_evm_config = get_base_evm_config();
+    let state = runtime.state().clone();
+    let base_config = get_base_evm_config();
+    let wrapped_config = state.borrow().config.clone();
     let scheduler = runtime.scheduler().clone();
+    let runtime = Rc::new(RefCell::new(runtime));
+
+    // Init event listener services
+    let base_event_handler = Erc20EventsHandler::new(
+        get_mint_order_nonce_counter(),
+        BridgeSide::Base,
+        base_config.clone(),
+        wrapped_config.clone(),
+    );
+    let base_events_service =
+        FetchBftBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+    let wrapped_event_handler = Erc20EventsHandler::new(
+        get_mint_order_nonce_counter(),
+        BridgeSide::Wrapped,
+        wrapped_config.clone(),
+        base_config.clone(),
+    );
+    let wrapped_events_service = FetchBftBridgeEventsService::new(
+        wrapped_event_handler,
+        runtime.clone(),
+        wrapped_config.clone(),
+    );
 
     // Init operation handlers
-    let base_handler = Erc20OrderHandler::new(state.clone(), base_evm_config, scheduler.clone());
-    let wrapped_config = state.borrow().config.clone();
+    let base_handler = Erc20OrderHandler::new(state.clone(), base_config, scheduler.clone());
     let wrapped_handler = Erc20OrderHandler::new(state.clone(), wrapped_config, scheduler.clone());
 
     // Init mint order signing service
@@ -173,6 +198,16 @@ fn init_runtime() -> SharedRuntime {
 
     let services = state.borrow().services.clone();
     services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_BASE_LOGS_SERVICE_ID,
+        Rc::new(base_events_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_WRAPPED_LOGS_SERVICE_ID,
+        Rc::new(wrapped_events_service),
+    );
+    services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
         Rc::new(sign_service),
@@ -183,7 +218,7 @@ fn init_runtime() -> SharedRuntime {
         Rc::new(send_mint_tx_service),
     );
 
-    Rc::new(RefCell::new(runtime))
+    runtime
 }
 
 pub type SharedNonceCounter = Rc<RefCell<StableCell<u32, StableMemory>>>;

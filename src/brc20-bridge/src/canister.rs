@@ -179,9 +179,12 @@ fn init_runtime() -> SharedRuntime {
     let mint_tx_handler = Brc20MintTxHandler::new(state.clone());
     let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
-    let bft_events_handler = Brc20BftEventsHandler::new(runtime.clone());
-    let fetch_bft_events_service =
-        Rc::new(FetchBftBridgeEventsService::new(bft_events_handler, config));
+    let bft_events_handler = Brc20BftEventsHandler::new(get_brc20_state());
+    let fetch_bft_events_service = Rc::new(FetchBftBridgeEventsService::new(
+        bft_events_handler,
+        runtime.clone(),
+        config,
+    ));
 
     let services = state.borrow().services.clone();
     services.borrow_mut().add_service(
