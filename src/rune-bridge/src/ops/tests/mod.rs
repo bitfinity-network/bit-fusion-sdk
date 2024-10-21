@@ -64,11 +64,12 @@ pub mod minter_notification {
     use bridge_canister::bridge::OperationAction;
     use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
     use bridge_did::event_data::*;
+    use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
     use candid::Encode;
 
     use crate::ops::events_handler::RuneEventsHandler;
     use crate::ops::tests::{dst_tokens, test_rune_state, token_address};
-    use crate::ops::RuneDepositRequestData;
+    use crate::ops::{RuneBridgeOpImpl, RuneDepositRequestData};
 
     fn test_deposit_data() -> RuneDepositRequestData {
         RuneDepositRequestData {
@@ -123,7 +124,18 @@ pub mod minter_notification {
 
         let handler = RuneEventsHandler::new(test_rune_state());
         let result = handler.on_minter_notification(event);
-        assert!(result.is_none());
+        let expected = test_deposit_data();
+        assert_eq!(
+            result,
+            Some(OperationAction::Create(
+                RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+                    dst_address: expected.dst_address,
+                    dst_tokens: expected.dst_tokens,
+                    requested_amounts: expected.amounts,
+                })),
+                None,
+            ))
+        );
     }
 
     #[tokio::test]
