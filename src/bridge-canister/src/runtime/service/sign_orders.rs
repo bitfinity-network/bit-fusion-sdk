@@ -6,7 +6,6 @@ use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedOrders, SignedOrdersData};
 use did::keccak;
 use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::types::RecoveryMessage;
 
 use super::BridgeService;
 

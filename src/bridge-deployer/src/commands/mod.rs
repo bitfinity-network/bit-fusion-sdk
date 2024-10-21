@@ -186,7 +186,7 @@ impl Bridge {
                     .deploy_bft(network, bridge_principal, pk, &agent, false)
                     .await?;
 
-                println!("Base BFT bridge deployed with address {bft_address:?}");
+                info!("Base BFT bridge deployed with address {bft_address:?}");
 
                 let client = Erc20BridgeClient::new(IcAgentClient::with_agent(
                     bridge_principal,
@@ -196,7 +196,7 @@ impl Bridge {
                     .set_base_bft_bridge_contract(&bft_address.bft_bridge.into())
                     .await?;
 
-                println!("Bridge canister configured with base BFT bridge contract address");
+                info!("Bridge canister configured with base BFT bridge contract address");
 
                 Ok(())
             }
@@ -328,10 +328,10 @@ impl BFTArgs {
         };
         let expected_nonce = contract_deployer.get_nonce().await? + nonce_increment;
 
-        println!("Expected nonce: {expected_nonce}");
+        debug!("Expected nonce: {expected_nonce}");
         let expected_fee_charge_address =
             contract_deployer.compute_fee_charge_address(expected_nonce)?;
-        println!("Expected address: {expected_fee_charge_address}");
+        debug!("Expected address: {expected_fee_charge_address}");
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
 

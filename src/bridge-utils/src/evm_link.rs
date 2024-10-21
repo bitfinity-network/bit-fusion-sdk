@@ -29,7 +29,7 @@ impl Clients {
     }
 
     pub fn http_outcall(url: String) -> Self {
-        Self::HttpOutCall(HttpOutcallClient::new_sanitized(url))
+        Self::HttpOutCall(HttpOutcallClient::new(url).sanitized())
     }
 
     pub fn evm_rpc_canister(principal: Principal, rpc_service: &[RpcService]) -> Self {
