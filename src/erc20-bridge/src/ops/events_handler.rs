@@ -1,8 +1,7 @@
+use bridge_canister::bridge::OperationAction;
 use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
 use bridge_canister::runtime::state::SharedConfig;
-use bridge_canister::runtime::RuntimeState;
 use bridge_did::bridge_side::BridgeSide;
-use bridge_did::error::{BftResult, Error};
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -12,11 +11,10 @@ use bridge_utils::evm_bridge::EvmParams;
 use did::{H160, U256};
 use ic_stable_structures::CellStructure;
 
-use crate::canister::{SharedNonceCounter, SharedRuntime};
+use crate::canister::SharedNonceCounter;
 use crate::ops::Erc20BridgeOpImpl;
 
 pub struct Erc20EventsHandler {
-    runtime: SharedRuntime,
     nonce_counter: SharedNonceCounter,
     side: BridgeSide,
 
@@ -29,46 +27,40 @@ pub struct Erc20EventsHandler {
 
 impl Erc20EventsHandler {
     pub fn new(
-        runtime: SharedRuntime,
         nonce_counter: SharedNonceCounter,
         side: BridgeSide,
         src_evm_config: SharedConfig,
         dst_evm_config: SharedConfig,
     ) -> Self {
         Self {
-            runtime,
             nonce_counter,
             side,
             src_evm_config,
             dst_evm_config,
         }
     }
-
-    fn state(&self) -> RuntimeState<Erc20BridgeOpImpl> {
-        self.runtime.borrow().state().clone()
-    }
 }
 
-impl BftBridgeEventHandler for Erc20EventsHandler {
-    fn on_wrapped_token_minted(&self, event: MintedEventData) -> BftResult<()> {
+impl BftBridgeEventHandler<Erc20BridgeOpImpl> for Erc20EventsHandler {
+    fn on_wrapped_token_minted(
+        &self,
+        event: MintedEventData,
+    ) -> Option<OperationAction<Erc20BridgeOpImpl>> {
         log::trace!("wrapped token minted. Updating operation to the complete state...");
 
         let nonce = event.nonce;
-        let dst_address = event.recipient.clone();
-        let operation = Erc20BridgeOpImpl(Erc20BridgeOp {
+        let update_to = Erc20BridgeOpImpl(Erc20BridgeOp {
             side: self.side,
             stage: Erc20OpStage::TokenMintConfirmed(event),
         });
 
-        self.state()
-            .borrow_mut()
-            .operations
-            .update_by_nonce(&dst_address, nonce, operation);
-
-        Ok(())
+        Some(OperationAction::Update { nonce, update_to })
     }
 
-    fn on_wrapped_token_burnt(&self, event: BurntEventData) -> BftResult<()> {
+    fn on_wrapped_token_burnt(
+        &self,
+        event: BurntEventData,
+    ) -> Option<OperationAction<Erc20BridgeOpImpl>> {
         log::trace!("Wrapped token burnt. Preparing mint order for other side...");
 
         // Panic here to make the runtime re-process the events when EVM params will be initialized.
@@ -82,17 +74,18 @@ impl BftBridgeEventHandler for Erc20EventsHandler {
         let nonce = {
             let mut counter = self.nonce_counter.borrow_mut();
             let nonce = *counter.get();
-            counter.set(nonce + 1);
+            counter
+                .set(nonce + 1)
+                .expect("failed to update nonce counter");
             nonce
         };
 
-        let order =
+        let Some(order) =
             mint_order_from_burnt_event(event.clone(), src_evm_params, dst_evm_params, nonce)
-                .ok_or_else(|| {
-                    Error::FailedToProgress(format!(
-                        "failed to create a mint order for event: {event:?}"
-                    ))
-                })?;
+        else {
+            log::warn!("failed to create a mint order for event: {event:?}");
+            return None;
+        };
 
         let operation = Erc20BridgeOpImpl(Erc20BridgeOp {
             side: self.side.other(),
@@ -101,23 +94,15 @@ impl BftBridgeEventHandler for Erc20EventsHandler {
         let memo = event.memo();
 
         let op_id = OperationId::new(nonce as _);
-        self.state()
-            .borrow_mut()
-            .operations
-            .new_operation_with_id(op_id, operation.clone(), memo);
-        self.runtime.borrow().schedule_operation(op_id, operation);
-
-        Ok(())
+        Some(OperationAction::CreateWithId(op_id, operation, memo))
     }
 
-    fn on_minter_notification(&self, event: NotifyMinterEventData) -> BftResult<()> {
+    fn on_minter_notification(
+        &self,
+        event: NotifyMinterEventData,
+    ) -> Option<OperationAction<Erc20BridgeOpImpl>> {
         log::debug!("on_minter_notification {event:?}");
-
-        if let Some(operation_id) = event.try_decode_reschedule_operation_id() {
-            self.runtime.borrow().reschedule_operation(operation_id);
-        }
-
-        Ok(())
+        None
     }
 }
 
