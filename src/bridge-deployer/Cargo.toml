@@ -30,6 +30,3 @@ tracing-subscriber = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-[features]
-dfx_tests = []

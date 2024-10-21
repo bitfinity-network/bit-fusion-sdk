@@ -6,7 +6,6 @@ use clap::Parser;
 use ethereum_types::{H160, H256};
 use ic_agent::{Agent, Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
-use ic_canister_client::CanisterClient as _;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
 use tracing::{debug, info};
 
@@ -100,25 +99,6 @@ impl DeployCommands {
             )
             .await?;
 
-        // wait for canister to come up
-        let canister_client =
-            ic_canister_client::IcAgentClient::with_agent(canister_id, agent.clone());
-        let t_start = std::time::Instant::now();
-        while t_start.elapsed() < std::time::Duration::from_secs(60) {
-            if matches!(
-                canister_client
-                    .update::<_, bridge_did::error::BftResult<did::H160>>(
-                        "get_bridge_canister_evm_address",
-                        (),
-                    )
-                    .await,
-                Ok(Ok(_))
-            ) {
-                break;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        }
         println!("Canister deployed with ID {canister_id}",);
 
         info!("Deploying BFT bridge");
