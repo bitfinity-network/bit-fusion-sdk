@@ -37,11 +37,6 @@ fn dfx_replica_port() -> u16 {
     dfx_info_port("replica-port")
 }
 
-/// Returns local dfx replica port
-fn dfx_webserver_port() -> u16 {
-    dfx_info_port("webserver-port")
-}
-
 /// Returns the port of the dfx service
 fn dfx_info_port(service: &str) -> u16 {
     Command::new("dfx")
