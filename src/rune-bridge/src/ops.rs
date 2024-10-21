@@ -24,8 +24,9 @@ use crate::core::rune_inputs::RuneInputProvider;
 use crate::core::utxo_handler::UtxoHandler;
 use crate::core::withdrawal::Withdrawal;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 0;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 1;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 2;
 
 pub mod events_handler;
 
