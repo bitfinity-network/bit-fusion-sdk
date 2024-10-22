@@ -2,6 +2,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use bridge_did::id256::Id256;
 use clap::{Args, ValueEnum};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
@@ -376,32 +377,32 @@ impl SolidityContractDeployer<'_> {
     /// Deploy wrapped ERC20 on the wrapped token deployer contract
     pub fn deploy_wrapped_token(
         &self,
-        wrapped_token_deployer: &H160,
+        bft_bridge: &H160,
         name: &str,
         symbol: &str,
         decimals: u8,
+        base_token_id: Id256,
     ) -> Result<H160> {
-        let owner = self.wallet.address();
         let network = self.network.to_string();
-        let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
-        let owner = owner.encode_hex_with_prefix();
+        let bfr_bridge = bft_bridge.encode_hex_with_prefix();
         let decimals = decimals.to_string();
+        let base_token_id = base_token_id.0.encode_hex_with_prefix();
 
         let args = vec![
             "hardhat",
             "deploy-wrapped-token",
             "--network",
             &network,
-            "--wrapped-token-deployer",
-            &wrapped_token_deployer,
+            "--bft-bridge",
+            &bfr_bridge,
             "--name",
             name,
             "--symbol",
             symbol,
             "--decimals",
             &decimals,
-            "--owner",
-            &owner,
+            "--base-token-id",
+            &base_token_id,
         ];
 
         let dir = std::env::current_dir()

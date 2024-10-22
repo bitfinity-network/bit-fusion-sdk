@@ -19,9 +19,12 @@ pub struct Cli {
     /// The command to run
     #[command(subcommand)]
     command: Commands,
+
     /// The identity that will be used to perform the DFX operations
+    ///
+    /// If not set, current active DFX identity will be used
     #[arg(long, value_name = "IDENTITY_PATH")]
-    identity: PathBuf,
+    identity: Option<PathBuf>,
 
     /// Private Key of the wallet to use for the transaction
     ///
@@ -72,6 +75,7 @@ pub struct Cli {
 impl Cli {
     /// Runs the Bitfinity Deployer application.
     pub async fn run() -> anyhow::Result<()> {
+        let _ = dotenv::dotenv();
         let cli = Cli::parse();
 
         // Initialize tracing with the appropriate log level based on the verbosity setting.

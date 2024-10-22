@@ -12,6 +12,7 @@ bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 clap = { workspace = true, features = ["env"] }
 did = { workspace = true }
+dotenv = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 ethereum-types = { workspace = true }

@@ -1,12 +1,7 @@
-use std::path::PathBuf;
-
 use alloy_sol_types::{SolInterface, SolValue};
-use anyhow::anyhow;
-use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
-use candid::Principal;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Subcommand};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::Bytes;
 use eth_signer::{Signer, Wallet};
@@ -15,12 +10,8 @@ use ethereum_json_rpc_client::EthJsonRpcClient;
 use ethereum_types::{H160, H256};
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, TransactionRequest};
-use ic_agent::Agent;
 use tracing::info;
 
-use crate::canister_ids::CanisterIdsPath;
-use crate::commands::BFTArgs;
-use crate::config::BaseEvmSettingsConfig;
 use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
 
 #[derive(Debug, Subcommand)]
@@ -78,9 +69,9 @@ impl WrapTokenType {
             name,
             symbol,
             decimals,
-            ..
+            id,
         } = base_token_params;
-        deployer.deploy_wrapped_token(self.token_deployer_address(), name, symbol, *decimals)
+        deployer.deploy_wrapped_token(self.token_deployer_address(), name, symbol, *decimals, *id)
     }
 
     async fn get_erc20_params(

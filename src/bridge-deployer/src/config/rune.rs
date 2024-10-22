@@ -5,8 +5,6 @@ use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin;
 use serde::{Deserialize, Serialize};
 
-use super::LogCanisterSettings;
-
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct RuneBridgeConfig {
     /// The network to use for the Bitcoin blockchain
@@ -34,9 +32,6 @@ pub struct RuneBridgeConfig {
     /// The timeout for the mempool to confirm a transaction
     #[arg(long)]
     pub mempool_timeout: u64,
-    /// Log settings for the canister
-    #[command(flatten, next_help_heading = "Log Settings for the canister")]
-    pub log_settings: Option<LogCanisterSettings>,
 }
 
 #[derive(ValueEnum, Serialize, Deserialize, Debug, Clone)]
