@@ -20,7 +20,6 @@ use upgrade::UpgradeCommands;
 use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::config;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
-use crate::evm::dfx_webserver_port;
 mod deploy;
 mod reinstall;
 mod upgrade;
@@ -222,7 +221,7 @@ impl Commands {
 
 #[derive(Debug, Args)]
 pub struct BFTArgs {
-    /// The address of the owner of the contract. Must be used with `--deploy-bft`.
+    /// The address of the owner of the contract.
     #[arg(long, value_name = "OWNER")]
     owner: Option<H160>,
 
@@ -249,17 +248,9 @@ impl BFTArgs {
     ) -> anyhow::Result<BftDeployedContracts> {
         info!("Deploying BFT bridge");
 
-        let evm_localhost_url = match network {
-            EvmNetwork::Localhost => Some(format!(
-                "http://127.0.0.1:{}/?canisterId={evm}",
-                dfx_webserver_port(),
-            )),
-            _ => None,
-        };
+        let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
 
-        let contract_deployer = SolidityContractDeployer::new(network, pk, evm_localhost_url);
-
-        let expected_nonce = contract_deployer.get_nonce(evm).await? + 3;
+        let expected_nonce = contract_deployer.get_nonce().await? + 3;
         let expected_fee_charge_address =
             contract_deployer.compute_fee_charge_address(expected_nonce)?;
 
@@ -290,7 +281,7 @@ impl BFTArgs {
 
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
-        info!("BFT bridge deployed successfully. Contract address: {bft_address}");
+        info!("BFT bridge deployed successfully. Contract address: {bft_address:x}");
 
         Ok(BftDeployedContracts {
             bft_bridge: bft_address,

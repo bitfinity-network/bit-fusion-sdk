@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
@@ -16,7 +17,6 @@ use tracing::{debug, error, info};
 use crate::evm::dfx_webserver_port;
 
 const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
-const LOCALHOST_URL_ENV_VAR: &str = "LOCALHOST_URL";
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
 #[strum(serialize_all = "snake_case")]
@@ -28,9 +28,8 @@ pub enum EvmNetwork {
 
 pub struct SolidityContractDeployer<'a> {
     network: EvmNetwork,
-    evm_localhost_url: Option<String>,
     wallet: Wallet<'a, SigningKey>,
-    private_key: H256,
+    evm: Principal,
 }
 
 impl SolidityContractDeployer<'_> {
@@ -44,23 +43,23 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: EvmNetwork, pk: H256, evm_localhost_url: Option<String>) -> Self {
+    pub fn new(network: EvmNetwork, pk: H256, evm: Principal) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
-
         Self {
             network,
             wallet,
-            evm_localhost_url,
-            private_key: pk,
+            evm,
         }
     }
 
-    pub fn get_network_url(&self, evm: Principal) -> String {
+    /// Returns the network URL based on the selected network.
+    pub fn get_network_url(&self) -> String {
         match self.network {
             EvmNetwork::Localhost => {
                 format!(
                     "http://127.0.0.1:{dfx_port}/?canisterId={evm}",
-                    dfx_port = dfx_webserver_port()
+                    dfx_port = dfx_webserver_port(),
+                    evm = self.evm,
                 )
             }
             EvmNetwork::Testnet => "https://testnet.bitfinity.network".to_string(),
@@ -68,17 +67,107 @@ impl SolidityContractDeployer<'_> {
         }
     }
 
-    /// Deploys the BFT contract with the given parameters.
+    /// Returns the path to the solidity directory.
+    pub fn solidity_dir(&self) -> PathBuf {
+        std::env::current_dir()
+            .context("Failed to get current directory")
+            .expect("Failed to get current directory")
+            .join("solidity")
+    }
+
+    /// Returns the private key of the deployer.
+    pub fn pk(&self) -> String {
+        self.wallet.signer().to_bytes().encode_hex_with_prefix()
+    }
+
+    /// Returns the address of the deployer.
+    pub fn sender(&self) -> String {
+        self.wallet.address().encode_hex_with_prefix()
+    }
+
+    /// Executes a forge script with the given environment variables.
     ///
-    /// # Arguments
+    /// This is a helper function that executes a forge script with the given environment variables.
+    fn execute_forge_script(
+        &self,
+        script_name: &str,
+        env_vars: Vec<(&str, String)>,
+    ) -> Result<String> {
+        let solidity_dir = self.solidity_dir();
+        let script_dir = solidity_dir.join("script").join(script_name);
+
+        let args = [
+            "forge",
+            "script",
+            "--broadcast",
+            "-v",
+            script_dir.to_str().expect("Invalid solidity dir"),
+            "--rpc-url",
+            &self.get_network_url(),
+            "--private-key",
+            &self.pk(),
+            "--sender",
+            &self.sender(),
+            "--slow",
+        ];
+
+        debug!(
+            "Executing command: sh -c cd {} && {}",
+            solidity_dir.display(),
+            args.join(" ")
+        );
+
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg(format!(
+                "cd {} && {} 2>&1",
+                solidity_dir.display(),
+                args.join(" ")
+            ))
+            .env(PRIVATE_KEY_ENV_VAR, self.pk())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        for (key, value) in env_vars {
+            command.env(key, value);
+        }
+
+        let output = command
+            .output()
+            .context(format!("Failed to execute {} command", script_name))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            error!(
+                "{} command failed. Stdout:\n{}\nStderr:\n{}",
+                script_name, stdout, stderr
+            );
+            return Err(anyhow::anyhow!("{} command failed", script_name));
+        } else {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            debug!("{} command output: {}", script_name, stdout);
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    /// Extracts the address from the output.
     ///
-    /// * `minter_address` - The address of the minter contract.
-    /// * `fee_charge_address` - The address of the fee charge contract.
-    /// * `is_wrapped_side` - A boolean indicating whether the BFT contract is for the wrapped side.
-    ///
-    /// # Returns
-    ///
-    /// The address of the deployed BFT contract.
+    /// This is a helper function that extracts the address from the output.
+    fn extract_address_from_output(output: &str, prefix: &str) -> Result<H160> {
+        let address = output
+            .lines()
+            .find(|line| line.contains(prefix))
+            .and_then(|line| line.split(':').nth(1))
+            .map(str::trim)
+            .context(format!("Failed to extract {} address", prefix))?;
+
+        H160::from_str(address).context(format!("Invalid {} address", prefix))
+    }
+
+    /// Deploys the BFT contract.
     pub fn deploy_bft(
         &self,
         minter_address: &H160,
@@ -90,268 +179,78 @@ impl SolidityContractDeployer<'_> {
     ) -> Result<H160> {
         info!("Deploying BFT contract");
 
-        let network = self.network.to_string();
-        let minter_address = minter_address.encode_hex_with_prefix();
-        let fee_charge_address = fee_charge_address.encode_hex_with_prefix();
-        let wrapped_token_deployer_address =
-            wrapped_token_deployer_address.encode_hex_with_prefix();
-        let is_wrapped_side = is_wrapped_side.to_string();
-        let owner = owner.map(|o| o.encode_hex_with_prefix());
-        let controllers = controllers.as_ref().map(|c| {
-            c.iter()
+        let env_vars = vec![
+            ("MINTER_ADDRESS", minter_address.encode_hex_with_prefix()),
+            (
+                "FEE_CHARGE_ADDRESS",
+                fee_charge_address.encode_hex_with_prefix(),
+            ),
+            (
+                "WRAPPED_TOKEN_DEPLOYER",
+                wrapped_token_deployer_address.encode_hex_with_prefix(),
+            ),
+            ("IS_WRAPPED_SIDE", is_wrapped_side.to_string()),
+        ];
+
+        let env_vars = if let Some(owner) = owner {
+            env_vars
+                .into_iter()
+                .chain(vec![("OWNER", owner.encode_hex_with_prefix())])
+                .collect()
+        } else {
+            env_vars
+        };
+
+        let env_vars = if let Some(controllers) = controllers {
+            let controllers_str = controllers
+                .iter()
                 .map(H160::encode_hex_upper_with_prefix)
                 .collect::<Vec<String>>()
-                .join(",")
-        });
-        let mut args = vec![
-            "hardhat",
-            "deploy-bft",
-            "--network",
-            &network,
-            "--minter-address",
-            &minter_address,
-            "--fee-charge-address",
-            &fee_charge_address,
-            "--wrapped-token-deployer-address",
-            &wrapped_token_deployer_address,
-            "--is-wrapped-side",
-            &is_wrapped_side,
-        ];
-
-        if let Some(ref owner) = owner {
-            args.push("--owner");
-            args.push(owner);
-        }
-
-        if let Some(ref controllers) = controllers {
-            args.push("--controllers");
-            args.push(controllers);
-        }
-
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
-
-        debug!(
-            "Executing command: sh -c cd {} && npx {}",
-            dir,
-            args.join(" ")
-        );
-
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
-            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
-            .env(
-                LOCALHOST_URL_ENV_VAR,
-                self.evm_localhost_url.as_deref().unwrap_or(""),
-            )
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .context("Failed to execute deploy-bft command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            error!("deploy-bft command failed: {}", args.join(" "));
-            error!(
-                "deploy-bft command failed. Stdout:\n{}\nStderr:\n{}",
-                stdout, stderr
-            );
-
-            return Err(anyhow::anyhow!("deploy-bft command failed"));
+                .join(",");
+            env_vars
+                .into_iter()
+                .chain(vec![("CONTROLLERS", controllers_str)])
+                .collect()
         } else {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            debug!("deploy-bft command output:\n{}", stdout);
-        }
+            env_vars
+        };
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Extract the proxy address from the output
-        let proxy_address = stdout
-            .lines()
-            .find(|line| line.starts_with("BFT deployed to:"))
-            .and_then(|line| line.split(':').nth(1))
-            .map(str::trim)
-            .context("Failed to extract BFT proxy address")?;
-
-        let address = H160::from_str(proxy_address).context("Invalid BFT proxy address")?;
-        Ok(address)
+        let output = self.execute_forge_script("DeployBFT.s.sol", env_vars)?;
+        Self::extract_address_from_output(&output, "Proxy address:")
     }
 
-    /// Deploys WrappedTokenDeployer contract
+    /// Deploys the WrappedTokenDeployer contract.
     pub fn deploy_wrapped_token_deployer(&self) -> Result<H160> {
         info!("Deploying WrappedTokenDeployer contract");
-        let network = self.network.to_string();
-
-        let args = [
-            "hardhat",
-            "deploy-wrapped-token-deployer",
-            "--network",
-            &network,
-        ];
-
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
-
-        debug!(
-            "Executing command: sh -c cd {} && npx {}",
-            dir,
-            args.join(" ")
-        );
-
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
-            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
-            .env(
-                LOCALHOST_URL_ENV_VAR,
-                self.evm_localhost_url.as_deref().unwrap_or(""),
-            )
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .context("Failed to execute deploy-wrapped-token-deployer command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            error!(
-                "deploy-wrapped-token-deployer command failed: {}",
-                args.join(" ")
-            );
-            error!(
-                "deploy-wrapped-token-deployer command failed. Stdout:\n{}\nStderr:\n{}",
-                stdout, stderr
-            );
-
-            return Err(anyhow::anyhow!(
-                "deploy-wrapped-token-deployer command failed"
-            ));
-        } else {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            debug!("deploy-wrapped-token-deployer command output:\n{}", stdout);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Extract the fee charge address from the output
-        let wrapped_token_deployer_address = stdout
-            .lines()
-            .find(|line| line.starts_with("WrappedTokenDeployer address:"))
-            .and_then(|line| line.split(':').nth(1))
-            .map(str::trim)
-            .context("Failed to extract WrappedTokenDeployer address")?;
-
-        let address = H160::from_str(wrapped_token_deployer_address)
-            .context("Invalid WrappedTokenDeployer address")?;
-
-        Ok(address)
+        let output = self.execute_forge_script("DeployWrappedTokenDeployer.s.sol", vec![])?;
+        Self::extract_address_from_output(&output, "WrappedTokenDeployer address:")
     }
 
-    /// Deploys the Fee Charge contract with the given parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `bridges` - A list of bridge addresses to be associated with the Fee Charge contract.
-    /// * `nonce` - The nonce to use for computing the contract address.
-    /// * `expected_address` - An optional expected address for the deployed Fee Charge contract.
-    ///
-    /// # Returns
-    ///
-    /// The address of the deployed Fee Charge contract.
+    /// Deploys the FeeCharge contract.
     pub fn deploy_fee_charge(
         &self,
         bridges: &[H160],
         expected_address: Option<H160>,
     ) -> Result<H160> {
         info!("Deploying Fee Charge contract");
+
         let bridges = bridges
             .iter()
             .map(H160::encode_hex_upper_with_prefix)
             .collect::<Vec<String>>()
             .join(",");
-        let network = self.network.to_string();
-        let expected_address = expected_address.map(|addr| addr.encode_hex_upper_with_prefix());
 
-        let mut args = vec![
-            "hardhat",
-            "deploy-fee-charge",
-            "--network",
-            &network,
-            "--bridges",
-            &bridges,
-        ];
+        let mut env_vars = vec![("BRIDGES", bridges)];
 
-        if let Some(ref addr) = expected_address {
-            args.push("--expected-address");
-            args.push(addr)
+        if let Some(addr) = expected_address {
+            env_vars.push(("EXPECTED_ADDRESS", addr.encode_hex_upper_with_prefix()));
         }
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
-
-        let dir = dir.display();
-        info!("Deploying Fee Charge contract in {}", dir);
-
-        debug!(
-            "Executing command: sh -c cd {} && npx {}",
-            dir,
-            args.join(" ")
-        );
-
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
-            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
-            .env(
-                LOCALHOST_URL_ENV_VAR,
-                self.evm_localhost_url.as_deref().unwrap_or(""),
-            )
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .context("Failed to execute deploy-bft command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            error!("deploy-fee-charge command failed: {}", args.join(" "));
-            error!(
-                "deploy-fee-charge command failed. Stdout:\n{}\nStderr:\n{}",
-                stdout, stderr
-            );
-
-            return Err(anyhow::anyhow!("deploy-fee-charge command failed"));
-        } else {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            debug!("deploy-fee-charge command output:\n{}", stdout);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Extract the fee charge address from the output
-        let fee_charge_address = stdout
-            .lines()
-            .find(|line| line.starts_with("Fee charge address:"))
-            .and_then(|line| line.split(':').nth(1))
-            .map(str::trim)
-            .context("Failed to extract Fee Charge address")?;
-
-        let address = H160::from_str(fee_charge_address).context("Invalid Fee Charge address")?;
-
-        Ok(address)
+        let output = self.execute_forge_script("DeployFeeCharge.s.sol", env_vars)?;
+        Self::extract_address_from_output(&output, "Fee charge address:")
     }
 
-    /// Deploy wrapped ERC20 on the wrapped token deployer contract
+    /// Deploys the WrappedToken contract.
     pub fn deploy_wrapped_token(
         &self,
         wrapped_token_deployer: &H160,
@@ -359,120 +258,39 @@ impl SolidityContractDeployer<'_> {
         symbol: &str,
         decimals: u8,
     ) -> Result<H160> {
-        let owner = self.wallet.address();
-        let network = self.network.to_string();
-        let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
-        let owner = owner.encode_hex_with_prefix();
-        let decimals = decimals.to_string();
+        info!("Deploying Wrapped ERC20 contract");
 
-        let args = vec![
-            "hardhat",
-            "deploy-wrapped-token",
-            "--network",
-            &network,
-            "--wrapped-token-deployer",
-            &wrapped_token_deployer,
-            "--name",
-            name,
-            "--symbol",
-            symbol,
-            "--decimals",
-            &decimals,
-            "--owner",
-            &owner,
+        let env_vars = vec![
+            (
+                "WRAPPED_TOKEN_DEPLOYER",
+                wrapped_token_deployer.encode_hex_with_prefix(),
+            ),
+            ("NAME", name.to_string()),
+            ("SYMBOL", symbol.to_string()),
+            ("DECIMALS", decimals.to_string()),
+            ("OWNER", self.wallet.address().encode_hex_with_prefix()),
         ];
 
-        let dir = std::env::current_dir()
-            .context("Failed to get current directory")?
-            .join("solidity");
+        let output = self.execute_forge_script("DeployWrappedToken.s.sol", env_vars)?;
 
-        let dir = dir.display();
-        info!("Deploying ERC20 contract in {dir}");
-
-        debug!(
-            "Executing command: sh -c cd {dir} && npx {}",
-            args.join(" ")
-        );
-
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!("cd {} && npx {} 2>&1", dir, args.join(" ")))
-            .env(PRIVATE_KEY_ENV_VAR, self.private_key_str())
-            .env(
-                LOCALHOST_URL_ENV_VAR,
-                self.evm_localhost_url.as_deref().unwrap_or(""),
-            )
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .context("Failed to execute deploy-wrapped-token command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            error!("deploy-wrapped-token command failed: {}", args.join(" "));
-            error!(
-                "deploy-wrapped-token command failed. Stdout:\n{}\nStderr:\n{}",
-                stdout, stderr
-            );
-
-            return Err(anyhow::anyhow!("deploy-wrapped-token command failed"));
-        } else {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            debug!("deploy-wrapped-token command output:\n{}", stdout);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Extract the fee charge address from the output
-        let fee_charge_address = stdout
-            .lines()
-            .find(|line| line.starts_with("ERC20 deployed at:"))
-            .and_then(|line| line.split(':').nth(1))
-            .map(str::trim)
-            .context("Failed to extract ERC20 address")?;
-
-        let address = H160::from_str(fee_charge_address).context("Invalid ERC20 address")?;
-
-        Ok(address)
+        Self::extract_address_from_output(&output, "ERC20 deployed at:")
     }
 
-    /// Computes the address of the fee charge contract based on the deployer's address and the given nonce.
-    ///
-    /// # Arguments
-    ///
-    /// * `nonce` - The nonce to use for computing the contract address.
-    ///
-    /// # Returns
-    ///
-    /// The computed fee charge contract address.
+    /// Computes the fee charge address.
     pub fn compute_fee_charge_address(&self, nonce: u64) -> Result<H160> {
         let deployer = self.wallet.address();
         let contract_address = ethers_core::utils::get_contract_address(deployer, nonce);
-
         Ok(contract_address)
     }
 
-    /// Retrieves the nonce of the deployer's address.
-    ///
-    /// # Returns
-    ///
-    /// The nonce of the deployer's address.
-    pub async fn get_nonce(&self, evm: Principal) -> Result<u64> {
-        let url = self.get_network_url(evm);
-
+    /// Returns the nonce of the deployer.
+    pub async fn get_nonce(&self) -> Result<u64> {
+        let url = self.get_network_url();
         let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
-
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)
             .await?;
-
         Ok(nonce)
-    }
-
-    /// Returns the private key as a string.
-    fn private_key_str(&self) -> String {
-        hex::encode(self.private_key.as_bytes())
     }
 }

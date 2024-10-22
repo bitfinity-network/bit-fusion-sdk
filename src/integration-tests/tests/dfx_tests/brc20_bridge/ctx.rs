@@ -413,7 +413,7 @@ impl Brc20Context {
             let response: Vec<(OperationId, Brc20BridgeOp)> = self
                 .inner
                 .brc20_bridge_client(ADMIN)
-                .get_operations_list(eth_address)
+                .get_operations_list(eth_address, None, None)
                 .await
                 .expect("canister call failed");
 
