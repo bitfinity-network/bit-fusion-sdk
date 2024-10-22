@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import 'forge-std/Script.sol';
-import '@openzeppelin/foundry-upgrades/Upgrades.sol';
+import "forge-std/Script.sol";
+import "@openzeppelin/foundry-upgrades/Upgrades.sol";
 
 /**
  * @title PrepareUpgradeScript
@@ -15,19 +15,19 @@ contract PrepareUpgrade is Script {
 
     function setUp() public {
         // Read the proxy address from the environment variables
-        proxyAddress = vm.envAddress('PROXY_ADDRESS');
+        proxyAddress = vm.envAddress("PROXY_ADDRESS");
     }
 
     function run() external {
         setUp();
 
-        console.log('Starting upgrade preparation...');
+        console.log("Starting upgrade preparation...");
 
         // Start broadcasting to the network
         vm.startBroadcast();
 
         // Deploy the new implementation contract (BFTBridgeV2)
-        string memory contractName = 'BftBridge.sol:BFTBridgeV2';
+        string memory contractName = "BftBridge.sol:BFTBridgeV2";
         Upgrades.Options memory opts;
         newImplementationAddress = Upgrades.prepareUpgrade(contractName, opts);
 
@@ -35,18 +35,12 @@ contract PrepareUpgrade is Script {
         vm.stopBroadcast();
 
         // Retrieve and log the address of the new implementation
-        console.log(
-            'New implementation deployed at:',
-            newImplementationAddress
-        );
+        console.log("New implementation deployed at:", newImplementationAddress);
 
         // Optionally, store the implementation address for the next steps
-        vm.writeLine(
-            '.implementation_address',
-            vm.toString(newImplementationAddress)
-        );
+        vm.writeLine(".implementation_address", vm.toString(newImplementationAddress));
 
-        console.log('Upgrade preparation completed.');
+        console.log("Upgrade preparation completed.");
     }
 }
 
@@ -61,14 +55,14 @@ contract AddNewImplementation is Script {
 
     function setUp() public {
         // Read the addresses from the environment variables
-        proxyAddress = vm.envAddress('PROXY_ADDRESS');
-        newImplementationAddress = vm.readFile('.implementation_address');
+        proxyAddress = vm.envAddress("PROXY_ADDRESS");
+        newImplementationAddress = vm.readFile(".implementation_address");
     }
 
     function run() external {
         setUp();
 
-        console.log('Adding new implementation...');
+        console.log("Adding new implementation...");
 
         // Start broadcasting to the network
         vm.startBroadcast();
@@ -86,7 +80,7 @@ contract AddNewImplementation is Script {
         // Stop broadcasting
         vm.stopBroadcast();
 
-        console.log('New implementation added successfully.');
+        console.log("New implementation added successfully.");
     }
 }
 
@@ -101,14 +95,14 @@ contract UpgradeProxy is Script {
 
     function setUp() public {
         // Read the addresses from the environment variables
-        proxyAddress = vm.envAddress('PROXY_ADDRESS');
-        newImplementationAddress = vm.envAddress('NEW_IMPLEMENTATION_ADDRESS');
+        proxyAddress = vm.envAddress("PROXY_ADDRESS");
+        newImplementationAddress = vm.envAddress("NEW_IMPLEMENTATION_ADDRESS");
     }
 
     function run() external {
         setUp();
 
-        console.log('Upgrading proxy...');
+        console.log("Upgrading proxy...");
 
         // Start broadcasting to the network
         vm.startBroadcast();
@@ -117,7 +111,7 @@ contract UpgradeProxy is Script {
         IBFTBridge proxyContract = IBFTBridge(proxyAddress);
 
         // Prepare the initialization data
-        bytes memory initData = abi.encodeWithSignature('__BridgeV2_init()');
+        bytes memory initData = abi.encodeWithSignature("__BridgeV2_init()");
 
         // Upgrade the proxy to the new implementation and call the initializer
         proxyContract.upgradeToAndCall(newImplementationAddress, initData);
@@ -125,7 +119,7 @@ contract UpgradeProxy is Script {
         // Stop broadcasting
         vm.stopBroadcast();
 
-        console.log('Proxy upgraded successfully.');
+        console.log("Proxy upgraded successfully.");
     }
 }
 
@@ -134,10 +128,9 @@ contract UpgradeProxy is Script {
  * Include the functions needed for the upgrade process.
  */
 interface IBFTBridge {
-    function addAllowedImplementation(bytes32 bytecodeHash) external;
-
-    function upgradeToAndCall(
-        address newImplementation,
-        bytes memory data
+    function addAllowedImplementation(
+        bytes32 bytecodeHash
     ) external;
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external;
 }

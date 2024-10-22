@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import 'forge-std/Script.sol';
-import 'src/BFTBridge.sol';
+import "forge-std/Script.sol";
+import "src/BftBridge.sol";
 
 /**
  * @title PauseUnpauseScript
@@ -16,20 +16,20 @@ import 'src/BFTBridge.sol';
  * !!! MAKE SURE THE OWNER IS THE SAME AS THE DEPLOYER
  */
 contract PauseUnpauseScript is Script {
-    function setUp() public {}
+    function setUp() public { }
 
     function run(address contractAddress, bool shouldPause) public {
-        uint256 deployerPrivateKey = vm.envUint('PRIVATE_KEY');
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
         BFTBridge bridge = BFTBridge(contractAddress);
 
         if (shouldPause) {
             bridge.pause();
-            console.log('Contract paused');
+            console.log("Contract paused");
         } else {
             bridge.unpause();
-            console.log('Contract unpaused');
+            console.log("Contract unpaused");
         }
 
         vm.stopBroadcast();
