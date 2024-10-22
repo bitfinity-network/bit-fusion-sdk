@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "@openzeppelin/foundry-upgrades/Upgrades.sol";
+import { Options } from "@openzeppelin/foundry-upgrades/Options.sol";
 
 /**
  * @title PrepareUpgradeScript
@@ -28,7 +29,7 @@ contract PrepareUpgrade is Script {
 
         // Deploy the new implementation contract (BFTBridgeV2)
         string memory contractName = "BftBridge.sol:BFTBridgeV2";
-        Upgrades.Options memory opts;
+        Options memory opts;
         newImplementationAddress = Upgrades.prepareUpgrade(contractName, opts);
 
         // Stop broadcasting
@@ -56,7 +57,8 @@ contract AddNewImplementation is Script {
     function setUp() public {
         // Read the addresses from the environment variables
         proxyAddress = vm.envAddress("PROXY_ADDRESS");
-        newImplementationAddress = vm.readFile(".implementation_address");
+        string memory newImp = vm.readFile(".implementation_address");
+        newImplementationAddress = address(bytes20(bytes(newImp)));
     }
 
     function run() external {
