@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
+use anyhow::bail;
 use bridge_did::id256::Id256;
 use bridge_did::init::btc::WrappedTokenConfig;
 use candid::{Encode, Principal};
@@ -53,10 +55,11 @@ pub struct DeployCommands {
     #[arg(long, default_value_t = DEFAULT_CYCLES)]
     cycles: u128,
 
-    /// Wallet canister ID that is used in the creation of
-    /// canisters
+    /// Wallet canister ID that is used in the creation of canisters.
+    ///
+    /// If not set, default wallet of the currently active dfx identity will be used.
     #[arg(long, value_name = "WALLET_CANISTER", env)]
-    wallet_canister: Principal,
+    wallet_canister: Option<Principal>,
 
     /// These are extra arguments for the BFT bridge.
     #[command(flatten, next_help_heading = "BFT Bridge deployment")]
@@ -82,9 +85,9 @@ impl DeployCommands {
             .build()?;
 
         super::fetch_root_key(ic_host, &agent).await?;
+        let wallet_canister = self.get_wallet_canister(ic_host)?;
 
-        let deployer =
-            BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
+        let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
         let canister_id = deployer
             .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
             .await?;
@@ -190,5 +193,30 @@ impl DeployCommands {
             .await?;
 
         Ok(())
+    }
+
+    fn get_wallet_canister(&self, ic_host: &str) -> anyhow::Result<Principal> {
+        if let Some(principal) = self.wallet_canister {
+            return Ok(principal);
+        }
+
+        let mut command = Command::new("dfx");
+        command.args(vec!["identity", "get-wallet"]);
+
+        if ic_host.starts_with("httsp://ic0.app") {
+            command.arg("--ic");
+        }
+
+        let result = command.stdout(Stdio::piped()).output()?;
+
+        if !result.status.success() {
+            bail!(
+                "Failed to get wallet principal: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+        }
+
+        let principal = Principal::from_text(&String::from_utf8(result.stdout)?.trim())?;
+        Ok(principal)
     }
 }

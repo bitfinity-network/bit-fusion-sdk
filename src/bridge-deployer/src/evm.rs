@@ -65,6 +65,10 @@ fn local_evm_principal() -> Principal {
         .trim()
         .to_string();
 
+    if principal.is_empty() {
+        panic!("Local evm-testnet canister is not found.")
+    }
+
     // Verify the principal
     Principal::from_text(&principal).expect("Invalid principal")
 }
