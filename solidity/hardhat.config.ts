@@ -1,8 +1,9 @@
-import { HardhatUserConfig } from 'hardhat/config';
+import {HardhatUserConfig} from 'hardhat/config';
 import '@nomicfoundation/hardhat-toolbox';
 import '@nomicfoundation/hardhat-foundry';
 import '@openzeppelin/hardhat-upgrades';
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 
 /// Tasks that are used to interact with the BFT contract
@@ -24,38 +25,40 @@ const CUSTOM_URL = process.env.CUSTOM_URL || "";
 
 
 const config: HardhatUserConfig = {
-  networks: {
-    localhost: {
-      url: 'http://127.0.0.1:8545',
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
-    },
-    mainnet: {
-      url: MAINNET_URL,
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
-    },
-    testnet: {
-      url: TESTNET_URL,
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
-    },
-    custom: {
-      url: CUSTOM_URL,
-      accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
-    }
-  },
-  solidity: {
-    version: '0.8.25',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
-      outputSelection: {
-        '*': {
-          '*': ['storageLayout'],
+    networks: {
+        localhost: {
+            url: 'http://127.0.0.1:8545',
+            accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
         },
-      },
+        mainnet: {
+            url: MAINNET_URL,
+            accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
+            timeout: 120000,
+        },
+        testnet: {
+            url: TESTNET_URL,
+            accounts: [`0x${DEPLOYER_PRIVATE_KEY}`],
+            timeout: 120000,
+        },
+        custom: {
+            url: CUSTOM_URL,
+            accounts: [`0x${DEPLOYER_PRIVATE_KEY}`]
+        }
     },
-  },
+    solidity: {
+        version: '0.8.25',
+        settings: {
+            optimizer: {
+                enabled: true,
+                runs: 200,
+            },
+            outputSelection: {
+                '*': {
+                    '*': ['storageLayout'],
+                },
+            },
+        },
+    },
 };
 
 export default config;

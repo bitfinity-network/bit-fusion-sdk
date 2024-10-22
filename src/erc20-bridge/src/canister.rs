@@ -146,7 +146,7 @@ impl Erc20Bridge {
             .get_log(operation_id)
     }
 
-    #[query]
+    #[update]
     pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
         let signer = get_base_evm_config().borrow().get_signer()?;
         signer.get_address().await.map_err(|e| {

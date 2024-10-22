@@ -43,12 +43,12 @@ impl WrapTokenType {
         }
     }
 
-    fn token_deployer_address(&self) -> &H160 {
+    fn wrapped_bft_address(&self) -> &H160 {
         match self {
             WrapTokenType::Erc20(WrapErc20Args {
-                token_deployer_address,
+                wrapped_bft_address,
                 ..
-            }) => token_deployer_address,
+            }) => wrapped_bft_address,
         }
     }
 
@@ -71,7 +71,7 @@ impl WrapTokenType {
             decimals,
             id,
         } = base_token_params;
-        deployer.deploy_wrapped_token(self.token_deployer_address(), name, symbol, *decimals, *id)
+        deployer.deploy_wrapped_token(self.wrapped_bft_address(), name, symbol, *decimals, *id)
     }
 
     async fn get_erc20_params(
@@ -170,9 +170,6 @@ pub struct WrapErc20Args {
 
     #[arg(long)]
     wrapped_bft_address: H160,
-
-    #[arg(long)]
-    token_deployer_address: H160,
 
     #[arg(long)]
     token_address: H160,
