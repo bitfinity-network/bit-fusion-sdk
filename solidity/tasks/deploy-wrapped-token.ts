@@ -43,17 +43,7 @@ task(
                 throw new Error('Failed to deploy ERC20 token contract');
             }
 
-            // get event
-            const event = receipt.logs
-                .map((log) => contract.interface.parseLog(log))
-                .filter((maybeLog) => maybeLog !== null)
-                .find((parsedLog) => parsedLog.name === 'ERC20Deployed');
-
-            if (!event) {
-                throw new Error('Failed to get ERC20Deployed event');
-            }
-
-            const tokenAddress = event.args[0];
+            const tokenAddress = receipt.getResult();
             console.log('ERC20 deployed at:', tokenAddress);
         },
     );

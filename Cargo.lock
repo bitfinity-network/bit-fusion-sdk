@@ -1046,6 +1046,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-utils 0.37.0",
+ "jsonrpc-core",
  "serde",
  "serde_json",
  "strum",

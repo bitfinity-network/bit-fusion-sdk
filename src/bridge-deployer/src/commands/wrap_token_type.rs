@@ -137,7 +137,7 @@ impl WrapTokenType {
                 TransactionRequest {
                     from: Some(wallet.address().into()),
                     to: Some((*address).into()),
-                    gas: Some(5_000_000u64.into()),
+                    gas: Some(10_000_000_000u64.into()),
                     gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
                     value: None,
                     data: Some(data.into()),
