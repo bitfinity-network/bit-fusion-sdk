@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use candid::Principal;
 use clap::Parser;
 use ethereum_types::H160;
-use ic_agent::{Agent, Identity};
+use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::Bridge;
 use crate::bridge_deployer::BridgeDeployer;
@@ -45,7 +45,7 @@ pub struct ReinstallCommands {
 impl ReinstallCommands {
     pub async fn reinstall_canister(
         &self,
-        identity: PathBuf,
+        identity: GenericIdentity,
         ic_host: &str,
         network: EvmNetwork,
         canister_ids_path: CanisterIdsPath,
@@ -62,10 +62,6 @@ impl ReinstallCommands {
                 anyhow::bail!("Could not resolve canister id for {canister}");
             }
         };
-
-        let identity = GenericIdentity::try_from(identity.as_ref())?;
-        let caller = identity.sender().expect("No sender found");
-        debug!("Deploying with Principal: {caller}",);
 
         let agent = Agent::builder()
             .with_url(ic_host)

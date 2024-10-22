@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Context;
@@ -12,6 +11,7 @@ use deploy::DeployCommands;
 use eth_signer::sign_strategy::SigningStrategy;
 use ethereum_types::{H160, H256};
 use ic_agent::Agent;
+use ic_canister_client::agent::identity::GenericIdentity;
 use ic_canister_client::{CanisterClient, IcAgentClient};
 use reinstall::ReinstallCommands;
 use serde::{Deserialize, Serialize};
@@ -232,7 +232,7 @@ impl Commands {
 
     pub async fn run(
         &self,
-        identity: PathBuf,
+        identity: GenericIdentity,
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,

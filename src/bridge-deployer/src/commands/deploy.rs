@@ -5,10 +5,10 @@ use bridge_did::init::btc::WrappedTokenConfig;
 use candid::{Encode, Principal};
 use clap::Parser;
 use ethereum_types::{H160, H256};
-use ic_agent::{Agent, Identity};
+use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::{BFTArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
@@ -67,7 +67,7 @@ impl DeployCommands {
     /// Deploys a canister with the specified configuration.
     pub async fn deploy_canister(
         &self,
-        identity: PathBuf,
+        identity: GenericIdentity,
         ic_host: &str,
         network: EvmNetwork,
         pk: H256,
@@ -75,10 +75,6 @@ impl DeployCommands {
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
-
-        let identity = GenericIdentity::try_from(identity.as_ref())?;
-        let caller = identity.sender().expect("No sender found");
-        debug!("Deploying with Principal : {caller}",);
 
         let agent = Agent::builder()
             .with_url(ic_host)
