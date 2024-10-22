@@ -70,7 +70,7 @@ impl ReinstallCommands {
 
         super::fetch_root_key(ic_host, &agent).await?;
 
-        let deployer = BridgeDeployer::new(agent.clone(), canister_id);
+        let deployer = BridgeDeployer::new(agent.clone(), ic_host, canister_id);
         deployer
             .install_wasm(
                 &self.wasm,

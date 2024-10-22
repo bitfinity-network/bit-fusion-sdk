@@ -87,7 +87,8 @@ impl DeployCommands {
         super::fetch_root_key(ic_host, &agent).await?;
         let wallet_canister = self.get_wallet_canister(ic_host)?;
 
-        let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
+        let deployer =
+            BridgeDeployer::create(agent.clone(), ic_host, wallet_canister, self.cycles).await?;
         let canister_id = deployer
             .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
             .await?;

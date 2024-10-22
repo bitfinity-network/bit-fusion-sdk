@@ -10,10 +10,10 @@ use crate::contracts::EvmNetwork;
 pub struct InitBridgeConfig {
     /// The signing key ID to use for signing messages
     ///
-    /// This key are fixed in the management canister depending on the environment
-    /// being used
+    /// If not set, `production` or `dfx` signing key will be used based on the IC network the bridge
+    /// is being deployed to.
     #[arg(long)]
-    pub signing_key_id: SigningKeyId,
+    pub signing_key_id: Option<SigningKeyId>,
     /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
     #[arg(long)]
     pub evm: Option<Principal>,
@@ -27,13 +27,15 @@ impl InitBridgeConfig {
     pub fn into_bridge_init_data(
         self,
         owner: Principal,
+        ic_host: &str,
         evm_network: EvmNetwork,
     ) -> BridgeInitData {
+        let signing_strategy = self.signing_key_id(ic_host).into();
         let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
             owner,
             evm_link: crate::evm::evm_link(evm_network, self.evm),
-            signing_strategy: self.signing_key_id.into(),
+            signing_strategy,
             log_settings: Some(ic_log::did::LogCanisterSettings {
                 enable_console: log_settings.enable_console,
                 in_memory_records: log_settings.in_memory_records,
@@ -48,6 +50,16 @@ impl InitBridgeConfig {
                 }),
             }),
         }
+    }
+
+    pub fn signing_key_id(&self, ic_host: &str) -> SigningKeyId {
+        self.signing_key_id.unwrap_or_else(|| {
+            if ic_host.starts_with("https://ic0.app") {
+                SigningKeyId::Production
+            } else {
+                SigningKeyId::Dfx
+            }
+        })
     }
 }
 
