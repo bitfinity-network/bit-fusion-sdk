@@ -52,7 +52,7 @@ impl From<EvmNetwork> for NetworkConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
+#[derive(Debug, Clone, Copy, strum::Display, ValueEnum, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum EvmNetwork {
     Localhost,

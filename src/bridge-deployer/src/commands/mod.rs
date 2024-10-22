@@ -111,7 +111,6 @@ impl Bridge {
     pub fn init_raw_arg(
         &self,
         owner: Principal,
-        ic_host: &str,
         evm_network: EvmNetwork,
     ) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
@@ -120,18 +119,14 @@ impl Bridge {
                 brc20,
             } => {
                 trace!("Preparing BRC20 bridge configuration");
-                let init_data = init
-                    .clone()
-                    .into_bridge_init_data(owner, ic_host, evm_network);
+                let init_data = init.clone().into_bridge_init_data(owner, evm_network);
                 debug!("BRC20 Bridge Config : {:?}", init_data);
                 let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let init_data = init
-                    .clone()
-                    .into_bridge_init_data(owner, ic_host, evm_network);
+                let init_data = init.clone().into_bridge_init_data(owner, evm_network);
                 debug!("Init Bridge Config : {:?}", init_data);
                 let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
@@ -139,18 +134,14 @@ impl Bridge {
             }
             Bridge::Icrc { config } => {
                 trace!("Preparing ICRC bridge configuration");
-                let config = config
-                    .clone()
-                    .into_bridge_init_data(owner, ic_host, evm_network);
+                let config = config.clone().into_bridge_init_data(owner, evm_network);
                 debug!("ICRC Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
             Bridge::Erc20 { init, erc } => {
                 trace!("Preparing ERC20 bridge configuration");
-                let signing_strategy = init.signing_key_id(ic_host).into();
-                let init = init
-                    .clone()
-                    .into_bridge_init_data(owner, ic_host, evm_network);
+                let signing_strategy = init.signing_key_id(evm_network).into();
+                let init = init.clone().into_bridge_init_data(owner, evm_network);
 
                 // Workaround for not depending on the `erc-20` crate
                 #[derive(candid::CandidType)]
@@ -169,9 +160,7 @@ impl Bridge {
             Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
                 let connection = bridge_did::init::btc::BitcoinConnection::from(connection.clone());
-                let init_data = config
-                    .clone()
-                    .into_bridge_init_data(owner, ic_host, evm_network);
+                let init_data = config.clone().into_bridge_init_data(owner, evm_network);
                 let config = BtcBridgeConfig {
                     network: connection,
                     init_data,
@@ -256,7 +245,7 @@ impl Commands {
         match self {
             Commands::Deploy(deploy) => {
                 deploy
-                    .deploy_canister(identity, ic_host, network, pk, canister_ids_path)
+                    .deploy_canister(identity, network, pk, canister_ids_path)
                     .await?
             }
             Commands::Reinstall(reinstall) => {

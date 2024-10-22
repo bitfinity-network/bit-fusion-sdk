@@ -18,6 +18,7 @@ use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::commands::BftDeployedContracts;
 use crate::config::BtcBridgeConnection;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
+use crate::evm::ic_host;
 
 /// The default number of cycles to deposit to the canister
 const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
@@ -71,7 +72,6 @@ impl DeployCommands {
     pub async fn deploy_canister(
         &self,
         identity: GenericIdentity,
-        ic_host: &str,
         network: EvmNetwork,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
@@ -79,16 +79,16 @@ impl DeployCommands {
         info!("Starting canister deployment");
         let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
+        let ic_host = ic_host(network);
         let agent = Agent::builder()
-            .with_url(ic_host)
+            .with_url(&ic_host)
             .with_identity(identity)
             .build()?;
 
-        super::fetch_root_key(ic_host, &agent).await?;
-        let wallet_canister = self.get_wallet_canister(ic_host)?;
+        super::fetch_root_key(&ic_host, &agent).await?;
+        let wallet_canister = self.get_wallet_canister(network)?;
 
-        let deployer =
-            BridgeDeployer::create(agent.clone(), ic_host, wallet_canister, self.cycles).await?;
+        let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
         let canister_id = deployer
             .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
             .await?;
@@ -196,7 +196,7 @@ impl DeployCommands {
         Ok(())
     }
 
-    fn get_wallet_canister(&self, ic_host: &str) -> anyhow::Result<Principal> {
+    fn get_wallet_canister(&self, network: EvmNetwork) -> anyhow::Result<Principal> {
         if let Some(principal) = self.wallet_canister {
             return Ok(principal);
         }
@@ -204,7 +204,7 @@ impl DeployCommands {
         let mut command = Command::new("dfx");
         command.args(vec!["identity", "get-wallet"]);
 
-        if ic_host.starts_with("httsp://ic0.app") {
+        if network != EvmNetwork::Localhost {
             command.arg("--ic");
         }
 

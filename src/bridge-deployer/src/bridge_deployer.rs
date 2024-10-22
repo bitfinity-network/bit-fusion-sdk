@@ -16,16 +16,10 @@ use crate::contracts::EvmNetwork;
 pub struct BridgeDeployer {
     client: GenericBridgeClient<IcAgentClient>,
     agent: Agent,
-    ic_host: String,
 }
 
 impl BridgeDeployer {
-    pub async fn create(
-        agent: Agent,
-        ic_host: &str,
-        wallet: Principal,
-        cycles: u128,
-    ) -> anyhow::Result<Self> {
+    pub async fn create(agent: Agent, wallet: Principal, cycles: u128) -> anyhow::Result<Self> {
         info!("Using wallet canister ID: {wallet}");
         let wallet = WalletCanister::create(&agent, wallet).await?;
         let caller = agent.get_principal().map_err(|err| anyhow!(err))?;
@@ -37,21 +31,13 @@ impl BridgeDeployer {
 
         let client =
             GenericBridgeClient::new(IcAgentClient::with_agent(canister_id, agent.clone()));
-        Ok(Self {
-            client,
-            ic_host: ic_host.to_string(),
-            agent,
-        })
+        Ok(Self { client, agent })
     }
 
-    pub fn new(agent: Agent, ic_host: &str, bridge_principal: Principal) -> Self {
+    pub fn new(agent: Agent, bridge_principal: Principal) -> Self {
         let client =
             GenericBridgeClient::new(IcAgentClient::with_agent(bridge_principal, agent.clone()));
-        Self {
-            client,
-            ic_host: ic_host.to_string(),
-            agent,
-        }
+        Self { client, agent }
     }
 
     pub async fn install_wasm(
@@ -69,8 +55,7 @@ impl BridgeDeployer {
 
         let canister_id = self.client.client().canister_id;
         let management_canister = ManagementCanister::create(&self.agent);
-        let arg =
-            config.init_raw_arg(self.agent.get_principal().unwrap(), &self.ic_host, network)?;
+        let arg = config.init_raw_arg(self.agent.get_principal().unwrap(), network)?;
 
         management_canister
             .install(&canister_id, &canister_wasm)

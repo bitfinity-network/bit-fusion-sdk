@@ -27,10 +27,9 @@ impl InitBridgeConfig {
     pub fn into_bridge_init_data(
         self,
         owner: Principal,
-        ic_host: &str,
         evm_network: EvmNetwork,
     ) -> BridgeInitData {
-        let signing_strategy = self.signing_key_id(ic_host).into();
+        let signing_strategy = self.signing_key_id(evm_network).into();
         let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
             owner,
@@ -52,9 +51,9 @@ impl InitBridgeConfig {
         }
     }
 
-    pub fn signing_key_id(&self, ic_host: &str) -> SigningKeyId {
+    pub fn signing_key_id(&self, network: EvmNetwork) -> SigningKeyId {
         self.signing_key_id.unwrap_or_else(|| {
-            if ic_host.starts_with("https://ic0.app") {
+            if network != EvmNetwork::Localhost {
                 SigningKeyId::Production
             } else {
                 SigningKeyId::Dfx
