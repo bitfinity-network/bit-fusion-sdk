@@ -76,16 +76,24 @@ impl Brc20Bridge {
             .map_err(GetAddressError::from)
     }
 
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
+    /// If `count` is `None`, it returns all operations.
     #[query]
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, Brc20BridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, pagination)
+        get_runtime_state().borrow().operations.get_for_address(
+            &wallet_address,
+            min_included_id,
+            pagination,
+        )
     }
 
     /// Returns log of an operation by its ID.

@@ -123,7 +123,7 @@ impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op
             .state()
             .borrow()
             .operations
-            .get_for_address(&update_to.evm_wallet_address(), None)
+            .get_for_address(&update_to.evm_wallet_address(), None, None)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {

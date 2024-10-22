@@ -72,19 +72,24 @@ impl Icrc2BridgeCanister {
         runtime.borrow_mut().run();
     }
 
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
+    /// If `count` is `None`, it returns all operations.
     #[query]
-    /// Returns the list of operations for the given wallet address.
-    /// Offset, if set, defines the starting index of the page,
-    /// Count, if set, defines the number of elements in the page.
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, IcrcBridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, pagination)
+        get_runtime_state().borrow().operations.get_for_address(
+            &wallet_address,
+            min_included_id,
+            pagination,
+        )
     }
 
     #[query]

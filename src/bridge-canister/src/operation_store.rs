@@ -183,31 +183,36 @@ where
         dst_address: &H160,
         nonce: u32,
     ) -> Option<(OperationId, P)> {
-        self.get_for_address(dst_address, None)
+        self.get_for_address(dst_address, None, None)
             .iter()
             .find(|(op_id, _)| op_id.nonce() == nonce)
             .cloned()
     }
 
-    /// Retrieves all operations for the given ETH wallet address,
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
     /// starting from `offset` returning a max of `count` items
-    /// If `offset` is `None`, it starts from the beginning.
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
     /// If `count` is `None`, it returns all operations.
     pub fn get_for_address(
         &self,
         dst_address: &H160,
+        min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, P)> {
         log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
 
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
         let count = pagination.map(|p| p.count).unwrap_or(usize::MAX);
+        let min_included_id = min_included_id.unwrap_or_default();
 
         self.address_operation_map
             .get(dst_address)
             .unwrap_or_default()
             .0
             .into_iter()
+            .filter(|id| id >= &min_included_id)
             .filter_map(|id| self.get_with_id(id))
             .skip(offset)
             .take(count)
@@ -264,7 +269,7 @@ where
 
     pub fn update_by_nonce(&mut self, dst_address: &H160, nonce: u32, payload: P) {
         let Some((op_id, _)) = self
-            .get_for_address(dst_address, None)
+            .get_for_address(dst_address, None, None)
             .into_iter()
             .find(|(operation_id, _)| operation_id.nonce() == nonce)
         else {
@@ -419,12 +424,17 @@ mod tests {
 
         for i in 0..(COUNT - LIMIT) {
             assert!(store
-                .get_for_address(&eth_address(i as u8), None)
+                .get_for_address(&eth_address(i as u8), None, None)
                 .is_empty());
         }
 
         for i in (COUNT - LIMIT)..COUNT {
-            assert_eq!(store.get_for_address(&eth_address(i as u8), None).len(), 1,);
+            assert_eq!(
+                store
+                    .get_for_address(&eth_address(i as u8), None, None)
+                    .len(),
+                1,
+            );
         }
     }
 
@@ -442,18 +452,18 @@ mod tests {
         assert_eq!(store.operations_log.len(), COUNT);
 
         // No offset, with count
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 10)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(0, 10)));
         assert_eq!(page.len(), 10);
         // No offset with count > total
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(0, 120)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(0, 120)));
         assert_eq!(page.len() as u64, COUNT);
 
         // Offset with count
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(20, 15)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(20, 15)));
         assert_eq!(page.len(), 15);
 
         // Offset with count beyond total
-        let page = store.get_for_address(&eth_address(0), Some(Pagination::new(100, 10)));
+        let page = store.get_for_address(&eth_address(0), None, Some(Pagination::new(100, 10)));
         assert!(page.is_empty());
     }
 
@@ -473,7 +483,7 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), Some(Pagination::new(0, 10)))
+                .get_for_address(&eth_address(42), None, Some(Pagination::new(0, 10)))
                 .len(),
             LIMIT as usize
         );
@@ -497,10 +507,74 @@ mod tests {
 
         assert_eq!(
             store
-                .get_for_address(&eth_address(42), Some(Pagination::new(0, COUNT as usize)))
+                .get_for_address(
+                    &eth_address(42),
+                    None,
+                    Some(Pagination::new(0, COUNT as usize))
+                )
                 .len(),
             COUNT as usize
         );
+    }
+
+    #[test]
+    fn should_get_for_address_from_min_included_id() {
+        const LIMIT: u64 = 1000;
+        const COUNT: u64 = 100;
+
+        let min_included_id = Some(OperationId::new(20));
+
+        let mut store = test_store(LIMIT);
+
+        for _ in 0..COUNT {
+            store.new_operation(TestOp::complete(0), None);
+        }
+
+        assert_eq!(store.operations_log.len(), COUNT);
+
+        // No offset, no count
+        let page = store.get_for_address(&eth_address(0), min_included_id, None);
+        assert_eq!(page.len(), 80);
+        assert_eq!(page[0].0, OperationId::new(20));
+        assert_eq!(page[79].0, OperationId::new(99));
+
+        // No offset, with count
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(0, 10)),
+        );
+        assert_eq!(page.len(), 10);
+        assert_eq!(page[0].0, OperationId::new(20));
+        assert_eq!(page[9].0, OperationId::new(29));
+
+        // No offset with count > total
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(0, 120)),
+        );
+        assert_eq!(page.len(), 80);
+        assert_eq!(page[0].0, OperationId::new(20));
+        assert_eq!(page[79].0, OperationId::new(99));
+
+        // Offset with count
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(10, 20)),
+        );
+        assert_eq!(page.len(), 20);
+        assert_eq!(page[0].0, OperationId::new(30));
+        assert_eq!(page[19].0, OperationId::new(49));
+
+        // Offset with count beyond total
+        let page = store.get_for_address(
+            &eth_address(0),
+            min_included_id,
+            Some(Pagination::new(100, 10)),
+        );
+        assert!(page.is_empty());
     }
 
     #[test]
