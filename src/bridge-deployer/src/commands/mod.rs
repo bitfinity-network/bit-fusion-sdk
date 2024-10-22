@@ -19,11 +19,13 @@ use tracing::{debug, info, trace};
 use upgrade::UpgradeCommands;
 
 use crate::canister_ids::{CanisterIdsPath, CanisterType};
+use crate::commands::wrap_token_type::WrapTokenType;
 use crate::config;
 use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
 mod deploy;
 mod reinstall;
 mod upgrade;
+mod wrap_token_type;
 
 /// The commands that can be run by the bridge deployer.
 #[derive(Debug, Subcommand)]
@@ -48,6 +50,9 @@ pub enum Commands {
         next_help_heading = "Upgrade Bridge"
     )]
     Upgrade(UpgradeCommands),
+
+    #[command(subcommand)]
+    Wrap(WrapTokenType),
 }
 
 #[derive(Subcommand, Clone, Serialize, Deserialize, Debug)]
@@ -245,6 +250,7 @@ impl Commands {
                     .await?
             }
             Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
+            Commands::Wrap(wrap_token_type) => wrap_token_type.wrap(network, pk).await?,
         };
 
         Ok(())

@@ -13,7 +13,7 @@ use ethers_core::utils::hex::ToHexExt;
 use tracing::{debug, info};
 
 const LOCALHOST_URL: &str = "http://127.0.0.1:8545";
-const TESTNET_URL: &str = "https://testnet.bitfinity.network";
+pub(crate) const TESTNET_URL: &str = "https://testnet.bitfinity.network";
 const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
 
 #[derive(Debug, Clone, Args)]
@@ -441,14 +441,14 @@ impl SolidityContractDeployer<'_> {
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // Extract the fee charge address from the output
-        let fee_charge_address = stdout
+        let wrapped_token_address = stdout
             .lines()
             .find(|line| line.starts_with("ERC20 deployed at:"))
             .and_then(|line| line.split(':').nth(1))
             .map(str::trim)
             .context("Failed to extract ERC20 address")?;
 
-        let address = H160::from_str(fee_charge_address).context("Invalid ERC20 address")?;
+        let address = H160::from_str(wrapped_token_address).context("Invalid ERC20 address")?;
 
         Ok(address)
     }

@@ -48,9 +48,9 @@ impl BurntEventData {
 impl From<BurnTokenEvent> for BurntEventData {
     fn from(event: BurnTokenEvent) -> Self {
         Self {
-            sender: event.sender.into(),
-            amount: event.amount.into(),
-            from_erc20: event.fromERC20.into(),
+            sender: event.sender.0 .0.into(),
+            amount: event.amount.as_limbs().into(),
+            from_erc20: event.fromERC20.0 .0.into(),
             recipient_id: event.recipientID.into(),
             to_token: event.toToken.0.into(),
             operation_id: event.operationID,
@@ -77,13 +77,13 @@ pub struct MintedEventData {
 impl From<MintTokenEvent> for MintedEventData {
     fn from(event: MintTokenEvent) -> Self {
         Self {
-            amount: event.amount.into(),
+            amount: event.amount.as_limbs().into(),
             from_token: event.fromToken.0.into(),
             sender_id: event.senderID.0.into(),
-            to_erc20: event.toERC20.into(),
-            recipient: event.recipient.into(),
+            to_erc20: event.toERC20.0 .0.into(),
+            recipient: event.recipient.0 .0.into(),
             nonce: event.nonce,
-            fee_charged: event.chargedFee.into(),
+            fee_charged: event.chargedFee.as_limbs().into(),
         }
     }
 }
@@ -150,7 +150,7 @@ impl From<NotifyMinterEvent> for NotifyMinterEventData {
     fn from(event: NotifyMinterEvent) -> Self {
         Self {
             notification_type: event.notificationType.into(),
-            tx_sender: event.txSender.into(),
+            tx_sender: event.txSender.0 .0.into(),
             user_data: event.userData.0.into(),
             memo: event.memo.0.into(),
         }
