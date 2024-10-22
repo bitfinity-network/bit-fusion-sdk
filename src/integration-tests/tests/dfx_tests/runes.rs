@@ -382,7 +382,7 @@ impl RunesContext {
             let response: Vec<(OperationId, RuneBridgeOp)> = self
                 .inner
                 .rune_bridge_client(ADMIN)
-                .get_operations_list(eth_address)
+                .get_operations_list(eth_address, None, None)
                 .await
                 .expect("canister call failed");
 
@@ -901,7 +901,7 @@ async fn bail_out_of_impossible_deposit() {
 
     let client = ctx.inner.rune_bridge_client(ADMIN);
     let operations = client
-        .get_operations_list(&ctx.eth_wallet.address().into())
+        .get_operations_list(&ctx.eth_wallet.address().into(), None, None)
         .await
         .unwrap();
 

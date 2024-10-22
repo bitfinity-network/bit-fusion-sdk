@@ -22,6 +22,12 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct OperationId(u64);
 
+impl From<u64> for OperationId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
 impl OperationId {
     /// Creates new Id from the given number.
     pub fn new(id: u64) -> Self {
