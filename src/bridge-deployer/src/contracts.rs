@@ -286,47 +286,19 @@ impl SolidityContractDeployer<'_> {
         decimals: u8,
         base_token_id: Id256,
     ) -> Result<H160> {
-        let owner = self.wallet.address();
-        let network = self.network.to_string();
-        let wrapped_token_deployer = wrapped_token_deployer.encode_hex_with_prefix();
-        let owner = owner.encode_hex_with_prefix();
-        let decimals = decimals.to_string();
+        info!("Deploying Wrapped ERC20 contract");
 
-        let args = vec![
-            "hardhat",
-            "deploy-wrapped-token",
-            "--network",
-            &network,
-            "--wrapped-token-deployer",
-            &wrapped_token_deployer,
-            "--name",
-            name,
-            "--symbol",
-            symbol,
-            "--decimals",
-            &decimals,
-            "--owner",
-            &owner,
+        let env_vars = vec![
+            ("BFT_BRIDGE", bft_bridge.encode_hex_with_prefix()),
+            ("NAME", name.to_string()),
+            ("SYMBOL", symbol.to_string()),
+            ("DECIMALS", decimals.to_string()),
+            ("BASE_TOKEN_ID", base_token_id.0.encode_hex_with_prefix()),
         ];
 
         let output = self.execute_forge_script("DeployWrappedToken.s.sol", env_vars)?;
 
         Self::extract_address_from_output(&output, "ERC20 deployed at:")
-    }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        // Extract the fee charge address from the output
-        let fee_charge_address = stdout
-            .lines()
-            .find(|line| line.starts_with("ERC20 deployed at:"))
-            .and_then(|line| line.split(':').nth(1))
-            .map(str::trim)
-            .context("Failed to extract ERC20 address")?;
-
-        let address = H160::from_str(fee_charge_address).context("Invalid ERC20 address")?;
-
-        Ok(address)
     }
 
     /// Computes the address of the fee charge contract based on the deployer's address and the given nonce.
