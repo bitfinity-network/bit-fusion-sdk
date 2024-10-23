@@ -388,6 +388,8 @@ impl SolidityContractDeployer<'_> {
         let decimals = decimals.to_string();
         let base_token_id = base_token_id.0.encode_hex_with_prefix();
 
+        let name_arg = format!("\"{name}\"");
+        let symbol_arg = format!("\"{symbol}\"");
         let args = vec![
             "hardhat",
             "deploy-wrapped-token",
@@ -396,9 +398,9 @@ impl SolidityContractDeployer<'_> {
             "--bft-bridge",
             &bfr_bridge,
             "--name",
-            name,
+            &name_arg,
             "--symbol",
-            symbol,
+            &symbol_arg,
             "--decimals",
             &decimals,
             "--base-token-id",

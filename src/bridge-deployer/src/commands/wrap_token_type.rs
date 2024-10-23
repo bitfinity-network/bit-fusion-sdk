@@ -2,7 +2,6 @@ use alloy_sol_types::{SolInterface, SolValue};
 use bridge_did::id256::Id256;
 use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
 use clap::{Args, Subcommand};
-use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::Bytes;
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
@@ -137,8 +136,8 @@ impl WrapTokenType {
                 TransactionRequest {
                     from: Some(wallet.address().into()),
                     to: Some((*address).into()),
-                    gas: Some(10_000_000_000u64.into()),
-                    gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+                    gas: None,
+                    gas_price: None,
                     value: None,
                     data: Some(data.into()),
                     nonce: None,

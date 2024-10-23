@@ -10,13 +10,14 @@ const ICRC2_BRIDGE_NAME: &str = "icrc2-bridge";
 const RUNE_BRIDGE_NAME: &str = "rune-bridge";
 
 /// Canister type to set the principal for
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CanisterType {
     Brc20,
     Btc,
     Erc20,
     Icrc2,
     Rune,
+    Other(String),
 }
 
 impl fmt::Display for CanisterType {
@@ -27,6 +28,7 @@ impl fmt::Display for CanisterType {
             CanisterType::Erc20 => ERC20_BRIDGE_NAME,
             CanisterType::Icrc2 => ICRC2_BRIDGE_NAME,
             CanisterType::Rune => RUNE_BRIDGE_NAME,
+            CanisterType::Other(name) => &name,
         };
 
         write!(f, "{}", canister)
@@ -43,7 +45,7 @@ impl FromStr for CanisterType {
             ERC20_BRIDGE_NAME => Ok(Self::Erc20),
             ICRC2_BRIDGE_NAME => Ok(Self::Icrc2),
             RUNE_BRIDGE_NAME => Ok(Self::Rune),
-            _ => Err("invalid canister"),
+            name => Ok(Self::Other(name.to_string())),
         }
     }
 }

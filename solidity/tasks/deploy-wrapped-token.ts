@@ -43,7 +43,7 @@ task(
                 throw new Error('Failed to deploy ERC20 token contract');
             }
 
-            const tokenAddress = receipt.getResult();
+            const tokenAddress = await receipt.getResult();
             console.log('ERC20 deployed at:', tokenAddress);
         },
     );

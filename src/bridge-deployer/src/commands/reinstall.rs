@@ -10,7 +10,7 @@ use tracing::info;
 
 use super::Bridge;
 use crate::bridge_deployer::BridgeDeployer;
-use crate::canister_ids::{CanisterIds, CanisterIdsPath};
+use crate::canister_ids::{CanisterIds, CanisterIdsPath, CanisterType};
 use crate::contracts::EvmNetwork;
 
 /// The reinstall command.
@@ -55,8 +55,11 @@ impl ReinstallCommands {
         let canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
         // get canister id
-        let canister = (&self.bridge_type).into();
-        let canister_id = match self.canister_id.or_else(|| canister_ids.get(canister)) {
+        let canister: CanisterType = (&self.bridge_type).into();
+        let canister_id = match self
+            .canister_id
+            .or_else(|| canister_ids.get(canister.clone()))
+        {
             Some(id) => id,
             None => {
                 anyhow::bail!("Could not resolve canister id for {canister}");
