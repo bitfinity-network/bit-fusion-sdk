@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::pin::Pin;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -522,7 +525,7 @@ impl RunesContext {
             .expect("Failed to stop rune bridge canister");
     }
 
-    async fn withdraw(&self, rune_id: &RuneId, amount: u128) {
+    async fn withdraw(&self, rune_id: &RuneId, amount: u128) -> anyhow::Result<()> {
         let token_address = self.tokens.get(rune_id).expect("token not found");
         let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
 
@@ -540,12 +543,11 @@ impl RunesContext {
                 true,
                 None,
             )
-            .await
-            .expect("failed to burn wrapped token");
+            .await?;
 
-        self.inner.advance_time(Duration::from_secs(15)).await;
         self.mint_blocks(6).await;
-        self.inner.advance_time(Duration::from_secs(5)).await;
+
+        Ok(())
     }
 
     async fn wrapped_balance(&self, rune_id: &RuneId, wallet: &Wallet<'_, SigningKey>) -> u128 {
@@ -685,14 +687,17 @@ async fn runes_bridging_flow() {
     )
     .await;
 
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     // withdraw back 30 of rune
-    ctx.withdraw(&rune_id, 30).await;
-
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    let ctx = Arc::new(ctx);
+    let ctx_t = ctx.clone();
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            Box::pin(async move { ctx_t.withdraw(&rune_id, 30).await })
+        },
+        Duration::from_secs(60),
+    )
+    .await;
 
     ctx.runes
         .admin_btc_rpc_client
@@ -705,15 +710,21 @@ async fn runes_bridging_flow() {
     let expected_balance = ord_balance - 100 + 30;
 
     for _ in 0..10 {
-        // wait
-        ctx.inner.advance_time(Duration::from_secs(3)).await;
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        let ctx_t = ctx.clone();
         // advance
-        ctx.runes
-            .admin_btc_rpc_client
-            .generate_to_address(&ctx.runes.admin_address, 1)
-            .expect("failed to generate blocks");
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        block_until_succeeds(
+            move || {
+                let ctx_t = ctx_t.clone();
+                Box::pin(async move {
+                    ctx_t
+                        .runes
+                        .admin_btc_rpc_client
+                        .generate_to_address(&ctx_t.runes.admin_address, 1)
+                })
+            },
+            Duration::from_secs(60),
+        )
+        .await;
 
         let updated_ord_balance = ctx.ord_rune_balance(&rune_id).await;
         if updated_ord_balance == expected_balance {
@@ -759,7 +770,17 @@ async fn inputs_from_different_users() {
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    ctx.withdraw(&rune_id, 50).await;
+    let ctx = Arc::new(ctx);
+    let ctx_t = ctx.clone();
+
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            Box::pin(async move { ctx_t.withdraw(&rune_id, 50).await })
+        },
+        Duration::from_secs(60),
+    )
+    .await;
 
     let updated_balance = ctx.wrapped_balance(&rune_id, &ctx.eth_wallet).await;
     assert_eq!(updated_balance, 50);
@@ -813,22 +834,31 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
     )
     .await;
 
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     // check balances
-    let after_balances = ctx
-        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
-        .await;
+    let ctx = Arc::new(ctx);
+    let ctx_t = ctx.clone();
 
-    assert_eq!(
-        after_balances[&foo_rune_id],
-        before_balances[&foo_rune_id] + 100
-    );
-    assert_eq!(
-        after_balances[&bar_rune_id],
-        before_balances[&bar_rune_id] + 200
-    );
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            let before_balances = before_balances.clone();
+            Box::pin(async move {
+                let after_balances = ctx_t
+                    .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx_t.eth_wallet)
+                    .await;
+
+                if after_balances[&foo_rune_id] == before_balances[&foo_rune_id] + 100
+                    && after_balances[&bar_rune_id] == before_balances[&bar_rune_id] + 200
+                {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Balances are not correct"))
+                }
+            })
+        },
+        Duration::from_secs(30),
+    )
+    .await;
 
     ctx.stop().await
 }
@@ -853,22 +883,31 @@ async fn test_should_deposit_two_runes_in_two_tx() {
     )
     .await;
 
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     // check balances
-    let after_balances = ctx
-        .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
-        .await;
+    let ctx = Arc::new(ctx);
+    let ctx_t = ctx.clone();
 
-    assert_eq!(
-        after_balances[&foo_rune_id],
-        before_balances[&foo_rune_id] + 100
-    );
-    assert_eq!(
-        after_balances[&bar_rune_id],
-        before_balances[&bar_rune_id] + 200
-    );
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            let before_balances = before_balances.clone();
+            Box::pin(async move {
+                let after_balances = ctx_t
+                    .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx_t.eth_wallet)
+                    .await;
+
+                if after_balances[&foo_rune_id] == before_balances[&foo_rune_id] + 100
+                    && after_balances[&bar_rune_id] == before_balances[&bar_rune_id] + 200
+                {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Balances are not correct"))
+                }
+            })
+        },
+        Duration::from_secs(30),
+    )
+    .await;
 
     ctx.stop().await
 }
@@ -899,13 +938,32 @@ async fn bail_out_of_impossible_deposit() {
     tokio::time::sleep(Duration::from_secs(2)).await;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    let client = ctx.inner.rune_bridge_client(ADMIN);
-    let operations = client
-        .get_operations_list(&ctx.eth_wallet.address().into(), None, None)
-        .await
-        .unwrap();
+    let client = std::sync::Arc::new(ctx.inner.rune_bridge_client(ADMIN));
+    let address = ctx.eth_wallet.address();
 
-    assert_eq!(operations.len(), 1);
+    let operations = block_until_succeeds(
+        move || {
+            let client = client.clone();
+            Box::pin(async move {
+                let operations = client
+                    .get_operations_list(&address.into(), None, None)
+                    .await?;
+
+                if operations.len() == 1 {
+                    Ok(operations)
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Expected 1 operation, got {}",
+                        operations.len()
+                    ))
+                }
+            })
+        },
+        Duration::from_secs(30),
+    )
+    .await;
+
+    let client = ctx.inner.rune_bridge_client(ADMIN);
     let operation_id = operations[0].0;
 
     let log = client
@@ -937,4 +995,23 @@ async fn bail_out_of_impossible_deposit() {
         .contains("operation cannot progress"));
 
     ctx.stop().await
+}
+
+/// Blocks until the predicate returns [`Ok`].
+///
+/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
+/// Returns the value inside of the [`Ok`] variant of the predicate.
+async fn block_until_succeeds<F, T>(predicate: F, max_wait: Duration) -> T
+where
+    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+{
+    let start = Instant::now();
+    while start.elapsed() < max_wait {
+        if let Ok(res) = predicate().await {
+            return res;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
 }

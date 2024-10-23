@@ -293,8 +293,6 @@ impl Brc20Context {
             .await
             .unwrap();
 
-        context.advance_time(Duration::from_secs(2)).await;
-
         Self {
             bft_bridge_contract: bft_bridge,
             eth_wallet: wallet,
@@ -375,7 +373,7 @@ impl Brc20Context {
 
     pub async fn mint_blocks(&self, count: u64) {
         // Await all previous operations to synchronize for ord and dfx
-        self.inner.advance_time(Duration::from_secs(1)).await;
+        self.sync().await.expect("failed to sync");
 
         self.brc20
             .admin_btc_rpc_client
@@ -383,7 +381,7 @@ impl Brc20Context {
             .expect("failed to generate blocks");
 
         // Allow dfx and ord catch up with the new block
-        self.inner.advance_time(Duration::from_secs(5)).await;
+        self.sync().await.expect("failed to sync");
     }
 
     pub async fn deposit(
@@ -538,7 +536,7 @@ impl Brc20Context {
                     return receipt;
                 }
             } else {
-                tokio::time::sleep(Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
 
@@ -577,5 +575,24 @@ impl Brc20Context {
             .get(tick)
             .copied()
             .expect("brc20 balance not found")
+    }
+
+    /// Wait for indexer and dfx to synchronize
+    pub async fn sync(&self) -> anyhow::Result<()> {
+        let btc_block_height = self.brc20.admin_btc_rpc_client.get_block_height()?;
+        Self::wait_for_hiro_sync(btc_block_height).await
+    }
+
+    async fn wait_for_hiro_sync(btc_block_height: u64) -> anyhow::Result<()> {
+        let client = HiroOrdinalsClient::dfx_test_client();
+        loop {
+            let ord_block_height = client.get_block_height().await?;
+            if ord_block_height >= btc_block_height {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        Ok(())
     }
 }
