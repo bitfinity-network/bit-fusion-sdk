@@ -1,7 +1,6 @@
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use clap::Parser;
-use eth_signer::sign_strategy::SigningStrategy;
 use serde::{Deserialize, Serialize};
 
 use super::{LogCanisterSettings, SigningKeyId};
@@ -11,13 +10,10 @@ use crate::contracts::EvmNetwork;
 pub struct InitBridgeConfig {
     /// The signing key ID to use for signing messages
     ///
-    /// This key are fixed in the management canister depending on the environment
-    /// being used
+    /// If not set, `production` or `dfx` signing key will be used based on the IC network the bridge
+    /// is being deployed to.
     #[arg(long)]
-    pub signing_key_id: SigningKeyId,
-    /// Owner of the bridge canister
-    #[arg(long)]
-    pub owner: Principal,
+    pub signing_key_id: Option<SigningKeyId>,
     /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
     #[arg(long)]
     pub evm: Option<Principal>,
@@ -28,19 +24,23 @@ pub struct InitBridgeConfig {
 
 impl InitBridgeConfig {
     /// Converts the `InitBridgeConfig` into a `BridgeInitData` struct.
-    pub fn into_bridge_init_data(self, evm_network: EvmNetwork) -> BridgeInitData {
+    pub fn into_bridge_init_data(
+        self,
+        owner: Principal,
+        evm_network: EvmNetwork,
+    ) -> BridgeInitData {
+        let signing_strategy = self.signing_key_id(evm_network).into();
+        let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
-            owner: self.owner,
+            owner,
             evm_link: crate::evm::evm_link(evm_network, self.evm),
-            signing_strategy: SigningStrategy::ManagementCanister {
-                key_id: self.signing_key_id.into(),
-            },
-            log_settings: self.log_settings.map(|v| ic_log::did::LogCanisterSettings {
-                enable_console: v.enable_console,
-                in_memory_records: v.in_memory_records,
-                max_record_length: v.max_record_length,
-                log_filter: v.log_filter,
-                acl: v.acl.map(|v| {
+            signing_strategy,
+            log_settings: Some(ic_log::did::LogCanisterSettings {
+                enable_console: log_settings.enable_console,
+                in_memory_records: log_settings.in_memory_records,
+                max_record_length: log_settings.max_record_length,
+                log_filter: log_settings.log_filter,
+                acl: log_settings.acl.map(|v| {
                     v.iter()
                         .map(|(principal, perm)| {
                             (*principal, ic_log::did::LoggerPermission::from(*perm))
@@ -49,5 +49,25 @@ impl InitBridgeConfig {
                 }),
             }),
         }
+    }
+
+    pub fn signing_key_id(&self, network: EvmNetwork) -> SigningKeyId {
+        self.signing_key_id.unwrap_or_else(|| {
+            if network != EvmNetwork::Localhost {
+                SigningKeyId::Production
+            } else {
+                SigningKeyId::Dfx
+            }
+        })
+    }
+}
+
+fn default_log_settings() -> LogCanisterSettings {
+    LogCanisterSettings {
+        enable_console: Some(true),
+        in_memory_records: Some(10_000),
+        max_record_length: Some(4096),
+        log_filter: Some("trace,ic_task_scheduler=off".into()),
+        acl: None,
     }
 }
