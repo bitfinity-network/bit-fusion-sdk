@@ -179,7 +179,7 @@ impl Bridge {
         bridge_principal: Principal,
         pk: H256,
         agent: &Agent,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<BftDeployedContracts>> {
         match self {
             Self::Erc20 { erc, .. } => {
                 let network = if let Some(url) = &erc.base_evm_url {
@@ -207,9 +207,9 @@ impl Bridge {
 
                 info!("Bridge canister configured with base BFT bridge contract address");
 
-                Ok(())
+                Ok(Some(bft_address))
             }
-            _ => Ok(()),
+            _ => Ok(None),
         }
     }
 }
@@ -276,6 +276,8 @@ pub struct BFTArgs {
 pub struct BftDeployedContracts {
     pub bft_bridge: H160,
     pub wrapped_token_deployer: H160,
+    pub fee_charge: H160,
+    pub minter_address: H160,
 }
 
 impl BFTArgs {
@@ -327,7 +329,7 @@ impl BFTArgs {
         info!("Minter address: {:x}", minter_address);
 
         let bft_address = contract_deployer.deploy_bft(
-            &minter_address.into(),
+            &minter_address.clone().into(),
             &expected_fee_charge_address,
             &wrapped_token_deployer,
             is_wrapped_side,
@@ -342,6 +344,8 @@ impl BFTArgs {
         Ok(BftDeployedContracts {
             bft_bridge: bft_address,
             wrapped_token_deployer,
+            fee_charge: expected_fee_charge_address,
+            minter_address: minter_address.into(),
         })
     }
 }

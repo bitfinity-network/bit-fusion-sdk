@@ -99,6 +99,8 @@ impl DeployCommands {
         let BftDeployedContracts {
             bft_bridge,
             wrapped_token_deployer,
+            fee_charge,
+            minter_address,
         } = self
             .bft_args
             .deploy_bft(network.into(), canister_id, pk, &agent, true)
@@ -127,7 +129,8 @@ impl DeployCommands {
         // configure minter
         deployer.configure_minter(bft_bridge).await?;
 
-        self.bridge_type
+        let base_side_ids = self
+            .bridge_type
             .finalize(
                 &self.bft_args,
                 network,
@@ -142,11 +145,29 @@ impl DeployCommands {
 
         info!("Canister deployed successfully");
 
+        println!();
         println!(
-            "Canister {canister_type} deployed with ID {canister_id}",
-            canister_type = self.bridge_type.kind(),
-            canister_id = deployer.bridge_principal(),
+            "Canister {} deployed successfully.",
+            self.bridge_type.kind(),
         );
+        println!("Bridge canister principal: {}", canister_id);
+        println!();
+        println!("Wrapped side BFT bridge: {}", bft_bridge);
+        println!("Wrapped side FeeCharge: {}", fee_charge);
+        println!("Wrapped side bridge address: {}", minter_address);
+
+        if let Some(BftDeployedContracts {
+            bft_bridge,
+            fee_charge,
+            minter_address,
+            ..
+        }) = base_side_ids
+        {
+            println!();
+            println!("Base side BFT bridge: {}", bft_bridge);
+            println!("Base side FeeCharge: {}", fee_charge);
+            println!("Base side bridge address: {}", minter_address);
+        }
 
         Ok(())
     }
