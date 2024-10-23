@@ -13,7 +13,7 @@ This comprehensive guide provides detailed instructions for running various Forg
 
 ## Prerequisites
 
-Before running any scripts, ensure you have the following:xw
+Before running any scripts, ensure you have the following:
 
 - Forge CLI installed
 - Access to an Ethereum RPC endpoint
