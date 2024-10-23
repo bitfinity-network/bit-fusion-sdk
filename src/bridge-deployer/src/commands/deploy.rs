@@ -145,13 +145,13 @@ impl DeployCommands {
 
         info!("Canister deployed successfully");
 
-        println!();
+        println!("---------------------------");
         println!(
             "Canister {} deployed successfully.",
             self.bridge_type.kind(),
         );
         println!("Bridge canister principal: {}", canister_id);
-        println!();
+        println!("---------------------------");
         println!("Wrapped side BFT bridge: {}", bft_bridge);
         println!("Wrapped side FeeCharge: {}", fee_charge);
         println!("Wrapped side bridge address: {}", minter_address);
