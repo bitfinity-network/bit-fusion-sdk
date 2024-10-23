@@ -217,7 +217,7 @@ impl DeployCommands {
             );
         }
 
-        let principal = Principal::from_text(&String::from_utf8(result.stdout)?.trim())?;
+        let principal = Principal::from_text(String::from_utf8(result.stdout)?.trim())?;
         Ok(principal)
     }
 }

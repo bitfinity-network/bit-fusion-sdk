@@ -2001,6 +2001,7 @@ name = "did"
 version = "0.34.0"
 source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
+ "alloy-primitives",
  "bincode",
  "bytes",
  "candid",

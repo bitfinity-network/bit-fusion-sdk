@@ -117,7 +117,7 @@ impl Cli {
             .run(
                 identity,
                 &ic_host,
-                evm_network.into(),
+                evm_network,
                 private_key,
                 canister_ids_path,
             )

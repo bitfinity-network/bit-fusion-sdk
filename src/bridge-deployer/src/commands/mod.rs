@@ -159,7 +159,7 @@ impl Bridge {
             }
             Bridge::Btc { config, connection } => {
                 trace!("Preparing BTC bridge configuration");
-                let connection = bridge_did::init::btc::BitcoinConnection::from(connection.clone());
+                let connection = bridge_did::init::btc::BitcoinConnection::from(*connection);
                 let init_data = config.clone().into_bridge_init_data(owner, evm_network);
                 let config = BtcBridgeConfig {
                     network: connection,
@@ -192,7 +192,7 @@ impl Bridge {
                 };
 
                 let bft_address = bft_args
-                    .deploy_bft(network, bridge_principal, pk, &agent, false)
+                    .deploy_bft(network, bridge_principal, pk, agent, false)
                     .await?;
 
                 info!("Base BFT bridge deployed with address {bft_address:?}");

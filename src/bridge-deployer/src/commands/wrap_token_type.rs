@@ -115,7 +115,7 @@ impl WrapTokenType {
         )? as u8;
         let chain_id = client.get_chain_id().await?;
 
-        let id = Id256::from_evm_address(&did::H160::new(token_address.clone()), chain_id as u32);
+        let id = Id256::from_evm_address(&did::H160::new(*token_address), chain_id as u32);
 
         Ok(TokenParameters {
             name,
@@ -134,7 +134,7 @@ impl WrapTokenType {
         let result = client
             .eth_call(
                 TransactionRequest {
-                    from: Some(wallet.address().into()),
+                    from: Some(wallet.address()),
                     to: Some((*address).into()),
                     gas: None,
                     gas_price: None,
@@ -147,7 +147,7 @@ impl WrapTokenType {
             )
             .await?;
 
-        let hex = hex::decode(&result.trim_start_matches("0x"))?;
+        let hex = hex::decode(result.trim_start_matches("0x"))?;
         Ok(hex)
     }
 }

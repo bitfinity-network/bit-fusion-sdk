@@ -28,7 +28,7 @@ impl fmt::Display for CanisterType {
             CanisterType::Erc20 => ERC20_BRIDGE_NAME,
             CanisterType::Icrc2 => ICRC2_BRIDGE_NAME,
             CanisterType::Rune => RUNE_BRIDGE_NAME,
-            CanisterType::Other(name) => &name,
+            CanisterType::Other(name) => name,
         };
 
         write!(f, "{}", canister)
