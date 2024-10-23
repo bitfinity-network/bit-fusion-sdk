@@ -3,6 +3,7 @@
 pub mod erc20;
 pub mod icrc;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -14,7 +15,7 @@ use ethers_core::k256::ecdsa::SigningKey;
 use futures::future;
 
 use crate::context::TestContext;
-use crate::utils::error::Result;
+use crate::utils::error::{Result, TestError};
 
 pub struct StressTestConfig {
     pub users_number: usize,
@@ -62,9 +63,23 @@ pub struct BurnInfo<UserId> {
     pub amount: U256,
 }
 
+pub type OwnedWallet = Wallet<'static, SigningKey>;
+
+struct User<BaseId> {
+    pub wallet: OwnedWallet,
+    pub base_id: BaseId,
+    pub nonce: AtomicU64,
+}
+
+impl<B> User<B> {
+    pub fn next_nonce(&self) -> u64 {
+        self.nonce.fetch_add(1, Ordering::Relaxed)
+    }
+}
+
 pub struct StressTestState<B: BaseTokens> {
     base_tokens: B,
-    users: Vec<(Wallet<'static, SigningKey>, B::UserId)>,
+    users: Vec<User<B::UserId>>,
     wrapped_tokens: Vec<H160>,
     bft_bridge: H160,
     config: StressTestConfig,
@@ -146,7 +161,7 @@ impl<B: BaseTokens> StressTestState<B> {
             }
 
             // Create a wallet for the user.
-            let user_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
+            let wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
             // Deposit native token to charge fee.
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
             let user_id256 = base_tokens.user_id256(user_id.clone());
@@ -155,13 +170,18 @@ impl<B: BaseTokens> StressTestState<B> {
                 .native_token_deposit(
                     &evm_client,
                     fee_charge_address.clone(),
-                    &user_wallet,
+                    &wallet,
                     &[user_id256],
                     10_u128.pow(15),
                 )
                 .await?;
 
-            users.push((user_wallet, user_id.clone()));
+            let user = User {
+                wallet,
+                base_id: user_id.clone(),
+                nonce: Default::default(),
+            };
+            users.push(user);
         }
 
         let state = Self {
@@ -272,10 +292,10 @@ impl<B: BaseTokens> StressTestState<B> {
                 bridge: self.bft_bridge.clone(),
                 base_token_idx: token_idx,
                 wrapped_token: self.wrapped_tokens[token_idx].clone(),
-                from: user.1.clone(),
+                from: user.base_id.clone(),
                 amount: self.config.operation_amount.clone(),
             };
-            self.base_tokens.deposit(&user.0, &burn_info).await?;
+            self.base_tokens.deposit(&user.wallet, &burn_info).await?;
         }
 
         Ok(())
@@ -288,10 +308,14 @@ impl<B: BaseTokens> StressTestState<B> {
         let balance_result = tokio::time::timeout(WAIT_FOR_BALANCE_TIMEOUT, balance_future).await;
 
         if let Ok(Ok(balance)) = balance_result {
+            println!("Withdrawing token {token_idx} for user {user_idx}");
             self.withdraw(token_idx, user_idx, balance).await?;
+            return Ok(());
         }
 
-        Ok(())
+        Err(TestError::Generic(format!(
+            "no balance for user {user_idx} on token {token_idx}"
+        )))
     }
 
     async fn wait_for_wrapped_balance(&self, token_idx: usize, user_idx: usize) -> Result<U256> {
@@ -301,7 +325,7 @@ impl<B: BaseTokens> StressTestState<B> {
                 .ctx()
                 .check_erc20_balance(
                     &self.wrapped_tokens[token_idx],
-                    &self.users[user_idx].0,
+                    &self.users[user_idx].wallet,
                     None,
                 )
                 .await?;
@@ -315,7 +339,9 @@ impl<B: BaseTokens> StressTestState<B> {
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<()> {
         let token_id = self.base_tokens.ids()[token_idx].clone();
         let base_token_id: Id256 = self.base_tokens.token_id256(token_id);
-        let user_id256 = self.base_tokens.user_id256(self.users[user_idx].1.clone());
+        let user_id256 = self
+            .base_tokens
+            .user_id256(self.users[user_idx].base_id.clone());
 
         let input = BFTBridge::burnCall {
             amount: amount.into(),
@@ -326,9 +352,17 @@ impl<B: BaseTokens> StressTestState<B> {
         }
         .abi_encode();
 
+        let nonce = self.users.get(user_idx).unwrap().next_nonce();
+
         self.base_tokens
             .ctx()
-            .call_contract_without_waiting(&self.users[user_idx].0, &self.bft_bridge, input, 0)
+            .call_contract_without_waiting(
+                &self.users[user_idx].wallet,
+                &self.bft_bridge,
+                input,
+                0,
+                Some(nonce),
+            )
             .await?;
 
         Ok(())

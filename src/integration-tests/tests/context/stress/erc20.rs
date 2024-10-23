@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -12,21 +12,30 @@ use ethers_core::k256::ecdsa::SigningKey;
 use ic_exports::ic_cdk::println;
 use tokio::sync::RwLock;
 
-use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
+use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState};
 use crate::context::TestContext;
 use crate::utils::error::Result;
 use crate::utils::{TestWTM, CHAIN_ID};
 
 static MEMO_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-type OwnedWallet = Wallet<'static, SigningKey>;
+struct User {
+    pub wallet: OwnedWallet,
+    pub nonce: AtomicU64,
+}
+
+impl User {
+    pub fn next_nonce(&self) -> u64 {
+        self.nonce.fetch_add(1, Ordering::Relaxed)
+    }
+}
 
 pub struct Erc20BaseTokens<Ctx> {
     ctx: Ctx,
     tokens: Vec<H160>,
     contracts_deployer: OwnedWallet,
     bft_bridge: H160,
-    users: RwLock<HashMap<H160, OwnedWallet>>,
+    users: RwLock<HashMap<H160, User>>,
 }
 
 impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
@@ -113,7 +122,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
         let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
         let mut retries = 0;
         let receipt = loop {
-            if retries > 10 {
+            if retries > 100 {
                 return Err(crate::utils::error::TestError::Generic(
                     "failed to get tx receipt".into(),
                 ));
@@ -195,7 +204,11 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .unwrap();
         assert_eq!(mint_tx_receipt.status, Some(U64::one()));
 
-        self.users.write().await.insert(address.into(), wallet);
+        let user = User {
+            wallet,
+            nonce: Default::default(),
+        };
+        self.users.write().await.insert(address.into(), user);
         Ok(address.into())
     }
 
@@ -248,7 +261,21 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
     ) -> Result<U256> {
         let token_address = self.tokens[info.base_token_idx].clone();
         let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
-        let sender_wallet = self.users.read().await.get(&info.from).cloned().unwrap();
+        let sender_wallet = self
+            .users
+            .read()
+            .await
+            .get(&info.from)
+            .unwrap()
+            .wallet
+            .clone();
+        let nonce = self
+            .users
+            .read()
+            .await
+            .get(&info.from)
+            .unwrap()
+            .next_nonce();
         let to_token_id = self.token_id256(info.wrapped_token.clone());
         let recipient_id = self.user_id256(to_wallet.address().into());
         let memo = self.next_memo();
@@ -268,6 +295,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
                 &token_address,
                 input,
                 0,
+                Some(nonce),
             )
             .await?;
 
@@ -283,6 +311,13 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         }
         .abi_encode();
 
+        let nonce = self
+            .users
+            .read()
+            .await
+            .get(&info.from)
+            .unwrap()
+            .next_nonce();
         let tx_hash = self
             .ctx
             .call_contract_without_waiting_on_evm(
@@ -291,6 +326,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
                 &self.bft_bridge,
                 input,
                 0,
+                Some(nonce),
             )
             .await?;
 

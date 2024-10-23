@@ -198,7 +198,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         loop {
             let call_result = self
                 .ctx
-                .call_contract_without_waiting(to_wallet, &info.bridge, input.clone(), 0)
+                .call_contract_without_waiting(to_wallet, &info.bridge, input.clone(), 0, None)
                 .await;
 
             // Retry on invalid nonce or alerady exits.

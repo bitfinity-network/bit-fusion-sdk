@@ -669,10 +669,18 @@ pub trait TestContext {
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
+        nonce: Option<u64>,
     ) -> Result<H256> {
         let evm_client = self.evm_client(self.admin_name());
-        self.call_contract_without_waiting_on_evm(&evm_client, wallet, contract, input, amount)
-            .await
+        self.call_contract_without_waiting_on_evm(
+            &evm_client,
+            wallet,
+            contract,
+            input,
+            amount,
+            nonce,
+        )
+        .await
     }
 
     /// Calls contract in the evm_client without waiting for it's receipt.
@@ -683,10 +691,15 @@ pub trait TestContext {
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
+        nonce: Option<u64>,
     ) -> Result<H256> {
         let from: H160 = wallet.address().into();
-        let nonce = evm_client.account_basic(from.clone()).await?.nonce;
+        let nonce = match nonce {
+            Some(n) => n.into(),
+            None => evm_client.account_basic(from.clone()).await?.nonce,
+        };
 
+        println!("sending tx from wallet {from} with nonce {nonce}");
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
         let hash = evm_client.send_raw_transaction(call_tx).await??;
