@@ -11,7 +11,7 @@ force = true
 evm_version = 'paris'
 optimizer = true
 optimizer_runs = 2_000
-
+fs_permissions = [{ access = "read", path = "./out" }]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [fmt]
@@ -30,6 +30,8 @@ single_line_statement_blocks = "multi"
 "@openzeppelin-contracts-upgradeable" = "5.0.2"
 "@openzeppelin-contracts" = "5.0.2"
 forge-std = "1.9.2"
+openzeppelin-foundry-upgrades = "0.3.6"
+
 
 [soldeer]
 # whether soldeer manages remappings
