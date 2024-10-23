@@ -172,6 +172,7 @@ impl Bridge {
         Ok(arg)
     }
 
+    /// Run necessary deployment steps after canister and wrapped side BFT were deployed.
     pub async fn finalize(
         &self,
         bft_args: &BFTArgs,

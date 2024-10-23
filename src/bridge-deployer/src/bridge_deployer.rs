@@ -55,7 +55,10 @@ impl BridgeDeployer {
 
         let canister_id = self.client.client().canister_id;
         let management_canister = ManagementCanister::create(&self.agent);
-        let arg = config.init_raw_arg(self.agent.get_principal().unwrap(), network)?;
+        let arg = config.init_raw_arg(
+            self.agent.get_principal().expect("invalid agent identity"),
+            network,
+        )?;
 
         management_canister
             .install(&canister_id, &canister_wasm)

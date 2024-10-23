@@ -88,7 +88,7 @@ impl Cli {
         let identity = cli.init_identity()?;
         info!(
             "Using dfx identity with principal: {}",
-            identity.sender().unwrap()
+            identity.sender().expect("invalid agent identity"),
         );
 
         let Cli {
@@ -181,6 +181,10 @@ impl Cli {
         true
     }
 
+    /// Returns DFX identity to be used.
+    ///
+    /// If configured though CLI, returns the set one. Otherwise, gets the currently active identity
+    /// from the DFX.
     fn init_identity(&self) -> anyhow::Result<GenericIdentity> {
         if let Some(path) = &self.identity {
             Ok(GenericIdentity::try_from(path.as_ref())?)

@@ -217,6 +217,10 @@ impl DeployCommands {
         Ok(())
     }
 
+    /// Gets the wallet canister principal to be used.
+    ///
+    /// If configured through CLI argument, will return the set one. Otherwise, will return the
+    /// default wallet of the current DFX identity.
     fn get_wallet_canister(&self, network: EvmNetwork) -> anyhow::Result<Principal> {
         if let Some(principal) = self.wallet_canister {
             return Ok(principal);

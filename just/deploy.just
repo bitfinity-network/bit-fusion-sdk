@@ -20,7 +20,4 @@ configure_signature:
     dfx canister call signature_verification add_access "(principal \"$(dfx canister id evm_testnet)\")"
 
 [group('deploy')]
-deploy_evm:
-    just deploy_signature
-    just deploy_evm_canister
-    just configure_signature
+deploy_evm: deploy_signature deploy_evm_canister configure_signature
