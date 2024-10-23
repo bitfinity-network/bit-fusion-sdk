@@ -104,8 +104,8 @@ impl DeployCommands {
             .deploy_bft(network.into(), canister_id, pk, &agent, true)
             .await?;
 
-        info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
-        println!("BFT bridge deployed with address {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer}");
+        info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
+        println!("BFT bridge deployed with address {bft_bridge:x}; wrapped_token_deployer: {wrapped_token_deployer:x}");
 
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
         if let Bridge::Btc { connection, .. } = &self.bridge_type {
@@ -113,8 +113,8 @@ impl DeployCommands {
             let wrapped_btc_addr =
                 self.deploy_wrapped_btc(network, pk, &bft_bridge, *connection)?;
 
-            info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr}");
-            println!("Wrapped BTC contract deployed with address {wrapped_btc_addr}");
+            info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr:x}");
+            println!("Wrapped BTC contract deployed with address {wrapped_btc_addr:x}");
 
             info!("Configuring BTC wrapped token on the BTC bridge");
             self.configure_btc_wrapped_token(&agent, &canister_id, wrapped_btc_addr)

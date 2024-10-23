@@ -263,11 +263,11 @@ impl Commands {
 
 #[derive(Debug, Args)]
 pub struct BFTArgs {
-    /// The address of the owner of the contract.
+    /// The address of the owner of the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "OWNER")]
     owner: Option<H160>,
 
-    /// The list of controllers for the contract.
+    /// The list of controllers for the contract. Must be used with `--deploy-bft`.
     #[arg(long, value_name = "CONTROLLERS")]
     controllers: Option<Vec<H160>>,
 }
@@ -337,7 +337,7 @@ impl BFTArgs {
 
         contract_deployer.deploy_fee_charge(&[bft_address], Some(expected_fee_charge_address))?;
 
-        info!("BFT bridge deployed successfully. Contract address: {bft_address}");
+        info!("BFT bridge deployed successfully. Contract address: {bft_address:x}");
 
         Ok(BftDeployedContracts {
             bft_bridge: bft_address,
