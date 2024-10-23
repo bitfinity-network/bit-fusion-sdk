@@ -105,7 +105,10 @@ mod test {
             CanisterType::from_str(RUNE_BRIDGE_NAME),
             Ok(CanisterType::Rune)
         );
-        assert_eq!(CanisterType::from_str("invalid"), Err("invalid canister"));
+        assert_eq!(
+            CanisterType::from_str("invalid"),
+            Ok(CanisterType::Other("invalid".to_string()))
+        );
     }
 
     #[test]
