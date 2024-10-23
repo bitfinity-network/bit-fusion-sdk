@@ -1038,12 +1038,15 @@ dependencies = [
 name = "bridge-deployer"
 version = "0.2.0"
 dependencies = [
+ "alloy-sol-types",
  "anyhow",
  "bridge-client",
  "bridge-did",
+ "bridge-utils",
  "candid",
  "clap 4.5.18",
  "did",
+ "dotenv",
  "eth-signer",
  "ethereum-json-rpc-client",
  "ethereum-types",
@@ -1054,6 +1057,7 @@ dependencies = [
  "ic-exports",
  "ic-log",
  "ic-utils 0.37.0",
+ "jsonrpc-core",
  "serde",
  "serde_json",
  "strum",
@@ -2014,8 +2018,8 @@ dependencies = [
 
 [[package]]
 name = "did"
-version = "0.33.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.33.x#2d0f916623c3d34345e7ef0d1fceaf97ec4207a1"
+version = "0.34.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
  "alloy-primitives",
  "bincode",
@@ -2125,6 +2129,12 @@ dependencies = [
  "quote",
  "syn 2.0.77",
 ]
+
+[[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "downcast"
@@ -2351,8 +2361,8 @@ dependencies = [
 
 [[package]]
 name = "eth-signer"
-version = "0.33.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.33.x#2d0f916623c3d34345e7ef0d1fceaf97ec4207a1"
+version = "0.34.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
  "async-trait",
  "candid",
@@ -2402,8 +2412,8 @@ dependencies = [
 
 [[package]]
 name = "ethereum-json-rpc-client"
-version = "0.33.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.33.x#2d0f916623c3d34345e7ef0d1fceaf97ec4207a1"
+version = "0.34.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
  "anyhow",
  "candid",
@@ -2488,8 +2498,8 @@ dependencies = [
 
 [[package]]
 name = "evm-canister-client"
-version = "0.33.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.33.x#2d0f916623c3d34345e7ef0d1fceaf97ec4207a1"
+version = "0.34.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
  "candid",
  "did",
@@ -6065,8 +6075,8 @@ dependencies = [
 
 [[package]]
 name = "icrc-client"
-version = "0.33.0"
-source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.33.x#2d0f916623c3d34345e7ef0d1fceaf97ec4207a1"
+version = "0.34.0"
+source = "git+https://github.com/bitfinity-network/bitfinity-evm-sdk?tag=v0.34.x#70b56ce70d27c6a4a16b02500bf261e84b7d4223"
 dependencies = [
  "candid",
  "ic-canister-client",

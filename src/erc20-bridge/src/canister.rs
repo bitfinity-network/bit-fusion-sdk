@@ -12,6 +12,7 @@ use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::id256::Id256;
+use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
@@ -22,6 +23,7 @@ use candid::Principal;
 use did::build::BuildData;
 use did::H160;
 use drop_guard::guard;
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
@@ -32,7 +34,7 @@ use crate::ops::{
     self, Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, SEND_MINT_TX_SERVICE_ID,
     SIGN_MINT_ORDER_SERVICE_ID,
 };
-use crate::state::{BaseEvmSettings, SharedBaseEvmState};
+use crate::state::SharedBaseEvmState;
 
 #[cfg(feature = "export-api")]
 pub mod inspect;
@@ -145,6 +147,14 @@ impl Erc20Bridge {
             .get_log(operation_id)
     }
 
+    #[update]
+    pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
+        let signer = get_base_evm_config().borrow().get_signer()?;
+        signer.get_address().await.map_err(|e| {
+            Error::Initialization(format!("failed to get bridge canister address: {e}"))
+        })
+    }
+
     /// Returns the build data of the canister
     #[query]
     fn get_canister_build_data(&self) -> BuildData {
@@ -185,8 +195,8 @@ async fn process_base_evm_logs() {
         .await;
     let collected = match collect_result {
         Ok(c) => c,
-        Err(_) => {
-            log::warn!("failed to collect base EVM events");
+        Err(err) => {
+            log::warn!("failed to collect base EVM events: {err}");
             return;
         }
     };

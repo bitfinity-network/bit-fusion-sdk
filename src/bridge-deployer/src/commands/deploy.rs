@@ -1,19 +1,24 @@
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
+use anyhow::bail;
+use bridge_did::id256::Id256;
 use bridge_did::init::btc::WrappedTokenConfig;
 use candid::{Encode, Principal};
 use clap::Parser;
 use ethereum_types::{H160, H256};
-use ic_agent::{Agent, Identity};
+use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::{BFTArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::commands::BftDeployedContracts;
+use crate::config::BtcBridgeConnection;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
+use crate::evm::ic_host;
 
 /// The default number of cycles to deposit to the canister
 const DEFAULT_CYCLES: u128 = 2_000_000_000_000;
@@ -51,10 +56,11 @@ pub struct DeployCommands {
     #[arg(long, default_value_t = DEFAULT_CYCLES)]
     cycles: u128,
 
-    /// Wallet canister ID that is used in the creation of
-    /// canisters
+    /// Wallet canister ID that is used in the creation of canisters.
+    ///
+    /// If not set, default wallet of the currently active dfx identity will be used.
     #[arg(long, value_name = "WALLET_CANISTER", env)]
-    wallet_canister: Principal,
+    wallet_canister: Option<Principal>,
 
     /// These are extra arguments for the BFT bridge.
     #[command(flatten, next_help_heading = "BFT Bridge deployment")]
@@ -65,29 +71,25 @@ impl DeployCommands {
     /// Deploys a canister with the specified configuration.
     pub async fn deploy_canister(
         &self,
-        identity: PathBuf,
-        ic_host: &str,
+        identity: GenericIdentity,
         network: EvmNetwork,
-        evm: Principal,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
+        evm: Principal,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
-        let identity = GenericIdentity::try_from(identity.as_ref())?;
-        let caller = identity.sender().expect("No sender found");
-        debug!("Deploying with Principal : {caller}",);
-
+        let ic_host = ic_host(network);
         let agent = Agent::builder()
-            .with_url(ic_host)
+            .with_url(&ic_host)
             .with_identity(identity)
             .build()?;
 
-        super::fetch_root_key(ic_host, &agent).await?;
+        super::fetch_root_key(&ic_host, &agent).await?;
+        let wallet_canister = self.get_wallet_canister(network)?;
 
-        let deployer =
-            BridgeDeployer::create(agent.clone(), self.wallet_canister, self.cycles).await?;
+        let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
         let canister_id = deployer
             .install_wasm(
                 &self.wasm,
@@ -98,25 +100,24 @@ impl DeployCommands {
             )
             .await?;
 
-        println!("Canister deployed with ID {canister_id}",);
-
         info!("Deploying BFT bridge");
         let BftDeployedContracts {
             bft_bridge,
             wrapped_token_deployer,
+            fee_charge,
+            minter_address,
         } = self
             .bft_args
-            .deploy_bft(network, evm, canister_id, &self.bridge_type, pk, &agent)
+            .deploy_bft(network.into(), canister_id, pk, &agent, true, evm)
             .await?;
 
         info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
-        println!("BFT bridge deployed with address {bft_bridge:x}; wrapped_token_deployer: {wrapped_token_deployer:x}");
 
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
-        if matches!(&self.bridge_type, Bridge::Btc { .. }) {
+        if let Bridge::Btc { connection, .. } = &self.bridge_type {
             info!("Deploying wrapped BTC contract");
             let wrapped_btc_addr =
-                self.deploy_wrapped_btc(network, evm, pk, &wrapped_token_deployer)?;
+                self.deploy_wrapped_btc(network, pk, &bft_bridge, *connection, evm)?;
 
             info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr:x}");
             println!("Wrapped BTC contract deployed with address {wrapped_btc_addr:x}");
@@ -132,16 +133,43 @@ impl DeployCommands {
         // configure minter
         deployer.configure_minter(bft_bridge).await?;
 
+        let base_side_ids = self
+            .bridge_type
+            .finalize(
+                &self.bft_args,
+                network,
+                deployer.bridge_principal(),
+                pk,
+                &agent,
+                evm,
+            )
+            .await?;
+
         // write canister ids file
         canister_ids.write()?;
 
         info!("Canister deployed successfully");
 
         println!(
-            "Canister {canister_type} deployed with ID {canister_id}",
-            canister_type = self.bridge_type.kind(),
-            canister_id = deployer.bridge_principal(),
+            "Canister {} deployed with ID: {}",
+            self.bridge_type.kind(),
+            canister_id
         );
+        println!("Wrapped side BFT bridge: {}", bft_bridge);
+        println!("Wrapped side FeeCharge: {}", fee_charge);
+        println!("Wrapped side bridge address: {}", minter_address);
+
+        if let Some(BftDeployedContracts {
+            bft_bridge,
+            fee_charge,
+            minter_address,
+            ..
+        }) = base_side_ids
+        {
+            println!("Base side BFT bridge: {}", bft_bridge);
+            println!("Base side FeeCharge: {}", fee_charge);
+            println!("Base side bridge address: {}", minter_address);
+        }
 
         Ok(())
     }
@@ -150,17 +178,20 @@ impl DeployCommands {
     fn deploy_wrapped_btc(
         &self,
         network: EvmNetwork,
-        evm: Principal,
         pk: H256,
-        wrapped_token_deployer: &H160,
+        bft_bridge: &H160,
+        btc_connection: BtcBridgeConnection,
+        evm: Principal,
     ) -> anyhow::Result<H160> {
-        let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
+        let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
+        let base_token_id = Id256::from(btc_connection.ledger_principal());
 
         contract_deployer.deploy_wrapped_token(
-            wrapped_token_deployer,
+            bft_bridge,
             String::from_utf8_lossy(&BTC_ERC20_NAME).as_ref(),
             String::from_utf8_lossy(&BTC_ERC20_SYMBOL).as_ref(),
             BTC_ERC20_DECIMALS,
+            base_token_id,
         )
     }
 
@@ -187,5 +218,34 @@ impl DeployCommands {
             .await?;
 
         Ok(())
+    }
+
+    /// Gets the wallet canister principal to be used.
+    ///
+    /// If configured through CLI argument, will return the set one. Otherwise, will return the
+    /// default wallet of the current DFX identity.
+    fn get_wallet_canister(&self, network: EvmNetwork) -> anyhow::Result<Principal> {
+        if let Some(principal) = self.wallet_canister {
+            return Ok(principal);
+        }
+
+        let mut command = Command::new("dfx");
+        command.args(vec!["identity", "get-wallet"]);
+
+        if network != EvmNetwork::Localhost {
+            command.arg("--ic");
+        }
+
+        let result = command.stdout(Stdio::piped()).output()?;
+
+        if !result.status.success() {
+            bail!(
+                "Failed to get wallet principal: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+        }
+
+        let principal = Principal::from_text(String::from_utf8(result.stdout)?.trim())?;
+        Ok(principal)
     }
 }

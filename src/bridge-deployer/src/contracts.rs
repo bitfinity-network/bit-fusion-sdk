@@ -3,8 +3,9 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use bridge_did::id256::Id256;
 use candid::Principal;
-use clap::ValueEnum;
+use clap::{Args, ValueEnum};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
@@ -18,7 +19,45 @@ use crate::evm::dfx_webserver_port;
 
 const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
 
-#[derive(Debug, Clone, Copy, strum::Display, ValueEnum)]
+pub(crate) const TESTNET_URL: &str = "https://testnet.bitfinity.network";
+const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
+
+#[derive(Debug, Clone, Args)]
+#[group(required = true, multiple = false)]
+pub struct NetworkConfig {
+    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    #[clap(value_enum, long)]
+    pub evm_network: EvmNetwork,
+    /// Custom network URL
+    pub custom_network: Option<String>,
+}
+
+impl std::fmt::Display for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.custom_network.is_some() {
+            return write!(f, "custom");
+        }
+
+        let network = match self.evm_network {
+            EvmNetwork::Localhost => "localhost",
+            EvmNetwork::Testnet => "testnet",
+            EvmNetwork::Mainnet => "mainnet",
+        };
+
+        write!(f, "{network}")
+    }
+}
+
+impl From<EvmNetwork> for NetworkConfig {
+    fn from(value: EvmNetwork) -> Self {
+        Self {
+            evm_network: value,
+            custom_network: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, strum::Display, ValueEnum, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum EvmNetwork {
     Localhost,
@@ -27,9 +66,9 @@ pub enum EvmNetwork {
 }
 
 pub struct SolidityContractDeployer<'a> {
-    network: EvmNetwork,
-    wallet: Wallet<'a, SigningKey>,
     evm: Principal,
+    network: NetworkConfig,
+    wallet: Wallet<'a, SigningKey>,
 }
 
 impl SolidityContractDeployer<'_> {
@@ -43,27 +82,29 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: EvmNetwork, pk: H256, evm: Principal) -> Self {
+    pub fn new(network: NetworkConfig, pk: H256, evm: Principal) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
         Self {
+            evm,
             network,
             wallet,
-            evm,
         }
     }
 
     /// Returns the network URL based on the selected network.
     pub fn get_network_url(&self) -> String {
-        match self.network {
-            EvmNetwork::Localhost => {
-                format!(
+        if let Some(custom_network) = &self.network.custom_network {
+            custom_network.to_string()
+        } else {
+            match self.network.evm_network {
+                EvmNetwork::Localhost => format!(
                     "http://127.0.0.1:{dfx_port}/?canisterId={evm}",
                     dfx_port = dfx_webserver_port(),
                     evm = self.evm,
-                )
+                ),
+                EvmNetwork::Testnet => TESTNET_URL.to_string(),
+                EvmNetwork::Mainnet => MAINNET_URL.to_string(),
             }
-            EvmNetwork::Testnet => "https://testnet.bitfinity.network".to_string(),
-            EvmNetwork::Mainnet => "https://mainnet.bitfinity.network".to_string(),
         }
     }
 
@@ -253,22 +294,20 @@ impl SolidityContractDeployer<'_> {
     /// Deploys the WrappedToken contract.
     pub fn deploy_wrapped_token(
         &self,
-        wrapped_token_deployer: &H160,
+        bft_bridge: &H160,
         name: &str,
         symbol: &str,
         decimals: u8,
+        base_token_id: Id256,
     ) -> Result<H160> {
         info!("Deploying Wrapped ERC20 contract");
 
         let env_vars = vec![
-            (
-                "WRAPPED_TOKEN_DEPLOYER",
-                wrapped_token_deployer.encode_hex_with_prefix(),
-            ),
+            ("BFT_BRIDGE", bft_bridge.encode_hex_with_prefix()),
             ("NAME", name.to_string()),
             ("SYMBOL", symbol.to_string()),
             ("DECIMALS", decimals.to_string()),
-            ("OWNER", self.wallet.address().encode_hex_with_prefix()),
+            ("BASE_TOKEN_ID", base_token_id.0.encode_hex_with_prefix()),
         ];
 
         let output = self.execute_forge_script("DeployWrappedToken.s.sol", env_vars)?;
@@ -276,7 +315,15 @@ impl SolidityContractDeployer<'_> {
         Self::extract_address_from_output(&output, "ERC20 deployed at:")
     }
 
-    /// Computes the fee charge address.
+    /// Computes the address of the fee charge contract based on the deployer's address and the given nonce.
+    ///
+    /// # Arguments
+    ///
+    /// * `nonce` - The nonce to use for computing the contract address.
+    ///
+    /// # Returns
+    ///
+    /// The computed fee charge contract address.
     pub fn compute_fee_charge_address(&self, nonce: u64) -> Result<H160> {
         let deployer = self.wallet.address();
         let contract_address = ethers_core::utils::get_contract_address(deployer, nonce);
@@ -286,11 +333,17 @@ impl SolidityContractDeployer<'_> {
     /// Returns the nonce of the deployer.
     pub async fn get_nonce(&self) -> Result<u64> {
         let url = self.get_network_url();
+
+        debug!("Requesting nonce with EVM url: {url}");
+
         let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)
             .await?;
+
+        info!("Got nonce value: {nonce}");
+
         Ok(nonce)
     }
 }

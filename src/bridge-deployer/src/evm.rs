@@ -34,9 +34,7 @@ pub fn evm_principal_or_default(
     match evm_principal {
         Some(principal) => principal,
         None => match evm_network {
-            EvmNetwork::Localhost => {
-                Principal::from_text(local_evm_principal()).expect("Invalid principal")
-            }
+            EvmNetwork::Localhost => local_evm_principal(),
             EvmNetwork::Mainnet => {
                 Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
             }
@@ -73,7 +71,7 @@ fn dfx_info_port(service: &str) -> u16 {
 }
 
 /// Returns the local EVM principal
-pub fn local_evm_principal() -> String {
+pub fn local_evm_principal() -> Principal {
     let principal = Command::new("dfx")
         .args(["canister", "id", "evm_testnet"])
         .output()
@@ -85,8 +83,10 @@ pub fn local_evm_principal() -> String {
         .trim()
         .to_string();
 
+    if principal.is_empty() {
+        panic!("Local evm-testnet canister is not found.")
+    }
+
     // Verify the principal
-    Principal::from_text(&principal)
-        .expect("Invalid principal")
-        .to_text()
+    Principal::from_text(&principal).expect("Invalid principal")
 }

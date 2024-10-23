@@ -1,6 +1,7 @@
 pub mod brc20;
 mod bridge_data;
 pub mod btc;
+pub mod erc20;
 mod rune;
 
 use std::time::Duration;

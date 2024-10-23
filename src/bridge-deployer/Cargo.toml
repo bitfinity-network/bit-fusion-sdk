@@ -4,12 +4,15 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
 bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
+bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 clap = { workspace = true, features = ["env"] }
 did = { workspace = true }
+dotenv = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 ethereum-types = { workspace = true }
@@ -20,6 +23,7 @@ ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-utils = { workspace = true }
+jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
