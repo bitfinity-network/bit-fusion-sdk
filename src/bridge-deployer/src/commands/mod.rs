@@ -296,8 +296,8 @@ impl BFTArgs {
         let contract_deployer = SolidityContractDeployer::new(network, pk);
 
         let nonce_increment = match is_wrapped_side {
-            true => 3,
-            false => 2, // we don't deploy token deployer for base EVM
+            true => 3,  // 1) TokenDeployer, 2) BFTBridge, 3) FeePayer
+            false => 2, // we don't deploy token deployer for base EVM, so FeePayer is No 2.
         };
         let expected_nonce = contract_deployer.get_nonce().await? + nonce_increment;
 
