@@ -22,6 +22,30 @@ impl RuneEventsHandler {
     pub fn new(rune_state: Rc<RefCell<RuneState>>) -> Self {
         Self { rune_state }
     }
+
+    pub fn on_deposit_notification(
+        &self,
+        event: NotifyMinterEventData,
+    ) -> Option<OperationAction<RuneBridgeOpImpl>> {
+        match Decode!(&event.user_data, RuneDepositRequestData) {
+            Ok(data) => {
+                let operation =
+                    RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
+                        dst_address: data.dst_address,
+                        dst_tokens: data.dst_tokens,
+                        requested_amounts: data.amounts,
+                    }));
+                Some(OperationAction::Create(operation, event.memo()))
+            }
+            _ => {
+                log::warn!(
+                    "Invalid encoded deposit request: {}",
+                    hex::encode(&event.user_data)
+                );
+                None
+            }
+        }
+    }
 }
 
 impl BftBridgeEventHandler<RuneBridgeOpImpl> for RuneEventsHandler {
@@ -65,27 +89,7 @@ impl BftBridgeEventHandler<RuneBridgeOpImpl> for RuneEventsHandler {
         log::debug!("on_minter_notification {event:?}");
 
         match event.notification_type {
-            MinterNotificationType::DepositRequest => {
-                match Decode!(&event.user_data, RuneDepositRequestData) {
-                    Ok(data) => {
-                        let operation = RuneBridgeOpImpl(RuneBridgeOp::Deposit(
-                            RuneBridgeDepositOp::AwaitInputs {
-                                dst_address: data.dst_address,
-                                dst_tokens: data.dst_tokens,
-                                requested_amounts: data.amounts,
-                            },
-                        ));
-                        Some(OperationAction::Create(operation, event.memo()))
-                    }
-                    _ => {
-                        log::warn!(
-                            "Invalid encoded deposit request: {}",
-                            hex::encode(&event.user_data)
-                        );
-                        None
-                    }
-                }
-            }
+            MinterNotificationType::DepositRequest => self.on_deposit_notification(event),
             _ => {
                 log::warn!(
                     "Unsupported minter notification type: {:?}",

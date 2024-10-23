@@ -5,6 +5,7 @@ use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
 use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
+use crate::error::{BftResult, Error};
 use crate::op_id::OperationId;
 use crate::operation_log::Memo;
 
@@ -147,12 +148,18 @@ impl NotifyMinterEventData {
     }
 
     /// Tries to decode the notification into rescheduling operation id.
-    pub fn try_decode_reschedule_operation_id(&self) -> Option<OperationId> {
+    pub fn try_decode_reschedule_operation_id(&self) -> BftResult<OperationId> {
         if self.notification_type != MinterNotificationType::RescheduleOperation {
-            return None;
+            return Err(Error::Serialization(format!(
+                "expected MinterNotificationType::RescheduleOperation, got {:?}",
+                self.notification_type,
+            )));
         }
 
-        Decode!(&self.user_data, OperationId).ok()
+        let decoded = Decode!(&self.user_data, OperationId).map_err(|e| {
+            Error::Serialization(format!("failed to decode reschedule operation ID: {e}"))
+        })?;
+        Ok(decoded)
     }
 }
 

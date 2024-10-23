@@ -60,7 +60,7 @@ impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op
                 BridgeEvent::Burnt(event) => self.handler.on_wrapped_token_burnt(event),
                 BridgeEvent::Minted(event) => self.handler.on_wrapped_token_minted(event),
                 BridgeEvent::Notify(event) => {
-                    if let Some(operation_id) = event.try_decode_reschedule_operation_id() {
+                    if let Ok(operation_id) = event.try_decode_reschedule_operation_id() {
                         self.runtime.borrow().reschedule_operation(operation_id);
                         return Ok(());
                     }
