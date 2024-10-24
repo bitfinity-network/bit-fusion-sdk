@@ -13,6 +13,7 @@ use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::{BftResult, Error};
+use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
@@ -34,7 +35,7 @@ use crate::ops::{
     FETCH_WRAPPED_LOGS_SERVICE_ID, REFRESH_BASE_PARAMS_SERVICE_ID,
     REFRESH_WRAPPED_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
-use crate::state::{BaseEvmSettings, SharedBaseEvmState};
+use crate::state::SharedBaseEvmState;
 
 #[cfg(feature = "export-api")]
 pub mod inspect;

@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use bridge_did::id256::Id256;
+use candid::Principal;
 use clap::{Args, ValueEnum};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
@@ -12,9 +13,12 @@ use ethereum_types::H256;
 use ethers_core::k256::ecdsa::SigningKey;
 use ethers_core::types::{BlockNumber, H160};
 use ethers_core::utils::hex::ToHexExt;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
-const LOCALHOST_URL: &str = "http://127.0.0.1:8545";
+use crate::evm::dfx_webserver_port;
+
+const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
+
 pub(crate) const TESTNET_URL: &str = "https://testnet.bitfinity.network";
 const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
 
@@ -62,6 +66,7 @@ pub enum EvmNetwork {
 }
 
 pub struct SolidityContractDeployer<'a> {
+    evm: Principal,
     network: NetworkConfig,
     wallet: Wallet<'a, SigningKey>,
 }
@@ -77,20 +82,28 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: NetworkConfig, pk: H256) -> Self {
+    pub fn new(network: NetworkConfig, pk: H256, evm: Principal) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
-        Self { network, wallet }
+        Self {
+            evm,
+            network,
+            wallet,
+        }
     }
 
     /// Returns the network URL based on the selected network.
-    pub fn get_network_url(&self) -> &str {
+    pub fn get_network_url(&self) -> String {
         if let Some(custom_network) = &self.network.custom_network {
-            custom_network
+            custom_network.to_string()
         } else {
             match self.network.evm_network {
-                EvmNetwork::Localhost => LOCALHOST_URL,
-                EvmNetwork::Testnet => TESTNET_URL,
-                EvmNetwork::Mainnet => MAINNET_URL,
+                EvmNetwork::Localhost => format!(
+                    "http://127.0.0.1:{dfx_port}/?canisterId={evm}",
+                    dfx_port = dfx_webserver_port(),
+                    evm = self.evm,
+                ),
+                EvmNetwork::Testnet => TESTNET_URL.to_string(),
+                EvmNetwork::Mainnet => MAINNET_URL.to_string(),
             }
         }
     }
@@ -131,7 +144,7 @@ impl SolidityContractDeployer<'_> {
             "-v",
             script_dir.to_str().expect("Invalid solidity dir"),
             "--rpc-url",
-            self.get_network_url(),
+            &self.get_network_url(),
             "--private-key",
             &self.pk(),
             "--sender",
@@ -153,6 +166,7 @@ impl SolidityContractDeployer<'_> {
                 solidity_dir.display(),
                 args.join(" ")
             ))
+            .env(PRIVATE_KEY_ENV_VAR, self.pk())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -167,14 +181,14 @@ impl SolidityContractDeployer<'_> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            eprintln!(
+            error!(
                 "{} command failed. Stdout:\n{}\nStderr:\n{}",
                 script_name, stdout, stderr
             );
             return Err(anyhow::anyhow!("{} command failed", script_name));
         } else {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            println!("{} command output: {}", script_name, stdout);
+            debug!("{} command output: {}", script_name, stdout);
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
