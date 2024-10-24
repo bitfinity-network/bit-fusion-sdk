@@ -108,6 +108,20 @@ impl HiroOrdinalsClient {
             .collect())
     }
 
+    /// Get block height the indexer is currently at
+    pub async fn get_block_height(&self) -> anyhow::Result<u64> {
+        let url: String = format!("{}/ordinals/v1", self.url);
+        let response = self.client.get(&url).send().await?;
+        if response.status() != StatusCode::OK {
+            return Err(anyhow::anyhow!(
+                "Failed to get block height: {}",
+                response.status()
+            ));
+        }
+        let response: Status = response.json().await?;
+        Ok(response.block_height)
+    }
+
     fn integer_amount(amount: Decimal, decimals: u8) -> TokenAmount {
         use rust_decimal::prelude::ToPrimitive;
         let multiplier = 10u64.pow(decimals as u32);
@@ -144,4 +158,9 @@ pub struct GetBrc20TokensResponse {
 pub struct Brc20TokenResponse {
     pub ticker: String,
     pub decimals: u8,
+}
+
+#[derive(Debug, Deserialize)]
+struct Status {
+    block_height: u64,
 }

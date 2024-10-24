@@ -126,4 +126,11 @@ impl BitcoinRpcClient {
             height: block.height as u64,
         })
     }
+
+    /// Get the block height
+    pub fn get_block_height(&self) -> anyhow::Result<u64> {
+        let block_height = self.client.get_block_count()?;
+
+        Ok(block_height)
+    }
 }
