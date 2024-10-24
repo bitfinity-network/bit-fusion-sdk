@@ -3,15 +3,14 @@ mod mint_tx_handler;
 
 use std::collections::HashMap;
 
-use bridge_canister::bridge::{Operation, OperationAction, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::*;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
 use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
-use candid::{CandidType, Decode, Deserialize};
+use candid::{CandidType, Deserialize};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use ic_task_scheduler::task::TaskOptions;
@@ -19,14 +18,18 @@ use serde::Serialize;
 
 pub use self::mint_order_handler::RuneMintOrderHandler;
 pub use self::mint_tx_handler::RuneMintTxHandler;
-use crate::canister::{get_rune_state, get_runtime};
+use crate::canister::get_runtime;
 use crate::core::deposit::RuneDeposit;
 use crate::core::rune_inputs::RuneInputProvider;
 use crate::core::utxo_handler::UtxoHandler;
-use crate::core::withdrawal::{RuneWithdrawalPayloadImpl, Withdrawal};
+use crate::core::withdrawal::Withdrawal;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
+pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
+
+pub mod events_handler;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone, PartialEq, Eq)]
 pub struct RuneBridgeOpImpl(pub RuneBridgeOp);
@@ -195,79 +198,6 @@ impl Operation for RuneBridgeOpImpl {
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
             ),
-        }
-    }
-
-    async fn on_wrapped_token_minted(
-        _ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!(
-            "on_wrapped_token_minted nonce {nonce} {event:?}",
-            nonce = event.nonce
-        );
-
-        Some(OperationAction::Update {
-            nonce: event.nonce,
-            update_to: Self(RuneBridgeOp::Deposit(
-                RuneBridgeDepositOp::MintOrderConfirmed { data: event },
-            )),
-        })
-    }
-
-    async fn on_wrapped_token_burnt(
-        _ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!("on_wrapped_token_burnt {event:?}");
-        let memo = event.memo();
-        match RuneWithdrawalPayloadImpl::new(event, &get_rune_state().borrow()) {
-            Ok(payload) => Some(OperationAction::Create(
-                Self(RuneBridgeOp::Withdraw(
-                    RuneBridgeWithdrawOp::CreateTransaction { payload: payload.0 },
-                )),
-                memo,
-            )),
-            Err(err) => {
-                log::warn!("Invalid withdrawal data: {err:?}");
-                None
-            }
-        }
-    }
-
-    async fn on_minter_notification(
-        _ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::debug!("on_minter_notification {event:?}");
-
-        match event.notification_type {
-            MinterNotificationType::DepositRequest => {
-                match Decode!(&event.user_data, RuneDepositRequestData) {
-                    Ok(data) => Some(OperationAction::Create(
-                        Self(RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
-                            dst_address: data.dst_address,
-                            dst_tokens: data.dst_tokens,
-                            requested_amounts: data.amounts,
-                        })),
-                        event.memo(),
-                    )),
-                    _ => {
-                        log::warn!(
-                            "Invalid encoded deposit request: {}",
-                            hex::encode(&event.user_data)
-                        );
-                        None
-                    }
-                }
-            }
-            _ => {
-                log::warn!(
-                    "Unsupported minter notification type: {:?}",
-                    event.notification_type
-                );
-                None
-            }
         }
     }
 }

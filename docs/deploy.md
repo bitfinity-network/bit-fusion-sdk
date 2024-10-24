@@ -4,13 +4,9 @@
     - [Requirements](#requirements)
         - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
     - [Build](#build)
-    - [Canisters deployment](#canisters-deployment)
-        - [BFT Bridge](#bft-bridge)
-        - [BTC Bridge](#btc-bridge)
-        - [ERC20 Bridge](#erc20-bridge)
-        - [ERC721 Bridge](#erc721-bridge)
-        - [ICRC2 Bridge](#icrc2-bridge)
-        - [Rune Bridge](#rune-bridge)
+    - [Local test EVM deployment](#local-test-evm-deployment)
+    - [Bridge deployment](#bridge-deployment)
+        - [Erc20 bridge](#erc20-bridge)
 
 ## Requirements
 
@@ -26,17 +22,17 @@
     curl -L https://foundry.paradigm.xyz | bash
     ```
 
-. Install [just](https://just.systems/) command runner.
+- Install [just](https://just.systems/) command runner.
 - Install SSL certificates to make the `local-ssl-proxy` in the docker images able to work.
 
-    On Debian-based systems it should be enough to run
+  On Debian-based systems it should be enough to run
 
     ```sh
     sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
     sudo update-ca-certificates --fresh --verbose
     ```
 
-    On Arch linux based systems
+  On Arch linux based systems
 
     ```sh
     sudo trust anchor btc-deploy/mkcert/*
@@ -52,213 +48,69 @@
 
 ## Build
 
-Before deploying the canister, you need to build both the canisters and the solidity contracts first.
+Use `just` command to build canisters and contracts:
 
-```sh
-./scripts/build_solidity.sh
-./scripts/build.sh
+```shell
+just build_solidity
+just build_all_canisters
 ```
 
-## Canisters deployment
+## Local test EVM deployment
 
-> ❗ All the scripts, if run against localhost and with `-m create`, will deploy the evm first
+Deploy local EVM with this command:
 
-### BFT Bridge
-
-```sh
-./scripts/deploy/bft-bridge.sh
+```shell
+just deploy_evm
 ```
 
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -e, --evm-canister <principal>                  EVM canister principal
-  -w, --wallet <ETH wallet address>               Ethereum wallet address for deploy
-  --minter-address <minter-address>               Bridge canister EVM address
-  --dfx-setup                                     Setup dfx locally
+After the EVM is deployed you need to mint some native tokens to you wallet address:
+
+```shell
+dfx canister call evm_testnet admin_mint_native_tokens '("<WALLET HEX ADDRESS>", "10000000000000000000")'
 ```
 
-In order to deploy the BFT bridge, run:
+Use `icx-proxy` cli tool to create a proxy-server that routes requests to a certain URL directly to the EVM canister.
+This way you can use third-party tools that connect to EVMs with your local deployment:
 
-If deploying on ic
-
-```sh
-./scripts/deploy/bft-bridge.sh -e <evm-principal> -m <minter-address> -w <wallet-address>
+```shell
+dfx_local_port=$(dfx info replica-port) && evm_canister=$(dfx canister id evm_testnet) \
+  && icx-proxy \
+    --fetch-root-key \
+    --address 0.0.0.0:8545 \
+    --dns-alias 127.0.0.1:$evm_canister \
+    --replica http://localhost:$dfx_local_port
 ```
 
-If deploying on localhost just pass the `--dfx-setup` option.
+## Bridge deployment
 
-```sh
-./scripts/deploy/bft-bridge.sh --dfx-setup
+To simplify deployment and configuring of the bridge canisters a CLI tool `bridge-deployer` is provided. Some examples
+about how to use this tool are given below. You can get list of all available options for each command by running:
+
+```shell
+cargo run -p bridge-deployer -- --help
 ```
 
-### BTC Bridge
+All commands of bridge deployer require a private key of you EVM wallet to run EVM operations. It can be specified:
 
-Deploy the Bitcoin bridge
+* through `.env` file with content `PRIVATE_KEY=<KEY>`
+* through setting `PRIVATE_KEY` environment variable
+* through command line argument `--private-key <KEY>`
 
-```sh
-./scripts/deploy/btc-bridge.sh --help
+### Erc20 bridge
+
+Deploy bridge canister and BFT bridge contract:
+
+```shell
+cargo run -p bridge-deployer -- deploy --wasm .artifact/erc20-bridge.wasm.gz \
+  erc20 --base-evm-url https://testnet.bitfinity.network
 ```
 
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -b, --bitcoin-network <network>                 Bitcoin network (regtest, testnet, mainnet) (default: regtest)
-  -e, --evm-principal <principal>                 EVM Principal
-  -i, --ic-network <network>                      Internet Computer network (local, ic) (default: local)
-  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)
-  --ckbtc-minter <canister-id>                    CK-BTC minter canister ID
-  --ckbtc-ledger <canister-id>                    CK-BTC ledger canister ID
+After the bridge was deployed, create a wrapped token (using addresses from the previous command as inputs):
+
+```shell
+cargo run -p bridge-deployer -- wrap erc20 \
+  --base-evm-url https://testnet.bitfinity.network \
+  --base-bft-address <BASE_BFT_CONTRACT_ADDRESS> \
+  --wrapped-bft-address <WRAPPED_BFT_CONTRACT_ADDRESS> \
+  --token-address <BASE_TOKEN_ADDRESS>
 ```
-
-If deploying on ic
-
-```sh
-./scripts/deploy/btc-bridge.sh -m <create|install|reinstall|update> -i ic -e <evm-principal> --bitcoin-network mainnet
-```
-
-If deploying on local
-
-```sh
-# setup bitcoind
-cd btc-deploy/ && docker compose up --build -d && cd -
-# deploy btc bridge
-./scripts/deploy/btc-bridge.sh -m <create|install|reinstall|update> -e <evm-principal>
-```
-
-When deploying on local, this will also deploy the ckbtc ledger and minter canisters.
-By default this will run against the bitcoin regtest
-
-### ERC20 Bridge
-
-Deploy the ERC20 Bridge
-
-```sh
-./scripts/deploy/erc20-bridge.sh --help
-```
-
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -e, --evm-principal <principal>                 EVM Principal
-  -i, --ic-network <network>                      Internet Computer network (local, ic) (default: local)
-  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)
-  --base-evm <canister-id>                        Base EVM link canister ID
-  --wrapped-evm <canister-id>                     Wrapped EVM link canister ID
-  --erc20-base-bridge-contract <canister-id>      ERC20 Base bridge contract canister ID
-  --erc20-wrapped-bridge-contract <canister-id>   ERC20 Wrapped bridge contract canister ID
-```
-
-If deploying on ic
-
-```sh
-./scripts/deploy/erc20-bridge.sh
-  -m <create|install|reinstall|update>
-  -e <evm-principal>
-  -i ic
-  --base-evm <evm-principal-or-rpc-url>
-  --wrapped-evm <evm-principal-or-rpc-url>
-  --erc20-base-bridge-contract <erc20-base-eth-address>
-  --erc20-wrapped-bridge-contract <erc20-wrapped-eth-address>
-```
-
-If deploying on local
-
-```sh
-./scripts/deploy-erc20-bridge.sh -m create
-```
-
-This will deploy the ERC20 bridge, setup the evm canister and the BFT bridge.
-
-### ERC721 Bridge
-
-```sh
-./scripts/deploy/erc721-bridge.sh
-```
-
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -e, --evm-canister <principal>                  EVM canister principal
-  -w, --wallet <ETH wallet address>               Ethereum wallet address for deploy
-  --minter-address <minter-address>               Bridge minter address
-  --dfx-setup                                     Setup dfx locally
-```
-
-In order to deploy the ERC721 bridge, run:
-
-If deploying on ic
-
-```sh
-./scripts/deploy/erc721-bridge.sh -e <evm-principal> -m <minter-address> -w <wallet-address>
-```
-
-If deploying on localhost just pass the `--dfx-setup` option.
-
-```sh
-./scripts/deploy/erc721-bridge.sh --dfx-setup
-```
-
-### ICRC2 Bridge
-
-```sh
-./scripts/deploy/icrc2-bridge.sh
-```
-
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -e, --evm-principal <principal>                 EVM Principal
-  -i, --ic-network <network>                      Internet Computer network (local, ic) (default: local)
-  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)
-```
-
-If deploying on ic
-
-```sh
-./scripts/deploy/icrc2-bridge.sh -m <create|install|reinstall|update> -e <evm-principal> -i ic
-```
-
-If deploying on local
-
-```sh
-./scripts/deploy/icrc2-bridge.sh -m <create|install|reinstall|update>
-```
-
-### Rune Bridge
-
-```sh
-./scripts/deploy/rune-bridge.sh
-```
-
-```txt
-Options:
-  -h, --help                                      Display this help message
-  -b, --bitcoin-network <network>                 Bitcoin network (regtest, testnet, mainnet) (default: regtest)
-  -e, --evm-principal <principal>                 EVM Principal
-  -i, --ic-network <network>                      Internet Computer network (local, ic) (default: local)
-  -m, --install-mode <mode>                       Install mode (create, init, reinstall, upgrade)
-  --indexer-url <url>                             Indexer URL
-```
-
-If deploying on ic
-
-```sh
-./scripts/deploy/rune-bridge.sh
-  -m <create|install|reinstall|update>
-  -e <evm-principal> 
-  -i ic 
-  --bitcoin-network mainnet 
-  --indexer-url <indexer-url>
-```
-
-If deploying on local
-
-```sh
-# setup bitcoind
-cd btc-deploy/ && docker compose up --build -d && cd -
-# deploy rune bridge
-./scripts/deploy/rune-bridge.sh -m <create|install|reinstall|update>
-```
-
-By default, this will run against the bitcoin regtest

@@ -2,8 +2,10 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -27,7 +29,8 @@ use ic_storage::IcStorage;
 use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
 use crate::ops::{
-    Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler, SEND_MINT_TX_SERVICE_ID,
+    Brc20BftEventsHandler, Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler,
+    FETCH_BFT_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
     SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::Brc20State;
@@ -73,16 +76,24 @@ impl Brc20Bridge {
             .map_err(GetAddressError::from)
     }
 
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
+    /// If `count` is `None`, it returns all operations.
     #[query]
     pub fn get_operations_list(
         &self,
         wallet_address: H160,
+        min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, Brc20BridgeOpImpl)> {
-        get_runtime_state()
-            .borrow()
-            .operations
-            .get_for_address(&wallet_address, pagination)
+        get_runtime_state().borrow().operations.get_for_address(
+            &wallet_address,
+            min_included_id,
+            pagination,
+        )
     }
 
     /// Returns log of an operation by its ID.
@@ -167,17 +178,37 @@ pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
 }
 
 fn init_runtime() -> SharedRuntime {
-    let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state();
+    let runtime = Rc::new(RefCell::new(BridgeRuntime::default(ConfigStorage::get())));
+    let state = runtime.borrow().state().clone();
+    let config = state.borrow().config.clone();
+
+    let refresh_params_service = RefreshEvmParamsService::new(config.clone());
 
     let sign_orders_handler =
-        Brc20MintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+        Brc20MintOrderHandler::new(state.clone(), runtime.borrow().scheduler().clone());
     let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
 
     let mint_tx_handler = Brc20MintTxHandler::new(state.clone());
     let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
+    let bft_events_handler = Brc20BftEventsHandler::new(get_brc20_state());
+    let fetch_bft_events_service = Rc::new(FetchBftBridgeEventsService::new(
+        bft_events_handler,
+        runtime.clone(),
+        config,
+    ));
+
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_PARAMS_SERVICE_ID,
+        Rc::new(refresh_params_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_BFT_EVENTS_SERVICE_ID,
+        fetch_bft_events_service,
+    );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
@@ -189,7 +220,7 @@ fn init_runtime() -> SharedRuntime {
         mint_tx_service,
     );
 
-    Rc::new(RefCell::new(runtime))
+    runtime
 }
 
 impl Metrics for Brc20Bridge {
@@ -205,7 +236,7 @@ impl LogCanister for Brc20Bridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<Brc20BridgeOpImpl>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime = init_runtime();
