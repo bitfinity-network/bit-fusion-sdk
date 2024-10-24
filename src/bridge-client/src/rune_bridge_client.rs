@@ -1,6 +1,7 @@
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::OperationLog;
 use bridge_did::operations::RuneBridgeOp;
+use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
 
@@ -15,12 +16,23 @@ impl<C: CanisterClient> RuneBridgeClient<C> {
         Self { client }
     }
 
+    /// Retrieves all operations for the given ETH wallet address whose
+    /// id is greater than or equal to `min_included_id` if provided.
+    /// The operations are then paginated with the given `pagination` parameters,
+    /// starting from `offset` returning a max of `count` items
+    /// If `offset` is `None`, it starts from the beginning (i.e. the first entry is the min_included_id).
+    /// If `count` is `None`, it returns all operations.
     pub async fn get_operations_list(
         &self,
         wallet_address: &H160,
+        min_included_id: Option<OperationId>,
+        pagination: Option<Pagination>,
     ) -> CanisterClientResult<Vec<(OperationId, RuneBridgeOp)>> {
         self.client
-            .update("get_operations_list", (wallet_address,))
+            .query(
+                "get_operations_list",
+                (wallet_address, min_included_id, pagination),
+            )
             .await
     }
 

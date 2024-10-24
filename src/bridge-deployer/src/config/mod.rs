@@ -4,6 +4,9 @@ pub use brc20::Brc20BridgeConfig;
 use candid::{CandidType, Principal};
 use clap::{Parser, ValueEnum};
 use eth_signer::sign_strategy;
+use eth_signer::sign_strategy::SigningStrategy;
+use ethers_core::k256::ecdsa::SigningKey;
+use ethers_core::rand;
 use serde::{Deserialize, Serialize};
 
 mod brc20;
@@ -18,7 +21,7 @@ pub use icrc::*;
 pub use rune::*;
 
 #[derive(
-    ValueEnum, Debug, Serialize, Deserialize, Clone, CandidType, PartialEq, Eq, strum::Display,
+    ValueEnum, Debug, Serialize, Deserialize, Clone, Copy, CandidType, PartialEq, Eq, strum::Display,
 )]
 /// The signing key ID to use for signing messages
 ///
@@ -29,14 +32,28 @@ pub enum SigningKeyId {
     /// The test signing key
     Test,
     Production,
+    Pk,
 }
 
-impl From<SigningKeyId> for sign_strategy::SigningKeyId {
+impl From<SigningKeyId> for SigningStrategy {
     fn from(value: SigningKeyId) -> Self {
         match value {
-            SigningKeyId::Dfx => Self::Dfx,
-            SigningKeyId::Test => Self::Test,
-            SigningKeyId::Production => Self::Production,
+            SigningKeyId::Dfx => Self::ManagementCanister {
+                key_id: sign_strategy::SigningKeyId::Dfx,
+            },
+            SigningKeyId::Test => Self::ManagementCanister {
+                key_id: sign_strategy::SigningKeyId::Test,
+            },
+            SigningKeyId::Production => Self::ManagementCanister {
+                key_id: sign_strategy::SigningKeyId::Production,
+            },
+            SigningKeyId::Pk => {
+                let signer = SigningKey::random(&mut rand::thread_rng());
+                let pk = signer.to_bytes();
+                Self::Local {
+                    private_key: pk.into(),
+                }
+            }
         }
     }
 }

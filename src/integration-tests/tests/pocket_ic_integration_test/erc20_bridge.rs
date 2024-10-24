@@ -284,7 +284,7 @@ async fn test_external_bridging() {
         .await;
 
     let operation = erc20_bridge_client
-        .get_operations_list(&alice_address, None)
+        .get_operations_list(&alice_address, None, None)
         .await
         .unwrap()
         .last()
@@ -396,7 +396,7 @@ async fn native_token_deposit_increase_and_decrease() {
     let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
 
     let mint_op = erc20_bridge_client
-        .get_operations_list(&alice_address, None)
+        .get_operations_list(&alice_address, None, None)
         .await
         .unwrap()
         .last()
@@ -418,7 +418,7 @@ async fn native_token_deposit_increase_and_decrease() {
     }
 
     let operation = erc20_bridge_client
-        .get_operations_list(&alice_address, None)
+        .get_operations_list(&alice_address, None, None)
         .await
         .unwrap()
         .last()
@@ -507,7 +507,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // Check mint order is not removed
     let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
     let (_, op) = erc20_bridge_client
-        .get_operations_list(&alice_address, None)
+        .get_operations_list(&alice_address, None, None)
         .await
         .unwrap()
         .last()
@@ -531,7 +531,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // check the operation is complete after the successful mint
     let (_, op) = erc20_bridge_client
-        .get_operations_list(&alice_address, None)
+        .get_operations_list(&alice_address, None, None)
         .await
         .unwrap()
         .last()

@@ -1,9 +1,14 @@
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
+use anyhow::bail;
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
+use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
+use ic_agent::Identity;
+use ic_canister_client::agent::identity::GenericIdentity;
 use tracing::level_filters::LevelFilter;
-use tracing::{debug, trace, Level};
+use tracing::{debug, info, trace, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
@@ -19,9 +24,12 @@ pub struct Cli {
     /// The command to run
     #[command(subcommand)]
     command: Commands,
+
     /// The identity that will be used to perform the DFX operations
+    ///
+    /// If not set, current active DFX identity will be used
     #[arg(long, value_name = "IDENTITY_PATH")]
-    identity: PathBuf,
+    identity: Option<PathBuf>,
 
     /// Private Key of the wallet to use for the transaction
     ///
@@ -29,7 +37,7 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    /// EVM network to deploy the contract to
     #[arg(
         long,
         value_name = "EVM_NETWORK",
@@ -72,13 +80,18 @@ pub struct Cli {
 impl Cli {
     /// Runs the Bitfinity Deployer application.
     pub async fn run() -> anyhow::Result<()> {
+        let _ = dotenv::dotenv();
         let cli = Cli::parse();
 
         // Initialize tracing with the appropriate log level based on the verbosity setting.
         cli.init_tracing();
+        let identity = cli.init_identity()?;
+        info!(
+            "Using dfx identity with principal: {}",
+            identity.sender().expect("invalid agent identity"),
+        );
 
         let Cli {
-            identity,
             private_key,
             evm_network,
             command,
@@ -96,12 +109,13 @@ impl Cli {
         let canister_ids_path = canister_ids
             .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
             .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
+
         debug!("Canister ids path: {}", canister_ids_path.path().display());
 
         trace!("Executing command: {:?}", command);
         command
             .run(
-                identity.to_path_buf(),
+                identity,
                 &ic_host,
                 evm_network,
                 private_key,
@@ -165,5 +179,45 @@ impl Cli {
     /// Filters out no log messages.
     fn filter_none(_metadata: &tracing::Metadata) -> bool {
         true
+    }
+
+    /// Returns DFX identity to be used.
+    ///
+    /// If configured though CLI, returns the set one. Otherwise, gets the currently active identity
+    /// from the DFX.
+    fn init_identity(&self) -> anyhow::Result<GenericIdentity> {
+        if let Some(path) = &self.identity {
+            Ok(GenericIdentity::try_from(path.as_ref())?)
+        } else {
+            let result = Command::new("dfx")
+                .args(vec!["identity", "whoami"])
+                .stdout(Stdio::piped())
+                .output()?;
+            if !result.status.success() {
+                bail!(
+                    "Failed to get dfx identity name: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+            }
+
+            let identity_name = String::from_utf8(result.stdout)?;
+            let identity_name = identity_name.trim();
+
+            let result = Command::new("dfx")
+                .args(vec!["identity", "export", &identity_name])
+                .stdout(Stdio::piped())
+                .output()?;
+
+            if !result.status.success() {
+                bail!(
+                    "Failed to get dfx identity PEM: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+            }
+
+            Ok(Secp256k1Identity::from_pem(&result.stdout[..])
+                .map(GenericIdentity::from)
+                .or(BasicIdentity::from_pem(&result.stdout[..]).map(GenericIdentity::from))?)
+        }
     }
 }
