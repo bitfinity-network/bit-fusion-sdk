@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -34,9 +36,13 @@ use tokio::time::Instant;
 use crate::context::{CanisterType, TestContext};
 use crate::dfx_tests::{block_until_succeeds, DfxTestContext, ADMIN};
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
+use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
 use crate::utils::wasm::get_rune_bridge_canister_bytecode;
+
+const MINER_INTERVAL: Duration = Duration::from_secs(3);
+const REQUIRED_CONFIRMATIONS: u64 = 6;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum RuneDepositStrategy {
@@ -51,7 +57,7 @@ struct RuneWalletInfo {
 
 struct RuneWallet {
     admin_address: Address,
-    admin_btc_rpc_client: BitcoinRpcClient,
+    admin_btc_rpc_client: Arc<BitcoinRpcClient>,
     ord_wallet: BtcWallet,
     runes: HashMap<RuneId, RuneWalletInfo>,
 }
@@ -60,6 +66,8 @@ struct RunesContext {
     inner: DfxTestContext,
     eth_wallet: Wallet<'static, SigningKey>,
     bft_bridge_contract: H160,
+    exit: Exit,
+    miner: Option<JoinHandle<()>>,
     runes: RuneWallet,
     tokens: HashMap<RuneId, H160>,
 }
@@ -127,7 +135,7 @@ async fn dfx_rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> 
     }
 
     Ok(RuneWallet {
-        admin_btc_rpc_client,
+        admin_btc_rpc_client: Arc::new(admin_btc_rpc_client),
         admin_address,
         ord_wallet,
         runes,
@@ -235,9 +243,19 @@ impl RunesContext {
 
         context.advance_time(Duration::from_secs(2)).await;
 
+        let exit = Arc::new(AtomicBool::new(false));
+        let miner = Miner::run(
+            rune_wallet.admin_address.clone(),
+            &rune_wallet.admin_btc_rpc_client,
+            &exit,
+            MINER_INTERVAL,
+        );
+
         Self {
             bft_bridge_contract: bft_bridge,
             eth_wallet: wallet,
+            exit,
+            miner: Some(miner),
             inner: context,
             runes: rune_wallet,
             tokens,
@@ -334,7 +352,7 @@ impl RunesContext {
             .await
             .expect("failed to send runes");
 
-        self.mint_blocks(6).await;
+        self.mint_blocks(REQUIRED_CONFIRMATIONS);
         println!(
             "{runes_count} Runes sent. txid: {tx_id}; sent to {btc_address}; amounts: {amounts:?}",
             runes_count = amounts.len(),
@@ -350,35 +368,25 @@ impl RunesContext {
             .send_to_address(&btc_address, amount)
             .expect("failed to send btc");
 
-        self.mint_blocks(1).await;
-    }
-
-    async fn mint_blocks(&self, count: u64) {
-        // Await all previous operations to synchronize for ord and dfx
-        self.inner.advance_time(Duration::from_secs(1)).await;
-
-        self.runes
-            .admin_btc_rpc_client
-            .generate_to_address(&self.runes.admin_address, count)
-            .expect("failed to generate blocks");
-
-        // Allow dfx and ord catch up with the new block
-        self.inner.advance_time(Duration::from_secs(5)).await;
+        self.mint_blocks(1);
     }
 
     async fn deposit(&self, runes: &[RuneId], eth_address: &H160) -> Result<(), DepositError> {
         self.send_deposit_notification(runes, eth_address, None)
             .await;
 
-        const MAX_RETRIES: u32 = 20;
-        let mut retry_count = 0;
+        self.mint_blocks(REQUIRED_CONFIRMATIONS);
+        const MAX_WAIT: Duration = Duration::from_secs(60);
+        const OP_INTERVAL: Duration = Duration::from_secs(5);
+        let start = Instant::now();
+
         let mut successful_orders = HashSet::new();
 
-        while retry_count < MAX_RETRIES {
-            self.inner.advance_time(Duration::from_secs(2)).await;
-            retry_count += 1;
-
-            println!("Checking deposit status. Try #{retry_count}...");
+        while start.elapsed() < MAX_WAIT {
+            println!(
+                "Checking deposit status. Elapsed {}s...",
+                start.elapsed().as_secs()
+            );
 
             let response: Vec<(OperationId, RuneBridgeOp)> = self
                 .inner
@@ -401,12 +409,12 @@ impl RunesContext {
                 }
             }
 
-            println!("Deposit response: {response:?}");
-
             // since we use batched, one is enough
             if !successful_orders.is_empty() {
                 return Ok(());
             }
+            println!("Deposit response: {response:?}");
+            self.inner.advance_time(OP_INTERVAL).await;
         }
 
         println!("Successful {}/{}", successful_orders.len(), runes.len());
@@ -543,7 +551,7 @@ impl RunesContext {
             )
             .await?;
 
-        self.mint_blocks(6).await;
+        self.mint_blocks(REQUIRED_CONFIRMATIONS);
 
         Ok(())
     }
@@ -594,6 +602,13 @@ impl RunesContext {
         amount
     }
 
+    pub fn mint_blocks(&self, count: u64) {
+        self.runes
+            .admin_btc_rpc_client
+            .generate_to_address(&self.runes.admin_address, count)
+            .expect("failed to generate blocks");
+    }
+
     async fn deposit_runes_to(
         &self,
         runes: &[(&RuneId, u128)],
@@ -615,13 +630,13 @@ impl RunesContext {
                 for rune in runes {
                     self.send_runes(&address, &[*rune]).await;
                     self.send_btc(&address, Amount::from_int_btc(1)).await;
-                    self.inner.advance_time(Duration::from_secs(5)).await;
+                    self.mint_blocks(1);
                 }
             }
             RuneDepositStrategy::AllInOne => {
                 self.send_runes(&address, runes).await;
                 self.send_btc(&address, Amount::from_int_btc(1)).await;
-                self.inner.advance_time(Duration::from_secs(5)).await;
+                self.mint_blocks(1);
             }
         }
 
@@ -637,11 +652,16 @@ impl RunesContext {
             assert_eq!(balance_after - balance_before, *rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
         }
 
-        self.inner.advance_time(Duration::from_secs(5)).await;
-        self.runes
-            .admin_btc_rpc_client
-            .generate_to_address(&self.runes.admin_address, 6)
-            .expect("failed to generate blocks");
+        self.mint_blocks(REQUIRED_CONFIRMATIONS);
+    }
+}
+
+impl Drop for RunesContext {
+    fn drop(&mut self) {
+        self.exit.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(join) = self.miner.take() {
+            join.join().expect("failed to join miner thread");
+        }
     }
 }
 
@@ -676,7 +696,7 @@ async fn runes_bridging_flow() {
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
-    ctx.mint_blocks(1).await;
+    ctx.mint_blocks(1);
     let ord_balance = ctx.ord_rune_balance(&rune_id).await;
     ctx.deposit_runes_to(
         &[(&rune_id, 100)],
@@ -697,38 +717,34 @@ async fn runes_bridging_flow() {
     )
     .await;
 
-    ctx.runes
-        .admin_btc_rpc_client
-        .generate_to_address(&ctx.runes.admin_address, 6)
-        .expect("failed to generate blocks");
+    ctx.mint_blocks(REQUIRED_CONFIRMATIONS);
 
     let updated_balance = ctx.wrapped_balance(&rune_id, &ctx.eth_wallet).await;
     assert_eq!(updated_balance, 70);
 
     let expected_balance = ord_balance - 100 + 30;
 
-    for _ in 0..10 {
-        let ctx_t = ctx.clone();
-        // advance
-        block_until_succeeds(
-            move || {
-                let ctx_t = ctx_t.clone();
-                Box::pin(async move {
-                    ctx_t
-                        .runes
-                        .admin_btc_rpc_client
-                        .generate_to_address(&ctx_t.runes.admin_address, 1)
-                })
-            },
-            Duration::from_secs(60),
-        )
-        .await;
+    let ctx_t = ctx.clone();
+    // advance
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            Box::pin(async move {
+                ctx_t.mint_blocks(1);
 
-        let updated_ord_balance = ctx.ord_rune_balance(&rune_id).await;
-        if updated_ord_balance == expected_balance {
-            break;
-        }
-    }
+                let updated_ord_balance = ctx_t.ord_rune_balance(&rune_id).await;
+                if updated_ord_balance == expected_balance {
+                    return Ok(());
+                }
+
+                Err(anyhow::anyhow!(
+                    "Expected balance: {expected_balance}; got {updated_ord_balance}"
+                ))
+            })
+        },
+        Duration::from_secs(120),
+    )
+    .await;
 
     let updated_ord_balance = ctx.ord_rune_balance(&rune_id).await;
 
@@ -744,7 +760,7 @@ async fn inputs_from_different_users() {
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
-    ctx.mint_blocks(1).await;
+    ctx.mint_blocks(1);
     let rune_balance = ctx.ord_rune_balance(&rune_id).await;
     ctx.deposit_runes_to(
         &[(&rune_id, 100)],
@@ -765,46 +781,51 @@ async fn inputs_from_different_users() {
     )
     .await;
 
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     let ctx = Arc::new(ctx);
+    ctx.withdraw(&rune_id, 50)
+        .await
+        .expect("failed to withdraw");
+
     let ctx_t = ctx.clone();
 
     block_until_succeeds(
         move || {
             let ctx_t = ctx_t.clone();
-            Box::pin(async move { ctx_t.withdraw(&rune_id, 50).await })
+            Box::pin(async move {
+                let updated_balance = ctx_t.wrapped_balance(&rune_id, &ctx_t.eth_wallet).await;
+                if updated_balance == 50 {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Expected balance: 50; got {updated_balance}"
+                    ))
+                }
+            })
         },
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     )
     .await;
 
-    let updated_balance = ctx.wrapped_balance(&rune_id, &ctx.eth_wallet).await;
-    assert_eq!(updated_balance, 50);
-
     let expected_balance = rune_balance - 50 - 77;
 
-    for retry in 0..10 {
-        println!("retry {retry}");
-        // wait
-        ctx.inner.advance_time(Duration::from_secs(2)).await;
-        // advance
-        ctx.runes
-            .admin_btc_rpc_client
-            .generate_to_address(&ctx.runes.admin_address, 1)
-            .expect("failed to generate blocks");
-        ctx.inner.advance_time(Duration::from_secs(2)).await;
-
-        let updated_rune_balance = ctx.ord_rune_balance(&rune_id).await;
-        if updated_rune_balance == expected_balance {
-            break;
-        }
-    }
-
-    let updated_rune_balance = ctx.ord_rune_balance(&rune_id).await;
-
-    assert_eq!(updated_rune_balance, expected_balance);
+    let ctx_t = ctx.clone();
+    block_until_succeeds(
+        move || {
+            let ctx_t = ctx_t.clone();
+            Box::pin(async move {
+                let updated_rune_balance = ctx_t.ord_rune_balance(&rune_id).await;
+                if updated_rune_balance == expected_balance {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Expected balance: {expected_balance}; got {updated_rune_balance}"
+                    ))
+                }
+            })
+        },
+        Duration::from_secs(120),
+    )
+    .await;
 
     assert_eq!(ctx.wrapped_balance(&rune_id, &another_wallet).await, 77);
     assert_eq!(ctx.wrapped_balance(&rune_id, &ctx.eth_wallet).await, 50);
@@ -820,7 +841,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
     // Mint one block in case there are some pending transactions
-    ctx.mint_blocks(1).await;
+    ctx.mint_blocks(1);
     let before_balances = ctx
         .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
@@ -869,7 +890,7 @@ async fn test_should_deposit_two_runes_in_two_tx() {
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
     // Mint one block in case there are some pending transactions
-    ctx.mint_blocks(1).await;
+    ctx.mint_blocks(1);
     let before_balances = ctx
         .wrapped_balances(&[foo_rune_id, bar_rune_id], &ctx.eth_wallet)
         .await;
@@ -919,7 +940,7 @@ async fn bail_out_of_impossible_deposit() {
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let rune_name = RuneName::from_str(&rune_name).unwrap();
     // Mint one block in case there are some pending transactions
-    ctx.mint_blocks(1).await;
+    ctx.mint_blocks(1);
     let address = ctx
         .get_deposit_address(&ctx.eth_wallet.address().into())
         .await;
