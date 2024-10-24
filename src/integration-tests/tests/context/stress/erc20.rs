@@ -1,10 +1,12 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
+use bridge_did::operation_log::Memo;
+use bridge_did::operations::Erc20OpStage;
 use bridge_utils::BFTBridge;
 use did::{TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::{Signer, Wallet};
@@ -14,10 +16,8 @@ use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState};
 use crate::context::TestContext;
-use crate::utils::error::Result;
+use crate::utils::error::{Result, TestError};
 use crate::utils::{TestWTM, CHAIN_ID};
-
-static MEMO_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 struct User {
     pub wallet: OwnedWallet,
@@ -171,13 +171,6 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         Id256::from_evm_address(&token_id, CHAIN_ID as _)
     }
 
-    fn next_memo(&self) -> [u8; 32] {
-        let mut memo = [0u8; 32];
-        let memo_value = MEMO_COUNTER.fetch_add(1, Ordering::Relaxed);
-        memo[0..4].copy_from_slice(&memo_value.to_be_bytes());
-        memo
-    }
-
     async fn bridge_canister_evm_address(&self) -> Result<H160> {
         let client = self.ctx.erc20_bridge_client(self.ctx.admin_name());
         let address = client.get_bridge_canister_evm_address().await??;
@@ -278,7 +271,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .next_nonce();
         let to_token_id = self.token_id256(info.wrapped_token.clone());
         let recipient_id = self.user_id256(to_wallet.address().into());
-        let memo = self.next_memo();
+        let memo = info.memo;
 
         println!("approving tokens for bridge");
         let input = TestWTM::approveCall {
@@ -343,6 +336,20 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
         Ok(())
     }
+
+    async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool> {
+        let Some(operation) = self
+            .ctx
+            .erc20_bridge_client(self.ctx.admin_name())
+            .get_operation_by_memo_and_user(memo, &address)
+            .await?
+        else {
+            return Err(TestError::Generic("operation not found".into()));
+        };
+
+        let is_complete = matches!(operation.1.stage, Erc20OpStage::TokenMintConfirmed(_));
+        Ok(is_complete)
+    }
 }
 
 /// Run stress test with the given TestContext implementation.
@@ -360,6 +367,5 @@ pub async fn stress_test_erc20_bridge_with_ctx<T>(
 
     dbg!(&stress_test_stats);
 
-    assert_eq!(stress_test_stats.failed_deposits, 0);
-    assert_eq!(stress_test_stats.failed_withdrawals, 0);
+    assert_eq!(stress_test_stats.failed_roundtrips, 0);
 }

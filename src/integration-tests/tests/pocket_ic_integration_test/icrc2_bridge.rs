@@ -846,6 +846,7 @@ async fn icrc_bridge_stress_test() {
         user_deposits_per_token: 4,
         init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
+        operation_timeout: Duration::from_secs(30),
     };
 
     icrc::stress_test_icrc_bridge_with_ctx(context, 2, config).await;

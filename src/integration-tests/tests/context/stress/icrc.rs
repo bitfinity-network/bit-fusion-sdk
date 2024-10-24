@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use alloy_sol_types::SolCall;
 use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
+use bridge_did::operation_log::Memo;
+use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::{evm_link, BFTBridge};
 use candid::{Encode, Nat, Principal};
@@ -21,7 +23,6 @@ use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext}
 use crate::utils::error::{Result, TestError};
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
-static MEMO_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub struct IcrcBaseTokens<Ctx> {
     ctx: Ctx,
@@ -79,13 +80,6 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
     fn token_id256(&self, token_id: Self::TokenId) -> Id256 {
         (&token_id).into()
-    }
-
-    fn next_memo(&self) -> [u8; 32] {
-        let mut memo = [0u8; 32];
-        let memo_value = MEMO_COUNTER.fetch_add(1, Ordering::Relaxed);
-        memo[0..4].copy_from_slice(&memo_value.to_be_bytes());
-        memo
     }
 
     async fn bridge_canister_evm_address(&self) -> Result<H160> {
@@ -191,7 +185,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         let input = BFTBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
-            memo: self.next_memo().into(),
+            memo: info.memo.into(),
         }
         .abi_encode();
 
@@ -227,6 +221,27 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
         Ok(())
     }
+
+    async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool> {
+        let op_info = self
+            .ctx
+            .icrc_bridge_client(self.ctx.admin_name())
+            .get_operation_by_memo_and_user(memo, &address)
+            .await?;
+
+        let op = match op_info {
+            Some((_, op)) => op,
+            None => {
+                return Err(TestError::Generic("opetaion not found".into()));
+            }
+        };
+
+        let is_complete = matches!(
+            op,
+            IcrcBridgeOp::WrappedTokenMintConfirmed(_) | IcrcBridgeOp::IcrcMintConfirmed { .. }
+        );
+        Ok(is_complete)
+    }
 }
 
 /// Run stress test with the given TestContext implementation.
@@ -242,6 +257,5 @@ pub async fn stress_test_icrc_bridge_with_ctx<T>(
 
     dbg!(&icrc_stress_test_stats);
 
-    assert_eq!(icrc_stress_test_stats.failed_deposits, 0);
-    assert_eq!(icrc_stress_test_stats.failed_withdrawals, 0);
+    assert_eq!(icrc_stress_test_stats.failed_roundtrips, 0);
 }
