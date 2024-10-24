@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use alloy_sol_types::sol;
 use bridge_did::evm_link::EvmLink;
 use bridge_utils::evm_link::{RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
@@ -17,12 +16,6 @@ use crate::utils::error::{Result, TestError};
 mod brc20_bridge;
 mod bridge_deployer;
 mod runes;
-
-sol! {
-    #[derive(Debug)]
-    TestWTM,
-    "../../solidity/out/TestWTM.sol/WatermelonToken.json"
-}
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
 pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;

@@ -14,6 +14,7 @@ use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
+use bridge_did::operations::IcrcBridgeOp;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
@@ -98,11 +99,12 @@ impl Icrc2BridgeCanister {
         &self,
         memo: Memo,
         user_id: H160,
-    ) -> Option<(OperationId, IcrcBridgeOpImpl)> {
+    ) -> Option<(OperationId, IcrcBridgeOp)> {
         get_runtime_state()
             .borrow()
             .operations
             .get_operation_by_memo_and_user(&memo, &user_id)
+            .map(|op| (op.0, op.1 .0))
     }
 
     /// Returns log of an operation by its ID.
