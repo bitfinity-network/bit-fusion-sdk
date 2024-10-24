@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::Context;
 use bridge_client::Erc20BridgeClient;
 use bridge_did::error::BftResult;
@@ -298,7 +296,7 @@ impl BFTArgs {
         is_wrapped_side: bool,
         evm: Principal,
     ) -> anyhow::Result<BftDeployedContracts> {
-        info!("Deploying BFT bridge");
+        info!("Deploying BFT contract");
 
         let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
 
@@ -314,9 +312,6 @@ impl BFTArgs {
         debug!("Expected address: {expected_fee_charge_address}");
 
         let canister_client = IcAgentClient::with_agent(canister_id, agent.clone());
-
-        // Sleep for 10 second to allow the canister to be created
-        tokio::time::sleep(Duration::from_secs(10)).await;
 
         let wrapped_token_deployer = if is_wrapped_side {
             contract_deployer.deploy_wrapped_token_deployer()?
