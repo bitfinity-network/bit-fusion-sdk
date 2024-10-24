@@ -13,7 +13,7 @@ dfx_start: dfx_prepare_env dfx_stop
   sleep 2
 
 
-# Stop the local dfx server and the ICX Proxy
+# Stop the local dfx server
 [group('dfx')]
 dfx_stop:
   dfx stop
