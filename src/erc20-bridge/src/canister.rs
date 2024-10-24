@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::bridge::OperationContext;
+use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
@@ -11,28 +13,27 @@ use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::id256::Id256;
 use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
-use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
-use bridge_utils::bft_events::BridgeEvent;
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
-use drop_guard::guard;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
-use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
+use ic_stable_structures::StableCell;
 use ic_storage::IcStorage;
 
+use crate::memory::NONCE_COUNTER_MEMORY_ID;
+use crate::ops::events_handler::Erc20EventsHandler;
 use crate::ops::{
-    self, Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, SEND_MINT_TX_SERVICE_ID,
-    SIGN_MINT_ORDER_SERVICE_ID,
+    Erc20BridgeOpImpl, Erc20OrderHandler, Erc20ServiceSelector, FETCH_BASE_LOGS_SERVICE_ID,
+    FETCH_WRAPPED_LOGS_SERVICE_ID, REFRESH_BASE_PARAMS_SERVICE_ID,
+    REFRESH_WRAPPED_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::SharedBaseEvmState;
 
@@ -68,16 +69,6 @@ impl Erc20Bridge {
     }
 
     fn run_scheduler() {
-        if get_base_evm_state().0.borrow().should_collect_evm_logs() {
-            get_base_evm_state().0.borrow_mut().collecting_logs_ts = Some(ic::time());
-            ic::spawn(process_base_evm_logs());
-        }
-
-        if get_base_evm_state().0.borrow().should_refresh_evm_params() {
-            get_base_evm_state().0.borrow_mut().refreshing_evm_params_ts = Some(ic::time());
-            ic::spawn(get_base_evm_state().refresh_base_evm_params());
-        }
-
         let runtime = get_runtime();
         runtime.borrow_mut().run();
     }
@@ -181,126 +172,41 @@ impl LogCanister for Erc20Bridge {
     }
 }
 
-async fn process_base_evm_logs() {
-    log::trace!("processing base evm logs");
-
-    let _lock = guard(get_base_evm_state(), |s| {
-        s.0.borrow_mut().collecting_logs_ts = None
-    });
-
-    let base_evm_state = get_base_evm_state();
-    const MAX_LOGS_PER_REQUEST: u64 = 1000;
-    let collect_result = base_evm_state
-        .collect_evm_events(MAX_LOGS_PER_REQUEST)
-        .await;
-    let collected = match collect_result {
-        Ok(c) => c,
-        Err(err) => {
-            log::warn!("failed to collect base EVM events: {err}");
-            return;
-        }
-    };
-
-    log::debug!("collected base evm events: {collected:?}");
-
-    get_base_evm_config()
-        .borrow_mut()
-        .update_evm_params(|params| params.next_block = collected.last_block_number + 1);
-
-    for event in collected.events {
-        if let Err(e) = process_base_evm_event(event) {
-            log::warn!("failed to process base EVM event: {e}")
-        };
-    }
-
-    log::debug!("base EVM logs processed");
-}
-
-fn process_base_evm_event(event: BridgeEvent) -> BftResult<()> {
-    match event {
-        BridgeEvent::Burnt(event) => {
-            log::trace!("base token burnt");
-
-            let wrapped_evm_params = get_runtime_state().get_evm_params().expect(
-                "process_base_evm_event must not be called if wrapped evm params are not initialized",
-            );
-            let base_evm_params = get_base_evm_config().borrow().get_evm_params().expect(
-                "process_base_evm_logs must not be called if base evm params are not initialized",
-            );
-
-            let nonce = get_base_evm_state().0.borrow_mut().next_nonce();
-            let order = ops::mint_order_from_burnt_event(
-                event.clone(),
-                base_evm_params,
-                wrapped_evm_params,
-                nonce,
-            )
-            .ok_or_else(|| {
-                Error::Serialization(format!(
-                    "failed to create mint order from base evm burnt event: {event:?}"
-                ))
-            })?;
-
-            let op_id = OperationId::new(nonce as _);
-            let operation = Erc20BridgeOpImpl(Erc20BridgeOp {
-                side: BridgeSide::Wrapped,
-                stage: Erc20OpStage::SignMintOrder(order),
-            });
-
-            let memo = event.memo();
-
-            get_runtime_state()
-                .borrow_mut()
-                .operations
-                .new_operation_with_id(op_id, operation.clone(), memo);
-
-            get_runtime()
-                .borrow_mut()
-                .schedule_operation(op_id, operation);
-        }
-        BridgeEvent::Minted(event) => {
-            log::trace!("base token minted");
-
-            let Some((_, wrapped_token_sender)) =
-                Id256::from_slice(&event.sender_id).and_then(|id| id.to_evm_address().ok())
-            else {
-                return Err(Error::Serialization(
-                    "failed to decode wrapped address from minted event".into(),
-                ));
-            };
-
-            let Some((op_id, _)) = get_runtime_state()
-                .borrow()
-                .operations
-                .get_for_address_nonce(&wrapped_token_sender, event.nonce)
-            else {
-                return Err(Error::OperationNotFound(OperationId::new(event.nonce as _)));
-            };
-
-            let confirmed = Erc20BridgeOpImpl(Erc20BridgeOp {
-                side: BridgeSide::Base,
-                stage: Erc20OpStage::TokenMintConfirmed(event),
-            });
-            get_runtime_state()
-                .borrow_mut()
-                .operations
-                .update(op_id, confirmed);
-        }
-        BridgeEvent::Notify(_) => {}
-    };
-
-    Ok(())
-}
-
 fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state();
-    let base_evm_config = get_base_evm_config();
+    let state = runtime.state().clone();
+    let base_config = get_base_evm_config();
+    let wrapped_config = state.borrow().config.clone();
     let scheduler = runtime.scheduler().clone();
+    let runtime = Rc::new(RefCell::new(runtime));
+
+    // Init refresh_evm_params services
+    let refresh_base_params_service = RefreshEvmParamsService::new(base_config.clone());
+    let refresh_wrapped_params_service = RefreshEvmParamsService::new(wrapped_config.clone());
+
+    // Init event listener services
+    let base_event_handler = Erc20EventsHandler::new(
+        get_mint_order_nonce_counter(),
+        BridgeSide::Base,
+        base_config.clone(),
+        wrapped_config.clone(),
+    );
+    let base_events_service =
+        FetchBftBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+    let wrapped_event_handler = Erc20EventsHandler::new(
+        get_mint_order_nonce_counter(),
+        BridgeSide::Wrapped,
+        wrapped_config.clone(),
+        base_config.clone(),
+    );
+    let wrapped_events_service = FetchBftBridgeEventsService::new(
+        wrapped_event_handler,
+        runtime.clone(),
+        wrapped_config.clone(),
+    );
 
     // Init operation handlers
-    let base_handler = Erc20OrderHandler::new(state.clone(), base_evm_config, scheduler.clone());
-    let wrapped_config = state.borrow().config.clone();
+    let base_handler = Erc20OrderHandler::new(state.clone(), base_config, scheduler.clone());
     let wrapped_handler = Erc20OrderHandler::new(state.clone(), wrapped_config, scheduler.clone());
 
     // Init mint order signing service
@@ -316,6 +222,26 @@ fn init_runtime() -> SharedRuntime {
 
     let services = state.borrow().services.clone();
     services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_BASE_PARAMS_SERVICE_ID,
+        Rc::new(refresh_base_params_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_WRAPPED_PARAMS_SERVICE_ID,
+        Rc::new(refresh_wrapped_params_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_BASE_LOGS_SERVICE_ID,
+        Rc::new(base_events_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_WRAPPED_LOGS_SERVICE_ID,
+        Rc::new(wrapped_events_service),
+    );
+    services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
         Rc::new(sign_service),
@@ -326,13 +252,21 @@ fn init_runtime() -> SharedRuntime {
         Rc::new(send_mint_tx_service),
     );
 
-    Rc::new(RefCell::new(runtime))
+    runtime
 }
+
+pub type SharedNonceCounter = Rc<RefCell<StableCell<u32, StableMemory>>>;
 
 thread_local! {
     pub static RUNTIME: SharedRuntime = init_runtime();
 
     pub static BASE_EVM_STATE: SharedBaseEvmState = SharedBaseEvmState::default();
+
+    pub static MINT_ORDER_NONCE_COUNTER: SharedNonceCounter =
+        Rc::new(RefCell::new(
+            StableCell::new(memory_by_id(NONCE_COUNTER_MEMORY_ID), 0)
+                .expect("failed to initialize nonce counter StableCell")
+        ));
 }
 
 pub fn get_runtime() -> SharedRuntime {
@@ -349,4 +283,8 @@ pub fn get_base_evm_state() -> SharedBaseEvmState {
 
 pub fn get_base_evm_config() -> Rc<RefCell<ConfigStorage>> {
     BASE_EVM_STATE.with(|s| s.0.borrow().config.clone())
+}
+
+pub fn get_mint_order_nonce_counter() -> SharedNonceCounter {
+    MINT_ORDER_NONCE_COUNTER.with(|c| c.clone())
 }

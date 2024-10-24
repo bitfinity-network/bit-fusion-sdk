@@ -1,4 +1,4 @@
-use bridge_canister::bridge::{Operation, OperationAction, OperationContext, OperationProgress};
+use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
@@ -8,23 +8,27 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
 use bridge_did::order::{MintOrder, SignedOrders};
-use bridge_utils::evm_bridge::EvmParams;
 use candid::CandidType;
-use did::{H160, U256};
+use did::H160;
 use eth_signer::sign_strategy::TransactionSigner;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::{Deserialize, Serialize};
 
-use crate::canister::{get_base_evm_config, get_base_evm_state, get_runtime_state};
+use crate::canister::get_runtime_state;
 
-pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 0;
-pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 1;
+pub mod events_handler;
+
+pub const REFRESH_BASE_PARAMS_SERVICE_ID: ServiceId = 0;
+pub const REFRESH_WRAPPED_PARAMS_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BASE_LOGS_SERVICE_ID: ServiceId = 2;
+pub const FETCH_WRAPPED_LOGS_SERVICE_ID: ServiceId = 3;
+pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 4;
+pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 5;
 
 #[derive(Debug, Serialize, Deserialize, CandidType, Clone)]
 pub struct Erc20BridgeOpImpl(pub Erc20BridgeOp);
@@ -113,65 +117,6 @@ impl Operation for Erc20BridgeOpImpl {
             Erc20OpStage::TokenMintConfirmed(_) => None,
         }
     }
-
-    async fn on_wrapped_token_burnt(
-        ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token burnt. Preparing mint order for other side...");
-
-        // Panic here to make the runtime re-process the events when EVM params will be initialized.
-        let wrapped_evm_params = ctx.get_evm_params().expect(
-            "on_wrapped_token_burnt should not be called if wrapped evm params are not initialized",
-        );
-        let base_evm_params = get_base_evm_config().borrow().get_evm_params().expect(
-            "on_wrapped_token_burnt should not be called if base evm params are not initialized",
-        );
-
-        let nonce = get_base_evm_state().0.borrow_mut().next_nonce();
-
-        let Some(order) =
-            mint_order_from_burnt_event(event.clone(), wrapped_evm_params, base_evm_params, nonce)
-        else {
-            log::warn!("failed to create a mint order for event: {event:?}");
-            return None;
-        };
-
-        let operation = Self(Erc20BridgeOp {
-            side: BridgeSide::Base,
-            stage: Erc20OpStage::SignMintOrder(order),
-        });
-        let memo = event.memo();
-
-        let action = OperationAction::CreateWithId(OperationId::new(nonce as _), operation, memo);
-        Some(action)
-    }
-
-    async fn on_wrapped_token_minted(
-        _ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::trace!("wrapped token minted. Updating operation to the complete state...");
-
-        let nonce = event.nonce;
-        let operation = Self(Erc20BridgeOp {
-            side: BridgeSide::Wrapped,
-            stage: Erc20OpStage::TokenMintConfirmed(event),
-        });
-        let action = OperationAction::Update {
-            nonce,
-            update_to: operation,
-        };
-        Some(action)
-    }
-
-    async fn on_minter_notification(
-        _ctx: RuntimeState<Self>,
-        _event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>> {
-        log::info!("got unexpected mint notification event");
-        None
-    }
 }
 
 pub struct Erc20OpStageImpl(pub Erc20OpStage);
@@ -203,62 +148,6 @@ impl Erc20OpStageImpl {
             )),
         }
     }
-}
-
-fn to_array<const N: usize>(data: &[u8]) -> Option<[u8; N]> {
-    match data.try_into() {
-        Ok(arr) => Some(arr),
-        Err(e) => {
-            log::warn!("failed to convert token metadata into array: {e}");
-            None
-        }
-    }
-}
-
-/// Creates mint order based on burnt event.
-pub fn mint_order_from_burnt_event(
-    event: BurntEventData,
-    burn_side_evm_params: EvmParams,
-    mint_side_evm_params: EvmParams,
-    nonce: u32,
-) -> Option<MintOrder> {
-    let sender = Id256::from_evm_address(&event.sender, burn_side_evm_params.chain_id);
-    let src_token = Id256::from_evm_address(&event.from_erc20, burn_side_evm_params.chain_id);
-    let recipient = Id256::from_slice(&event.recipient_id)?
-        .to_evm_address()
-        .inspect_err(|err| {
-            log::info!(
-                "Failed to parse recipeint_id {:?}: {}",
-                event.recipient_id,
-                err
-            )
-        })
-        .ok()?
-        .1;
-    let dst_token = Id256::from_slice(&event.to_token)?
-        .to_evm_address()
-        .inspect_err(|err| log::info!("Failed to parse to_token {:?}: {}", event.to_token, err))
-        .ok()?
-        .1;
-
-    let order = MintOrder {
-        amount: event.amount,
-        sender,
-        src_token,
-        recipient,
-        dst_token,
-        nonce,
-        sender_chain_id: burn_side_evm_params.chain_id,
-        recipient_chain_id: mint_side_evm_params.chain_id,
-        name: to_array(&event.name)?,
-        symbol: to_array(&event.symbol)?,
-        decimals: event.decimals,
-        approve_spender: H160::default(),
-        approve_amount: U256::default(),
-        fee_payer: event.sender,
-    };
-
-    Some(order)
 }
 
 /// Select base or wrapped service based on operation side.
@@ -362,8 +251,7 @@ impl MintOrderHandler for Erc20OrderHandler {
             .update(id, new_op.clone());
 
         if let Some(options) = scheduling_options {
-            let scheduled_task =
-                ScheduledTask::with_options(BridgeTask::Operation(id, new_op), options);
+            let scheduled_task = ScheduledTask::with_options(BridgeTask::new(id, new_op), options);
             self.scheduler.append_task(scheduled_task);
         }
     }
