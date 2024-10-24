@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
@@ -35,6 +38,7 @@ use crate::dfx_tests::{DfxTestContext, ADMIN};
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
+use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
 use crate::utils::wasm::get_brc20_bridge_canister_bytecode;
 
@@ -42,6 +46,9 @@ use crate::utils::wasm::get_brc20_bridge_canister_bytecode;
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
 /// Initial supply of the BRC20 token for the wallet
 pub const DEFAULT_MINT_AMOUNT: u64 = 100_000;
+/// Required confirmations for the deposit
+pub const REQUIRED_CONFIRMATIONS: u64 = 6;
+const MINER_INTERVAL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Brc20InitArgs {
@@ -53,7 +60,7 @@ pub struct Brc20InitArgs {
 
 pub struct Brc20Wallet {
     pub admin_address: Address,
-    pub admin_btc_rpc_client: BitcoinRpcClient,
+    pub admin_btc_rpc_client: Arc<BitcoinRpcClient>,
     ord_wallet: BtcWallet,
     pub brc20_tokens: HashSet<Brc20Tick>,
 }
@@ -107,6 +114,8 @@ pub struct Brc20Context {
     pub inner: DfxTestContext,
     pub eth_wallet: Wallet<'static, SigningKey>,
     bft_bridge_contract: H160,
+    exit: Exit,
+    miner: Option<JoinHandle<()>>,
     pub brc20: Brc20Wallet,
     pub tokens: HashMap<Brc20Tick, H160>,
 }
@@ -183,7 +192,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
 
     Ok(Brc20Wallet {
         brc20_tokens,
-        admin_btc_rpc_client,
+        admin_btc_rpc_client: Arc::new(admin_btc_rpc_client),
         admin_address,
         ord_wallet,
     })
@@ -293,9 +302,19 @@ impl Brc20Context {
             .await
             .unwrap();
 
+        let exit = Exit::new(AtomicBool::new(false));
+        let miner = Miner::run(
+            brc20_wallet.admin_address.clone(),
+            &brc20_wallet.admin_btc_rpc_client,
+            &exit,
+            MINER_INTERVAL,
+        );
+
         Self {
             bft_bridge_contract: bft_bridge,
             eth_wallet: wallet,
+            exit,
+            miner: Some(miner),
             inner: context,
             brc20: brc20_wallet,
             tokens,
@@ -372,16 +391,10 @@ impl Brc20Context {
     }
 
     pub async fn mint_blocks(&self, count: u64) {
-        // Await all previous operations to synchronize for ord and dfx
-        self.sync().await.expect("failed to sync");
-
         self.brc20
             .admin_btc_rpc_client
             .generate_to_address(&self.brc20.admin_address, count)
             .expect("failed to generate blocks");
-
-        // Allow dfx and ord catch up with the new block
-        self.sync().await.expect("failed to sync");
     }
 
     pub async fn deposit(
@@ -439,15 +452,17 @@ impl Brc20Context {
             hex::encode(tx_id.0)
         );
 
-        const MAX_RETRIES: u32 = 20;
-        let mut retry_count = 0;
+        // mint blocks required for confirmations
+        self.mint_blocks(REQUIRED_CONFIRMATIONS).await;
+        const MAX_WAIT: Duration = Duration::from_secs(60);
+        const OP_INTERVAL: Duration = Duration::from_secs(5);
+        let start = Instant::now();
 
-        while retry_count < MAX_RETRIES {
-            self.inner.advance_time(Duration::from_secs(2)).await;
-            self.mint_blocks(1).await;
-            retry_count += 1;
-
-            println!("Checking deposit status. Try #{retry_count}...");
+        while start.elapsed() < MAX_WAIT {
+            println!(
+                "Checking deposit status. Elapsed {}s...",
+                start.elapsed().as_secs()
+            );
 
             let response: Vec<(OperationId, Brc20BridgeOp)> = self
                 .inner
@@ -468,6 +483,7 @@ impl Brc20Context {
             }
 
             println!("Deposit response: {response:?}");
+            self.inner.advance_time(OP_INTERVAL).await;
         }
 
         Err(DepositError::NothingToDeposit)
@@ -576,23 +592,13 @@ impl Brc20Context {
             .copied()
             .expect("brc20 balance not found")
     }
+}
 
-    /// Wait for indexer and dfx to synchronize
-    pub async fn sync(&self) -> anyhow::Result<()> {
-        let btc_block_height = self.brc20.admin_btc_rpc_client.get_block_height()?;
-        Self::wait_for_hiro_sync(btc_block_height).await
-    }
-
-    async fn wait_for_hiro_sync(btc_block_height: u64) -> anyhow::Result<()> {
-        let client = HiroOrdinalsClient::dfx_test_client();
-        loop {
-            let ord_block_height = client.get_block_height().await?;
-            if ord_block_height >= btc_block_height {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
+impl Drop for Brc20Context {
+    fn drop(&mut self) {
+        self.exit.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(join) = self.miner.take() {
+            join.join().expect("failed to join miner thread");
         }
-
-        Ok(())
     }
 }

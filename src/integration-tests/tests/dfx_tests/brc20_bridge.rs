@@ -1,13 +1,14 @@
 mod ctx;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use bitcoin::Amount;
-use ctx::{Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT};
+use ctx::{Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT, REQUIRED_CONFIRMATIONS};
 use eth_signer::Signer;
 
 use self::ctx::Brc20Context;
-use crate::context::TestContext as _;
+use crate::dfx_tests::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
 
 /// Default deposit amount
@@ -50,10 +51,6 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
         .await
         .expect("deposit failed");
 
-    // advance
-    ctx.inner.advance_time(Duration::from_secs(10)).await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     // check balance
     let new_brc20_balance = ctx
         .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
@@ -78,26 +75,32 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
         .expect("send btc failed");
     ctx.withdraw(&brc20_tick, withdraw_amount).await;
 
-    for _ in 0..30 {
-        ctx.inner.advance_time(Duration::from_secs(2)).await;
-        ctx.mint_blocks(1).await;
-    }
+    ctx.mint_blocks(REQUIRED_CONFIRMATIONS).await;
 
-    ctx.brc20
-        .admin_btc_rpc_client
-        .generate_to_address(&ctx.brc20.admin_address, 6)
-        .expect("failed to generate blocks");
+    let ctx = Arc::new(ctx);
+    let ctx_t = ctx.clone();
 
-    // check brc20 balance
+    let expected_brc20_balance = withdraw_amount + brc20_balance;
     let expected_erc20_balance = deposit_amount - withdraw_amount;
-    let new_brc20_balance = ctx
-        .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
-        .await;
-    assert_eq!(new_brc20_balance, withdraw_amount + brc20_balance);
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            Box::pin(async move {
+                let new_brc20_balance = ctx
+                .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
+                .await;
+                if new_brc20_balance != expected_brc20_balance {
+                    anyhow::bail!("Got BRC20 balance: {new_brc20_balance}; expected: {expected_brc20_balance}");
+                }
 
-    // check brc20 balance
-    let new_erc20_balance = ctx.wrapped_balance(&brc20_tick, &ctx.eth_wallet).await;
-    assert_eq!(new_erc20_balance, expected_erc20_balance.amount());
+                let new_erc20_balance = ctx.wrapped_balance(&brc20_tick, &ctx.eth_wallet).await;
+                if new_erc20_balance != expected_erc20_balance.amount() {
+                    anyhow::bail!("Got ERC20 balance: {new_erc20_balance}; expected: {}", expected_erc20_balance.amount());
+                }
+
+                Ok(())
+            })
+        }, Duration::from_secs(120)).await;
 
     ctx.stop().await;
 }

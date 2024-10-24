@@ -1,6 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,7 +32,7 @@ use rune_bridge::ops::RuneDepositRequestData;
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
-use crate::dfx_tests::{DfxTestContext, ADMIN};
+use crate::dfx_tests::{block_until_succeeds, DfxTestContext, ADMIN};
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
@@ -995,23 +993,4 @@ async fn bail_out_of_impossible_deposit() {
         .contains("operation cannot progress"));
 
     ctx.stop().await
-}
-
-/// Blocks until the predicate returns [`Ok`].
-///
-/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
-/// Returns the value inside of the [`Ok`] variant of the predicate.
-async fn block_until_succeeds<F, T>(predicate: F, max_wait: Duration) -> T
-where
-    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
-{
-    let start = Instant::now();
-    while start.elapsed() < max_wait {
-        if let Ok(res) = predicate().await {
-            return res;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-
-    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
 }
