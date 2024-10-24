@@ -71,11 +71,7 @@ impl ConfigStorage {
             ],
         )
         .await
-        .map_err(|e| {
-            log::error!("failed to query evm params: {e}");
-
-            Error::EvmRequestFailed(format!("failed to query evm params: {e}"))
-        })?;
+        .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
 
         log::trace!("initializing evm params responses: {responses:?}");
 
