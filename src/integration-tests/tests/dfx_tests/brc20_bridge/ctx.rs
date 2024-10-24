@@ -111,13 +111,13 @@ pub fn generate_wallet_name() -> String {
 }
 
 pub struct Brc20Context {
-    pub inner: DfxTestContext,
+    inner: DfxTestContext,
     pub eth_wallet: Wallet<'static, SigningKey>,
     bft_bridge_contract: H160,
     exit: Exit,
     miner: Option<JoinHandle<()>>,
-    pub brc20: Brc20Wallet,
-    pub tokens: HashMap<Brc20Tick, H160>,
+    brc20: Brc20Wallet,
+    tokens: HashMap<Brc20Tick, H160>,
 }
 
 /// Setup a new brc20 for DFX tests
