@@ -119,9 +119,20 @@ pub fn mint_order_from_burnt_event(
     let src_token = Id256::from_evm_address(&event.from_erc20, burn_side_evm_params.chain_id);
     let recipient = Id256::from_slice(&event.recipient_id)?
         .to_evm_address()
+        .inspect_err(|err| {
+            log::info!(
+                "Failed to parse recipeint_id {:?}: {}",
+                event.recipient_id,
+                err
+            )
+        })
         .ok()?
         .1;
-    let dst_token = Id256::from_slice(&event.to_token)?.to_evm_address().ok()?.1;
+    let dst_token = Id256::from_slice(&event.to_token)?
+        .to_evm_address()
+        .inspect_err(|err| log::info!("Failed to parse to_token {:?}: {}", event.to_token, err))
+        .ok()?
+        .1;
 
     let order = MintOrder {
         amount: event.amount,

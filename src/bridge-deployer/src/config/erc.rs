@@ -1,14 +1,25 @@
+use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use clap::Parser;
+use clap::Args;
 use serde::{Deserialize, Serialize};
 
-use super::SigningKeyId;
-
-#[derive(Parser, Debug, Serialize, Deserialize, Clone)]
+#[derive(Args, Debug, Serialize, Deserialize, Clone)]
+#[group(required = true, multiple = false)]
 pub struct BaseEvmSettingsConfig {
     /// EVM canister to link to; if not provided, the default one will be used based on the network
     #[arg(long)]
-    pub evm: Option<Principal>,
+    pub base_evm_principal: Option<Principal>,
     #[arg(long)]
-    pub singing_key_id: SigningKeyId,
+    pub base_evm_url: Option<String>,
+}
+
+impl From<BaseEvmSettingsConfig> for EvmLink {
+    fn from(value: BaseEvmSettingsConfig) -> Self {
+        if let Some(principal) = value.base_evm_principal {
+            EvmLink::Ic(principal)
+        } else {
+            let url = value.base_evm_url.expect("evm url is not set");
+            EvmLink::Http(url)
+        }
+    }
 }

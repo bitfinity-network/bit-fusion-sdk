@@ -29,7 +29,7 @@ impl Clients {
     }
 
     pub fn http_outcall(url: String) -> Self {
-        Self::HttpOutCall(HttpOutcallClient::new(url))
+        Self::HttpOutCall(HttpOutcallClient::new(url).sanitized())
     }
 
     pub fn evm_rpc_canister(principal: Principal, rpc_service: &[RpcService]) -> Self {
@@ -62,12 +62,21 @@ impl EvmLinkClient for EvmLink {
     /// Returns the JSON-RPC client.
     fn get_json_rpc_client(&self) -> EthJsonRpcClient<impl Client> {
         match self {
-            EvmLink::Http(url) => EthJsonRpcClient::new(Clients::http_outcall(url.clone())),
-            EvmLink::Ic(principal) => EthJsonRpcClient::new(Clients::canister(*principal)),
+            EvmLink::Http(url) => {
+                log::trace!("Using http client with url: {url}");
+                EthJsonRpcClient::new(Clients::http_outcall(url.clone()))
+            }
+            EvmLink::Ic(principal) => {
+                log::trace!("Using IC client with principal: {principal}");
+                EthJsonRpcClient::new(Clients::canister(*principal))
+            }
             EvmLink::EvmRpcCanister {
                 canister_id: principal,
                 rpc_service,
-            } => EthJsonRpcClient::new(Clients::evm_rpc_canister(*principal, rpc_service)),
+            } => {
+                log::trace!("Using rpc client with canister_id: {principal} and rpc_service: {rpc_service:?}");
+                EthJsonRpcClient::new(Clients::evm_rpc_canister(*principal, rpc_service))
+            }
         }
     }
 

@@ -4,7 +4,7 @@ use clap::{Parser, ValueEnum};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use serde::Serialize;
 
-#[derive(Parser, Debug, Serialize, Deserialize, Clone)]
+#[derive(Parser, Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct BtcBridgeConnection {
     /// Bitcoin network to connect to.
     ///
@@ -22,11 +22,28 @@ pub struct BtcBridgeConnection {
     fee: Option<u64>,
 }
 
-#[derive(ValueEnum, Debug, Serialize, Deserialize, Clone)]
+#[derive(ValueEnum, Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum BtcNetwork {
     Mainnet,
     Testnet,
     Regtest,
+}
+
+const MAINNET_CKBTC_LEDGER: &str = "mxzaz-hqaaa-aaaar-qaada-cai";
+const TESTNET_CKBTC_LEDGER: &str = "mc6ru-gyaaa-aaaar-qaaaq-cai";
+
+impl BtcBridgeConnection {
+    pub fn ledger_principal(&self) -> Principal {
+        if let Some(principal) = self.ledger {
+            return principal;
+        }
+
+        match self.network {
+            BtcNetwork::Mainnet => Principal::from_text(MAINNET_CKBTC_LEDGER).unwrap(),
+            BtcNetwork::Testnet => Principal::from_text(TESTNET_CKBTC_LEDGER).unwrap(),
+            BtcNetwork::Regtest => panic!("Invalid BTC connection configuration"),
+        }
+    }
 }
 
 impl From<BtcNetwork> for BitcoinNetwork {

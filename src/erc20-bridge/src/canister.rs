@@ -12,6 +12,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
+use bridge_did::error::{BftResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
@@ -19,6 +20,7 @@ use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -133,6 +135,14 @@ impl Erc20Bridge {
             .borrow()
             .operations
             .get_log(operation_id)
+    }
+
+    #[update]
+    pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
+        let signer = get_base_evm_config().borrow().get_signer()?;
+        signer.get_address().await.map_err(|e| {
+            Error::Initialization(format!("failed to get bridge canister address: {e}"))
+        })
     }
 
     /// Returns the build data of the canister

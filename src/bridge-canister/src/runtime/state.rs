@@ -18,8 +18,8 @@ use crate::bridge::{Operation, OperationContext};
 use crate::memory::StableMemory;
 use crate::operation_store::{OperationStore, OperationsMemory};
 
-const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(2);
-const SCHEDULER_RUN_LOCK_TIMEOUT: Duration = Duration::from_secs(20);
+const SYS_TASK_LOCK_TIMEOUT: Duration = Duration::from_secs(60);
+const SCHEDULER_RUN_LOCK_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub type SharedConfig = Rc<RefCell<ConfigStorage>>;
 pub type SharedServices = Rc<RefCell<Services>>;

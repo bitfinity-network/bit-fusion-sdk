@@ -21,12 +21,14 @@ pub struct UpgradeCommands {
 }
 
 impl UpgradeCommands {
-    pub async fn upgrade_canister(&self, identity: PathBuf, ic_host: &str) -> anyhow::Result<()> {
+    pub async fn upgrade_canister(
+        &self,
+        identity: GenericIdentity,
+        ic_host: &str,
+    ) -> anyhow::Result<()> {
         info!("Upgrading canister with ID: {}", self.canister_id.to_text());
 
         let canister_wasm = std::fs::read(&self.wasm)?;
-
-        let identity = GenericIdentity::try_from(identity.as_ref())?;
 
         let agent = ic_agent::Agent::builder()
             .with_url(ic_host)

@@ -170,8 +170,14 @@ impl<Op: Operation> Task for BridgeTask<Op> {
                 .execute_inner(ctx, task_scheduler)
                 .await
                 .map_err(|e| match e {
-                    Error::CannotProgress(_) => SchedulerError::Unrecoverable(e.to_string()),
-                    _ => SchedulerError::TaskExecutionFailed(e.to_string()),
+                    Error::CannotProgress(_) => {
+                        log::trace!("Unrecoverable error during task execution: {e}");
+                        SchedulerError::Unrecoverable(e.to_string())
+                    }
+                    _ => {
+                        log::trace!("Error during task execution: {e}");
+                        SchedulerError::TaskExecutionFailed(e.to_string())
+                    }
                 })
         })
     }

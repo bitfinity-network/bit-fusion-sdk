@@ -10,7 +10,7 @@ test test_name="":
   cargo test {{test_name}}
 
 
-# Run all integration tests
+# Run pocket-ic and state machine integration tests
 [group('test')]
 integration_test test_name="": 
   export PROTOC_INCLUDE=${PWD}/proto
