@@ -366,7 +366,7 @@ impl RunesContext {
             match self
                 .runes
                 .admin_btc_rpc_client
-                .send_to_address(&btc_address, amount)
+                .send_to_address(btc_address, amount)
             {
                 Err(err) => {
                     println!("Failed to send btc: {err}");
