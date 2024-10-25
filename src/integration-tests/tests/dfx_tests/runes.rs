@@ -88,8 +88,6 @@ async fn dfx_rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> 
     let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&rune_name);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
-    // admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
-
     // create ord wallet
     let ord_wallet = generate_btc_wallet();
 
@@ -289,11 +287,7 @@ impl RunesContext {
             .expect("get_deposit_address error")
     }
 
-    async fn send_runes(&self, btc_address: &str, runes: &[(&RuneId, u128)]) {
-        let btc_address = Address::from_str(btc_address)
-            .expect("failed to parse btc address")
-            .assume_checked();
-
+    async fn send_runes(&self, btc_address: &Address, runes: &[(&RuneId, u128)]) {
         let etcher = RuneHelper::new(
             &self.runes.admin_btc_rpc_client,
             &self.runes.ord_wallet.private_key,
@@ -337,14 +331,8 @@ impl RunesContext {
 
         // get funding utxo
         let edict_fund_tx = self
-            .runes
-            .admin_btc_rpc_client
-            .send_to_address(&self.runes.ord_wallet.address, Amount::from_int_btc(1))
-            .expect("failed to send btc");
-        self.runes
-            .admin_btc_rpc_client
-            .generate_to_address(&self.runes.admin_address, 1)
-            .expect("failed to generate blocks");
+            .send_btc(&self.runes.ord_wallet.address, Amount::from_sat(10_000_000))
+            .await;
 
         let edict_funds_utxo = self
             .runes
@@ -373,16 +361,23 @@ impl RunesContext {
         );
     }
 
-    async fn send_btc(&self, btc_address: &str, amount: Amount) {
-        let btc_address = Address::from_str(btc_address)
-            .expect("failed to parse btc address")
-            .assume_checked();
-        self.runes
-            .admin_btc_rpc_client
-            .send_to_address(&btc_address, amount)
-            .expect("failed to send btc");
-
-        self.mint_blocks(1);
+    async fn send_btc(&self, btc_address: &Address, amount: Amount) -> Txid {
+        loop {
+            match self
+                .runes
+                .admin_btc_rpc_client
+                .send_to_address(&btc_address, amount)
+            {
+                Err(err) => {
+                    println!("Failed to send btc: {err}");
+                    self.mint_blocks(1);
+                }
+                Ok(tx) => {
+                    self.mint_blocks(REQUIRED_CONFIRMATIONS);
+                    return tx;
+                }
+            }
+        }
     }
 
     async fn deposit(&self, runes: &[RuneId], eth_address: &H160) -> Result<(), DepositError> {
@@ -639,17 +634,21 @@ impl RunesContext {
         let address = self.get_deposit_address(&wallet_address.into()).await;
         println!("Wallet address: {wallet_address}; deposit_address {address}");
 
+        let btc_address = Address::from_str(&address)
+            .expect("failed to parse btc address")
+            .assume_checked();
+
         match deposit_strategy {
             RuneDepositStrategy::OnePerTx => {
                 for rune in runes {
-                    self.send_runes(&address, &[*rune]).await;
-                    self.send_btc(&address, Amount::from_int_btc(1)).await;
+                    self.send_runes(&btc_address, &[*rune]).await;
+                    self.send_btc(&btc_address, Amount::from_int_btc(1)).await;
                     self.mint_blocks(1);
                 }
             }
             RuneDepositStrategy::AllInOne => {
-                self.send_runes(&address, runes).await;
-                self.send_btc(&address, Amount::from_int_btc(1)).await;
+                self.send_runes(&btc_address, runes).await;
+                self.send_btc(&btc_address, Amount::from_int_btc(1)).await;
                 self.mint_blocks(1);
             }
         }
@@ -958,6 +957,7 @@ async fn bail_out_of_impossible_deposit() {
     let address = ctx
         .get_deposit_address(&ctx.eth_wallet.address().into())
         .await;
+    let address = Address::from_str(&address).unwrap().assume_checked();
     ctx.send_runes(&address, &[(&rune_id, 10_000)]).await;
     ctx.send_deposit_notification(
         &[rune_id],
