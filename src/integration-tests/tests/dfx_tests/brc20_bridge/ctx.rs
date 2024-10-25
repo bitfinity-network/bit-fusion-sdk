@@ -128,7 +128,7 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
 
     println!("Dfx BTC wallet address: {}", admin_address);
 
-    admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
+    //admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
 
     // create ord wallet
     let ord_wallet = generate_btc_wallet();

@@ -88,7 +88,7 @@ async fn dfx_rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> 
     let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&rune_name);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
-    admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
+    // admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
 
     // create ord wallet
     let ord_wallet = generate_btc_wallet();
