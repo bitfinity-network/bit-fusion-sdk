@@ -150,8 +150,21 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
         } = *brc20;
 
         // deploy
-        let commit_fund_tx =
-            admin_btc_rpc_client.send_to_address(&ord_wallet.address, Amount::from_int_btc(1))?;
+        let commit_fund_tx;
+        loop {
+            match admin_btc_rpc_client
+                .send_to_address(&ord_wallet.address, Amount::from_sat(10_000_000))
+            {
+                Ok(tx) => {
+                    commit_fund_tx = tx;
+                    break;
+                }
+                Err(err) => {
+                    println!("Failed to send btc: {err}");
+                    admin_btc_rpc_client.generate_to_address(&admin_address, 10)?;
+                }
+            }
+        }
         admin_btc_rpc_client.generate_to_address(&admin_address, 1)?;
 
         let deploy_utxo =
