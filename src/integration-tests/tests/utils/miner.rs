@@ -58,9 +58,10 @@ impl Miner {
         // on panic set MINING to false
         let hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            MINING
-                .get()
-                .map(|v| v.store(false, std::sync::atomic::Ordering::Relaxed));
+            if let Some(v) = MINING.get() {
+                v.store(false, std::sync::atomic::Ordering::Relaxed);
+            }
+
             hook(info);
         }));
 
@@ -70,9 +71,9 @@ impl Miner {
         // start mining
         loop {
             if self.exit.load(std::sync::atomic::Ordering::Relaxed) {
-                MINING
-                    .get()
-                    .map(|v| v.store(false, std::sync::atomic::Ordering::Relaxed));
+                if let Some(v) = MINING.get() {
+                    v.store(false, std::sync::atomic::Ordering::Relaxed);
+                }
                 println!(
                     "Released MINING. Exited after {} milliseconds. Blocks mined: {blocks_mined}",
                     started.elapsed().as_millis()
