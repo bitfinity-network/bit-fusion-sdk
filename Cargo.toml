@@ -1,17 +1,17 @@
 [workspace]
 members = [
-    "src/brc20-bridge",
-    "src/bridge-canister",
-    "src/bridge-client",
-    "src/bridge-deployer",
-    "src/bridge-did",
-    "src/bridge-tool",
-    "src/bridge-utils",
-    "src/integration-tests",
-    "src/icrc2-bridge",
-    "src/erc20-bridge",
-    "src/btc-bridge",
-    "src/rune-bridge",
+  "src/brc20-bridge",
+  "src/bridge-canister",
+  "src/bridge-client",
+  "src/bridge-deployer",
+  "src/bridge-did",
+  "src/bridge-tool",
+  "src/bridge-utils",
+  "src/integration-tests",
+  "src/icrc2-bridge",
+  "src/erc20-bridge",
+  "src/btc-bridge",
+  "src/rune-bridge",
 ]
 
 resolver = "2"
@@ -72,7 +72,6 @@ rust_decimal = "1.36"
 serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
-serial_test = "3"
 signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.33.x" }
 snapbox = "0.6"
 strum = "0.26"

@@ -61,7 +61,6 @@ erc20_bridge = { path = "../erc20-bridge" }
 ic-test-utils = { workspace = true }
 ic-utils = { workspace = true }
 rune_bridge = { path = "../rune-bridge" }
-serial_test = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 tokio-util = { workspace = true }

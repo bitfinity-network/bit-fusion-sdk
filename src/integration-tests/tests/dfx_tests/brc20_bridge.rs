@@ -19,7 +19,6 @@ const DEFAULT_WITHDRAW_AMOUNT: u128 = 3_000;
 const DEFAULT_DECIMALS: u8 = 18;
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let deposit_amount = TokenAmount::from_int(DEFAULT_DEPOSIT_AMOUNT, DEFAULT_DECIMALS);
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
@@ -34,7 +33,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     .await;
 
     // Get initial balance
-    ctx.mint_blocks(1).await;
+    ctx.wait_for_blocks(1).await;
     let brc20_balance = ctx
         .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
         .await;
@@ -75,7 +74,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
         .expect("send btc failed");
     ctx.withdraw(&brc20_tick, withdraw_amount).await;
 
-    ctx.mint_blocks(REQUIRED_CONFIRMATIONS).await;
+    ctx.wait_for_blocks(REQUIRED_CONFIRMATIONS).await;
 
     let ctx = Arc::new(ctx);
     let ctx_t = ctx.clone();

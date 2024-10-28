@@ -48,7 +48,6 @@ pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
 pub const DEFAULT_MINT_AMOUNT: u64 = 100_000;
 /// Required confirmations for the deposit
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
-const MINER_INTERVAL: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Brc20InitArgs {
@@ -320,7 +319,6 @@ impl Brc20Context {
             brc20_wallet.admin_address.clone(),
             &brc20_wallet.admin_btc_rpc_client,
             &exit,
-            MINER_INTERVAL,
         );
 
         Self {
@@ -403,11 +401,24 @@ impl Brc20Context {
         Ok(transfer_txid)
     }
 
-    pub async fn mint_blocks(&self, count: u64) {
-        self.brc20
+    /// Wait for the specified number of blocks to be mined
+    pub async fn wait_for_blocks(&self, count: u64) {
+        let block_height = self
+            .brc20
             .admin_btc_rpc_client
-            .generate_to_address(&self.brc20.admin_address, count)
-            .expect("failed to generate blocks");
+            .get_block_height()
+            .expect("failed to get block count");
+        let target = block_height + count;
+
+        while self
+            .brc20
+            .admin_btc_rpc_client
+            .get_block_height()
+            .expect("failed to get block count")
+            < target
+        {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
     }
 
     pub async fn deposit(
@@ -466,7 +477,7 @@ impl Brc20Context {
         );
 
         // mint blocks required for confirmations
-        self.mint_blocks(REQUIRED_CONFIRMATIONS).await;
+        self.wait_for_blocks(REQUIRED_CONFIRMATIONS).await;
         const MAX_WAIT: Duration = Duration::from_secs(60);
         const OP_INTERVAL: Duration = Duration::from_secs(5);
         let start = Instant::now();
