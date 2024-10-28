@@ -1,6 +1,7 @@
 target
 .dfx
 .is20
+.cargo/config.toml
 
 .DS_Store
 

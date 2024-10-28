@@ -57,6 +57,7 @@ abstract contract TokenManager is Initializable {
         uint8 decimals,
         bytes32 baseTokenID
     ) public returns (address) {
+        require(false);
         require(isWrappedSide, "Only for wrapped side");
         require(_baseToWrapped[baseTokenID] == address(0), "Wrapper already exist");
 
@@ -82,13 +83,13 @@ abstract contract TokenManager is Initializable {
     ) internal view returns (TokenMetadata memory meta) {
         try IERC20Metadata(token).name() returns (string memory _name) {
             meta.name = StringUtils.truncateUTF8(_name);
-        } catch { }
+        } catch {}
         try IERC20Metadata(token).symbol() returns (string memory _symbol) {
             meta.symbol = bytes16(StringUtils.truncateUTF8(_symbol));
-        } catch { }
+        } catch {}
         try IERC20Metadata(token).decimals() returns (uint8 _decimals) {
             meta.decimals = _decimals;
-        } catch { }
+        } catch {}
     }
 
     /// Returns wrapped token for the given base token

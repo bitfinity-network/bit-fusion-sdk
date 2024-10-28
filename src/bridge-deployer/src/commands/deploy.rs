@@ -152,9 +152,12 @@ impl DeployCommands {
         );
         println!("Bridge canister principal: {}", canister_id);
         println!("---------------------------");
-        println!("Wrapped side BFT bridge: {}", bft_bridge);
-        println!("Wrapped side FeeCharge: {}", fee_charge);
-        println!("Wrapped side bridge address: {}", minter_address);
+        println!("Wrapped side BFT bridge: 0x{}", hex::encode(&bft_bridge));
+        println!("Wrapped side FeeCharge: 0x{}", hex::encode(&fee_charge));
+        println!(
+            "Wrapped side bridge address: 0x{}",
+            hex::encode(&minter_address)
+        );
 
         if let Some(BftDeployedContracts {
             bft_bridge,
@@ -164,9 +167,12 @@ impl DeployCommands {
         }) = base_side_ids
         {
             println!();
-            println!("Base side BFT bridge: {}", bft_bridge);
-            println!("Base side FeeCharge: {}", fee_charge);
-            println!("Base side bridge address: {}", minter_address);
+            println!("Base side BFT bridge: 0x{}", hex::encode(&bft_bridge));
+            println!("Base side FeeCharge: 0x{}", hex::encode(&fee_charge));
+            println!(
+                "Base side bridge address: 0x{}",
+                hex::encode(&minter_address)
+            );
         }
 
         Ok(())
