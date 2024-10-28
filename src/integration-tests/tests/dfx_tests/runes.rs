@@ -643,13 +643,11 @@ impl RunesContext {
                 for rune in runes {
                     self.send_runes(&btc_address, &[*rune]).await;
                     self.send_btc(&btc_address, Amount::from_int_btc(1)).await;
-                    self.mint_blocks(1);
                 }
             }
             RuneDepositStrategy::AllInOne => {
                 self.send_runes(&btc_address, runes).await;
                 self.send_btc(&btc_address, Amount::from_int_btc(1)).await;
-                self.mint_blocks(1);
             }
         }
 
