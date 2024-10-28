@@ -32,14 +32,18 @@ bitcoincore-rpc = "0.18.0"
 candid = { version = "0.10", features = ["value"] }
 cfg-if = "1.0"
 clap = { version = "4", features = ["derive"] }
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.33.x" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.34.x", features = [
+  "alloy-primitives-07",
+] }
+dirs = "5"
+dotenv = "0.15"
 drop_guard = "0.3"
 env_logger = { version = "0.11.4", default-features = false }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.33.x" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.33.x" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.34.x" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.34.x" }
 ethereum-types = "0.14"
 ethers-core = "2.0"
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.33.x" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.34.x" }
 foundry-compilers = { version = "0.9", features = ["svm-solc"] }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
@@ -57,8 +61,9 @@ ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.22.x" }
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.22.x" }
 ic-utils = "0.37"
-icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.33.x" }
+icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.34.x" }
 jsonrpc-core = "18.0"
+lazy-regex = "3"
 log = "0.4"
 mockall = "0.13"
 num-bigint = "0.4"
@@ -72,11 +77,13 @@ rust_decimal = "1.36"
 serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.33.x" }
+serial_test = "3"
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.34.x" }
 snapbox = "0.6"
 strum = "0.26"
 tempfile = "3"
 thiserror = "1.0"
+trycmd = "0.15"
 tokio = { version = "1.36", features = ["macros", "rt"] }
 tokio-util = "0.7"
 tracing = "0.1"
@@ -86,6 +93,7 @@ vergen-gitcl = { version = "1", default-features = false, features = [
   "cargo",
   "rustc",
 ] }
+wildmatch = "2"
 
 # state machine tests deps
 ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }

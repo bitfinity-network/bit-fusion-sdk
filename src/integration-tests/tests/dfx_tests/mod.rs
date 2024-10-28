@@ -17,6 +17,7 @@ use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
 mod brc20_bridge;
+mod bridge_deployer;
 mod runes;
 
 sol! {

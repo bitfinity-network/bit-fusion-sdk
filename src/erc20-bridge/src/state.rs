@@ -8,13 +8,13 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::{SharedConfig, Timestamp};
 use bridge_did::error::{BftResult, Error};
 use bridge_did::evm_link::EvmLink;
+use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_utils::evm_bridge::EvmParams;
-use candid::{CandidType, Principal};
+use candid::Principal;
 use drop_guard::guard;
-use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
+use eth_signer::sign_strategy::TransactionSigner;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{CellStructure, StableCell};
-use serde::Deserialize;
 
 use crate::memory::{BASE_EVM_CONFIG_MEMORY_ID, NONCE_COUNTER_MEMORY_ID};
 
@@ -114,10 +114,4 @@ impl OperationContext for SharedBaseEvmState {
     fn get_signer(&self) -> BftResult<impl TransactionSigner> {
         self.0.borrow().config.borrow().get_signer()
     }
-}
-
-#[derive(Debug, Clone, Deserialize, CandidType)]
-pub struct BaseEvmSettings {
-    pub evm_link: EvmLink,
-    pub signing_strategy: SigningStrategy,
 }

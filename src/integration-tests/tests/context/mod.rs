@@ -1,11 +1,15 @@
 mod evm_rpc_canister;
 pub mod stress;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
+use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
+use bridge_did::init::btc::BitcoinConnection;
+use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedOrders;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
@@ -17,13 +21,13 @@ use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
 use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
-use erc20_bridge::state::BaseEvmSettings;
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
+use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::ic_kit::mock_principals::alice;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -47,7 +51,7 @@ use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::evm_link::EvmLink;
-use bridge_did::init::BridgeInitData;
+use bridge_did::init::{BridgeInitData, BtcBridgeConfig, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
 
@@ -889,6 +893,11 @@ pub trait TestContext {
         args: impl ArgumentEncoder + Send,
     ) -> Result<()>;
 
+    /// Returns the path to the wasm file for the given canister type.
+    async fn get_wasm_path(&self, canister_type: CanisterType) -> PathBuf {
+        canister_type.default_canister_wasm_path().await
+    }
+
     /// Installs code to test context's canister with the given type.
     /// If the canister depends on not-created canister, Principal::anonymous() is used.
     async fn install_default_canister(&self, canister_type: CanisterType) {
@@ -1097,10 +1106,52 @@ pub trait TestContext {
                 .unwrap();
             }
             CanisterType::BtcBridge => {
-                todo!()
+                println!(
+                    "Installing default BTC bridge canister with Principal {}",
+                    self.canisters().btc_bridge()
+                );
+                let init_data = btc_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                    self.canisters().ck_btc_minter(),
+                    self.canisters().icrc1_ledger(),
+                );
+
+                self.install_canister(self.canisters().btc_bridge(), wasm, (init_data,))
+                    .await
+                    .unwrap();
             }
-            CanisterType::Brc20Bridge => {}
-            CanisterType::RuneBridge => {}
+            CanisterType::Brc20Bridge => {
+                println!(
+                    "Installing default BRC20 bridge canister with Principal {}",
+                    self.canisters().brc20_bridge()
+                );
+                let init_data = brc20_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                );
+
+                self.install_canister(self.canisters().brc20_bridge(), wasm, init_data)
+                    .await
+                    .unwrap();
+            }
+            CanisterType::RuneBridge => {
+                println!(
+                    "Installing default Rune bridge canister with Principal {}",
+                    self.canisters().rune_bridge()
+                );
+                let init_data = rune_bridge_canister_init_data(
+                    self.admin(),
+                    self.canisters().evm(),
+                    self.sign_key(),
+                );
+
+                self.install_canister(self.canisters().rune_bridge(), wasm, init_data)
+                    .await
+                    .unwrap();
+            }
         }
     }
 
@@ -1238,6 +1289,70 @@ pub fn erc20_bridge_canister_init_data(
             ..Default::default()
         }),
     }
+}
+
+pub fn btc_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+    ckbtc_minter: Principal,
+    ckbtc_ledger: Principal,
+) -> BtcBridgeConfig {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    BtcBridgeConfig {
+        init_data,
+        network: BitcoinConnection::Custom {
+            network: BitcoinNetwork::Regtest,
+            ckbtc_minter,
+            ckbtc_ledger,
+            ledger_fee: 1_000,
+        },
+    }
+}
+
+pub fn rune_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> (BridgeInitData, RuneBridgeConfig) {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    (
+        init_data,
+        RuneBridgeConfig {
+            network: BitcoinNetwork::Regtest,
+            btc_cache_timeout_secs: None,
+            min_confirmations: 1,
+            indexers: vec![IndexerType::OrdHttp {
+                url: "https://localhost:8001".to_string(),
+            }],
+            deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
+        },
+    )
+}
+
+pub fn brc20_bridge_canister_init_data(
+    owner: Principal,
+    evm_principal: Principal,
+    key_id: SigningKeyId,
+) -> (BridgeInitData, Brc20BridgeConfig) {
+    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+
+    (
+        init_data,
+        Brc20BridgeConfig {
+            network: BitcoinNetwork::Regtest,
+            min_confirmations: 1,
+            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
+            deposit_fee: 500_000,
+            mempool_timeout: Duration::from_secs(60),
+            indexer_consensus_threshold: 1,
+            schnorr_key_id: SchnorrKeyIds::TestKeyLocalDevelopment,
+        },
+    )
 }
 
 pub fn evm_canister_init_data(
@@ -1524,6 +1639,26 @@ impl CanisterType {
             CanisterType::Signature => get_signature_verification_canister_bytecode().await,
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
+        }
+    }
+
+    pub async fn default_canister_wasm_path(&self) -> PathBuf {
+        match self {
+            CanisterType::Brc20Bridge => get_brc20_bridge_canister_wasm_path().await,
+            CanisterType::Btc => get_btc_canister_wasm_path().await,
+            CanisterType::BtcBridge => get_btc_bridge_canister_wasm_path().await,
+            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_wasm_path().await,
+            CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_wasm_path().await,
+            CanisterType::Evm => get_evm_testnet_canister_wasm_path().await,
+            CanisterType::EvmRpcCanister => get_evm_rpc_canister_wasm_path().await,
+            CanisterType::ExternalEvm => get_evm_testnet_canister_wasm_path().await,
+            CanisterType::Icrc1Ledger => get_icrc1_token_canister_wasm_path().await,
+            CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_wasm_path().await,
+            CanisterType::Kyt => get_kyt_canister_wasm_path().await,
+            CanisterType::RuneBridge => get_rune_bridge_canister_wasm_path().await,
+            CanisterType::Signature => get_signature_verification_canister_wasm_path().await,
+            CanisterType::Token1 => get_icrc1_token_canister_wasm_path().await,
+            CanisterType::Token2 => get_icrc1_token_canister_wasm_path().await,
         }
     }
 }

@@ -5,18 +5,15 @@ Bridge Deployer is a CLI tool for deploying and managing various types of bridge
 ## Requirements
 
 - Rust
-- Node.js
-- Yarn
+- Forge CLI Installed
 - dfx (only for **local** deployment)
 
 ## Installation
 
-Clone the repository and build the project:
+Build the project using the following commands:
 
 ```bash
-git clone <https://github.com/your-repo/bridge-deployer.git>
-cd bridge-deployer
-cargo build --release
+cargo build -p bridge-deployer --release
 ```
 
 ## Usage
@@ -38,7 +35,7 @@ The general syntax for using the Bridge Deployer is:
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
 - `--evm-network <EVM_NETWORK>`: EVM network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
-- `--deploy-bft`: Deploy the BFT bridge (default: false)
+- `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
 - `-v, --verbosity`: Set the verbosity level (use multiple times for higher levels)
 - `-q, --quiet`: Silence all output
 
@@ -48,6 +45,7 @@ The general syntax for using the Bridge Deployer is:
 - ICRC
 - ERC20
 - BTC
+- BRC20
 
 ## Deployment
 
@@ -55,92 +53,72 @@ For the deployment of canisters, you will require to have/create a wallet canist
 
 For the deployment, you will need to provide the wallet canister id as `--wallet-canister` or as an environment variable `WALLET_CANISTER`.
 
-### Deploying a Rune Bridge
+Command to deploy a bridge canister:
 
 ```bash
 ./bridge-deployer
   -vvv \
+  --evm-network localhost \
+  --private-key <PRIVATE_KEY> \
+  --identity path/to/identity.pem \
+  --evm <EVM_PRINCIPAL> \
   deploy \
   --wasm path/to/rune_bridge.wasm \
-    rune \
-  --identity path/to/identity.pem \
-  --private-key <PRIVATE_KEY> \
-  --evm-network localhost \
-  --admin <ADMIN_PRINCIPAL> \
+  --wallet-canister <WALLET_CANISTER> \
+  rune \
+  --owner <ADMIN_PRINCIPAL> \
   --min-confirmations 6 \
-  --no-of-indexers 3 \
   --indexer-urls <https://indexer1.com,https://indexer2.com,https://indexer3.com> \
   --deposit-fee 1000000 \
   --mempool-timeout 3600 \
   --signing-key-id dfx \
-  --wallet-canister <WALLET_CANISTER> \
-  --evm-principal <EVM_PRINCIPAL>
+  --bitcoin-network <bitcoin_network> \
+  --indexer-consensus-threshold 3
 ```
 
-For the other bridge types, the command is similar to the one above, with the necessary arguments for the specific bridge type. Check the help command for more information on the arguments required for each bridge type.
+For more detailed information on each command and its options, use the `--help` flag:
 
 ```bash
-./bridge-deployer deploy <BRIDGE_TYPE> --help
+./bridge-deployer --help
 ```
 
-### Reinstalling a Bridge
+## Upgrading a Bridge
+
+To upgrade a bridge, you will need to provide the canister id of the bridge to be upgraded. The command is similar to the commands shown above, with the addition of the `--canister-id` argument.
+
+```bash
+./bridge-deployer upgrade [BRIDGE_TYPE] --wasm <WASM_PATH> --canister-id <CANISTER_ID>
+```
+
+## Reinstalling a Bridge
 
 To reinstall a bridge, you will need to provide the canister id of the bridge to be reinstalled. The command is similar to the deployment command, with the addition of the `--canister-id` argument.
 
 ```bash
-./bridge-deployer
-  -vvv \
-  reinstall \
-  --wasm path/to/rune_bridge.wasm \
-    rune \
-  --identity path/to/identity.pem \
-  --private-key <PRIVATE_KEY> \
-  --evm-network localhost \
-  --admin <ADMIN_PRINCIPAL> \
-  --min-confirmations 6 \
-  --no-of-indexers 3 \
-  --indexer-urls <https://indexer1.com,https://indexer2.com,https://indexer3.com> \
-  --deposit-fee 1000000 \
-  --mempool-timeout 3600 \
-  --signing-key-id dfx \
-  --evm-principal <EVM_PRINCIPAL> \
-  --canister-id <CANISTER_ID>
+bridge-deployer reinstall [BRIDGE_TYPE] --canister-id <PRINCIPAL> --wasm <WASM_PATH> --bft-bridge <ADDRESS>
 ```
 
-### Upgrading a Bridge
+Note: You need to provide the canister arguments for the bridge type you are reinstalling.
 
-To upgrade a bridge, you will need to provide the canister id of the bridge to be upgraded. The command is similar to the commands shown above, with the addition of the `--canister-id` argument.
+### Bridge-Specific Deployment Examples
 
-Note: The BFT contract will not be upgraded during the upgrade process. The BFT contract should be deployed separately in case it requires an upgrade.
+#### ICRC Bridge
 
 ```bash
-./bridge-deployer -vv upgrade --help
+bridge-deployer -vvv \
+  --evm-network mainnet \
+  --identity <IDENTITY_PATH> \
+  deploy \
+  --wasm ./icrc_bridge.wasm \
+  --wallet-canister rrkah-fqaaa-aaaaa-aaaaq-cai \
+  icrc \
+  --signing-key-id production \
+  --owner 2vxsx-fae \
+  --evm <EVM_PRINCIPAL> \
+  --log-filter "trace" # You can set the log filter to "trace", "debug", "info", "warn", "error"
 ```
 
-### Deploying BFT Contract
-
-To deploy the BFT contract alongside a bridge, add the `--deploy-bft` flag, by default the flag is set to false.
-
-The arguments `controller` and `owner` are optional. If not provided, the BFT contract will be deployed with the default controller(sender) and owner(sender) address.
-
-Before deploying the BFT contract, make sure you have some funds in the wallet address to cover the deployment gas fees.
-
-```bash
-./bridge-deployer deploy <BRIDGE_TYPE> \
-  --identity path/to/identity.pem \
-  --private-key <PRIVATE_KEY> \
-  --evm-network localhost \
-  --deploy-bft \
-  --owner <BFT_OWNER_ADDRESS> \
-  --controllers <BFT_CONTROLLER_ADDRESSES>
-```
-
-For more detailed information on each command and its options, use the --help flag:
-
-```bash
-./bridge-deployer --help
-./bridge-deployer <COMMAND> --help
-```
+The other bridges are more or less similar to the ICRC bridge, with the only difference being the arguments required for the specific bridge type. You can refer to the help text for each bridge type for more information.
 
 Note: The examples above are for illustrative purposes only. Please replace the placeholders with the actual values.
 

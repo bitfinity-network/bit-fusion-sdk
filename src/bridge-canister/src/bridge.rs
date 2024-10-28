@@ -1,7 +1,6 @@
 #![allow(async_fn_in_trait)]
 
 use bridge_did::error::{BftResult, Error};
-use bridge_did::event_data::*;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
@@ -39,24 +38,6 @@ pub trait Operation:
     fn scheduling_options(&self) -> Option<TaskOptions> {
         Some(TaskOptions::default())
     }
-
-    /// Action to perform when a WrappedToken is minted.
-    async fn on_wrapped_token_minted(
-        ctx: RuntimeState<Self>,
-        event: MintedEventData,
-    ) -> Option<OperationAction<Self>>;
-
-    /// Action to perform when a WrappedToken is burnt.
-    async fn on_wrapped_token_burnt(
-        ctx: RuntimeState<Self>,
-        event: BurntEventData,
-    ) -> Option<OperationAction<Self>>;
-
-    /// Action to perform on notification from BftBridge contract.
-    async fn on_minter_notification(
-        ctx: RuntimeState<Self>,
-        event: NotifyMinterEventData,
-    ) -> Option<OperationAction<Self>>;
 }
 
 /// Context for an operation execution.
@@ -93,7 +74,7 @@ pub trait OperationContext {
         let events = BridgeEvent::collect(
             &client,
             evm_params.next_block,
-            last_chain_block,
+            last_request_block,
             bridge_contract.0,
         )
         .await?;

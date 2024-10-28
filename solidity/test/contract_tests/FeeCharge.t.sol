@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import "forge-std/src/Test.sol";
+import "forge-std/Test.sol";
 import "src/FeeCharge.sol";
 
 contract ChargeFeeTest is Test {

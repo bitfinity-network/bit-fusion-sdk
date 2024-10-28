@@ -1,10 +1,12 @@
 use std::fmt::{Display, Formatter};
 
 use alloy_sol_types::sol;
-use candid::CandidType;
+use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
 use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
+use crate::error::{BftResult, Error};
+use crate::op_id::OperationId;
 use crate::operation_log::Memo;
 
 sol! {
@@ -48,9 +50,9 @@ impl BurntEventData {
 impl From<BurnTokenEvent> for BurntEventData {
     fn from(event: BurnTokenEvent) -> Self {
         Self {
-            sender: event.sender.into(),
-            amount: event.amount.into(),
-            from_erc20: event.fromERC20.into(),
+            sender: event.sender.0 .0.into(),
+            amount: event.amount.as_limbs().into(),
+            from_erc20: event.fromERC20.0 .0.into(),
             recipient_id: event.recipientID.into(),
             to_token: event.toToken.0.into(),
             operation_id: event.operationID,
@@ -77,13 +79,13 @@ pub struct MintedEventData {
 impl From<MintTokenEvent> for MintedEventData {
     fn from(event: MintTokenEvent) -> Self {
         Self {
-            amount: event.amount.into(),
+            amount: event.amount.as_limbs().into(),
             from_token: event.fromToken.0.into(),
             sender_id: event.senderID.0.into(),
-            to_erc20: event.toERC20.into(),
-            recipient: event.recipient.into(),
+            to_erc20: event.toERC20.0 .0.into(),
+            recipient: event.recipient.0 .0.into(),
             nonce: event.nonce,
-            fee_charged: event.chargedFee.into(),
+            fee_charged: event.chargedFee.as_limbs().into(),
         }
     }
 }
@@ -144,13 +146,28 @@ impl NotifyMinterEventData {
             None
         }
     }
+
+    /// Tries to decode the notification into rescheduling operation id.
+    pub fn try_decode_reschedule_operation_id(&self) -> BftResult<OperationId> {
+        if self.notification_type != MinterNotificationType::RescheduleOperation {
+            return Err(Error::Serialization(format!(
+                "expected MinterNotificationType::RescheduleOperation, got {:?}",
+                self.notification_type,
+            )));
+        }
+
+        let decoded = Decode!(&self.user_data, OperationId).map_err(|e| {
+            Error::Serialization(format!("failed to decode reschedule operation ID: {e}"))
+        })?;
+        Ok(decoded)
+    }
 }
 
 impl From<NotifyMinterEvent> for NotifyMinterEventData {
     fn from(event: NotifyMinterEvent) -> Self {
         Self {
             notification_type: event.notificationType.into(),
-            tx_sender: event.txSender.into(),
+            tx_sender: event.txSender.0 .0.into(),
             user_data: event.userData.0.into(),
             memo: event.memo.0.into(),
         }

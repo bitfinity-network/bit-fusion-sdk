@@ -20,7 +20,7 @@ pub struct BridgeDeployer {
 
 impl BridgeDeployer {
     pub async fn create(agent: Agent, wallet: Principal, cycles: u128) -> anyhow::Result<Self> {
-        info!("Using  wallet canister ID: {wallet}");
+        info!("Using wallet canister ID: {wallet}");
         let wallet = WalletCanister::create(&agent, wallet).await?;
         let caller = agent.get_principal().map_err(|err| anyhow!(err))?;
 
@@ -46,6 +46,7 @@ impl BridgeDeployer {
         config: &Bridge,
         mode: InstallMode,
         network: EvmNetwork,
+        evm: Principal,
     ) -> anyhow::Result<Principal> {
         let canister_wasm = std::fs::read(wasm_path)?;
         debug!(
@@ -55,7 +56,11 @@ impl BridgeDeployer {
 
         let canister_id = self.client.client().canister_id;
         let management_canister = ManagementCanister::create(&self.agent);
-        let arg = config.init_raw_arg(network)?;
+        let arg = config.init_raw_arg(
+            self.agent.get_principal().expect("invalid agent identity"),
+            network,
+            evm,
+        )?;
 
         management_canister
             .install(&canister_id, &canister_wasm)

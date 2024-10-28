@@ -77,9 +77,8 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         let signer = self.order_handler.get_signer()?;
         let digest = keccak::keccak_hash(&orders_data);
         let signature = signer.sign_digest(digest.0 .0).await?;
-        let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
-
-        log::trace!("Batch of {orders_number} mint orders signed");
+        let signature = ethers_core::types::Signature::from(signature);
+        let signature_bytes: [u8; 65] = signature.into();
 
         let signed_orders = SignedOrdersData {
             orders_data,

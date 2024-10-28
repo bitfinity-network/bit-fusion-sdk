@@ -10,9 +10,7 @@ use bitcoin::key::Secp256k1;
 use bitcoin::{Address, Amount, PrivateKey, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::event_data::MinterNotificationType;
-use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
-use bridge_did::init::{BridgeInitData, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
 use bridge_did::runes::RuneName;
@@ -20,13 +18,10 @@ use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
-use eth_signer::sign_strategy::{SigningKeyId, SigningStrategy};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_log::did::LogCanisterSettings;
 use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
 use rune_bridge::interface::{DepositError, GetAddressError};
@@ -39,7 +34,6 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
-use crate::utils::wasm::get_rune_bridge_canister_bytecode;
 
 const REQUIRED_CONFIRMATIONS: u64 = 6;
 
@@ -166,39 +160,7 @@ impl RunesContext {
             .unwrap();
 
         let bridge = context.canisters().rune_bridge();
-        let init_args = BridgeInitData {
-            evm_link: EvmLink::Ic(context.canisters().evm()),
-            signing_strategy: SigningStrategy::ManagementCanister {
-                key_id: SigningKeyId::Dfx,
-            },
-            owner: context.admin(),
-            log_settings: Some(LogCanisterSettings {
-                enable_console: Some(true),
-                in_memory_records: None,
-                log_filter: Some("trace".to_string()),
-                ..Default::default()
-            }),
-        };
 
-        let rune_config = RuneBridgeConfig {
-            network: BitcoinNetwork::Regtest,
-            btc_cache_timeout_secs: None,
-            min_confirmations: 1,
-            indexers: vec![IndexerType::OrdHttp {
-                url: "https://localhost:8001".to_string(),
-            }],
-            deposit_fee: 500_000,
-            mempool_timeout: Duration::from_secs(60),
-            indexer_consensus_threshold: 1,
-        };
-        context
-            .install_canister(
-                bridge,
-                get_rune_bridge_canister_bytecode().await,
-                (init_args, rune_config),
-            )
-            .await
-            .unwrap();
         let _: () = context
             .client(bridge, ADMIN)
             .update("admin_configure_ecdsa", ())
