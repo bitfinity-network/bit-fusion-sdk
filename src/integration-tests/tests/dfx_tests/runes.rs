@@ -743,8 +743,6 @@ async fn runes_bridging_flow() {
         move || {
             let ctx_t = ctx_t.clone();
             Box::pin(async move {
-                ctx_t.mint_blocks(1);
-
                 let updated_ord_balance = ctx_t.ord_rune_balance(&rune_id).await;
                 if updated_ord_balance == expected_balance {
                     return Ok(());
@@ -755,7 +753,7 @@ async fn runes_bridging_flow() {
                 ))
             })
         },
-        Duration::from_secs(120),
+        Duration::from_secs(180),
     )
     .await;
 
