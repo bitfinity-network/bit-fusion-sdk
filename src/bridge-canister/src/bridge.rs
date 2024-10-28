@@ -79,6 +79,10 @@ pub trait OperationContext {
         )
         .await?;
 
+        if !events.is_empty() {
+            log::debug!("collected EVM events: {events:?}");
+        }
+
         Ok(CollectedEvents {
             events,
             last_block_number: last_request_block,

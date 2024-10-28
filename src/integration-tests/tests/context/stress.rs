@@ -57,6 +57,9 @@ pub trait BaseTokens {
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
 
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool>;
+
+    // todo: remove
+    async fn debug(&self, user: &H160) {}
 }
 
 pub struct BurnInfo<UserId> {
@@ -351,6 +354,7 @@ impl<B: BaseTokens> StressTestState<B> {
                 Ok(c) => c,
                 Err(e) => {
                     println!("failed to check operation completeness: {e}");
+                    self.base_tokens.debug(&address).await;
                     false
                 }
             };

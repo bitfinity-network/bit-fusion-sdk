@@ -350,6 +350,12 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let is_complete = matches!(operation.1.stage, Erc20OpStage::TokenMintConfirmed(_));
         Ok(is_complete)
     }
+
+    async fn debug(&self, user: &H160) {
+        let client = self.ctx.erc20_bridge_client(self.ctx.admin_name());
+        let ops = client.get_operations_list(user, None, None).await;
+        println!("User operations: {ops:?}");
+    }
 }
 
 /// Run stress test with the given TestContext implementation.

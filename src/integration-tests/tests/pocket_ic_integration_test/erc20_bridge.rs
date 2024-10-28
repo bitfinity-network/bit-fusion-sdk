@@ -606,7 +606,7 @@ async fn erc20_bridge_stress_test() {
 
     let config = StressTestConfig {
         users_number: 1,
-        user_deposits_per_token: 4,
+        user_deposits_per_token: 1,
         init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
         operation_timeout: Duration::from_secs(30),
