@@ -57,14 +57,19 @@ ic-state-machine-tests = { workspace = true, optional = true }
 anyhow = { workspace = true }
 brc20_bridge = { path = "../brc20-bridge" }
 btc_bridge = { path = "../btc-bridge" }
+dirs = { workspace = true }
 erc20_bridge = { path = "../erc20-bridge" }
 ic-test-utils = { workspace = true }
 ic-utils = { workspace = true }
+lazy-regex = { workspace = true }
 rune_bridge = { path = "../rune-bridge" }
 serial_test = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
 tokio-util = { workspace = true }
+trycmd = { workspace = true }
+wildmatch = { workspace = true }
 
 # IC deps
 [features]

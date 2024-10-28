@@ -46,6 +46,7 @@ impl BridgeDeployer {
         config: &Bridge,
         mode: InstallMode,
         network: EvmNetwork,
+        evm: Principal,
     ) -> anyhow::Result<Principal> {
         let canister_wasm = std::fs::read(wasm_path)?;
         debug!(
@@ -58,6 +59,7 @@ impl BridgeDeployer {
         let arg = config.init_raw_arg(
             self.agent.get_principal().expect("invalid agent identity"),
             network,
+            evm,
         )?;
 
         management_canister

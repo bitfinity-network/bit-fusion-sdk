@@ -1,6 +1,7 @@
 use alloy_sol_types::{SolInterface, SolValue};
 use bridge_did::id256::Id256;
 use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
+use candid::Principal;
 use clap::{Args, Subcommand};
 use did::Bytes;
 use eth_signer::{Signer, Wallet};
@@ -19,10 +20,10 @@ pub enum WrapTokenType {
 }
 
 impl WrapTokenType {
-    pub async fn wrap(&self, network: EvmNetwork, pk: H256) -> anyhow::Result<()> {
+    pub async fn wrap(&self, network: EvmNetwork, pk: H256, evm: Principal) -> anyhow::Result<()> {
         let base_token_parameters = self.get_base_token_parameters(pk).await?;
         let wrapped_token_address = self
-            .deploy_wrapped_token(&base_token_parameters, network, pk)
+            .deploy_wrapped_token(&base_token_parameters, network, pk, evm)
             .await?;
 
         info!(
@@ -56,6 +57,7 @@ impl WrapTokenType {
         base_token_params: &TokenParameters,
         evm_network: EvmNetwork,
         pk: H256,
+        evm: Principal,
     ) -> anyhow::Result<H160> {
         let deployer = SolidityContractDeployer::new(
             NetworkConfig {
@@ -63,6 +65,7 @@ impl WrapTokenType {
                 custom_network: None,
             },
             pk,
+            evm,
         );
         let TokenParameters {
             name,

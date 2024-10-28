@@ -4,16 +4,11 @@
       "type": "pull",
       "id": "7hfb6-caaaa-aaaar-qadga-cai"
     },
-    "evm_testnet": {
+    "evm": {
       "build": "",
       "candid": ".artifact/evm_testnet.did",
       "wasm": ".artifact/evm_testnet.wasm.gz",
-      "type": "custom",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ]
+      "type": "custom"
     },
     "signature_verification": {
       "build": "",
@@ -39,12 +34,6 @@
       "wasm": ".artifact/erc20-bridge.wasm.gz",
       "type": "custom"
     },
-    "spender": {
-      "build": "",
-      "candid": ".artifact/spender.did",
-      "wasm": ".artifact/spender.wasm.gz",
-      "type": "custom"
-    },
     "icrc2-bridge": {
       "build": "",
       "candid": ".artifact/icrc2-bridge.did",
@@ -55,39 +44,18 @@
       "build": "",
       "candid": ".artifact/btc-bridge.did",
       "wasm": ".artifact/btc-bridge.wasm.gz",
-      "type": "custom",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ]
+      "type": "custom"
     },
     "brc20-bridge": {
       "build": "",
       "candid": ".artifact/brc20-bridge.did",
       "wasm": ".artifact/brc20-bridge.wasm.gz",
-      "type": "custom",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ]
+      "type": "custom"
     },
     "rune-bridge": {
       "build": "",
       "candid": ".artifact/rune-bridge.did",
       "wasm": ".artifact/rune-bridge.wasm.gz",
-      "type": "custom",
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ]
-    },
-    "ic-ckbtc-ledger": {
-      "build": "",
-      "candid": ".artifact/icrc1-ledger.did",
-      "wasm": ".artifact/icrc1-ledger.wasm.gz",
       "type": "custom"
     },
     "ic-ckbtc-kyt": {
@@ -101,11 +69,6 @@
       "candid": ".artifact/ic-ckbtc-minter.did",
       "wasm": ".artifact/ic-ckbtc-minter.wasm.gz",
       "type": "custom"
-    }
-  },
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943"
     }
   }
 }

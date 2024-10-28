@@ -14,9 +14,6 @@ pub struct InitBridgeConfig {
     /// is being deployed to.
     #[arg(long)]
     pub signing_key_id: Option<SigningKeyId>,
-    /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
-    #[arg(long)]
-    pub evm: Option<Principal>,
     /// Log settings for the canister
     #[command(flatten, next_help_heading = "Log Settings for the canister")]
     pub log_settings: Option<LogCanisterSettings>,
@@ -28,15 +25,16 @@ impl InitBridgeConfig {
         self,
         owner: Principal,
         evm_network: EvmNetwork,
+        evm: Principal,
     ) -> BridgeInitData {
         let signing_strategy = self.signing_key_id(evm_network).into();
         let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
             owner,
-            evm_link: crate::evm::evm_link(evm_network, self.evm),
+            evm_link: crate::evm::evm_link(evm_network, Some(evm)),
             signing_strategy,
             log_settings: Some(ic_log::did::LogCanisterSettings {
-                enable_console: log_settings.enable_console,
+                enable_console: Some(log_settings.enable_console),
                 in_memory_records: log_settings.in_memory_records,
                 max_record_length: log_settings.max_record_length,
                 log_filter: log_settings.log_filter,
@@ -64,7 +62,7 @@ impl InitBridgeConfig {
 
 fn default_log_settings() -> LogCanisterSettings {
     LogCanisterSettings {
-        enable_console: Some(true),
+        enable_console: true,
         in_memory_records: Some(10_000),
         max_record_length: Some(4096),
         log_filter: Some("trace,ic_task_scheduler=off".into()),
