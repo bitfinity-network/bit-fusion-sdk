@@ -188,12 +188,21 @@ pub trait TestContext {
 
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
+        let client = self.evm_client(self.admin_name());
+        self.new_wallet_on_evm(&client, balance).await
+    }
+
+    /// Creates a new wallet with the EVM balance on it.
+    async fn new_wallet_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        balance: u128,
+    ) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
             let mut rng = rand::thread_rng();
             Wallet::new(&mut rng)
         };
-        let client = self.evm_client(self.admin_name());
-        client
+        evm_client
             .admin_mint_native_tokens(wallet.address().into(), balance.into())
             .await??;
 
@@ -279,6 +288,7 @@ pub trait TestContext {
             minter_canister_address,
             fee_charge_address,
             wrapped_token_deployer,
+            true,
         )
         .await
     }
@@ -290,19 +300,22 @@ pub trait TestContext {
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
+        is_wrapped: bool,
     ) -> Result<H160> {
         evm_client
             .admin_mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
             .await??;
         self.advance_time(Duration::from_secs(2)).await;
 
+        let wallet = self.new_wallet_on_evm(evm_client, u64::MAX.into()).await?;
         let bridge_address = self
-            .initialize_bft_bridge_with_minter(
-                &self.new_wallet(u64::MAX.into()).await?,
+            .initialize_bft_bridge_with_minter_on_evm(
+                evm_client,
+                &wallet,
                 minter_canister_address,
                 fee_charge_address,
                 wrapped_token_deployer,
-                true,
+                is_wrapped,
             )
             .await?;
 
@@ -318,6 +331,28 @@ pub trait TestContext {
         wrapped_token_deployer: H160,
         is_wrapped: bool,
     ) -> Result<H160> {
+        let evm_client = self.evm_client(self.admin_name());
+        self.initialize_bft_bridge_with_minter_on_evm(
+            &evm_client,
+            wallet,
+            minter_canister_address,
+            fee_charge_address,
+            wrapped_token_deployer,
+            is_wrapped,
+        )
+        .await
+    }
+
+    /// Creates BFTBridge contract in EVMC and registered it in minter canister
+    async fn initialize_bft_bridge_with_minter_on_evm(
+        &self,
+        evm_client: &EvmCanisterClient<Self::Client>,
+        wallet: &Wallet<'_, SigningKey>,
+        minter_canister_address: H160,
+        fee_charge_address: Option<H160>,
+        wrapped_token_deployer: H160,
+        is_wrapped: bool,
+    ) -> Result<H160> {
         let mut bridge_input = BFTBridge::BYTECODE.to_vec();
         let constructor = BFTBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
@@ -325,7 +360,7 @@ pub trait TestContext {
         println!("bridge bytecode size: {}", BFTBridge::BYTECODE.len());
 
         let bridge_address = self
-            .create_contract(wallet, bridge_input.clone())
+            .create_contract_on_evm(evm_client, wallet, bridge_input.clone())
             .await
             .unwrap();
 
@@ -347,7 +382,10 @@ pub trait TestContext {
         .abi_encode();
         proxy_input.extend_from_slice(&constructor);
 
-        let proxy_address = self.create_contract(wallet, proxy_input).await.unwrap();
+        let proxy_address = self
+            .create_contract_on_evm(evm_client, wallet, proxy_input)
+            .await
+            .unwrap();
 
         println!("proxy_address: {}", proxy_address);
 

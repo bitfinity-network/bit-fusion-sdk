@@ -38,18 +38,23 @@ pub trait BaseTokens {
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
 
-    async fn new_user(&self) -> Result<Self::UserId>;
+    async fn new_user(&self, wrapped_wallet: &OwnedWallet) -> Result<Self::UserId>;
     async fn mint(&self, token_idx: usize, to: &Self::UserId, amount: U256) -> Result<()>;
     async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<U256>;
 
     async fn deposit(
         &self,
-        to_wallet: &Wallet<'_, SigningKey>,
+        to_user: &User<Self::UserId>,
         info: &BurnInfo<Self::UserId>,
     ) -> Result<U256>;
 
-    async fn new_user_with_balance(&self, token_idx: usize, balance: U256) -> Result<Self::UserId> {
-        let user = self.new_user().await?;
+    async fn new_user_with_balance(
+        &self,
+        wrapped_wallet: &OwnedWallet,
+        token_idx: usize,
+        balance: U256,
+    ) -> Result<Self::UserId> {
+        let user = self.new_user(wrapped_wallet).await?;
         self.mint(token_idx, &user, balance).await?;
         Ok(user)
     }
@@ -57,9 +62,6 @@ pub trait BaseTokens {
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
 
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool>;
-
-    // todo: remove
-    async fn debug(&self, user: &H160) {}
 }
 
 pub struct BurnInfo<UserId> {
@@ -73,7 +75,7 @@ pub struct BurnInfo<UserId> {
 
 pub type OwnedWallet = Wallet<'static, SigningKey>;
 
-struct User<BaseId> {
+pub struct User<BaseId> {
     pub wallet: OwnedWallet,
     pub base_id: BaseId,
     pub nonce: AtomicU64,
@@ -164,7 +166,9 @@ impl<B: BaseTokens> StressTestState<B> {
         println!("Initializing base token users with their balances");
         let mut users = Vec::with_capacity(config.users_number);
         for _ in 0..config.users_number {
-            let user_id = base_tokens.new_user().await?;
+            // Create a wallet for the user.
+            let wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
+            let user_id = base_tokens.new_user(&wallet).await?;
 
             for token_idx in 0..base_tokens.ids().len() {
                 // Create a user with base token balance.
@@ -173,8 +177,6 @@ impl<B: BaseTokens> StressTestState<B> {
                     .await?;
             }
 
-            // Create a wallet for the user.
-            let wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
             // Deposit native token to charge fee.
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
             let user_id256 = base_tokens.user_id256(user_id.clone());
@@ -192,7 +194,7 @@ impl<B: BaseTokens> StressTestState<B> {
             let user = User {
                 wallet,
                 base_id: user_id.clone(),
-                nonce: Default::default(),
+                nonce: AtomicU64::new(1),
             };
             users.push(user);
         }
@@ -308,13 +310,14 @@ impl<B: BaseTokens> StressTestState<B> {
         println!("waiting for user {user_idx} deposit in token {token_idx}");
         let user_address = self.users[user_idx].address();
         if !self
-            .wait_operaion_complete(user_address, deposit_memo)
+            .wait_operation_complete(user_address, deposit_memo)
             .await
         {
             println!("deposit of user {user_idx} for token {token_idx} timeout");
             return false;
         }
 
+        println!("starting withdrawal for user {user_idx} in token {token_idx}");
         let withdraw_amount = self.config.operation_amount.0 / U256::from(2u64).0;
         let withdraw_memo = match self
             .withdraw(token_idx, user_idx, withdraw_amount.into())
@@ -330,7 +333,7 @@ impl<B: BaseTokens> StressTestState<B> {
         println!("waiting for user {user_idx} withdraw from token {token_idx}");
         let user_address = self.users[user_idx].address();
         if !self
-            .wait_operaion_complete(user_address, withdraw_memo)
+            .wait_operation_complete(user_address, withdraw_memo)
             .await
         {
             println!("withdraw of user {user_idx} for token {token_idx} timeout");
@@ -340,7 +343,7 @@ impl<B: BaseTokens> StressTestState<B> {
         true
     }
 
-    async fn wait_operaion_complete(&self, address: H160, memo: Memo) -> bool {
+    async fn wait_operation_complete(&self, address: H160, memo: Memo) -> bool {
         let mut elapsed = Duration::default();
         let wait_per_iteration = Duration::from_secs(1);
         while elapsed < self.config.operation_timeout {
@@ -354,7 +357,6 @@ impl<B: BaseTokens> StressTestState<B> {
                 Ok(c) => c,
                 Err(e) => {
                     println!("failed to check operation completeness: {e}");
-                    self.base_tokens.debug(&address).await;
                     false
                 }
             };
@@ -378,7 +380,7 @@ impl<B: BaseTokens> StressTestState<B> {
             amount: self.config.operation_amount.clone(),
             memo,
         };
-        self.base_tokens.deposit(&user.wallet, &burn_info).await?;
+        self.base_tokens.deposit(user, &burn_info).await?;
 
         Ok(memo)
     }
@@ -400,8 +402,7 @@ impl<B: BaseTokens> StressTestState<B> {
         }
         .abi_encode();
 
-        let nonce = self.users.get(user_idx).unwrap().next_nonce();
-
+        let nonce = self.users[user_idx].next_nonce();
         self.base_tokens
             .ctx()
             .call_contract_without_waiting(

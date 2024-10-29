@@ -10,15 +10,14 @@ use bridge_utils::{evm_link, BFTBridge};
 use candid::{Encode, Nat, Principal};
 use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::Signer;
 use ic_exports::icrc_types::icrc1_ledger::LedgerArgument;
 use icrc_client::account::Account;
 use icrc_client::allowance::AllowanceArgs;
 use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
-use super::{BaseTokens, BurnInfo, StressTestConfig, StressTestState};
+use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::utils::error::{Result, TestError};
 
@@ -88,7 +87,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         Ok(address)
     }
 
-    async fn new_user(&self) -> Result<Self::UserId> {
+    async fn new_user(&self, _wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
         Ok(format!(
             "icrc {}",
             USER_COUNTER.fetch_add(1, Ordering::Relaxed)
@@ -132,13 +131,13 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
     async fn deposit(
         &self,
-        to_wallet: &Wallet<'_, SigningKey>,
+        to_user: &User<Self::UserId>,
         info: &BurnInfo<Self::UserId>,
     ) -> Result<U256> {
         let token_principal = self.tokens[info.base_token_idx];
         let client = self.ctx.icrc_token_client(token_principal, &info.from);
 
-        let to = to_wallet.address();
+        let to = to_user.wallet.address();
         let subaccount = Some(evm_link::address_to_icrc_subaccount(&to));
         let minter_canister = Account {
             owner: self.ctx.canisters().icrc2_bridge(),
@@ -192,7 +191,13 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         loop {
             let call_result = self
                 .ctx
-                .call_contract_without_waiting(to_wallet, &info.bridge, input.clone(), 0, None)
+                .call_contract_without_waiting(
+                    &to_user.wallet,
+                    &info.bridge,
+                    input.clone(),
+                    0,
+                    None,
+                )
                 .await;
 
             // Retry on invalid nonce or alerady exits.

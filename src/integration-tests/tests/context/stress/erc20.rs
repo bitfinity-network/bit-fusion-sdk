@@ -10,37 +10,27 @@ use bridge_did::operations::Erc20OpStage;
 use bridge_utils::BFTBridge;
 use did::{TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
 use ic_exports::ic_cdk::println;
 use tokio::sync::RwLock;
 
-use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState};
+use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
 use crate::utils::{TestWTM, CHAIN_ID};
-
-struct User {
-    pub wallet: OwnedWallet,
-    pub nonce: AtomicU64,
-}
-
-impl User {
-    pub fn next_nonce(&self) -> u64 {
-        self.nonce.fetch_add(1, Ordering::Relaxed)
-    }
-}
 
 pub struct Erc20BaseTokens<Ctx> {
     ctx: Ctx,
     tokens: Vec<H160>,
     contracts_deployer: OwnedWallet,
     bft_bridge: H160,
-    users: RwLock<HashMap<H160, User>>,
+    nonces: RwLock<HashMap<H160, AtomicU64>>,
 }
 
 impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         let external_evm_client = ctx.external_evm_client(ctx.admin_name());
+
+        // Create contract deployer wallet.
         let contracts_deployer = Wallet::new(&mut rand::thread_rng());
         let deployer_address = contracts_deployer.address();
         let tx_hash = external_evm_client
@@ -70,19 +60,40 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             tokens.push(icrc_principal);
         }
 
-        println!("Icrc token canisters created");
+        println!("Base Erc20 token contracts created");
 
         // wait to allow bridge canister to query evm params from external EVM.
         ctx.advance_by_times(Duration::from_millis(500), 10).await;
 
         let bft_bridge = Self::init_bft_bridge_contract(&ctx).await;
 
+        // Mint tokens for bridge canister
+        let bridge_client = ctx.erc20_bridge_client(ctx.admin_name());
+        let bridge_address = bridge_client
+            .get_bridge_canister_base_evm_address()
+            .await
+            .unwrap()
+            .unwrap();
+        let tx_hash = external_evm_client
+            .admin_mint_native_tokens(bridge_address, u128::MAX.into())
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
+
+        let mint_tx_receipt = ctx
+            .wait_transaction_receipt_on_evm(&external_evm_client, &tx_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+
         Ok(Self {
             ctx,
             tokens,
             contracts_deployer,
             bft_bridge,
-            users: Default::default(),
+            nonces: Default::default(),
         })
     }
 
@@ -104,6 +115,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
                 bridge_canister_address,
                 None,
                 base_wrapped_token_deployer,
+                false,
             )
             .await
             .unwrap();
@@ -149,6 +161,15 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
 
         Ok(receipt)
     }
+
+    async fn next_nonce(&self, address: &H160) -> u64 {
+        self.nonces
+            .read()
+            .await
+            .get(address)
+            .unwrap()
+            .fetch_add(1, Ordering::Relaxed)
+    }
 }
 
 impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
@@ -177,10 +198,8 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         Ok(address)
     }
 
-    async fn new_user(&self) -> Result<Self::UserId> {
-        let wallet = OwnedWallet::new(&mut rand::thread_rng());
-        let address = wallet.address();
-
+    async fn new_user(&self, wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
+        let address = wrapped_wallet.address();
         let client = self.ctx.external_evm_client(self.ctx.admin_name());
         let tx_hash = client
             .admin_mint_native_tokens(address.into(), u128::MAX.into())
@@ -197,11 +216,11 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .unwrap();
         assert_eq!(mint_tx_receipt.status, Some(U64::one()));
 
-        let user = User {
-            wallet,
-            nonce: Default::default(),
-        };
-        self.users.write().await.insert(address.into(), user);
+        self.nonces
+            .write()
+            .await
+            .insert(address.into(), AtomicU64::default());
+
         Ok(address.into())
     }
 
@@ -249,28 +268,16 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
     async fn deposit(
         &self,
-        to_wallet: &Wallet<'_, SigningKey>,
+        to_user: &User<Self::UserId>,
         info: &BurnInfo<Self::UserId>,
     ) -> Result<U256> {
+        let user_wallet = to_user.wallet.clone();
+        let user_address = user_wallet.address();
         let token_address = self.tokens[info.base_token_idx].clone();
         let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
-        let sender_wallet = self
-            .users
-            .read()
-            .await
-            .get(&info.from)
-            .unwrap()
-            .wallet
-            .clone();
-        let nonce = self
-            .users
-            .read()
-            .await
-            .get(&info.from)
-            .unwrap()
-            .next_nonce();
+        let nonce = self.next_nonce(&user_address.into()).await;
         let to_token_id = self.token_id256(info.wrapped_token.clone());
-        let recipient_id = self.user_id256(to_wallet.address().into());
+        let recipient_id = self.user_id256(user_address.into());
         let memo = info.memo;
 
         println!("approving tokens for bridge");
@@ -284,7 +291,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .ctx
             .call_contract_without_waiting_on_evm(
                 &evm_client,
-                &sender_wallet,
+                &user_wallet,
                 &token_address,
                 input,
                 0,
@@ -304,18 +311,12 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         }
         .abi_encode();
 
-        let nonce = self
-            .users
-            .read()
-            .await
-            .get(&info.from)
-            .unwrap()
-            .next_nonce();
+        let nonce = self.next_nonce(&user_address.into()).await;
         let tx_hash = self
             .ctx
             .call_contract_without_waiting_on_evm(
                 &evm_client,
-                &sender_wallet,
+                &user_wallet,
                 &self.bft_bridge,
                 input,
                 0,
@@ -350,12 +351,6 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let is_complete = matches!(operation.1.stage, Erc20OpStage::TokenMintConfirmed(_));
         Ok(is_complete)
     }
-
-    async fn debug(&self, user: &H160) {
-        let client = self.ctx.erc20_bridge_client(self.ctx.admin_name());
-        let ops = client.get_operations_list(user, None, None).await;
-        println!("User operations: {ops:?}");
-    }
 }
 
 /// Run stress test with the given TestContext implementation.
@@ -374,4 +369,8 @@ pub async fn stress_test_erc20_bridge_with_ctx<T>(
     dbg!(&stress_test_stats);
 
     assert_eq!(stress_test_stats.failed_roundtrips, 0);
+    assert!(
+        stress_test_stats.init_bridge_canister_native_balance
+            <= stress_test_stats.finish_bridge_canister_native_balance
+    );
 }

@@ -605,14 +605,17 @@ async fn erc20_bridge_stress_test() {
     .await;
 
     let config = StressTestConfig {
-        users_number: 1,
-        user_deposits_per_token: 1,
+        users_number: 5,
+        user_deposits_per_token: 3,
         init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
         operation_timeout: Duration::from_secs(30),
     };
 
+    // If set more then one token, tests probably will fail because of
+    // parallel tx nonces calculation issue.
     erc20::stress_test_erc20_bridge_with_ctx(context, 1, config).await;
+    panic!();
 }
 
 async fn create_bft_bridge(

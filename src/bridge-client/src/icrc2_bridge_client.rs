@@ -1,6 +1,6 @@
-use bridge_did::operation_log::OperationLog;
+use bridge_did::op_id::OperationId;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_did::operations::IcrcBridgeOp;
-use bridge_did::{op_id::OperationId, operation_log::Memo};
 use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
