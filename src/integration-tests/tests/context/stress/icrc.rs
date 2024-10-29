@@ -196,7 +196,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
                     &info.bridge,
                     input.clone(),
                     0,
-                    None,
+                    Some(to_user.next_nonce()),
                 )
                 .await;
 

@@ -615,7 +615,6 @@ async fn erc20_bridge_stress_test() {
     // If set more then one token, tests probably will fail because of
     // parallel tx nonces calculation issue.
     erc20::stress_test_erc20_bridge_with_ctx(context, 1, config).await;
-    panic!();
 }
 
 async fn create_bft_bridge(
