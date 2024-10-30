@@ -15,6 +15,8 @@ pub mod error;
 #[cfg(feature = "dfx_tests")]
 pub mod hiro_ordinals_client;
 #[cfg(feature = "dfx_tests")]
+pub mod miner;
+#[cfg(feature = "dfx_tests")]
 pub mod ord_client;
 #[cfg(feature = "dfx_tests")]
 pub mod rune_helper;

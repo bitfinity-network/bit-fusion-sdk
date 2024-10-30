@@ -1,4 +1,6 @@
-use std::time::Duration;
+use std::future::Future;
+use std::pin::Pin;
+use std::time::{Duration, Instant};
 
 use bridge_did::evm_link::EvmLink;
 use bridge_utils::evm_link::{RpcApi, RpcService};
@@ -187,4 +189,23 @@ impl TestContext for DfxTestContext {
     fn sign_key(&self) -> SigningKeyId {
         SigningKeyId::Dfx
     }
+}
+
+/// Blocks until the predicate returns [`Ok`].
+///
+/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
+/// Returns the value inside of the [`Ok`] variant of the predicate.
+pub async fn block_until_succeeds<F, T>(predicate: F, max_wait: Duration) -> T
+where
+    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+{
+    let start = Instant::now();
+    while start.elapsed() < max_wait {
+        if let Ok(res) = predicate().await {
+            return res;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
 }

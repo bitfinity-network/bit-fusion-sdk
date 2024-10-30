@@ -76,7 +76,7 @@ impl Operation for Brc20BridgeOpImpl {
                 Error::FailedToProgress("MintOrderConfirmed task cannot be progressed".into()),
             ),
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs(payload)) => {
-                log::debug!("Brc20BridgeDepositOp::CreateInscriptionTxs {payload:?}");
+                log::debug!("Brc20BridgeWithdrawOp::CreateInscriptionTxs {payload:?}");
                 Brc20BridgeWithdrawOpImpl::create_inscription_txs(payload).await
             }
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx {
@@ -86,7 +86,7 @@ impl Operation for Brc20BridgeOpImpl {
                 reveal_utxo,
             }) => {
                 log::debug!(
-                    "Brc20BridgeDepositOp::SendCommitTx {payload:?} {commit_tx:?} {reveal_tx:?} {reveal_utxo:?}"
+                    "Brc20BridgeWithdrawOp::SendCommitTx {payload:?} {commit_tx:?} {reveal_tx:?} {reveal_utxo:?}"
                 );
                 Brc20BridgeWithdrawOpImpl::send_commit_transaction(
                     payload,
@@ -102,7 +102,7 @@ impl Operation for Brc20BridgeOpImpl {
                 reveal_utxo,
             }) => {
                 log::debug!(
-                    "Brc20BridgeDepositOp::SendRevealTx {payload:?} {reveal_tx:?} {reveal_utxo:?}"
+                    "Brc20BridgeWithdrawOp::SendRevealTx {payload:?} {reveal_tx:?} {reveal_utxo:?}"
                 );
                 Brc20BridgeWithdrawOpImpl::send_reveal_transaction(payload, reveal_tx, reveal_utxo)
                     .await
@@ -112,7 +112,7 @@ impl Operation for Brc20BridgeOpImpl {
                 reveal_utxo,
             }) => {
                 log::debug!(
-                    "Brc20BridgeDepositOp::AwaitInscriptionTxs {reveal_utxo:?} {payload:?} "
+                    "Brc20BridgeWithdrawOp::AwaitInscriptionTxs {reveal_utxo:?} {payload:?} "
                 );
                 Brc20BridgeWithdrawOpImpl::await_inscription_transactions(payload, reveal_utxo)
                     .await
@@ -121,11 +121,11 @@ impl Operation for Brc20BridgeOpImpl {
                 payload,
                 reveal_utxo,
             }) => {
-                log::debug!("Brc20BridgeDepositOp::CreateTransferTx {payload:?} {reveal_utxo:?}");
+                log::debug!("Brc20BridgeWithdrawOp::CreateTransferTx {payload:?} {reveal_utxo:?}");
                 Brc20BridgeWithdrawOpImpl::create_transfer_transaction(payload, reveal_utxo).await
             }
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendTransferTx { from_address, tx }) => {
-                log::debug!("Brc20BridgeDepositOp::SendTransferTx {from_address:?} {tx:?}");
+                log::debug!("Brc20BridgeWithdrawOp::SendTransferTx {from_address:?} {tx:?}");
                 Brc20BridgeWithdrawOpImpl::send_transfer_transaction(from_address, tx).await
             }
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::TransferTxSent { .. }) => Err(
