@@ -1,5 +1,5 @@
 use bridge_did::op_id::OperationId;
-use bridge_did::operation_log::OperationLog;
+use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_utils::common::Pagination;
 use did::H160;
@@ -42,6 +42,25 @@ impl<C: CanisterClient> Icrc2BridgeClient<C> {
     ) -> CanisterClientResult<Option<OperationLog<IcrcBridgeOp>>> {
         self.client
             .query("get_operation_log", (operation_id,))
+            .await
+    }
+
+    pub async fn get_operation_by_memo_and_user(
+        &self,
+        memo: Memo,
+        user_id: &H160,
+    ) -> CanisterClientResult<Option<(OperationId, IcrcBridgeOp)>> {
+        self.client
+            .query("get_operation_by_memo_and_user", (memo, user_id))
+            .await
+    }
+
+    pub async fn get_memos_by_user_address(
+        &self,
+        user_id: &H160,
+    ) -> CanisterClientResult<Vec<Memo>> {
+        self.client
+            .query("get_memos_by_user_address", (user_id,))
             .await
     }
 }

@@ -26,14 +26,11 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     uint8 public constant MINT_ERROR_CODE_TOKENS_NOT_BRIDGED = 6;
     uint8 public constant MINT_ERROR_CODE_PROCESSING_NOT_REQUESTED = 7;
 
-    // Additional gas amount for fee charge.
-    uint256 constant additionalGasFee = 200000;
-
     // Gas fee for batch mint operation.
     uint256 constant COMMON_BATCH_MINT_GAS_FEE = 200000;
 
     // Gas fee for mint order processing.
-    uint256 constant ORDER_BATCH_MINT_GAS_FEE = 50000;
+    uint256 constant ORDER_BATCH_MINT_GAS_FEE = 100000;
 
     // Minimal amount of fee deposit to process mint order.
     uint256 constant MIN_FEE_DEPOSIT_AMOUNT = COMMON_BATCH_MINT_GAS_FEE + ORDER_BATCH_MINT_GAS_FEE;
@@ -273,9 +270,10 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
         // Charge fee for successfully processed orders and emit Minted event for each.
         uint256 feePerUser = 0;
-        if (processedOrdersNumber > 0) {
+        if (_isFeeRequired() && processedOrdersNumber > 0) {
             feePerUser = ((COMMON_BATCH_MINT_GAS_FEE / processedOrdersNumber) + ORDER_BATCH_MINT_GAS_FEE) * tx.gasprice;
         }
+
         for (uint32 i = 0; i < ordersNumber; i++) {
             if (processedOrderIndexes[i] == MINT_ERROR_CODE_OK) {
                 // Array indexes inlined to soleve StackTooDeep problem.
@@ -389,6 +387,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         return minterCanisterAddress;
     }
 
+    /// Returns true if mint fee must be charged.
     function _isFeeRequired() private view returns (bool) {
         return minterCanisterAddress == msg.sender && address(feeChargeContract) != address(0);
     }

@@ -56,6 +56,8 @@ impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op
             .update_evm_params(|params| params.next_block = collected.last_block_number + 1);
 
         for event in events {
+            log::trace!("handling event: {event:?}");
+
             let op_action = match event {
                 BridgeEvent::Burnt(event) => self.handler.on_wrapped_token_burnt(event),
                 BridgeEvent::Minted(event) => self.handler.on_wrapped_token_minted(event),
