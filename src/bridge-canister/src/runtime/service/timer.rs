@@ -1,11 +1,12 @@
-use std::{cell::Cell, time::Duration};
+use std::cell::Cell;
+use std::time::Duration;
 
-use bridge_did::{error::BftResult, op_id::OperationId};
+use bridge_did::error::BftResult;
+use bridge_did::op_id::OperationId;
 use ic_exports::ic_kit::ic;
 
-use crate::runtime::state::Timestamp;
-
 use super::BridgeService;
+use crate::runtime::state::Timestamp;
 
 /// Service decorator to run the inner service with the given delay.
 pub struct ServiceTimer<S> {
