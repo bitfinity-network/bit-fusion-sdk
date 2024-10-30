@@ -19,7 +19,7 @@ use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{BlockNumber, TransactionReceipt, H160, H256};
+use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -53,13 +53,13 @@ pub struct Brc20InitArgs {
 pub struct Brc20Wallet {
     pub admin_address: Address,
     pub admin_btc_rpc_client: Arc<BitcoinRpcClient>,
-    ord_wallet: BtcWallet,
+    pub ord_wallet: BtcWallet,
     pub brc20_tokens: HashSet<Brc20Tick>,
 }
 
 pub struct BtcWallet {
-    private_key: PrivateKey,
-    address: Address,
+    pub private_key: PrivateKey,
+    pub address: Address,
 }
 
 pub fn generate_btc_wallet() -> BtcWallet {
@@ -103,12 +103,12 @@ pub fn generate_wallet_name() -> String {
 }
 
 pub struct Brc20Context {
-    inner: DfxTestContext,
+    pub inner: DfxTestContext,
     pub eth_wallet: Wallet<'static, SigningKey>,
     bft_bridge_contract: H160,
     exit: Exit,
     miner: Option<JoinHandle<()>>,
-    brc20: Brc20Wallet,
+    pub brc20: Brc20Wallet,
     tokens: HashMap<Brc20Tick, H160>,
 }
 
@@ -380,24 +380,22 @@ impl Brc20Context {
         }
     }
 
+    /// Deposit the specified amount to the BRC20 bridge to the provided address
     pub async fn deposit(
         &self,
         tick: Brc20Tick,
         amount: TokenAmount,
-        eth_address: &H160,
+        dst_address: &H160,
+        sender: &Wallet<'static, SigningKey>,
+        nonce: U256,
     ) -> Result<(), DepositError> {
         let dst_token = self.tokens.get(&tick).expect("token not found").clone();
 
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
-        let nonce = client
-            .eth_get_transaction_count(self.eth_wallet.address().into(), BlockNumber::Latest)
-            .await
-            .unwrap()
-            .unwrap();
 
         let data = Brc20DepositRequestData {
-            dst_address: eth_address.clone(),
+            dst_address: dst_address.clone(),
             dst_token,
             amount: amount.amount(),
             brc20_tick: tick,
@@ -411,14 +409,14 @@ impl Brc20Context {
         .abi_encode();
 
         let transaction = TransactionBuilder {
-            from: &self.eth_wallet.address().into(),
+            from: &sender.address().into(),
             to: Some(self.bft_bridge_contract.clone()),
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
             gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
             input,
-            signature: SigningMethod::SigningKey(self.eth_wallet.signer()),
+            signature: SigningMethod::SigningKey(sender.signer()),
             chain_id,
         }
         .calculate_hash_and_build()
@@ -450,7 +448,7 @@ impl Brc20Context {
             let response: Vec<(OperationId, Brc20BridgeOp)> = self
                 .inner
                 .brc20_bridge_client(ADMIN)
-                .get_operations_list(eth_address, None, None)
+                .get_operations_list(dst_address, None, None)
                 .await
                 .expect("canister call failed");
 
@@ -472,10 +470,15 @@ impl Brc20Context {
         Err(DepositError::NothingToDeposit)
     }
 
-    pub async fn withdraw(&self, tick: &Brc20Tick, amount: TokenAmount) {
+    /// Withdraw to the specified recipient
+    pub async fn withdraw(
+        &self,
+        recipient: &Address,
+        tick: &Brc20Tick,
+        amount: TokenAmount,
+    ) -> anyhow::Result<()> {
         let token_address = self.tokens.get(tick).expect("token not found");
 
-        let withdrawal_address = self.brc20.ord_wallet.address.to_string();
         let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
@@ -483,14 +486,15 @@ impl Brc20Context {
                 &self.eth_wallet,
                 token_address,
                 Id256::from(*tick).0.as_slice(),
-                withdrawal_address.as_bytes().to_vec(),
+                recipient.to_string().as_bytes().to_vec(),
                 &self.bft_bridge_contract,
                 amount.amount(),
                 true,
                 None,
             )
             .await
-            .expect("failed to burn wrapped token");
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to burn tokens: {e}"))
     }
 
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<()> {
@@ -562,18 +566,21 @@ impl Brc20Context {
             .expect("Failed to get wrapped token balance")
     }
 
-    pub async fn brc20_balance(&self, address: &Address, tick: &Brc20Tick) -> TokenAmount {
+    pub async fn brc20_balance(
+        &self,
+        address: &Address,
+        tick: &Brc20Tick,
+    ) -> anyhow::Result<TokenAmount> {
         let client = HiroOrdinalsClient::dfx_test_client();
 
-        let balances = client
-            .get_brc20_balances(address)
-            .await
-            .expect("failed to get brc20 balances");
+        let balances = client.get_brc20_balances(address).await?;
 
-        balances
+        let amount = balances
             .get(tick)
             .copied()
-            .expect("brc20 balance not found")
+            .ok_or_else(|| anyhow::anyhow!("balance not found"))?;
+
+        Ok(amount)
     }
 }
 

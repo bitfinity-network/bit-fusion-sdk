@@ -70,41 +70,53 @@ pub struct DepositResponse {
     pub mint_order_result: Erc20MintStatus,
 }
 
-#[derive(Debug, Clone, CandidType, Deserialize)]
+#[derive(Debug, Error, Clone, CandidType, Deserialize)]
 pub enum DepositError {
+    #[error("not initialized")]
     NotInitialized,
+    #[error("signer not initialized")]
     SignerNotInitialized,
+    #[error("not scheduled")]
     NotScheduled,
+    #[error("nothing to deposit")]
     NothingToDeposit,
+    #[error("no BRC20 to deposit")]
     NoBrc20ToDeposit,
+    #[error("deposit UTXOs are not confirmed")]
     UtxosNotConfirmed,
+    #[error("no destination token address")]
     NoDstTokenAddress,
+    #[error("the provided UTXOs are already used")]
     UtxoAlreadyUsed,
+    #[error("the amount is too big: {0}")]
     AmountTooBig(String),
+    #[error("key error: {0}")]
     KeyError(String),
+    #[error("indexers disagree: {indexer_responses:?}")]
     IndexersDisagree {
         indexer_responses: Vec<(String, String)>,
     },
+    #[error("insufficient consensus: received {received_responses}/{required_responses}, checked {checked_indexers}")]
     InsufficientConsensus {
         received_responses: usize,
         required_responses: u8,
         checked_indexers: usize,
     },
-    InvalidAmounts {
-        requested: u128,
-        actual: u128,
-    },
-    NotEnoughBtc {
-        received: u64,
-        minimum: u64,
-    },
+    #[error("invalid amounts: requested {requested}, actual {actual}")]
+    InvalidAmounts { requested: u128, actual: u128 },
+    #[error("not enough BTC: received {received}, minimum {minimum}")]
+    NotEnoughBtc { received: u64, minimum: u64 },
+    #[error("unavailable: {0}")]
     Unavailable(String),
+    #[error("pending; min confirmations: {min_confirmations}, current confirmations: {current_confirmations}")]
     Pending {
         min_confirmations: u32,
         current_confirmations: u32,
     },
+    #[error("sign error: {0}")]
     /// Error while signing the mint order.
     Sign(String),
+    #[error("EVM error: {0}")]
     Evm(String),
 }
 

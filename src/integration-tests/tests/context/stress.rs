@@ -1,5 +1,7 @@
 #![allow(async_fn_in_trait)]
 
+#[cfg(feature = "dfx_tests")]
+pub mod brc20;
 pub mod erc20;
 pub mod icrc;
 

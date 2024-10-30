@@ -1,3 +1,5 @@
+#[cfg(feature = "dfx_tests")]
+pub mod brc20;
 mod evm_rpc_canister;
 pub mod stress;
 

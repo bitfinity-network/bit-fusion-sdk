@@ -237,7 +237,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         let op = match op_info {
             Some((_, op)) => op,
             None => {
-                return Err(TestError::Generic("opetaion not found".into()));
+                return Err(TestError::Generic("operation not found".into()));
             }
         };
 
