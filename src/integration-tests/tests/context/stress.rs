@@ -93,8 +93,8 @@ impl<B> User<B> {
     }
 }
 
-pub struct StressTestState<B: BaseTokens> {
-    base_tokens: B,
+pub struct StressTestState<'a, B: BaseTokens> {
+    base_tokens: &'a B,
     users: Vec<User<B::UserId>>,
     wrapped_tokens: Vec<H160>,
     bft_bridge: H160,
@@ -102,8 +102,8 @@ pub struct StressTestState<B: BaseTokens> {
     memo_counter: AtomicU64,
 }
 
-impl<B: BaseTokens> StressTestState<B> {
-    pub async fn run(base_tokens: B, config: StressTestConfig) -> Result<StressTestStats> {
+impl<'a, B: BaseTokens> StressTestState<'a, B> {
+    pub async fn run(base_tokens: &'a B, config: StressTestConfig) -> Result<StressTestStats> {
         let admin_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
 
         let wrapped_token_deployer = base_tokens

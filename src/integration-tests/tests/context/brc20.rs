@@ -25,6 +25,7 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
+use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
@@ -102,12 +103,15 @@ pub fn generate_wallet_name() -> String {
     name
 }
 
-pub struct Brc20Context {
-    pub inner: DfxTestContext,
+pub struct Brc20Context<Ctx>
+where
+    Ctx: TestContext + Sync,
+{
+    pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
     bft_bridge_contract: H160,
     exit: Exit,
-    miner: Option<JoinHandle<()>>,
+    miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
     tokens: HashMap<Brc20Tick, H160>,
 }
@@ -203,13 +207,24 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
     })
 }
 
-impl Brc20Context {
-    pub async fn new(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
+impl Brc20Context<DfxTestContext> {
+    /// Init BRC20 context for DFX tests
+    pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
+        let context = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+
+        Self::new(context, brc20_to_deploy).await
+    }
+}
+
+impl<Ctx> Brc20Context<Ctx>
+where
+    Ctx: TestContext + Sync,
+{
+    pub async fn new(context: Ctx, brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         let brc20_wallet = dfx_brc20_setup(brc20_to_deploy)
             .await
             .expect("failed to setup brc20 tokens");
 
-        let context = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
         context
             .evm_client(ADMIN)
             .set_logger_filter("info")
@@ -284,26 +299,44 @@ impl Brc20Context {
             bft_bridge_contract: bft_bridge,
             eth_wallet: wallet,
             exit,
-            miner: Some(miner),
+            miner: Arc::new(Mutex::new(Some(miner))),
             inner: context,
             brc20: brc20_wallet,
             tokens,
         }
     }
 
-    pub async fn get_funding_utxo(&self) -> anyhow::Result<Utxo> {
+    pub async fn stop(&self) {
+        self.inner
+            .stop_canister(self.inner.canisters().evm())
+            .await
+            .expect("Failed to stop evm canister");
+        self.inner
+            .stop_canister(self.inner.canisters().brc20_bridge())
+            .await
+            .expect("Failed to stop brc20 bridge canister");
+
+        self.exit.store(true, std::sync::atomic::Ordering::Relaxed);
+        // stop miner
+        {
+            let mut miner = self.miner.lock().await;
+            if let Some(miner) = miner.take() {
+                miner.join().expect("Failed to join miner thread");
+            }
+        }
+    }
+
+    pub async fn get_funding_utxo(&self, to: &Address) -> anyhow::Result<Utxo> {
         let fund_tx = self
             .brc20
             .admin_btc_rpc_client
-            .send_to_address(&self.brc20.ord_wallet.address, Amount::from_int_btc(1))?;
-        self.brc20
-            .admin_btc_rpc_client
-            .generate_to_address(&self.brc20.admin_address, 1)?;
+            .send_to_address(to, Amount::from_int_btc(1))?;
+        self.brc20.admin_btc_rpc_client.generate_to_address(to, 1)?;
 
         let utxo = self
             .brc20
             .admin_btc_rpc_client
-            .get_utxo_by_address(&fund_tx, &self.brc20.ord_wallet.address)?;
+            .get_utxo_by_address(&fund_tx, to)?;
 
         Ok(utxo)
     }
@@ -328,28 +361,33 @@ impl Brc20Context {
 
     pub async fn send_brc20(
         &self,
-        btc_address: &Address,
+        from: &BtcWallet,
+        recipient: &Address,
         tick: Brc20Tick,
         amount: TokenAmount,
     ) -> anyhow::Result<Txid> {
         let brc20_helper = Brc20Helper::new(
             &self.brc20.admin_btc_rpc_client,
-            &self.brc20.ord_wallet.private_key,
-            &self.brc20.ord_wallet.address,
+            &from.private_key,
+            &from.address,
         );
 
-        println!("Sending {amount} of {tick} to {btc_address}");
+        println!(
+            "Sending {amount} of {tick} from {sender} to {recipient}",
+            amount = amount.as_int(),
+            sender = from.address
+        );
 
-        let inscription_utxo = self.get_funding_utxo().await?;
+        let inscription_utxo = self.get_funding_utxo(&from.address).await?;
         println!("Inscription utxo: {:?}", inscription_utxo);
-        let transfer_utxo = self.get_funding_utxo().await?;
+        let transfer_utxo = self.get_funding_utxo(&from.address).await?;
         println!("Transfer utxo: {:?}", transfer_utxo);
 
         let transfer_txid = brc20_helper
             .transfer(
                 tick,
                 amount.as_int() as u64,
-                btc_address.clone(),
+                recipient.clone(),
                 inscription_utxo,
                 transfer_utxo,
             )
@@ -428,7 +466,7 @@ impl Brc20Context {
             .unwrap()
             .unwrap();
         self.wait_for_tx_success(&tx_id).await;
-        eprintln!(
+        println!(
             "Deposit notification sent by tx: 0x{}",
             hex::encode(tx_id.0)
         );
@@ -479,6 +517,8 @@ impl Brc20Context {
     ) -> anyhow::Result<()> {
         let token_address = self.tokens.get(tick).expect("token not found");
 
+        println!("Burning {amount} of {tick} to {recipient}");
+
         let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
@@ -495,6 +535,65 @@ impl Brc20Context {
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to burn tokens: {e}"))
+    }
+
+    /// Mint tokens to admin wallet and then transfer to the recipient
+    pub async fn mint(
+        &self,
+        tick: Brc20Tick,
+        amount: TokenAmount,
+        recipient: &Address,
+    ) -> anyhow::Result<Txid> {
+        let commit_fund_tx = self
+            .brc20
+            .admin_btc_rpc_client
+            .send_to_address(&self.brc20.ord_wallet.address, Amount::from_sat(10_000_000))?;
+
+        let mint_utxo = self
+            .brc20
+            .admin_btc_rpc_client
+            .get_utxo_by_address(&commit_fund_tx, &self.brc20.ord_wallet.address)?;
+
+        let brc20_helper = Brc20Helper::new(
+            &self.brc20.admin_btc_rpc_client,
+            &self.brc20.ord_wallet.private_key,
+            &self.brc20.ord_wallet.address,
+        );
+
+        let mint_reveal_txid = brc20_helper
+            .mint(tick, amount.as_int() as u64, mint_utxo)
+            .await?;
+
+        // mint blocks required for confirmations\
+        brc20_helper
+            .wait_for_confirmations(&mint_reveal_txid, REQUIRED_CONFIRMATIONS as u32)
+            .await?;
+
+        let inscription_utxo = self
+            .get_funding_utxo(&self.brc20.ord_wallet.address)
+            .await?;
+        println!("Inscription utxo: {:?}", inscription_utxo);
+        let transfer_utxo = self
+            .get_funding_utxo(&self.brc20.ord_wallet.address)
+            .await?;
+        println!("Transfer utxo: {:?}", transfer_utxo);
+
+        // transfer to the recipient
+        let transfer_txid = brc20_helper
+            .transfer(
+                tick,
+                amount.as_int() as u64,
+                recipient.clone(),
+                inscription_utxo,
+                transfer_utxo,
+            )
+            .await?;
+
+        brc20_helper
+            .wait_for_confirmations(&transfer_txid, REQUIRED_CONFIRMATIONS as u32)
+            .await?;
+
+        Ok(transfer_txid)
     }
 
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<()> {
@@ -546,17 +645,6 @@ impl Brc20Context {
         panic!("Transaction {tx_hash} timed out");
     }
 
-    pub async fn stop(&self) {
-        self.inner
-            .stop_canister(self.inner.canisters().evm())
-            .await
-            .expect("Failed to stop evm canister");
-        self.inner
-            .stop_canister(self.inner.canisters().brc20_bridge())
-            .await
-            .expect("Failed to stop brc20 bridge canister");
-    }
-
     pub async fn wrapped_balance(&self, tick: &Brc20Tick, wallet: &Wallet<'_, SigningKey>) -> u128 {
         let token_contract = self.tokens.get(tick).expect("token not found");
 
@@ -581,14 +669,5 @@ impl Brc20Context {
             .ok_or_else(|| anyhow::anyhow!("balance not found"))?;
 
         Ok(amount)
-    }
-}
-
-impl Drop for Brc20Context {
-    fn drop(&mut self) {
-        self.exit.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some(join) = self.miner.take() {
-            join.join().expect("failed to join miner thread");
-        }
     }
 }

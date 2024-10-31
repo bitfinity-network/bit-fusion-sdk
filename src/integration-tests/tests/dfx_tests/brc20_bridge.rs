@@ -9,8 +9,9 @@ use crate::context::brc20::{
     self, Brc20Context, Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT,
     REQUIRED_CONFIRMATIONS,
 };
-use crate::context::TestContext as _;
-use crate::dfx_tests::{block_until_succeeds, ADMIN};
+use crate::context::stress::StressTestConfig;
+use crate::context::{CanisterType, TestContext as _};
+use crate::dfx_tests::{block_until_succeeds, DfxTestContext, ADMIN};
 use crate::utils::token_amount::TokenAmount;
 
 /// Default deposit amount
@@ -26,7 +27,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
     let brc20_tick = brc20::generate_brc20_tick();
 
-    let ctx = Brc20Context::new(&[Brc20InitArgs {
+    let ctx = Brc20Context::dfx(&[Brc20InitArgs {
         tick: brc20_tick,
         decimals: Some(DEFAULT_DECIMALS),
         limit: Some(DEFAULT_MINT_AMOUNT),
@@ -46,9 +47,14 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     // deposit
     let wallet_address = ctx.eth_wallet.address().into();
     let deposit_address = ctx.get_deposit_address(&wallet_address).await;
-    ctx.send_brc20(&deposit_address, brc20_tick, deposit_amount)
-        .await
-        .expect("send brc20 failed");
+    ctx.send_brc20(
+        &ctx.brc20.ord_wallet,
+        &deposit_address,
+        brc20_tick,
+        deposit_amount,
+    )
+    .await
+    .expect("send brc20 failed");
 
     // get nonce
     let client = ctx.inner.evm_client(ADMIN);
@@ -130,4 +136,24 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 }
 
 #[tokio::test]
-async fn test_brc20_bridge_stress_test() {}
+async fn test_brc20_bridge_stress_test() {
+    let ctx = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+
+    //let config = StressTestConfig {
+    //    users_number: 5,
+    //    user_deposits_per_token: 3,
+    //    init_user_balance: 2u64.pow(30).into(),
+    //    operation_amount: 2u64.pow(20).into(),
+    //    operation_timeout: Duration::from_secs(300),
+    //};
+
+    let config = StressTestConfig {
+        users_number: 1,
+        user_deposits_per_token: 1,
+        init_user_balance: DEFAULT_DEPOSIT_AMOUNT.into(),
+        operation_amount: 100u64.into(),
+        operation_timeout: Duration::from_secs(300),
+    };
+
+    crate::context::stress::brc20::stress_test_brc20_bridge_with_ctx(ctx, 1, config).await;
+}

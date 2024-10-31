@@ -26,7 +26,7 @@ dfx_test test_name="": docker_down docker_pull docker_up dfx_start
   sleep 5
 
   cleanup() {
-    just dfx_stop docker_down
+    echo aaaaa
   }  
   trap cleanup EXIT INT TERM
 

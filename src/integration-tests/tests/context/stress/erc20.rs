@@ -364,7 +364,7 @@ pub async fn stress_test_erc20_bridge_with_ctx<T>(
     let base_tokens = Erc20BaseTokens::init(ctx, base_tokens_number)
         .await
         .unwrap();
-    let stress_test_stats = StressTestState::run(base_tokens, config).await.unwrap();
+    let stress_test_stats = StressTestState::run(&base_tokens, config).await.unwrap();
 
     dbg!(&stress_test_stats);
 

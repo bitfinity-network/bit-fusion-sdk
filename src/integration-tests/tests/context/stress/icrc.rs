@@ -258,7 +258,7 @@ pub async fn stress_test_icrc_bridge_with_ctx<T>(
     T: TestContext + Send + Sync,
 {
     let base_tokens = IcrcBaseTokens::init(ctx, base_tokens_number).await.unwrap();
-    let icrc_stress_test_stats = StressTestState::run(base_tokens, config).await.unwrap();
+    let icrc_stress_test_stats = StressTestState::run(&base_tokens, config).await.unwrap();
 
     dbg!(&icrc_stress_test_stats);
 

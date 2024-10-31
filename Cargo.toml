@@ -32,6 +32,7 @@ bitcoincore-rpc = "0.18.0"
 candid = { version = "0.10", features = ["value"] }
 cfg-if = "1.0"
 clap = { version = "4", features = ["derive"] }
+dashmap = "6"
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.34.x", features = [
   "alloy-primitives-07",
 ] }
