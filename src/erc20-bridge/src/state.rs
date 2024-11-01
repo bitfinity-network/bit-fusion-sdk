@@ -5,27 +5,23 @@ use std::time::Duration;
 use bridge_canister::bridge::OperationContext;
 use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::runtime::state::config::ConfigStorage;
-use bridge_canister::runtime::state::{SharedConfig, Timestamp};
+use bridge_canister::runtime::state::SharedConfig;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::evm_link::EvmLink;
-use bridge_did::init::erc20::BaseEvmSettings;
+use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};
 use bridge_utils::evm_bridge::EvmParams;
 use candid::Principal;
-use drop_guard::guard;
 use eth_signer::sign_strategy::TransactionSigner;
-use ic_exports::ic_kit::ic;
 use ic_stable_structures::{CellStructure, StableCell};
 
-use crate::memory::{BASE_EVM_CONFIG_MEMORY_ID, NONCE_COUNTER_MEMORY_ID};
+use crate::memory::{BASE_EVM_CONFIG_MEMORY_ID, DELAYS_MEMORY_ID};
 
 pub const BASE_EVM_DATA_REFRESH_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Parameters of the Base EVM.
 pub struct BaseEvmState {
     pub config: SharedConfig,
-    pub nonce: StableCell<u32, StableMemory>,
-    pub collecting_logs_ts: Option<Timestamp>,
-    pub refreshing_evm_params_ts: Option<Timestamp>,
+    pub delays: StableCell<QueryDelays, StableMemory>,
 }
 
 impl Default for BaseEvmState {
@@ -33,10 +29,8 @@ impl Default for BaseEvmState {
         let config = ConfigStorage::default(memory_by_id(BASE_EVM_CONFIG_MEMORY_ID));
         Self {
             config: Rc::new(RefCell::new(config)),
-            nonce: StableCell::new(memory_by_id(NONCE_COUNTER_MEMORY_ID), 0)
-                .expect("failed to initialize nonce counter"),
-            collecting_logs_ts: None,
-            refreshing_evm_params_ts: None,
+            delays: StableCell::new(memory_by_id(DELAYS_MEMORY_ID), QueryDelays::default())
+                .expect("failed to initialize delays cell"),
         }
     }
 }
@@ -52,31 +46,6 @@ impl BaseEvmState {
             config.bft_bridge_contract_address = None;
         })
     }
-
-    /// Returns unique nonce value.
-    pub fn next_nonce(&mut self) -> u32 {
-        let value = *self.nonce.get();
-        self.nonce.set(value + 1).expect("failed to update nonce");
-        value
-    }
-
-    /// Checks if the EVM parameters should be refreshed.
-    ///
-    /// The EVM parameters are refreshed if the `refreshing_evm_params_ts` timestamp is older than the `TASK_LOCK_TIMEOUT` duration, or if the `refreshing_evm_params_ts` is `None`.
-    pub fn should_refresh_evm_params(&self) -> bool {
-        self.refreshing_evm_params_ts
-            .map(|ts| (ts + BASE_EVM_DATA_REFRESH_TIMEOUT.as_nanos() as u64) <= ic::time())
-            .unwrap_or(true)
-    }
-
-    /// Checks if the EVM logs should be collected.
-    ///
-    /// The EVM logs are collected if the `collecting_logs_ts` timestamp is older than the `BASE_EVM_DATA_REFRESH_TIMEOUT` duration, or if the `collecting_logs_ts` is `None`.
-    pub fn should_collect_evm_logs(&self) -> bool {
-        self.collecting_logs_ts
-            .map(|ts| (ts + BASE_EVM_DATA_REFRESH_TIMEOUT.as_nanos() as u64) <= ic::time())
-            .unwrap_or(true)
-    }
 }
 
 /// Newtype for base EVM state
@@ -84,12 +53,8 @@ impl BaseEvmState {
 pub struct SharedBaseEvmState(pub Rc<RefCell<BaseEvmState>>);
 
 impl SharedBaseEvmState {
-    pub async fn refresh_base_evm_params(self) {
-        let _lock = guard(self.0.clone(), |s| s.borrow_mut().collecting_logs_ts = None);
-        let config = self.0.borrow().config.clone();
-        if let Err(e) = ConfigStorage::refresh_evm_params(config).await {
-            log::warn!("failed to refresh base EVM params: {e}");
-        };
+    pub fn query_delays(&self) -> QueryDelays {
+        *self.0.borrow().delays.get()
     }
 }
 

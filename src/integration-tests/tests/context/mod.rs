@@ -9,7 +9,7 @@ use bridge_did::error::BftResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
 use bridge_did::init::btc::BitcoinConnection;
-use bridge_did::init::erc20::BaseEvmSettings;
+use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedOrders;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
@@ -1207,6 +1207,10 @@ pub trait TestContext {
                     evm_link: EvmLink::Ic(self.canisters().external_evm()),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: self.sign_key(),
+                    },
+                    delays: QueryDelays {
+                        evm_params_query: Duration::from_secs(2),
+                        logs_query: Duration::from_secs(2),
                     },
                 };
                 self.install_canister(

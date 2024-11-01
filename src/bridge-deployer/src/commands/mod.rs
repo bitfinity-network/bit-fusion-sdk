@@ -1,7 +1,10 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use bridge_client::Erc20BridgeClient;
 use bridge_did::error::BftResult;
 use bridge_did::evm_link::EvmLink;
+use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};
 use bridge_did::init::BtcBridgeConfig;
 use candid::{Encode, Principal};
 use clap::{Args, Subcommand};
@@ -150,9 +153,16 @@ impl Bridge {
                     pub signing_strategy: SigningStrategy,
                 }
 
-                let erc = EvmSettings {
+                let evm_params_query =
+                    Duration::from_secs(erc.params_query_delay_secs.unwrap_or(60));
+                let logs_query = Duration::from_secs(erc.logs_query_delay_secs.unwrap_or(10 * 60));
+                let erc = BaseEvmSettings {
                     evm_link: erc.clone().into(),
                     signing_strategy,
+                    delays: QueryDelays {
+                        evm_params_query,
+                        logs_query,
+                    },
                 };
 
                 Encode!(&init, &erc)?
