@@ -69,18 +69,6 @@ After the EVM is deployed you need to mint some native tokens to you wallet addr
 dfx canister call evm_testnet admin_mint_native_tokens '("<WALLET HEX ADDRESS>", "10000000000000000000")'
 ```
 
-Use `icx-proxy` cli tool to create a proxy-server that routes requests to a certain URL directly to the EVM canister.
-This way you can use third-party tools that connect to EVMs with your local deployment:
-
-```shell
-dfx_local_port=$(dfx info replica-port) && evm_canister=$(dfx canister id evm_testnet) \
-  && icx-proxy \
-    --fetch-root-key \
-    --address 0.0.0.0:8545 \
-    --dns-alias 127.0.0.1:$evm_canister \
-    --replica http://localhost:$dfx_local_port
-```
-
 ## Bridge deployment
 
 To simplify deployment and configuring of the bridge canisters a CLI tool `bridge-deployer` is provided. Some examples

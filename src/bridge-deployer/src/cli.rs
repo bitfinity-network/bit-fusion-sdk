@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use anyhow::bail;
+use candid::Principal;
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
 use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
@@ -16,6 +17,7 @@ use tracing_subscriber::{filter, Layer as _};
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
 use crate::contracts::EvmNetwork;
+use crate::evm::evm_principal_or_default;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
@@ -45,6 +47,10 @@ pub struct Cli {
         help_heading = "Bridge Contract Args"
     )]
     evm_network: EvmNetwork,
+
+    /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
+    #[arg(long)]
+    pub evm: Option<Principal>,
 
     /// Set the minimum log level.
     ///
@@ -93,6 +99,7 @@ impl Cli {
 
         let Cli {
             private_key,
+            evm,
             evm_network,
             command,
             canister_ids,
@@ -118,6 +125,7 @@ impl Cli {
                 identity,
                 &ic_host,
                 evm_network,
+                evm_principal_or_default(evm_network, evm),
                 private_key,
                 canister_ids_path,
             )

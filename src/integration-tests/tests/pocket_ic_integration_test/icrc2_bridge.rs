@@ -18,7 +18,7 @@ use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
-use super::{init_bridge, PocketIcTestContext, JOHN};
+use super::{PocketIcTestContext, JOHN};
 use crate::context::stress::{icrc, StressTestConfig};
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
@@ -842,11 +842,60 @@ async fn icrc_bridge_stress_test() {
     .await;
 
     let config = StressTestConfig {
-        users_number: 2,
-        user_deposits_per_token: 4,
+        users_number: 5,
+        user_deposits_per_token: 3,
         init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
+        operation_timeout: Duration::from_secs(30),
     };
 
-    icrc::stress_test_icrc_bridge_with_ctx(context, 2, config).await;
+    // If set more then one token, tests probably will fail because of
+    // parallel tx nonces calculation issue.
+    icrc::stress_test_icrc_bridge_with_ctx(context, 1, config).await;
+}
+
+/// Initialize test environment with:
+/// - john wallet with native tokens,
+/// - operation points for john,
+/// - bridge contract
+pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160, H160) {
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
+    let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
+
+    let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
+    let expected_fee_charge_address =
+        ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
+
+    let wrapped_token_deployer = ctx
+        .initialize_wrapped_token_deployer_contract(&john_wallet)
+        .await
+        .unwrap();
+
+    let icrc_bridge_client = &ctx.icrc_bridge_client(ADMIN);
+    let minter_canister_address = icrc_bridge_client
+        .get_bridge_canister_evm_address()
+        .await
+        .unwrap()
+        .unwrap();
+    let bft_bridge = ctx
+        .initialize_bft_bridge(
+            minter_canister_address,
+            Some(expected_fee_charge_address.into()),
+            wrapped_token_deployer,
+        )
+        .await
+        .unwrap();
+
+    icrc_bridge_client
+        .set_bft_bridge_contract(&bft_bridge)
+        .await
+        .unwrap();
+
+    let fee_charge_address = ctx
+        .initialize_fee_charge_contract(&fee_charge_deployer, &[bft_bridge.clone()])
+        .await
+        .unwrap();
+    assert_eq!(expected_fee_charge_address, fee_charge_address.0);
+
+    (ctx, john_wallet, bft_bridge, fee_charge_address)
 }

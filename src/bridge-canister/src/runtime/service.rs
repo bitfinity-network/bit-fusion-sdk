@@ -4,8 +4,11 @@ use std::rc::Rc;
 use bridge_did::error::{BftResult, Error};
 use bridge_did::op_id::OperationId;
 
+pub mod fetch_logs;
 pub mod mint_tx;
 pub mod sign_orders;
+pub mod timer;
+pub mod update_evm_params;
 
 // The async-trait macro is necessary to make the trait object safe.
 #[async_trait::async_trait(?Send)]

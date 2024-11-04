@@ -1,8 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
@@ -24,9 +26,10 @@ use ic_storage::IcStorage;
 
 use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexers};
 use crate::interface::GetAddressError;
+use crate::ops::events_handler::RuneEventsHandler;
 use crate::ops::{
-    RuneBridgeOpImpl, RuneMintOrderHandler, RuneMintTxHandler, SEND_MINT_TX_SERVICE_ID,
-    SIGN_MINT_ORDER_SERVICE_ID,
+    RuneBridgeOpImpl, RuneMintOrderHandler, RuneMintTxHandler, FETCH_BFT_EVENTS_SERVICE_ID,
+    REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::RuneState;
 
@@ -190,19 +193,38 @@ impl LogCanister for RuneBridge {
     }
 }
 
-type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
+pub type SharedRuntime = Rc<RefCell<BridgeRuntime<RuneBridgeOpImpl>>>;
 
 fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state();
+    let state = runtime.state().clone();
+    let scheduler = runtime.scheduler().clone();
+    let runtime = Rc::new(RefCell::new(runtime));
+    let config = state.borrow().config.clone();
 
-    let sign_orders_handler = RuneMintOrderHandler::new(state.clone(), runtime.scheduler().clone());
+    let refresh_params_service = RefreshEvmParamsService::new(config.clone());
+
+    let events_handler = RuneEventsHandler::new(get_rune_state());
+    let fetch_bft_events_service =
+        FetchBftBridgeEventsService::new(events_handler, runtime.clone(), config);
+
+    let sign_orders_handler = RuneMintOrderHandler::new(state.clone(), scheduler);
     let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
 
     let mint_tx_handler = RuneMintTxHandler::new(state.clone());
     let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
     let services = state.borrow().services.clone();
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        REFRESH_PARAMS_SERVICE_ID,
+        Rc::new(refresh_params_service),
+    );
+    services.borrow_mut().add_service(
+        ServiceOrder::BeforeOperations,
+        FETCH_BFT_EVENTS_SERVICE_ID,
+        Rc::new(fetch_bft_events_service),
+    );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,
         SIGN_MINT_ORDER_SERVICE_ID,
@@ -214,7 +236,7 @@ fn init_runtime() -> SharedRuntime {
         mint_tx_service,
     );
 
-    Rc::new(RefCell::new(runtime))
+    runtime
 }
 
 thread_local! {

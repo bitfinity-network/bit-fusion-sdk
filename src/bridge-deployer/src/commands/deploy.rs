@@ -75,6 +75,7 @@ impl DeployCommands {
         network: EvmNetwork,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
+        evm: Principal,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
@@ -90,10 +91,14 @@ impl DeployCommands {
 
         let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
         let canister_id = deployer
-            .install_wasm(&self.wasm, &self.bridge_type, InstallMode::Install, network)
+            .install_wasm(
+                &self.wasm,
+                &self.bridge_type,
+                InstallMode::Install,
+                network,
+                evm,
+            )
             .await?;
-
-        println!("Canister deployed with ID {canister_id}",);
 
         info!("Deploying BFT bridge");
         let BftDeployedContracts {
@@ -103,17 +108,16 @@ impl DeployCommands {
             minter_address,
         } = self
             .bft_args
-            .deploy_bft(network.into(), canister_id, pk, &agent, true)
+            .deploy_bft(network.into(), canister_id, pk, &agent, true, evm)
             .await?;
 
         info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
-        println!("BFT bridge deployed with address {bft_bridge:x}; wrapped_token_deployer: {wrapped_token_deployer:x}");
 
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
         if let Bridge::Btc { connection, .. } = &self.bridge_type {
             info!("Deploying wrapped BTC contract");
             let wrapped_btc_addr =
-                self.deploy_wrapped_btc(network, pk, &bft_bridge, *connection)?;
+                self.deploy_wrapped_btc(network, pk, &bft_bridge, *connection, evm)?;
 
             info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr:x}");
             println!("Wrapped BTC contract deployed with address {wrapped_btc_addr:x}");
@@ -137,6 +141,7 @@ impl DeployCommands {
                 deployer.bridge_principal(),
                 pk,
                 &agent,
+                evm,
             )
             .await?;
 
@@ -145,10 +150,10 @@ impl DeployCommands {
 
         info!("Canister deployed successfully");
 
-        println!("---------------------------");
         println!(
-            "Canister {} deployed successfully.",
+            "Canister {} deployed with ID: {}",
             self.bridge_type.kind(),
+            canister_id
         );
         println!("Bridge canister principal: {}", canister_id);
         println!("---------------------------");
@@ -185,8 +190,9 @@ impl DeployCommands {
         pk: H256,
         bft_bridge: &H160,
         btc_connection: BtcBridgeConnection,
+        evm: Principal,
     ) -> anyhow::Result<H160> {
-        let contract_deployer = SolidityContractDeployer::new(network.into(), pk);
+        let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
         let base_token_id = Id256::from(btc_connection.ledger_principal());
 
         contract_deployer.deploy_wrapped_token(
