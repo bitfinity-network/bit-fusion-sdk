@@ -351,6 +351,17 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let is_complete = matches!(operation.1.stage, Erc20OpStage::TokenMintConfirmed(_));
         Ok(is_complete)
     }
+
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        bft_bridge: &H160,
+        token_id: Id256,
+    ) -> Result<H160> {
+        self.ctx
+            .create_wrapped_token(admin_wallet, bft_bridge, token_id)
+            .await
+    }
 }
 
 /// Run stress test with the given TestContext implementation.

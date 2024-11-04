@@ -227,6 +227,17 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         Ok(())
     }
 
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        bft_bridge: &H160,
+        token_id: Id256,
+    ) -> Result<H160> {
+        self.ctx
+            .create_wrapped_token(admin_wallet, bft_bridge, token_id)
+            .await
+    }
+
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool> {
         let op_info = self
             .ctx

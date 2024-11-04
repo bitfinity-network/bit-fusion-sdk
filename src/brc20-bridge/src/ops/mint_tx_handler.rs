@@ -46,6 +46,7 @@ impl MintTxHandler for Brc20MintTxHandler {
     }
 
     fn mint_tx_sent(&self, id: OperationId, tx_hash: H256) {
+        log::debug!("Mint transaction sent: {tx_hash}; op_id: {id}");
         let op = self.state.borrow().operations.get(id);
         let Some(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(orders))) =
             op.map(|op| op.0)

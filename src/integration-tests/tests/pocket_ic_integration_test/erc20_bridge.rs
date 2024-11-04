@@ -610,6 +610,7 @@ async fn erc20_bridge_stress_test() {
         init_user_balance: 2u64.pow(30).into(),
         operation_amount: 2u64.pow(20).into(),
         operation_timeout: Duration::from_secs(30),
+        wait_per_iteration: Duration::from_secs(1),
     };
 
     // If set more then one token, tests probably will fail because of

@@ -8,6 +8,7 @@ use bridge_did::id256::{Id256, ID_256_BYTE_SIZE};
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
+use eth_signer::Signer as _;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -221,10 +222,10 @@ where
 
         let tick = token.tick;
         let amount = TokenAmount::from_int(info.amount.0.as_u128(), token.decimals);
-        let dst_address = &info.wrapped_token;
 
         // transfer BRC20 first
-        let from_user = self.user_wallet(&to_user.base_id)?;
+        let from_user = self.user_wallet(&info.from)?;
+        println!("deposit from user: {}", from_user.address);
 
         // check balance
         let balance = self.brc20_balance(&from_user.address, &tick).await?;
@@ -237,7 +238,7 @@ where
         let eth_wallet_address = to_user.address();
         let deposit_address = self.ctx.get_deposit_address(&eth_wallet_address).await;
         println!(
-            "Sending BRC20 from {from} to deposit address: {deposit_address}, tick: {tick}, amount: {amount}",
+            "Sending BRC20 from {from} with ETH address: {eth_wallet_address} to deposit address: {deposit_address}, tick: {tick}, amount: {amount}",
             from = from_user.address,
         );
         self.ctx
@@ -245,22 +246,58 @@ where
             .await
             .expect("send brc20 failed");
 
-        // TODO: remove? self.ctx.wait_for_blocks(6).await;
-
         self.ctx
-            .deposit(tick, amount, dst_address, &to_user.wallet, nonce.into())
+            .deposit(
+                tick,
+                amount,
+                &eth_wallet_address,
+                &to_user.wallet,
+                nonce.into(),
+            )
             .await?;
 
         Ok(info.amount.clone())
     }
 
-    async fn set_bft_bridge_contract_address(&self, bft_bridge: &did::H160) -> Result<()> {
-        self.ctx()
-            .brc20_bridge_client(self.ctx().admin_name())
-            .set_bft_bridge_contract(bft_bridge)
-            .await?;
+    async fn before_withdraw(
+        &self,
+        _token_idx: usize,
+        _user_id: Self::UserId,
+        user_wallet: &OwnedWallet,
+        _amount: did::U256,
+    ) -> Result<()> {
+        let deposit_address = self
+            .ctx
+            .get_deposit_address(&user_wallet.address().into())
+            .await;
 
-        Ok(())
+        println!("before withdraw: sending BTC to deposit address: {deposit_address}");
+
+        self.ctx
+            .send_btc(&deposit_address, Amount::from_sat(100_000_000))
+            .await
+            .map_err(|e| TestError::Generic(e.to_string()))
+    }
+
+    async fn set_bft_bridge_contract_address(&self, bft_bridge: &did::H160) -> Result<()> {
+        self.ctx
+            .set_bft_bridge_contract(bft_bridge)
+            .await
+            .map_err(|e| TestError::Generic(e.to_string()))
+    }
+
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        _bft_bridge: &did::H160,
+        token_id: Id256,
+    ) -> Result<did::H160> {
+        let tick = Brc20Tick::from(token_id);
+
+        self.ctx
+            .create_wrapped_token(admin_wallet, tick)
+            .await
+            .map_err(|e| TestError::Generic(e.to_string()))
     }
 
     async fn is_operation_complete(

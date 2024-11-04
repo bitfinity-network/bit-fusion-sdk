@@ -6,7 +6,7 @@ pub mod erc20;
 pub mod icrc;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use alloy_sol_types::SolCall;
 use bridge_did::id256::Id256;
@@ -27,6 +27,7 @@ pub struct StressTestConfig {
     pub operation_timeout: Duration,
     pub init_user_balance: U256,
     pub operation_amount: U256,
+    pub wait_per_iteration: Duration,
 }
 
 pub trait BaseTokens {
@@ -61,7 +62,29 @@ pub trait BaseTokens {
         Ok(user)
     }
 
+    /// A hook that is called before the withdraw operation is executed.
+    ///
+    /// Implementation is optional.
+    ///
+    /// Some protocols require it to fund the withdraw operation, such as brc20 bridge.
+    async fn before_withdraw(
+        &self,
+        _token_idx: usize,
+        _user_id: Self::UserId,
+        _user_wallet: &OwnedWallet,
+        _amount: U256,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
+
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        bft_bridge: &H160,
+        token_id: Id256,
+    ) -> Result<H160>;
 
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool>;
 }
@@ -158,7 +181,6 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         for base_id in base_tokens.ids() {
             let token_id256 = base_tokens.token_id256(base_id.clone());
             let wrapped_address = base_tokens
-                .ctx()
                 .create_wrapped_token(&admin_wallet, &bft_bridge, token_id256)
                 .await?;
             wrapped_tokens.push(wrapped_address);
@@ -346,11 +368,10 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
     }
 
     async fn wait_operation_complete(&self, address: H160, memo: Memo) -> bool {
-        let mut elapsed = Duration::default();
-        let wait_per_iteration = Duration::from_secs(1);
-        while elapsed < self.config.operation_timeout {
-            tokio::time::sleep(wait_per_iteration).await;
-            elapsed += wait_per_iteration;
+        let start = Instant::now();
+        while start.elapsed() < self.config.operation_timeout {
+            tokio::time::sleep(self.config.wait_per_iteration).await;
+
             let complete = match self
                 .base_tokens
                 .is_operation_complete(address.clone(), memo)
@@ -358,7 +379,11 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             {
                 Ok(c) => c,
                 Err(e) => {
-                    println!("failed to check operation completeness: {e}");
+                    println!(
+                        "failed to check operation completeness: {e}; elapsed: {}s/{}s",
+                        start.elapsed().as_secs(),
+                        self.config.operation_timeout.as_secs()
+                    );
                     false
                 }
             };
@@ -393,6 +418,15 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         let user_id256 = self
             .base_tokens
             .user_id256(self.users[user_idx].base_id.clone());
+
+        self.base_tokens
+            .before_withdraw(
+                token_idx,
+                self.users[user_idx].base_id.clone().clone(),
+                &self.users[user_idx].wallet,
+                amount.clone(),
+            )
+            .await?;
 
         let memo = self.next_memo();
         let input = BFTBridge::burnCall {

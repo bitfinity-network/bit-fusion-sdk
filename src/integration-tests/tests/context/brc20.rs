@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -18,6 +18,7 @@ use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BFTBridge;
 use candid::{Encode, Principal};
+use dashmap::DashMap;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
@@ -109,11 +110,11 @@ where
 {
     pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
-    bft_bridge_contract: H160,
+    pub bft_bridge_contract: Arc<RwLock<H160>>,
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
-    tokens: HashMap<Brc20Tick, H160>,
+    pub tokens: DashMap<Brc20Tick, H160>,
 }
 
 /// Setup a new brc20 for DFX tests
@@ -271,7 +272,7 @@ where
             .await
             .unwrap();
 
-        let mut tokens = HashMap::new();
+        let tokens = DashMap::new();
 
         for brc20_token in &brc20_wallet.brc20_tokens {
             let token = context
@@ -279,6 +280,7 @@ where
                 .await
                 .unwrap();
 
+            println!("Token {brc20_token} deployed at {token}");
             tokens.insert(*brc20_token, token);
         }
 
@@ -296,7 +298,7 @@ where
         );
 
         Self {
-            bft_bridge_contract: bft_bridge,
+            bft_bridge_contract: Arc::new(RwLock::new(bft_bridge)),
             eth_wallet: wallet,
             exit,
             miner: Arc::new(Mutex::new(Some(miner))),
@@ -324,6 +326,38 @@ where
                 miner.join().expect("Failed to join miner thread");
             }
         }
+    }
+
+    pub async fn set_bft_bridge_contract(&self, bft_bridge: &H160) -> anyhow::Result<()> {
+        self.inner
+            .brc20_bridge_client(ADMIN)
+            .set_bft_bridge_contract(&bft_bridge)
+            .await?;
+        println!("BFT bridge contract updated to {bft_bridge}");
+
+        *self.bft_bridge_contract.write().unwrap() = bft_bridge.clone();
+
+        // clear tokens
+        self.tokens.clear();
+
+        Ok(())
+    }
+
+    pub async fn create_wrapped_token(
+        &self,
+        wallet: &Wallet<'_, SigningKey>,
+        tick: Brc20Tick,
+    ) -> anyhow::Result<H160> {
+        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
+
+        let token = self
+            .inner
+            .create_wrapped_token(&wallet, &bft_bridge_contract, tick.into())
+            .await?;
+
+        self.tokens.insert(tick, token.clone());
+
+        Ok(token)
     }
 
     pub async fn get_funding_utxo(&self, to: &Address) -> anyhow::Result<Utxo> {
@@ -419,6 +453,14 @@ where
     }
 
     /// Deposit the specified amount to the BRC20 bridge to the provided address
+    ///
+    /// ## Arguments
+    ///
+    /// - `tick` - BRC20 token tick
+    /// - `amount` - amount to deposit
+    /// - `dst_address` - address of the wallet that will receive the tokens
+    /// - `sender` - wallet that will sign the transaction
+    /// - `nonce` - nonce of the transaction
     pub async fn deposit(
         &self,
         tick: Brc20Tick,
@@ -446,9 +488,11 @@ where
         }
         .abi_encode();
 
+        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
+
         let transaction = TransactionBuilder {
             from: &sender.address().into(),
-            to: Some(self.bft_bridge_contract.clone()),
+            to: Some(bft_bridge_contract),
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
@@ -515,19 +559,25 @@ where
         tick: &Brc20Tick,
         amount: TokenAmount,
     ) -> anyhow::Result<()> {
-        let token_address = self.tokens.get(tick).expect("token not found");
+        let token_address = self
+            .tokens
+            .get(tick)
+            .expect("token not found")
+            .value()
+            .clone();
 
         println!("Burning {amount} of {tick} to {recipient}");
+        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
 
         let client = self.inner.evm_client(ADMIN);
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,
                 &self.eth_wallet,
-                token_address,
+                &token_address,
                 Id256::from(*tick).0.as_slice(),
                 recipient.to_string().as_bytes().to_vec(),
-                &self.bft_bridge_contract,
+                &bft_bridge_contract,
                 amount.amount(),
                 true,
                 None,
@@ -646,10 +696,15 @@ where
     }
 
     pub async fn wrapped_balance(&self, tick: &Brc20Tick, wallet: &Wallet<'_, SigningKey>) -> u128 {
-        let token_contract = self.tokens.get(tick).expect("token not found");
+        let token_contract = self
+            .tokens
+            .get(tick)
+            .expect("token not found")
+            .value()
+            .clone();
 
         self.inner
-            .check_erc20_balance(token_contract, wallet, None)
+            .check_erc20_balance(&token_contract, wallet, None)
             .await
             .expect("Failed to get wrapped token balance")
     }

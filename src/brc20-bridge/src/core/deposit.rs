@@ -167,6 +167,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
     // Get input utxos
     pub async fn get_inputs(&self, dst_address: &H160) -> Result<Vec<Utxo>, DepositError> {
         let transit_address = self.get_transit_address(dst_address).await?;
+        log::debug!("Getting inputs for address: {transit_address}");
 
         Ok(self.get_deposit_utxos(&transit_address).await?.utxos)
     }
