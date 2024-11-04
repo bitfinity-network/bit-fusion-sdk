@@ -25,7 +25,7 @@ contract DeployWrappedToken is Script {
         BFTBridge bftBridge = BFTBridge(bftBridgeAddress);
 
         // Deploy ERC20 token
-        address tokenAddress = bftBridge.deployERC20(name, symbol, decimals, bytes32(0));
+        address tokenAddress = bftBridge.deployERC20(name, symbol, decimals, baseTokenId);
 
         // Stop broadcasting transactions
         vm.stopBroadcast();

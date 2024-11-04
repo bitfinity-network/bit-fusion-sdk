@@ -25,6 +25,7 @@ pub struct NetworkConfig {
     #[clap(value_enum, long)]
     pub evm_network: EvmNetwork,
     /// Custom network URL
+    #[clap(long)]
     pub custom_network: Option<String>,
 }
 
@@ -49,6 +50,20 @@ impl From<EvmNetwork> for NetworkConfig {
         Self {
             evm_network: value,
             custom_network: None,
+        }
+    }
+}
+
+impl NetworkConfig {
+    pub fn evm_url(&self) -> &str {
+        if let Some(custom_network) = &self.custom_network {
+            custom_network
+        } else {
+            match self.evm_network {
+                EvmNetwork::Localhost => LOCALHOST_URL,
+                EvmNetwork::Testnet => TESTNET_URL,
+                EvmNetwork::Mainnet => MAINNET_URL,
+            }
         }
     }
 }
@@ -84,15 +99,7 @@ impl SolidityContractDeployer<'_> {
 
     /// Returns the network URL based on the selected network.
     pub fn get_network_url(&self) -> &str {
-        if let Some(custom_network) = &self.network.custom_network {
-            custom_network
-        } else {
-            match self.network.evm_network {
-                EvmNetwork::Localhost => LOCALHOST_URL,
-                EvmNetwork::Testnet => TESTNET_URL,
-                EvmNetwork::Mainnet => MAINNET_URL,
-            }
-        }
+        self.network.evm_url()
     }
 
     /// Returns the path to the solidity directory.

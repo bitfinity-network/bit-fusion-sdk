@@ -6,17 +6,24 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
+bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 clap = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
 ethereum-types = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true, features = ["ic-agent-client"] }
 hex = { workspace = true }
+ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 rand = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = "0.12"

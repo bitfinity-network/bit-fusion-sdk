@@ -15,6 +15,9 @@ contract DeployErc20 is Script {
         WrappedToken token = new WrappedToken(name, symbol, 18, owner);
         console.log("Token address: ", address(token));
 
+        token.transfer(owner, 1000000000000000000000000);
+        console.log("Transferred many tokens to the owner");
+
         vm.stopBroadcast();
     }
 }
