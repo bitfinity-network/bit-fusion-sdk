@@ -66,7 +66,7 @@ just deploy_evm
 After the EVM is deployed you need to mint some native tokens to you wallet address:
 
 ```shell
-dfx canister call evm_testnet admin_mint_native_tokens '("<WALLET HEX ADDRESS>", "10000000000000000000")'
+dfx canister call evm admin_mint_native_tokens '("<WALLET HEX ADDRESS>", "10000000000000000000")'
 ```
 
 ## Bridge deployment
