@@ -36,7 +36,9 @@ pub trait BaseTokens {
 
     fn ctx(&self) -> &(impl TestContext + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
-    fn user_id256(&self, user_id: Self::UserId) -> Id256;
+
+    /// Returns the bridged user id as bytes
+    fn user_id(&self, user_id: Self::UserId) -> Vec<u8>;
     fn token_id256(&self, token_id: Self::TokenId) -> Id256;
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
@@ -77,6 +79,12 @@ pub trait BaseTokens {
         Ok(())
     }
 
+    /// Get the BFTBridge contract address, if already set in the inner context.
+    ///
+    /// Implementation is optional.
+    async fn get_bft_bridge_contract_address(&self) -> Option<H160> {
+        None
+    }
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
 
     async fn create_wrapped_token(
@@ -153,28 +161,37 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             .advance_by_times(Duration::from_secs(1), 2)
             .await;
 
-        let bft_bridge = base_tokens
-            .ctx()
-            .initialize_bft_bridge_with_minter(
-                &admin_wallet,
-                bridge_canister_address,
-                Some(expected_fee_charge_address.into()),
-                wrapped_token_deployer,
-                true,
-            )
-            .await?;
+        let existing_bft_bridge = base_tokens.get_bft_bridge_contract_address().await;
 
-        println!("Initializing fee charge contract");
-        let fee_charge_address = base_tokens
-            .ctx()
-            .initialize_fee_charge_contract(&admin_wallet, &[bft_bridge.clone()])
-            .await
-            .unwrap();
-        assert_eq!(expected_fee_charge_address, fee_charge_address.0);
+        let (bft_bridge, fee_charge_address) = match existing_bft_bridge {
+            Some(bft_bridge) => (bft_bridge, None),
+            None => {
+                let bft_bridge = base_tokens
+                    .ctx()
+                    .initialize_bft_bridge_with_minter(
+                        &admin_wallet,
+                        bridge_canister_address,
+                        Some(expected_fee_charge_address.into()),
+                        wrapped_token_deployer,
+                        true,
+                    )
+                    .await?;
 
-        base_tokens
-            .set_bft_bridge_contract_address(&bft_bridge)
-            .await?;
+                println!("Initializing fee charge contract");
+                let fee_charge_address = base_tokens
+                    .ctx()
+                    .initialize_fee_charge_contract(&admin_wallet, &[bft_bridge.clone()])
+                    .await
+                    .unwrap();
+                assert_eq!(expected_fee_charge_address, fee_charge_address.0);
+
+                base_tokens
+                    .set_bft_bridge_contract_address(&bft_bridge)
+                    .await?;
+
+                (bft_bridge, Some(fee_charge_address))
+            }
+        };
 
         println!("Creating wrapped tokens");
         let mut wrapped_tokens = Vec::with_capacity(base_tokens.ids().len());
@@ -203,23 +220,37 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
 
             // Deposit native token to charge fee.
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
-            let user_id256 = base_tokens.user_id256(user_id.clone());
-            base_tokens
-                .ctx()
-                .native_token_deposit(
-                    &evm_client,
-                    fee_charge_address.clone(),
-                    &wallet,
-                    &[user_id256],
-                    10_u128.pow(15),
-                )
-                .await?;
+
+            if let Some(fee_charge_address) = fee_charge_address.as_ref() {
+                // TODO: must be changed, because ID256 shouldn't be used for this purpose!!!
+                // TODO: see <https://infinityswap.atlassian.net/browse/EPROD-1062>
+                let user_id = base_tokens.user_id(user_id.clone());
+                let user_id_32: [u8; 32] = user_id.try_into().unwrap();
+                let user_id256 = Id256(user_id_32);
+                base_tokens
+                    .ctx()
+                    .native_token_deposit(
+                        &evm_client,
+                        fee_charge_address.clone(),
+                        &wallet,
+                        &[user_id256],
+                        10_u128.pow(15),
+                    )
+                    .await?;
+            } else {
+                evm_client
+                    .admin_mint_native_tokens(wallet.address().into(), u64::MAX.into())
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
 
             let user = User {
                 wallet,
                 base_id: user_id.clone(),
-                nonce: AtomicU64::new(1),
+                nonce: AtomicU64::new(if fee_charge_address.is_some() { 1 } else { 0 }),
             };
+
             users.push(user);
         }
 
@@ -415,9 +446,10 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<Memo> {
         let token_id = self.base_tokens.ids()[token_idx].clone();
         let base_token_id: Id256 = self.base_tokens.token_id256(token_id);
-        let user_id256 = self
+
+        let user_id = self
             .base_tokens
-            .user_id256(self.users[user_idx].base_id.clone());
+            .user_id(self.users[user_idx].base_id.clone());
 
         self.base_tokens
             .before_withdraw(
@@ -433,7 +465,7 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             amount: amount.into(),
             fromERC20: self.wrapped_tokens[token_idx].clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&base_token_id.0),
-            recipientID: user_id256.0.into(),
+            recipientID: user_id.into(),
             memo: memo.into(),
         }
         .abi_encode();

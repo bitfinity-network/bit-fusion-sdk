@@ -72,9 +72,10 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         &self.tokens
     }
 
-    fn user_id256(&self, user_id: Self::UserId) -> Id256 {
+    fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
         let principal = self.ctx.principal_by_caller_name(&user_id);
-        (&principal).into()
+        let id256 = Id256::from(principal);
+        id256.0.to_vec()
     }
 
     fn token_id256(&self, token_id: Self::TokenId) -> Id256 {

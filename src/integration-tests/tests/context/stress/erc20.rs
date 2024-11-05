@@ -184,8 +184,8 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         &self.tokens
     }
 
-    fn user_id256(&self, user_id: Self::UserId) -> Id256 {
-        Id256::from_evm_address(&user_id, CHAIN_ID as _)
+    fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
+        Id256::from_evm_address(&user_id, CHAIN_ID as _).0.to_vec()
     }
 
     fn token_id256(&self, token_id: Self::TokenId) -> Id256 {
@@ -277,7 +277,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
         let nonce = self.next_nonce(&user_address.into()).await;
         let to_token_id = self.token_id256(info.wrapped_token.clone());
-        let recipient_id = self.user_id256(user_address.into());
+        let recipient_id = self.user_id(user_address.into());
         let memo = info.memo;
 
         println!("approving tokens for bridge");
@@ -306,7 +306,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             amount: info.amount.clone().into(),
             fromERC20: token_address.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id.0),
-            recipientID: recipient_id.0.into(),
+            recipientID: recipient_id.into(),
             memo: memo.into(),
         }
         .abi_encode();
