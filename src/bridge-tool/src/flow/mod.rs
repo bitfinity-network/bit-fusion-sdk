@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use bridge_client::Erc20BridgeClient;
 use bridge_did::id256::Id256;
 use bridge_did::operations::Erc20OpStage;
-use bridge_utils::{BFTBridge, FeeCharge, WrappedToken};
+use bridge_utils::{BTFBridge, FeeCharge, WrappedToken};
 use candid::Principal;
 use clap::{Args, Parser, Subcommand};
 use did::block::ExeResult;
@@ -311,7 +311,7 @@ impl<'a> Erc20BridgeFlow<'a> {
     }
 
     async fn get_fee_charge_address(&self, side: EvmSide) -> anyhow::Result<H160> {
-        let input = BFTBridge::feeChargeContractCall {}.abi_encode();
+        let input = BTFBridge::feeChargeContractCall {}.abi_encode();
 
         let (client, bft, _) = self.get_side(side);
         let result = client
@@ -615,7 +615,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let recipient = recipient_id.0;
 
         let amount: U256 = amount.into();
-        let input = BFTBridge::burnCall {
+        let input = BTFBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.0.into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id.0),

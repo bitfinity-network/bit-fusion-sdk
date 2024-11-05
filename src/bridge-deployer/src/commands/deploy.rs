@@ -172,7 +172,7 @@ impl DeployCommands {
         }) = base_side_ids
         {
             println!();
-            println!("Base side BTF bridge: 0x{}", hex::encode(bft_bridge));
+            println!("Base side BTF bridge: 0x{}", hex::encode(btf_bridge));
             println!("Base side FeeCharge: 0x{}", hex::encode(fee_charge));
             println!(
                 "Base side bridge address: 0x{}",
