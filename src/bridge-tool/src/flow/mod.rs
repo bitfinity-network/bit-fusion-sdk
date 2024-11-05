@@ -265,6 +265,8 @@ impl EvmSide {
     }
 }
 
+const FEE_APPROVE_AMOUNT: u128 = 10u128.pow(15);
+
 impl<'a> Erc20BridgeFlow<'a> {
     async fn chain_id(&self, evm_side: EvmSide) -> anyhow::Result<u64> {
         let (client, _, _) = self.get_side(evm_side);
@@ -280,7 +282,8 @@ impl<'a> Erc20BridgeFlow<'a> {
         let base_chain_id = self.chain_id(EvmSide::Base).await?;
         let base_sender_id =
             Id256::from_evm_address(&self.wallet.address().into(), base_chain_id as u32);
-        self.approve_fee(EvmSide::Wrapped, base_sender_id, amount)
+
+        self.approve_fee(EvmSide::Wrapped, base_sender_id, FEE_APPROVE_AMOUNT)
             .await?;
 
         self.burn_bft(EvmSide::Base, amount, &recipient, memo)
@@ -298,7 +301,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let wrapped_chain_id = self.chain_id(EvmSide::Wrapped).await?;
         let wrapped_sender_id =
             Id256::from_evm_address(&self.wallet.address().into(), wrapped_chain_id as u32);
-        self.approve_fee(EvmSide::Wrapped, wrapped_sender_id, amount)
+        self.approve_fee(EvmSide::Base, wrapped_sender_id, FEE_APPROVE_AMOUNT)
             .await?;
 
         self.burn_bft(EvmSide::Wrapped, amount, &recipient, memo)
@@ -519,7 +522,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let balance = u128::from_str_radix(result.trim_start_matches("0x"), 16)
             .expect("Failed to decode balance response");
 
-        eprintln!("Current token balance: {balance}");
+        info!("Current token balance: {balance}");
         if balance < amount {
             return Err(anyhow!(
                 "Balance ({balance}) is less then requested transfer amount ({amount})"
@@ -563,15 +566,21 @@ impl<'a> Erc20BridgeFlow<'a> {
         Ok(())
     }
 
-    async fn wait_for_tx(client: &RpcClient, hash: H256) -> anyhow::Result<()> {
-        const TX_TIMEOUT: Duration = Duration::from_secs(30);
+    async fn wait_for_tx(client: &RpcClient, hash: H256) -> anyhow::Result<Vec<u8>> {
+        const TX_TIMEOUT: Duration = Duration::from_secs(120);
         const TX_REQUEST_INTERVAL: Duration = Duration::from_secs(1);
 
         let timeout = Instant::now() + TX_TIMEOUT;
         while Instant::now() < timeout {
             if let Ok(result) = client.get_tx_execution_result_by_hash(hash).await {
                 return match result.exe_result {
-                    ExeResult::Success { .. } => Ok(()),
+                    ExeResult::Success { output, .. } => {
+                        match output {
+                            did::block::TransactOut::None => Ok(vec![]),
+                            did::block::TransactOut::Call(v) => Ok(v),
+                            did::block::TransactOut::Create(v, _) => Ok(v),
+                        }
+                    },
                     ExeResult::Revert { revert_message, .. } => {
                         Err(anyhow!("Transaction failed: {revert_message:?}"))
                     }
