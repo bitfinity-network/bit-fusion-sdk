@@ -854,6 +854,87 @@ async fn icrc_bridge_stress_test() {
     icrc::stress_test_icrc_bridge_with_ctx(context, 1, config).await;
 }
 
+#[tokio::test]
+async fn test_charge_fee_from_different_spender_ids() {
+    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+
+    let bridge_client = ctx.icrc_bridge_client(ADMIN);
+    bridge_client
+        .add_to_whitelist(ctx.canisters().token_1())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let base_token_id = Id256::from(&ctx.canisters().token_1());
+    let wrapped_token = ctx
+        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .await
+        .unwrap();
+
+    let amount = 300_000u64;
+
+    let evm_client = ctx.evm_client(ADMIN);
+    let john_principal_id = Id256::from(&john());
+    let alice_principal_id = Id256::from(&alice());
+    let init_fee_deposit_amount = 10_u64.pow(17);
+    ctx.native_token_deposit(
+        &evm_client,
+        fee_charge.clone(),
+        &john_wallet,
+        &[john_principal_id, alice_principal_id],
+        init_fee_deposit_amount.into(),
+    )
+    .await
+    .unwrap();
+
+    let john_address: H160 = john_wallet.address().into();
+
+    eprintln!("burning icrc tokens on behalf of John");
+    ctx.burn_icrc2(
+        JOHN,
+        &john_wallet,
+        &bft_bridge,
+        &wrapped_token,
+        amount as _,
+        Some(john_address.clone()),
+        None,
+    )
+    .await
+    .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
+    let fee_deposit_after_john_operation = ctx
+        .native_token_deposit_balance(&evm_client, fee_charge.clone(), john_address.clone())
+        .await;
+    assert!(fee_deposit_after_john_operation < init_fee_deposit_amount.into());
+
+    eprintln!("burning icrc tokens on behalf of Alice");
+    ctx.burn_icrc2(
+        ALICE,
+        &john_wallet,
+        &bft_bridge,
+        &wrapped_token,
+        amount as _,
+        Some(john_address.clone()),
+        None,
+    )
+    .await
+    .unwrap();
+
+    ctx.advance_by_times(Duration::from_secs(2), 25).await;
+    let fee_deposit_after_alice_operation = ctx
+        .native_token_deposit_balance(&evm_client, fee_charge.clone(), john_address.clone())
+        .await;
+    assert!(fee_deposit_after_alice_operation < fee_deposit_after_john_operation);
+
+    eprintln!("checking wrapped token balance");
+    let wrapped_balance = ctx
+        .check_erc20_balance(&wrapped_token, &john_wallet, None)
+        .await
+        .unwrap();
+    assert_eq!(wrapped_balance as u64, amount * 2);
+}
+
 /// Initialize test environment with:
 /// - john wallet with native tokens,
 /// - operation points for john,
