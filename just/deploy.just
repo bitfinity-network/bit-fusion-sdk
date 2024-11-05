@@ -4,7 +4,7 @@ deploy_signature:
 
 [group('deploy')]
 deploy_evm_canister:
-    dfx deploy evm_testnet --argument \
+    dfx deploy evm --argument \
         "(record { \
             owner = principal \"$(dfx identity get-principal)\"; \
             min_gas_price = 10; \
@@ -17,7 +17,7 @@ deploy_evm_canister:
 
 [group('deploy')]
 configure_signature:
-    dfx canister call signature_verification add_access "(principal \"$(dfx canister id evm_testnet)\")"
+    dfx canister call signature_verification add_access "(principal \"$(dfx canister id evm)\")"
 
 [group('deploy')]
 deploy_evm: deploy_signature deploy_evm_canister configure_signature
