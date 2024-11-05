@@ -574,12 +574,10 @@ impl<'a> Erc20BridgeFlow<'a> {
         while Instant::now() < timeout {
             if let Ok(result) = client.get_tx_execution_result_by_hash(hash).await {
                 return match result.exe_result {
-                    ExeResult::Success { output, .. } => {
-                        match output {
-                            did::block::TransactOut::None => Ok(vec![]),
-                            did::block::TransactOut::Call(v) => Ok(v),
-                            did::block::TransactOut::Create(v, _) => Ok(v),
-                        }
+                    ExeResult::Success { output, .. } => match output {
+                        did::block::TransactOut::None => Ok(vec![]),
+                        did::block::TransactOut::Call(v) => Ok(v),
+                        did::block::TransactOut::Create(v, _) => Ok(v),
                     },
                     ExeResult::Revert { revert_message, .. } => {
                         Err(anyhow!("Transaction failed: {revert_message:?}"))
