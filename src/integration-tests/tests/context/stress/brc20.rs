@@ -284,29 +284,29 @@ where
             .map_err(|e| TestError::Generic(e.to_string()))
     }
 
-    async fn set_bft_bridge_contract_address(&self, _bft_bridge: &did::H160) -> Result<()> {
-        panic!("bft bridge cannot be updated");
-    }
+    async fn set_bft_bridge_contract_address(&self, bft_bridge: &did::H160) -> Result<()> {
+        println!("Setting BFT bridge contract address: {bft_bridge}");
+        self.ctx
+            .set_bft_bridge_contract(bft_bridge)
+            .await
+            .map_err(|e| TestError::Generic(e.to_string()))?;
 
-    async fn get_bft_bridge_contract_address(&self) -> Option<did::H160> {
-        Some(self.ctx.bft_bridge_contract.read().unwrap().clone())
+        Ok(())
     }
 
     async fn create_wrapped_token(
         &self,
-        _admin_wallet: &OwnedWallet,
+        admin_wallet: &OwnedWallet,
         _bft_bridge: &did::H160,
         token_id: Id256,
     ) -> Result<did::H160> {
         let tick = Brc20Tick::from(token_id);
+        println!("Creating wrapped token with tick: {tick}");
 
-        let addr = self
-            .ctx
-            .tokens
-            .get(&tick)
-            .ok_or(TestError::Generic("Token not found".into()))?;
-
-        Ok(addr.value().clone())
+        self.ctx
+            .create_wrapped_token(admin_wallet, tick)
+            .await
+            .map_err(|e| TestError::Generic(e.to_string()))
     }
 
     async fn is_operation_complete(

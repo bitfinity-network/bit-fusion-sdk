@@ -28,6 +28,7 @@ pub struct StressTestConfig {
     pub init_user_balance: U256,
     pub operation_amount: U256,
     pub wait_per_iteration: Duration,
+    pub charge_fee: bool,
 }
 
 pub trait BaseTokens {
@@ -79,12 +80,6 @@ pub trait BaseTokens {
         Ok(())
     }
 
-    /// Get the BFTBridge contract address, if already set in the inner context.
-    ///
-    /// Implementation is optional.
-    async fn get_bft_bridge_contract_address(&self) -> Option<H160> {
-        None
-    }
     async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
 
     async fn create_wrapped_token(
@@ -161,11 +156,8 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             .advance_by_times(Duration::from_secs(1), 2)
             .await;
 
-        let existing_bft_bridge = base_tokens.get_bft_bridge_contract_address().await;
-
-        let (bft_bridge, fee_charge_address) = match existing_bft_bridge {
-            Some(bft_bridge) => (bft_bridge, None),
-            None => {
+        let (bft_bridge, fee_charge_address) = match config.charge_fee {
+            true => {
                 let bft_bridge = base_tokens
                     .ctx()
                     .initialize_bft_bridge_with_minter(
@@ -190,6 +182,24 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
                     .await?;
 
                 (bft_bridge, Some(fee_charge_address))
+            }
+            false => {
+                let bft_bridge = base_tokens
+                    .ctx()
+                    .initialize_bft_bridge_with_minter(
+                        &admin_wallet,
+                        bridge_canister_address,
+                        None,
+                        wrapped_token_deployer,
+                        true,
+                    )
+                    .await?;
+
+                base_tokens
+                    .set_bft_bridge_contract_address(&bft_bridge)
+                    .await?;
+
+                (bft_bridge, None)
             }
         };
 
