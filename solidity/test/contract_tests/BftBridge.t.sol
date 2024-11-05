@@ -4,13 +4,13 @@ pragma solidity ^0.8.7;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "src/BftBridge.sol";
+import "src/BTFBridge.sol";
 import "src/test_contracts/UUPSProxy.sol";
 import "src/WrappedToken.sol";
 import "src/WrappedTokenDeployer.sol";
 import "src/libraries/StringUtils.sol";
 
-contract BftBridgeTest is Test {
+contract BTFBridgeTest is Test {
     using StringUtils for string;
 
     struct MintOrder {
@@ -42,8 +42,8 @@ contract BftBridgeTest is Test {
 
     WrappedTokenDeployer _wrappedTokenDeployer;
 
-    BFTBridge _wrappedBridge;
-    BFTBridge _baseBridge;
+    BTFBridge _wrappedBridge;
+    BTFBridge _baseBridge;
 
     address newImplementation = address(8);
 
@@ -61,7 +61,7 @@ contract BftBridgeTest is Test {
 
         // Encode the initialization call
         bytes memory initializeData = abi.encodeWithSelector(
-            BFTBridge.initialize.selector,
+            BTFBridge.initialize.selector,
             _owner,
             address(0),
             address(_wrappedTokenDeployer),
@@ -70,28 +70,28 @@ contract BftBridgeTest is Test {
             initialControllers
         );
 
-        BFTBridge wrappedImpl = new BFTBridge();
+        BTFBridge wrappedImpl = new BTFBridge();
 
         UUPSProxy wrappedProxyContract = new UUPSProxy(address(wrappedImpl), initializeData);
 
         wrappedProxy = address(wrappedProxyContract);
 
-        // Cast the proxy to BFTBridge
-        _wrappedBridge = BFTBridge(address(wrappedProxy));
+        // Cast the proxy to BTFBridge
+        _wrappedBridge = BTFBridge(address(wrappedProxy));
 
         // Encode the initialization call
         bytes memory baseInitializeData = abi.encodeWithSelector(
-            BFTBridge.initialize.selector, _owner, address(0), _wrappedTokenDeployer, false, _owner, initialControllers
+            BTFBridge.initialize.selector, _owner, address(0), _wrappedTokenDeployer, false, _owner, initialControllers
         );
 
-        BFTBridge baseImpl = new BFTBridge();
+        BTFBridge baseImpl = new BTFBridge();
 
         UUPSProxy baseProxyContract = new UUPSProxy(address(baseImpl), baseInitializeData);
 
         baseProxy = address(baseProxyContract);
 
-        // Cast the proxy to BFTBridge
-        _baseBridge = BFTBridge(address(baseProxy));
+        // Cast the proxy to BTFBridge
+        _baseBridge = BTFBridge(address(baseProxy));
 
         vm.stopPrank();
     }
@@ -538,7 +538,7 @@ contract BftBridgeTest is Test {
     function testAddAllowedImplementation() public {
         vm.startPrank(_owner, _owner);
 
-        BFTBridge _newImpl = new BFTBridge();
+        BTFBridge _newImpl = new BTFBridge();
 
         newImplementation = address(_newImpl);
 
@@ -559,7 +559,7 @@ contract BftBridgeTest is Test {
 
     function testAddAllowedImplementationByAController() public {
         vm.startPrank(_owner);
-        BFTBridge _newImpl = new BFTBridge();
+        BTFBridge _newImpl = new BTFBridge();
 
         newImplementation = address(_newImpl);
 
@@ -579,7 +579,7 @@ contract BftBridgeTest is Test {
     function testUpgradeBridgeWithAllowedImplementation() public {
         vm.startPrank(_owner);
 
-        BFTBridge _newImpl = new BFTBridge();
+        BTFBridge _newImpl = new BTFBridge();
 
         newImplementation = address(_newImpl);
 
@@ -587,7 +587,7 @@ contract BftBridgeTest is Test {
         assertTrue(_wrappedBridge.allowedImplementations(newImplementation.codehash));
 
         // Wrap in ABI for easier testing
-        BFTBridge proxy = BFTBridge(wrappedProxy);
+        BTFBridge proxy = BTFBridge(wrappedProxy);
 
         // pass empty calldata to initialize
         bytes memory data = new bytes(0);
@@ -599,11 +599,11 @@ contract BftBridgeTest is Test {
 
     function testUpgradeBridgeWithNotAllowedImplementation() public {
         vm.startPrank(_owner);
-        BFTBridge _newImpl = new BFTBridge();
+        BTFBridge _newImpl = new BTFBridge();
         newImplementation = address(_newImpl);
         // Wrap in ABI for easier testing
 
-        BFTBridge proxy = BFTBridge(wrappedProxy);
+        BTFBridge proxy = BTFBridge(wrappedProxy);
         // pass empty calldata to initialize
         bytes memory data = new bytes(0);
         vm.expectRevert();

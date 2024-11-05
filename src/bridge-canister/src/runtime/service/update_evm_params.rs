@@ -1,4 +1,4 @@
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 
 use super::BridgeService;
@@ -18,11 +18,11 @@ impl RefreshEvmParamsService {
 
 #[async_trait::async_trait(?Send)]
 impl BridgeService for RefreshEvmParamsService {
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         ConfigStorage::refresh_evm_params(self.config.clone()).await
     }
 
-    fn push_operation(&self, _: OperationId) -> BftResult<()> {
+    fn push_operation(&self, _: OperationId) -> BTFResult<()> {
         let msg = "Operations should not be pushed to the RefreshEvmParamsService service";
         log::warn!("{msg}");
         Err(bridge_did::error::Error::FailedToProgress(msg.into()))

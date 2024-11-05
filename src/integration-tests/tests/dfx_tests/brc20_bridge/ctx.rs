@@ -16,7 +16,7 @@ use bridge_did::event_data::MinterNotificationType;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
@@ -105,7 +105,7 @@ pub fn generate_wallet_name() -> String {
 pub struct Brc20Context {
     inner: DfxTestContext,
     pub eth_wallet: Wallet<'static, SigningKey>,
-    bft_bridge_contract: H160,
+    btf_bridge_contract: H160,
     exit: Exit,
     miner: Option<JoinHandle<()>>,
     brc20: Brc20Wallet,
@@ -245,8 +245,8 @@ impl Brc20Context {
             .await
             .unwrap();
 
-        let bft_bridge = context
-            .initialize_bft_bridge_with_minter(
+        let btf_bridge = context
+            .initialize_btf_bridge_with_minter(
                 &wallet,
                 btc_bridge_eth_address.unwrap(),
                 None,
@@ -260,7 +260,7 @@ impl Brc20Context {
 
         for brc20_token in &brc20_wallet.brc20_tokens {
             let token = context
-                .create_wrapped_token(&wallet, &bft_bridge, (*brc20_token).into())
+                .create_wrapped_token(&wallet, &btf_bridge, (*brc20_token).into())
                 .await
                 .unwrap();
 
@@ -269,7 +269,7 @@ impl Brc20Context {
 
         let _: () = context
             .brc20_bridge_client(ADMIN)
-            .set_bft_bridge_contract(&bft_bridge)
+            .set_btf_bridge_contract(&btf_bridge)
             .await
             .unwrap();
 
@@ -281,7 +281,7 @@ impl Brc20Context {
         );
 
         Self {
-            bft_bridge_contract: bft_bridge,
+            btf_bridge_contract: btf_bridge,
             eth_wallet: wallet,
             exit,
             miner: Some(miner),
@@ -403,7 +403,7 @@ impl Brc20Context {
             brc20_tick: tick,
         };
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
@@ -412,7 +412,7 @@ impl Brc20Context {
 
         let transaction = TransactionBuilder {
             from: &self.eth_wallet.address().into(),
-            to: Some(self.bft_bridge_contract.clone()),
+            to: Some(self.btf_bridge_contract.clone()),
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
@@ -484,7 +484,7 @@ impl Brc20Context {
                 token_address,
                 Id256::from(*tick).0.as_slice(),
                 withdrawal_address.as_bytes().to_vec(),
-                &self.bft_bridge_contract,
+                &self.btf_bridge_contract,
                 amount.amount(),
                 true,
                 None,

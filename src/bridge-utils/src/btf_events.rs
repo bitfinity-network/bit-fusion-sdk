@@ -1,16 +1,16 @@
 use alloy_sol_types::private::{Bytes, LogData};
 use alloy_sol_types::{SolCall, SolEvent};
 use anyhow::anyhow;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
 use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::BFTBridge;
+use crate::BTFBridge;
 
-/// Emitted when token is burnt or minted by BFTBridge.
+/// Emitted when token is burnt or minted by BTFBridge.
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
 pub enum BridgeEvent {
     Burnt(BurntEventData),
@@ -24,7 +24,7 @@ impl BridgeEvent {
         from_block: u64,
         to_block: u64,
         bridge_contract: H160,
-    ) -> BftResult<Vec<Self>> {
+    ) -> BTFResult<Vec<Self>> {
         let logs_result =
             Self::collect_logs(evm_client, from_block, to_block, bridge_contract).await;
 
@@ -163,14 +163,14 @@ pub struct TxParams {
 }
 
 /// Sends transaction with given params to call `batchMint` function
-/// in BftBridge contract.
+/// in Btfbridge contract.
 pub fn batch_mint_transaction(
     params: TxParams,
     mint_orders_data: &[u8],
     signature: &[u8],
     orders_to_process: &[u32],
 ) -> Transaction {
-    let data = BFTBridge::batchMintCall {
+    let data = BTFBridge::batchMintCall {
         encodedOrders: mint_orders_data.to_vec().into(),
         signature: signature.to_vec().into(),
         ordersToProcess: orders_to_process.into(),

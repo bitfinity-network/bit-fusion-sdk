@@ -14,7 +14,7 @@ use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
 use bridge_did::runes::RuneName;
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, TransactionReceipt, H160, H256};
@@ -58,7 +58,7 @@ struct RuneWallet {
 struct RunesContext {
     inner: DfxTestContext,
     eth_wallet: Wallet<'static, SigningKey>,
-    bft_bridge_contract: H160,
+    btf_bridge_contract: H160,
     exit: Exit,
     miner: Option<JoinHandle<()>>,
     runes: RuneWallet,
@@ -186,8 +186,8 @@ impl RunesContext {
             .initialize_wrapped_token_deployer_contract(&wallet)
             .await
             .unwrap();
-        let bft_bridge = context
-            .initialize_bft_bridge_with_minter(
+        let btf_bridge = context
+            .initialize_btf_bridge_with_minter(
                 &wallet,
                 btc_bridge_eth_address.unwrap(),
                 None,
@@ -201,7 +201,7 @@ impl RunesContext {
 
         for rune_id in rune_wallet.runes.keys() {
             let token = context
-                .create_wrapped_token(&wallet, &bft_bridge, (*rune_id).into())
+                .create_wrapped_token(&wallet, &btf_bridge, (*rune_id).into())
                 .await
                 .unwrap();
 
@@ -210,7 +210,7 @@ impl RunesContext {
 
         let _: () = context
             .rune_bridge_client(ADMIN)
-            .set_bft_bridge_contract(&bft_bridge)
+            .set_btf_bridge_contract(&btf_bridge)
             .await
             .unwrap();
 
@@ -224,7 +224,7 @@ impl RunesContext {
         );
 
         Self {
-            bft_bridge_contract: bft_bridge,
+            btf_bridge_contract: btf_bridge,
             eth_wallet: wallet,
             exit,
             miner: Some(miner),
@@ -441,7 +441,7 @@ impl RunesContext {
             amounts,
         };
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
@@ -450,7 +450,7 @@ impl RunesContext {
 
         let transaction = TransactionBuilder {
             from: &self.eth_wallet.address().into(),
-            to: Some(self.bft_bridge_contract.clone()),
+            to: Some(self.btf_bridge_contract.clone()),
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
@@ -532,7 +532,7 @@ impl RunesContext {
                 token_address,
                 rune_info.id256.0.as_slice(),
                 withdrawal_address.as_bytes().to_vec(),
-                &self.bft_bridge_contract,
+                &self.btf_bridge_contract,
                 amount,
                 true,
                 None,

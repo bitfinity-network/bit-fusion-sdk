@@ -4,7 +4,7 @@ use std::time::Duration;
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_did::id256::Id256;
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
+use bridge_utils::{BTFBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -21,12 +21,12 @@ use tokio::time::Instant;
 // identity.
 const IDENTITY_PATH: &str = "src/bridge-tool/identity.pem";
 
-/// Some operations with BFT bridge.
+/// Some operations with BTF bridge.
 #[derive(Parser, Debug)]
 #[clap(version = "0.1")]
 enum CliCommand {
-    /// Create bft bridge contract.
-    DeployBftBridge(DeployBftArgs),
+    /// Create btf bridge contract.
+    DeployBtfbridge(DeployBtfArgs),
     /// Create WrappedTokenDeployer contract.
     DeployWrappedTokenDeployer(DeployWrappedTokenDeployerArgs),
     /// Create wrapper token contract.
@@ -37,7 +37,7 @@ enum CliCommand {
     BurnWrapped(BurnWrappedArgs),
     /// Return ETH wallet address.
     WalletAddress(WalletAddressArgs),
-    /// Create bft bridge contract.
+    /// Create btf bridge contract.
     DeployFeeCharge(DeployFeeChargeArgs),
     /// Returns expected contract address for the given parameters.
     ExpectedContractAddress(ExpectedContractAddress),
@@ -68,9 +68,9 @@ struct DepositIcrcArgs {
     #[arg(long)]
     evm: Principal,
 
-    /// EVM address of the BFT bridge
+    /// EVM address of the BTF bridge
     #[arg(long)]
-    bft_bridge: String,
+    btf_bridge: String,
 
     /// Amount to deposit
     #[arg(long)]
@@ -98,7 +98,7 @@ struct DepositIcrcArgs {
 }
 
 #[derive(Debug, Parser)]
-struct DeployBftArgs {
+struct DeployBtfArgs {
     /// ETH address of the bridge
     #[arg(long)]
     minter_address: String,
@@ -172,7 +172,7 @@ struct DeployFeeChargeArgs {
     #[arg(long)]
     nonce: u64,
 
-    /// Addresses of BftBridges, which should be able to charge fee.
+    /// Addresses of Btfbridges, which should be able to charge fee.
     #[arg(long)]
     bridges: Vec<String>,
 }
@@ -190,9 +190,9 @@ struct ExpectedContractAddress {
 
 #[derive(Debug, Parser)]
 struct CreateTokenArgs {
-    /// ETH address of the BFT bridge contract.
+    /// ETH address of the BTF bridge contract.
     #[arg(long)]
-    bft_bridge_address: String,
+    btf_bridge_address: String,
 
     /// Name of the token to be created.
     #[arg(long)]
@@ -245,9 +245,9 @@ struct BurnWrappedArgs {
     #[arg(long)]
     evm_canister: Principal,
 
-    /// ETH address of the BFT bridge contract.
+    /// ETH address of the BTF bridge contract.
     #[arg(long)]
-    bft_bridge: String,
+    btf_bridge: String,
 
     /// ETH address of the wrapper token contract.
     #[arg(long)]
@@ -280,7 +280,7 @@ struct WalletAddressArgs {
 #[tokio::main]
 async fn main() {
     match CliCommand::parse() {
-        CliCommand::DeployBftBridge(args) => deploy_bft_bridge(args).await,
+        CliCommand::DeployBtfbridge(args) => deploy_btf_bridge(args).await,
         CliCommand::DeployWrappedTokenDeployer(args) => deploy_wrapped_token_deployer(args).await,
         CliCommand::CreateToken(args) => create_token(args).await,
         CliCommand::CreateWallet(args) => create_wallet(args).await,
@@ -313,9 +313,9 @@ async fn get_nonce(args: GetNonceArgs) {
 }
 
 async fn deposit_icrc(args: DepositIcrcArgs) {
-    let bft_bridge = H160::from_slice(
-        &hex::decode(args.bft_bridge.trim_start_matches("0x"))
-            .expect("failed to parse bft bridge address"),
+    let btf_bridge = H160::from_slice(
+        &hex::decode(args.btf_bridge.trim_start_matches("0x"))
+            .expect("failed to parse btf bridge address"),
     );
 
     let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
@@ -341,7 +341,7 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
     };
     let memo = alloy_sol_types::private::FixedBytes::ZERO;
 
-    let input = BFTBridge::notifyMinterCall {
+    let input = BTFBridge::notifyMinterCall {
         notificationType: 0,
         userData: Encode!(&data).unwrap().into(),
         memo,
@@ -355,7 +355,7 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         .nonce;
     let notify_minter_tx = TransactionBuilder {
         from: &wallet.address().into(),
-        to: Some(bft_bridge.into()),
+        to: Some(btf_bridge.into()),
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
@@ -466,7 +466,7 @@ fn _print_signed_tx(tx: Transaction) {
     println!("{args}");
 }
 
-async fn deploy_bft_bridge(args: DeployBftArgs) {
+async fn deploy_btf_bridge(args: DeployBtfArgs) {
     let minter = H160::from_slice(
         &hex::decode(args.minter_address.trim_start_matches("0x"))
             .expect("failed to parse minter address"),
@@ -537,14 +537,14 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
             .into()
     }
 
-    let mut bft_contract_input = BFTBridge::BYTECODE.to_vec();
-    let constructor = BFTBridge::constructorCall {}.abi_encode();
-    bft_contract_input.extend_from_slice(&constructor);
+    let mut btf_contract_input = BTFBridge::BYTECODE.to_vec();
+    let constructor = BTFBridge::constructorCall {}.abi_encode();
+    btf_contract_input.extend_from_slice(&constructor);
 
-    let bft_contract_address =
-        deploy_contract(&client, &wallet, bft_contract_input, chain_id).await;
+    let btf_contract_address =
+        deploy_contract(&client, &wallet, btf_contract_input, chain_id).await;
 
-    let init_data = BFTBridge::initializeCall {
+    let init_data = BTFBridge::initializeCall {
         minterAddress: minter.0.into(),
         feeChargeAddress: fee_charge.0.into(),
         wrappedTokenDeployer: wrapped_token_deployer.0.into(),
@@ -557,18 +557,18 @@ async fn deploy_bft_bridge(args: DeployBftArgs) {
     let mut proxy_input = UUPSProxy::BYTECODE.to_vec();
 
     let constructor = UUPSProxy::constructorCall {
-        _implementation: bft_contract_address.0.into(),
+        _implementation: btf_contract_address.0.into(),
         _data: init_data.into(),
     }
     .abi_encode();
     proxy_input.extend_from_slice(&constructor);
 
-    let bft_proxy_address = deploy_contract(&client, &wallet, proxy_input, chain_id).await;
+    let btf_proxy_address = deploy_contract(&client, &wallet, proxy_input, chain_id).await;
 
-    eprintln!("Created BFT Bridge contract");
-    println!("Implementation address: {bft_contract_address:#x}");
-    println!("Proxy address: {bft_proxy_address:#x}");
-    println!("{bft_proxy_address:#x}");
+    eprintln!("Created BTF Bridge contract");
+    println!("Implementation address: {btf_contract_address:#x}");
+    println!("Proxy address: {btf_proxy_address:#x}");
+    println!("{btf_proxy_address:#x}");
 }
 
 async fn deploy_wrapped_token_deployer(args: DeployWrappedTokenDeployerArgs) {
@@ -611,7 +611,7 @@ async fn deploy_wrapped_token_deployer(args: DeployWrappedTokenDeployerArgs) {
         .send_raw_transaction(create_contract_tx)
         .await
         .expect("Failed to send raw transaction")
-        .expect("Failed to execute crate BFT contract transaction");
+        .expect("Failed to execute crate BTF contract transaction");
     let receipt = wait_for_tx_success(&client, hash).await;
     let wrapped_token_deployer_contract_address = receipt
         .contract_address
@@ -673,7 +673,7 @@ async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
         .send_raw_transaction(create_contract_tx)
         .await
         .expect("Failed to send raw transaction")
-        .expect("Failed to execute crate BFT contract transaction");
+        .expect("Failed to execute crate BTF contract transaction");
     let receipt = wait_for_tx_success(&client, hash).await;
     let fee_charge_contract_address = receipt
         .contract_address
@@ -695,9 +695,9 @@ fn expected_contract_address(args: ExpectedContractAddress) {
 }
 
 async fn create_token(args: CreateTokenArgs) {
-    let bft_bridge = H160::from_slice(
-        &hex::decode(args.bft_bridge_address.trim_start_matches("0x"))
-            .expect("failed to parse bft bridge address"),
+    let btf_bridge = H160::from_slice(
+        &hex::decode(args.btf_bridge_address.trim_start_matches("0x"))
+            .expect("failed to parse btf bridge address"),
     );
 
     let token_id = decode_token_id(&args.token_id)
@@ -715,7 +715,7 @@ async fn create_token(args: CreateTokenArgs) {
     let wallet = get_wallet(&args.wallet, &client).await;
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
-    let input = BFTBridge::deployERC20Call {
+    let input = BTFBridge::deployERC20Call {
         name: args.token_name.clone(),
         symbol: args.token_name,
         decimals: args.token_decimals,
@@ -730,7 +730,7 @@ async fn create_token(args: CreateTokenArgs) {
         .nonce;
     let create_token_tx = TransactionBuilder {
         from: &wallet.address().into(),
-        to: Some(bft_bridge.into()),
+        to: Some(btf_bridge.into()),
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
@@ -749,7 +749,7 @@ async fn create_token(args: CreateTokenArgs) {
         .expect("Failed to execute crate token transaction");
     let receipt = wait_for_tx_success(&client, hash).await;
 
-    let token_address = BFTBridge::deployERC20Call::abi_decode_returns(
+    let token_address = BTFBridge::deployERC20Call::abi_decode_returns(
         &receipt
             .output
             .expect("Receipt for token creation does not contain output"),
@@ -823,14 +823,14 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     let wallet = get_wallet(&wallet_addr, &client).await;
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
-    let bft_bridge = H160::from_slice(
-        &hex::decode(args.bft_bridge.trim_start_matches("0x"))
-            .expect("failed to parse bft bridge address"),
+    let btf_bridge = H160::from_slice(
+        &hex::decode(args.btf_bridge.trim_start_matches("0x"))
+            .expect("failed to parse btf bridge address"),
     );
 
     let token = H160::from_slice(
         &hex::decode(args.token_address.trim_start_matches("0x"))
-            .expect("failed to parse bft bridge address"),
+            .expect("failed to parse btf bridge address"),
     );
 
     let input = WrappedToken::balanceOfCall {
@@ -857,7 +857,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     let amount: U256 = args.amount.into();
 
     let input = WrappedToken::approveCall {
-        spender: bft_bridge.0.into(),
+        spender: btf_bridge.0.into(),
         value: amount.clone().into(),
     }
     .abi_encode();
@@ -889,7 +889,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
 
     let memo = alloy_sol_types::private::FixedBytes::ZERO;
 
-    let input = BFTBridge::burnCall {
+    let input = BTFBridge::burnCall {
         amount: amount.into(),
         fromERC20: token.0.into(),
         toTokenID: alloy_sol_types::private::FixedBytes::from_slice(args.to_token_id.as_bytes()),
@@ -905,7 +905,7 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         .nonce;
     let burn_tx = TransactionBuilder {
         from: &wallet.address().into(),
-        to: Some(bft_bridge.into()),
+        to: Some(btf_bridge.into()),
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),

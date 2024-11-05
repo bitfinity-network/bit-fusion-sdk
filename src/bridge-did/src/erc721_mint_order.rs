@@ -10,7 +10,7 @@ use ic_stable_structures::{Bound, MultimapStructure as _, StableMultimap, Storab
 use serde::de::Visitor;
 use serde::Deserialize;
 
-use crate::error::{BftResult, Error};
+use crate::error::{BTFResult, Error};
 use crate::id256::Id256;
 
 #[derive(Debug, CandidType, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,7 +47,7 @@ impl<'de> Deserialize<'de> for ERC721SignedMintOrder {
     }
 }
 
-/// Data which should be signed and provided to the `BftBridge.mint()` call
+/// Data which should be signed and provided to the `Btfbridge.mint()` call
 /// to perform mint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ERC721MintOrder {
@@ -115,7 +115,7 @@ impl ERC721MintOrder {
     pub async fn encode_and_sign(
         &self,
         signer: &impl TransactionSigner,
-    ) -> BftResult<ERC721SignedMintOrder> {
+    ) -> BTFResult<ERC721SignedMintOrder> {
         let data = self.token_uri.as_bytes();
         let mut buf = vec![0; Self::SIGNED_ENCODED_DATA_SIZE + data.len()];
         let data_size = data.len();

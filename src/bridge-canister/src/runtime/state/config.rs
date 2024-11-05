@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use bridge_utils::evm_bridge::EvmParams;
@@ -49,7 +49,7 @@ impl ConfigStorage {
             owner: init_data.owner,
             evm_link: init_data.evm_link.clone(),
             evm_params: None,
-            bft_bridge_contract_address: None,
+            btf_bridge_contract_address: None,
             signing_strategy: init_data.signing_strategy.clone(),
         };
 
@@ -57,7 +57,7 @@ impl ConfigStorage {
     }
 
     /// Query EVM params using the EvmLink in the config data.
-    pub async fn init_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
+    pub async fn init_evm_params(config: Rc<RefCell<Self>>) -> BTFResult<()> {
         log::trace!("initializing evm params");
 
         let link = config.borrow().get_evm_link();
@@ -102,7 +102,7 @@ impl ConfigStorage {
     }
 
     /// Updates evm params in the given config, using the EvmLink from there.
-    pub async fn refresh_evm_params(config: Rc<RefCell<Self>>) -> BftResult<()> {
+    pub async fn refresh_evm_params(config: Rc<RefCell<Self>>) -> BTFResult<()> {
         log::trace!("updating evm params");
 
         let link = config.borrow().get_evm_link();
@@ -156,7 +156,7 @@ impl ConfigStorage {
     }
 
     /// Checks if the caller is owner.
-    pub fn check_owner(&self, caller: Principal) -> BftResult<()> {
+    pub fn check_owner(&self, caller: Principal) -> BTFResult<()> {
         if caller != self.get_owner() {
             return Err(Error::AccessDenied);
         }
@@ -165,7 +165,7 @@ impl ConfigStorage {
     }
 
     /// Returns parameters of EVM canister with which the bridge canister works.
-    pub fn get_evm_params(&self) -> BftResult<EvmParams> {
+    pub fn get_evm_params(&self) -> BTFResult<EvmParams> {
         self.0.get().evm_params.clone().ok_or_else(|| {
             Error::Initialization("failed to get uninitialized get evm params".into())
         })
@@ -191,17 +191,17 @@ impl ConfigStorage {
     }
 
     /// Returns bridge contract address for EVM.
-    pub fn get_bft_bridge_contract(&self) -> Option<H160> {
-        self.0.get().bft_bridge_contract_address.clone()
+    pub fn get_btf_bridge_contract(&self) -> Option<H160> {
+        self.0.get().btf_bridge_contract_address.clone()
     }
 
     /// Set bridge contract address for EVM.
-    pub fn set_bft_bridge_contract(&mut self, address: H160) {
-        self.update(|config| config.bft_bridge_contract_address = Some(address));
+    pub fn set_btf_bridge_contract(&mut self, address: H160) {
+        self.update(|config| config.btf_bridge_contract_address = Some(address));
     }
 
     /// Creates a signer according to `Self::signing_strategy`.
-    pub fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    pub fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         let config = self.0.get();
         let chain_id = self.get_evm_params()?.chain_id;
         config
@@ -234,7 +234,7 @@ pub struct Config {
     pub owner: Principal,
     pub evm_link: EvmLink,
     pub evm_params: Option<EvmParams>,
-    pub bft_bridge_contract_address: Option<H160>,
+    pub btf_bridge_contract_address: Option<H160>,
     pub signing_strategy: SigningStrategy,
 }
 
@@ -244,7 +244,7 @@ impl Default for Config {
             owner: Principal::management_canister(),
             evm_link: EvmLink::Ic(Principal::anonymous()),
             evm_params: None,
-            bft_bridge_contract_address: None,
+            btf_bridge_contract_address: None,
             signing_strategy: SigningStrategy::ManagementCanister {
                 key_id: eth_signer::ic_sign::SigningKeyId::Test,
             },

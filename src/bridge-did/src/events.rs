@@ -3,19 +3,19 @@ use std::fmt::{Display, Formatter};
 use alloy_sol_types::sol;
 use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
-use BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
+use BTFBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
-use crate::error::{BftResult, Error};
+use crate::error::{BTFResult, Error};
 use crate::op_id::OperationId;
 use crate::operation_log::Memo;
 
 sol! {
     #[derive(Debug, Serialize, Deserialize)]
-    BFTBridge,
-    "../../solidity/out/BftBridge.sol/BFTBridge.json"
+    BTFBridge,
+    "../../solidity/out/Btfbridge.sol/BTFBridge.json"
 }
 
-/// Emitted when token is burnt by BFTBridge.
+/// Emitted when token is burnt by BTFBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize)]
 pub struct BurntEventData {
     pub sender: did::H160,
@@ -64,7 +64,7 @@ impl From<BurnTokenEvent> for BurntEventData {
     }
 }
 
-/// Event emitted when token is minted by BFTBridge.
+/// Event emitted when token is minted by BTFBridge.
 #[derive(Debug, Default, Clone, CandidType, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MintedEventData {
     pub amount: did::U256,
@@ -148,7 +148,7 @@ impl NotifyMinterEventData {
     }
 
     /// Tries to decode the notification into rescheduling operation id.
-    pub fn try_decode_reschedule_operation_id(&self) -> BftResult<OperationId> {
+    pub fn try_decode_reschedule_operation_id(&self) -> BTFResult<OperationId> {
         if self.notification_type != MinterNotificationType::RescheduleOperation {
             return Err(Error::Serialization(format!(
                 "expected MinterNotificationType::RescheduleOperation, got {:?}",

@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "src/BftBridge.sol";
+import "src/BTFBridge.sol";
 
 /**
  * @title PauseUnpauseScript
- * @dev This script allows pausing and unpausing of the BFTBridge contract
+ * @dev This script allows pausing and unpausing of the BTFBridge contract
  *
  * To run this script:
  * forge script script/PauseUnpause.s.sol:PauseUnpauseScript --rpc-url <your_rpc_url> --private-key <your_private_key> --broadcast
@@ -16,13 +16,13 @@ import "src/BftBridge.sol";
  * !!! MAKE SURE THE OWNER IS THE SAME AS THE DEPLOYER
  */
 contract PauseUnpauseScript is Script {
-    function setUp() public { }
+    function setUp() public {}
 
     function run(address contractAddress, bool shouldPause) public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        BFTBridge bridge = BFTBridge(contractAddress);
+        BTFBridge bridge = BTFBridge(contractAddress);
 
         if (shouldPause) {
             bridge.pause();

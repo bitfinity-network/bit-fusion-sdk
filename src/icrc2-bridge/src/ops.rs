@@ -6,7 +6,7 @@ use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -32,7 +32,7 @@ use crate::tokens::icrc2::{self, Success};
 pub mod events_handler;
 
 pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
-pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BTF_EVENTS_SERVICE_ID: ServiceId = 1;
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
 pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
@@ -44,7 +44,7 @@ impl Operation for IcrcBridgeOpImpl {
         self,
         id: OperationId,
         ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>> {
+    ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
@@ -118,7 +118,7 @@ impl IcrcBridgeOpImpl {
         ctx: impl OperationContext,
         burn_info: Icrc2Burn,
         nonce: u32,
-    ) -> BftResult<IcrcBridgeOp> {
+    ) -> BTFResult<IcrcBridgeOp> {
         log::trace!("burning icrc tokens due to: {burn_info:?}");
 
         let evm_params = ctx.get_evm_params()?;
@@ -199,7 +199,7 @@ impl IcrcBridgeOpImpl {
         ctx: impl OperationContext,
         event: BurntEventData,
         nonce: u32,
-    ) -> BftResult<IcrcBridgeOp> {
+    ) -> BTFResult<IcrcBridgeOp> {
         log::trace!("Minting Icrc2 tokens");
 
         let evm_params = ctx.get_evm_params()?;
@@ -314,7 +314,7 @@ impl IcrcMintOrderHandler {
 }
 
 impl MintOrderHandler for IcrcMintOrderHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.state.get_signer()
     }
 
@@ -380,7 +380,7 @@ impl IcrcMintTxHandler {
 }
 
 impl MintTxHandler for IcrcMintTxHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.state.get_signer()
     }
 

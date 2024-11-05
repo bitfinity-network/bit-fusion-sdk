@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
 use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
@@ -25,7 +25,7 @@ use crate::core::utxo_handler::UtxoHandler;
 use crate::core::withdrawal::Withdrawal;
 
 pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
-pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BTF_EVENTS_SERVICE_ID: ServiceId = 1;
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
 pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
@@ -39,7 +39,7 @@ impl Operation for RuneBridgeOpImpl {
         self,
         id: OperationId,
         ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>> {
+    ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitInputs {
                 dst_address,
@@ -235,7 +235,7 @@ impl RuneBridgeOpImpl {
     async fn schedule_operation_split(
         ctx: RuntimeState<Self>,
         operation_ids: Vec<OperationId>,
-    ) -> BftResult<Self> {
+    ) -> BTFResult<Self> {
         let state = ctx.borrow();
 
         let mut operations = operation_ids
@@ -263,7 +263,7 @@ impl RuneBridgeOpImpl {
         dst_address: H160,
         dst_tokens: HashMap<RuneName, H160>,
         requested_amounts: Option<HashMap<RuneName, u128>>,
-    ) -> BftResult<Self> {
+    ) -> BTFResult<Self> {
         let inputs = input_provider
             .get_inputs(&dst_address)
             .await
@@ -337,7 +337,7 @@ impl RuneBridgeOpImpl {
         dst_address: H160,
         utxo: Utxo,
         runes_to_wrap: Vec<RuneToWrap>,
-    ) -> BftResult<Self> {
+    ) -> BTFResult<Self> {
         utxo_handler
             .check_confirmations(&dst_address, &utxo)
             .await
@@ -360,7 +360,7 @@ impl RuneBridgeOpImpl {
         Ok(Self::split_or_update(ctx, dst_address, operations))
     }
 
-    async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BftResult<Self> {
+    async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BTFResult<Self> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
         let from_address = payload.sender.clone();
@@ -379,7 +379,7 @@ impl RuneBridgeOpImpl {
         )))
     }
 
-    async fn send_transaction(from_address: H160, transaction: DidTransaction) -> BftResult<Self> {
+    async fn send_transaction(from_address: H160, transaction: DidTransaction) -> BTFResult<Self> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
         withdraw

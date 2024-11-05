@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
@@ -87,7 +87,7 @@ impl<Op: Operation> State<Op> {
         &self,
         service: ServiceId,
         operation_id: OperationId,
-    ) -> BftResult<()> {
+    ) -> BTFResult<()> {
         self.services
             .borrow_mut()
             .push_operation(service, operation_id)
@@ -99,24 +99,24 @@ impl OperationContext for SharedConfig {
         self.borrow().get_evm_link()
     }
 
-    fn get_bridge_contract_address(&self) -> BftResult<H160> {
-        self.borrow().get_bft_bridge_contract().ok_or_else(|| {
-            Error::Initialization("bft bridge contract expected to be initialized".to_string())
+    fn get_bridge_contract_address(&self) -> BTFResult<H160> {
+        self.borrow().get_btf_bridge_contract().ok_or_else(|| {
+            Error::Initialization("btf bridge contract expected to be initialized".to_string())
         })
     }
 
-    fn get_evm_params(&self) -> BftResult<EvmParams> {
+    fn get_evm_params(&self) -> BTFResult<EvmParams> {
         self.borrow().get_evm_params()
     }
 
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.borrow().get_signer()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bridge_did::error::BftResult;
+    use bridge_did::error::BTFResult;
     use bridge_did::op_id::OperationId;
     use candid::CandidType;
     use ic_exports::ic_kit::MockContext;
@@ -136,7 +136,7 @@ mod tests {
             self,
             _: OperationId,
             _: RuntimeState<Self>,
-        ) -> BftResult<OperationProgress<Self>> {
+        ) -> BTFResult<OperationProgress<Self>> {
             unimplemented!()
         }
 

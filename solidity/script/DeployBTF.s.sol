@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "forge-std/Vm.sol";
 import "@openzeppelin/foundry-upgrades/Upgrades.sol";
-import { BFTBridge } from "src/BftBridge.sol";
+import {BTFBridge} from "src/BTFBridge.sol";
 
 abstract contract DeployScript is Script {
     uint256 public immutable privateKey;
@@ -13,7 +13,7 @@ abstract contract DeployScript is Script {
     address public proxyAddress;
 
     // contract name
-    string public contractName = "BftBridge.sol:BFTBridge";
+    string public contractName = "BTFBridge.solBTFTBridge";
 
     error InvalidAddress(string reason);
 
@@ -22,9 +22,7 @@ abstract contract DeployScript is Script {
         proxyAddress = address(Upgrades.deployUUPSProxy(contractName, data));
     }
 
-    constructor(
-        uint256 pkey
-    ) {
+    constructor(uint256 pkey) {
         privateKey = pkey;
     }
 
@@ -43,8 +41,8 @@ abstract contract DeployScript is Script {
     }
 }
 
-contract DeployBFTBridge is DeployScript {
-    constructor() DeployScript(vm.envUint("PRIVATE_KEY")) { }
+contract DeploBTFTBridge is DeployScript {
+    constructor() DeployScript(vm.envUint("PRIVATE_KEY")) {}
 
     address minterAddress = vm.envAddress("MINTER_ADDRESS");
     address feeChargeAddress = vm.envAddress("FEE_CHARGE_ADDRESS");
@@ -53,11 +51,12 @@ contract DeployBFTBridge is DeployScript {
     address addressZero = address(0);
     address owner = vm.envOr("OWNER", addressZero);
     address[] zeroAddressControllers = new address[](0);
-    address[] controllers = vm.envOr("CONTROLLERS", ",", zeroAddressControllers);
+    address[] controllers =
+        vm.envOr("CONTROLLERS", ",", zeroAddressControllers);
 
     function _run() internal override create {
         data = abi.encodeWithSelector(
-            BFTBridge.initialize.selector,
+            BTFBridge.initialize.selector,
             minterAddress,
             feeChargeAddress,
             wrappedTokenDeployer,
