@@ -30,7 +30,10 @@ impl WrapTokenType {
             "Wrapped token contract for ERC20 token {} deployed",
             base_token_parameters.name
         );
-        info!("Wrapped token address: {}", wrapped_token_address);
+        info!(
+            "Wrapped token address: 0x{}",
+            hex::encode(wrapped_token_address)
+        );
 
         Ok(())
     }

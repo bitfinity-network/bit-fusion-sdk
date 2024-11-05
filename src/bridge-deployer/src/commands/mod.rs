@@ -23,6 +23,7 @@ use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::commands::wrap_token_type::WrapTokenType;
 use crate::config::{self, BaseEvmSettingsConfig};
 use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
+
 mod deploy;
 mod reinstall;
 mod upgrade;

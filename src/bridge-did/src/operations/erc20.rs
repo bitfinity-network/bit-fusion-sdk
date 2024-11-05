@@ -27,3 +27,14 @@ pub enum Erc20OpStage {
     },
     TokenMintConfirmed(MintedEventData),
 }
+
+impl Erc20OpStage {
+    pub fn name(&self) -> String {
+        match self {
+            Erc20OpStage::SignMintOrder(_) => String::from("SignMintOrder"),
+            Erc20OpStage::SendMintTransaction(_) => String::from("SendMintTransaction"),
+            Erc20OpStage::ConfirmMint { .. } => String::from("ConfirmMint"),
+            Erc20OpStage::TokenMintConfirmed(_) => String::from("TokenMintConfirmed"),
+        }
+    }
+}

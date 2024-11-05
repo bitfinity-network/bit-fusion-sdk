@@ -16,6 +16,14 @@ use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
 use tokio::time::Instant;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{filter, Layer};
+
+use crate::flow::{DepositToken, WithdrawToken};
+
+mod flow;
 
 // This identity is only used to make the calls non-anonymous. No actual checks depend on this
 // identity.
@@ -45,6 +53,10 @@ enum CliCommand {
     DepositIcrc(DepositIcrcArgs),
     /// Get wallet nonce
     GetNonce(GetNonceArgs),
+    /// Run deposit flow (mint wrapped tokens from the base tokens)
+    Deposit(DepositToken),
+    /// Run withdrawal flow (recieve base tokens from the wrapped tokens)
+    Withdraw(WithdrawToken),
 }
 
 #[derive(Debug, Parser)]
@@ -279,6 +291,22 @@ struct WalletAddressArgs {
 
 #[tokio::main]
 async fn main() {
+    let stdout_logger = tracing_subscriber::fmt::layer()
+        .compact()
+        .with_ansi(true)
+        .with_span_events(FmtSpan::CLOSE)
+        .with_writer(std::io::stdout);
+
+    let registry = tracing_subscriber::registry().with(
+        stdout_logger
+            .with_filter(LevelFilter::TRACE)
+            .with_filter(filter::filter_fn(|metadata| {
+                metadata.target().starts_with("bridge_tool")
+            })),
+    );
+
+    tracing::subscriber::set_global_default(registry).expect("failed to set global default");
+
     match CliCommand::parse() {
         CliCommand::DeployBtfbridge(args) => deploy_btf_bridge(args).await,
         CliCommand::DeployWrappedTokenDeployer(args) => deploy_wrapped_token_deployer(args).await,
@@ -290,6 +318,8 @@ async fn main() {
         CliCommand::ExpectedContractAddress(args) => expected_contract_address(args),
         CliCommand::DepositIcrc(args) => deposit_icrc(args).await,
         CliCommand::GetNonce(args) => get_nonce(args).await,
+        CliCommand::Deposit(args) => args.run().await.unwrap(),
+        CliCommand::Withdraw(args) => args.run().await.unwrap(),
     }
 }
 

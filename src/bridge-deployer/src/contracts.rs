@@ -29,6 +29,7 @@ pub struct NetworkConfig {
     #[clap(value_enum, long)]
     pub evm_network: EvmNetwork,
     /// Custom network URL
+    #[clap(long)]
     pub custom_network: Option<String>,
 }
 
@@ -157,6 +158,7 @@ impl SolidityContractDeployer<'_> {
             solidity_dir.display(),
             args.join(" ")
         );
+        debug!("Environment variables: {env_vars:?}");
 
         let mut command = Command::new("sh");
         command
@@ -336,7 +338,13 @@ impl SolidityContractDeployer<'_> {
 
         debug!("Requesting nonce with EVM url: {url}");
 
-        let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
+        let reqwest_client = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        let client = EthJsonRpcClient::new(ReqwestClient::new_with_client(
+            url.to_string(),
+            reqwest_client,
+        ));
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)
