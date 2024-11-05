@@ -12,7 +12,7 @@ use crate::operation_log::Memo;
 sol! {
     #[derive(Debug, Serialize, Deserialize)]
     BTFBridge,
-    "../../solidity/out/BTFbridge.sol/BTFBridge.json"
+    "../../solidity/out/BTFBridge.sol/BTFBridge.json"
 }
 
 /// Emitted when token is burnt by BTFBridge.
