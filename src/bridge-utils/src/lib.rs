@@ -8,7 +8,7 @@ pub mod query;
 sol! {
     #[derive(Debug)]
     BTFBridge,
-    "../../solidity/out/BTFbridge.sol/BTFBridge.json"
+    "../../solidity/out/BTFBridge.sol/BTFBridge.json"
 }
 
 sol! {
