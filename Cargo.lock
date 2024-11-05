@@ -1058,6 +1058,7 @@ dependencies = [
  "ic-log",
  "ic-utils 0.37.0",
  "jsonrpc-core",
+ "reqwest",
  "serde",
  "serde_json",
  "strum",
@@ -1092,19 +1093,26 @@ name = "bridge-tool"
 version = "0.2.0"
 dependencies = [
  "alloy-sol-types",
+ "anyhow",
+ "bridge-client",
  "bridge-did",
  "bridge-utils",
  "candid",
  "clap 4.5.18",
  "did",
  "eth-signer",
+ "ethereum-json-rpc-client",
  "ethereum-types",
  "ethers-core",
  "evm-canister-client",
  "hex",
+ "ic-agent",
  "ic-canister-client",
  "rand",
+ "reqwest",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
