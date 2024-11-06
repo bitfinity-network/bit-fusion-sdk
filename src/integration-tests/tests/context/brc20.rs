@@ -331,7 +331,7 @@ where
     pub async fn set_bft_bridge_contract(&self, bft_bridge: &H160) -> anyhow::Result<()> {
         self.inner
             .brc20_bridge_client(ADMIN)
-            .set_bft_bridge_contract(&bft_bridge)
+            .set_bft_bridge_contract(bft_bridge)
             .await?;
         println!("BFT bridge contract updated to {bft_bridge}");
 
@@ -352,7 +352,7 @@ where
 
         let token = self
             .inner
-            .create_wrapped_token(&wallet, &bft_bridge_contract, tick.into())
+            .create_wrapped_token(wallet, &bft_bridge_contract, tick.into())
             .await?;
 
         self.tokens.insert(tick, token.clone());
@@ -468,6 +468,7 @@ where
         dst_address: &H160,
         sender: &Wallet<'static, SigningKey>,
         nonce: U256,
+        memo: Option<[u8; 32]>,
     ) -> Result<(), DepositError> {
         let dst_token = self.tokens.get(&tick).expect("token not found").clone();
 
@@ -484,7 +485,9 @@ where
         let input = BFTBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
-            memo: alloy_sol_types::private::FixedBytes::ZERO,
+            memo: memo
+                .map(|memo| memo.into())
+                .unwrap_or(alloy_sol_types::private::FixedBytes::ZERO),
         }
         .abi_encode();
 

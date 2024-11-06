@@ -70,6 +70,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
         &wallet_address,
         &ctx.eth_wallet,
         nonce,
+        None,
     )
     .await
     .expect("deposit failed");
@@ -139,17 +140,9 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 async fn test_brc20_bridge_stress_test() {
     let ctx = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
 
-    //let config = StressTestConfig {
-    //    users_number: 5,
-    //    user_deposits_per_token: 3,
-    //    init_user_balance: 2u64.pow(30).into(),
-    //    operation_amount: 2u64.pow(20).into(),
-    //    operation_timeout: Duration::from_secs(300),
-    //};
-
     let config = StressTestConfig {
-        users_number: 1,
-        user_deposits_per_token: 1,
+        users_number: 5,
+        user_deposits_per_token: 3,
         init_user_balance: DEFAULT_DEPOSIT_AMOUNT.into(),
         operation_amount: 100u64.into(),
         operation_timeout: Duration::from_secs(300),

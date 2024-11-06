@@ -212,7 +212,7 @@ where
         let token = self.tick(token_idx)?;
         let user = self.user_wallet(user)?.address.clone();
 
-        self.brc20_balance(&user, &token)
+        self.brc20_balance(&user, token)
             .await
             .map(|amount| amount.as_int().into())
     }
@@ -258,6 +258,7 @@ where
                 &eth_wallet_address,
                 &to_user.wallet,
                 nonce.into(),
+                Some(info.memo),
             )
             .await?;
 
@@ -314,6 +315,7 @@ where
         address: did::H160,
         memo: bridge_did::operation_log::Memo,
     ) -> Result<bool> {
+        println!("getting operation by memo: {memo:?} and user: {address}");
         let op_info = self
             .ctx()
             .brc20_bridge_client(self.ctx().admin_name())
