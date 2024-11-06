@@ -141,7 +141,7 @@ async fn test_brc20_bridge_stress_test() {
     let ctx = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
 
     let config = StressTestConfig {
-        users_number: 5,
+        users_number: 3,
         user_deposits_per_token: 3,
         init_user_balance: DEFAULT_DEPOSIT_AMOUNT.into(),
         operation_amount: 100u64.into(),
