@@ -100,6 +100,10 @@ impl DeployCommands {
             )
             .await?;
 
+        // set principal in canister ids and write it to canister_ids file
+        canister_ids.set((&self.bridge_type).into(), canister_id);
+        canister_ids.write()?;
+
         info!("Deploying BTF bridge");
         let BtfDeployedContracts {
             btf_bridge,
@@ -127,9 +131,6 @@ impl DeployCommands {
                 .await?;
         }
 
-        // set principal in canister ids
-        canister_ids.set((&self.bridge_type).into(), canister_id);
-
         // configure minter
         deployer.configure_minter(btf_bridge).await?;
 
@@ -144,9 +145,6 @@ impl DeployCommands {
                 evm,
             )
             .await?;
-
-        // write canister ids file
-        canister_ids.write()?;
 
         info!("Canister deployed successfully");
 
