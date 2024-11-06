@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "@openzeppelin/foundry-upgrades/Upgrades.sol";
-import {Options} from "@openzeppelin/foundry-upgrades/Options.sol";
+import { Options } from "@openzeppelin/foundry-upgrades/Options.sol";
 
 /**
  * @title PrepareUpgradeScript
@@ -36,16 +36,10 @@ contract PrepareUpgrade is Script {
         vm.stopBroadcast();
 
         // Retrieve and log the address of the new implementation
-        console.log(
-            "New implementation deployed at:",
-            newImplementationAddress
-        );
+        console.log("New implementation deployed at:", newImplementationAddress);
 
         // Optionally, store the implementation address for the next steps
-        vm.writeLine(
-            ".implementation_address",
-            vm.toString(newImplementationAddress)
-        );
+        vm.writeLine(".implementation_address", vm.toString(newImplementationAddress));
 
         console.log("Upgrade preparation completed.");
     }
@@ -136,10 +130,9 @@ contract UpgradeProxy is Script {
  * Include the functions needed for the upgrade process.
  */
 interface IBTFBridge {
-    function addAllowedImplementation(bytes32 bytecodeHash) external;
-
-    function upgradeToAndCall(
-        address newImplementation,
-        bytes memory data
+    function addAllowedImplementation(
+        bytes32 bytecodeHash
     ) external;
+
+    function upgradeToAndCall(address newImplementation, bytes memory data) external;
 }

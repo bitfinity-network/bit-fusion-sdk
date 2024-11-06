@@ -16,7 +16,7 @@ import "src/BTFBridge.sol";
  * !!! MAKE SURE THE OWNER IS THE SAME AS THE DEPLOYER
  */
 contract PauseUnpauseScript is Script {
-    function setUp() public {}
+    function setUp() public { }
 
     function run(address contractAddress, bool shouldPause) public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
