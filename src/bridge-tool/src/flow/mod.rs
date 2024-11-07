@@ -274,40 +274,33 @@ impl<'a> Erc20BridgeFlow<'a> {
     }
 
     async fn deposit(&self, amount: u128, recipient: Option<H160>) -> anyhow::Result<()> {
-        let recipient = recipient.unwrap_or_else(|| self.wallet.address());
-        let memo = Self::generate_memo();
-
-        self.approve_erc20(amount, EvmSide::Base).await?;
-
-        let base_chain_id = self.chain_id(EvmSide::Base).await?;
-        let base_sender_id =
-            Id256::from_evm_address(&self.wallet.address().into(), base_chain_id as u32);
-
-        self.approve_fee(EvmSide::Wrapped, base_sender_id, FEE_APPROVE_AMOUNT)
-            .await?;
-
-        self.burn_bft(EvmSide::Base, amount, &recipient, memo)
-            .await?;
-
-        self.track_operation(memo, EvmSide::Wrapped).await
+        self.wrap(amount, recipient, EvmSide::Base).await
     }
 
     async fn withdraw(&self, amount: u128, recipient: Option<H160>) -> anyhow::Result<()> {
+        self.wrap(amount, recipient, EvmSide::Wrapped).await
+    }
+
+    async fn wrap(
+        &self,
+        amount: u128,
+        recipient: Option<H160>,
+        side: EvmSide,
+    ) -> anyhow::Result<()> {
         let recipient = recipient.unwrap_or_else(|| self.wallet.address());
         let memo = Self::generate_memo();
 
-        self.approve_erc20(amount, EvmSide::Wrapped).await?;
+        self.approve_erc20(amount, side).await?;
 
-        let wrapped_chain_id = self.chain_id(EvmSide::Wrapped).await?;
-        let wrapped_sender_id =
-            Id256::from_evm_address(&self.wallet.address().into(), wrapped_chain_id as u32);
-        self.approve_fee(EvmSide::Base, wrapped_sender_id, FEE_APPROVE_AMOUNT)
+        let chain_id = self.chain_id(side).await?;
+        let sender_id = Id256::from_evm_address(&self.wallet.address().into(), chain_id as u32);
+
+        self.approve_fee(side.other(), sender_id, FEE_APPROVE_AMOUNT)
             .await?;
 
-        self.burn_bft(EvmSide::Wrapped, amount, &recipient, memo)
-            .await?;
+        self.burn_bft(side, amount, &recipient, memo).await?;
 
-        self.track_operation(memo, EvmSide::Base).await
+        self.track_operation(memo, side.other()).await
     }
 
     async fn get_fee_charge_address(&self, side: EvmSide) -> anyhow::Result<H160> {
