@@ -186,7 +186,6 @@ impl<B: BaseTokens> StressTestState<B> {
                     &evm_client,
                     fee_charge_address.clone(),
                     &wallet,
-                    &[user_id256],
                     10_u128.pow(15),
                 )
                 .await?;

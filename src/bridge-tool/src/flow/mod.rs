@@ -291,15 +291,8 @@ impl<'a> Erc20BridgeFlow<'a> {
         let memo = Self::generate_memo();
 
         self.approve_erc20(amount, side).await?;
-
-        let chain_id = self.chain_id(side).await?;
-        let sender_id = Id256::from_evm_address(&self.wallet.address().into(), chain_id as u32);
-
-        self.approve_fee(side.other(), sender_id, FEE_APPROVE_AMOUNT)
-            .await?;
-
+        self.approve_fee(side.other(), FEE_APPROVE_AMOUNT).await?;
         self.burn_bft(side, amount, &recipient, memo).await?;
-
         self.track_operation(memo, side.other()).await
     }
 
@@ -335,12 +328,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         Ok(address)
     }
 
-    async fn approve_fee(
-        &self,
-        evm_side: EvmSide,
-        sender_id: Id256,
-        amount: u128,
-    ) -> anyhow::Result<()> {
+    async fn approve_fee(&self, evm_side: EvmSide, amount: u128) -> anyhow::Result<()> {
         info!("Requesting fee charge approve");
 
         let (client, _, _) = self.get_side(evm_side);
@@ -353,12 +341,7 @@ impl<'a> Erc20BridgeFlow<'a> {
             .await?;
         let chain_id = self.chain_id(evm_side).await?;
 
-        let input = FeeCharge::nativeTokenDepositCall {
-            approvedSenderIDs: vec![alloy_sol_types::private::FixedBytes::from_slice(
-                &sender_id.0,
-            )],
-        }
-        .abi_encode();
+        let input = FeeCharge::nativeTokenDepositCall {}.abi_encode();
 
         let approve_tx = TransactionBuilder {
             from: &self.wallet.address().into(),

@@ -51,7 +51,6 @@ async fn test_icrc2_tokens_roundtrip() {
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -146,7 +145,6 @@ async fn test_icrc2_token_canister_stopped() {
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -345,7 +343,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -439,13 +436,11 @@ async fn icrc2_token_bridge(
     let amount = 300_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(10);
     ctx.native_token_deposit(
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -501,7 +496,6 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -567,7 +561,6 @@ async fn rescheduling_deposit_operation() {
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await
@@ -756,7 +749,6 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
         &evm_client,
         fee_charge.clone(),
         &john_wallet,
-        &[john_principal_id],
         native_token_amount.into(),
     )
     .await

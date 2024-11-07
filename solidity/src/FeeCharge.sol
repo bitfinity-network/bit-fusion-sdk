@@ -10,9 +10,7 @@ contract FeeCharge is IFeeCharge {
     // Mapping from user address to amount of native tokens on his deposit.
     mapping(address => uint256) private _userBalance;
 
-    // Mapping from user address to list of senderIDs, which are able to spend native deposit.
-    mapping(address => mapping(bytes32 => bool)) private _approvedIDs;
-
+    // Addresses allowed to charge fee from users.
     mapping(address => bool) private _canChargeFee;
 
     constructor(
@@ -25,18 +23,11 @@ contract FeeCharge is IFeeCharge {
         }
     }
 
-    // Deposit `msg.value` amount of native token to user's address.
-    // The deposit could be used to pay fees by the approvedSenderIDs.
+    // Deposit `msg.value` amount of native token to `msg.sender` address.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(
-        bytes32[] calldata approvedSenderIDs
-    ) external payable returns (uint256 balance) {
+    function nativeTokenDeposit() external payable returns (uint256 balance) {
         address to = msg.sender;
-
-        // Add approved SpenderIDs
-        for (uint256 i = 0; i < approvedSenderIDs.length; i++) {
-            _approvedIDs[to][approvedSenderIDs[i]] = true;
-        }
+        require(to != address(0), "expected non-zero to address");
 
         balance = _userBalance[to];
         balance += msg.value;
@@ -68,22 +59,12 @@ contract FeeCharge is IFeeCharge {
         balance = _userBalance[user];
     }
 
-    // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(
-        bytes32[] calldata approvedSenderIDs
-    ) external {
-        for (uint256 i = 0; i < approvedSenderIDs.length; i++) {
-            delete _approvedIDs[msg.sender][approvedSenderIDs[i]];
-        }
-    }
-
     // Take the given amount of fee from the user.
     // Require the user to have enough native token balance and approval for senderID.
-    function chargeFee(address from, address payable to, bytes32 senderID, uint256 amount) external {
+    function chargeFee(address from, address payable to, uint256 amount) external {
         require(_canChargeFee[msg.sender], "fee charger is not present in allow list");
         uint256 balance = _userBalance[from];
         require(balance >= amount, "insufficient balance to pay fee");
-        require(_approvedIDs[from][senderID], "senderID is not approved");
 
         uint256 newBalance = balance - amount;
         _userBalance[from] = newBalance;
@@ -91,7 +72,7 @@ contract FeeCharge is IFeeCharge {
     }
 
     /// Function to check if fee charge operation can be performed.
-    function canPayFee(address payer, bytes32 senderID, uint256 amount) external view returns (bool) {
+    function canPayFee(address payer, uint256 amount) external view returns (bool) {
         /// Check if the msg.sender is able to charge fee.
         if (!_canChargeFee[msg.sender]) {
             return false;
@@ -100,11 +81,6 @@ contract FeeCharge is IFeeCharge {
         /// Check if the payer have enough balance.
         uint256 balance = _userBalance[payer];
         if (balance < amount) {
-            return false;
-        }
-
-        /// Check if the payer approved fee charge for the senderID.
-        if (!_approvedIDs[payer][senderID]) {
             return false;
         }
 
