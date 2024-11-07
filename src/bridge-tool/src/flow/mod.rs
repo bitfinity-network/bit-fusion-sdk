@@ -295,7 +295,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         self.approve_fee(side.other(), sender_id, FEE_APPROVE_AMOUNT)
             .await?;
 
-        self.burn_bft(side, amount, &recipient, memo).await?;
+        self.burn_btf(side, amount, &recipient, memo).await?;
 
         self.track_operation(memo, side.other()).await
     }
