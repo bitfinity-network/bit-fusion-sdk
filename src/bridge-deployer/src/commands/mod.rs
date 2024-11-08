@@ -80,6 +80,9 @@ pub enum Bridge {
         init: config::InitBridgeConfig,
         #[command(flatten, next_help_heading = "ERC20 configuration")]
         erc: BaseEvmSettingsConfig,
+        /// Amount of ETH tokens to transfer to the bridge canister
+        #[arg(long)]
+        base_eth: Option<u128>,
     },
     Icrc {
         /// The configuration to use
@@ -142,7 +145,7 @@ impl Bridge {
                 debug!("ICRC Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
-            Bridge::Erc20 { init, erc } => {
+            Bridge::Erc20 { init, erc, .. } => {
                 trace!("Preparing ERC20 bridge configuration");
                 let signing_strategy = init.signing_key_id(evm_network).into();
                 let init = init.clone().into_bridge_init_data(owner, evm_network, evm);
@@ -196,7 +199,7 @@ impl Bridge {
         evm: Principal,
     ) -> anyhow::Result<Option<BftDeployedContracts>> {
         match self {
-            Self::Erc20 { erc, .. } => {
+            Self::Erc20 { erc, base_eth, .. } => {
                 let network = if let Some(url) = &erc.base_evm_url {
                     NetworkConfig {
                         custom_network: Some(url.clone()),
@@ -206,23 +209,30 @@ impl Bridge {
                     wrapped_network.into()
                 };
 
-                let bft_address = bft_args
-                    .deploy_bft(network, bridge_principal, pk, agent, false, evm)
+                let contracts = bft_args
+                    .deploy_bft(network.clone(), bridge_principal, pk, agent, false, evm)
                     .await?;
 
-                info!("Base BFT bridge deployed with address {bft_address:?}");
+                info!("Base BFT bridge deployed with address {contracts:?}");
 
                 let client = Erc20BridgeClient::new(IcAgentClient::with_agent(
                     bridge_principal,
                     agent.clone(),
                 ));
                 client
-                    .set_base_bft_bridge_contract(&bft_address.bft_bridge.into())
+                    .set_base_bft_bridge_contract(&contracts.bft_bridge.into())
                     .await?;
+
+                if let Some(eth) = base_eth {
+                    let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
+                    contract_deployer
+                        .transfer_eth(&contracts.minter_address, *eth)
+                        .await?;
+                }
 
                 info!("Bridge canister configured with base BFT bridge contract address");
 
-                Ok(Some(bft_address))
+                Ok(Some(contracts))
             }
             _ => Ok(None),
         }

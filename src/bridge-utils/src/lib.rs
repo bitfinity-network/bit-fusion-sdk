@@ -5,6 +5,9 @@ pub mod evm_bridge;
 pub mod evm_link;
 pub mod query;
 
+#[cfg(feature = "native")]
+pub mod native;
+
 sol! {
     #[derive(Debug)]
     BFTBridge,
