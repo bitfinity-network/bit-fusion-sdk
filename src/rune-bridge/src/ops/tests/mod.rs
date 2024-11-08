@@ -62,7 +62,7 @@ fn dst_tokens() -> HashMap<RuneName, H160> {
 
 pub mod minter_notification {
     use bridge_canister::bridge::OperationAction;
-    use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+    use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
     use bridge_did::event_data::*;
     use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
     use candid::Encode;

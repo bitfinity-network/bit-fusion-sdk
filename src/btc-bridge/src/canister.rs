@@ -3,7 +3,7 @@ mod inspect;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
@@ -12,7 +12,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::init::btc::WrappedTokenConfig;
 use bridge_did::init::BtcBridgeConfig;
 use bridge_did::op_id::OperationId;
@@ -35,7 +35,7 @@ use ic_storage::IcStorage;
 
 use crate::ops::{
     BtcBridgeOpImpl, BtcEventsHandler, BtcMintOrderHandler, BtcMintTxHandler,
-    FETCH_BFT_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
+    FETCH_BTF_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
     SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::State;
@@ -131,7 +131,7 @@ impl BtcBridge {
     }
 
     #[update]
-    pub fn admin_configure_wrapped_token(&self, config: WrappedTokenConfig) -> BftResult<()> {
+    pub fn admin_configure_wrapped_token(&self, config: WrappedTokenConfig) -> BTFResult<()> {
         Self::inspect_caller_is_owner()?;
 
         get_state().borrow_mut().configure_wrapped_token(config);
@@ -172,7 +172,7 @@ impl BtcBridge {
         generate_idl!()
     }
 
-    pub fn inspect_caller_is_owner() -> BftResult<()> {
+    pub fn inspect_caller_is_owner() -> BTFResult<()> {
         let owner = ConfigStorage::get().borrow().get_owner();
 
         if ic_cdk::caller() == owner {
@@ -212,8 +212,8 @@ fn init_runtime() -> SharedRuntime {
 
     let refresh_params_service = RefreshEvmParamsService::new(config.clone());
 
-    let fetch_bft_events_service =
-        FetchBftBridgeEventsService::new(BtcEventsHandler, runtime.clone(), config);
+    let fetch_btf_events_service =
+        FetchBtfBridgeEventsService::new(BtcEventsHandler, runtime.clone(), config);
 
     let sign_orders_handler = BtcMintOrderHandler::new(state.clone(), scheduler);
     let sign_mint_orders_service = SignMintOrdersService::new(sign_orders_handler);
@@ -229,8 +229,8 @@ fn init_runtime() -> SharedRuntime {
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
-        FETCH_BFT_EVENTS_SERVICE_ID,
-        Rc::new(fetch_bft_events_service),
+        FETCH_BTF_EVENTS_SERVICE_ID,
+        Rc::new(fetch_btf_events_service),
     );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,

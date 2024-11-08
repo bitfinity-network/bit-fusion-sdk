@@ -1,4 +1,4 @@
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_did::operations::Erc20BridgeOp;
@@ -65,15 +65,15 @@ impl<C: CanisterClient> Erc20BridgeClient<C> {
             .await
     }
 
-    pub async fn set_base_bft_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {
+    pub async fn set_base_btf_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {
         self.client
-            .update("set_base_bft_bridge_contract", (address,))
+            .update("set_base_btf_bridge_contract", (address,))
             .await
     }
 
     pub async fn get_bridge_canister_base_evm_address(
         &self,
-    ) -> CanisterClientResult<BftResult<H160>> {
+    ) -> CanisterClientResult<BTFResult<H160>> {
         self.client
             .update("get_bridge_canister_base_evm_address", ())
             .await

@@ -1,6 +1,6 @@
 #[cfg(target_family = "wasm")]
 use bridge_canister::bridge_inspect;
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 #[cfg(target_family = "wasm")]
 use ic_exports::ic_cdk;
 #[cfg(target_family = "wasm")]
@@ -24,7 +24,7 @@ async fn inspect_message() {
 }
 
 #[allow(dead_code)]
-async fn inspect_method(method: &str) -> BftResult<()> {
+async fn inspect_method(method: &str) -> BTFResult<()> {
     match method {
         method if method.starts_with("admin_") => BtcBridge::inspect_caller_is_owner(),
         _ => Ok(()),

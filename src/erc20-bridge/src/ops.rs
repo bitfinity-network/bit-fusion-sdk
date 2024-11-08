@@ -7,7 +7,7 @@ use bridge_canister::runtime::service::{BridgeService, ServiceId};
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::bridge_side::BridgeSide;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
@@ -38,7 +38,7 @@ impl Operation for Erc20BridgeOpImpl {
         self,
         _id: OperationId,
         _ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>> {
+    ) -> BTFResult<OperationProgress<Self>> {
         let stage = Erc20OpStageImpl(self.0.stage);
         let next_stage = match self.0.side {
             BridgeSide::Base => stage.progress().await?,
@@ -132,7 +132,7 @@ impl Erc20OpStageImpl {
         }
     }
 
-    async fn progress(self) -> BftResult<OperationProgress<Self>> {
+    async fn progress(self) -> BTFResult<OperationProgress<Self>> {
         match self.0 {
             Erc20OpStage::SignMintOrder(_) => {
                 Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID))
@@ -164,14 +164,14 @@ impl<S> Erc20ServiceSelector<S> {
 
 #[async_trait::async_trait(?Send)]
 impl<S: BridgeService> BridgeService for Erc20ServiceSelector<S> {
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         let (base_result, wrapped_result) = futures::join!(self.base.run(), self.wrapped.run());
         base_result?;
         wrapped_result?;
         Ok(())
     }
 
-    fn push_operation(&self, id: OperationId) -> BftResult<()> {
+    fn push_operation(&self, id: OperationId) -> BTFResult<()> {
         let Some(op) = get_runtime_state().borrow().operations.get(id) else {
             log::warn!("Attempt to add unexisting operataion to mint order sign service");
             return Err(Error::OperationNotFound(id));
@@ -206,7 +206,7 @@ impl Erc20OrderHandler {
 }
 
 impl MintOrderHandler for Erc20OrderHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.config.borrow().get_signer()
     }
 
@@ -258,7 +258,7 @@ impl MintOrderHandler for Erc20OrderHandler {
 }
 
 impl MintTxHandler for Erc20OrderHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.config.borrow().get_signer()
     }
 

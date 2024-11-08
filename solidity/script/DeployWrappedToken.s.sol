@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "src/BftBridge.sol";
+import "src/BTFBridge.sol";
 
 contract DeployWrappedToken is Script {
     function run() external {
         // Load environment variables or parameters
-        address bftBridgeAddress = vm.envAddress("BFT_BRIDGE");
+        address btfBridgeAddress = vm.envAddress("BTF_BRIDGE");
         string memory name = vm.envString("NAME");
         string memory symbol = vm.envString("SYMBOL");
         uint8 decimals = uint8(vm.envUint("DECIMALS"));
@@ -22,10 +22,10 @@ contract DeployWrappedToken is Script {
         vm.startBroadcast();
 
         // Get contract instance
-        BFTBridge bftBridge = BFTBridge(bftBridgeAddress);
+        BTFBridge btfBridge = BTFBridge(btfBridgeAddress);
 
         // Deploy ERC20 token
-        address tokenAddress = bftBridge.deployERC20(name, symbol, decimals, baseTokenId);
+        address tokenAddress = btfBridge.deployERC20(name, symbol, decimals, baseTokenId);
 
         // Stop broadcasting transactions
         vm.stopBroadcast();

@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
@@ -10,7 +10,7 @@ use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
@@ -29,7 +29,7 @@ use ic_storage::IcStorage;
 
 use crate::ops::events_handler::IcrcEventsHandler;
 use crate::ops::{
-    IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, FETCH_BFT_EVENTS_SERVICE_ID,
+    IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, FETCH_BTF_EVENTS_SERVICE_ID,
     REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::IcrcState;
@@ -130,7 +130,7 @@ impl Icrc2BridgeCanister {
 
     /// Adds the provided principal to the whitelist.
     #[update]
-    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
+    pub fn add_to_whitelist(&mut self, icrc2_principal: Principal) -> BTFResult<()> {
         let state = get_icrc_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
@@ -144,7 +144,7 @@ impl Icrc2BridgeCanister {
 
     /// Remove a icrc2 principal token from the access list
     #[update]
-    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> BftResult<()> {
+    pub fn remove_from_whitelist(&mut self, icrc2_principal: Principal) -> BTFResult<()> {
         let state = get_icrc_state();
 
         Self::access_control_inspect_message_check(ic::caller(), icrc2_principal)?;
@@ -165,7 +165,7 @@ impl Icrc2BridgeCanister {
     fn access_control_inspect_message_check(
         owner: Principal,
         icrc2_principal: Principal,
-    ) -> BftResult<()> {
+    ) -> BTFResult<()> {
         inspect_check_is_owner(owner)?;
         check_anonymous_principal(icrc2_principal)?;
 
@@ -198,7 +198,7 @@ impl Metrics for Icrc2BridgeCanister {
 }
 
 /// inspect function to check whether provided principal is owner
-fn inspect_check_is_owner(principal: Principal) -> BftResult<()> {
+fn inspect_check_is_owner(principal: Principal) -> BTFResult<()> {
     let owner = ConfigStorage::get().borrow().get_owner();
 
     if owner != principal {
@@ -209,7 +209,7 @@ fn inspect_check_is_owner(principal: Principal) -> BftResult<()> {
 }
 
 /// inspect function to check whether the provided principal is anonymous
-fn check_anonymous_principal(principal: Principal) -> BftResult<()> {
+fn check_anonymous_principal(principal: Principal) -> BTFResult<()> {
     if principal == Principal::anonymous() {
         return Err(Error::AnonymousPrincipal);
     }
@@ -226,8 +226,8 @@ fn init_runtime() -> SharedRuntime {
 
     let refresh_params_service = RefreshEvmParamsService::new(config.clone());
 
-    let fetch_bft_events_service =
-        FetchBftBridgeEventsService::new(IcrcEventsHandler, runtime.clone(), config);
+    let fetch_btf_events_service =
+        FetchBtfBridgeEventsService::new(IcrcEventsHandler, runtime.clone(), config);
 
     let sign_orders_handler = IcrcMintOrderHandler::new(state.clone(), scheduler);
     let sign_mint_orders_service = SignMintOrdersService::new(sign_orders_handler);
@@ -243,8 +243,8 @@ fn init_runtime() -> SharedRuntime {
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
-        FETCH_BFT_EVENTS_SERVICE_ID,
-        Rc::new(fetch_bft_events_service),
+        FETCH_BTF_EVENTS_SERVICE_ID,
+        Rc::new(fetch_btf_events_service),
     );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,

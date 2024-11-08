@@ -17,7 +17,7 @@ pub fn bridge_inspect() {
         "set_logger_filter" => inspect_set_logger_filter(config),
         "ic_logs" => inspect_ic_logs(config),
         "set_owner" => inspect_set_owner(config),
-        "set_bft_bridge_contract" => inspect_set_bft_bridge_contract(config),
+        "set_btf_bridge_contract" => inspect_set_btf_bridge_contract(config),
         _ => {}
     }
 }
@@ -57,8 +57,8 @@ pub fn inspect_set_evm_principal(config: SharedConfig) {
     inspect_caller_is_owner(owner, caller)
 }
 
-/// Inspect check for `set_bft_bridge_contract` API method.
-pub fn inspect_set_bft_bridge_contract(config: SharedConfig) {
+/// Inspect check for `set_btf_bridge_contract` API method.
+pub fn inspect_set_btf_bridge_contract(config: SharedConfig) {
     let caller = ic::caller();
     let owner = config.borrow().get_owner();
     inspect_caller_is_owner(owner, caller)

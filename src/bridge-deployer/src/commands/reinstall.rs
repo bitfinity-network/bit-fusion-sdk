@@ -37,9 +37,9 @@ pub struct ReinstallCommands {
     #[arg(long, value_name = "WASM_PATH")]
     wasm: PathBuf,
 
-    /// Existing BFT bridge contract address to work with the deployed bridge.
-    #[arg(long = "bft-bridge", value_name = "ADDRESS")]
-    bft_bridge: H160,
+    /// Existing BTF bridge contract address to work with the deployed bridge.
+    #[arg(long = "btf-bridge", value_name = "ADDRESS")]
+    btf_bridge: H160,
 }
 
 impl ReinstallCommands {
@@ -87,7 +87,7 @@ impl ReinstallCommands {
 
         info!("Canister installed successfully");
 
-        deployer.configure_minter(self.bft_bridge).await?;
+        deployer.configure_minter(self.btf_bridge).await?;
 
         info!("Canister reinstalled successfully with ID: {}", canister_id);
 

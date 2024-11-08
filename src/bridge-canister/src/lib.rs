@@ -1,4 +1,4 @@
-//! Implementation of the common functions for BFT bridge canisters. The main entry point is
+//! Implementation of the common functions for BTF bridge canisters. The main entry point is
 //! [`BridgeCanister`] trait that should be implemented by a canister to include common APIs and
 //! functions.
 //!

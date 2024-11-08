@@ -1,10 +1,10 @@
 #![allow(async_fn_in_trait)]
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_utils::bft_events::BridgeEvent;
+use bridge_utils::btf_events::BridgeEvent;
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLinkClient;
 use candid::CandidType;
@@ -26,7 +26,7 @@ pub trait Operation:
         self,
         id: OperationId,
         ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>>;
+    ) -> BTFResult<OperationProgress<Self>>;
 
     /// Check if the operation is complete.
     fn is_complete(&self) -> bool;
@@ -45,16 +45,16 @@ pub trait OperationContext {
     /// Get link to the EVM with wrapped tokens.
     fn get_evm_link(&self) -> EvmLink;
 
-    /// Get address of the BftBridge contract.
-    fn get_bridge_contract_address(&self) -> BftResult<H160>;
+    /// Get address of the Btfbridge contract.
+    fn get_bridge_contract_address(&self) -> BTFResult<H160>;
 
     /// Get EVM parameters.
-    fn get_evm_params(&self) -> BftResult<EvmParams>;
+    fn get_evm_params(&self) -> BTFResult<EvmParams>;
 
     /// Get signer for transactions, orders, etc...
-    fn get_signer(&self) -> BftResult<impl TransactionSigner>;
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner>;
 
-    async fn collect_evm_events(&self, max_logs_number: u64) -> BftResult<CollectedEvents> {
+    async fn collect_evm_events(&self, max_logs_number: u64) -> BTFResult<CollectedEvents> {
         log::trace!("collecting evm events");
 
         let link = self.get_evm_link();

@@ -95,7 +95,7 @@ To upgrade a bridge, you will need to provide the canister id of the bridge to b
 To reinstall a bridge, you will need to provide the canister id of the bridge to be reinstalled. The command is similar to the deployment command, with the addition of the `--canister-id` argument.
 
 ```bash
-bridge-deployer reinstall [BRIDGE_TYPE] --canister-id <PRINCIPAL> --wasm <WASM_PATH> --bft-bridge <ADDRESS>
+bridge-deployer reinstall [BRIDGE_TYPE] --canister-id <PRINCIPAL> --wasm <WASM_PATH> --btf-bridge <ADDRESS>
 ```
 
 Note: You need to provide the canister arguments for the bridge type you are reinstalling.
@@ -124,7 +124,7 @@ Note: The examples above are for illustrative purposes only. Please replace the 
 
 ### Extra Information
 
-For the upgrade process, only the canister will be upgraded. The BFT contract will remain the same, hence the BFT contract should be deployed separately in case it requires an upgrade.
+For the upgrade process, only the canister will be upgraded. The BTF contract will remain the same, hence the BTF contract should be deployed separately in case it requires an upgrade.
 
 ### Troubleshooting
 

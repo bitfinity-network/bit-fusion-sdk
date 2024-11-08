@@ -1,33 +1,33 @@
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
-use bridge_utils::bft_events::BridgeEvent;
+use bridge_utils::btf_events::BridgeEvent;
 
 use super::BridgeService;
 use crate::bridge::{Operation, OperationAction, OperationContext};
 use crate::runtime::state::SharedConfig;
 use crate::runtime::{RuntimeState, SharedRuntime};
 
-pub trait BftBridgeEventHandler<Op> {
+pub trait BtfBridgeEventHandler<Op> {
     /// Action to perform when a WrappedToken is minted.
     fn on_wrapped_token_minted(&self, event: MintedEventData) -> Option<OperationAction<Op>>;
 
     /// Action to perform when a WrappedToken is burnt.
     fn on_wrapped_token_burnt(&self, event: BurntEventData) -> Option<OperationAction<Op>>;
 
-    /// Action to perform on notification from BftBridge contract.
+    /// Action to perform on notification from Btfbridge contract.
     fn on_minter_notification(&self, event: NotifyMinterEventData) -> Option<OperationAction<Op>>;
 }
 
 /// Service to fetch logs from evm and process it using event handler H.
-pub struct FetchBftBridgeEventsService<Op: Operation, H> {
+pub struct FetchBtfBridgeEventsService<Op: Operation, H> {
     handler: H,
     runtime: SharedRuntime<Op>,
     evm_config: SharedConfig,
 }
 
-impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op, H> {
+impl<Op: Operation, H: BtfBridgeEventHandler<Op>> FetchBtfBridgeEventsService<Op, H> {
     const MAX_LOG_REQUEST_COUNT: u64 = 1000;
 
     /// Creates new instance of the service, which will fetch events using the `evm_config`
@@ -44,7 +44,7 @@ impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op
         self.runtime.borrow().state().clone()
     }
 
-    async fn collect_evm_logs(&self) -> BftResult<()> {
+    async fn collect_evm_logs(&self) -> BTFResult<()> {
         let collected = self
             .evm_config
             .collect_evm_events(Self::MAX_LOG_REQUEST_COUNT)
@@ -146,14 +146,14 @@ impl<Op: Operation, H: BftBridgeEventHandler<Op>> FetchBftBridgeEventsService<Op
 }
 
 #[async_trait::async_trait(?Send)]
-impl<Op: Operation, H: BftBridgeEventHandler<Op>> BridgeService
-    for FetchBftBridgeEventsService<Op, H>
+impl<Op: Operation, H: BtfBridgeEventHandler<Op>> BridgeService
+    for FetchBtfBridgeEventsService<Op, H>
 {
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         self.collect_evm_logs().await
     }
 
-    fn push_operation(&self, _: OperationId) -> BftResult<()> {
+    fn push_operation(&self, _: OperationId) -> BTFResult<()> {
         Err(Error::FailedToProgress(
             "Log fetch service doesn't requre operations".into(),
         ))

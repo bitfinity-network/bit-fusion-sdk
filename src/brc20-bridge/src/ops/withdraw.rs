@@ -1,4 +1,4 @@
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::operations::{
     Brc20BridgeWithdrawOp, Brc20WithdrawalPayload, DidTransaction, RevealUtxo,
 };
@@ -14,7 +14,7 @@ impl Brc20BridgeWithdrawOpImpl {
     /// Create BRC20 transfer inscription transactions
     pub async fn create_inscription_txs(
         payload: Brc20WithdrawalPayload,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
@@ -48,7 +48,7 @@ impl Brc20BridgeWithdrawOpImpl {
         commit_tx: DidTransaction,
         reveal_tx: DidTransaction,
         reveal_utxo: RevealUtxo,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
@@ -72,7 +72,7 @@ impl Brc20BridgeWithdrawOpImpl {
         payload: Brc20WithdrawalPayload,
         reveal_tx: DidTransaction,
         reveal_utxo: RevealUtxo,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
@@ -94,7 +94,7 @@ impl Brc20BridgeWithdrawOpImpl {
     pub async fn await_inscription_transactions(
         payload: Brc20WithdrawalPayload,
         reveal_utxo: RevealUtxo,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
@@ -122,7 +122,7 @@ impl Brc20BridgeWithdrawOpImpl {
     pub async fn create_transfer_transaction(
         payload: Brc20WithdrawalPayload,
         reveal_utxo: Utxo,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 
@@ -144,7 +144,7 @@ impl Brc20BridgeWithdrawOpImpl {
     pub async fn send_transfer_transaction(
         from_address: H160,
         tx: DidTransaction,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let withdraw = Withdrawal::get()
             .map_err(|err| Error::FailedToProgress(format!("cannot get withdraw: {err:?}")))?;
 

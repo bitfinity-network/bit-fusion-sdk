@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
@@ -29,8 +29,8 @@ use ic_storage::IcStorage;
 use crate::canister::inspect::inspect_is_owner;
 use crate::interface::GetAddressError;
 use crate::ops::{
-    Brc20BftEventsHandler, Brc20BridgeOpImpl, Brc20MintOrderHandler, Brc20MintTxHandler,
-    FETCH_BFT_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
+    Brc20BridgeOpImpl, Brc20BtfEventsHandler, Brc20MintOrderHandler, Brc20MintTxHandler,
+    FETCH_BTF_EVENTS_SERVICE_ID, REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID,
     SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::Brc20State;
@@ -191,9 +191,9 @@ fn init_runtime() -> SharedRuntime {
     let mint_tx_handler = Brc20MintTxHandler::new(state.clone());
     let mint_tx_service = Rc::new(SendMintTxService::new(mint_tx_handler));
 
-    let bft_events_handler = Brc20BftEventsHandler::new(get_brc20_state());
-    let fetch_bft_events_service = Rc::new(FetchBftBridgeEventsService::new(
-        bft_events_handler,
+    let btf_events_handler = Brc20BtfEventsHandler::new(get_brc20_state());
+    let fetch_btf_events_service = Rc::new(FetchBtfBridgeEventsService::new(
+        btf_events_handler,
         runtime.clone(),
         config,
     ));
@@ -206,8 +206,8 @@ fn init_runtime() -> SharedRuntime {
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
-        FETCH_BFT_EVENTS_SERVICE_ID,
-        fetch_bft_events_service,
+        FETCH_BTF_EVENTS_SERVICE_ID,
+        fetch_btf_events_service,
     );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,

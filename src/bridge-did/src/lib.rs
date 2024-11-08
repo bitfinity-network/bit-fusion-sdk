@@ -19,7 +19,7 @@ pub mod runes;
 /// Re-export the event data
 ///
 pub mod event_data {
-    pub use crate::events::BFTBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
+    pub use crate::events::BTFBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
     pub use crate::events::{
         BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
     };
