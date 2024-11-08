@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::bridge::OperationAction;
-use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
 use bridge_did::event_data::{
     BurntEventData, MintedEventData, MinterNotificationType, NotifyMinterEventData,
 };
@@ -48,7 +48,7 @@ impl RuneEventsHandler {
     }
 }
 
-impl BftBridgeEventHandler<RuneBridgeOpImpl> for RuneEventsHandler {
+impl BtfBridgeEventHandler<RuneBridgeOpImpl> for RuneEventsHandler {
     fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,

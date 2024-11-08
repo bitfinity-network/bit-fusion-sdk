@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 
 pub mod fetch_logs;
@@ -13,9 +13,9 @@ pub mod update_evm_params;
 // The async-trait macro is necessary to make the trait object safe.
 #[async_trait::async_trait(?Send)]
 pub trait BridgeService {
-    async fn run(&self) -> BftResult<()>;
+    async fn run(&self) -> BTFResult<()>;
 
-    fn push_operation(&self, id: OperationId) -> BftResult<()>;
+    fn push_operation(&self, id: OperationId) -> BTFResult<()>;
 }
 
 pub type ServiceId = u64;
@@ -45,7 +45,7 @@ impl Services {
     }
 
     /// Asks a start service with the given id to process operation with the given OperationId.
-    pub fn push_operation(&self, service_id: ServiceId, op_id: OperationId) -> BftResult<()> {
+    pub fn push_operation(&self, service_id: ServiceId, op_id: OperationId) -> BTFResult<()> {
         let Some(service) = self
             .before
             .get(&service_id)

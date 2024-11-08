@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
@@ -28,7 +28,7 @@ use crate::canister::inspect::{inspect_configure_ecdsa, inspect_configure_indexe
 use crate::interface::GetAddressError;
 use crate::ops::events_handler::RuneEventsHandler;
 use crate::ops::{
-    RuneBridgeOpImpl, RuneMintOrderHandler, RuneMintTxHandler, FETCH_BFT_EVENTS_SERVICE_ID,
+    RuneBridgeOpImpl, RuneMintOrderHandler, RuneMintTxHandler, FETCH_BTF_EVENTS_SERVICE_ID,
     REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::RuneState;
@@ -205,8 +205,8 @@ fn init_runtime() -> SharedRuntime {
     let refresh_params_service = RefreshEvmParamsService::new(config.clone());
 
     let events_handler = RuneEventsHandler::new(get_rune_state());
-    let fetch_bft_events_service =
-        FetchBftBridgeEventsService::new(events_handler, runtime.clone(), config);
+    let fetch_btf_events_service =
+        FetchBtfBridgeEventsService::new(events_handler, runtime.clone(), config);
 
     let sign_orders_handler = RuneMintOrderHandler::new(state.clone(), scheduler);
     let sign_mint_orders_service = Rc::new(SignMintOrdersService::new(sign_orders_handler));
@@ -222,8 +222,8 @@ fn init_runtime() -> SharedRuntime {
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
-        FETCH_BFT_EVENTS_SERVICE_ID,
-        Rc::new(fetch_bft_events_service),
+        FETCH_BTF_EVENTS_SERVICE_ID,
+        Rc::new(fetch_btf_events_service),
     );
     services.borrow_mut().add_service(
         ServiceOrder::ConcurrentWithOperations,

@@ -86,7 +86,7 @@ All commands of bridge deployer require a private key of you EVM wallet to run E
 
 ### Erc20 bridge
 
-Deploy bridge canister and BFT bridge contract:
+Deploy bridge canister and BTF bridge contract:
 
 ```shell
 cargo run -p bridge-deployer -- deploy --wasm .artifact/erc20-bridge.wasm.gz \
@@ -98,7 +98,7 @@ After the bridge was deployed, create a wrapped token (using addresses from the 
 ```shell
 cargo run -p bridge-deployer -- wrap erc20 \
   --base-evm-url https://testnet.bitfinity.network \
-  --base-bft-address <BASE_BFT_CONTRACT_ADDRESS> \
-  --wrapped-bft-address <WRAPPED_BFT_CONTRACT_ADDRESS> \
+  --base-btf-address <BASE_BTF_CONTRACT_ADDRESS> \
+  --wrapped-btf-address <WRAPPED_BTF_CONTRACT_ADDRESS> \
   --token-address <BASE_TOKEN_ADDRESS>
 ```

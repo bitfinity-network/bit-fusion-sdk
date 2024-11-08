@@ -12,7 +12,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
+contract BTFBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
     using RingBuffer for RingBuffer.RingBufferUint32;
     using SafeERC20 for IERC20;
 
@@ -112,7 +112,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         _disableInitializers();
     }
 
-    /// Initializes the BftBridge contract.
+    /// Initializes the BTFBridge contract.
     ///
     /// @param minterAddress The address of the minter canister.
     /// @param feeChargeAddress The address of the fee charge contract.
@@ -339,7 +339,7 @@ contract BFTBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
         bytes memory recipientID,
         bytes32 memo
     ) public whenNotPaused returns (uint32) {
-        require(fromERC20 != address(this), "From address must not be BFT bridge address");
+        require(fromERC20 != address(this), "From address must not be BTF bridge address");
         require(fromERC20 != address(0), "Invalid from address; must not be zero address");
         // Check if the token is registered on the bridge or the side is base
         require(

@@ -228,10 +228,10 @@ async fn test_should_reinstall_bridge() {
     let ckbtc_ledger = ctx.canisters.icrc1_ledger().to_text();
     let ckbtc_minter = ctx.canisters.ck_btc_minter().to_text();
 
-    // deploy the bft bridge
-    let bft_bridge = deploy_bft_bridge(&ctx)
+    // deploy the btf bridge
+    let btf_bridge = deploy_btf_bridge(&ctx)
         .await
-        .expect("failed to deploy bft bridge");
+        .expect("failed to deploy btf bridge");
 
     // get the output dir for evaluated trycmd files
     let trycmd_output_dir = TempDir::new().expect("failed to create temp file");
@@ -255,7 +255,7 @@ async fn test_should_reinstall_bridge() {
             ("ERC20_BRIDGE_ID", erc20_bridge_id.to_string()),
             ("ICRC2_BRIDGE_ID", icrc2_bridge_id.to_string()),
             ("RUNE_BRIDGE_ID", rune_bridge_id.to_string()),
-            ("BFT_BRIDGE", hex::encode(bft_bridge)),
+            ("BTF_BRIDGE", hex::encode(btf_bridge)),
         ],
         Path::new("./tests/bridge_deployer/reinstall"),
         trycmd_output_dir.path(),
@@ -310,8 +310,8 @@ fn restore_manifest_dir() {
     std::env::set_current_dir(&manifest_dir).expect("failed to change cwd");
 }
 
-/// Deploy the BFT bridge
-async fn deploy_bft_bridge(ctx: &DfxTestContext) -> anyhow::Result<H160> {
+/// Deploy the BTF bridge
+async fn deploy_btf_bridge(ctx: &DfxTestContext) -> anyhow::Result<H160> {
     let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY)?;
     let wallet = Wallet::from_bytes(&private_key_bytes)?;
 
@@ -324,8 +324,8 @@ async fn deploy_bft_bridge(ctx: &DfxTestContext) -> anyhow::Result<H160> {
         .initialize_wrapped_token_deployer_contract(&wallet)
         .await?;
 
-    let bft_bridge = ctx
-        .initialize_bft_bridge_with_minter(
+    let btf_bridge = ctx
+        .initialize_btf_bridge_with_minter(
             &wallet,
             btc_bridge_eth_address.unwrap(),
             None,
@@ -334,5 +334,5 @@ async fn deploy_bft_bridge(ctx: &DfxTestContext) -> anyhow::Result<H160> {
         )
         .await?;
 
-    Ok(bft_bridge.0)
+    Ok(btf_bridge.0)
 }

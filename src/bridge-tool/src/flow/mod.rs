@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use bridge_client::Erc20BridgeClient;
 use bridge_did::id256::Id256;
 use bridge_did::operations::Erc20OpStage;
-use bridge_utils::{BFTBridge, FeeCharge, WrappedToken};
+use bridge_utils::{BTFBridge, FeeCharge, WrappedToken};
 use candid::Principal;
 use clap::{Args, Parser, Subcommand};
 use did::block::ExeResult;
@@ -64,9 +64,9 @@ pub struct DepositErc20Args {
     #[arg(long)]
     base_evm: String,
 
-    /// Base side BFT bridge contract address
+    /// Base side BTF bridge contract address
     #[arg(long)]
-    base_bft: H160,
+    base_btf: H160,
 
     /// Base token address
     #[arg(long)]
@@ -76,9 +76,9 @@ pub struct DepositErc20Args {
     #[clap(long)]
     wrapped_evm: String,
 
-    /// Wrapped side BFT bridge contract address
+    /// Wrapped side BTF bridge contract address
     #[arg(long)]
-    wrapped_bft: H160,
+    wrapped_btf: H160,
 
     /// Wrapped token address
     #[arg(long)]
@@ -92,7 +92,7 @@ pub struct DepositErc20Args {
     #[arg(long)]
     bridge_canister: Principal,
 
-    /// Amount of tokens to be tranferred
+    /// Amount of tokens to be transferred
     #[arg(long)]
     amount: u128,
 
@@ -107,9 +107,9 @@ pub struct WithdrawErc20Args {
     #[arg(long)]
     base_evm: String,
 
-    /// Base side BFT bridge contract address
+    /// Base side BTF bridge contract address
     #[arg(long)]
-    base_bft: H160,
+    base_btf: H160,
 
     /// Base token address
     #[arg(long)]
@@ -119,9 +119,9 @@ pub struct WithdrawErc20Args {
     #[clap(long)]
     wrapped_evm: String,
 
-    /// Wrapped side BFT bridge contract address
+    /// Wrapped side BTF bridge contract address
     #[arg(long)]
-    wrapped_bft: H160,
+    wrapped_btf: H160,
 
     /// Wrapped token address
     #[arg(long)]
@@ -135,7 +135,7 @@ pub struct WithdrawErc20Args {
     #[arg(long)]
     bridge_canister: Principal,
 
-    /// Amount of tokens to be tranferred
+    /// Amount of tokens to be transferred
     #[arg(long)]
     amount: u128,
 
@@ -150,19 +150,16 @@ struct Erc20BridgeFlow<'a> {
     wallet: Wallet<'a, SigningKey>,
     base_client: RpcClient,
     wrapped_client: RpcClient,
-
-    base_bft: H160,
+    base_btf: H160,
     base_token: H160,
-
-    wrapped_bft: H160,
+    wrapped_btf: H160,
     wrapped_token: H160,
-
     ic_host: String,
     bridge_canister: Principal,
 }
 
 impl<'a> Erc20BridgeFlow<'a> {
-    fn new_desposit(pk: H256, args: &DepositErc20Args) -> Self {
+    fn new_deposit(pk: H256, args: &DepositErc20Args) -> Self {
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
@@ -181,9 +178,9 @@ impl<'a> Erc20BridgeFlow<'a> {
             wallet,
             base_client,
             wrapped_client,
-            base_bft: args.base_bft,
+            base_btf: args.base_btf,
             base_token: args.base_token,
-            wrapped_bft: args.wrapped_bft,
+            wrapped_btf: args.wrapped_btf,
             wrapped_token: args.wrapped_token,
             ic_host: args.ic_host.clone(),
             bridge_canister: args.bridge_canister,
@@ -209,9 +206,9 @@ impl<'a> Erc20BridgeFlow<'a> {
             wallet,
             base_client,
             wrapped_client,
-            base_bft: args.base_bft,
+            base_btf: args.base_btf,
             base_token: args.base_token,
-            wrapped_bft: args.wrapped_bft,
+            wrapped_btf: args.wrapped_btf,
             wrapped_token: args.wrapped_token,
             ic_host: args.ic_host.clone(),
             bridge_canister: args.bridge_canister,
@@ -232,7 +229,7 @@ impl DepositToken {
     pub async fn run(&self) -> anyhow::Result<()> {
         match &self.token_type {
             DepositTokenType::Erc20(erc20args) => {
-                let flow = Erc20BridgeFlow::new_desposit(self.private_key, erc20args);
+                let flow = Erc20BridgeFlow::new_deposit(self.private_key, erc20args);
                 flow.deposit(erc20args.amount, erc20args.recipient).await
             }
         }
@@ -298,20 +295,20 @@ impl<'a> Erc20BridgeFlow<'a> {
         self.approve_fee(side.other(), sender_id, FEE_APPROVE_AMOUNT)
             .await?;
 
-        self.burn_bft(side, amount, &recipient, memo).await?;
+        self.burn_btf(side, amount, &recipient, memo).await?;
 
         self.track_operation(memo, side.other()).await
     }
 
     async fn get_fee_charge_address(&self, side: EvmSide) -> anyhow::Result<H160> {
-        let input = BFTBridge::feeChargeContractCall {}.abi_encode();
+        let input = BTFBridge::feeChargeContractCall {}.abi_encode();
 
-        let (client, bft, _) = self.get_side(side);
+        let (client, btf, _) = self.get_side(side);
         let result = client
             .eth_call(
                 TransactionRequest {
                     from: Some(self.wallet.address()),
-                    to: Some((*bft).into()),
+                    to: Some((*btf).into()),
                     gas: None,
                     gas_price: None,
                     value: None,
@@ -327,8 +324,8 @@ impl<'a> Erc20BridgeFlow<'a> {
             .unwrap_or_else(|_| panic!("Invalid response for fee charge address: {result}"));
 
         info!(
-            "Fee charge address for BFT {} is {}",
-            bft.encode_hex_with_prefix(),
+            "Fee charge address for BTF {} is {}",
+            btf.encode_hex_with_prefix(),
             address.encode_hex_with_prefix()
         );
 
@@ -482,15 +479,15 @@ impl<'a> Erc20BridgeFlow<'a> {
 
     fn get_side(&self, evm_side: EvmSide) -> (&RpcClient, &H160, &H160) {
         match evm_side {
-            EvmSide::Base => (&self.base_client, &self.base_bft, &self.base_token),
-            EvmSide::Wrapped => (&self.wrapped_client, &self.wrapped_bft, &self.wrapped_token),
+            EvmSide::Base => (&self.base_client, &self.base_btf, &self.base_token),
+            EvmSide::Wrapped => (&self.wrapped_client, &self.wrapped_btf, &self.wrapped_token),
         }
     }
 
     async fn approve_erc20(&self, amount: u128, evm_side: EvmSide) -> anyhow::Result<()> {
         info!("Approving transfer of {amount} ERC20 tokens");
 
-        let (client, bft_bridge, token) = self.get_side(evm_side);
+        let (client, btf_bridge, token) = self.get_side(evm_side);
         let input = WrappedToken::balanceOfCall {
             account: self.wallet.address().0.into(),
         }
@@ -525,7 +522,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let amount: U256 = amount.into();
 
         let input = WrappedToken::approveCall {
-            spender: bft_bridge.0.into(),
+            spender: btf_bridge.0.into(),
             value: amount.clone().into(),
         }
         .abi_encode();
@@ -589,16 +586,16 @@ impl<'a> Erc20BridgeFlow<'a> {
         ))
     }
 
-    async fn burn_bft(
+    async fn burn_btf(
         &self,
         evm_side: EvmSide,
         amount: u128,
         recipient: &H160,
         memo: [u8; 32],
     ) -> anyhow::Result<H256> {
-        info!("Requesting BFT burn with amount {amount} ");
+        info!("Requesting BTF burn with amount {amount} ");
 
-        let (client, bft, from_token) = self.get_side(evm_side);
+        let (client, btf, from_token) = self.get_side(evm_side);
         let (_, _, to_token) = self.get_side(evm_side.other());
 
         let to_chain_id = self.chain_id(evm_side.other()).await?;
@@ -608,7 +605,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let recipient = recipient_id.0;
 
         let amount: U256 = amount.into();
-        let input = BFTBridge::burnCall {
+        let input = BTFBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.0.into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id.0),
@@ -623,7 +620,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         let chain_id = client.get_chain_id().await?;
         let burn_tx = TransactionBuilder {
             from: &self.wallet.address().into(),
-            to: Some((*bft).into()),
+            to: Some((*btf).into()),
             nonce: nonce.into(),
             value: 0u64.into(),
             gas: 5_000_000u64.into(),
@@ -641,7 +638,7 @@ impl<'a> Erc20BridgeFlow<'a> {
             .expect("Failed to send raw transaction");
 
         info!(
-            "BFT burn transaction sent: 0x{}",
+            "BTF burn transaction sent: 0x{}",
             hash.encode_hex_with_prefix()
         );
 

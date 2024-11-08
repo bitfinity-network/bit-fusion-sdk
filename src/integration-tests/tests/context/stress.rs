@@ -9,7 +9,7 @@ use std::time::Duration;
 use alloy_sol_types::SolCall;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use did::{H160, U256};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
@@ -59,7 +59,7 @@ pub trait BaseTokens {
         Ok(user)
     }
 
-    async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()>;
+    async fn set_btf_bridge_contract_address(&self, btf_bridge: &H160) -> Result<()>;
 
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool>;
 }
@@ -95,7 +95,7 @@ pub struct StressTestState<B: BaseTokens> {
     base_tokens: B,
     users: Vec<User<B::UserId>>,
     wrapped_tokens: Vec<H160>,
-    bft_bridge: H160,
+    btf_bridge: H160,
     config: StressTestConfig,
     memo_counter: AtomicU64,
 }
@@ -113,7 +113,7 @@ impl<B: BaseTokens> StressTestState<B> {
         let expected_fee_charge_address =
             ethers_core::utils::get_contract_address(admin_wallet.address(), 3);
 
-        println!("Initializing BftBridge contract");
+        println!("Initializing Btfbridge contract");
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;
 
         base_tokens
@@ -128,9 +128,9 @@ impl<B: BaseTokens> StressTestState<B> {
             .advance_by_times(Duration::from_secs(1), 2)
             .await;
 
-        let bft_bridge = base_tokens
+        let btf_bridge = base_tokens
             .ctx()
-            .initialize_bft_bridge_with_minter(
+            .initialize_btf_bridge_with_minter(
                 &admin_wallet,
                 bridge_canister_address,
                 Some(expected_fee_charge_address.into()),
@@ -142,13 +142,13 @@ impl<B: BaseTokens> StressTestState<B> {
         println!("Initializing fee charge contract");
         let fee_charge_address = base_tokens
             .ctx()
-            .initialize_fee_charge_contract(&admin_wallet, &[bft_bridge.clone()])
+            .initialize_fee_charge_contract(&admin_wallet, &[btf_bridge.clone()])
             .await
             .unwrap();
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
         base_tokens
-            .set_bft_bridge_contract_address(&bft_bridge)
+            .set_btf_bridge_contract_address(&btf_bridge)
             .await?;
 
         println!("Creating wrapped tokens");
@@ -157,7 +157,7 @@ impl<B: BaseTokens> StressTestState<B> {
             let token_id256 = base_tokens.token_id256(base_id.clone());
             let wrapped_address = base_tokens
                 .ctx()
-                .create_wrapped_token(&admin_wallet, &bft_bridge, token_id256)
+                .create_wrapped_token(&admin_wallet, &btf_bridge, token_id256)
                 .await?;
             wrapped_tokens.push(wrapped_address);
         }
@@ -203,7 +203,7 @@ impl<B: BaseTokens> StressTestState<B> {
             base_tokens,
             wrapped_tokens,
             users,
-            bft_bridge,
+            btf_bridge,
             config,
             memo_counter: Default::default(),
         };
@@ -373,7 +373,7 @@ impl<B: BaseTokens> StressTestState<B> {
         let user = &self.users[user_idx];
         let memo = self.next_memo();
         let burn_info = BurnInfo {
-            bridge: self.bft_bridge.clone(),
+            bridge: self.btf_bridge.clone(),
             base_token_idx: token_idx,
             wrapped_token: self.wrapped_tokens[token_idx].clone(),
             from: user.base_id.clone(),
@@ -393,7 +393,7 @@ impl<B: BaseTokens> StressTestState<B> {
             .user_id256(self.users[user_idx].base_id.clone());
 
         let memo = self.next_memo();
-        let input = BFTBridge::burnCall {
+        let input = BTFBridge::burnCall {
             amount: amount.into(),
             fromERC20: self.wrapped_tokens[token_idx].clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&base_token_id.0),
@@ -407,7 +407,7 @@ impl<B: BaseTokens> StressTestState<B> {
             .ctx()
             .call_contract_without_waiting(
                 &self.users[user_idx].wallet,
-                &self.bft_bridge,
+                &self.btf_bridge,
                 input,
                 0,
                 Some(nonce),

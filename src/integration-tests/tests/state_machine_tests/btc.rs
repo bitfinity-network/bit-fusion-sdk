@@ -10,14 +10,14 @@ use alloy_sol_types::SolCall;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::{Address as BtcAddress, Network as BtcNetwork, PublicKey};
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_did::init::btc::{BitcoinConnection, WrappedTokenConfig};
 use bridge_did::init::{BridgeInitData, BtcBridgeConfig};
 use bridge_did::order::SignedMintOrder;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
 use candid::{Decode, Encode, Nat, Principal};
 use did::{H160, U256};
@@ -209,7 +209,7 @@ struct CkBtcSetup {
     pub tip_height: AtomicU32,
     pub token_id: Id256,
     pub wrapped_token: H160,
-    pub bft_bridge: H160,
+    pub btf_bridge: H160,
 }
 
 impl CkBtcSetup {}
@@ -365,9 +365,9 @@ impl CkBtcSetup {
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
 
-        let btc_bridge_eth_address: BftResult<H160> = (&context)
+        let btc_bridge_eth_address: BTFResult<H160> = (&context)
             .client(btc_bridge, "admin")
-            .update::<_, BftResult<H160>>("get_bridge_canister_evm_address", ())
+            .update::<_, BTFResult<H160>>("get_bridge_canister_evm_address", ())
             .await
             .unwrap();
 
@@ -388,8 +388,8 @@ impl CkBtcSetup {
             .await
             .unwrap();
 
-        let bft_bridge = (&context)
-            .initialize_bft_bridge_with_minter(
+        let btf_bridge = (&context)
+            .initialize_btf_bridge_with_minter(
                 &wallet,
                 btc_bridge_eth_address,
                 None,
@@ -399,18 +399,18 @@ impl CkBtcSetup {
             .await
             .unwrap();
 
-        println!("bft_bridge {bft_bridge}",);
+        println!("btf_bridge {btf_bridge}",);
 
-        // set bft bridge
+        // set btf bridge
         (&context)
             .client(btc_bridge, "admin")
-            .update::<_, ()>("set_bft_bridge_contract", (bft_bridge.clone(),))
+            .update::<_, ()>("set_btf_bridge_contract", (btf_bridge.clone(),))
             .await
             .unwrap();
 
         let token_id = Id256::from(&Principal::from(ledger_id));
         let token = (&context)
-            .create_wrapped_token(&wallet, &bft_bridge, token_id)
+            .create_wrapped_token(&wallet, &btf_bridge, token_id)
             .await
             .unwrap();
 
@@ -421,16 +421,16 @@ impl CkBtcSetup {
         let mut token_symbol = [0; 16];
         token_symbol[0..3].copy_from_slice(b"WPT");
 
-        let bft_config = WrappedTokenConfig {
+        let btf_config = WrappedTokenConfig {
             token_address: token.clone(),
             token_name,
             token_symbol,
             decimals: 0,
         };
 
-        let res: BftResult<()> = (&context)
+        let res: BTFResult<()> = (&context)
             .client(btc_bridge, "admin")
-            .update("admin_configure_wrapped_token", (bft_config,))
+            .update("admin_configure_wrapped_token", (btf_config,))
             .await
             .unwrap();
 
@@ -452,7 +452,7 @@ impl CkBtcSetup {
             minter_id,
             kyt_id,
             wrapped_token: token,
-            bft_bridge,
+            btf_bridge,
             token_id,
             tip_height: AtomicU32::default(),
         }
@@ -1038,7 +1038,7 @@ impl CkBtcSetup {
     pub async fn btc_to_erc20(
         &self,
         wallet: &Wallet<'_, SigningKey>,
-        bft_bridge: &H160,
+        btf_bridge: &H160,
         eth_address: &H160,
     ) -> Result<(), TestError> {
         let user_data = BtcDeposit {
@@ -1051,7 +1051,7 @@ impl CkBtcSetup {
         };
         let encoded_reason = Encode!(&user_data).unwrap();
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
@@ -1062,7 +1062,7 @@ impl CkBtcSetup {
         (&self.context).advance_time(Duration::from_secs(2)).await;
 
         let receipt = (&self.context)
-            .call_contract(wallet, bft_bridge, input, 0)
+            .call_contract(wallet, btf_bridge, input, 0)
             .await
             .map(|(_, receipt)| receipt)?;
 
@@ -1147,7 +1147,7 @@ impl CkBtcSetup {
         }
 
         assert!(self
-            .btc_to_erc20(wallet, &self.bft_bridge, &caller_eth_address)
+            .btc_to_erc20(wallet, &self.btf_bridge, &caller_eth_address)
             .await
             .is_ok());
 
@@ -1205,7 +1205,7 @@ impl CkBtcSetup {
                 from_token,
                 &self.token_id.to_bytes(),
                 recipient,
-                &self.bft_bridge,
+                &self.btf_bridge,
                 amount as u128,
                 true,
                 None,
@@ -1442,7 +1442,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
 
     // deposit
     assert!(ckbtc
-        .btc_to_erc20(&wallet, &ckbtc.bft_bridge, &caller_eth_address)
+        .btc_to_erc20(&wallet, &ckbtc.btf_bridge, &caller_eth_address)
         .await
         .is_ok());
 
@@ -1523,7 +1523,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
         // deposit
         let caller_eth_address = wallet.address().0.into();
         assert!(ckbtc
-            .btc_to_erc20(wallet, &ckbtc.bft_bridge, &caller_eth_address)
+            .btc_to_erc20(wallet, &ckbtc.btf_bridge, &caller_eth_address)
             .await
             .is_ok());
     }

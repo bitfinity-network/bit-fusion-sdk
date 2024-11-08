@@ -5,7 +5,7 @@ pub mod state;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
@@ -157,15 +157,15 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
         self.borrow().config.get_evm_link()
     }
 
-    fn get_bridge_contract_address(&self) -> BftResult<did::H160> {
+    fn get_bridge_contract_address(&self) -> BTFResult<did::H160> {
         self.borrow().config.get_bridge_contract_address()
     }
 
-    fn get_evm_params(&self) -> BftResult<EvmParams> {
+    fn get_evm_params(&self) -> BTFResult<EvmParams> {
         self.borrow().config.get_evm_params()
     }
 
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.borrow().config.borrow().get_signer()
     }
 }

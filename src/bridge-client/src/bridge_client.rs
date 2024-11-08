@@ -1,4 +1,4 @@
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::id256::Id256;
 use bridge_did::order::SignedMintOrder;
 use candid::Principal;
@@ -80,7 +80,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     }
 
     /// Returns principal of EVM canister with which the bridge canister works.
-    async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BftResult<H160>> {
+    async fn get_bridge_canister_evm_address(&self) -> CanisterClientResult<BTFResult<H160>> {
         self.client()
             .update("get_bridge_canister_evm_address", ())
             .await
@@ -91,16 +91,16 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
         self.client().query("get_evm_principal", ()).await
     }
 
-    /// Sets bft bridge contract address.
-    async fn set_bft_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {
+    /// Sets btf bridge contract address.
+    async fn set_btf_bridge_contract(&self, address: &H160) -> CanisterClientResult<()> {
         self.client()
-            .update("set_bft_bridge_contract", (address,))
+            .update("set_btf_bridge_contract", (address,))
             .await
     }
 
-    /// Returns the address of the BFT bridge contract in EVM canister.
-    async fn get_bft_bridge_contract(&self) -> CanisterClientResult<BftResult<Option<H160>>> {
-        self.client().update("get_bft_bridge_contract", ()).await
+    /// Returns the address of the BTF bridge contract in EVM canister.
+    async fn get_btf_bridge_contract(&self) -> CanisterClientResult<BTFResult<Option<H160>>> {
+        self.client().update("get_btf_bridge_contract", ()).await
     }
 
     /// Returns `(nonce, mint_order)` pairs for the given sender id.
@@ -120,7 +120,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     }
 
     /// Adds the given principal to the whitelist.
-    async fn add_to_whitelist(&self, principal: Principal) -> CanisterClientResult<BftResult<()>> {
+    async fn add_to_whitelist(&self, principal: Principal) -> CanisterClientResult<BTFResult<()>> {
         self.client().update("add_to_whitelist", (principal,)).await
     }
 
@@ -128,7 +128,7 @@ pub trait BridgeCanisterClient<C: CanisterClient> {
     async fn remove_from_whitelist(
         &self,
         principal: Principal,
-    ) -> CanisterClientResult<BftResult<()>> {
+    ) -> CanisterClientResult<BTFResult<()>> {
         self.client()
             .update("remove_from_whitelist", (principal,))
             .await

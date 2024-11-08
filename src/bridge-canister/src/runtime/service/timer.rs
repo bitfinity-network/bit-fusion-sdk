@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::time::Duration;
 
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use ic_exports::ic_kit::ic;
 
@@ -33,7 +33,7 @@ impl<S> ServiceTimer<S> {
 
 #[async_trait::async_trait(?Send)]
 impl<S: BridgeService> BridgeService for ServiceTimer<S> {
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         let now = ic::time();
         if !self.time_to_run(now) {
             return Ok(());
@@ -44,7 +44,7 @@ impl<S: BridgeService> BridgeService for ServiceTimer<S> {
         self.inner.run().await
     }
 
-    fn push_operation(&self, id: OperationId) -> BftResult<()> {
+    fn push_operation(&self, id: OperationId) -> BTFResult<()> {
         self.inner.push_operation(id)
     }
 }

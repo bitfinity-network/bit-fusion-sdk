@@ -10,10 +10,10 @@ use ic_stable_structures::{Bound, Storable};
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{BftResult, Error};
+use crate::error::{BTFResult, Error};
 use crate::id256::Id256;
 
-/// Data which should be signed and provided to the `BftBridge.mint()` call
+/// Data which should be signed and provided to the `Btfbridge.mint()` call
 /// to perform mint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CandidType)]
 pub struct MintOrder {
@@ -136,7 +136,7 @@ impl MintOrder {
     pub async fn encode_and_sign(
         &self,
         signer: &impl TransactionSigner,
-    ) -> BftResult<SignedMintOrder> {
+    ) -> BTFResult<SignedMintOrder> {
         let mut buf = [0; Self::SIGNED_ENCODED_DATA_SIZE];
 
         let encoded_data = self.encode();

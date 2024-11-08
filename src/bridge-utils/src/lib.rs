@@ -1,5 +1,5 @@
 use alloy_sol_types::sol;
-pub mod bft_events;
+pub mod btf_events;
 pub mod common;
 pub mod evm_bridge;
 pub mod evm_link;
@@ -7,8 +7,8 @@ pub mod query;
 
 sol! {
     #[derive(Debug)]
-    BFTBridge,
-    "../../solidity/out/BftBridge.sol/BFTBridge.json"
+    BTFBridge,
+    "../../solidity/out/BTFBridge.sol/BTFBridge.json"
 }
 
 sol! {

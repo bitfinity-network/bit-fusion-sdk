@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
@@ -36,7 +36,7 @@ use crate::interface::{BtcBridgeError, BtcWithdrawError};
 use crate::state::State;
 
 pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
-pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BTF_EVENTS_SERVICE_ID: ServiceId = 1;
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
 pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
@@ -48,7 +48,7 @@ impl Operation for BtcBridgeOpImpl {
         self,
         id: OperationId,
         ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>> {
+    ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             BtcBridgeOp::UpdateCkBtcBalance { eth_address } => {
                 log::debug!("UpdateCkBtcBalance: Eth address {eth_address}");
@@ -186,7 +186,7 @@ impl Operation for BtcBridgeOpImpl {
 }
 
 impl BtcBridgeOpImpl {
-    async fn update_ckbtc_balance(ckbtc_minter: Principal, eth_address: &H160) -> BftResult<()> {
+    async fn update_ckbtc_balance(ckbtc_minter: Principal, eth_address: &H160) -> BTFResult<()> {
         let self_id = ic::id();
         let subaccount = eth_address_to_subaccount(eth_address);
 
@@ -246,7 +246,7 @@ impl BtcBridgeOpImpl {
     }
 
     /// Collect ckBTC balance for the given Ethereum address.
-    async fn collect_ckbtc_balance(ckbtc_ledger: Principal, eth_address: &H160) -> BftResult<u64> {
+    async fn collect_ckbtc_balance(ckbtc_ledger: Principal, eth_address: &H160) -> BTFResult<u64> {
         let icrc_account = IcrcAccount {
             owner: ic::id(),
             subaccount: Some(eth_address_to_subaccount(eth_address).0),
@@ -279,7 +279,7 @@ impl BtcBridgeOpImpl {
         eth_address: &H160,
         amount: u64,
         ckbtc_fee: u64,
-    ) -> BftResult<u64> {
+    ) -> BTFResult<u64> {
         let amount_minus_fee = amount
             .checked_sub(ckbtc_fee)
             .ok_or(BtcBridgeError::ValueTooSmall)?;
@@ -314,7 +314,7 @@ impl BtcBridgeOpImpl {
         eth_address: &H160,
         nonce: u32,
         amount: u64,
-    ) -> BftResult<MintOrder> {
+    ) -> BTFResult<MintOrder> {
         let state = get_state();
 
         log::debug!(
@@ -329,7 +329,7 @@ impl BtcBridgeOpImpl {
     }
 
     /// Withdraw BTC from the bridge to the recipient address.
-    async fn withdraw_btc(event: &BurntEventData) -> BftResult<()> {
+    async fn withdraw_btc(event: &BurntEventData) -> BTFResult<()> {
         let state = get_state();
 
         let Ok(address) = String::from_utf8(event.recipient_id.clone()) else {
@@ -360,7 +360,7 @@ impl BtcBridgeOpImpl {
         eth_address: H160,
         amount: u64,
         nonce: u32,
-    ) -> BftResult<MintOrder> {
+    ) -> BTFResult<MintOrder> {
         log::trace!("preparing mint order");
 
         let state_ref = state.borrow();
@@ -392,7 +392,7 @@ impl BtcBridgeOpImpl {
     }
 
     /// Get the withdrawal account for the ckbtc minter.
-    async fn get_ckbtc_withdrawal_account(ckbtc_minter: Principal) -> BftResult<IcrcAccount> {
+    async fn get_ckbtc_withdrawal_account(ckbtc_minter: Principal) -> BTFResult<IcrcAccount> {
         log::trace!("Requesting ckbtc withdrawal account");
 
         let account =
@@ -416,7 +416,7 @@ impl BtcBridgeOpImpl {
         to: IcrcAccount,
         amount: u64,
         fee: u64,
-    ) -> BftResult<()> {
+    ) -> BTFResult<()> {
         log::trace!("Transferring {amount} ckbtc to {to:?} with fee {fee}");
 
         CkBtcLedgerClient::from(ckbtc_ledger)
@@ -445,7 +445,7 @@ impl BtcBridgeOpImpl {
         ckbtc_minter: Principal,
         address: String,
         amount: u64,
-    ) -> BftResult<RetrieveBtcOk> {
+    ) -> BTFResult<RetrieveBtcOk> {
         log::trace!("Requesting withdrawal of {amount} btc to {address}");
 
         let result = CkBtcMinterClient::from(ckbtc_minter)

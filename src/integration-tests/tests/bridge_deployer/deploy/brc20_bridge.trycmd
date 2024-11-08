@@ -2,7 +2,7 @@
 $ bridge-deployer -v --evm-network localhost --evm $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $BRC20_BRIDGE_WASM_PATH --wallet-canister $WALLET_CANISTER brc20 --min-confirmations 6 --indexer-urls "https://indexer1.com,https://indexer2.com,https://indexer3.com" --deposit-fee 1000000 --mempool-timeout 3600 --signing-key-id dfx --bitcoin-network regtest --indexer-consensus-threshold 3 --enable-console --log-filter trace
 Starting Bitfinity Deployer v[..]
 Canister brc20-bridge deployed with ID: [..]
-Wrapped side BFT bridge: [..]
+Wrapped side BTF bridge: [..]
 Wrapped side FeeCharge: [..]
 Wrapped side bridge address: [..]
 
