@@ -213,7 +213,7 @@ impl Bridge {
                     .deploy_btf(network.clone(), bridge_principal, pk, agent, false, evm)
                     .await?;
 
-                info!("Base BFT bridge deployed with address {contracts:?}");
+                info!("Base BTF bridge deployed with address {contracts:?}");
 
                 let client = Erc20BridgeClient::new(IcAgentClient::with_agent(
                     bridge_principal,
