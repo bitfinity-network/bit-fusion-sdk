@@ -8,7 +8,7 @@ import { Options } from "@openzeppelin/foundry-upgrades/Options.sol";
 /**
  * @title PrepareUpgradeScript
  * @dev Step 1: Deploys the new implementation contract.
- * Running this script will deploy the updated contract (BFTBridgeV2).
+ * Running this script will deploy the updated contract (BTFBridgeV2).
  */
 contract PrepareUpgrade is Script {
     address proxyAddress;
@@ -27,8 +27,8 @@ contract PrepareUpgrade is Script {
         // Start broadcasting to the network
         vm.startBroadcast();
 
-        // Deploy the new implementation contract (BFTBridgeV2)
-        string memory contractName = "BftBridge.sol:BFTBridgeV2";
+        // Deploy the new implementation contract (BTFBridgeV2)
+        string memory contractName = "BTFBridge.sol:BTFBridgeV2";
         Options memory opts;
         newImplementationAddress = Upgrades.prepareUpgrade(contractName, opts);
 
@@ -74,7 +74,7 @@ contract AddNewImplementation is Script {
         bytes32 bytecodeHash = keccak256(deployedBytecode);
 
         // Interface to interact with the proxy contract (assuming it's an Ownable UUPS proxy)
-        IBFTBridge proxyContract = IBFTBridge(proxyAddress);
+        IBTFBridge proxyContract = IBTFBridge(proxyAddress);
 
         // Add the new implementation's bytecode hash to allowed implementations
         proxyContract.addAllowedImplementation(bytecodeHash);
@@ -110,7 +110,7 @@ contract UpgradeProxy is Script {
         vm.startBroadcast();
 
         // Interface to interact with the proxy contract
-        IBFTBridge proxyContract = IBFTBridge(proxyAddress);
+        IBTFBridge proxyContract = IBTFBridge(proxyAddress);
 
         // Prepare the initialization data
         bytes memory initData = abi.encodeWithSignature("__BridgeV2_init()");
@@ -126,10 +126,10 @@ contract UpgradeProxy is Script {
 }
 
 /**
- * @dev Interface to interact with the BFTBridge proxy contract.
+ * @dev Interface to interact with the BTFBridge proxy contract.
  * Include the functions needed for the upgrade process.
  */
-interface IBFTBridge {
+interface IBTFBridge {
     function addAllowedImplementation(
         bytes32 bytecodeHash
     ) external;

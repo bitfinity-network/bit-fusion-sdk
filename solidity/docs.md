@@ -1,11 +1,11 @@
-# BFT Bridge Forge Scripts
+# BTF Bridge Forge Scripts
 
-This comprehensive guide provides detailed instructions for running various Forge scripts within the project. These scripts are essential for deploying, upgrading, and managing the BFT Bridge and related contracts.
+This comprehensive guide provides detailed instructions for running various Forge scripts within the project. These scripts are essential for deploying, upgrading, and managing the BTF Bridge and related contracts.
 
 ## Table of Contents
 
-1. [DeployBFT.s.sol](#deploybftssol)
-2. [UpgradeBFT.s.sol](#upgradebftssol)
+1. [DeployBTF.s.sol](#deploybtfssol)
+2. [UpgradeBTF.s.sol](#upgradebtfssol)
 3. [PauseUnpause.s.sol](#pauseunpausessol)
 4. [DeployFeeCharge.s.sol](#deployfeechargessol)
 5. [DeployWrappedToken.s.sol](#deploywrappedtokenssol)
@@ -19,15 +19,15 @@ Before running any scripts, ensure you have the following:
 - Access to an Ethereum RPC endpoint
 - A funded account with the necessary permissions
 
-## DeployBFT.s.sol
+## DeployBTF.s.sol
 
-This script is responsible for deploying the BFTBridge contract, a crucial component of the BFT Bridge system.
+This script is responsible for deploying the BTFBridge contract, a crucial component of the BTF Bridge system.
 
 ### Usage
 
-Execute the following command to deploy the BFTBridge:
+Execute the following command to deploy the BTFBridge:
 
-forge script script/DeployBFT.s.sol:DeployBFTBridge --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
+forge script script/DeployBTF.s.sol:DeployBTFBridge --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
 
 ### Environment Variables
 
@@ -41,9 +41,9 @@ To customize the deployment, set the following environment variables:
 - `OWNER`: (Optional) Address of the contract owner
 - `CONTROLLERS`: (Optional) Comma-separated list of controller addresses
 
-## UpgradeBFT.s.sol
+## UpgradeBTF.s.sol
 
-This script facilitates the upgrade process for the BFTBridge contract. It consists of three separate contracts, each handling a specific step in the upgrade process.
+This script facilitates the upgrade process for the BTFBridge contract. It consists of three separate contracts, each handling a specific step in the upgrade process.
 
 #### Usage
 
@@ -51,15 +51,15 @@ Execute the following commands in sequence to perform the upgrade:
 
 1. Deploy the new implementation:
 
-   forge script script/UpgradeBFT.s.sol:PrepareUpgrade --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
+   forge script script/UpgradeBTF.s.sol:PrepareUpgrade --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
 
 2. Add the new implementation to the proxy's allowed implementations:
 
-   forge script script/UpgradeBFT.s.sol:AddNewImplementation --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
+   forge script script/UpgradeBTF.s.sol:AddNewImplementation --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
 
 3. Upgrade the proxy to use the new implementation:
 
-   forge script script/UpgradeBFT.s.sol:UpgradeProxy --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
+   forge script script/UpgradeBTF.s.sol:UpgradeProxy --rpc-url <your_rpc_url> --broadcast --private-key <your_private_key> --sender <your_sender_address>
 
 ### Environment Variables
 
@@ -70,7 +70,7 @@ Set the following environment variables for the upgrade process:
 
 ## PauseUnpause.s.sol
 
-This script allows for the pausing and unpausing of the BFTBridge contract, providing an essential safety mechanism.
+This script allows for the pausing and unpausing of the BTFBridge contract, providing an essential safety mechanism.
 
 ### Usage
 
@@ -84,7 +84,7 @@ forge script script/PauseUnpause.s.sol:PauseUnpauseScript --rpc-url <your_rpc_ur
 
 ## DeployFeeCharge.s.sol
 
-This script deploys the FeeCharge contract, which handles fee collection for the BFT Bridge system.
+This script deploys the FeeCharge contract, which handles fee collection for the BTF Bridge system.
 
 ### Usage
 
@@ -132,4 +132,4 @@ forge script script/DeployWrappedTokenDeployer.s.sol:DeployWrappedTokenDeployer 
 No specific environment variables are required for this script.
 
 ---
-NOTE: By following these instructions, you can effectively manage and deploy various components of the BFT Bridge system using Forge scripts. Always ensure you're using the correct RPC URL, private key, and sender address when executing these scripts.
+NOTE: By following these instructions, you can effectively manage and deploy various components of the BTF Bridge system using Forge scripts. Always ensure you're using the correct RPC URL, private key, and sender address when executing these scripts.

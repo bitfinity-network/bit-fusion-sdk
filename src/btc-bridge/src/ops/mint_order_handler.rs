@@ -3,7 +3,7 @@ use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::order::{MintOrder, SignedOrders};
@@ -30,7 +30,7 @@ impl BtcMintOrderHandler {
 }
 
 impl MintOrderHandler for BtcMintOrderHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.state.get_signer()
     }
 

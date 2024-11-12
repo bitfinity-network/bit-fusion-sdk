@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::op_id::OperationId;
 
-pub type BftResult<T> = Result<T, Error>;
+pub type BTFResult<T> = Result<T, Error>;
 
 #[derive(Debug, Error, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub enum Error {

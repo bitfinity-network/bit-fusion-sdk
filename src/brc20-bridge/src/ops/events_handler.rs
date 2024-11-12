@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::bridge::OperationAction;
-use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::operations::{
     Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp, DepositRequest,
@@ -12,18 +12,18 @@ use crate::core::withdrawal;
 use crate::ops::{Brc20BridgeOpImpl, Brc20MinterNotification};
 use crate::state::Brc20State;
 
-/// Decsribes event processing logic.
-pub struct Brc20BftEventsHandler {
+/// Describes event processing logic.
+pub struct Brc20BtfEventsHandler {
     brc20_state: Rc<RefCell<Brc20State>>,
 }
 
-impl Brc20BftEventsHandler {
+impl Brc20BtfEventsHandler {
     pub fn new(brc20_state: Rc<RefCell<Brc20State>>) -> Self {
         Self { brc20_state }
     }
 }
 
-impl BftBridgeEventHandler<Brc20BridgeOpImpl> for Brc20BftEventsHandler {
+impl BtfBridgeEventHandler<Brc20BridgeOpImpl> for Brc20BtfEventsHandler {
     fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,

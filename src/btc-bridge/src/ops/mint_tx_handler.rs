@@ -2,7 +2,7 @@ use bridge_canister::bridge::OperationContext as _;
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::BftResult;
+use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::order::SignedOrders;
@@ -24,7 +24,7 @@ impl BtcMintTxHandler {
 }
 
 impl MintTxHandler for BtcMintTxHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.state.get_signer()
     }
 

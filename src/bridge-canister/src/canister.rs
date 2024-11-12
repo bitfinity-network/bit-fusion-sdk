@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
@@ -59,24 +59,24 @@ pub trait BridgeCanister: Canister + LogCanister {
     /// Returns bridge contract address for EVM.
     /// If contract isn't initialized yet - returns None.
     #[query(trait = true)]
-    fn get_bft_bridge_contract(&mut self) -> Option<H160> {
-        self.config().borrow().get_bft_bridge_contract()
+    fn get_btf_bridge_contract(&mut self) -> Option<H160> {
+        self.config().borrow().get_btf_bridge_contract()
     }
 
-    /// Set BFT bridge contract address.
+    /// Set BTF bridge contract address.
     #[update(trait = true)]
-    fn set_bft_bridge_contract(&mut self, address: H160) {
+    fn set_btf_bridge_contract(&mut self, address: H160) {
         let config = self.config();
-        inspect::inspect_set_bft_bridge_contract(self.config());
-        config.borrow_mut().set_bft_bridge_contract(address.clone());
+        inspect::inspect_set_btf_bridge_contract(self.config());
+        config.borrow_mut().set_btf_bridge_contract(address.clone());
 
-        info!("Bridge canister BFT bridge contract address changed to {address}");
+        info!("Bridge canister BTF bridge contract address changed to {address}");
     }
 
     /// Returns evm_address of the bridge canister.
     #[allow(async_fn_in_trait)]
     #[update(trait = true)]
-    async fn get_bridge_canister_evm_address(&mut self) -> BftResult<H160> {
+    async fn get_bridge_canister_evm_address(&mut self) -> BTFResult<H160> {
         let signer = self.config().borrow().get_signer()?;
         signer.get_address().await.map_err(|e| {
             Error::Initialization(format!("failed to get bridge canister address: {e}"))
@@ -298,26 +298,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_bft_bridge_works() {
+    async fn set_btf_bridge_works() {
         let mut canister = init_canister().await;
 
         inject::get_context().update_id(owner());
         let address = H160::from_slice(&[42; 20]);
-        let _ = canister_call!(canister.set_bft_bridge_contract(address.clone()), ()).await;
+        let _ = canister_call!(canister.set_btf_bridge_contract(address.clone()), ()).await;
 
         // check if state updated
-        let stored_bft = canister_call!(canister.get_bft_bridge_contract(), Option<H160>)
+        let stored_btf = canister_call!(canister.get_btf_bridge_contract(), Option<H160>)
             .await
             .unwrap();
-        assert_eq!(stored_bft, Some(address));
+        assert_eq!(stored_btf, Some(address));
     }
 
     #[tokio::test]
     #[should_panic(expected = "Running this method is only allowed for the owner of the canister")]
-    async fn set_bft_bridge_rejected_for_non_owner() {
+    async fn set_btf_bridge_rejected_for_non_owner() {
         let mut canister = init_canister().await;
 
         let address = H160::from_slice(&[42; 20]);
-        let _ = canister_call!(canister.set_bft_bridge_contract(address), ()).await;
+        let _ = canister_call!(canister.set_btf_bridge_contract(address), ()).await;
     }
 }

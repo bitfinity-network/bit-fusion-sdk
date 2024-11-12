@@ -1,5 +1,5 @@
 use bridge_canister::bridge::OperationAction;
-use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
@@ -43,7 +43,7 @@ impl Erc20EventsHandler {
     }
 }
 
-impl BftBridgeEventHandler<Erc20BridgeOpImpl> for Erc20EventsHandler {
+impl BtfBridgeEventHandler<Erc20BridgeOpImpl> for Erc20EventsHandler {
     fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,

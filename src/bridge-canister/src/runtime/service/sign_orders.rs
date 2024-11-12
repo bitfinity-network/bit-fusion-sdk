@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedOrders, SignedOrdersData};
 use did::keccak;
@@ -11,7 +11,7 @@ use super::BridgeService;
 
 pub trait MintOrderHandler {
     /// Get signer to sign mint orders batch.
-    fn get_signer(&self) -> BftResult<impl TransactionSigner>;
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner>;
 
     /// Get mint order by the OperationId.
     fn get_order(&self, id: OperationId) -> Option<MintOrder>;
@@ -40,7 +40,7 @@ impl<H: MintOrderHandler> SignMintOrdersService<H> {
 
 #[async_trait::async_trait(?Send)]
 impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
-    fn push_operation(&self, id: OperationId) -> BftResult<()> {
+    fn push_operation(&self, id: OperationId) -> BTFResult<()> {
         let order = self
             .order_handler
             .get_order(id)
@@ -50,7 +50,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         Ok(())
     }
 
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         log::trace!("Running SignMintOrdersService");
 
         let orders_number = self.orders.borrow().len().min(MAX_MINT_ORDERS_IN_BATCH);

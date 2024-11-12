@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::memory::{memory_by_id, StableMemory};
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::timer::ServiceTimer;
@@ -13,7 +13,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
@@ -75,14 +75,14 @@ impl Erc20Bridge {
     }
 
     #[update]
-    fn set_base_bft_bridge_contract(&mut self, address: H160) {
+    fn set_base_btf_bridge_contract(&mut self, address: H160) {
         let config = get_runtime_state().borrow().config.clone();
-        bridge_canister::inspect::inspect_set_bft_bridge_contract(config);
+        bridge_canister::inspect::inspect_set_btf_bridge_contract(config);
         get_base_evm_config()
             .borrow_mut()
-            .set_bft_bridge_contract(address.clone());
+            .set_btf_bridge_contract(address.clone());
 
-        log::info!("Bridge canister base EVM BFT bridge contract address changed to {address}");
+        log::info!("Bridge canister base EVM BTF bridge contract address changed to {address}");
     }
 
     /// Retrieves all operations for the given ETH wallet address whose
@@ -140,7 +140,7 @@ impl Erc20Bridge {
     }
 
     #[update]
-    pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
+    pub async fn get_bridge_canister_base_evm_address(&self) -> BTFResult<H160> {
         let signer = get_base_evm_config().borrow().get_signer()?;
         signer.get_address().await.map_err(|e| {
             Error::Initialization(format!("failed to get bridge canister address: {e}"))
@@ -198,7 +198,7 @@ fn init_runtime() -> SharedRuntime {
         wrapped_config.clone(),
     );
     let base_events_service =
-        FetchBftBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+        FetchBtfBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
     let base_events_service_with_delay =
         ServiceTimer::new(base_events_service, base_state.query_delays().logs_query);
     let wrapped_event_handler = Erc20EventsHandler::new(
@@ -207,7 +207,7 @@ fn init_runtime() -> SharedRuntime {
         wrapped_config.clone(),
         base_config.clone(),
     );
-    let wrapped_events_service = FetchBftBridgeEventsService::new(
+    let wrapped_events_service = FetchBtfBridgeEventsService::new(
         wrapped_event_handler,
         runtime.clone(),
         wrapped_config.clone(),

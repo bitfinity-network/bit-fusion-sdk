@@ -77,11 +77,11 @@ impl BridgeDeployer {
         Ok(canister_id)
     }
 
-    pub async fn configure_minter(&self, bft_address: H160) -> anyhow::Result<()> {
+    pub async fn configure_minter(&self, btf_address: H160) -> anyhow::Result<()> {
         info!("Configuring bridge canister");
 
         self.client
-            .set_bft_bridge_contract(&bft_address.into())
+            .set_btf_bridge_contract(&btf_address.into())
             .await?;
 
         info!("Bridge canister is configured");

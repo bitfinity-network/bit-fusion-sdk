@@ -1,4 +1,4 @@
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use candid::Principal;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{BTreeMapStructure, StableBTreeMap};
@@ -13,7 +13,7 @@ impl<M: Memory> AccessList<M> {
             access_list: StableBTreeMap::new(m),
         }
     }
-    pub fn add(&mut self, principal: Principal) -> BftResult<()> {
+    pub fn add(&mut self, principal: Principal) -> BTFResult<()> {
         if principal == Principal::anonymous() {
             return Err(Error::AnonymousPrincipal);
         }
@@ -23,7 +23,7 @@ impl<M: Memory> AccessList<M> {
         Ok(())
     }
 
-    pub fn batch_add(&mut self, principals: &[Principal]) -> BftResult<()> {
+    pub fn batch_add(&mut self, principals: &[Principal]) -> BTFResult<()> {
         for principal in principals {
             self.add(*principal)?;
         }

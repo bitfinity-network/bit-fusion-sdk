@@ -6,7 +6,7 @@ use bridge_client::{BridgeCanisterClient, Erc20BridgeClient};
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::id256::Id256;
 use bridge_did::operations::Erc20OpStage;
-use bridge_utils::{BFTBridge, UUPSProxy};
+use bridge_utils::{BTFBridge, UUPSProxy};
 use did::{H160, U256};
 use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
 use eth_signer::{Signer, Wallet};
@@ -25,8 +25,8 @@ pub struct ContextWithBridges {
     pub bob_wallet: Wallet<'static, SigningKey>,
     pub bob_address: H160,
     pub erc20_bridge_address: H160,
-    pub base_bft_bridge: H160,
-    pub wrapped_bft_bridge: H160,
+    pub base_btf_bridge: H160,
+    pub wrapped_btf_bridge: H160,
     pub base_token_address: H160,
     pub wrapped_token_address: H160,
     pub fee_charge_address: H160,
@@ -102,8 +102,8 @@ impl ContextWithBridges {
             .await
             .unwrap();
 
-        // Deploy the BFTBridge contract on the external EVM.
-        let base_bft_bridge = create_bft_bridge(
+        // Deploy the BTFBridge contract on the external EVM.
+        let base_btf_bridge = create_btf_bridge(
             &ctx,
             &bob_wallet,
             BridgeSide::Base,
@@ -113,11 +113,11 @@ impl ContextWithBridges {
         )
         .await;
         erc20_bridge_client
-            .set_base_bft_bridge_contract(&base_bft_bridge)
+            .set_base_btf_bridge_contract(&base_btf_bridge)
             .await
             .unwrap();
 
-        let wrapped_bft_bridge = create_bft_bridge(
+        let wrapped_btf_bridge = create_btf_bridge(
             &ctx,
             &bob_wallet,
             BridgeSide::Wrapped,
@@ -127,7 +127,7 @@ impl ContextWithBridges {
         )
         .await;
         erc20_bridge_client
-            .set_bft_bridge_contract(&wrapped_bft_bridge)
+            .set_btf_bridge_contract(&wrapped_btf_bridge)
             .await
             .unwrap();
 
@@ -136,13 +136,13 @@ impl ContextWithBridges {
             .initialize_fee_charge_contract_on_evm(
                 &base_evm_client,
                 &fee_charge_deployer,
-                &[base_bft_bridge.clone()],
+                &[base_btf_bridge.clone()],
             )
             .await
             .unwrap();
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
         let fee_charge_address = ctx
-            .initialize_fee_charge_contract(&fee_charge_deployer, &[wrapped_bft_bridge.clone()])
+            .initialize_fee_charge_contract(&fee_charge_deployer, &[wrapped_btf_bridge.clone()])
             .await
             .unwrap();
         assert_eq!(expected_fee_charge_address, fee_charge_address.0);
@@ -158,7 +158,7 @@ impl ContextWithBridges {
         let wrapped_token_address = ctx
             .create_wrapped_token(
                 &ctx.new_wallet(u128::MAX).await.unwrap(),
-                &wrapped_bft_bridge,
+                &wrapped_btf_bridge,
                 token_id,
             )
             .await
@@ -169,8 +169,8 @@ impl ContextWithBridges {
             bob_wallet,
             bob_address,
             erc20_bridge_address,
-            base_bft_bridge,
-            wrapped_bft_bridge,
+            base_btf_bridge,
+            wrapped_btf_bridge,
             base_token_address,
             wrapped_token_address,
             fee_charge_address,
@@ -182,12 +182,12 @@ impl ContextWithBridges {
     }
 }
 
-// Create a second EVM canister (base_evm) instance and create BFTBridge contract on it, // It will play role of external evm
+// Create a second EVM canister (base_evm) instance and create BTFBridge contract on it, // It will play role of external evm
 // Create erc20-bridge instance, initialized with EvmInfos for both EVM canisters.
 // Deploy ERC-20 token on external_evm,
 // Deploy Wrapped token on first EVM for the ERC-20 from previous step,
 // Approve ERC-20 transfer on behalf of some user in external_evm,
-// Call BFTBridge::burn() on behalf of the user in external_evm.
+// Call BTFBridge::burn() on behalf of the user in external_evm.
 // Wait some time for the erc20-bridge see and process it.
 // Make sure the tokens minted.
 // Make sure SignedMintOrder removed from erc20-bridge after some time.
@@ -204,15 +204,13 @@ async fn test_external_bridging() {
 
     let amount = 1000_u128;
 
-    // spender should deposit native tokens to bft bridge, to pay fee.
+    // spender should deposit native tokens to btf bridge, to pay fee.
     let wrapped_evm_client = ctx.context.evm_client(ADMIN);
-    let bob_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     ctx.context
         .native_token_deposit(
             &wrapped_evm_client,
             ctx.fee_charge_address.clone(),
             &ctx.bob_wallet,
-            &[bob_id],
             10_u64.pow(15).into(),
         )
         .await
@@ -242,7 +240,7 @@ async fn test_external_bridging() {
             &ctx.base_token_address,
             &to_token_id.to_bytes(),
             alice_id,
-            &ctx.base_bft_bridge,
+            &ctx.base_btf_bridge,
             amount,
             Some(memo),
         )
@@ -321,16 +319,14 @@ async fn native_token_deposit_increase_and_decrease() {
         .unwrap()
         .unwrap();
 
-    // spender should deposit native tokens to bft bridge, to pay fee.
+    // spender should deposit native tokens to btf bridge, to pay fee.
     let native_balance_after_deposit = 10_u64.pow(15);
-    let bob_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     let init_native_balance = ctx
         .context
         .native_token_deposit(
             &wrapped_evm_client,
             ctx.fee_charge_address.clone(),
             &ctx.bob_wallet,
-            &[bob_id],
             native_balance_after_deposit.into(),
         )
         .await
@@ -379,7 +375,7 @@ async fn native_token_deposit_increase_and_decrease() {
             &ctx.base_token_address,
             &to_token_id.to_bytes(),
             alice_id,
-            &ctx.base_bft_bridge,
+            &ctx.base_btf_bridge,
             amount,
             None,
         )
@@ -449,7 +445,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
     let amount = 1000_u128;
 
-    // spender should deposit native tokens to bft bridge, to pay fee.
+    // spender should deposit native tokens to btf bridge, to pay fee.
     let base_evm_client = EvmCanisterClient::new(
         ctx.context
             .client(ctx.context.canisters().external_evm(), ADMIN),
@@ -471,7 +467,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
             &ctx.base_token_address,
             &to_token_id.to_bytes(),
             alice_id,
-            &ctx.base_bft_bridge,
+            &ctx.base_btf_bridge,
             amount,
             None,
         )
@@ -519,7 +515,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     ctx.context
         .batch_mint_erc_20_with_order(
             &ctx.bob_wallet,
-            &ctx.wrapped_bft_bridge,
+            &ctx.wrapped_btf_bridge,
             signed_order.clone(),
         )
         .await
@@ -565,16 +561,14 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
         .unwrap()
         .unwrap();
 
-    // Deposit native tokens to bft bridge.
+    // Deposit native tokens to btf bridge.
     let native_token_deposit = 10_000_000_u64;
     let wrapped_evm_client = ctx.context.evm_client(ADMIN);
-    let bob_id = Id256::from_evm_address(&ctx.bob_address, CHAIN_ID as _);
     ctx.context
         .native_token_deposit(
             &wrapped_evm_client,
             ctx.fee_charge_address.clone(),
             &ctx.bob_wallet,
-            &[bob_id],
             native_token_deposit.into(),
         )
         .await
@@ -617,7 +611,7 @@ async fn erc20_bridge_stress_test() {
     erc20::stress_test_erc20_bridge_with_ctx(context, 1, config).await;
 }
 
-async fn create_bft_bridge(
+async fn create_btf_bridge(
     ctx: &PocketIcTestContext,
     wallet: &Wallet<'static, SigningKey>,
     side: BridgeSide,
@@ -630,9 +624,9 @@ async fn create_bft_bridge(
         BridgeSide::Wrapped => true,
     };
 
-    let mut bft_input = BFTBridge::BYTECODE.to_vec();
-    let constructor = BFTBridge::constructorCall {}.abi_encode();
-    bft_input.extend_from_slice(&constructor);
+    let mut btf_input = BTFBridge::BYTECODE.to_vec();
+    let constructor = BTFBridge::constructorCall {}.abi_encode();
+    btf_input.extend_from_slice(&constructor);
 
     let evm = match side {
         BridgeSide::Base => ctx.canisters().external_evm(),
@@ -642,11 +636,11 @@ async fn create_bft_bridge(
     let evm_client = EvmCanisterClient::new(ctx.client(evm, ADMIN));
 
     let bridge_address = ctx
-        .create_contract_on_evm(&evm_client, wallet, bft_input.clone())
+        .create_contract_on_evm(&evm_client, wallet, btf_input.clone())
         .await
         .unwrap();
 
-    let init_data = BFTBridge::initializeCall {
+    let init_data = BTFBridge::initializeCall {
         minterAddress: minter_address.into(),
         feeChargeAddress: fee_charge.into(),
         wrappedTokenDeployer: wrapped_token_deployer.into(),

@@ -1,5 +1,5 @@
 use bridge_canister::bridge::OperationAction;
-use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::Icrc2Burn;
@@ -9,7 +9,7 @@ use super::IcrcBridgeOpImpl;
 
 pub struct IcrcEventsHandler;
 
-impl BftBridgeEventHandler<IcrcBridgeOpImpl> for IcrcEventsHandler {
+impl BtfBridgeEventHandler<IcrcBridgeOpImpl> for IcrcEventsHandler {
     fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,
@@ -40,7 +40,7 @@ impl BftBridgeEventHandler<IcrcBridgeOpImpl> for IcrcEventsHandler {
         let mut icrc_burn = match Decode!(&event.user_data, Icrc2Burn) {
             Ok(icrc_burn) => icrc_burn,
             Err(e) => {
-                log::warn!("failed to decode BftBridge notification into Icrc2Burn: {e}");
+                log::warn!("failed to decode Btfbridge notification into Icrc2Burn: {e}");
                 return None;
             }
         };

@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use bridge_did::error::BftResult as McResult;
+use bridge_did::error::BTFResult as McResult;
 use bridge_did::id256::Id256;
 use bridge_did::init::brc20::{Brc20BridgeConfig, SchnorrKeyIds};
 use bridge_did::init::btc::BitcoinConnection;
@@ -14,7 +14,7 @@ use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedOrders;
 use bridge_did::reason::{ApproveAfterMint, Icrc2Burn};
 use bridge_utils::evm_link::address_to_icrc_subaccount;
-use bridge_utils::{BFTBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
+use bridge_utils::{BTFBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDeployer};
 use candid::utils::ArgumentEncoder;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -275,15 +275,15 @@ pub trait TestContext {
         }
     }
 
-    /// Crates BFTBridge contract in EVMc and registered it in minter canister
-    async fn initialize_bft_bridge(
+    /// Crates BTFBridge contract in EVMc and registered it in minter canister
+    async fn initialize_btf_bridge(
         &self,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
     ) -> Result<H160> {
         let client = self.evm_client(self.admin_name());
-        self.initialize_bft_bridge_on_evm(
+        self.initialize_btf_bridge_on_evm(
             &client,
             minter_canister_address,
             fee_charge_address,
@@ -293,8 +293,8 @@ pub trait TestContext {
         .await
     }
 
-    /// Crates BFTBridge contract in EVMc and registered it in minter canister
-    async fn initialize_bft_bridge_on_evm(
+    /// Crates BTFBridge contract in EVMc and registered it in minter canister
+    async fn initialize_btf_bridge_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         minter_canister_address: H160,
@@ -309,7 +309,7 @@ pub trait TestContext {
 
         let wallet = self.new_wallet_on_evm(evm_client, u64::MAX.into()).await?;
         let bridge_address = self
-            .initialize_bft_bridge_with_minter_on_evm(
+            .initialize_btf_bridge_with_minter_on_evm(
                 evm_client,
                 &wallet,
                 minter_canister_address,
@@ -322,8 +322,8 @@ pub trait TestContext {
         Ok(bridge_address)
     }
 
-    /// Creates BFTBridge contract in EVMC and registered it in minter canister
-    async fn initialize_bft_bridge_with_minter(
+    /// Creates BTFBridge contract in EVMC and registered it in minter canister
+    async fn initialize_btf_bridge_with_minter(
         &self,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
@@ -332,7 +332,7 @@ pub trait TestContext {
         is_wrapped: bool,
     ) -> Result<H160> {
         let evm_client = self.evm_client(self.admin_name());
-        self.initialize_bft_bridge_with_minter_on_evm(
+        self.initialize_btf_bridge_with_minter_on_evm(
             &evm_client,
             wallet,
             minter_canister_address,
@@ -343,8 +343,8 @@ pub trait TestContext {
         .await
     }
 
-    /// Creates BFTBridge contract in EVMC and registered it in minter canister
-    async fn initialize_bft_bridge_with_minter_on_evm(
+    /// Creates BTFBridge contract in EVMC and registered it in minter canister
+    async fn initialize_btf_bridge_with_minter_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
@@ -353,18 +353,18 @@ pub trait TestContext {
         wrapped_token_deployer: H160,
         is_wrapped: bool,
     ) -> Result<H160> {
-        let mut bridge_input = BFTBridge::BYTECODE.to_vec();
-        let constructor = BFTBridge::constructorCall {}.abi_encode();
+        let mut bridge_input = BTFBridge::BYTECODE.to_vec();
+        let constructor = BTFBridge::constructorCall {}.abi_encode();
         bridge_input.extend_from_slice(&constructor);
 
-        println!("bridge bytecode size: {}", BFTBridge::BYTECODE.len());
+        println!("bridge bytecode size: {}", BTFBridge::BYTECODE.len());
 
         let bridge_address = self
             .create_contract_on_evm(evm_client, wallet, bridge_input.clone())
             .await
             .unwrap();
 
-        let init_data = BFTBridge::initializeCall {
+        let init_data = BTFBridge::initializeCall {
             minterAddress: minter_canister_address.into(),
             feeChargeAddress: fee_charge_address.unwrap_or_default().into(),
             wrappedTokenDeployer: wrapped_token_deployer.into(),
@@ -485,9 +485,9 @@ pub trait TestContext {
             assert!(decoded_output._0);
         }
 
-        println!("Burning src tokens using BftBridge");
+        println!("Burning src tokens using Btfbridge");
 
-        let input = BFTBridge::burnCall {
+        let input = BTFBridge::burnCall {
             amount: amount.into(),
             fromERC20: from_token.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(to_token_id),
@@ -502,7 +502,7 @@ pub trait TestContext {
 
         if receipt.status != Some(U64::one()) {
             let decoded_output =
-                BFTBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
+                BTFBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
                     .unwrap();
             return Err(TestError::Generic(format!(
                 "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
@@ -511,7 +511,7 @@ pub trait TestContext {
         }
 
         let decoded_output =
-            BFTBridge::burnCall::abi_decode_returns(&dbg!(receipt.output.clone()).unwrap(), true)
+            BTFBridge::burnCall::abi_decode_returns(&dbg!(receipt.output.clone()).unwrap(), true)
                 .unwrap();
 
         let operation_id = decoded_output._0;
@@ -569,7 +569,7 @@ pub trait TestContext {
         .await
     }
 
-    /// Current native token balance on user's deposit inside the BftBridge.
+    /// Current native token balance on user's deposit inside the Btfbridge.
     async fn native_token_deposit_balance(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
@@ -604,7 +604,7 @@ pub trait TestContext {
         balance
     }
 
-    /// Deposit native tokens to BftBridge to pay mint fee.
+    /// Deposit native tokens to Btfbridge to pay mint fee.
     async fn native_token_deposit(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
@@ -743,14 +743,14 @@ pub trait TestContext {
         Ok(hash)
     }
 
-    /// Creates wrapped token in EVMc by calling `BFTBridge:::deploy_wrapped_token()`.
+    /// Creates wrapped token in EVMc by calling `BTFBridge:::deploy_wrapped_token()`.
     async fn create_wrapped_token(
         &self,
         wallet: &Wallet<'_, SigningKey>,
-        bft_bridge: &H160,
+        btf_bridge: &H160,
         base_token_id: Id256,
     ) -> Result<H160> {
-        let input = BFTBridge::deployERC20Call {
+        let input = BTFBridge::deployERC20Call {
             name: "Wrapper".into(),
             symbol: "WPT".into(),
             decimals: 18,
@@ -758,11 +758,11 @@ pub trait TestContext {
         }
         .abi_encode();
 
-        let (_hash, receipt) = self.call_contract(wallet, bft_bridge, input, 0).await?;
+        let (_hash, receipt) = self.call_contract(wallet, btf_bridge, input, 0).await?;
 
         let output = receipt.output.as_ref().unwrap();
 
-        let address = BFTBridge::deployERC20Call::abi_decode_returns(output, true)
+        let address = BTFBridge::deployERC20Call::abi_decode_returns(output, true)
             .unwrap()
             ._0;
 
@@ -840,7 +840,7 @@ pub trait TestContext {
 
         let encoded_reason = Encode!(&reason).unwrap();
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: encoded_reason.into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
@@ -862,7 +862,7 @@ pub trait TestContext {
         bridge: &H160,
     ) -> Result<()> {
         let encoded_op_id = Encode!(&operation_id).unwrap();
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: MinterNotificationType::RescheduleOperation as u32,
             userData: encoded_op_id.into(),
             memo: alloy_sol_types::private::FixedBytes::ZERO,
@@ -910,7 +910,7 @@ pub trait TestContext {
         order: SignedOrders,
     ) -> Result<TransactionReceipt> {
         let all_orders = order.all_orders().clone();
-        let input = BFTBridge::batchMintCall {
+        let input = BTFBridge::batchMintCall {
             encodedOrders: all_orders.orders_data.into(),
             signature: all_orders.signature.into(),
             ordersToProcess: vec![order.idx() as u32],

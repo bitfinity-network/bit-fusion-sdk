@@ -27,7 +27,7 @@ use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
 
     let bridge_client = ctx.icrc_bridge_client(ADMIN);
     bridge_client
@@ -38,14 +38,13 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
     let amount = 300_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -62,7 +61,7 @@ async fn test_icrc2_tokens_roundtrip() {
     ctx.burn_icrc2(
         JOHN,
         &john_wallet,
-        &bft_bridge,
+        &btf_bridge,
         &wrapped_token,
         amount as _,
         Some(john_address),
@@ -97,7 +96,7 @@ async fn test_icrc2_tokens_roundtrip() {
             &wrapped_token,
             base_token_id.0.as_slice(),
             (&john()).into(),
-            &bft_bridge,
+            &btf_bridge,
             wrapped_balance,
         )
         .await
@@ -122,7 +121,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
 #[tokio::test]
 async fn test_icrc2_token_canister_stopped() {
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
 
     let minter_client = ctx.icrc_bridge_client(ADMIN);
     minter_client
@@ -132,14 +131,13 @@ async fn test_icrc2_token_canister_stopped() {
         .unwrap();
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
     let amount = 3_000_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -155,7 +153,7 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.burn_icrc2(
         JOHN,
         &john_wallet,
-        &bft_bridge,
+        &btf_bridge,
         &wrapped_token,
         amount as _,
         Some(john_address.clone()),
@@ -196,7 +194,7 @@ async fn test_icrc2_token_canister_stopped() {
             &wrapped_token,
             base_token_id.0.as_slice(),
             john_principal_id256,
-            &bft_bridge,
+            &btf_bridge,
             wrapped_balance,
         )
         .await
@@ -228,7 +226,7 @@ async fn test_icrc2_token_canister_stopped() {
     assert!(tx_hash.is_none());
 
     let receipt = ctx
-        .batch_mint_erc_20_with_order(&john_wallet, &bft_bridge, order)
+        .batch_mint_erc_20_with_order(&john_wallet, &btf_bridge, order)
         .await
         .unwrap();
 
@@ -321,11 +319,11 @@ async fn test_canister_build_data() {
 
 #[tokio::test]
 async fn test_icrc2_tokens_approve_after_mint() {
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
@@ -337,7 +335,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
     let spender_wallet = ctx.new_wallet(0).await.unwrap();
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -358,7 +355,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     ctx.burn_icrc2(
         JOHN,
         &john_wallet,
-        &bft_bridge,
+        &btf_bridge,
         &wrapped_token,
         amount as _,
         Some(john_address.clone()),
@@ -422,7 +419,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
 async fn icrc2_token_bridge(
     ctx: &PocketIcTestContext,
     john_wallet: Wallet<'static, SigningKey>,
-    bft_bridge: &H160,
+    btf_bridge: &H160,
     fee_charge: &H160,
     wrapped_token: &H160,
 ) {
@@ -452,7 +449,7 @@ async fn icrc2_token_bridge(
     ctx.burn_icrc2(
         JOHN,
         &john_wallet,
-        bft_bridge,
+        btf_bridge,
         wrapped_token,
         amount as _,
         Some(john_address.clone()),
@@ -482,7 +479,7 @@ async fn icrc2_token_bridge(
 
 #[tokio::test]
 async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip() {
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
     let evm_client = ctx.evm_client(ADMIN);
 
     let minter_address = ctx
@@ -490,7 +487,6 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await
         .unwrap();
 
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -504,7 +500,7 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
     let base_token_id = Id256::from(&ctx.canisters().token_1());
 
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
@@ -519,7 +515,7 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         icrc2_token_bridge(
             &ctx,
             john_wallet.clone(),
-            &bft_bridge,
+            &btf_bridge,
             &fee_charge,
             &wrapped_token,
         )
@@ -537,7 +533,7 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
 
 #[tokio::test]
 async fn rescheduling_deposit_operation() {
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
 
     let bridge_client = ctx.icrc_bridge_client(ADMIN);
     bridge_client
@@ -548,14 +544,13 @@ async fn rescheduling_deposit_operation() {
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
     let amount = 300_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -574,7 +569,7 @@ async fn rescheduling_deposit_operation() {
     ctx.burn_icrc2(
         JOHN,
         &john_wallet,
-        &bft_bridge,
+        &btf_bridge,
         &wrapped_token,
         amount as _,
         Some(john_address),
@@ -663,7 +658,7 @@ async fn rescheduling_deposit_operation() {
 
     assert!(matches!(*state, IcrcBridgeOp::BurnIcrc2Tokens { .. }));
 
-    ctx.reschedule_operation(*operation_id, &john_wallet, &bft_bridge)
+    ctx.reschedule_operation(*operation_id, &john_wallet, &btf_bridge)
         .await
         .unwrap();
 
@@ -695,7 +690,7 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
     async fn spam_reschedule_requests(
         ctx: PocketIcTestContext,
         wallet: Wallet<'_, SigningKey>,
-        bft_bridge: H160,
+        btf_bridge: H160,
         spam_stopper: CancellationToken,
         semaphore: Arc<Semaphore>,
     ) {
@@ -707,21 +702,21 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
                 .unwrap();
             for (id, _) in &operations {
                 let _ = semaphore.acquire().await;
-                ctx.reschedule_operation(*id, &wallet, &bft_bridge)
+                ctx.reschedule_operation(*id, &wallet, &btf_bridge)
                     .await
                     .unwrap();
             }
         }
     }
 
-    let (ctx, john_wallet, bft_bridge, fee_charge) = init_bridge().await;
+    let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
 
     let spam_stopper = CancellationToken::new();
     let semaphore = Arc::new(Semaphore::new(1));
     tokio::task::spawn(spam_reschedule_requests(
         ctx.clone(),
         john_wallet.clone(),
-        bft_bridge.clone(),
+        btf_bridge.clone(),
         spam_stopper.clone(),
         semaphore.clone(),
     ));
@@ -736,14 +731,13 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
 
     let base_token_id = Id256::from(&ctx.canisters().token_1());
     let wrapped_token = ctx
-        .create_wrapped_token(&john_wallet, &bft_bridge, base_token_id)
+        .create_wrapped_token(&john_wallet, &btf_bridge, base_token_id)
         .await
         .unwrap();
 
     let amount = 300_000u64;
 
     let evm_client = ctx.evm_client(ADMIN);
-    let john_principal_id = Id256::from(&john());
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -762,7 +756,7 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
         ctx.burn_icrc2(
             JOHN,
             &john_wallet,
-            &bft_bridge,
+            &btf_bridge,
             &wrapped_token,
             amount as _,
             Some(john_address),
@@ -800,7 +794,7 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
                 &wrapped_token,
                 base_token_id.0.as_slice(),
                 (&john()).into(),
-                &bft_bridge,
+                &btf_bridge,
                 wrapped_balance,
             )
             .await
@@ -869,8 +863,8 @@ pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>,
         .await
         .unwrap()
         .unwrap();
-    let bft_bridge = ctx
-        .initialize_bft_bridge(
+    let btf_bridge = ctx
+        .initialize_btf_bridge(
             minter_canister_address,
             Some(expected_fee_charge_address.into()),
             wrapped_token_deployer,
@@ -879,15 +873,15 @@ pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>,
         .unwrap();
 
     icrc_bridge_client
-        .set_bft_bridge_contract(&bft_bridge)
+        .set_btf_bridge_contract(&btf_bridge)
         .await
         .unwrap();
 
     let fee_charge_address = ctx
-        .initialize_fee_charge_contract(&fee_charge_deployer, &[bft_bridge.clone()])
+        .initialize_fee_charge_contract(&fee_charge_deployer, &[btf_bridge.clone()])
         .await
         .unwrap();
     assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
-    (ctx, john_wallet, bft_bridge, fee_charge_address)
+    (ctx, john_wallet, btf_bridge, fee_charge_address)
 }

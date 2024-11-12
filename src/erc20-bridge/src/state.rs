@@ -6,7 +6,7 @@ use bridge_canister::bridge::OperationContext;
 use bridge_canister::memory::{memory_by_id, StableMemory};
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};
 use bridge_utils::evm_bridge::EvmParams;
@@ -43,7 +43,7 @@ impl BaseEvmState {
             config.evm_link = settings.evm_link;
             config.signing_strategy = settings.signing_strategy;
             config.evm_params = None;
-            config.bft_bridge_contract_address = None;
+            config.btf_bridge_contract_address = None;
         })
     }
 }
@@ -63,20 +63,20 @@ impl OperationContext for SharedBaseEvmState {
         self.0.borrow().config.borrow().get_evm_link()
     }
 
-    fn get_bridge_contract_address(&self) -> BftResult<did::H160> {
+    fn get_bridge_contract_address(&self) -> BTFResult<did::H160> {
         self.0
             .borrow()
             .config
             .borrow()
-            .get_bft_bridge_contract()
-            .ok_or_else(|| Error::Initialization("base bft bridge contract not initialized".into()))
+            .get_btf_bridge_contract()
+            .ok_or_else(|| Error::Initialization("base btf bridge contract not initialized".into()))
     }
 
-    fn get_evm_params(&self) -> BftResult<EvmParams> {
+    fn get_evm_params(&self) -> BTFResult<EvmParams> {
         self.0.borrow().config.borrow().get_evm_params()
     }
 
-    fn get_signer(&self) -> BftResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
         self.0.borrow().config.borrow().get_signer()
     }
 }

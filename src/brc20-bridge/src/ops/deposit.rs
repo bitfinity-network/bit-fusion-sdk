@@ -1,5 +1,5 @@
 use bridge_canister::runtime::RuntimeState;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::operations::{Brc20BridgeDepositOp, DepositRequest};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 
@@ -13,7 +13,7 @@ impl Brc20BridgeDepositOpImpl {
     pub async fn await_inputs(
         state: RuntimeState<Brc20BridgeOpImpl>,
         request: DepositRequest,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let deposit = Brc20Deposit::get(state.clone())
             .map_err(|err| Error::FailedToProgress(format!("cannot deposit: {err:?}")))?;
         let utxos = deposit
@@ -42,7 +42,7 @@ impl Brc20BridgeDepositOpImpl {
         deposit_request: DepositRequest,
         utxos: Vec<Utxo>,
         nonce: u32,
-    ) -> BftResult<Brc20BridgeOpImpl> {
+    ) -> BTFResult<Brc20BridgeOpImpl> {
         let DepositRequest {
             amount,
             brc20_tick,

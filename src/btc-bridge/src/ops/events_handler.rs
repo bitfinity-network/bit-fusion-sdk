@@ -1,5 +1,5 @@
 use bridge_canister::bridge::OperationAction;
-use bridge_canister::runtime::service::fetch_logs::BftBridgeEventHandler;
+use bridge_canister::runtime::service::fetch_logs::BtfBridgeEventHandler;
 use bridge_did::event_data::{BurntEventData, MintedEventData, NotifyMinterEventData};
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::reason::BtcDeposit;
@@ -9,7 +9,7 @@ use super::BtcBridgeOpImpl;
 
 pub struct BtcEventsHandler;
 
-impl BftBridgeEventHandler<BtcBridgeOpImpl> for BtcEventsHandler {
+impl BtfBridgeEventHandler<BtcBridgeOpImpl> for BtcEventsHandler {
     fn on_wrapped_token_minted(
         &self,
         event: MintedEventData,
@@ -39,7 +39,7 @@ impl BftBridgeEventHandler<BtcBridgeOpImpl> for BtcEventsHandler {
         let mut btc_deposit = match Decode!(&event.user_data, BtcDeposit) {
             Ok(icrc_burn) => icrc_burn,
             Err(e) => {
-                log::warn!("failed to decode BftBridge notification into BtcDeposit: {e}");
+                log::warn!("failed to decode Btfbridge notification into BtcDeposit: {e}");
                 return None;
             }
         };
