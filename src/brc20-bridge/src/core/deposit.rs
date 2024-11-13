@@ -52,7 +52,7 @@ pub enum DepositRequestStatus {
         requested_amounts: HashMap<Brc20Tick, u128>,
         actual_amounts: HashMap<Brc20Tick, u128>,
     },
-    /// Mint orders are signed by the canister but are not sent to the BftBridge. The user may attempt
+    /// Mint orders are signed by the canister but are not sent to the BTFBridge. The user may attempt
     /// to send them by themselves or wait for the canister to retry the operation.
     MintOrdersCreated {
         orders: Vec<MintOrderDetails>,

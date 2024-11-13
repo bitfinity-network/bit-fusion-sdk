@@ -5,7 +5,7 @@ use did::H160;
 use ic_stable_structures::{Bound, Storable};
 use serde::Deserialize;
 
-use crate::error::{BftResult, Error};
+use crate::error::{BTFResult, Error};
 
 /// 32-bytes entity identifier.
 /// Uniquely identifies:
@@ -61,7 +61,7 @@ impl Id256 {
         Self(buf)
     }
 
-    pub fn to_evm_address(&self) -> BftResult<(u32, H160)> {
+    pub fn to_evm_address(&self) -> BTFResult<(u32, H160)> {
         if self.0[0] != Self::EVM_ADDRESS_MARK {
             return Err(Error::Serialization(
                 "wrong evm address mark in Id256".into(),
@@ -78,7 +78,7 @@ impl Id256 {
     }
 
     /// Convert ID256 into BRC20 tick.
-    pub fn to_brc20_tick(&self) -> BftResult<[u8; 4]> {
+    pub fn to_brc20_tick(&self) -> BTFResult<[u8; 4]> {
         if self.0[0] != Self::BRC20_TICK_MARK {
             return Err(Error::Serialization(
                 "wrong brc20 tick mark in Id256".into(),
@@ -145,7 +145,7 @@ impl Id256 {
 
     /// Converts Id256 into `(block_id, tx_index)` transaction index if the ID represents the rune id,
     /// or returns an error otherwise.
-    pub fn to_btc_tx_index(&self) -> BftResult<(u64, u32)> {
+    pub fn to_btc_tx_index(&self) -> BTFResult<(u64, u32)> {
         if self.0[0] != Self::BTC_TX_MARK {
             return Err(Error::Serialization("wrong rune id mark in Id256".into()));
         }
@@ -166,7 +166,7 @@ impl Id256 {
 impl TryFrom<&[u8]> for Id256 {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> BftResult<Self> {
+    fn try_from(value: &[u8]) -> BTFResult<Self> {
         let inner: [u8; Self::BYTE_SIZE as _] = value.try_into().map_err(|_| {
             Error::Serialization("data of Id256 should contain exactly 32 bytes".into())
         })?;
@@ -220,7 +220,7 @@ impl From<(u32, H160)> for Id256 {
 impl TryFrom<Id256> for Principal {
     type Error = Error;
 
-    fn try_from(id: Id256) -> BftResult<Self> {
+    fn try_from(id: Id256) -> BTFResult<Self> {
         if id.0[0] != Id256::PRINCIPAL_MARK {
             return Err(Error::Serialization("wrong principal mark in Id256".into()));
         }
@@ -239,7 +239,7 @@ impl TryFrom<Id256> for Principal {
 impl TryFrom<Id256> for H160 {
     type Error = Error;
 
-    fn try_from(id: Id256) -> BftResult<Self> {
+    fn try_from(id: Id256) -> BTFResult<Self> {
         if id.0[0] != Id256::EVM_ADDRESS_MARK {
             return Err(Error::Serialization("wrong address mark in Id256".into()));
         }

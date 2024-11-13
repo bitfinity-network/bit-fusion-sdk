@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use candid::CandidType;
 use ic_stable_structures::stable_structures::Memory;
@@ -110,7 +110,7 @@ impl<Op: Operation> BridgeTask<Op> {
         self,
         ctx: RuntimeState<Op>,
         task_scheduler: DynScheduler<Op>,
-    ) -> BftResult<()> {
+    ) -> BTFResult<()> {
         let Some(operation) = ctx.borrow().operations.get(self.op_id) else {
             log::warn!("Operation #{} not found.", { self.op_id });
             return Err(Error::OperationNotFound(self.op_id));
@@ -235,7 +235,7 @@ mod tests {
             self,
             _id: OperationId,
             _ctx: RuntimeState<Self>,
-        ) -> BftResult<OperationProgress<Self>> {
+        ) -> BTFResult<OperationProgress<Self>> {
             if self.successful {
                 Ok(OperationProgress::Progress(Self {
                     successful_runs: self.successful_runs + 1,

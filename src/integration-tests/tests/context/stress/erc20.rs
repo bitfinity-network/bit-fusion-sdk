@@ -7,7 +7,7 @@ use bridge_client::BridgeCanisterClient;
 use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_did::operations::Erc20OpStage;
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use did::{TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::{Signer, Wallet};
 use ic_exports::ic_cdk::println;
@@ -22,7 +22,7 @@ pub struct Erc20BaseTokens<Ctx> {
     ctx: Ctx,
     tokens: Vec<H160>,
     contracts_deployer: OwnedWallet,
-    bft_bridge: H160,
+    btf_bridge: H160,
     nonces: RwLock<HashMap<H160, AtomicU64>>,
 }
 
@@ -65,7 +65,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
         // wait to allow bridge canister to query evm params from external EVM.
         ctx.advance_by_times(Duration::from_millis(500), 10).await;
 
-        let bft_bridge = Self::init_bft_bridge_contract(&ctx).await;
+        let btf_bridge = Self::init_btf_bridge_contract(&ctx).await;
 
         // Mint tokens for bridge canister
         let bridge_client = ctx.erc20_bridge_client(ctx.admin_name());
@@ -92,13 +92,13 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             ctx,
             tokens,
             contracts_deployer,
-            bft_bridge,
+            btf_bridge,
             nonces: Default::default(),
         })
     }
 
-    async fn init_bft_bridge_contract(ctx: &Ctx) -> H160 {
-        println!("Initializing BFTBridge contract on base EVM");
+    async fn init_btf_bridge_contract(ctx: &Ctx) -> H160 {
+        println!("Initializing BTFBridge contract on base EVM");
 
         let erc20_bridge_client = ctx.erc20_bridge_client(ctx.admin_name());
         let bridge_canister_address = erc20_bridge_client
@@ -110,7 +110,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
 
         let base_evm_client = ctx.external_evm_client(ctx.admin_name());
         let addr = ctx
-            .initialize_bft_bridge_on_evm(
+            .initialize_btf_bridge_on_evm(
                 &base_evm_client,
                 bridge_canister_address,
                 None,
@@ -121,11 +121,11 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             .unwrap();
 
         erc20_bridge_client
-            .set_base_bft_bridge_contract(&addr)
+            .set_base_btf_bridge_contract(&addr)
             .await
             .unwrap();
 
-        println!("BFTBridge contract initialized on base EVM");
+        println!("BTFBridge contract initialized on base EVM");
 
         addr
     }
@@ -282,7 +282,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
         println!("approving tokens for bridge");
         let input = TestWTM::approveCall {
-            spender: self.bft_bridge.clone().into(),
+            spender: self.btf_bridge.clone().into(),
             value: info.amount.clone().into(),
         }
         .abi_encode();
@@ -302,7 +302,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         self.wait_tx_success(&tx_hash).await?;
 
         println!("burning tokens for bridge");
-        let input = BFTBridge::burnCall {
+        let input = BTFBridge::burnCall {
             amount: info.amount.clone().into(),
             fromERC20: token_address.clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&to_token_id.0),
@@ -317,7 +317,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .call_contract_without_waiting_on_evm(
                 &evm_client,
                 &user_wallet,
-                &self.bft_bridge,
+                &self.btf_bridge,
                 input,
                 0,
                 Some(nonce),
@@ -329,10 +329,10 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         Ok(info.amount.clone())
     }
 
-    async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()> {
+    async fn set_btf_bridge_contract_address(&self, btf_bridge: &H160) -> Result<()> {
         self.ctx
             .erc20_bridge_client(self.ctx.admin_name())
-            .set_bft_bridge_contract(bft_bridge)
+            .set_btf_bridge_contract(btf_bridge)
             .await?;
 
         Ok(())

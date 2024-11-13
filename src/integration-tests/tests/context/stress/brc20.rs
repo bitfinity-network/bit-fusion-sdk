@@ -285,10 +285,10 @@ where
             .map_err(|e| TestError::Generic(e.to_string()))
     }
 
-    async fn set_bft_bridge_contract_address(&self, bft_bridge: &did::H160) -> Result<()> {
-        println!("Setting BFT bridge contract address: {bft_bridge}");
+    async fn set_btf_bridge_contract_address(&self, btf_bridge: &did::H160) -> Result<()> {
+        println!("Setting btf bridge contract address: {btf_bridge}");
         self.ctx
-            .set_bft_bridge_contract(bft_bridge)
+            .set_btf_bridge_contract(btf_bridge)
             .await
             .map_err(|e| TestError::Generic(e.to_string()))?;
 
@@ -298,7 +298,7 @@ where
     async fn create_wrapped_token(
         &self,
         admin_wallet: &OwnedWallet,
-        _bft_bridge: &did::H160,
+        _btf_bridge: &did::H160,
         token_id: Id256,
     ) -> Result<did::H160> {
         let tick = Brc20Tick::from(token_id);

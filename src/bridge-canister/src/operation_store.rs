@@ -338,7 +338,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use bridge_did::error::BftResult;
+    use bridge_did::error::BTFResult;
     use ic_exports::ic_kit::MockContext;
     use ic_stable_structures::VectorMemory;
     use serde::Serialize;
@@ -377,7 +377,7 @@ mod tests {
             self,
             _id: OperationId,
             _ctx: RuntimeState<Self>,
-        ) -> BftResult<OperationProgress<Self>> {
+        ) -> BTFResult<OperationProgress<Self>> {
             todo!()
         }
 

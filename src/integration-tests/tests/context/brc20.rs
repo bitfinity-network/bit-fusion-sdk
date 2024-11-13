@@ -16,7 +16,7 @@ use bridge_did::event_data::MinterNotificationType;
 use bridge_did::id256::Id256;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
-use bridge_utils::BFTBridge;
+use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use dashmap::DashMap;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
@@ -110,7 +110,7 @@ where
 {
     pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
-    pub bft_bridge_contract: Arc<RwLock<H160>>,
+    pub btf_bridge_contract: Arc<RwLock<H160>>,
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
@@ -261,8 +261,8 @@ where
             .await
             .unwrap();
 
-        let bft_bridge = context
-            .initialize_bft_bridge_with_minter(
+        let btf_bridge = context
+            .initialize_btf_bridge_with_minter(
                 &wallet,
                 btc_bridge_eth_address.unwrap(),
                 None,
@@ -276,7 +276,7 @@ where
 
         for brc20_token in &brc20_wallet.brc20_tokens {
             let token = context
-                .create_wrapped_token(&wallet, &bft_bridge, (*brc20_token).into())
+                .create_wrapped_token(&wallet, &btf_bridge, (*brc20_token).into())
                 .await
                 .unwrap();
 
@@ -286,7 +286,7 @@ where
 
         let _: () = context
             .brc20_bridge_client(ADMIN)
-            .set_bft_bridge_contract(&bft_bridge)
+            .set_btf_bridge_contract(&btf_bridge)
             .await
             .unwrap();
 
@@ -298,7 +298,7 @@ where
         );
 
         Self {
-            bft_bridge_contract: Arc::new(RwLock::new(bft_bridge)),
+            btf_bridge_contract: Arc::new(RwLock::new(btf_bridge)),
             eth_wallet: wallet,
             exit,
             miner: Arc::new(Mutex::new(Some(miner))),
@@ -328,14 +328,14 @@ where
         }
     }
 
-    pub async fn set_bft_bridge_contract(&self, bft_bridge: &H160) -> anyhow::Result<()> {
+    pub async fn set_btf_bridge_contract(&self, btf_bridge: &H160) -> anyhow::Result<()> {
         self.inner
             .brc20_bridge_client(ADMIN)
-            .set_bft_bridge_contract(bft_bridge)
+            .set_btf_bridge_contract(btf_bridge)
             .await?;
-        println!("BFT bridge contract updated to {bft_bridge}");
+        println!("btf bridge contract updated to {btf_bridge}");
 
-        *self.bft_bridge_contract.write().unwrap() = bft_bridge.clone();
+        *self.btf_bridge_contract.write().unwrap() = btf_bridge.clone();
 
         // clear tokens
         self.tokens.clear();
@@ -348,11 +348,11 @@ where
         wallet: &Wallet<'_, SigningKey>,
         tick: Brc20Tick,
     ) -> anyhow::Result<H160> {
-        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
 
         let token = self
             .inner
-            .create_wrapped_token(wallet, &bft_bridge_contract, tick.into())
+            .create_wrapped_token(wallet, &btf_bridge_contract, tick.into())
             .await?;
 
         self.tokens.insert(tick, token.clone());
@@ -482,7 +482,7 @@ where
             brc20_tick: tick,
         };
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: MinterNotificationType::DepositRequest as u32,
             userData: Encode!(&data).unwrap().into(),
             memo: memo
@@ -491,11 +491,11 @@ where
         }
         .abi_encode();
 
-        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
 
         let transaction = TransactionBuilder {
             from: &sender.address().into(),
-            to: Some(bft_bridge_contract),
+            to: Some(btf_bridge_contract),
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
@@ -570,7 +570,7 @@ where
             .clone();
 
         println!("Burning {amount} of {tick} to {recipient}");
-        let bft_bridge_contract = self.bft_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
 
         let client = self.inner.evm_client(ADMIN);
         self.inner
@@ -580,7 +580,7 @@ where
                 &token_address,
                 Id256::from(*tick).0.as_slice(),
                 recipient.to_string().as_bytes().to_vec(),
-                &bft_bridge_contract,
+                &btf_bridge_contract,
                 amount.amount(),
                 true,
                 None,

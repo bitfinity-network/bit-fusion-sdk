@@ -30,7 +30,10 @@ impl WrapTokenType {
             "Wrapped token contract for ERC20 token {} deployed",
             base_token_parameters.name
         );
-        info!("Wrapped token address: {}", wrapped_token_address);
+        info!(
+            "Wrapped token address: 0x{}",
+            hex::encode(wrapped_token_address)
+        );
 
         Ok(())
     }
@@ -43,12 +46,12 @@ impl WrapTokenType {
         }
     }
 
-    fn wrapped_bft_address(&self) -> &H160 {
+    fn wrapped_btf_address(&self) -> &H160 {
         match self {
             WrapTokenType::Erc20(WrapErc20Args {
-                wrapped_bft_address,
+                wrapped_btf_address,
                 ..
-            }) => wrapped_bft_address,
+            }) => wrapped_btf_address,
         }
     }
 
@@ -73,7 +76,7 @@ impl WrapTokenType {
             decimals,
             id,
         } = base_token_params;
-        deployer.deploy_wrapped_token(self.wrapped_bft_address(), name, symbol, *decimals, *id)
+        deployer.deploy_wrapped_token(self.wrapped_btf_address(), name, symbol, *decimals, *id)
     }
 
     async fn get_erc20_params(
@@ -168,10 +171,10 @@ pub struct WrapErc20Args {
     base_evm_url: String,
 
     #[arg(long)]
-    base_bft_address: H160,
+    base_btf_address: H160,
 
     #[arg(long)]
-    wrapped_bft_address: H160,
+    wrapped_btf_address: H160,
 
     #[arg(long)]
     token_address: H160,
@@ -183,7 +186,7 @@ mod tests {
     use crate::contracts::TESTNET_URL;
 
     #[tokio::test]
-    #[ignore = "requires connection to BF testnet and some BFT in the wallet; if in doubt, run manually"]
+    #[ignore = "requires connection to BF testnet and some BTF in the wallet; if in doubt, run manually"]
     async fn getting_erc20_token_parameters() {
         let wallet_pk = "0xf886b8c9418002fb34bbeaa0a1002e13eebd9fdc0fc41d70a7393747cd95af71";
         let token_address = "0xCe72ce5Aa299e1E630CBf5262Dd630260b42BF1a";

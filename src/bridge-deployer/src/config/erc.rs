@@ -11,6 +11,10 @@ pub struct BaseEvmSettingsConfig {
     pub base_evm_principal: Option<Principal>,
     #[arg(long)]
     pub base_evm_url: Option<String>,
+    #[arg(long)]
+    pub logs_query_delay_secs: Option<u64>,
+    #[arg(long)]
+    pub params_query_delay_secs: Option<u64>,
 }
 
 impl From<BaseEvmSettingsConfig> for EvmLink {

@@ -29,6 +29,7 @@ pub struct NetworkConfig {
     #[clap(value_enum, long)]
     pub evm_network: EvmNetwork,
     /// Custom network URL
+    #[clap(long)]
     pub custom_network: Option<String>,
 }
 
@@ -157,6 +158,7 @@ impl SolidityContractDeployer<'_> {
             solidity_dir.display(),
             args.join(" ")
         );
+        debug!("Environment variables: {env_vars:?}");
 
         let mut command = Command::new("sh");
         command
@@ -208,8 +210,8 @@ impl SolidityContractDeployer<'_> {
         H160::from_str(address).context(format!("Invalid {} address", prefix))
     }
 
-    /// Deploys the BFT contract.
-    pub fn deploy_bft(
+    /// Deploys the BTF contract.
+    pub fn deploy_btf(
         &self,
         minter_address: &H160,
         fee_charge_address: &H160,
@@ -218,7 +220,7 @@ impl SolidityContractDeployer<'_> {
         owner: Option<H160>,
         controllers: &Option<Vec<H160>>,
     ) -> Result<H160> {
-        info!("Deploying BFT contract");
+        info!("Deploying BTF contract");
 
         let env_vars = vec![
             ("MINTER_ADDRESS", minter_address.encode_hex_with_prefix()),
@@ -256,7 +258,7 @@ impl SolidityContractDeployer<'_> {
             env_vars
         };
 
-        let output = self.execute_forge_script("DeployBFT.s.sol", env_vars)?;
+        let output = self.execute_forge_script("DeployBTF.s.sol", env_vars)?;
         Self::extract_address_from_output(&output, "Proxy address:")
     }
 
@@ -294,7 +296,7 @@ impl SolidityContractDeployer<'_> {
     /// Deploys the WrappedToken contract.
     pub fn deploy_wrapped_token(
         &self,
-        bft_bridge: &H160,
+        btf_bridge: &H160,
         name: &str,
         symbol: &str,
         decimals: u8,
@@ -303,7 +305,7 @@ impl SolidityContractDeployer<'_> {
         info!("Deploying Wrapped ERC20 contract");
 
         let env_vars = vec![
-            ("BFT_BRIDGE", bft_bridge.encode_hex_with_prefix()),
+            ("BTF_BRIDGE", btf_bridge.encode_hex_with_prefix()),
             ("NAME", name.to_string()),
             ("SYMBOL", symbol.to_string()),
             ("DECIMALS", decimals.to_string()),
@@ -336,7 +338,13 @@ impl SolidityContractDeployer<'_> {
 
         debug!("Requesting nonce with EVM url: {url}");
 
-        let client = EthJsonRpcClient::new(ReqwestClient::new(url.to_string()));
+        let reqwest_client = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        let client = EthJsonRpcClient::new(ReqwestClient::new_with_client(
+            url.to_string(),
+            reqwest_client,
+        ));
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)

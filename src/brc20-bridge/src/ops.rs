@@ -9,7 +9,7 @@ use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::brc20_info::Brc20Tick;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::{MinterNotificationType, NotifyMinterEventData};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{
@@ -23,13 +23,13 @@ use serde::Serialize;
 use withdraw::Brc20BridgeWithdrawOpImpl;
 
 pub use self::deposit::Brc20BridgeDepositOpImpl;
-pub use self::events_handler::Brc20BftEventsHandler;
+pub use self::events_handler::Brc20BtfEventsHandler;
 pub use self::mint_order_handler::Brc20MintOrderHandler;
 pub use self::mint_tx_handler::Brc20MintTxHandler;
 use crate::canister::get_brc20_state;
 
 pub const REFRESH_PARAMS_SERVICE_ID: ServiceId = 0;
-pub const FETCH_BFT_EVENTS_SERVICE_ID: ServiceId = 1;
+pub const FETCH_BTF_EVENTS_SERVICE_ID: ServiceId = 1;
 pub const SIGN_MINT_ORDER_SERVICE_ID: ServiceId = 2;
 pub const SEND_MINT_TX_SERVICE_ID: ServiceId = 3;
 
@@ -48,7 +48,7 @@ impl Operation for Brc20BridgeOpImpl {
         self,
         id: OperationId,
         ctx: RuntimeState<Self>,
-    ) -> BftResult<OperationProgress<Self>> {
+    ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitInputs(deposit)) => {
                 log::debug!("Brc20BridgeDepositOp::AwaitInputs {deposit:?}");

@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{SignedOrders, SignedOrdersData};
-use bridge_utils::bft_events::{self};
+use bridge_utils::btf_events::{self};
 use bridge_utils::evm_link::EvmLinkClient;
 use did::H256;
 use eth_signer::sign_strategy::TransactionSigner;
@@ -20,7 +20,7 @@ pub struct MintOrderBatchInfo {
 }
 
 pub trait MintTxHandler {
-    fn get_signer(&self) -> BftResult<impl TransactionSigner>;
+    fn get_signer(&self) -> BTFResult<impl TransactionSigner>;
     fn get_evm_config(&self) -> SharedConfig;
     fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders>;
     fn mint_tx_sent(&self, id: OperationId, tx_hash: H256);
@@ -44,7 +44,7 @@ impl<H> SendMintTxService<H> {
 
 #[async_trait::async_trait(?Send)]
 impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
-    async fn run(&self) -> BftResult<()> {
+    async fn run(&self) -> BTFResult<()> {
         log::trace!("Running SendMintTxService");
 
         let Some((digest, batch_info)) = self
@@ -66,9 +66,9 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         let bridge_contract =
             config
                 .borrow()
-                .get_bft_bridge_contract()
+                .get_btf_bridge_contract()
                 .ok_or(Error::Initialization(
-                    "Singing service failed to get BftBridge address".into(),
+                    "Singing service failed to get Btfbridge address".into(),
                 ))?;
 
         let evm_params = config.borrow().get_evm_params()?;
@@ -78,7 +78,7 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
             "Sending batchMint transaction with {} mint orders.",
             batch_info.orders_batch.orders_number()
         );
-        let mut tx = bft_events::batch_mint_transaction(
+        let mut tx = btf_events::batch_mint_transaction(
             tx_params,
             &batch_info.orders_batch.orders_data,
             &batch_info.orders_batch.signature,
@@ -129,7 +129,7 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         Ok(())
     }
 
-    fn push_operation(&self, op_id: OperationId) -> BftResult<()> {
+    fn push_operation(&self, op_id: OperationId) -> BTFResult<()> {
         let Some(order) = self.handler.get_signed_orders(op_id) else {
             log::warn!("Signed order not found for operation {op_id}.");
             return Err(bridge_did::error::Error::FailedToProgress(format!(

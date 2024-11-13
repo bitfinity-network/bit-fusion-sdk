@@ -2,9 +2,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bridge_canister::memory::{memory_by_id, StableMemory};
-use bridge_canister::runtime::service::fetch_logs::FetchBftBridgeEventsService;
+use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
+use bridge_canister::runtime::service::timer::ServiceTimer;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
 use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
@@ -12,7 +13,7 @@ use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
 use bridge_canister::BridgeCanister;
 use bridge_did::bridge_side::BridgeSide;
-use bridge_did::error::{BftResult, Error};
+use bridge_did::error::{BTFResult, Error};
 use bridge_did::init::erc20::BaseEvmSettings;
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
@@ -74,14 +75,14 @@ impl Erc20Bridge {
     }
 
     #[update]
-    fn set_base_bft_bridge_contract(&mut self, address: H160) {
+    fn set_base_btf_bridge_contract(&mut self, address: H160) {
         let config = get_runtime_state().borrow().config.clone();
-        bridge_canister::inspect::inspect_set_bft_bridge_contract(config);
+        bridge_canister::inspect::inspect_set_btf_bridge_contract(config);
         get_base_evm_config()
             .borrow_mut()
-            .set_bft_bridge_contract(address.clone());
+            .set_btf_bridge_contract(address.clone());
 
-        log::info!("Bridge canister base EVM BFT bridge contract address changed to {address}");
+        log::info!("Bridge canister base EVM BTF bridge contract address changed to {address}");
     }
 
     /// Retrieves all operations for the given ETH wallet address whose
@@ -139,7 +140,7 @@ impl Erc20Bridge {
     }
 
     #[update]
-    pub async fn get_bridge_canister_base_evm_address(&self) -> BftResult<H160> {
+    pub async fn get_bridge_canister_base_evm_address(&self) -> BTFResult<H160> {
         let signer = get_base_evm_config().borrow().get_signer()?;
         signer.get_address().await.map_err(|e| {
             Error::Initialization(format!("failed to get bridge canister address: {e}"))
@@ -174,14 +175,19 @@ impl LogCanister for Erc20Bridge {
 
 fn init_runtime() -> SharedRuntime {
     let runtime = BridgeRuntime::default(ConfigStorage::get());
-    let state = runtime.state().clone();
-    let base_config = get_base_evm_config();
-    let wrapped_config = state.borrow().config.clone();
+    let base_state = get_base_evm_state();
+    let wrapped_state = runtime.state().clone();
+    let base_config = base_state.0.borrow().config.clone();
+    let wrapped_config = wrapped_state.borrow().config.clone();
     let scheduler = runtime.scheduler().clone();
     let runtime = Rc::new(RefCell::new(runtime));
 
     // Init refresh_evm_params services
     let refresh_base_params_service = RefreshEvmParamsService::new(base_config.clone());
+    let refresh_base_params_service_with_delay = ServiceTimer::new(
+        refresh_base_params_service,
+        base_state.query_delays().evm_params_query,
+    );
     let refresh_wrapped_params_service = RefreshEvmParamsService::new(wrapped_config.clone());
 
     // Init event listener services
@@ -192,22 +198,26 @@ fn init_runtime() -> SharedRuntime {
         wrapped_config.clone(),
     );
     let base_events_service =
-        FetchBftBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+        FetchBtfBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+    let base_events_service_with_delay =
+        ServiceTimer::new(base_events_service, base_state.query_delays().logs_query);
     let wrapped_event_handler = Erc20EventsHandler::new(
         get_mint_order_nonce_counter(),
         BridgeSide::Wrapped,
         wrapped_config.clone(),
         base_config.clone(),
     );
-    let wrapped_events_service = FetchBftBridgeEventsService::new(
+    let wrapped_events_service = FetchBtfBridgeEventsService::new(
         wrapped_event_handler,
         runtime.clone(),
         wrapped_config.clone(),
     );
 
     // Init operation handlers
-    let base_handler = Erc20OrderHandler::new(state.clone(), base_config, scheduler.clone());
-    let wrapped_handler = Erc20OrderHandler::new(state.clone(), wrapped_config, scheduler.clone());
+    let base_handler =
+        Erc20OrderHandler::new(wrapped_state.clone(), base_config, scheduler.clone());
+    let wrapped_handler =
+        Erc20OrderHandler::new(wrapped_state.clone(), wrapped_config, scheduler.clone());
 
     // Init mint order signing service
     let base_sign_service = SignMintOrdersService::new(base_handler.clone());
@@ -220,11 +230,11 @@ fn init_runtime() -> SharedRuntime {
     let send_mint_tx_service =
         Erc20ServiceSelector::new(base_mint_tx_service, wrapped_mint_tx_service);
 
-    let services = state.borrow().services.clone();
+    let services = wrapped_state.borrow().services.clone();
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
         REFRESH_BASE_PARAMS_SERVICE_ID,
-        Rc::new(refresh_base_params_service),
+        Rc::new(refresh_base_params_service_with_delay),
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
@@ -234,7 +244,7 @@ fn init_runtime() -> SharedRuntime {
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,
         FETCH_BASE_LOGS_SERVICE_ID,
-        Rc::new(base_events_service),
+        Rc::new(base_events_service_with_delay),
     );
     services.borrow_mut().add_service(
         ServiceOrder::BeforeOperations,

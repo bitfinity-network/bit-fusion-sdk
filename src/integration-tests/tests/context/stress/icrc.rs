@@ -6,7 +6,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::{evm_link, BFTBridge};
+use bridge_utils::{evm_link, BTFBridge};
 use candid::{Encode, Nat, Principal};
 use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
@@ -182,7 +182,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
 
         let encoded_reason = Encode!(&reason).unwrap();
 
-        let input = BFTBridge::notifyMinterCall {
+        let input = BTFBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
             memo: info.memo.into(),
@@ -219,10 +219,10 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         Ok(info.amount.clone())
     }
 
-    async fn set_bft_bridge_contract_address(&self, bft_bridge: &H160) -> Result<()> {
+    async fn set_btf_bridge_contract_address(&self, btf_bridge: &H160) -> Result<()> {
         self.ctx
             .icrc_bridge_client(self.ctx.admin_name())
-            .set_bft_bridge_contract(bft_bridge)
+            .set_btf_bridge_contract(btf_bridge)
             .await?;
 
         Ok(())

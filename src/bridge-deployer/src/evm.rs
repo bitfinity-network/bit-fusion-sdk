@@ -73,9 +73,9 @@ fn dfx_info_port(service: &str) -> u16 {
 /// Returns the local EVM principal
 pub fn local_evm_principal() -> Principal {
     let principal = Command::new("dfx")
-        .args(["canister", "id", "evm_testnet"])
+        .args(["canister", "id", "evm"])
         .output()
-        .expect("Failed to get evm_testnet canister id")
+        .expect("Failed to get evm canister id")
         .stdout
         .iter()
         .map(|&b| b as char)
@@ -84,7 +84,7 @@ pub fn local_evm_principal() -> Principal {
         .to_string();
 
     if principal.is_empty() {
-        panic!("Local evm-testnet canister is not found.")
+        panic!("Local evm canister is not found.")
     }
 
     // Verify the principal

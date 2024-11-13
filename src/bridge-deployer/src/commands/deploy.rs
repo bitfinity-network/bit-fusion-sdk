@@ -12,10 +12,10 @@ use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
 use tracing::info;
 
-use super::{BFTArgs, Bridge};
+use super::{BTFArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
-use crate::commands::BftDeployedContracts;
+use crate::commands::BtfDeployedContracts;
 use crate::config::BtcBridgeConnection;
 use crate::contracts::{EvmNetwork, SolidityContractDeployer};
 use crate::evm::ic_host;
@@ -33,7 +33,7 @@ const BTC_ERC20_DECIMALS: u8 = 10;
 /// The deploy command.
 ///
 /// This command is used to deploy a bridge canister to the IC network.
-/// It will also deploy the BFT bridge if the `deploy_bft` flag is set to true.
+/// It will also deploy the BTF bridge if the `deploy_btf` flag is set to true.
 #[derive(Debug, Parser)]
 pub struct DeployCommands {
     /// The type of Bridge to deploy
@@ -62,9 +62,9 @@ pub struct DeployCommands {
     #[arg(long, value_name = "WALLET_CANISTER", env)]
     wallet_canister: Option<Principal>,
 
-    /// These are extra arguments for the BFT bridge.
-    #[command(flatten, next_help_heading = "BFT Bridge deployment")]
-    bft_args: BFTArgs,
+    /// These are extra arguments for the BTF bridge.
+    #[command(flatten, next_help_heading = "BTF Bridge deployment")]
+    btf_args: BTFArgs,
 }
 
 impl DeployCommands {
@@ -100,24 +100,28 @@ impl DeployCommands {
             )
             .await?;
 
-        info!("Deploying BFT bridge");
-        let BftDeployedContracts {
-            bft_bridge,
+        // set principal in canister ids and write it to canister_ids file
+        canister_ids.set((&self.bridge_type).into(), canister_id);
+        canister_ids.write()?;
+
+        info!("Deploying BTF bridge");
+        let BtfDeployedContracts {
+            btf_bridge,
             wrapped_token_deployer,
             fee_charge,
             minter_address,
         } = self
-            .bft_args
-            .deploy_bft(network.into(), canister_id, pk, &agent, true, evm)
+            .btf_args
+            .deploy_btf(network.into(), canister_id, pk, &agent, true, evm)
             .await?;
 
-        info!("BFT bridge deployed successfully with {bft_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
+        info!("BTF bridge deployed successfully with {btf_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
 
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
         if let Bridge::Btc { connection, .. } = &self.bridge_type {
             info!("Deploying wrapped BTC contract");
             let wrapped_btc_addr =
-                self.deploy_wrapped_btc(network, pk, &bft_bridge, *connection, evm)?;
+                self.deploy_wrapped_btc(network, pk, &btf_bridge, *connection, evm)?;
 
             info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr:x}");
             println!("Wrapped BTC contract deployed with address {wrapped_btc_addr:x}");
@@ -127,16 +131,13 @@ impl DeployCommands {
                 .await?;
         }
 
-        // set principal in canister ids
-        canister_ids.set((&self.bridge_type).into(), canister_id);
-
         // configure minter
-        deployer.configure_minter(bft_bridge).await?;
+        deployer.configure_minter(btf_bridge).await?;
 
         let base_side_ids = self
             .bridge_type
             .finalize(
-                &self.bft_args,
+                &self.btf_args,
                 network,
                 deployer.bridge_principal(),
                 pk,
@@ -145,9 +146,6 @@ impl DeployCommands {
             )
             .await?;
 
-        // write canister ids file
-        canister_ids.write()?;
-
         info!("Canister deployed successfully");
 
         println!(
@@ -155,20 +153,29 @@ impl DeployCommands {
             self.bridge_type.kind(),
             canister_id
         );
-        println!("Wrapped side BFT bridge: {}", bft_bridge);
-        println!("Wrapped side FeeCharge: {}", fee_charge);
-        println!("Wrapped side bridge address: {}", minter_address);
+        println!("Bridge canister principal: {}", canister_id);
+        println!("---------------------------");
+        println!("Wrapped side BTF bridge: 0x{}", hex::encode(btf_bridge));
+        println!("Wrapped side FeeCharge: 0x{}", hex::encode(fee_charge));
+        println!(
+            "Wrapped side bridge address: 0x{}",
+            hex::encode(minter_address)
+        );
 
-        if let Some(BftDeployedContracts {
-            bft_bridge,
+        if let Some(BtfDeployedContracts {
+            btf_bridge,
             fee_charge,
             minter_address,
             ..
         }) = base_side_ids
         {
-            println!("Base side BFT bridge: {}", bft_bridge);
-            println!("Base side FeeCharge: {}", fee_charge);
-            println!("Base side bridge address: {}", minter_address);
+            println!();
+            println!("Base side BTF bridge: 0x{}", hex::encode(btf_bridge));
+            println!("Base side FeeCharge: 0x{}", hex::encode(fee_charge));
+            println!(
+                "Base side bridge address: 0x{}",
+                hex::encode(minter_address)
+            );
         }
 
         Ok(())
@@ -179,7 +186,7 @@ impl DeployCommands {
         &self,
         network: EvmNetwork,
         pk: H256,
-        bft_bridge: &H160,
+        btf_bridge: &H160,
         btc_connection: BtcBridgeConnection,
         evm: Principal,
     ) -> anyhow::Result<H160> {
@@ -187,7 +194,7 @@ impl DeployCommands {
         let base_token_id = Id256::from(btc_connection.ledger_principal());
 
         contract_deployer.deploy_wrapped_token(
-            bft_bridge,
+            btf_bridge,
             String::from_utf8_lossy(&BTC_ERC20_NAME).as_ref(),
             String::from_utf8_lossy(&BTC_ERC20_SYMBOL).as_ref(),
             BTC_ERC20_DECIMALS,
