@@ -280,7 +280,7 @@ where
         println!("before withdraw: sending BTC to deposit address: {deposit_address}");
 
         self.ctx
-            .send_btc(&deposit_address, Amount::from_sat(10_000_000))
+            .send_btc(&deposit_address, Amount::from_sat(100_000_000))
             .await
             .map_err(|e| TestError::Generic(e.to_string()))
     }

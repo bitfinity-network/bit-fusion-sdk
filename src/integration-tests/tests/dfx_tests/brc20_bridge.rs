@@ -146,7 +146,7 @@ async fn test_brc20_bridge_stress_test() {
         init_user_balance: DEFAULT_DEPOSIT_AMOUNT.into(),
         operation_amount: 100u64.into(),
         operation_timeout: Duration::from_secs(300),
-        wait_per_iteration: Duration::from_secs(5),
+        wait_per_iteration: Duration::from_secs(10),
         charge_fee: false,
     };
 
