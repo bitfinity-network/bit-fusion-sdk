@@ -179,14 +179,12 @@ impl<B: BaseTokens> StressTestState<B> {
 
             // Deposit native token to charge fee.
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
-            let user_id256 = base_tokens.user_id256(user_id.clone());
             base_tokens
                 .ctx()
                 .native_token_deposit(
                     &evm_client,
                     fee_charge_address.clone(),
                     &wallet,
-                    &[user_id256],
                     10_u128.pow(15),
                 )
                 .await?;

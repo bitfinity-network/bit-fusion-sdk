@@ -30,7 +30,7 @@ contract ChargeFeeTest is Test {
         aliceSenderIDs[1] = _aliceSender2;
         vm.deal(_alice, _aliceInitBalance);
         vm.prank(_alice);
-        _feeCharge.nativeTokenDeposit{ value: _aliceInitDeposit }(aliceSenderIDs);
+        _feeCharge.nativeTokenDeposit{ value: _aliceInitDeposit }();
     }
 
     function testDeposit() public view {
@@ -58,14 +58,14 @@ contract ChargeFeeTest is Test {
         uint256 fee = 1000;
 
         vm.prank(_charger);
-        _feeCharge.chargeFee(_alice, payable(_recepient), _aliceSender1, fee);
+        _feeCharge.chargeFee(_alice, payable(_recepient), fee);
         uint256 newBalance = _feeCharge.nativeTokenBalance(_alice);
         assertEq(newBalance, _aliceInitDeposit - fee, "deposit balance should decrese");
         assertEq(_alice.balance, _aliceInitBalance - _aliceInitDeposit, "alice balance should not change");
         assertEq(_recepient.balance, fee, "recepient balance should increase");
 
         vm.prank(_charger);
-        _feeCharge.chargeFee(_alice, payable(_recepient), _aliceSender2, fee);
+        _feeCharge.chargeFee(_alice, payable(_recepient), fee);
         uint256 newBalance2 = _feeCharge.nativeTokenBalance(_alice);
         assertEq(newBalance2, _aliceInitDeposit - fee * 2, "deposit balance should decrese");
         assertEq(_alice.balance, _aliceInitBalance - _aliceInitDeposit, "alice balance should not change");
@@ -73,10 +73,6 @@ contract ChargeFeeTest is Test {
 
         vm.prank(_alice);
         vm.expectRevert();
-        _feeCharge.chargeFee(_alice, payable(_recepient), _aliceSender1, fee);
-
-        vm.prank(_charger);
-        vm.expectRevert();
-        _feeCharge.chargeFee(_alice, payable(_recepient), _bobSender1, fee);
+        _feeCharge.chargeFee(_alice, payable(_recepient), fee);
     }
 }

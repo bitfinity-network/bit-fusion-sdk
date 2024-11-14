@@ -3,12 +3,9 @@ pragma solidity >=0.5.0;
 
 // Allows to depsit/withdraw native tokens and use the deposit to charge fee.
 interface IFeeCharge {
-    // Deposit `msg.value` amount of native token to user's address.
-    // The deposit could be used to pay fees by the approvedSenderIDs.
+    // Deposit `msg.value` amount of native token to `msg.sender` address.
     // Returns user's balance after the operation.
-    function nativeTokenDeposit(
-        bytes32[] calldata approvedSenderIDs
-    ) external payable returns (uint256 balance);
+    function nativeTokenDeposit() external payable returns (uint256 balance);
 
     // Withdraw the amount of native token to user's address.
     // Returns user's balance after the operation.
@@ -21,15 +18,10 @@ interface IFeeCharge {
         address user
     ) external view returns (uint256 balance);
 
-    // Remove approved SpenderIDs
-    function removeApprovedSenderIDs(
-        bytes32[] calldata approvedSenderIDs
-    ) external;
-
-    // Take the given amount of fee from the user.
-    // Require the user to have enough native token balance and approval for senderID.
-    function chargeFee(address from, address payable to, bytes32 senderID, uint256 amount) external;
+    // Charge the given amount of fee from the user.
+    // Require the user to have enough native token deposit balance.
+    function chargeFee(address from, address payable to, uint256 amount) external;
 
     /// Function to check if fee charge operation can be performed.
-    function canPayFee(address payer, bytes32 senderID, uint256 amount) external view returns (bool);
+    function canPayFee(address from, uint256 amount) external view returns (bool);
 }
