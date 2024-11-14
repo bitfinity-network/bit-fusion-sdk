@@ -10,7 +10,7 @@ anyhow = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
 bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did", features = ["runes"] }
-bridge-utils = { path = "../bridge-utils" }
+bridge-utils = { path = "../bridge-utils", features = ["native"] }
 candid = { workspace = true }
 clap = { workspace = true, features = ["env"] }
 did = { workspace = true }

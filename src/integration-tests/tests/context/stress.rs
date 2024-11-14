@@ -232,18 +232,12 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
 
             if let Some(fee_charge_address) = fee_charge_address.as_ref() {
-                // TODO: must be changed, because ID256 shouldn't be used for this purpose!!!
-                // TODO: see <https://infinityswap.atlassian.net/browse/EPROD-1062>
-                let user_id = base_tokens.user_id(user_id.clone());
-                let user_id_32: [u8; 32] = user_id.try_into().unwrap();
-                let user_id256 = Id256(user_id_32);
                 base_tokens
                     .ctx()
                     .native_token_deposit(
                         &evm_client,
                         fee_charge_address.clone(),
                         &wallet,
-                        &[user_id256],
                         10_u128.pow(15),
                     )
                     .await?;

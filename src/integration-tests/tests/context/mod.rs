@@ -612,15 +612,9 @@ pub trait TestContext {
         evm_client: &EvmCanisterClient<Self::Client>,
         fee_charge: H160,
         user_wallet: &Wallet<'static, SigningKey>,
-        sender_ids: &[Id256],
         amount: u128,
     ) -> Result<U256> {
-        let sender_ids = sender_ids.iter().map(|id| id.0.into()).collect();
-
-        let input = FeeCharge::nativeTokenDepositCall {
-            approvedSenderIDs: sender_ids,
-        }
-        .abi_encode();
+        let input = FeeCharge::nativeTokenDepositCall {}.abi_encode();
 
         let receipt = self
             .call_contract_on_evm(evm_client, user_wallet, &fee_charge, input, amount)

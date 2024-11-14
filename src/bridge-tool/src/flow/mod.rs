@@ -9,7 +9,6 @@ use bridge_did::operations::Erc20OpStage;
 use bridge_utils::{BTFBridge, FeeCharge, WrappedToken};
 use candid::Principal;
 use clap::{Args, Parser, Subcommand};
-use did::block::ExeResult;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::U256;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
@@ -288,15 +287,8 @@ impl<'a> Erc20BridgeFlow<'a> {
         let memo = Self::generate_memo();
 
         self.approve_erc20(amount, side).await?;
-
-        let chain_id = self.chain_id(side).await?;
-        let sender_id = Id256::from_evm_address(&self.wallet.address().into(), chain_id as u32);
-
-        self.approve_fee(side.other(), sender_id, FEE_APPROVE_AMOUNT)
-            .await?;
-
+        self.approve_fee(side.other(), FEE_APPROVE_AMOUNT).await?;
         self.burn_btf(side, amount, &recipient, memo).await?;
-
         self.track_operation(memo, side.other()).await
     }
 
@@ -332,12 +324,7 @@ impl<'a> Erc20BridgeFlow<'a> {
         Ok(address)
     }
 
-    async fn approve_fee(
-        &self,
-        evm_side: EvmSide,
-        sender_id: Id256,
-        amount: u128,
-    ) -> anyhow::Result<()> {
+    async fn approve_fee(&self, evm_side: EvmSide, amount: u128) -> anyhow::Result<()> {
         info!("Requesting fee charge approve");
 
         let (client, _, _) = self.get_side(evm_side);
@@ -350,12 +337,7 @@ impl<'a> Erc20BridgeFlow<'a> {
             .await?;
         let chain_id = self.chain_id(evm_side).await?;
 
-        let input = FeeCharge::nativeTokenDepositCall {
-            approvedSenderIDs: vec![alloy_sol_types::private::FixedBytes::from_slice(
-                &sender_id.0,
-            )],
-        }
-        .abi_encode();
+        let input = FeeCharge::nativeTokenDepositCall {}.abi_encode();
 
         let approve_tx = TransactionBuilder {
             from: &self.wallet.address().into(),
@@ -557,33 +539,7 @@ impl<'a> Erc20BridgeFlow<'a> {
     }
 
     async fn wait_for_tx(client: &RpcClient, hash: H256) -> anyhow::Result<Vec<u8>> {
-        const TX_TIMEOUT: Duration = Duration::from_secs(120);
-        const TX_REQUEST_INTERVAL: Duration = Duration::from_secs(1);
-
-        let timeout = Instant::now() + TX_TIMEOUT;
-        while Instant::now() < timeout {
-            if let Ok(result) = client.get_tx_execution_result_by_hash(hash).await {
-                return match result.exe_result {
-                    ExeResult::Success { output, .. } => match output {
-                        did::block::TransactOut::None => Ok(vec![]),
-                        did::block::TransactOut::Call(v) => Ok(v),
-                        did::block::TransactOut::Create(v, _) => Ok(v),
-                    },
-                    ExeResult::Revert { revert_message, .. } => {
-                        Err(anyhow!("Transaction failed: {revert_message:?}"))
-                    }
-                    ExeResult::Halt { error, .. } => Err(anyhow!("Transaction halted: {error:?}")),
-                };
-            }
-
-            tokio::time::sleep(TX_REQUEST_INTERVAL).await;
-        }
-
-        Err(anyhow!(
-            "Transaction {} did not complete in {} seconds",
-            hash.encode_hex_with_prefix(),
-            TX_TIMEOUT.as_secs()
-        ))
+        Ok(bridge_utils::native::wait_for_tx(client, hash).await?)
     }
 
     async fn burn_btf(

@@ -4,8 +4,11 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use bridge_did::id256::Id256;
+use bridge_utils::native::wait_for_tx;
 use candid::Principal;
 use clap::{Args, ValueEnum};
+use did::constant::EIP1559_INITIAL_BASE_FEE;
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
@@ -332,12 +335,8 @@ impl SolidityContractDeployer<'_> {
         Ok(contract_address)
     }
 
-    /// Returns the nonce of the deployer.
-    pub async fn get_nonce(&self) -> Result<u64> {
+    fn rpc_client(&self) -> anyhow::Result<EthJsonRpcClient<ReqwestClient>> {
         let url = self.get_network_url();
-
-        debug!("Requesting nonce with EVM url: {url}");
-
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()?;
@@ -345,13 +344,56 @@ impl SolidityContractDeployer<'_> {
             url.to_string(),
             reqwest_client,
         ));
+
+        Ok(client)
+    }
+
+    /// Returns the nonce of the deployer.
+    pub async fn get_nonce(&self) -> Result<u64> {
+        let network = self.get_network_url();
+        info!("Requesting nonce for network {network}");
+
+        let client = self.rpc_client()?;
         let address = self.wallet.address();
         let nonce = client
             .get_transaction_count(address, BlockNumber::Latest)
             .await?;
 
-        info!("Got nonce value: {nonce}");
+        info!("Got nonce value for network {network}: {nonce}");
 
         Ok(nonce)
+    }
+
+    pub async fn transfer_eth(&self, to: &H160, amount: u128) -> Result<()> {
+        info!(
+            "Transferring {amount} ETH tokens to address {}",
+            to.encode_hex_with_prefix()
+        );
+        let client = self.rpc_client()?;
+
+        let address = self.wallet.address();
+        let nonce = client
+            .get_transaction_count(address, BlockNumber::Latest)
+            .await?;
+        let chain_id = client.get_chain_id().await?;
+
+        let tx = TransactionBuilder {
+            from: &address.into(),
+            to: Some((*to).into()),
+            nonce: nonce.into(),
+            value: amount.into(),
+            gas: 5_000_000u64.into(),
+            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            input: vec![],
+            signature: SigningMethod::SigningKey(self.wallet.signer()),
+            chain_id,
+        }
+        .calculate_hash_and_build()
+        .expect("failed to sign the transaction");
+
+        let hash = client.send_raw_transaction(tx.into()).await?;
+        wait_for_tx(&client, hash).await?;
+
+        Ok(())
     }
 }

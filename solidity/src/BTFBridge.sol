@@ -246,7 +246,7 @@ contract BTFBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
 
             // If user can't pay required fee, skip his order.
             if (_isFeeRequired()) {
-                bool canPayFee = feeChargeContract.canPayFee(order.feePayer, order.senderID, MIN_FEE_DEPOSIT_AMOUNT);
+                bool canPayFee = feeChargeContract.canPayFee(order.feePayer, MIN_FEE_DEPOSIT_AMOUNT);
                 if (!canPayFee) {
                     processedOrderIndexes[i] = MINT_ERROR_CODE_INSUFFICIENT_FEE_DEPOSIT;
                     continue;
@@ -280,7 +280,7 @@ contract BTFBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
                 MintOrderData memory order =
                     _decodeOrder(encodedOrders[MINT_ORDER_DATA_LEN * i:MINT_ORDER_DATA_LEN * i + MINT_ORDER_DATA_LEN]);
                 if (_isFeeRequired()) {
-                    _chargeFee(order.feePayer, order.senderID, feePerUser);
+                    _chargeFee(order.feePayer, feePerUser);
                 }
                 _emitMintedEvent(order, feePerUser);
             }
@@ -311,9 +311,9 @@ contract BTFBridge is TokenManager, UUPSUpgradeable, OwnableUpgradeable, Pausabl
     }
 
     /// Charge fee from the user.
-    function _chargeFee(address from, bytes32 senderID, uint256 amount) private {
+    function _chargeFee(address from, uint256 amount) private {
         if (amount != 0) {
-            feeChargeContract.chargeFee(from, payable(minterCanisterAddress), senderID, amount);
+            feeChargeContract.chargeFee(from, payable(minterCanisterAddress), amount);
         }
     }
 
