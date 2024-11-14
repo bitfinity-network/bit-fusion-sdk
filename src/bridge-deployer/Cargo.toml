@@ -8,7 +8,7 @@ alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
 bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
-bridge-utils = { path = "../bridge-utils" }
+bridge-utils = { path = "../bridge-utils", features = ["native"] }
 candid = { workspace = true }
 clap = { workspace = true, features = ["env"] }
 did = { workspace = true }

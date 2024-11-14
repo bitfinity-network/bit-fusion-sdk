@@ -50,11 +50,15 @@ pub struct DeployCommands {
     #[arg(long, value_name = "WASM_PATH")]
     wasm: PathBuf,
 
-    /// The number of cycles to deposit to the canister
+    /// Amount of cycles to deposit to the canister
     ///
     /// If not specified, the default value is 2_000_000_000_000 (2T) cycles.
     #[arg(long, default_value_t = DEFAULT_CYCLES)]
     cycles: u128,
+
+    /// Amount of ETH tokens to deposit to the bridge canister address
+    #[arg(long)]
+    eth: Option<u128>,
 
     /// Wallet canister ID that is used in the creation of canisters.
     ///
@@ -133,6 +137,11 @@ impl DeployCommands {
 
         // configure minter
         deployer.configure_minter(btf_bridge).await?;
+
+        if let Some(eth) = self.eth {
+            let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
+            contract_deployer.transfer_eth(&minter_address, eth).await?;
+        }
 
         let base_side_ids = self
             .bridge_type
