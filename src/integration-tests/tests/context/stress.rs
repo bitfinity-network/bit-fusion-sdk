@@ -4,6 +4,8 @@
 pub mod brc20;
 pub mod erc20;
 pub mod icrc;
+#[cfg(feature = "dfx_tests")]
+pub mod rune;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};

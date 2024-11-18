@@ -1,10 +1,11 @@
-use brc20_bridge::interface::DepositError;
+use brc20_bridge::interface::DepositError as Brc20DepositError;
 use did::error::EvmError;
 use ic_canister_client::CanisterClientError;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
 use ic_exports::pocket_ic::CallError;
 use ic_test_utils::Error;
+use rune_bridge::interface::DepositError as RuneDepositError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,7 +26,10 @@ pub enum TestError {
     TestUtils(#[from] Error),
 
     #[error(transparent)]
-    Deposit(DepositError),
+    Brc20Deposit(Brc20DepositError),
+
+    #[error("Rune bridge deposit failed: {0:?}")]
+    RuneBridgeDeposit(RuneDepositError),
 
     #[error(transparent)]
     Icrc(IcrcError),
@@ -34,9 +38,15 @@ pub enum TestError {
     Generic(String),
 }
 
-impl From<DepositError> for TestError {
-    fn from(e: DepositError) -> Self {
-        Self::Deposit(e)
+impl From<Brc20DepositError> for TestError {
+    fn from(e: Brc20DepositError) -> Self {
+        Self::Brc20Deposit(e)
+    }
+}
+
+impl From<RuneDepositError> for TestError {
+    fn from(e: RuneDepositError) -> Self {
+        Self::RuneBridgeDeposit(e)
     }
 }
 

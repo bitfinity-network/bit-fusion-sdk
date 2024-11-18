@@ -1,6 +1,8 @@
 #[cfg(feature = "dfx_tests")]
 pub mod brc20;
 mod evm_rpc_canister;
+#[cfg(feature = "dfx_tests")]
+pub mod rune;
 pub mod stress;
 
 use std::collections::{HashMap, HashSet};
