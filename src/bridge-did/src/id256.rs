@@ -37,7 +37,7 @@ use crate::error::{BTFResult, Error};
 )]
 pub struct Id256(pub [u8; ID_256_BYTE_SIZE]);
 
-const ID_256_BYTE_SIZE: usize = 32;
+pub const ID_256_BYTE_SIZE: usize = 32;
 
 impl Id256 {
     pub const BYTE_SIZE: usize = ID_256_BYTE_SIZE;

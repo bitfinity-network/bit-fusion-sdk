@@ -34,6 +34,10 @@ impl TokenAmount {
     pub fn as_int(&self) -> u128 {
         self.amount / 10u128.pow(self.decimals as u32)
     }
+
+    pub fn decimals(&self) -> u8 {
+        self.decimals
+    }
 }
 
 impl From<Decimal> for TokenAmount {

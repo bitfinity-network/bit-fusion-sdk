@@ -94,6 +94,7 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         let link = config.borrow().get_evm_link();
         let client = link.get_json_rpc_client();
         let tx_hash = client.send_raw_transaction(tx).await.map_err(|e| {
+            log::error!("Failed to send batch mint tx to EVM: {e}");
             Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
         })?;
 
@@ -119,6 +120,7 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
 
         // Update state for all operations related with the orders batch.
         for op_id in sent_batch_info.related_operations {
+            log::trace!("Updating state `mint_tx_sent` for operation {op_id} and tx {tx_hash}.");
             self.handler.mint_tx_sent(op_id, tx_hash.into())
         }
 

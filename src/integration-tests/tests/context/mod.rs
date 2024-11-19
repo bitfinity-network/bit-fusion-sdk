@@ -1,4 +1,8 @@
+#[cfg(feature = "dfx_tests")]
+pub mod brc20;
 mod evm_rpc_canister;
+#[cfg(feature = "dfx_tests")]
+pub mod rune;
 pub mod stress;
 
 use std::collections::{HashMap, HashSet};
@@ -974,6 +978,11 @@ pub trait TestContext {
     async fn create_canister(&self) -> Result<Principal>;
 
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal>;
+
+    /// Stop the canister with the given `canister_id`.
+    async fn stop_canister(&self, _canister: Principal) -> Result<()> {
+        Ok(())
+    }
 
     /// Installs the `wasm` code to the `canister` with the given init `args`.
     async fn install_canister(

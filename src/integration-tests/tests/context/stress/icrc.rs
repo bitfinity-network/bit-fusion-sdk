@@ -72,9 +72,10 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         &self.tokens
     }
 
-    fn user_id256(&self, user_id: Self::UserId) -> Id256 {
+    async fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
         let principal = self.ctx.principal_by_caller_name(&user_id);
-        (&principal).into()
+        let id256 = Id256::from(principal);
+        id256.0.to_vec()
     }
 
     fn token_id256(&self, token_id: Self::TokenId) -> Id256 {
@@ -227,6 +228,17 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         Ok(())
     }
 
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        bft_bridge: &H160,
+        token_id: Id256,
+    ) -> Result<H160> {
+        self.ctx
+            .create_wrapped_token(admin_wallet, bft_bridge, token_id)
+            .await
+    }
+
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool> {
         let op_info = self
             .ctx
@@ -237,7 +249,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
         let op = match op_info {
             Some((_, op)) => op,
             None => {
-                return Err(TestError::Generic("opetaion not found".into()));
+                return Err(TestError::Generic("operation not found".into()));
             }
         };
 
@@ -258,7 +270,7 @@ pub async fn stress_test_icrc_bridge_with_ctx<T>(
     T: TestContext + Send + Sync,
 {
     let base_tokens = IcrcBaseTokens::init(ctx, base_tokens_number).await.unwrap();
-    let icrc_stress_test_stats = StressTestState::run(base_tokens, config).await.unwrap();
+    let icrc_stress_test_stats = StressTestState::run(&base_tokens, config).await.unwrap();
 
     dbg!(&icrc_stress_test_stats);
 
