@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -18,7 +18,6 @@ use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
-use dashmap::DashMap;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
@@ -26,7 +25,7 @@ use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
 use crate::context::{CanisterType, TestContext};
@@ -44,6 +43,8 @@ pub const DEFAULT_MINT_AMOUNT: u64 = 100_000;
 /// Required confirmations for the deposit
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
 
+type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Brc20InitArgs {
     pub tick: Brc20Tick,
@@ -59,6 +60,7 @@ pub struct Brc20Wallet {
     pub brc20_tokens: HashSet<Brc20Tick>,
 }
 
+#[derive(Clone)]
 pub struct BtcWallet {
     pub private_key: PrivateKey,
     pub address: Address,
@@ -114,7 +116,7 @@ where
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
-    pub tokens: DashMap<Brc20Tick, H160>,
+    pub tokens: AsyncMap<Brc20Tick, H160>,
 }
 
 /// Setup a new brc20 for DFX tests
@@ -272,7 +274,7 @@ where
             .await
             .unwrap();
 
-        let tokens = DashMap::new();
+        let tokens = AsyncMap::default();
 
         for brc20_token in &brc20_wallet.brc20_tokens {
             let token = context
@@ -281,7 +283,7 @@ where
                 .unwrap();
 
             println!("Token {brc20_token} deployed at {token}");
-            tokens.insert(*brc20_token, token);
+            tokens.write().await.insert(*brc20_token, token);
         }
 
         let _: () = context
@@ -335,10 +337,10 @@ where
             .await?;
         println!("btf bridge contract updated to {btf_bridge}");
 
-        *self.btf_bridge_contract.write().unwrap() = btf_bridge.clone();
+        *self.btf_bridge_contract.write().await = btf_bridge.clone();
 
         // clear tokens
-        self.tokens.clear();
+        self.tokens.write().await.clear();
 
         Ok(())
     }
@@ -348,14 +350,14 @@ where
         wallet: &Wallet<'_, SigningKey>,
         tick: Brc20Tick,
     ) -> anyhow::Result<H160> {
-        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
         let token = self
             .inner
             .create_wrapped_token(wallet, &btf_bridge_contract, tick.into())
             .await?;
 
-        self.tokens.insert(tick, token.clone());
+        self.tokens.write().await.insert(tick, token.clone());
 
         Ok(token)
     }
@@ -470,7 +472,13 @@ where
         nonce: U256,
         memo: Option<[u8; 32]>,
     ) -> Result<(), DepositError> {
-        let dst_token = self.tokens.get(&tick).expect("token not found").clone();
+        let dst_token = self
+            .tokens
+            .read()
+            .await
+            .get(&tick)
+            .expect("token not found")
+            .clone();
 
         let client = self.inner.evm_client(ADMIN);
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
@@ -491,7 +499,7 @@ where
         }
         .abi_encode();
 
-        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
         let transaction = TransactionBuilder {
             from: &sender.address().into(),
@@ -564,13 +572,14 @@ where
     ) -> anyhow::Result<()> {
         let token_address = self
             .tokens
+            .read()
+            .await
             .get(tick)
             .expect("token not found")
-            .value()
             .clone();
 
         println!("Burning {amount} of {tick} to {recipient}");
-        let btf_bridge_contract = self.btf_bridge_contract.read().unwrap().clone();
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
         let client = self.inner.evm_client(ADMIN);
         self.inner
@@ -701,9 +710,10 @@ where
     pub async fn wrapped_balance(&self, tick: &Brc20Tick, wallet: &Wallet<'_, SigningKey>) -> u128 {
         let token_contract = self
             .tokens
+            .read()
+            .await
             .get(tick)
             .expect("token not found")
-            .value()
             .clone();
 
         self.inner

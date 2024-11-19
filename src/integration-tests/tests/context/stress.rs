@@ -41,7 +41,7 @@ pub trait BaseTokens {
     fn ids(&self) -> &[Self::TokenId];
 
     /// Returns the bridged user id as bytes
-    fn user_id(&self, user_id: Self::UserId) -> Vec<u8>;
+    async fn user_id(&self, user_id: Self::UserId) -> Vec<u8>;
     fn token_id256(&self, token_id: Self::TokenId) -> Id256;
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
@@ -455,7 +455,8 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
 
         let user_id = self
             .base_tokens
-            .user_id(self.users[user_idx].base_id.clone());
+            .user_id(self.users[user_idx].base_id.clone())
+            .await;
 
         self.base_tokens
             .before_withdraw(

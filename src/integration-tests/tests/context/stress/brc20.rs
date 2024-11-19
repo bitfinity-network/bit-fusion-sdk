@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -6,11 +7,10 @@ use bridge_client::BridgeCanisterClient as _;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::id256::{Id256, ID_256_BYTE_SIZE};
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp};
-use dashmap::mapref::one::Ref;
-use dashmap::DashMap;
 use eth_signer::Signer as _;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::brc20::{self as ctx, Brc20Context, Brc20InitArgs, BtcWallet};
@@ -19,6 +19,8 @@ use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
 struct Brc20Token {
     tick: Brc20Tick,
@@ -33,7 +35,7 @@ where
     ctx: Arc<Brc20Context<Ctx>>,
     tokens: Vec<Brc20Token>,
     ticks: Vec<Brc20Tick>,
-    users: DashMap<Id256, BtcWallet>,
+    users: AsyncMap<Id256, BtcWallet>,
 }
 
 impl<Ctx> Brc20BaseTokens<Ctx>
@@ -82,7 +84,7 @@ where
             ctx: Arc::new(brc20_context),
             tokens,
             ticks,
-            users: DashMap::new(),
+            users: AsyncMap::default(),
         })
     }
 
@@ -100,9 +102,12 @@ where
             .ok_or(TestError::Generic("Token not found".to_string()))
     }
 
-    fn user_wallet(&self, user: &Id256) -> Result<Ref<'_, Id256, BtcWallet>> {
+    async fn user_wallet(&self, user: &Id256) -> Result<BtcWallet> {
         self.users
+            .read()
+            .await
             .get(user)
+            .cloned()
             .ok_or(TestError::Generic("User not found".to_string()))
     }
 
@@ -129,8 +134,9 @@ where
         &self.ticks
     }
 
-    fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
+    async fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
         self.user_wallet(&user_id)
+            .await
             .unwrap()
             .address
             .to_string()
@@ -162,7 +168,7 @@ where
         id_buf[..4].copy_from_slice(&next_id.to_be_bytes());
         let id = Id256(id_buf);
 
-        self.users.insert(id, wallet);
+        self.users.write().await.insert(id, wallet);
 
         Ok(id)
     }
@@ -174,7 +180,7 @@ where
             return Err(TestError::Generic("Mint amount exceeds max supply".into()));
         }
 
-        let to = self.user_wallet(to)?.address.clone();
+        let to = self.user_wallet(to).await?.address.clone();
 
         let amount = TokenAmount::from_int(amount, token.decimals);
         // mint tokens
@@ -210,7 +216,7 @@ where
 
     async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<did::U256> {
         let token = self.tick(token_idx)?;
-        let user = self.user_wallet(user)?.address.clone();
+        let user = self.user_wallet(user).await?.address.clone();
 
         self.brc20_balance(&user, token)
             .await
@@ -229,7 +235,7 @@ where
         let amount = TokenAmount::from_int(info.amount.0.as_u128(), token.decimals);
 
         // transfer BRC20 first
-        let from_user = self.user_wallet(&info.from)?;
+        let from_user = self.user_wallet(&info.from).await?;
         println!("deposit from user: {}", from_user.address);
 
         // check balance

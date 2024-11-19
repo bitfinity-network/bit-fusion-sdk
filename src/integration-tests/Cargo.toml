@@ -16,7 +16,6 @@ bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
-dashmap = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
 ethers-core = { workspace = true }
