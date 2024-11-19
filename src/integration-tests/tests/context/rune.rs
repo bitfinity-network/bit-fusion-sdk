@@ -16,7 +16,6 @@ use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
 use bridge_did::runes::RuneName;
 use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
-use dashmap::DashMap;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
@@ -36,6 +35,8 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
+
+type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
 
@@ -67,7 +68,7 @@ where
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub runes: RuneWallet,
-    pub tokens: DashMap<RuneId, H160>,
+    pub tokens: AsyncMap<RuneId, H160>,
 }
 
 pub fn generate_rune_name() -> String {
@@ -213,7 +214,7 @@ where
             .await
             .unwrap();
 
-        let tokens = DashMap::new();
+        let tokens = AsyncMap::default();
 
         for rune_id in rune_wallet.runes.keys() {
             let token = context
@@ -221,7 +222,7 @@ where
                 .await
                 .unwrap();
 
-            tokens.insert(*rune_id, token);
+            tokens.write().await.insert(*rune_id, token);
         }
 
         let _: () = context
@@ -472,13 +473,16 @@ where
     ) {
         let mut dst_tokens = HashMap::new();
         for rune_id in runes {
-            let erc20_address = self.tokens.get(rune_id).expect("token not found");
+            let erc20_address = self
+                .tokens
+                .read()
+                .await
+                .get(rune_id)
+                .expect("token not found")
+                .clone();
             let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
 
-            dst_tokens.insert(
-                RuneName::from_str(&rune_info.name).unwrap(),
-                erc20_address.clone(),
-            );
+            dst_tokens.insert(RuneName::from_str(&rune_info.name).unwrap(), erc20_address);
         }
 
         let client = self.inner.evm_client(ADMIN);
@@ -570,9 +574,10 @@ where
     ) -> anyhow::Result<()> {
         let token_address = self
             .tokens
+            .read()
+            .await
             .get(rune_id)
             .expect("token not found")
-            .value()
             .clone();
         let rune_info = self.runes.runes.get(rune_id).expect("rune not found");
 
@@ -610,7 +615,7 @@ where
         *self.btf_bridge_contract.write().await = btf_bridge.clone();
 
         // clear tokens
-        self.tokens.clear();
+        self.tokens.write().await.clear();
 
         Ok(())
     }
@@ -627,7 +632,7 @@ where
             .create_wrapped_token(wallet, &btf_bridge_contract, rune.into())
             .await?;
 
-        self.tokens.insert(rune, token.clone());
+        self.tokens.write().await.insert(rune, token.clone());
 
         Ok(token)
     }
@@ -635,9 +640,10 @@ where
     pub async fn wrapped_balance(&self, rune_id: &RuneId, wallet: &Wallet<'_, SigningKey>) -> u128 {
         let token_contract = self
             .tokens
+            .read()
+            .await
             .get(rune_id)
             .expect("token not found")
-            .value()
             .clone();
 
         self.inner
@@ -761,6 +767,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct BtcWallet {
     pub private_key: PrivateKey,
     pub address: Address,

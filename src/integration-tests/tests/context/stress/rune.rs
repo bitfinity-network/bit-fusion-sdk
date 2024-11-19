@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -5,15 +6,16 @@ use bitcoin::{Address, Amount};
 use bridge_client::BridgeCanisterClient as _;
 use bridge_did::id256::{Id256, ID_256_BYTE_SIZE};
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};
-use dashmap::mapref::one::Ref;
-use dashmap::DashMap;
 use eth_signer::Signer as _;
 use ordinals::RuneId;
+use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::rune::{self as ctx, BtcWallet, RunesContext};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
+
+type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -23,7 +25,7 @@ where
 {
     ctx: Arc<RunesContext<Ctx>>,
     tokens: Vec<RuneId>,
-    users: DashMap<Id256, BtcWallet>,
+    users: AsyncMap<Id256, BtcWallet>,
 }
 
 impl<Ctx> RuneBaseTokens<Ctx>
@@ -47,7 +49,7 @@ where
         Ok(Self {
             tokens: rune_context.runes.runes.keys().copied().collect(),
             ctx: Arc::new(rune_context),
-            users: DashMap::new(),
+            users: AsyncMap::default(),
         })
     }
 
@@ -66,9 +68,12 @@ where
             .ok_or(TestError::Generic("Token not found".to_string()))
     }
 
-    fn user_wallet(&self, user: &Id256) -> Result<Ref<'_, Id256, BtcWallet>> {
+    async fn user_wallet(&self, user: &Id256) -> Result<BtcWallet> {
         self.users
+            .read()
+            .await
             .get(user)
+            .cloned()
             .ok_or(TestError::Generic("User not found".to_string()))
     }
 
@@ -95,8 +100,9 @@ where
         &self.tokens
     }
 
-    fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
+    async fn user_id(&self, user_id: Self::UserId) -> Vec<u8> {
         self.user_wallet(&user_id)
+            .await
             .unwrap()
             .address
             .to_string()
@@ -128,7 +134,7 @@ where
         id_buf[..4].copy_from_slice(&next_id.to_be_bytes());
         let id = Id256(id_buf);
 
-        self.users.insert(id, wallet);
+        self.users.write().await.insert(id, wallet);
 
         Ok(id)
     }
@@ -137,7 +143,7 @@ where
         let rune = self.token_info(token_idx)?;
         let amount: u128 = amount.0.as_u128();
 
-        let to = self.user_wallet(to)?.address.clone();
+        let to = self.user_wallet(to).await?.address.clone();
 
         // mint tokens
         println!("Minting {amount} of {rune} tokens to {to}");
@@ -163,7 +169,7 @@ where
 
     async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<did::U256> {
         let rune = self.rune(token_idx)?;
-        let user = self.user_wallet(user)?.address.clone();
+        let user = self.user_wallet(user).await?.address.clone();
 
         let balance = self
             .rune_balance(&user, &rune)
@@ -182,7 +188,7 @@ where
         let nonce = to_user.next_nonce();
 
         // transfer Rune first
-        let from_user = self.user_wallet(&info.from)?;
+        let from_user = self.user_wallet(&info.from).await?;
         println!("deposit from user: {}", from_user.address);
 
         // check balance
