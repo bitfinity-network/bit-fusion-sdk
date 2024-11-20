@@ -79,13 +79,6 @@ impl DfxTestContext {
             _ => panic!("Unknown agent: {name}"),
         }
     }
-
-    pub async fn stop_canister(&self, canister: Principal) -> Result<()> {
-        let agent = self.agent_by_name(ADMIN);
-        let management = Canister::new_management(&agent);
-        management.stop_canister(&agent, canister).await?;
-        Ok(())
-    }
 }
 
 #[async_trait::async_trait]
@@ -132,6 +125,13 @@ impl TestContext for DfxTestContext {
         let principal = wallet.create_canister(INIT_CANISTER_CYCLES, None).await?;
 
         Ok(principal)
+    }
+
+    async fn stop_canister(&self, canister: Principal) -> Result<()> {
+        let agent = self.agent_by_name(ADMIN);
+        let management = Canister::new_management(&agent);
+        management.stop_canister(&agent, canister).await?;
+        Ok(())
     }
 
     /// Installs the `wasm` code to the `canister` with the given init `args`.

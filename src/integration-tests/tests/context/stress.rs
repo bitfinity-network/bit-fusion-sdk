@@ -1,10 +1,12 @@
 #![allow(async_fn_in_trait)]
 
+#[cfg(feature = "dfx_tests")]
+pub mod brc20;
 pub mod erc20;
 pub mod icrc;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use alloy_sol_types::SolCall;
 use bridge_did::id256::Id256;
@@ -25,6 +27,8 @@ pub struct StressTestConfig {
     pub operation_timeout: Duration,
     pub init_user_balance: U256,
     pub operation_amount: U256,
+    pub wait_per_iteration: Duration,
+    pub charge_fee: bool,
 }
 
 pub trait BaseTokens {
@@ -33,7 +37,9 @@ pub trait BaseTokens {
 
     fn ctx(&self) -> &(impl TestContext + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
-    fn user_id256(&self, user_id: Self::UserId) -> Id256;
+
+    /// Returns the bridged user id as bytes
+    async fn user_id(&self, user_id: Self::UserId) -> Vec<u8>;
     fn token_id256(&self, token_id: Self::TokenId) -> Id256;
 
     async fn bridge_canister_evm_address(&self) -> Result<H160>;
@@ -59,7 +65,29 @@ pub trait BaseTokens {
         Ok(user)
     }
 
+    /// A hook that is called before the withdraw operation is executed.
+    ///
+    /// Implementation is optional.
+    ///
+    /// Some protocols require it to fund the withdraw operation, such as brc20 bridge.
+    async fn before_withdraw(
+        &self,
+        _token_idx: usize,
+        _user_id: Self::UserId,
+        _user_wallet: &OwnedWallet,
+        _amount: U256,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     async fn set_btf_bridge_contract_address(&self, btf_bridge: &H160) -> Result<()>;
+
+    async fn create_wrapped_token(
+        &self,
+        admin_wallet: &OwnedWallet,
+        btf_bridge: &H160,
+        token_id: Id256,
+    ) -> Result<H160>;
 
     async fn is_operation_complete(&self, address: H160, memo: Memo) -> Result<bool>;
 }
@@ -91,8 +119,8 @@ impl<B> User<B> {
     }
 }
 
-pub struct StressTestState<B: BaseTokens> {
-    base_tokens: B,
+pub struct StressTestState<'a, B: BaseTokens> {
+    base_tokens: &'a B,
     users: Vec<User<B::UserId>>,
     wrapped_tokens: Vec<H160>,
     btf_bridge: H160,
@@ -100,8 +128,8 @@ pub struct StressTestState<B: BaseTokens> {
     memo_counter: AtomicU64,
 }
 
-impl<B: BaseTokens> StressTestState<B> {
-    pub async fn run(base_tokens: B, config: StressTestConfig) -> Result<StressTestStats> {
+impl<'a, B: BaseTokens> StressTestState<'a, B> {
+    pub async fn run(base_tokens: &'a B, config: StressTestConfig) -> Result<StressTestStats> {
         let admin_wallet = base_tokens.ctx().new_wallet(u64::MAX as _).await?;
 
         let wrapped_token_deployer = base_tokens
@@ -128,35 +156,58 @@ impl<B: BaseTokens> StressTestState<B> {
             .advance_by_times(Duration::from_secs(1), 2)
             .await;
 
-        let btf_bridge = base_tokens
-            .ctx()
-            .initialize_btf_bridge_with_minter(
-                &admin_wallet,
-                bridge_canister_address,
-                Some(expected_fee_charge_address.into()),
-                wrapped_token_deployer,
-                true,
-            )
-            .await?;
+        let (btf_bridge, fee_charge_address) = match config.charge_fee {
+            true => {
+                let btf_bridge = base_tokens
+                    .ctx()
+                    .initialize_btf_bridge_with_minter(
+                        &admin_wallet,
+                        bridge_canister_address,
+                        Some(expected_fee_charge_address.into()),
+                        wrapped_token_deployer,
+                        true,
+                    )
+                    .await?;
 
-        println!("Initializing fee charge contract");
-        let fee_charge_address = base_tokens
-            .ctx()
-            .initialize_fee_charge_contract(&admin_wallet, &[btf_bridge.clone()])
-            .await
-            .unwrap();
-        assert_eq!(expected_fee_charge_address, fee_charge_address.0);
+                println!("Initializing fee charge contract");
+                let fee_charge_address = base_tokens
+                    .ctx()
+                    .initialize_fee_charge_contract(&admin_wallet, &[btf_bridge.clone()])
+                    .await
+                    .unwrap();
+                assert_eq!(expected_fee_charge_address, fee_charge_address.0);
 
-        base_tokens
-            .set_btf_bridge_contract_address(&btf_bridge)
-            .await?;
+                base_tokens
+                    .set_btf_bridge_contract_address(&btf_bridge)
+                    .await?;
+
+                (btf_bridge, Some(fee_charge_address))
+            }
+            false => {
+                let btf_bridge = base_tokens
+                    .ctx()
+                    .initialize_btf_bridge_with_minter(
+                        &admin_wallet,
+                        bridge_canister_address,
+                        None,
+                        wrapped_token_deployer,
+                        true,
+                    )
+                    .await?;
+
+                base_tokens
+                    .set_btf_bridge_contract_address(&btf_bridge)
+                    .await?;
+
+                (btf_bridge, None)
+            }
+        };
 
         println!("Creating wrapped tokens");
         let mut wrapped_tokens = Vec::with_capacity(base_tokens.ids().len());
         for base_id in base_tokens.ids() {
             let token_id256 = base_tokens.token_id256(base_id.clone());
             let wrapped_address = base_tokens
-                .ctx()
                 .create_wrapped_token(&admin_wallet, &btf_bridge, token_id256)
                 .await?;
             wrapped_tokens.push(wrapped_address);
@@ -179,21 +230,31 @@ impl<B: BaseTokens> StressTestState<B> {
 
             // Deposit native token to charge fee.
             let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
-            base_tokens
-                .ctx()
-                .native_token_deposit(
-                    &evm_client,
-                    fee_charge_address.clone(),
-                    &wallet,
-                    10_u128.pow(15),
-                )
-                .await?;
+
+            if let Some(fee_charge_address) = fee_charge_address.as_ref() {
+                base_tokens
+                    .ctx()
+                    .native_token_deposit(
+                        &evm_client,
+                        fee_charge_address.clone(),
+                        &wallet,
+                        10_u128.pow(15),
+                    )
+                    .await?;
+            } else {
+                evm_client
+                    .admin_mint_native_tokens(wallet.address().into(), u64::MAX.into())
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
 
             let user = User {
                 wallet,
                 base_id: user_id.clone(),
-                nonce: AtomicU64::new(1),
+                nonce: AtomicU64::new(if fee_charge_address.is_some() { 1 } else { 0 }),
             };
+
             users.push(user);
         }
 
@@ -342,11 +403,10 @@ impl<B: BaseTokens> StressTestState<B> {
     }
 
     async fn wait_operation_complete(&self, address: H160, memo: Memo) -> bool {
-        let mut elapsed = Duration::default();
-        let wait_per_iteration = Duration::from_secs(1);
-        while elapsed < self.config.operation_timeout {
-            tokio::time::sleep(wait_per_iteration).await;
-            elapsed += wait_per_iteration;
+        let start = Instant::now();
+        while start.elapsed() < self.config.operation_timeout {
+            tokio::time::sleep(self.config.wait_per_iteration).await;
+
             let complete = match self
                 .base_tokens
                 .is_operation_complete(address.clone(), memo)
@@ -354,7 +414,11 @@ impl<B: BaseTokens> StressTestState<B> {
             {
                 Ok(c) => c,
                 Err(e) => {
-                    println!("failed to check operation completeness: {e}");
+                    println!(
+                        "failed to check operation completeness: {e}; elapsed: {}s/{}s",
+                        start.elapsed().as_secs(),
+                        self.config.operation_timeout.as_secs()
+                    );
                     false
                 }
             };
@@ -386,16 +450,27 @@ impl<B: BaseTokens> StressTestState<B> {
     async fn withdraw(&self, token_idx: usize, user_idx: usize, amount: U256) -> Result<Memo> {
         let token_id = self.base_tokens.ids()[token_idx].clone();
         let base_token_id: Id256 = self.base_tokens.token_id256(token_id);
-        let user_id256 = self
+
+        let user_id = self
             .base_tokens
-            .user_id256(self.users[user_idx].base_id.clone());
+            .user_id(self.users[user_idx].base_id.clone())
+            .await;
+
+        self.base_tokens
+            .before_withdraw(
+                token_idx,
+                self.users[user_idx].base_id.clone().clone(),
+                &self.users[user_idx].wallet,
+                amount.clone(),
+            )
+            .await?;
 
         let memo = self.next_memo();
         let input = BTFBridge::burnCall {
             amount: amount.into(),
             fromERC20: self.wrapped_tokens[token_idx].clone().into(),
             toTokenID: alloy_sol_types::private::FixedBytes::from_slice(&base_token_id.0),
-            recipientID: user_id256.0.into(),
+            recipientID: user_id.into(),
             memo: memo.into(),
         }
         .abi_encode();

@@ -1,3 +1,4 @@
+use brc20_bridge::interface::DepositError;
 use did::error::EvmError;
 use ic_canister_client::CanisterClientError;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
@@ -24,10 +25,19 @@ pub enum TestError {
     TestUtils(#[from] Error),
 
     #[error(transparent)]
+    Deposit(DepositError),
+
+    #[error(transparent)]
     Icrc(IcrcError),
 
     #[error("{0}")]
     Generic(String),
+}
+
+impl From<DepositError> for TestError {
+    fn from(e: DepositError) -> Self {
+        Self::Deposit(e)
+    }
 }
 
 #[derive(Debug, Error)]
