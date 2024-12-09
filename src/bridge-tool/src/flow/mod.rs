@@ -157,7 +157,7 @@ struct Erc20BridgeFlow<'a> {
     bridge_canister: Principal,
 }
 
-impl<'a> Erc20BridgeFlow<'a> {
+impl Erc20BridgeFlow<'_> {
     fn new_deposit(pk: H256, args: &DepositErc20Args) -> Self {
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)

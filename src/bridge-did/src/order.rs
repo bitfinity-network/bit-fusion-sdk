@@ -231,7 +231,7 @@ pub struct SignedMintOrder(pub [u8; MintOrder::SIGNED_ENCODED_DATA_SIZE]);
 /// Visitor for `SignedMintOrder` objects deserialization.
 struct SignedMintOrderVisitor;
 
-impl<'v> Visitor<'v> for SignedMintOrderVisitor {
+impl Visitor<'_> for SignedMintOrderVisitor {
     type Value = SignedMintOrder;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -326,7 +326,7 @@ impl SignedMintOrder {
 /// Reads typed data from encoded MintOrder.
 pub struct EncodedOrderReader<'a>(&'a [u8]);
 
-impl<'a> EncodedOrderReader<'a> {
+impl EncodedOrderReader<'_> {
     /// Returns mint amount.
     pub fn get_amount(&self) -> U256 {
         U256::from_big_endian(&self.0[..32])

@@ -65,7 +65,6 @@ struct GetNonceArgs {
     #[arg(long)]
     evm: Principal,
     #[arg(long)]
-
     /// PK of the EVM wallet to get nonce for
     wallet: Option<String>,
 

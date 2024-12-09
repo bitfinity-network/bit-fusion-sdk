@@ -29,12 +29,14 @@ use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
-use crate::context::{CanisterType, TestContext};
+use crate::context::TestContext;
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
+
+use super::CanisterType;
 
 /// Maximum supply of the BRC20 token
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
