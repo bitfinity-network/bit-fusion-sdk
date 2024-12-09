@@ -1,6 +1,6 @@
-#[cfg(feature = "dfx_tests")]
 pub mod brc20;
 mod evm_rpc_canister;
+pub mod rune;
 pub mod stress;
 
 use std::collections::{HashMap, HashSet};
@@ -22,7 +22,7 @@ use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
-use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
+use did::{Transaction, TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
@@ -48,6 +48,7 @@ use crate::utils::wasm::*;
 use crate::utils::{TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
+const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";
 
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
@@ -129,27 +130,6 @@ pub trait TestContext {
     /// Returns client for the ICRC token 2 canister.
     fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
         self.icrc_token_client(self.canisters().token_2(), caller)
-    }
-
-    /// Sends tx with notification to EVMc.
-    async fn send_notification_tx(
-        &self,
-        user: &Wallet<'_, SigningKey>,
-        input: NotificationInput,
-    ) -> Result<H256> {
-        let address: H160 = user.address().into();
-        let client = self.evm_client(self.admin_name());
-        let account = client.account_basic(address.clone()).await?;
-
-        let tx = self.signed_transaction(
-            user,
-            Some(address.clone()),
-            account.nonce,
-            0,
-            input.encode().unwrap(),
-        );
-
-        Ok(client.send_raw_transaction(tx).await??)
     }
 
     /// Waits for transaction receipt.
@@ -1179,8 +1159,12 @@ pub trait TestContext {
                     .await
                     .unwrap();
             }
-            CanisterType::Btc => {
-                println!("Installing default mock ckBTC canister...");
+            CanisterType::Bitcoin => {
+                println!("Installing default BTC canister...");
+                todo!()
+            }
+            CanisterType::BitcoinMock => {
+                println!("Installing default mock BTC canister...");
                 todo!()
             }
             CanisterType::Kyt => {
@@ -1617,8 +1601,12 @@ impl TestCanisters {
     pub fn btc_mock(&self) -> Principal {
         *self
             .0
-            .get(&CanisterType::Btc)
+            .get(&CanisterType::BitcoinMock)
             .expect("bitcoin mock canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn bitcoin(&self) -> Principal {
+        Principal::from_text(BITCOIN_CANISTER_ID).expect("bitcoin canister id is invalid")
     }
 
     pub fn icrc1_ledger(&self) -> Principal {
@@ -1674,8 +1662,10 @@ impl TestCanisters {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CanisterType {
+    Bitcoin,
+    /// Mocked version of Bitcoin canister
+    BitcoinMock,
     Brc20Bridge,
-    Btc,
     BtcBridge,
     CkBtcMinter,
     Erc20Bridge,
@@ -1721,7 +1711,7 @@ impl CanisterType {
     ];
 
     pub const BTC_CANISTER_SET: [CanisterType; 4] = [
-        CanisterType::Btc,
+        CanisterType::BitcoinMock,
         CanisterType::CkBtcMinter,
         CanisterType::Kyt,
         CanisterType::Icrc1Ledger,
@@ -1742,7 +1732,8 @@ impl CanisterType {
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Brc20Bridge => get_brc20_bridge_canister_bytecode().await,
-            CanisterType::Btc => get_btc_canister_bytecode().await,
+            CanisterType::Bitcoin => get_ic_btc_canister_bytecode().await,
+            CanisterType::BitcoinMock => get_mock_btc_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
             CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
@@ -1762,7 +1753,8 @@ impl CanisterType {
     pub async fn default_canister_wasm_path(&self) -> PathBuf {
         match self {
             CanisterType::Brc20Bridge => get_brc20_bridge_canister_wasm_path().await,
-            CanisterType::Btc => get_btc_canister_wasm_path().await,
+            CanisterType::Bitcoin => get_ic_btc_canister_wasm_path().await,
+            CanisterType::BitcoinMock => get_mock_btc_canister_wasm_path().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_wasm_path().await,
             CanisterType::CkBtcMinter => get_ck_btc_minter_canister_wasm_path().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_wasm_path().await,

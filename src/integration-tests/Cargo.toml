@@ -9,7 +9,7 @@ edition.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 bip39 = { workspace = true }
-bitcoin = { workspace = true, optional = true, features = ["rand-std"] }
+bitcoin = { workspace = true, features = ["rand-std"] }
 bitcoincore-rpc = { workspace = true }
 bridge-canister = { path = "../bridge-canister" }
 bridge-client = { path = "../bridge-client" }
@@ -75,7 +75,6 @@ wildmatch = { workspace = true }
 [features]
 pocket_ic_integration_test = []
 state_machine_tests = [
-  "bitcoin",
   "ic-config",
   "ic-base-types",
   "ic-bitcoin-canister-mock",
@@ -86,4 +85,4 @@ state_machine_tests = [
   "ic-management-canister-types",
   "ic-state-machine-tests",
 ]
-dfx_tests = ["bitcoin"]
+dfx_tests = []

@@ -60,9 +60,8 @@ use crate::context::{CanisterType, TestContext};
 use crate::state_machine_tests::StateMachineContext;
 use crate::utils::error::TestError;
 use crate::utils::wasm::{
-    get_btc_bridge_canister_bytecode, get_btc_canister_bytecode,
-    get_ck_btc_minter_canister_bytecode, get_icrc1_token_canister_bytecode,
-    get_kyt_canister_bytecode,
+    get_btc_bridge_canister_bytecode, get_ck_btc_minter_canister_bytecode,
+    get_icrc1_token_canister_bytecode, get_kyt_canister_bytecode, get_mock_btc_canister_bytecode,
 };
 
 const KYT_FEE: u64 = 2_000;
@@ -87,7 +86,7 @@ fn minter_wasm() -> Vec<u8> {
 fn bitcoin_mock_wasm() -> Vec<u8> {
     tokio::runtime::Runtime::new()
         .unwrap()
-        .block_on(get_btc_canister_bytecode())
+        .block_on(get_mock_btc_canister_bytecode())
 }
 
 fn kyt_wasm() -> Vec<u8> {

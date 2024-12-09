@@ -1,5 +1,6 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use bitcoin::Amount;
 use did::BlockNumber;
@@ -11,7 +12,7 @@ use crate::context::brc20::{
 };
 use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext as _};
-use crate::dfx_tests::{block_until_succeeds, DfxTestContext, ADMIN};
+use crate::pocket_ic_integration_test::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
 
 /// Default deposit amount
@@ -27,7 +28,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
     let brc20_tick = brc20::generate_brc20_tick();
 
-    let ctx = Brc20Context::dfx(&[Brc20InitArgs {
+    let ctx = Brc20Context::pocket_ic(&[Brc20InitArgs {
         tick: brc20_tick,
         decimals: Some(DEFAULT_DECIMALS),
         limit: Some(DEFAULT_MINT_AMOUNT),
@@ -57,7 +58,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     .expect("send brc20 failed");
 
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -131,14 +132,37 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 
                 Ok(())
             })
-        }, Duration::from_secs(120)).await;
+        }, &ctx.inner, Duration::from_secs(120)).await;
 
     ctx.stop().await;
 }
 
 #[tokio::test]
 async fn test_brc20_bridge_stress_test() {
-    let ctx = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+    let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
+        &CanisterType::BRC20_CANISTER_SET,
+        |builder| {
+            builder
+                .with_ii_subnet()
+                .with_bitcoin_subnet()
+                .with_bitcoind_addr(SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                    18444,
+                ))
+        },
+        |mut pic| {
+            Box::pin(async move {
+                // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
+                pic.set_time(SystemTime::now()).await;
+                pic.make_live(None).await;
+                pic
+            })
+        },
+    )
+    .await
+    .live();
+
+    context.install_bitcoin().await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -150,5 +174,5 @@ async fn test_brc20_bridge_stress_test() {
         charge_fee: false,
     };
 
-    crate::context::stress::brc20::stress_test_brc20_bridge_with_ctx(ctx, 1, config).await;
+    crate::context::stress::brc20::stress_test_brc20_bridge_with_ctx(context, 1, config).await;
 }
