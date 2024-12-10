@@ -26,8 +26,7 @@ fetch_ic_canisters: pre_build
   curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-kyt.wasm.gz"    "https://download.dfinity.systems/ic/{{IC_COMMIT_HASH}}/canisters/ic-ckbtc-kyt.wasm.gz" 
   curl --fail -L -o "{{WASM_DIR}}/ic-ckbtc-kyt.did"        "https://raw.githubusercontent.com/dfinity/ic/{{IC_COMMIT_HASH}}/rs/bitcoin/ckbtc/kyt/kyt.did"
   curl --fail -L -o "{{WASM_DIR}}/evm_rpc.wasm.gz"         "https://github.com/internet-computer-protocol/evm-rpc-canister/releases/download/{{IC_EVM_RPC_TAG}}/evm_rpc.wasm.gz"
-
-  cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz {{WASM_DIR}}/ic-bitcoin-canister-mock.wasm.gz
+  curl --fail -L -o "{{WASM_DIR}}/ic-btc-canister.wasm.gz" "https://github.com/dfinity/bitcoin-canister/releases/download/release%2F2024-07-28/ic-btc-canister.wasm.gz"
 
 
 # Fetch evmc and signature-verification canister wasm and did files

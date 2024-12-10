@@ -13,7 +13,7 @@ use rand::Rng;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::brc20::{self as ctx, Brc20Context, Brc20InitArgs, BtcWallet};
+use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs, BtcWallet};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
