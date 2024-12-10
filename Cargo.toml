@@ -51,6 +51,8 @@ ic-agent = "0.39"
 ic-btc-interface = "0.2"
 ic-canister = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister", branch = "EPROD-1082-migrate-all-dfx-and-state-machine-tests-to-pocket-ic" }
 ic-canister-client = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-canister-client", branch = "EPROD-1082-migrate-all-dfx-and-state-machine-tests-to-pocket-ic" }
+ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
+ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 ic-exports = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-exports", branch = "EPROD-1082-migrate-all-dfx-and-state-machine-tests-to-pocket-ic" }
 ic-log = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-log", branch = "EPROD-1082-migrate-all-dfx-and-state-machine-tests-to-pocket-ic" }
 ic-metrics = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-metrics", branch = "EPROD-1082-migrate-all-dfx-and-state-machine-tests-to-pocket-ic", features = [
@@ -95,16 +97,6 @@ vergen-gitcl = { version = "1", default-features = false, features = [
 ] }
 wildmatch = "2"
 
-# state machine tests deps
-ic-base-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-bitcoin-canister-mock = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-ckbtc-kyt = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-ckbtc-minter = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-config = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-icrc1-ledger = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-management-canister-types = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
-ic-state-machine-tests = { git = "https://github.com/dfinity/ic.git", tag = "release-2024-04-17_23-01-base" }
 
 [profile.dev]
 debug = false

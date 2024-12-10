@@ -10,7 +10,6 @@ const IC_CKBTC_KYT_WASM_FILENAME: &str = "ic-ckbtc-kyt.wasm.gz";
 const EVM_RPC_WASM_FILENAME: &str = "evm_rpc.wasm.gz";
 const BTC_BRIDGE_WASM_FILENAME: &str = "btc-bridge.wasm.gz";
 const ERC20_BRIDGE_WASM_FILENAME: &str = "erc20-bridge.wasm.gz";
-const BTC_MOCK_CANISTER_WASM_FILENAME: &str = "ic-bitcoin-canister-mock.wasm.gz";
 const BTC_CANISTER_WASM_FILENAME: &str = "ic-btc-canister.wasm.gz";
 const SIGNATURE_VERIFICATION_WASM_FILENAME: &str = "signature_verification.wasm.gz";
 const EVM_TESTNET_WASM_FILENAME: &str = "evm_testnet.wasm.gz";
@@ -94,16 +93,6 @@ pub async fn get_icrc2_bridge_canister_wasm_path() -> PathBuf {
     get_wasm_path(ICRC2_BRIDGE_WASM_FILENAME).await
 }
 
-pub async fn get_mock_btc_canister_bytecode() -> Vec<u8> {
-    static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
-    get_or_load_wasm(&CANISTER_BYTECODE, BTC_MOCK_CANISTER_WASM_FILENAME).await
-}
-
-/// Returns the path to the mocked btc canister
-pub async fn get_mock_btc_canister_wasm_path() -> PathBuf {
-    get_wasm_path(BTC_MOCK_CANISTER_WASM_FILENAME).await
-}
-
 pub async fn get_ic_btc_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, BTC_CANISTER_WASM_FILENAME).await
@@ -115,13 +104,13 @@ pub async fn get_ic_btc_canister_wasm_path() -> PathBuf {
 }
 
 /// Returns the bytecode of the minter canister
-pub async fn get_ck_btc_minter_canister_bytecode() -> Vec<u8> {
+pub async fn get_ckbtc_minter_canister_bytecode() -> Vec<u8> {
     static CANISTER_BYTECODE: OnceCell<Vec<u8>> = OnceCell::new();
     get_or_load_wasm(&CANISTER_BYTECODE, IC_CKBTC_MINTER_WASM_FILENAME).await
 }
 
 /// Returns the path to the minter canister
-pub async fn get_ck_btc_minter_canister_wasm_path() -> PathBuf {
+pub async fn get_ckbtc_minter_canister_wasm_path() -> PathBuf {
     get_wasm_path(IC_CKBTC_MINTER_WASM_FILENAME).await
 }
 

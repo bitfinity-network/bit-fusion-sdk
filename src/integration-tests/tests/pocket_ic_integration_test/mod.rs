@@ -1,4 +1,5 @@
 pub mod brc20_bridge;
+pub mod btc_bridge;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
 pub mod rune_bridge;
@@ -11,7 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use candid::utils::ArgumentEncoder;
-use candid::{Encode, Nat, Principal};
+use candid::{Nat, Principal};
 use did::{TransactionReceipt, H256};
 use eth_signer::ic_sign::SigningKeyId;
 use evm_canister_client::EvmCanisterClient;
@@ -27,7 +28,6 @@ use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";
 pub const ALICE: &str = "alice";
-const NNS_ROOT_CANISTER_ID: &str = "r7inp-6aaaa-aaaaa-aaabq-cai";
 
 #[derive(Clone)]
 pub struct PocketIcTestContext {
@@ -118,32 +118,6 @@ impl PocketIcTestContext {
     pub fn live(mut self) -> Self {
         self.live = true;
         self
-    }
-
-    /// Install Bitcoin canister
-    pub async fn install_bitcoin(&self) {
-        // The NNS root canister should be the controller of the bitcoin testnet canister.
-        let nns_root_canister_id: Principal = Principal::from_text(NNS_ROOT_CANISTER_ID).unwrap();
-        let actual_canister_id = self
-            .client
-            .create_canister_with_id(Some(nns_root_canister_id), None, self.canisters.bitcoin())
-            .await
-            .unwrap();
-        assert_eq!(actual_canister_id, self.canisters.bitcoin());
-
-        let btc_wasm = CanisterType::Bitcoin.default_canister_wasm().await;
-        let args = ic_btc_interface::Config {
-            network: ic_btc_interface::Network::Regtest,
-            ..Default::default()
-        };
-        self.client
-            .install_canister(
-                self.canisters.bitcoin(),
-                btc_wasm,
-                Encode!(&args).unwrap(),
-                Some(nns_root_canister_id),
-            )
-            .await;
     }
 
     pub fn admin() -> Principal {

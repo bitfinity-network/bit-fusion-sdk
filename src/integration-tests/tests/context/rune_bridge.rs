@@ -30,13 +30,12 @@ use rune_bridge::ops::RuneDepositRequestData;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
+use super::CanisterType;
 use crate::context::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
-
-use super::CanisterType;
 
 type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
@@ -183,8 +182,6 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
         )
         .await
         .live();
-
-        context.install_bitcoin().await;
 
         Self::new(context, runes).await
     }

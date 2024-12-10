@@ -28,8 +28,6 @@ fetch_ic_canisters: pre_build
   curl --fail -L -o "{{WASM_DIR}}/evm_rpc.wasm.gz"         "https://github.com/internet-computer-protocol/evm-rpc-canister/releases/download/{{IC_EVM_RPC_TAG}}/evm_rpc.wasm.gz"
   curl --fail -L -o "{{WASM_DIR}}/ic-btc-canister.wasm.gz" "https://github.com/dfinity/bitcoin-canister/releases/download/release%2F2024-07-28/ic-btc-canister.wasm.gz"
 
-  cp src/integration-tests/ic-bitcoin-canister-mock.wasm.gz {{WASM_DIR}}/ic-bitcoin-canister-mock.wasm.gz
-
 
 # Fetch evmc and signature-verification canister wasm and did files
 [group('fetch_dependencies')]

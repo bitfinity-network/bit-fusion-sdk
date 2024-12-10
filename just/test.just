@@ -15,7 +15,7 @@ test test_name="":
 [group('test')]
 integration_test test_name="": docker_down docker_pull docker_up
   export PROTOC_INCLUDE=${PWD}/proto
-  cargo test {{test_name}} -p integration-tests --no-default-features --features "pocket_ic_integration_test" --features "state_machine_tests" 2> "{{TEST_LOGFILE}}"
+  cargo test {{test_name}} -p integration-tests --no-default-features --features "pocket_ic_integration_test" 2> "{{TEST_LOGFILE}}"
 
 
 # Run all unit tests for the i686 target

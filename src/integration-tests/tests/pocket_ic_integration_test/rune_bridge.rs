@@ -3,10 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bridge_did::runes::RuneName;
-use did::BlockNumber;
+use did::{BlockNumber, H160};
 use eth_signer::Signer as _;
 
-use crate::context::rune::{
+use crate::context::rune_bridge::{
     generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,
 };
 use crate::context::TestContext;
@@ -425,6 +425,33 @@ async fn bail_out_of_impossible_deposit() {
         .unwrap_err()
         .to_string()
         .contains("operation cannot progress"));
+
+    ctx.stop().await
+}
+
+#[tokio::test]
+async fn generates_correct_deposit_address() {
+    const ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b418";
+    let eth_address = H160::from_hex_str(ETH_ADDRESS).unwrap();
+
+    let rune_name = generate_rune_name();
+    let ctx = RunesContext::pocket_ic(&[rune_name.clone()]).await;
+    let address = ctx.get_deposit_address(&eth_address).await;
+
+    assert_eq!(
+        address.to_string(),
+        "bcrt1qka935qe96e6zkgkzx6hrr5knmvmhcdn0umc0zr"
+    );
+
+    const ANOTHER_ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b419";
+    let eth_address = H160::from_hex_str(ANOTHER_ETH_ADDRESS).unwrap();
+
+    let address = ctx.get_deposit_address(&eth_address).await;
+
+    assert_ne!(
+        address.to_string(),
+        "bc1qdmwl446fszfj40wpup4dgq6ezv8l6ajhs2zxyz".to_string()
+    );
 
     ctx.stop().await
 }

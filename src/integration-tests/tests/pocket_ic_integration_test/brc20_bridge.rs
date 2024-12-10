@@ -6,7 +6,7 @@ use bitcoin::Amount;
 use did::BlockNumber;
 use eth_signer::Signer;
 
-use crate::context::brc20::{
+use crate::context::brc20_bridge::{
     self, Brc20Context, Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT,
     REQUIRED_CONFIRMATIONS,
 };
@@ -26,7 +26,7 @@ const DEFAULT_DECIMALS: u8 = 18;
 async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let deposit_amount = TokenAmount::from_int(DEFAULT_DEPOSIT_AMOUNT, DEFAULT_DECIMALS);
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
-    let brc20_tick = brc20::generate_brc20_tick();
+    let brc20_tick = brc20_bridge::generate_brc20_tick();
 
     let ctx = Brc20Context::pocket_ic(&[Brc20InitArgs {
         tick: brc20_tick,
@@ -161,8 +161,6 @@ async fn test_brc20_bridge_stress_test() {
     )
     .await
     .live();
-
-    context.install_bitcoin().await;
 
     let config = StressTestConfig {
         users_number: 5,
