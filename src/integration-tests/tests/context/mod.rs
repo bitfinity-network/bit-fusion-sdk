@@ -49,6 +49,7 @@ use crate::utils::{TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TE
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";
+const NNS_ROOT_CANISTER_ID: &str = "r7inp-6aaaa-aaaaa-aaabq-cai";
 
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_client::{
@@ -966,7 +967,15 @@ pub trait TestContext {
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal>;
 
+    /// Creates an empty canister with cycles on it's balance and the specified id
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal>;
+
+    /// Creates an empty canister with cycles on it's balance with the specified id and controller.
+    async fn create_canister_with_id_and_controller(
+        &self,
+        id: Principal,
+        controller: Principal,
+    ) -> Result<Principal>;
 
     /// Stop the canister with the given `canister_id`.
     async fn stop_canister(&self, _canister: Principal) -> Result<()> {
@@ -979,6 +988,15 @@ pub trait TestContext {
         canister: Principal,
         wasm: Vec<u8>,
         args: impl ArgumentEncoder + Send,
+    ) -> Result<()>;
+
+    /// Installs the `wasm` code to the `canister` with the given init `args` and sender.
+    async fn install_canister_with_sender(
+        &self,
+        canister: Principal,
+        wasm: Vec<u8>,
+        args: impl ArgumentEncoder + Send,
+        sender: Principal,
     ) -> Result<()>;
 
     /// Reinstalls the canister.
@@ -1170,9 +1188,14 @@ pub trait TestContext {
             }
             CanisterType::Bitcoin => {
                 println!("Installing default BTC canister...");
+                let nns_root_canister = Principal::from_text(NNS_ROOT_CANISTER_ID)
+                    .expect("Failed to parse NNS_ROOT_CANISTER_ID");
 
                 let actual_canister_id = self
-                    .create_canister_with_id(self.canisters().bitcoin())
+                    .create_canister_with_id_and_controller(
+                        self.canisters().bitcoin(),
+                        nns_root_canister,
+                    )
                     .await
                     .unwrap();
                 assert_eq!(actual_canister_id, self.canisters().bitcoin());
@@ -1182,9 +1205,14 @@ pub trait TestContext {
                     network: ic_btc_interface::Network::Regtest,
                     ..Default::default()
                 };
-                self.install_canister(self.canisters().bitcoin(), btc_wasm, (&args,))
-                    .await
-                    .expect("Failed to install Bitcoin canister");
+                self.install_canister_with_sender(
+                    self.canisters().bitcoin(),
+                    btc_wasm,
+                    (&args,),
+                    nns_root_canister,
+                )
+                .await
+                .expect("Failed to install Bitcoin canister");
             }
             CanisterType::Kyt => {
                 println!(

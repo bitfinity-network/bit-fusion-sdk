@@ -145,6 +145,16 @@ impl TestContext for DfxTestContext {
             .map_err(|err| TestError::Generic(format!("Failed to install canister: {err:?}")))
     }
 
+    async fn install_canister_with_sender(
+        &self,
+        _canister: Principal,
+        _wasm: Vec<u8>,
+        _args: impl ArgumentEncoder + Send,
+        _sender: Principal,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn reinstall_canister(
         &self,
         canister: Principal,
@@ -175,11 +185,19 @@ impl TestContext for DfxTestContext {
     }
 
     async fn create_canister_with_id(&self, _id: Principal) -> Result<Principal> {
-        todo!()
+        unimplemented!()
+    }
+
+    async fn create_canister_with_id_and_controller(
+        &self,
+        _id: Principal,
+        _owner: Principal,
+    ) -> Result<Principal> {
+        unimplemented!()
     }
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
-        todo!()
+        unimplemented!()
     }
 
     fn sign_key(&self) -> SigningKeyId {

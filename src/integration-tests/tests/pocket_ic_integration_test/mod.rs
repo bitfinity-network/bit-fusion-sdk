@@ -182,8 +182,17 @@ impl TestContext for PocketIcTestContext {
     }
 
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
+        self.create_canister_with_id_and_controller(id, self.admin())
+            .await
+    }
+
+    async fn create_canister_with_id_and_controller(
+        &self,
+        id: Principal,
+        owner: Principal,
+    ) -> Result<Principal> {
         self.client
-            .create_canister_with_id(Some(self.admin()), None, id)
+            .create_canister_with_id(Some(owner), None, id)
             .await
             .expect("failed to create canister");
         self.client.add_cycles(id, u128::MAX).await;
@@ -196,9 +205,20 @@ impl TestContext for PocketIcTestContext {
         wasm: Vec<u8>,
         args: impl ArgumentEncoder + Send,
     ) -> Result<()> {
+        self.install_canister_with_sender(canister, wasm, args, self.admin())
+            .await
+    }
+
+    async fn install_canister_with_sender(
+        &self,
+        canister: Principal,
+        wasm: Vec<u8>,
+        args: impl ArgumentEncoder + Send,
+        sender: Principal,
+    ) -> Result<()> {
         let args = candid::encode_args(args).unwrap();
         self.client
-            .install_canister(canister, wasm, args, Some(self.admin()))
+            .install_canister(canister, wasm, args, Some(sender))
             .await;
         Ok(())
     }

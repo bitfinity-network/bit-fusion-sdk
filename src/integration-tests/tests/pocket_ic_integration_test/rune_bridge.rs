@@ -440,7 +440,7 @@ async fn generates_correct_deposit_address() {
 
     assert_eq!(
         address.to_string(),
-        "bcrt1qka935qe96e6zkgkzx6hrr5knmvmhcdn0umc0zr"
+        "bcrt1quj4mrtx0grz3n2m3axjr65fhe67z8m836f674x"
     );
 
     const ANOTHER_ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b419";
@@ -450,7 +450,7 @@ async fn generates_correct_deposit_address() {
 
     assert_ne!(
         address.to_string(),
-        "bc1qdmwl446fszfj40wpup4dgq6ezv8l6ajhs2zxyz".to_string()
+        "bcrt1quj4mrtx0grz3n2m3axjr65fhe67z8m836f674x".to_string()
     );
 
     ctx.stop().await
