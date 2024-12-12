@@ -217,7 +217,7 @@ where
 
         let mut rng = rand::thread_rng();
         let wallet = Wallet::new(&mut rng);
-        let wallet_address = wallet.address().clone();
+        let wallet_address = wallet.address();
 
         context
             .evm_client(context.admin_name())

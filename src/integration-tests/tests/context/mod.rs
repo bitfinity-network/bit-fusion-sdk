@@ -39,7 +39,6 @@ use ic_exports::icrc_types::icrc1_ledger::{
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use icrc2_bridge::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng};
 use tokio::time::Instant;
 
@@ -440,7 +439,7 @@ pub trait TestContext {
         evm: &EvmCanisterClient<Self::Client>,
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
-        let mut seedable_rng = StdRng::from(SeedableRng::from_entropy());
+        let mut seedable_rng: rand::prelude::StdRng = SeedableRng::from_entropy();
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
         let mut last_err = None;
 

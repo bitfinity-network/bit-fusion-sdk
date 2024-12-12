@@ -274,7 +274,7 @@ where
 
         let mut rng = rand::thread_rng();
         let wallet = Wallet::new(&mut rng);
-        let wallet_address = wallet.address().clone();
+        let wallet_address = wallet.address();
 
         context
             .evm_client(context.admin_name())
@@ -291,11 +291,6 @@ where
             .unwrap();
 
         context.advance_time(Duration::from_secs(2)).await;
-
-        let wrapped_token_deployer = context
-            .initialize_wrapped_token_deployer_contract(&wallet)
-            .await
-            .unwrap();
 
         let wrapped_token_deployer = context
             .initialize_wrapped_token_deployer_contract(&wallet)
