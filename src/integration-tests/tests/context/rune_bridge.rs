@@ -209,17 +209,26 @@ where
             .await
             .unwrap();
 
-        let wallet = context.new_wallet(u128::MAX).await.unwrap();
-
-        let btc_bridge_eth_address = context
+        let rune_bridge_eth_address = context
             .rune_bridge_client(context.admin_name())
             .get_bridge_canister_evm_address()
             .await
             .unwrap();
 
+        let mut rng = rand::thread_rng();
+        let wallet = Wallet::new(&mut rng);
+        let wallet_address = wallet.address().clone();
+
+        context
+            .evm_client(context.admin_name())
+            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .await
+            .unwrap()
+            .unwrap();
+
         let client = context.evm_client(context.admin_name());
         client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .admin_mint_native_tokens(rune_bridge_eth_address.clone().unwrap(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
@@ -231,7 +240,7 @@ where
         let btf_bridge = context
             .initialize_btf_bridge_with_minter(
                 &wallet,
-                btc_bridge_eth_address.unwrap(),
+                rune_bridge_eth_address.unwrap(),
                 None,
                 wrapped_token_deployer,
                 true,
