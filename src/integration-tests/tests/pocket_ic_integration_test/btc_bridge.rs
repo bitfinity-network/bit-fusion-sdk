@@ -5,6 +5,7 @@ use bitcoin::Amount;
 use btc_bridge::canister::eth_address_to_subaccount;
 use eth_signer::Signer as _;
 use icrc_client::account::Account;
+use serial_test::serial;
 
 use crate::context::btc_bridge::BtcContext;
 use crate::context::TestContext as _;
@@ -14,6 +15,7 @@ const CKBTC_LEDGER_FEE: u64 = 1_000;
 const KYT_FEE: u64 = 2_000;
 
 #[tokio::test]
+#[serial]
 async fn btc_to_erc20_test() {
     let ctx = BtcContext::pocket_ic().await;
     let ctx = Arc::new(ctx);
@@ -69,6 +71,7 @@ async fn btc_to_erc20_test() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_get_btc_address_from_bridge() {
     let ctx = BtcContext::pocket_ic().await;
 
@@ -101,6 +104,7 @@ async fn test_get_btc_address_from_bridge() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
     let ctx = Arc::new(BtcContext::pocket_ic().await);
 
@@ -192,6 +196,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     let ctx = Arc::new(BtcContext::pocket_ic().await);
 
