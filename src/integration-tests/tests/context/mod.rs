@@ -1045,6 +1045,14 @@ pub trait TestContext {
                     self.canisters().evm()
                 );
                 let signature_canister = self.canisters().get_or_anonymous(CanisterType::Signature);
+
+                // TODO: if evm canister already exists, don't reinstall.
+                let evm_client = self.evm_client(self.admin_name());
+                if evm_client.eth_block_number().await.is_ok() {
+                    println!("EVM canister already exists, skipping installation");
+                    return;
+                }
+
                 let init_data = evm_canister_init_data(
                     signature_canister,
                     self.admin(),
