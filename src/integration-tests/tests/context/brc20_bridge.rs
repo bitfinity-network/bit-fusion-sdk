@@ -266,7 +266,7 @@ where
             .await
             .unwrap();
 
-        context.advance_time(Duration::from_secs(2)).await;
+        context.advance_time(Duration::from_secs(10)).await;
 
         let brc20_bridge_eth_address = context
             .brc20_bridge_client(context.admin_name())
