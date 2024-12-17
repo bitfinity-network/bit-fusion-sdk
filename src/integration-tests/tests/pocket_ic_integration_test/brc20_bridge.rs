@@ -5,7 +5,6 @@ use std::time::{Duration, SystemTime};
 use bitcoin::Amount;
 use did::BlockNumber;
 use eth_signer::Signer;
-use serial_test::serial;
 
 use crate::context::brc20_bridge::{
     self, Brc20Context, Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT,
@@ -24,7 +23,6 @@ const DEFAULT_WITHDRAW_AMOUNT: u128 = 3_000;
 const DEFAULT_DECIMALS: u8 = 18;
 
 #[tokio::test]
-#[serial]
 async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let deposit_amount = TokenAmount::from_int(DEFAULT_DEPOSIT_AMOUNT, DEFAULT_DECIMALS);
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
@@ -140,7 +138,6 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_brc20_bridge_stress_test() {
     let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
         &CanisterType::BRC20_CANISTER_SET,

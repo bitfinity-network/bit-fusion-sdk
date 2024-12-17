@@ -70,15 +70,14 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                         18444,
                     ))
             },
-            |mut pic| {
+            |pic| {
                 Box::pin(async move {
                     // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
                     pic.set_time(SystemTime::now()).await;
-                    pic.make_live(None).await;
                     pic
                 })
             },
-            true,
+            false,
         )
         .await;
 
@@ -108,10 +107,13 @@ where
             .get_new_address()
             .expect("failed to get new address");
 
+        context.advance_time(Duration::from_secs(10)).await;
+
         let btc_bridge_eth_address = context
             .btc_bridge_client(context.admin_name())
             .get_bridge_canister_evm_address()
             .await
+            .expect("failed to get btc bridge eth address")
             .expect("failed to get btc bridge eth address");
 
         let mut rng = rand::thread_rng();
@@ -122,32 +124,32 @@ where
             .evm_client(context.admin_name())
             .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint tokens to user")
+            .expect("failed to mint tokens to user");
 
         let client = context.evm_client(context.admin_name());
         client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
             .await
-            .expect("failed to mint tokens")
-            .expect("failed to mint tokens");
+            .expect("failed to mint tokens to btc bridge")
+            .expect("failed to mint tokens to btc bridge");
 
         context.advance_time(Duration::from_secs(2)).await;
 
         let wrapped_token_deployer = context
             .initialize_wrapped_token_deployer_contract(&wallet)
             .await
-            .unwrap();
+            .expect("failed to initialize wrapped token deployer");
         let btf_bridge = context
             .initialize_btf_bridge_with_minter(
                 &wallet,
-                btc_bridge_eth_address.unwrap(),
+                btc_bridge_eth_address,
                 None,
                 wrapped_token_deployer,
                 true,
             )
             .await
-            .unwrap();
+            .expect("failed to initialize btf bridge");
 
         let token_id = Id256::from(&context.canisters().ckbtc_ledger());
         let token = context

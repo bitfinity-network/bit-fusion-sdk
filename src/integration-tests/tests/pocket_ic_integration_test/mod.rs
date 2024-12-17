@@ -52,13 +52,8 @@ impl PocketIcTestContext {
         Self::new_with(
             canisters_set,
             |builder| builder,
-            |mut pic| {
-                Box::pin(async move {
-                    pic.make_live(None).await;
-                    pic
-                })
-            },
-            true,
+            |pic| Box::pin(async move { pic }),
+            false,
         )
         .await
     }
@@ -117,6 +112,10 @@ impl PocketIcTestContext {
                 .create_canister()
                 .await
                 .expect("canister should be created");
+            println!(
+                "Created canister {:?} with principal {}",
+                canister_type, principal
+            );
 
             ctx.canisters.set(*canister_type, principal);
         }
@@ -152,10 +151,6 @@ impl TestContext for PocketIcTestContext {
 
     fn canisters(&self) -> TestCanisters {
         self.canisters.clone()
-    }
-
-    fn is_live(&self) -> bool {
-        self.live
     }
 
     async fn advance_time(&self, time: Duration) {
@@ -323,12 +318,17 @@ where
     F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
 {
     let start = Instant::now();
+    let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");
     while start.elapsed() < max_wait {
-        if let Ok(res) = predicate().await {
-            return res;
+        match predicate().await {
+            Ok(res) => return res,
+            Err(e) => err = e,
         }
         ctx.advance_time(Duration::from_millis(100)).await;
     }
 
-    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
+    panic!(
+        "Predicate did not succeed within {}s: {err}",
+        max_wait.as_secs()
+    );
 }

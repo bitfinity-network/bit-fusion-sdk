@@ -266,6 +266,8 @@ where
             .await
             .unwrap();
 
+        context.advance_time(Duration::from_secs(2)).await;
+
         let brc20_bridge_eth_address = context
             .brc20_bridge_client(context.admin_name())
             .get_bridge_canister_evm_address()

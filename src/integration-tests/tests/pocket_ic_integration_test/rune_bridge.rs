@@ -5,7 +5,6 @@ use std::time::Duration;
 use bridge_did::runes::RuneName;
 use did::{BlockNumber, H160};
 use eth_signer::Signer as _;
-use serial_test::serial;
 
 use crate::context::rune_bridge::{
     generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,
@@ -14,7 +13,6 @@ use crate::context::TestContext;
 use crate::pocket_ic_integration_test::{block_until_succeeds, ADMIN};
 
 #[tokio::test]
-#[serial]
 async fn runes_bridging_flow() {
     let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
 
@@ -102,7 +100,6 @@ async fn runes_bridging_flow() {
 }
 
 #[tokio::test]
-#[serial]
 async fn inputs_from_different_users() {
     let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
 
@@ -215,7 +212,6 @@ async fn inputs_from_different_users() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_should_deposit_two_runes_in_a_single_tx() {
     let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
@@ -277,7 +273,6 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_should_deposit_two_runes_in_two_tx() {
     let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
@@ -339,7 +334,6 @@ async fn test_should_deposit_two_runes_in_two_tx() {
 }
 
 #[tokio::test]
-#[serial]
 async fn bail_out_of_impossible_deposit() {
     let rune_name = generate_rune_name();
     let ctx = RunesContext::pocket_ic(&[rune_name.clone()]).await;
@@ -436,7 +430,6 @@ async fn bail_out_of_impossible_deposit() {
 }
 
 #[tokio::test]
-#[serial]
 async fn generates_correct_deposit_address() {
     const ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b418";
     let eth_address = H160::from_hex_str(ETH_ADDRESS).unwrap();

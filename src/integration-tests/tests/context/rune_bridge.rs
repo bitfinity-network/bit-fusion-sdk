@@ -209,6 +209,8 @@ where
             .await
             .unwrap();
 
+        context.advance_time(Duration::from_secs(2)).await;
+
         let rune_bridge_eth_address = context
             .rune_bridge_client(context.admin_name())
             .get_bridge_canister_evm_address()
@@ -232,6 +234,8 @@ where
             .await
             .unwrap()
             .unwrap();
+
+        context.advance_time(Duration::from_secs(2)).await;
 
         let wrapped_token_deployer = context
             .initialize_wrapped_token_deployer_contract(&wallet)

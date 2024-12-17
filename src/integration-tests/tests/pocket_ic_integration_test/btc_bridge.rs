@@ -5,7 +5,6 @@ use bitcoin::Amount;
 use btc_bridge::canister::eth_address_to_subaccount;
 use eth_signer::Signer as _;
 use icrc_client::account::Account;
-use serial_test::serial;
 
 use crate::context::btc_bridge::BtcContext;
 use crate::context::TestContext as _;
@@ -15,7 +14,6 @@ const CKBTC_LEDGER_FEE: u64 = 1_000;
 const KYT_FEE: u64 = 2_000;
 
 #[tokio::test]
-#[serial]
 async fn btc_to_erc20_test() {
     let ctx = BtcContext::pocket_ic().await;
     let ctx = Arc::new(ctx);
@@ -71,7 +69,6 @@ async fn btc_to_erc20_test() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_btc_address_from_bridge() {
     let ctx = BtcContext::pocket_ic().await;
 
@@ -104,7 +101,6 @@ async fn test_get_btc_address_from_bridge() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
     let ctx = Arc::new(BtcContext::pocket_ic().await);
 
@@ -139,7 +135,11 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
             .expect("Failed to get funding utxo");
 
         println!("Pushed tx {tx_count}: {utxo:?}");
+
+        ctx.wait_for_blocks(1).await;
     }
+
+    ctx.wait_for_blocks(6).await;
 
     // deposit
     let wallet_t = wallet.clone();
@@ -154,34 +154,32 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
             })
         },
         &ctx.context,
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     )
     .await;
-    assert!(ctx.btc_to_erc20(&wallet, &caller_eth_address).await.is_ok());
 
     let ctx_t = ctx.clone();
     let wallet_t = wallet.clone();
-    let minted = block_until_succeeds(
+
+    let expected_balance = (deposit_value - (KYT_FEE * tx_count) - CKBTC_LEDGER_FEE) as u128;
+    block_until_succeeds(
         move || {
             let ctx = ctx_t.clone();
             let wallet = wallet_t.clone();
             Box::pin(async move {
                 let balance = ctx.erc20_balance_of(&wallet).await?;
 
-                if balance > 0 {
+                if balance == expected_balance {
                     Ok(balance)
                 } else {
-                    anyhow::bail!("Balance is 0")
+                    anyhow::bail!("Balance is {balance}; expected: {expected_balance}")
                 }
             })
         },
         &ctx.context,
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     )
     .await;
-
-    let expected_balance = (deposit_value - (KYT_FEE * tx_count) - CKBTC_LEDGER_FEE) as u128;
-    assert_eq!(minted, expected_balance);
 
     let canister_balance = ctx
         .icrc_balance_of(Account {
@@ -196,7 +194,6 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     let ctx = Arc::new(BtcContext::pocket_ic().await);
 

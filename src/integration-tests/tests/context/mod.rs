@@ -6,7 +6,6 @@ pub mod stress;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use bridge_did::error::BTFResult as McResult;
@@ -40,7 +39,6 @@ use ic_exports::icrc_types::icrc1_ledger::{
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use icrc2_bridge::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
-use once_cell::sync::OnceCell;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -62,8 +60,6 @@ use bridge_did::evm_link::EvmLink;
 use bridge_did::init::{BridgeInitData, BtcBridgeConfig, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
-
-static EVM_DEPLOYED: OnceCell<Mutex<HashSet<Principal>>> = OnceCell::new();
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -443,26 +439,9 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
-        let mut last_err = None;
 
-        for _ in 0..500 {
-            tokio::time::sleep(Duration::from_millis(600)).await;
-
-            match self
-                .create_contract_on_evm(evm, wallet, wrapped_token_deployer_input.clone())
-                .await
-            {
-                Ok(wrapped_token_deployer_address) => {
-                    return Ok(wrapped_token_deployer_address);
-                }
-                Err(e) => {
-                    println!("Error creating wrapped token deployer contract: {:?}", e);
-                    last_err = Some(e);
-                }
-            }
-        }
-
-        Err(last_err.unwrap())
+        self.create_contract_on_evm(evm, wallet, wrapped_token_deployer_input.clone())
+            .await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -982,10 +961,6 @@ pub trait TestContext {
         Ok(balance.to())
     }
 
-    fn is_live(&self) -> bool {
-        false
-    }
-
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal>;
 
@@ -1055,17 +1030,6 @@ pub trait TestContext {
                 let signature_canister = self.canisters().get_or_anonymous(CanisterType::Signature);
                 let evm_principal = self.canisters().evm();
 
-                let evm_deployed = EVM_DEPLOYED.get().map_or(false, |v| {
-                    v.lock()
-                        .expect("failed to read deployed evm principal")
-                        .contains(&evm_principal)
-                });
-
-                if self.is_live() && evm_deployed {
-                    println!("EVM {evm_principal} is already deployed");
-                    return;
-                }
-
                 let init_data = evm_canister_init_data(
                     signature_canister,
                     self.admin(),
@@ -1074,14 +1038,6 @@ pub trait TestContext {
                 self.install_canister(evm_principal, wasm, (init_data,))
                     .await
                     .unwrap();
-
-                if self.is_live() {
-                    EVM_DEPLOYED.get().map(|v| {
-                        v.lock()
-                            .expect("failed to insert deployed evm principal")
-                            .insert(evm_principal)
-                    });
-                }
             }
             CanisterType::ExternalEvm => {
                 println!(
