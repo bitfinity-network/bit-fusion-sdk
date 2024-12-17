@@ -43,6 +43,22 @@ impl PocketIcTestContext {
             canisters_set,
             |builder| builder,
             |pic| Box::pin(async move { pic }),
+            false,
+        )
+        .await
+    }
+
+    pub async fn new_live(canisters_set: &[CanisterType]) -> Self {
+        Self::new_with(
+            canisters_set,
+            |builder| builder,
+            |mut pic| {
+                Box::pin(async move {
+                    pic.make_live(None).await;
+                    pic
+                })
+            },
+            true,
         )
         .await
     }
@@ -76,6 +92,7 @@ impl PocketIcTestContext {
         canisters_set: &[CanisterType],
         with_build: FB,
         with_pocket_ic: FPIC,
+        live: bool,
     ) -> Self
     where
         FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
@@ -92,7 +109,7 @@ impl PocketIcTestContext {
         let mut ctx = PocketIcTestContext {
             client,
             canisters: TestCanisters::default(),
-            live: false,
+            live,
         };
 
         for canister_type in canisters_set {
@@ -109,15 +126,6 @@ impl PocketIcTestContext {
         }
 
         ctx
-    }
-
-    /// Set live flag to [`true`].
-    ///
-    /// This is useful for making [`advance_time`] to use sleep as it should, instead of the [`advance_time`] function of the context,
-    /// which should be used only when not live.
-    pub fn live(mut self) -> Self {
-        self.live = true;
-        self
     }
 
     pub fn admin() -> Principal {
@@ -144,6 +152,10 @@ impl TestContext for PocketIcTestContext {
 
     fn canisters(&self) -> TestCanisters {
         self.canisters.clone()
+    }
+
+    fn is_live(&self) -> bool {
+        self.live
     }
 
     async fn advance_time(&self, time: Duration) {

@@ -179,9 +179,9 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                     pic
                 })
             },
+            true,
         )
-        .await
-        .live();
+        .await;
 
         Self::new(context, runes).await
     }

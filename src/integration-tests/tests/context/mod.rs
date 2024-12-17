@@ -6,6 +6,8 @@ pub mod stress;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use bridge_did::error::BTFResult as McResult;
@@ -39,6 +41,7 @@ use ic_exports::icrc_types::icrc1_ledger::{
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
 use icrc2_bridge::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
+use once_cell::sync::OnceCell;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
@@ -60,6 +63,8 @@ use bridge_did::evm_link::EvmLink;
 use bridge_did::init::{BridgeInitData, BtcBridgeConfig, IndexerType, RuneBridgeConfig};
 use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
+
+static EVM_DEPLOYED: OnceCell<Mutex<HashSet<Principal>>> = OnceCell::new();
 
 #[async_trait::async_trait]
 pub trait TestContext {
@@ -978,6 +983,10 @@ pub trait TestContext {
         Ok(balance.to())
     }
 
+    fn is_live(&self) -> bool {
+        false
+    }
+
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal>;
 
@@ -1045,11 +1054,16 @@ pub trait TestContext {
                     self.canisters().evm()
                 );
                 let signature_canister = self.canisters().get_or_anonymous(CanisterType::Signature);
+                let evm_principal = self.canisters().evm();
 
-                // TODO: if evm canister already exists, don't reinstall.
-                let evm_client = self.evm_client(self.admin_name());
-                if evm_client.eth_block_number().await.is_ok() {
-                    println!("EVM canister already exists, skipping installation");
+                let evm_deployed = EVM_DEPLOYED.get().map_or(false, |v| {
+                    v.lock()
+                        .expect("failed to read deployed evm principal")
+                        .contains(&evm_principal)
+                });
+
+                if self.is_live() && evm_deployed {
+                    println!("EVM {evm_principal} is already deployed");
                     return;
                 }
 
@@ -1058,9 +1072,17 @@ pub trait TestContext {
                     self.admin(),
                     Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
                 );
-                self.install_canister(self.canisters().evm(), wasm, (init_data,))
+                self.install_canister(evm_principal, wasm, (init_data,))
                     .await
                     .unwrap();
+
+                if self.is_live() {
+                    EVM_DEPLOYED.get().map(|v| {
+                        v.lock()
+                            .expect("failed to insert deployed evm principal")
+                            .insert(evm_principal)
+                    });
+                }
             }
             CanisterType::ExternalEvm => {
                 println!(

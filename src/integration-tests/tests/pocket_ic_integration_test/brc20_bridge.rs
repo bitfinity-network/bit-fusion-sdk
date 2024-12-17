@@ -161,9 +161,9 @@ async fn test_brc20_bridge_stress_test() {
                 pic
             })
         },
+        true,
     )
-    .await
-    .live();
+    .await;
 
     let config = StressTestConfig {
         users_number: 5,

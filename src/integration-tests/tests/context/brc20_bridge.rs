@@ -234,9 +234,9 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
                     pic
                 })
             },
+            true,
         )
-        .await
-        .live();
+        .await;
 
         Self::new(context, brc20_to_deploy).await
     }
