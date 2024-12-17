@@ -6,7 +6,6 @@ pub mod stress;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::time::Duration;
 
