@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bridge_did::runes::RuneName;
-use did::{BlockNumber, H160};
+use did::{BlockNumber};
 use eth_signer::Signer as _;
 
 use crate::context::rune_bridge::{
