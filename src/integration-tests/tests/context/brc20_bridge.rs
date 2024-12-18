@@ -367,7 +367,7 @@ where
             .expect("Failed to stop brc20 bridge canister");
         #[cfg(feature = "pocket_ic_integration_test")]
         self.inner
-            .stop_canister(self.inner.canisters().btc_bridge())
+            .stop_canister(self.inner.canisters().bitcoin())
             .await
             .expect("Failed to stop brc20 bridge canister");
 
