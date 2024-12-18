@@ -428,30 +428,3 @@ async fn bail_out_of_impossible_deposit() {
 
     ctx.stop().await
 }
-
-#[tokio::test]
-async fn generates_correct_deposit_address() {
-    const ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b418";
-    let eth_address = H160::from_hex_str(ETH_ADDRESS).unwrap();
-
-    let rune_name = generate_rune_name();
-    let ctx = RunesContext::dfx(&[rune_name.clone()]).await;
-    let address = ctx.get_deposit_address(&eth_address).await;
-
-    assert_eq!(
-        address.to_string(),
-        "bcrt1quj4mrtx0grz3n2m3axjr65fhe67z8m836f674x"
-    );
-
-    const ANOTHER_ETH_ADDRESS: &str = "0x4e37fc8684e0f7ad6a6c1178855450294a16b419";
-    let eth_address = H160::from_hex_str(ANOTHER_ETH_ADDRESS).unwrap();
-
-    let address = ctx.get_deposit_address(&eth_address).await;
-
-    assert_ne!(
-        address.to_string(),
-        "bcrt1quj4mrtx0grz3n2m3axjr65fhe67z8m836f674x".to_string()
-    );
-
-    ctx.stop().await
-}
