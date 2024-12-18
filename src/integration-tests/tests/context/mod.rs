@@ -1,6 +1,7 @@
-#[cfg(feature = "dfx_tests")]
-pub mod brc20;
+pub mod brc20_bridge;
+pub mod btc_bridge;
 mod evm_rpc_canister;
+pub mod rune_bridge;
 pub mod stress;
 
 use std::collections::{HashMap, HashSet};
@@ -22,7 +23,7 @@ use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
-use did::{NotificationInput, Transaction, TransactionReceipt, H160, H256, U256, U64};
+use did::{Transaction, TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
@@ -30,7 +31,6 @@ use ethers_core::k256::ecdsa::SigningKey;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_kit::mock_principals::alice;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc1_ledger::{
@@ -48,9 +48,13 @@ use crate::utils::wasm::*;
 use crate::utils::{TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
+const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";
+const NNS_ROOT_CANISTER_ID: &str = "r7inp-6aaaa-aaaaa-aaabq-cai";
 
 use alloy_sol_types::{SolCall, SolConstructor};
-use bridge_client::{Brc20BridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient};
+use bridge_client::{
+    Brc20BridgeClient, BtcBridgeClient, Erc20BridgeClient, Icrc2BridgeClient, RuneBridgeClient,
+};
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::{BridgeInitData, BtcBridgeConfig, IndexerType, RuneBridgeConfig};
@@ -108,6 +112,10 @@ pub trait TestContext {
         RuneBridgeClient::new(self.client(self.canisters().rune_bridge(), caller))
     }
 
+    fn btc_bridge_client(&self, caller: &str) -> BtcBridgeClient<Self::Client> {
+        BtcBridgeClient::new(self.client(self.canisters().btc_bridge(), caller))
+    }
+
     fn brc20_bridge_client(&self, caller: &str) -> Brc20BridgeClient<Self::Client> {
         Brc20BridgeClient::new(self.client(self.canisters().brc20_bridge(), caller))
     }
@@ -121,6 +129,11 @@ pub trait TestContext {
         IcrcCanisterClient::new(self.client(canister, caller))
     }
 
+    /// Returns client for the ICRC ckbtc ledger canister.
+    fn ckbtc_token_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
+        self.icrc_token_client(self.canisters().ckbtc_ledger(), caller)
+    }
+
     /// Returns client for the ICRC token 1 canister.
     fn icrc_token_1_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
         self.icrc_token_client(self.canisters().token_1(), caller)
@@ -129,27 +142,6 @@ pub trait TestContext {
     /// Returns client for the ICRC token 2 canister.
     fn icrc_token_2_client(&self, caller: &str) -> IcrcCanisterClient<Self::Client> {
         self.icrc_token_client(self.canisters().token_2(), caller)
-    }
-
-    /// Sends tx with notification to EVMc.
-    async fn send_notification_tx(
-        &self,
-        user: &Wallet<'_, SigningKey>,
-        input: NotificationInput,
-    ) -> Result<H256> {
-        let address: H160 = user.address().into();
-        let client = self.evm_client(self.admin_name());
-        let account = client.account_basic(address.clone()).await?;
-
-        let tx = self.signed_transaction(
-            user,
-            Some(address.clone()),
-            account.nonce,
-            0,
-            input.encode().unwrap(),
-        );
-
-        Ok(client.send_raw_transaction(tx).await??)
     }
 
     /// Waits for transaction receipt.
@@ -447,12 +439,9 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
-        let wrapped_token_deployer_address = self
-            .create_contract_on_evm(evm, wallet, wrapped_token_deployer_input.clone())
-            .await
-            .unwrap();
 
-        Ok(wrapped_token_deployer_address)
+        self.create_contract_on_evm(evm, wallet, wrapped_token_deployer_input.clone())
+            .await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -975,7 +964,15 @@ pub trait TestContext {
     /// Creates an empty canister with cycles on it's balance.
     async fn create_canister(&self) -> Result<Principal>;
 
+    /// Creates an empty canister with cycles on it's balance and the specified id
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal>;
+
+    /// Creates an empty canister with cycles on it's balance with the specified id and controller.
+    async fn create_canister_with_id_and_controller(
+        &self,
+        id: Principal,
+        controller: Principal,
+    ) -> Result<Principal>;
 
     /// Stop the canister with the given `canister_id`.
     async fn stop_canister(&self, _canister: Principal) -> Result<()> {
@@ -988,6 +985,15 @@ pub trait TestContext {
         canister: Principal,
         wasm: Vec<u8>,
         args: impl ArgumentEncoder + Send,
+    ) -> Result<()>;
+
+    /// Installs the `wasm` code to the `canister` with the given init `args` and sender.
+    async fn install_canister_with_sender(
+        &self,
+        canister: Principal,
+        wasm: Vec<u8>,
+        args: impl ArgumentEncoder + Send,
+        sender: Principal,
     ) -> Result<()>;
 
     /// Reinstalls the canister.
@@ -1022,12 +1028,14 @@ pub trait TestContext {
                     self.canisters().evm()
                 );
                 let signature_canister = self.canisters().get_or_anonymous(CanisterType::Signature);
+                let evm_principal = self.canisters().evm();
+
                 let init_data = evm_canister_init_data(
                     signature_canister,
                     self.admin(),
                     Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
                 );
-                self.install_canister(self.canisters().evm(), wasm, (init_data,))
+                self.install_canister(evm_principal, wasm, (init_data,))
                     .await
                     .unwrap();
             }
@@ -1156,39 +1164,61 @@ pub trait TestContext {
                 // Wait for initialization of the Minter canister parameters.
                 self.advance_time(Duration::from_secs(2)).await;
             }
-            CanisterType::Icrc1Ledger => {
+            CanisterType::CkBtcLedger => {
                 println!(
                     "Installing default ICRC1 Ledger canister with Principal {}",
-                    self.canisters().icrc1_ledger()
+                    self.canisters().ckbtc_ledger()
                 );
-                let init_data = icrc1_ledger_init_data(self.canisters().ck_btc_minter());
-                self.install_canister(self.canisters().icrc1_ledger(), wasm, (init_data,))
+                let init_data = ckbtc_ledger_init_data(self.canisters().ckbtc_minter());
+                self.install_canister(self.canisters().ckbtc_ledger(), wasm, (init_data,))
                     .await
                     .unwrap();
             }
             CanisterType::CkBtcMinter => {
                 println!(
                     "Installing default ckBTC minter canister with Principal {}",
-                    self.canisters().ck_btc_minter()
+                    self.canisters().ckbtc_minter()
                 );
-                let init_data = ck_btc_minter_init_data(
-                    self.canisters().icrc1_ledger(),
-                    self.canisters().kyt(),
-                );
-                self.install_canister(self.canisters().ck_btc_minter(), wasm, (init_data,))
+                let init_data =
+                    ckbtc_minter_init_data(self.canisters().ckbtc_ledger(), self.canisters().kyt());
+                self.install_canister(self.canisters().ckbtc_minter(), wasm, (init_data,))
                     .await
                     .unwrap();
             }
-            CanisterType::Btc => {
-                println!("Installing default mock ckBTC canister...");
-                todo!()
+            CanisterType::Bitcoin => {
+                println!("Installing default BTC canister...");
+                let nns_root_canister = Principal::from_text(NNS_ROOT_CANISTER_ID)
+                    .expect("Failed to parse NNS_ROOT_CANISTER_ID");
+
+                let actual_canister_id = self
+                    .create_canister_with_id_and_controller(
+                        self.canisters().bitcoin(),
+                        nns_root_canister,
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(actual_canister_id, self.canisters().bitcoin());
+
+                let btc_wasm = CanisterType::Bitcoin.default_canister_wasm().await;
+                let args = ic_btc_interface::Config {
+                    network: ic_btc_interface::Network::Regtest,
+                    ..Default::default()
+                };
+                self.install_canister_with_sender(
+                    self.canisters().bitcoin(),
+                    btc_wasm,
+                    (&args,),
+                    nns_root_canister,
+                )
+                .await
+                .expect("Failed to install Bitcoin canister");
             }
             CanisterType::Kyt => {
                 println!(
                     "Installing default KYT canister with Principal {}",
                     self.canisters().kyt()
                 );
-                let init_data = kyc_init_data(self.canisters().ck_btc_minter());
+                let init_data = kyc_init_data(self.canisters().ckbtc_minter(), self.admin());
                 self.install_canister(self.canisters().kyt(), wasm, (init_data,))
                     .await
                     .unwrap();
@@ -1231,8 +1261,8 @@ pub trait TestContext {
                     self.admin(),
                     self.canisters().evm(),
                     self.sign_key(),
-                    self.canisters().ck_btc_minter(),
-                    self.canisters().icrc1_ledger(),
+                    self.canisters().ckbtc_minter(),
+                    self.canisters().ckbtc_ledger(),
                 );
 
                 self.install_canister(self.canisters().btc_bridge(), wasm, (init_data,))
@@ -1493,7 +1523,7 @@ pub fn evm_canister_init_data(
     }
 }
 
-fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
+fn ckbtc_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
     let minting_account = Account {
         owner: minter_principal,
         subaccount: None,
@@ -1512,7 +1542,7 @@ fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
         minting_account,
         fee_collector_account: None,
         initial_balances: vec![],
-        transfer_fee: Nat::from(10u32),
+        transfer_fee: Nat::from(1_000u64),
         decimals: None,
         token_name: "ckBtc".into(),
         token_symbol: "ckBtc".into(),
@@ -1525,24 +1555,24 @@ fn icrc1_ledger_init_data(minter_principal: Principal) -> LedgerArgument {
     })
 }
 
-fn ck_btc_minter_init_data(ledger: Principal, kyt: Principal) -> MinterArg {
+fn ckbtc_minter_init_data(ledger: Principal, kyt: Principal) -> MinterArg {
     MinterArg::Init(crate::utils::btc::InitArgs {
-        btc_network: BtcNetwork::Mainnet,
-        ecdsa_key_name: "master_ecdsa_public_key_fscpm-uiaaa-aaaaa-aaaap-yai".to_string(),
+        btc_network: BtcNetwork::Regtest,
+        ecdsa_key_name: "dfx_test_key".to_string(),
         retrieve_btc_min_amount: 100_000,
         ledger_id: ledger,
         max_time_in_queue_nanos: 100,
-        min_confirmations: Some(12),
+        min_confirmations: Some(1),
         mode: Mode::GeneralAvailability,
         kyt_fee: Some(2000),
         kyt_principal: Some(kyt),
     })
 }
 
-fn kyc_init_data(ck_btc_minter: Principal) -> LifecycleArg {
+fn kyc_init_data(ckbtc_minter: Principal, admin: Principal) -> LifecycleArg {
     LifecycleArg::InitArg(InitArg {
-        minter_id: ck_btc_minter,
-        maintainers: vec![alice()],
+        minter_id: ckbtc_minter,
+        maintainers: vec![admin],
         mode: KytMode::AcceptAll,
     })
 }
@@ -1607,24 +1637,21 @@ impl TestCanisters {
             .expect("erc20 bridge canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn ck_btc_minter(&self) -> Principal {
+    pub fn ckbtc_minter(&self) -> Principal {
         *self
             .0
             .get(&CanisterType::CkBtcMinter)
             .expect("ckBTC minter canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn btc_mock(&self) -> Principal {
-        *self
-            .0
-            .get(&CanisterType::Btc)
-            .expect("bitcoin mock canister should be initialized (see `TestContext::new()`)")
+    pub fn bitcoin(&self) -> Principal {
+        Principal::from_text(BITCOIN_CANISTER_ID).expect("bitcoin canister id is invalid")
     }
 
-    pub fn icrc1_ledger(&self) -> Principal {
+    pub fn ckbtc_ledger(&self) -> Principal {
         *self
             .0
-            .get(&CanisterType::Icrc1Ledger)
+            .get(&CanisterType::CkBtcLedger)
             .expect("icrc1 ledger canister should be initialized (see `TestContext::new()`)")
     }
 
@@ -1674,15 +1701,15 @@ impl TestCanisters {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CanisterType {
+    Bitcoin,
     Brc20Bridge,
-    Btc,
     BtcBridge,
     CkBtcMinter,
     Erc20Bridge,
     Evm,
     EvmRpcCanister,
     ExternalEvm,
-    Icrc1Ledger,
+    CkBtcLedger,
     Icrc2Bridge,
     Kyt,
     RuneBridge,
@@ -1720,11 +1747,14 @@ impl CanisterType {
         CanisterType::Erc20Bridge,
     ];
 
-    pub const BTC_CANISTER_SET: [CanisterType; 4] = [
-        CanisterType::Btc,
+    pub const BTC_CANISTER_SET: [CanisterType; 7] = [
+        CanisterType::Bitcoin,
+        CanisterType::BtcBridge,
         CanisterType::CkBtcMinter,
         CanisterType::Kyt,
-        CanisterType::Icrc1Ledger,
+        CanisterType::CkBtcLedger, // acts as CkBtcLedger
+        CanisterType::Evm,
+        CanisterType::Signature,
     ];
 
     pub const BRC20_CANISTER_SET: [CanisterType; 3] = [
@@ -1742,14 +1772,14 @@ impl CanisterType {
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {
             CanisterType::Brc20Bridge => get_brc20_bridge_canister_bytecode().await,
-            CanisterType::Btc => get_btc_canister_bytecode().await,
+            CanisterType::Bitcoin => get_ic_btc_canister_bytecode().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
-            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_bytecode().await,
+            CanisterType::CkBtcMinter => get_ckbtc_minter_canister_bytecode().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
             CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
             CanisterType::EvmRpcCanister => get_evm_rpc_canister_bytecode().await,
             CanisterType::ExternalEvm => get_evm_testnet_canister_bytecode().await,
-            CanisterType::Icrc1Ledger => get_icrc1_token_canister_bytecode().await,
+            CanisterType::CkBtcLedger => get_icrc1_token_canister_bytecode().await,
             CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_bytecode().await,
             CanisterType::Kyt => get_kyt_canister_bytecode().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
@@ -1762,14 +1792,14 @@ impl CanisterType {
     pub async fn default_canister_wasm_path(&self) -> PathBuf {
         match self {
             CanisterType::Brc20Bridge => get_brc20_bridge_canister_wasm_path().await,
-            CanisterType::Btc => get_btc_canister_wasm_path().await,
+            CanisterType::Bitcoin => get_ic_btc_canister_wasm_path().await,
             CanisterType::BtcBridge => get_btc_bridge_canister_wasm_path().await,
-            CanisterType::CkBtcMinter => get_ck_btc_minter_canister_wasm_path().await,
+            CanisterType::CkBtcMinter => get_ckbtc_minter_canister_wasm_path().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_wasm_path().await,
             CanisterType::Evm => get_evm_testnet_canister_wasm_path().await,
             CanisterType::EvmRpcCanister => get_evm_rpc_canister_wasm_path().await,
             CanisterType::ExternalEvm => get_evm_testnet_canister_wasm_path().await,
-            CanisterType::Icrc1Ledger => get_icrc1_token_canister_wasm_path().await,
+            CanisterType::CkBtcLedger => get_icrc1_token_canister_wasm_path().await,
             CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_wasm_path().await,
             CanisterType::Kyt => get_kyt_canister_wasm_path().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_wasm_path().await,

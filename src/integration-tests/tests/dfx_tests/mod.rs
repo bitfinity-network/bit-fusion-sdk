@@ -17,7 +17,7 @@ use crate::utils::error::{Result, TestError};
 
 mod brc20_bridge;
 mod bridge_deployer;
-mod runes;
+mod rune_bridge;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
 pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
@@ -149,6 +149,16 @@ impl TestContext for DfxTestContext {
             .map_err(|err| TestError::Generic(format!("Failed to install canister: {err:?}")))
     }
 
+    async fn install_canister_with_sender(
+        &self,
+        _canister: Principal,
+        _wasm: Vec<u8>,
+        _args: impl ArgumentEncoder + Send,
+        _sender: Principal,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn reinstall_canister(
         &self,
         canister: Principal,
@@ -179,11 +189,19 @@ impl TestContext for DfxTestContext {
     }
 
     async fn create_canister_with_id(&self, _id: Principal) -> Result<Principal> {
-        todo!()
+        unimplemented!()
+    }
+
+    async fn create_canister_with_id_and_controller(
+        &self,
+        _id: Principal,
+        _owner: Principal,
+    ) -> Result<Principal> {
+        unimplemented!()
     }
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
-        todo!()
+        unimplemented!()
     }
 
     fn sign_key(&self) -> SigningKeyId {
@@ -195,17 +213,22 @@ impl TestContext for DfxTestContext {
 ///
 /// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
 /// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(predicate: F, max_wait: Duration) -> T
+pub async fn block_until_succeeds<F, T>(predicate: F, ctx: &DfxTestContext, max_wait: Duration) -> T
 where
     F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
 {
     let start = Instant::now();
+    let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");
     while start.elapsed() < max_wait {
-        if let Ok(res) = predicate().await {
-            return res;
+        match predicate().await {
+            Ok(res) => return res,
+            Err(e) => err = e,
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        ctx.advance_time(Duration::from_millis(100)).await;
     }
 
-    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
+    panic!(
+        "Predicate did not succeed within {}s: {err}",
+        max_wait.as_secs()
+    );
 }

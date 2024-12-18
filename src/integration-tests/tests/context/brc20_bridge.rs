@@ -28,8 +28,8 @@ use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
-use crate::context::{CanisterType, TestContext};
-use crate::dfx_tests::{DfxTestContext, ADMIN};
+use super::CanisterType;
+use crate::context::TestContext;
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
@@ -120,9 +120,9 @@ where
 }
 
 /// Setup a new brc20 for DFX tests
-async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20Wallet> {
+async fn brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20Wallet> {
     let wallet_name = generate_wallet_name();
-    let admin_btc_rpc_client = BitcoinRpcClient::dfx_test_client(&wallet_name);
+    let admin_btc_rpc_client = BitcoinRpcClient::test_client(&wallet_name);
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
     println!("Dfx BTC wallet address: {}", admin_address);
@@ -210,10 +210,44 @@ async fn dfx_brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Br
     })
 }
 
-impl Brc20Context<DfxTestContext> {
-    /// Init BRC20 context for DFX tests
+#[cfg(feature = "dfx_tests")]
+impl Brc20Context<crate::dfx_tests::DfxTestContext> {
     pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
-        let context = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+        let context =
+            crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+
+        Self::new(context, brc20_to_deploy).await
+    }
+}
+
+#[cfg(feature = "pocket_ic_integration_test")]
+impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
+    /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
+    pub async fn pocket_ic(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+        let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
+            &CanisterType::BRC20_CANISTER_SET,
+            |builder| {
+                builder
+                    .with_ii_subnet()
+                    .with_bitcoin_subnet()
+                    .with_bitcoind_addr(SocketAddr::new(
+                        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                        18444,
+                    ))
+            },
+            |mut pic| {
+                Box::pin(async move {
+                    // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
+                    pic.set_time(std::time::SystemTime::now()).await;
+                    pic.make_live(None).await;
+                    pic
+                })
+            },
+            true,
+        )
+        .await;
 
         Self::new(context, brc20_to_deploy).await
     }
@@ -224,12 +258,12 @@ where
     Ctx: TestContext + Sync,
 {
     pub async fn new(context: Ctx, brc20_to_deploy: &[Brc20InitArgs]) -> Self {
-        let brc20_wallet = dfx_brc20_setup(brc20_to_deploy)
+        let brc20_wallet = brc20_setup(brc20_to_deploy)
             .await
             .expect("failed to setup brc20 tokens");
 
         context
-            .evm_client(ADMIN)
+            .evm_client(context.admin_name())
             .set_logger_filter("info")
             .await
             .expect("failed to set logger filter")
@@ -238,35 +272,47 @@ where
         let bridge = context.canisters().brc20_bridge();
 
         let _: () = context
-            .client(bridge, ADMIN)
+            .client(bridge, context.admin_name())
             .update("admin_configure_ecdsa", ())
             .await
             .unwrap();
 
-        let wallet = context.new_wallet(u128::MAX).await.unwrap();
+        context.advance_time(Duration::from_secs(10)).await;
 
-        let btc_bridge_eth_address = context
-            .brc20_bridge_client(ADMIN)
+        let brc20_bridge_eth_address = context
+            .brc20_bridge_client(context.admin_name())
             .get_bridge_canister_evm_address()
             .await
             .unwrap();
 
-        let client = context.evm_client(ADMIN);
-        client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+        let mut rng = rand::thread_rng();
+        let wallet = Wallet::new(&mut rng);
+        let wallet_address = wallet.address();
+
+        context
+            .evm_client(context.admin_name())
+            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
             .unwrap()
             .unwrap();
+
+        let client = context.evm_client(context.admin_name());
+        client
+            .admin_mint_native_tokens(brc20_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .await
+            .unwrap()
+            .unwrap();
+
+        context.advance_time(Duration::from_secs(2)).await;
 
         let wrapped_token_deployer = context
             .initialize_wrapped_token_deployer_contract(&wallet)
             .await
             .unwrap();
-
         let btf_bridge = context
             .initialize_btf_bridge_with_minter(
                 &wallet,
-                btc_bridge_eth_address.unwrap(),
+                brc20_bridge_eth_address.unwrap(),
                 None,
                 wrapped_token_deployer,
                 true,
@@ -287,7 +333,7 @@ where
         }
 
         let _: () = context
-            .brc20_bridge_client(ADMIN)
+            .brc20_bridge_client(context.admin_name())
             .set_btf_bridge_contract(&btf_bridge)
             .await
             .unwrap();
@@ -319,6 +365,11 @@ where
             .stop_canister(self.inner.canisters().brc20_bridge())
             .await
             .expect("Failed to stop brc20 bridge canister");
+        #[cfg(feature = "pocket_ic_integration_test")]
+        self.inner
+            .stop_canister(self.inner.canisters().bitcoin())
+            .await
+            .expect("Failed to stop brc20 bridge canister");
 
         self.exit.store(true, std::sync::atomic::Ordering::Relaxed);
         // stop miner
@@ -332,7 +383,7 @@ where
 
     pub async fn set_btf_bridge_contract(&self, btf_bridge: &H160) -> anyhow::Result<()> {
         self.inner
-            .brc20_bridge_client(ADMIN)
+            .brc20_bridge_client(self.inner.admin_name())
             .set_btf_bridge_contract(btf_bridge)
             .await?;
         println!("btf bridge contract updated to {btf_bridge}");
@@ -387,7 +438,7 @@ where
 
     pub async fn get_deposit_address(&self, eth_address: &H160) -> Address {
         self.inner
-            .client(self.bridge(), ADMIN)
+            .client(self.bridge(), self.inner.admin_name())
             .query::<_, Result<String, GetAddressError>>("get_deposit_address", (eth_address,))
             .await
             .expect("canister call failed")
@@ -480,7 +531,7 @@ where
             .expect("token not found")
             .clone();
 
-        let client = self.inner.evm_client(ADMIN);
+        let client = self.inner.evm_client(self.inner.admin_name());
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
         let data = Brc20DepositRequestData {
@@ -540,7 +591,7 @@ where
 
             let response: Vec<(OperationId, Brc20BridgeOp)> = self
                 .inner
-                .brc20_bridge_client(ADMIN)
+                .brc20_bridge_client(self.inner.admin_name())
                 .get_operations_list(dst_address, None, None)
                 .await
                 .expect("canister call failed");
@@ -581,7 +632,7 @@ where
         println!("Burning {amount} of {tick} to {recipient}");
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
-        let client = self.inner.evm_client(ADMIN);
+        let client = self.inner.evm_client(self.inner.admin_name());
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,
@@ -678,7 +729,7 @@ where
 
         let start = Instant::now();
         let timeout = Duration::from_secs(MAX_TX_TIMEOUT_SEC);
-        let client = self.inner.evm_client(ADMIN);
+        let client = self.inner.evm_client(self.inner.admin_name());
         while start.elapsed() < timeout {
             let receipt = client
                 .eth_get_transaction_receipt(tx_hash.clone())
@@ -727,7 +778,7 @@ where
         address: &Address,
         tick: &Brc20Tick,
     ) -> anyhow::Result<TokenAmount> {
-        let client = HiroOrdinalsClient::dfx_test_client();
+        let client = HiroOrdinalsClient::test_client();
 
         let balances = client.get_brc20_balances(address).await?;
 

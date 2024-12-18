@@ -19,7 +19,7 @@ pub struct ERC721SignedMintOrder(pub Vec<u8>);
 /// Visitor for `ERC721SignedMintOrder` objects deserialization.
 struct ERC721SignedMintOrderVisitor;
 
-impl<'v> Visitor<'v> for ERC721SignedMintOrderVisitor {
+impl Visitor<'_> for ERC721SignedMintOrderVisitor {
     type Value = ERC721SignedMintOrder;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
