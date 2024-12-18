@@ -51,7 +51,7 @@ impl<Ctx: TestContext> IcrcBaseTokens<Ctx> {
             &format!("Tkn#{token_idx}"),
             init_balances,
         );
-        let wasm = CanisterType::Icrc1Ledger.default_canister_wasm().await;
+        let wasm = CanisterType::CkBtcLedger.default_canister_wasm().await;
         ctx.install_canister(token, wasm, (LedgerArgument::Init(init_data),))
             .await
             .unwrap();

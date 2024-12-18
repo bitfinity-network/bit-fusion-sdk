@@ -6,19 +6,13 @@ use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
-#[cfg(feature = "dfx_tests")]
 pub mod brc20_helper;
 pub mod btc;
-#[cfg(feature = "dfx_tests")]
 pub mod btc_rpc_client;
 pub mod error;
-#[cfg(feature = "dfx_tests")]
 pub mod hiro_ordinals_client;
-#[cfg(feature = "dfx_tests")]
 pub mod miner;
-#[cfg(feature = "dfx_tests")]
 pub mod ord_client;
-#[cfg(feature = "dfx_tests")]
 pub mod rune_helper;
 pub mod token_amount;
 pub mod wasm;

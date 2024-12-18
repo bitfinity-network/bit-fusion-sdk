@@ -1,6 +1,4 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bridge_did::evm_link::EvmLink;
 use bridge_utils::evm_link::{RpcApi, RpcService};
@@ -15,9 +13,7 @@ use ic_utils::interfaces::ManagementCanister;
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
-mod brc20_bridge;
 mod bridge_deployer;
-mod runes;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
 pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
@@ -149,6 +145,16 @@ impl TestContext for DfxTestContext {
             .map_err(|err| TestError::Generic(format!("Failed to install canister: {err:?}")))
     }
 
+    async fn install_canister_with_sender(
+        &self,
+        _canister: Principal,
+        _wasm: Vec<u8>,
+        _args: impl ArgumentEncoder + Send,
+        _sender: Principal,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn reinstall_canister(
         &self,
         canister: Principal,
@@ -179,33 +185,22 @@ impl TestContext for DfxTestContext {
     }
 
     async fn create_canister_with_id(&self, _id: Principal) -> Result<Principal> {
-        todo!()
+        unimplemented!()
+    }
+
+    async fn create_canister_with_id_and_controller(
+        &self,
+        _id: Principal,
+        _owner: Principal,
+    ) -> Result<Principal> {
+        unimplemented!()
     }
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
-        todo!()
+        unimplemented!()
     }
 
     fn sign_key(&self) -> SigningKeyId {
         SigningKeyId::Dfx
     }
-}
-
-/// Blocks until the predicate returns [`Ok`].
-///
-/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
-/// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(predicate: F, max_wait: Duration) -> T
-where
-    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
-{
-    let start = Instant::now();
-    while start.elapsed() < max_wait {
-        if let Ok(res) = predicate().await {
-            return res;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-
-    panic!("Predicate did not succeed within {}s", max_wait.as_secs());
 }

@@ -14,9 +14,8 @@ pub struct TxBlockInfo {
 }
 
 impl BitcoinRpcClient {
-    /// Initialize a new BitcoinRpcClient for DFX tests
-    #[cfg(feature = "dfx_tests")]
-    pub fn dfx_test_client(wallet_name: &str) -> Self {
+    /// Initialize a new BitcoinRpcClient for tests
+    pub fn test_client(wallet_name: &str) -> Self {
         let client = Client::new(
             &format!("http://localhost:18443/wallet/{wallet_name}"),
             Auth::UserPass(
