@@ -803,6 +803,7 @@ where
             .stop_canister(self.inner.canisters().rune_bridge())
             .await
             .expect("Failed to stop rune bridge canister");
+        #[cfg(feature = "pocket_ic_integration_test")]
         self.inner
             .stop_canister(self.inner.canisters().bitcoin())
             .await
