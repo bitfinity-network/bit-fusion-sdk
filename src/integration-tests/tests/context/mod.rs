@@ -1757,15 +1757,13 @@ impl CanisterType {
         CanisterType::Signature,
     ];
 
-    pub const BRC20_CANISTER_SET: [CanisterType; 4] = [
-        CanisterType::Bitcoin,
+    pub const BRC20_CANISTER_SET: [CanisterType; 3] = [
         CanisterType::Brc20Bridge,
         CanisterType::Evm,
         CanisterType::Signature,
     ];
 
-    pub const RUNE_CANISTER_SET: [CanisterType; 4] = [
-        CanisterType::Bitcoin,
+    pub const RUNE_CANISTER_SET: [CanisterType; 3] = [
         CanisterType::Evm,
         CanisterType::Signature,
         CanisterType::RuneBridge,

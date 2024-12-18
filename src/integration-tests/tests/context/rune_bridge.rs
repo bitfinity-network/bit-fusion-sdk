@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use alloy_sol_types::SolCall;
 use bitcoin::key::Secp256k1;
@@ -156,10 +155,21 @@ async fn rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> {
     })
 }
 
+#[cfg(feature = "dfx_tests")]
+impl RunesContext<crate::dfx_tests::DfxTestContext> {
+    pub async fn dfx(runes_to_etch: &[String]) -> Self {
+        let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
+
+        Self::new(context, runes_to_etch).await
+    }
+}
+
 #[cfg(feature = "pocket_ic_integration_test")]
 impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
     pub async fn pocket_ic(runes: &[String]) -> Self {
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
             &CanisterType::RUNE_CANISTER_SET,
             |builder| {
@@ -174,7 +184,7 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
             |mut pic| {
                 Box::pin(async move {
                     // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                    pic.set_time(SystemTime::now()).await;
+                    pic.set_time(std::time::SystemTime::now()).await;
                     pic.make_live(None).await;
                     pic
                 })

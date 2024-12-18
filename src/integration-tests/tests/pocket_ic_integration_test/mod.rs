@@ -1,8 +1,6 @@
-pub mod brc20_bridge;
 pub mod btc_bridge;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
-pub mod rune_bridge;
 mod token;
 
 use std::fmt;

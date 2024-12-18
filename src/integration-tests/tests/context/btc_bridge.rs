@@ -1,9 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr as _;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use alloy_sol_types::SolCall;
 use bitcoin::{Address, Amount, Txid};
@@ -25,7 +24,7 @@ use icrc_client::account::Account;
 use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 
-use super::{CanisterType, TestContext};
+use super::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 
@@ -59,8 +58,10 @@ fn generate_wallet_name() -> String {
 #[cfg(feature = "pocket_ic_integration_test")]
 impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     pub async fn pocket_ic() -> Self {
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
-            &CanisterType::BTC_CANISTER_SET,
+            &crate::context::CanisterType::BTC_CANISTER_SET,
             |builder| {
                 builder
                     .with_ii_subnet()
@@ -73,7 +74,7 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
             |pic| {
                 Box::pin(async move {
                     // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                    pic.set_time(SystemTime::now()).await;
+                    pic.set_time(std::time::SystemTime::now()).await;
                     pic
                 })
             },

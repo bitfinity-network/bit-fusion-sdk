@@ -10,11 +10,11 @@ use crate::context::rune_bridge::{
     generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,
 };
 use crate::context::TestContext;
-use crate::pocket_ic_integration_test::{block_until_succeeds, ADMIN};
+use crate::dfx_tests::block_until_succeeds;
 
 #[tokio::test]
 async fn runes_bridging_flow() {
-    let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
+    let ctx = RunesContext::dfx(&[generate_rune_name()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
@@ -25,7 +25,7 @@ async fn runes_bridging_flow() {
         .expect("failed to get ord balance");
     let wallet_address = ctx.eth_wallet.address().into();
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -101,7 +101,7 @@ async fn runes_bridging_flow() {
 
 #[tokio::test]
 async fn inputs_from_different_users() {
-    let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
+    let ctx = RunesContext::dfx(&[generate_rune_name()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
@@ -112,7 +112,7 @@ async fn inputs_from_different_users() {
         .expect("failed to get ord balance");
     let wallet_address = ctx.eth_wallet.address().into();
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -134,7 +134,7 @@ async fn inputs_from_different_users() {
         .new_wallet(u128::MAX)
         .await
         .expect("failed to create an ETH wallet");
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(another_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -213,7 +213,7 @@ async fn inputs_from_different_users() {
 
 #[tokio::test]
 async fn test_should_deposit_two_runes_in_a_single_tx() {
-    let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
+    let ctx = RunesContext::dfx(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
@@ -224,7 +224,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
         .await;
     let wallet_address = ctx.eth_wallet.address().into();
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -274,7 +274,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
 
 #[tokio::test]
 async fn test_should_deposit_two_runes_in_two_tx() {
-    let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
+    let ctx = RunesContext::dfx(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
@@ -285,7 +285,7 @@ async fn test_should_deposit_two_runes_in_two_tx() {
         .await;
     let wallet_address = ctx.eth_wallet.address().into();
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -336,7 +336,7 @@ async fn test_should_deposit_two_runes_in_two_tx() {
 #[tokio::test]
 async fn bail_out_of_impossible_deposit() {
     let rune_name = generate_rune_name();
-    let ctx = RunesContext::pocket_ic(&[rune_name.clone()]).await;
+    let ctx = RunesContext::dfx(&[rune_name.clone()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let rune_name = RuneName::from_str(&rune_name).unwrap();
@@ -346,7 +346,7 @@ async fn bail_out_of_impossible_deposit() {
         .get_deposit_address(&ctx.eth_wallet.address().into())
         .await;
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -369,7 +369,7 @@ async fn bail_out_of_impossible_deposit() {
     ctx.inner.advance_time(Duration::from_secs(10)).await;
     ctx.inner.advance_by_times(Duration::from_secs(5), 3).await;
 
-    let client = std::sync::Arc::new(ctx.inner.rune_bridge_client(ADMIN));
+    let client = std::sync::Arc::new(ctx.inner.rune_bridge_client(ctx.inner.admin_name()));
     let address = ctx.eth_wallet.address();
 
     let operations = block_until_succeeds(
@@ -395,7 +395,7 @@ async fn bail_out_of_impossible_deposit() {
     )
     .await;
 
-    let client = ctx.inner.rune_bridge_client(ADMIN);
+    let client = ctx.inner.rune_bridge_client(ctx.inner.admin_name());
     let operation_id = operations[0].0;
 
     let log = client
@@ -435,7 +435,7 @@ async fn generates_correct_deposit_address() {
     let eth_address = H160::from_hex_str(ETH_ADDRESS).unwrap();
 
     let rune_name = generate_rune_name();
-    let ctx = RunesContext::pocket_ic(&[rune_name.clone()]).await;
+    let ctx = RunesContext::dfx(&[rune_name.clone()]).await;
     let address = ctx.get_deposit_address(&eth_address).await;
 
     assert_eq!(

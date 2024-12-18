@@ -1,6 +1,5 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use bitcoin::Amount;
 use did::BlockNumber;
@@ -12,7 +11,7 @@ use crate::context::brc20_bridge::{
 };
 use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext as _};
-use crate::pocket_ic_integration_test::block_until_succeeds;
+use crate::dfx_tests::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
 
 /// Default deposit amount
@@ -28,7 +27,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
     let brc20_tick = brc20_bridge::generate_brc20_tick();
 
-    let ctx = Brc20Context::pocket_ic(&[Brc20InitArgs {
+    let ctx = Brc20Context::dfx(&[Brc20InitArgs {
         tick: brc20_tick,
         decimals: Some(DEFAULT_DECIMALS),
         limit: Some(DEFAULT_MINT_AMOUNT),
@@ -139,28 +138,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 
 #[tokio::test]
 async fn test_brc20_bridge_stress_test() {
-    let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
-        &CanisterType::BRC20_CANISTER_SET,
-        |builder| {
-            builder
-                .with_ii_subnet()
-                .with_bitcoin_subnet()
-                .with_bitcoind_addr(SocketAddr::new(
-                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                    18444,
-                ))
-        },
-        |mut pic| {
-            Box::pin(async move {
-                // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                pic.set_time(SystemTime::now()).await;
-                pic.make_live(None).await;
-                pic
-            })
-        },
-        true,
-    )
-    .await;
+    let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
 
     let config = StressTestConfig {
         users_number: 5,
