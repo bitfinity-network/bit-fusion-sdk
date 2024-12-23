@@ -91,8 +91,7 @@ impl PocketIcTestContext {
         FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
         FPIC: FnOnce(PocketIc) -> Pin<Box<dyn Future<Output = PocketIc> + Send + 'static>>,
     {
-        let mut pocket_ic = ic_exports::pocket_ic::init_pocket_ic_with(with_build)
-            .await
+        let mut pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
             .build_async()
             .await;
 
