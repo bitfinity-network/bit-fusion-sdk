@@ -21,8 +21,7 @@ pub struct Outpoint {
 }
 
 impl OrdClient {
-    #[cfg(feature = "dfx_tests")]
-    pub fn dfx_test_client() -> OrdClient {
+    pub fn test_client() -> OrdClient {
         Self {
             client: Client::new(),
             url: "http://localhost:8000".to_string(),

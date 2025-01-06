@@ -258,7 +258,6 @@ impl Commands {
     /// It takes in various parameters such as the identity file path, the IC host, the Ethereum network,
     /// the private key, whether to deploy the BTF contract, and the BTF contract arguments.
     /// The function returns a result indicating whether the operation was successful or not.
-
     pub async fn run(
         &self,
         identity: GenericIdentity,

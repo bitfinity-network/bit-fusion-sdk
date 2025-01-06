@@ -1,10 +1,13 @@
+pub mod btc_bridge;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
 mod token;
 
 use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
@@ -14,29 +17,91 @@ use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
-use ic_exports::pocket_ic::PocketIc;
+use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
 use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
 use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 
-const ADMIN: &str = "admin";
-const JOHN: &str = "john";
-const ALICE: &str = "alice";
+pub const ADMIN: &str = "admin";
+pub const JOHN: &str = "john";
+pub const ALICE: &str = "alice";
 
 #[derive(Clone)]
 pub struct PocketIcTestContext {
     pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
+    live: bool,
 }
 
 impl PocketIcTestContext {
+    /// Creates a new test context with the given canisters.
     pub async fn new(canisters_set: &[CanisterType]) -> Self {
-        let pocket_ic = ic_exports::pocket_ic::init_pocket_ic().await;
+        Self::new_with(
+            canisters_set,
+            |builder| builder,
+            |pic| Box::pin(async move { pic }),
+            false,
+        )
+        .await
+    }
+
+    pub async fn new_live(canisters_set: &[CanisterType]) -> Self {
+        Self::new_with(
+            canisters_set,
+            |builder| builder,
+            |pic| Box::pin(async move { pic }),
+            false,
+        )
+        .await
+    }
+
+    /// Creates a new test context with the given canisters and custom build and pocket_ic.
+    ///
+    /// # Arguments
+    ///
+    /// * `canisters_set` - The set of canisters to create.
+    /// * `with_build` - A closure that takes a `PocketIcBuilder` and returns a `PocketIcBuilder`.
+    /// * `with_pocket_ic` - A closure that takes a `PocketIc` and returns a `Future` that resolves to a `PocketIc`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ic_test_utilities::pocket_ic::PocketIcTestContext;
+    /// use ic_test_utilities::context::CanisterType;
+    ///
+    /// let canisters_set = vec![CanisterType::ICRC1];
+    ///
+    /// let ctx = PocketIcTestContext::new_with(
+    ///    &canisters_set,
+    ///    |builder| builder.with_ii_subnet().with_bitcoin_subnet(),
+    ///    |mut pic| Box::pin(async move {
+    ///        pic.make_live(None).await;
+    ///        pic
+    ///    }),
+    /// ).await;
+    /// ```
+    pub async fn new_with<FB, FPIC>(
+        canisters_set: &[CanisterType],
+        with_build: FB,
+        with_pocket_ic: FPIC,
+        live: bool,
+    ) -> Self
+    where
+        FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
+        FPIC: FnOnce(PocketIc) -> Pin<Box<dyn Future<Output = PocketIc> + Send + 'static>>,
+    {
+        let mut pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
+            .build_async()
+            .await;
+
+        pocket_ic = with_pocket_ic(pocket_ic).await;
+
         let client = Arc::new(pocket_ic);
         let mut ctx = PocketIcTestContext {
             client,
             canisters: TestCanisters::default(),
+            live,
         };
 
         for canister_type in canisters_set {
@@ -44,6 +109,10 @@ impl PocketIcTestContext {
                 .create_canister()
                 .await
                 .expect("canister should be created");
+            println!(
+                "Created canister {:?} with principal {}",
+                canister_type, principal
+            );
 
             ctx.canisters.set(*canister_type, principal);
         }
@@ -82,8 +151,12 @@ impl TestContext for PocketIcTestContext {
     }
 
     async fn advance_time(&self, time: Duration) {
-        self.client.advance_time(time).await;
-        self.client.tick().await;
+        if self.live {
+            tokio::time::sleep(time).await;
+        } else {
+            self.client.advance_time(time).await;
+            self.client.tick().await;
+        }
     }
 
     fn client(&self, canister: Principal, caller: &str) -> Self::Client {
@@ -113,8 +186,17 @@ impl TestContext for PocketIcTestContext {
     }
 
     async fn create_canister_with_id(&self, id: Principal) -> Result<Principal> {
+        self.create_canister_with_id_and_controller(id, self.admin())
+            .await
+    }
+
+    async fn create_canister_with_id_and_controller(
+        &self,
+        id: Principal,
+        owner: Principal,
+    ) -> Result<Principal> {
         self.client
-            .create_canister_with_id(Some(self.admin()), None, id)
+            .create_canister_with_id(Some(owner), None, id)
             .await
             .expect("failed to create canister");
         self.client.add_cycles(id, u128::MAX).await;
@@ -127,9 +209,20 @@ impl TestContext for PocketIcTestContext {
         wasm: Vec<u8>,
         args: impl ArgumentEncoder + Send,
     ) -> Result<()> {
+        self.install_canister_with_sender(canister, wasm, args, self.admin())
+            .await
+    }
+
+    async fn install_canister_with_sender(
+        &self,
+        canister: Principal,
+        wasm: Vec<u8>,
+        args: impl ArgumentEncoder + Send,
+        sender: Principal,
+    ) -> Result<()> {
         let args = candid::encode_args(args).unwrap();
         self.client
-            .install_canister(canister, wasm, args, Some(self.admin()))
+            .install_canister(canister, wasm, args, Some(sender))
             .await;
         Ok(())
     }
@@ -207,4 +300,32 @@ impl fmt::Debug for PocketIcTestContext {
             .field("canisters", &self.canisters)
             .finish()
     }
+}
+
+/// Blocks until the predicate returns [`Ok`].
+///
+/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
+/// Returns the value inside of the [`Ok`] variant of the predicate.
+pub async fn block_until_succeeds<F, T>(
+    predicate: F,
+    ctx: &PocketIcTestContext,
+    max_wait: Duration,
+) -> T
+where
+    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+{
+    let start = Instant::now();
+    let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");
+    while start.elapsed() < max_wait {
+        match predicate().await {
+            Ok(res) => return res,
+            Err(e) => err = e,
+        }
+        ctx.advance_time(Duration::from_millis(100)).await;
+    }
+
+    panic!(
+        "Predicate did not succeed within {}s: {err}",
+        max_wait.as_secs()
+    );
 }

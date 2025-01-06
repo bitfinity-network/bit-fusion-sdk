@@ -28,7 +28,7 @@ macro_rules! test_deploy {
                 CanisterType::Evm,
                 CanisterType::Signature,
                 CanisterType::Kyt,
-                CanisterType::Icrc1Ledger,
+                CanisterType::CkBtcLedger,
                 CanisterType::CkBtcMinter,
             ])
             .await;
@@ -49,8 +49,8 @@ macro_rules! test_deploy {
                 ..
             } = DeployCliArgs::new(&ctx).await;
 
-            let ckbtc_ledger = ctx.canisters.icrc1_ledger().to_text();
-            let ckbtc_minter = ctx.canisters.ck_btc_minter().to_text();
+            let ckbtc_ledger = ctx.canisters.ckbtc_ledger().to_text();
+            let ckbtc_minter = ctx.canisters.ckbtc_minter().to_text();
 
             let admin_principal = ctx.admin().to_text();
 
@@ -110,7 +110,7 @@ async fn test_should_update_bridge() {
         CanisterType::EvmRpcCanister,
         CanisterType::ExternalEvm,
         CanisterType::Kyt,
-        CanisterType::Icrc1Ledger,
+        CanisterType::CkBtcLedger,
         CanisterType::CkBtcMinter,
         CanisterType::Icrc2Bridge,
         CanisterType::Erc20Bridge,
@@ -193,7 +193,7 @@ async fn test_should_reinstall_bridge() {
         CanisterType::EvmRpcCanister,
         CanisterType::ExternalEvm,
         CanisterType::Kyt,
-        CanisterType::Icrc1Ledger,
+        CanisterType::CkBtcLedger,
         CanisterType::CkBtcMinter,
         CanisterType::Icrc2Bridge,
         CanisterType::Erc20Bridge,
@@ -225,8 +225,8 @@ async fn test_should_reinstall_bridge() {
     let erc20_bridge_id = ctx.canisters().erc20_bridge().to_text();
     let icrc2_bridge_id = ctx.canisters().icrc2_bridge().to_text();
     let rune_bridge_id = ctx.canisters().rune_bridge().to_text();
-    let ckbtc_ledger = ctx.canisters.icrc1_ledger().to_text();
-    let ckbtc_minter = ctx.canisters.ck_btc_minter().to_text();
+    let ckbtc_ledger = ctx.canisters.ckbtc_ledger().to_text();
+    let ckbtc_minter = ctx.canisters.ckbtc_minter().to_text();
 
     // deploy the btf bridge
     let btf_bridge = deploy_btf_bridge(&ctx)

@@ -5,13 +5,13 @@ use bitcoin::Amount;
 use did::BlockNumber;
 use eth_signer::Signer;
 
-use crate::context::brc20::{
+use crate::context::brc20_bridge::{
     self, Brc20Context, Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT,
     REQUIRED_CONFIRMATIONS,
 };
 use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext as _};
-use crate::dfx_tests::{block_until_succeeds, DfxTestContext, ADMIN};
+use crate::dfx_tests::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
 
 /// Default deposit amount
@@ -25,7 +25,7 @@ const DEFAULT_DECIMALS: u8 = 18;
 async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let deposit_amount = TokenAmount::from_int(DEFAULT_DEPOSIT_AMOUNT, DEFAULT_DECIMALS);
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
-    let brc20_tick = brc20::generate_brc20_tick();
+    let brc20_tick = brc20_bridge::generate_brc20_tick();
 
     let ctx = Brc20Context::dfx(&[Brc20InitArgs {
         tick: brc20_tick,
@@ -57,7 +57,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     .expect("send brc20 failed");
 
     // get nonce
-    let client = ctx.inner.evm_client(ADMIN);
+    let client = ctx.inner.evm_client(ctx.inner.admin_name());
     let nonce = client
         .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
         .await
@@ -131,14 +131,14 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 
                 Ok(())
             })
-        }, Duration::from_secs(120)).await;
+        }, &ctx.inner, Duration::from_secs(120)).await;
 
     ctx.stop().await;
 }
 
 #[tokio::test]
 async fn test_brc20_bridge_stress_test() {
-    let ctx = DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+    let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -150,5 +150,5 @@ async fn test_brc20_bridge_stress_test() {
         charge_fee: false,
     };
 
-    crate::context::stress::brc20::stress_test_brc20_bridge_with_ctx(ctx, 1, config).await;
+    crate::context::stress::brc20::stress_test_brc20_bridge_with_ctx(context, 1, config).await;
 }

@@ -23,7 +23,7 @@ pub struct Outpoint {
 }
 
 impl HiroOrdinalsClient {
-    pub fn dfx_test_client() -> HiroOrdinalsClient {
+    pub fn test_client() -> HiroOrdinalsClient {
         Self {
             client: Client::new(),
             url: "http://localhost:8004".to_string(),
