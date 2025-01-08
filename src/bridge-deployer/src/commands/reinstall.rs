@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use candid::Principal;
@@ -33,9 +34,11 @@ pub struct ReinstallCommands {
     #[arg(long, value_name = "CANISTER_ID")]
     canister_id: Option<Principal>,
 
-    /// The path to the wasm file to deploy
+    /// The path to the wasm file to deploy. If not set, the default wasm file will be used.
+    ///
+    /// Latest build of the wasm files are already embedded in the binary.
     #[arg(long, value_name = "WASM_PATH")]
-    wasm: PathBuf,
+    wasm: Option<PathBuf>,
 
     /// Existing BTF bridge contract address to work with the deployed bridge.
     #[arg(long = "btf-bridge", value_name = "ADDRESS")]
@@ -74,10 +77,16 @@ impl ReinstallCommands {
 
         super::fetch_root_key(ic_host, &agent).await?;
 
+        let canister_wasm = self
+            .wasm
+            .as_ref()
+            .map(|path| std::fs::read(path).map(Cow::Owned))
+            .unwrap_or_else(|| Ok(super::wasm::get_wasm(&self.bridge_type)))?;
+
         let deployer = BridgeDeployer::new(agent.clone(), canister_id);
         deployer
             .install_wasm(
-                &self.wasm,
+                &canister_wasm,
                 &self.bridge_type,
                 InstallMode::Reinstall,
                 network,

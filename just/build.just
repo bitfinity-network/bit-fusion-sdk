@@ -57,9 +57,9 @@ build_bridge_tool:
     cp target/release/bridge-tool "{{WASM_DIR}}/bridge-tool"
 
 
-# Builds the bridge deployer tool
+# Builds the bridge deployer tool; depends on `build_all_canisters` because wasm files are needed for the deployer
 [group('build')]
-build_bridge_deployer_tool:
+build_bridge_deployer_tool: build_all_canisters
   cargo build -p bridge-deployer --release
   cp target/release/bridge-deployer "{{WASM_DIR}}/bridge-deployer"
 

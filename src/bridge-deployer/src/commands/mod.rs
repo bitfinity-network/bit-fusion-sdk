@@ -27,6 +27,7 @@ use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
 mod deploy;
 mod reinstall;
 mod upgrade;
+mod wasm;
 mod wrap_token_type;
 
 /// The commands that can be run by the bridge deployer.
