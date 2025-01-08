@@ -40,13 +40,7 @@ macro_rules! test_deploy {
             } = CommonCliArgs::new(&ctx).await;
 
             let DeployCliArgs {
-                brc20_bridge,
-                btc_bridge,
-                erc20_bridge,
-                icrc2_bridge,
-                rune_bridge,
-                wallet_canister,
-                ..
+                wallet_canister, ..
             } = DeployCliArgs::new(&ctx).await;
 
             let ckbtc_ledger = ctx.canisters.ckbtc_ledger().to_text();
@@ -67,11 +61,6 @@ macro_rules! test_deploy {
                     ("EVM_PRINCIPAL", evm_principal.to_string()),
                     ("CKBTC_LEDGER", ckbtc_ledger.to_string()),
                     ("CKBTC_MINTER", ckbtc_minter.to_string()),
-                    ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
-                    ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
-                    ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
-                    ("ICRC2_BRIDGE_WASM_PATH", icrc2_bridge.display().to_string()),
-                    ("RUNE_BRIDGE_WASM_PATH", rune_bridge.display().to_string()),
                 ],
                 Path::new("./tests/bridge_deployer/deploy"),
                 trycmd_output_dir.path(),
@@ -209,15 +198,6 @@ async fn test_should_reinstall_bridge() {
         identity_path,
     } = CommonCliArgs::new(&ctx).await;
 
-    let DeployCliArgs {
-        brc20_bridge,
-        btc_bridge,
-        erc20_bridge,
-        icrc2_bridge,
-        rune_bridge,
-        ..
-    } = DeployCliArgs::new(&ctx).await;
-
     let admin_principal = ctx.admin().to_text();
 
     let brc20_bridge_id = ctx.canisters().brc20_bridge().to_text();
@@ -243,11 +223,6 @@ async fn test_should_reinstall_bridge() {
             ("PRIVATE_KEY", private_key.to_string()),
             ("ADMIN_PRINCIPAL", admin_principal.to_string()),
             ("EVM_PRINCIPAL", evm_principal.to_string()),
-            ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
-            ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
-            ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
-            ("ICRC2_BRIDGE_WASM_PATH", icrc2_bridge.display().to_string()),
-            ("RUNE_BRIDGE_WASM_PATH", rune_bridge.display().to_string()),
             ("CKBTC_LEDGER", ckbtc_ledger.to_string()),
             ("CKBTC_MINTER", ckbtc_minter.to_string()),
             ("BRC20_BRIDGE_ID", brc20_bridge_id.to_string()),

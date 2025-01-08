@@ -2,11 +2,11 @@ use std::borrow::Cow;
 
 use super::Bridge;
 
-const BRC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/brc20-bridge.wasm");
-const BTC_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/btc-bridge.wasm");
-const ERC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/erc20-bridge.wasm");
-const ICRC2_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/icrc2-bridge.wasm");
-const RUNE_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/rune-bridge.wasm");
+const BRC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/brc20-bridge.wasm.gz");
+const BTC_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/btc-bridge.wasm.gz");
+const ERC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/erc20-bridge.wasm.gz");
+const ICRC2_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/icrc2-bridge.wasm.gz");
+const RUNE_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/rune-bridge.wasm.gz");
 
 /// Get wasm bytes for the specified [`Bridge`] type.
 ///
