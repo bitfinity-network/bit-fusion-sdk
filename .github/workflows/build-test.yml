@@ -78,15 +78,6 @@ jobs:
         run: |
           just build_solidity
 
-      - name: create dummy wasm files for deployer
-        run: |
-          mkdir -p .artifact/
-          touch .artifact/brc20-bridge.wasm.gz
-          touch .artifact/btc-bridge.wasm.gz
-          touch .artifact/erc20-bridge.wasm.gz
-          touch .artifact/icrc2-bridge.wasm.gz
-          touch .artifact/rune-bridge.wasm.gz
-
       - name: check rust code style
         run: |
           just check_code
