@@ -12,7 +12,7 @@ fmt_nightly:
 
 # Runs clippy on the code
 [group('code_check')]
-clippy args="": init_dummy_artifacts
+clippy args="":
   export PROTOC_INCLUDE=${PWD}/proto
   cargo clippy --all-features --all-targets {{args}}
 
@@ -22,13 +22,3 @@ clippy args="": init_dummy_artifacts
 check_code:
   just fmt "--check"
   just clippy "-- -D warnings"
-
-# Init dummy artifacts because are required for building bridge-deplopyer
-[private]
-init_dummy_artifacts:
-  mkdir -p .artifact/
-  touch .artifact/brc20-bridge.wasm.gz
-  touch .artifact/btc-bridge.wasm.gz
-  touch .artifact/erc20-bridge.wasm.gz
-  touch .artifact/icrc2-bridge.wasm.gz
-  touch .artifact/rune-bridge.wasm.gz
