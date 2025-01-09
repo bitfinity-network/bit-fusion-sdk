@@ -1,22 +1,22 @@
-use std::borrow::Cow;
+use std::path::Path;
 
 use super::Bridge;
 
-const BRC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/brc20-bridge.wasm.gz");
-const BTC_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/btc-bridge.wasm.gz");
-const ERC20_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/erc20-bridge.wasm.gz");
-const ICRC2_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/icrc2-bridge.wasm.gz");
-const RUNE_BRIDGE_WASM: &[u8] = include_bytes!("../../../../.artifact/rune-bridge.wasm.gz");
+const BRC20_BRIDGE_DEFAULT_PATH: &str = ".artifact/brc20-bridge.wasm.gz";
+const BTC_BRIDGE_DEFAULT_PATH: &str = ".artifact/btc-bridge.wasm.gz";
+const ERC20_BRIDGE_DEFAULT_PATH: &str = ".artifact/erc20-bridge.wasm.gz";
+const ICRC2_BRIDGE_DEFAULT_PATH: &str = ".artifact/icrc2-bridge.wasm.gz";
+const RUNE_BRIDGE_DEFAULT_PATH: &str = ".artifact/rune-bridge.wasm.gz";
 
-/// Get wasm bytes for the specified [`Bridge`] type.
+/// Get the default wasm path based on the [`Bridge`] type.
 ///
-/// Returns a borrowed slice as [`Cow`] of the wasm bytes.
-pub fn get_wasm(bridge: &Bridge) -> Cow<'static, [u8]> {
-    Cow::Borrowed(match bridge {
-        Bridge::Brc20 { .. } => BRC20_BRIDGE_WASM,
-        Bridge::Btc { .. } => BTC_BRIDGE_WASM,
-        Bridge::Erc20 { .. } => ERC20_BRIDGE_WASM,
-        Bridge::Icrc { .. } => ICRC2_BRIDGE_WASM,
-        Bridge::Rune { .. } => RUNE_BRIDGE_WASM,
+/// Returns a [`Path`] to the default wasm file.
+pub fn get_default_wasm_path(bridge: &Bridge) -> &Path {
+    Path::new(match bridge {
+        Bridge::Brc20 { .. } => BRC20_BRIDGE_DEFAULT_PATH,
+        Bridge::Btc { .. } => BTC_BRIDGE_DEFAULT_PATH,
+        Bridge::Erc20 { .. } => ERC20_BRIDGE_DEFAULT_PATH,
+        Bridge::Icrc { .. } => ICRC2_BRIDGE_DEFAULT_PATH,
+        Bridge::Rune { .. } => RUNE_BRIDGE_DEFAULT_PATH,
     })
 }

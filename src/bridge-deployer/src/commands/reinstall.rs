@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::path::PathBuf;
 
 use candid::Principal;
@@ -77,11 +76,11 @@ impl ReinstallCommands {
 
         super::fetch_root_key(ic_host, &agent).await?;
 
-        let canister_wasm = self
+        let canister_wasm_path = self
             .wasm
-            .as_ref()
-            .map(|path| std::fs::read(path).map(Cow::Owned))
-            .unwrap_or_else(|| Ok(super::wasm::get_wasm(&self.bridge_type)))?;
+            .as_deref()
+            .unwrap_or_else(|| super::wasm::get_default_wasm_path(&self.bridge_type));
+        let canister_wasm = std::fs::read(canister_wasm_path)?;
 
         let deployer = BridgeDeployer::new(agent.clone(), canister_id);
         deployer
