@@ -61,7 +61,6 @@ fetch_evmc_private_canister artifact: pre_build
 
   GH_REPO="https://api.github.com/repos/$owner/$repo"
   GH_LATEST="$GH_REPO/releases/tags/{{EVMC_TAG}}"
-  AUTH="Authorization: token $GITHUB_API_TOKEN"
   filename="{{artifact}}.tar.gz"
   output="{{WASM_DIR}}/{{artifact}}.tar.gz"
 
