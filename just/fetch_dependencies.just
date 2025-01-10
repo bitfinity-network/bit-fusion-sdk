@@ -65,7 +65,8 @@ fetch_evmc_private_canister artifact: pre_build
   output="{{WASM_DIR}}/{{artifact}}.tar.gz"
 
   # Read asset id. This is required to download the asset file from a private repository
-  response=$(curl -sH "$AUTH" $GH_LATEST)
+  echo "fetching $GH_LATEST"
+  response=$(curl -sH "$AUTH" -H "X-GitHub-Api-Version: 2022-11-28" -H "Accept: application/vnd.github+json" $GH_LATEST)
   echo "$response"
   id=`echo "$response" | jq --arg name "$filename" '.assets[] | select(.name == $name).id' `
   GH_ASSET="$GH_REPO/releases/assets/$id"
