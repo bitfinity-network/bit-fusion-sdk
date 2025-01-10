@@ -50,8 +50,10 @@ fetch_evmc_private_canister artifact: pre_build
   # if the token is set, use token, else use bearer if set, otherwise exit with error
   if [ -n "$GITHUB_API_TOKEN" ]; then
     AUTH="Authorization: token $GITHUB_API_TOKEN"
+    echo "Using API token"
   elif [ -n "$GITHUB_BEARER_TOKEN" ]; then
     AUTH="Authorization: Bearer $GITHUB_BEARER_TOKEN"
+    echo "Using bearer token"
   else
     echo "Error: No GitHub token provided; set any of GH_API_TOKEN or GH_BEARER_TOKEN"
     exit 1
