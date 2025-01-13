@@ -62,9 +62,9 @@ impl Brc20BridgeConfig {
         if self
             .indexer_urls
             .iter()
-            .any(|url| !url.starts_with("https"))
+            .any(|url| !url.starts_with("https") && !url.starts_with("http://localhost"))
         {
-            return Err("Indexer url must specify https url".to_string());
+            return Err("Indexer url must etiher specify https url or be localhost".to_string());
         }
 
         Ok(())

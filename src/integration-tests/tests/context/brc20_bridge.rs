@@ -28,7 +28,6 @@ use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
-use super::CanisterType;
 use crate::context::TestContext;
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
@@ -214,7 +213,7 @@ async fn brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20W
 impl Brc20Context<crate::dfx_tests::DfxTestContext> {
     pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         let context =
-            crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::BRC20_CANISTER_SET).await;
 
         Self::new(context, brc20_to_deploy).await
     }
@@ -227,7 +226,7 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
-            &CanisterType::BRC20_CANISTER_SET,
+            &super::CanisterType::BRC20_CANISTER_SET,
             |builder| {
                 builder
                     .with_ii_subnet()

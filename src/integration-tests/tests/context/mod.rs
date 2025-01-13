@@ -1075,7 +1075,7 @@ pub trait TestContext {
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
                 let hostname = format!(
-                    "https://127.0.0.1:8002/?canisterId={}",
+                    "http://{}.raw.localhost:8000",
                     self.canisters().external_evm()
                 );
                 println!("EVM-RPC provider hostname: {hostname}");
@@ -1472,7 +1472,7 @@ pub fn rune_bridge_canister_init_data(
             btc_cache_timeout_secs: None,
             min_confirmations: 1,
             indexers: vec![IndexerType::OrdHttp {
-                url: "https://localhost:8001".to_string(),
+                url: "http://localhost:8000".to_string(),
             }],
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
@@ -1493,7 +1493,7 @@ pub fn brc20_bridge_canister_init_data(
         Brc20BridgeConfig {
             network: BitcoinNetwork::Regtest,
             min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8005".to_string()]),
+            indexer_urls: HashSet::from_iter(["https://localhost:8004".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
