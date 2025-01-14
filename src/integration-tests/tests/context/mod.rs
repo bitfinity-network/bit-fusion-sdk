@@ -1493,7 +1493,7 @@ pub fn brc20_bridge_canister_init_data(
         Brc20BridgeConfig {
             network: BitcoinNetwork::Regtest,
             min_confirmations: 1,
-            indexer_urls: HashSet::from_iter(["https://localhost:8004".to_string()]),
+            indexer_urls: HashSet::from_iter(["http://localhost:8004".to_string()]),
             deposit_fee: 500_000,
             mempool_timeout: Duration::from_secs(60),
             indexer_consensus_threshold: 1,
