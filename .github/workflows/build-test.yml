@@ -1,4 +1,4 @@
-name: "Build and Deploy"
+name: 'Build and Deploy'
 
 on:
   workflow_call:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install dfx
         uses: dfinity/setup-dfx@main
-        with:
+        with: 
           dfx-version: "0.23.0"
 
       - name: Install Protobuf compiler
@@ -86,9 +86,8 @@ jobs:
         run: |
           just build_all_canisters
 
-          export GH_BEARER_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           just fetch_all_canisters
-          just bundle_all
 
       - name: test
         if: ${{ !inputs.skip-test }}

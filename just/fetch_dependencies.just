@@ -45,29 +45,15 @@ fetch_evmc_private_canister artifact: pre_build
   # Define variables
   owner="bitfinity-network"
   repo="evm-canister"
-  GITHUB_API_TOKEN={{env("GH_API_TOKEN", "")}}
-  GITHUB_BEARER_TOKEN={{env("GH_BEARER_TOKEN", "")}}
-  # if the token is set, use token, else use bearer if set, otherwise exit with error
-  if [ -n "$GITHUB_API_TOKEN" ]; then
-    AUTH="Authorization: token $GITHUB_API_TOKEN"
-    echo "Using API token"
-  elif [ -n "$GITHUB_BEARER_TOKEN" ]; then
-    AUTH="Authorization: Bearer $GITHUB_BEARER_TOKEN"
-    echo "Using bearer token"
-  else
-    echo "Error: No GitHub token provided; set any of GH_API_TOKEN or GH_BEARER_TOKEN"
-    exit 1
-  fi
-
+  GITHUB_API_TOKEN={{env("GH_API_TOKEN")}}
   GH_REPO="https://api.github.com/repos/$owner/$repo"
   GH_LATEST="$GH_REPO/releases/tags/{{EVMC_TAG}}"
+  AUTH="Authorization: token $GITHUB_API_TOKEN"
   filename="{{artifact}}.tar.gz"
   output="{{WASM_DIR}}/{{artifact}}.tar.gz"
 
   # Read asset id. This is required to download the asset file from a private repository
-  echo "fetching $GH_LATEST"
-  response=$(curl -sH "$AUTH" -H "X-GitHub-Api-Version: 2022-11-28" -H "Accept: application/vnd.github+json" $GH_LATEST)
-  echo "$response"
+  response=$(curl -sH "$AUTH" $GH_LATEST)
   id=`echo "$response" | jq --arg name "$filename" '.assets[] | select(.name == $name).id' `
   GH_ASSET="$GH_REPO/releases/assets/$id"
 
