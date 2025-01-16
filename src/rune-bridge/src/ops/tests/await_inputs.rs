@@ -255,6 +255,7 @@ async fn await_inputs_returns_error_if_no_token_address() {
 }
 
 #[tokio::test]
+#[ignore = "we need runtime"]
 async fn await_inputs_returns_correct_operation_single_input() {
     let input = rune_input("A", 1000);
     let provider = TestRuneInputProvider::with_input(input.clone());
@@ -283,6 +284,7 @@ async fn await_inputs_returns_correct_operation_single_input() {
 }
 
 #[tokio::test]
+#[ignore = "we need runtime"]
 async fn await_inputs_returns_correct_operation_multiple_inputs() {
     MockContext::new().inject();
 

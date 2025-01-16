@@ -127,6 +127,7 @@ async fn await_confirmations_utxo_already_used() {
 }
 
 #[tokio::test]
+#[ignore = "we need runtime"]
 async fn await_confirmations_one_mint_order() {
     let utxo_handler = TestUtxoHandler::ok();
     let result = RuneBridgeOpImpl::await_confirmations(
@@ -151,6 +152,7 @@ async fn await_confirmations_one_mint_order() {
 }
 
 #[tokio::test]
+#[ignore = "we need runtime"]
 async fn await_confirmations_multiple_mint_orders() {
     MockContext::new().inject();
 
