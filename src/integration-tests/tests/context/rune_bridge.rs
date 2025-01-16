@@ -29,7 +29,6 @@ use rune_bridge::ops::RuneDepositRequestData;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
-use super::CanisterType;
 use crate::context::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
@@ -158,7 +157,8 @@ async fn rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> {
 #[cfg(feature = "dfx_tests")]
 impl RunesContext<crate::dfx_tests::DfxTestContext> {
     pub async fn dfx(runes_to_etch: &[String]) -> Self {
-        let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::RUNE_CANISTER_SET).await;
+        let context =
+            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::RUNE_CANISTER_SET).await;
 
         Self::new(context, runes_to_etch).await
     }
@@ -171,7 +171,7 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
-            &CanisterType::RUNE_CANISTER_SET,
+            &super::CanisterType::RUNE_CANISTER_SET,
             |builder| {
                 builder
                     .with_ii_subnet()

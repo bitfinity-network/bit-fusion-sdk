@@ -137,6 +137,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_brc20_bridge_stress_test() {
     let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
 
