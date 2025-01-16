@@ -61,10 +61,3 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
       POSTGRES_PORT: 5432
-
-  evm-rpc-canister-proxy:
-    image: ghcr.io/bitfinity-network/testing-local-ssl-proxy:latest
-    ports:
-      - "8002:8002"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"

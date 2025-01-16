@@ -1,4 +1,4 @@
-name: 'Build and Deploy'
+name: "Build and Deploy"
 
 on:
   workflow_call:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install dfx
         uses: dfinity/setup-dfx@main
-        with: 
+        with:
           dfx-version: "0.23.0"
 
       - name: Install Protobuf compiler
@@ -70,9 +70,6 @@ jobs:
           export RUST_BACKTRACE="full"
           sudo apt update
           sudo apt install -y gcc-multilib libunwind-dev ca-certificates
-          mkdir -p /usr/local/share/ca-certificates/
-          sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
-          sudo update-ca-certificates --fresh --verbose
 
       - name: build solidity contracts
         run: |
