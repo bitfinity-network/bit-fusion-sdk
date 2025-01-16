@@ -73,10 +73,12 @@ pub enum IndexerType {
 impl IndexerType {
     fn validate(&self) -> Result<(), String> {
         match self {
-            Self::OrdHttp { url } if !url.starts_with("https") => {
-                Err("Indexer url must specify https url".to_string())
+            Self::OrdHttp { url }
+                if url.starts_with("https") || url.starts_with("http://localhost") =>
+            {
+                Ok(())
             }
-            _ => Ok(()),
+            _ => Err("Indexer url must etiher specify https url or be localhost".to_string()),
         }
     }
 

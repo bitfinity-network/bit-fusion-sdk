@@ -1,12 +1,12 @@
 # Deploy
 
 - [Deploy](#deploy)
-    - [Requirements](#requirements)
-        - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
-    - [Build](#build)
-    - [Local test EVM deployment](#local-test-evm-deployment)
-    - [Bridge deployment](#bridge-deployment)
-        - [Erc20 bridge](#erc20-bridge)
+  - [Requirements](#requirements)
+    - [Ubuntu 24.04 additional dependencies](#ubuntu-2404-additional-dependencies)
+  - [Build](#build)
+  - [Local test EVM deployment](#local-test-evm-deployment)
+  - [Bridge deployment](#bridge-deployment)
+    - [Erc20 bridge](#erc20-bridge)
 
 ## Requirements
 
@@ -23,23 +23,6 @@
     ```
 
 - Install [just](https://just.systems/) command runner.
-- Install SSL certificates to make the `local-ssl-proxy` in the docker images able to work.
-
-  On Debian-based systems it should be enough to run
-
-    ```sh
-    sudo cp btc-deploy/mkcert/* /usr/local/share/ca-certificates/
-    sudo update-ca-certificates --fresh --verbose
-    ```
-
-  On Arch linux based systems
-
-    ```sh
-    sudo trust anchor btc-deploy/mkcert/*
-    sudo update-ca-trust
-    ```
-
-  While on MacOS you should install them by clicking on the certificates in the mkcert folder.
 
 ### Ubuntu 24.04 additional dependencies
 
