@@ -1,4 +1,5 @@
 use bridge_did::error::Error;
+use bridge_did::order::MintOrder;
 use bridge_did::runes::{RuneInfo, RuneToWrap};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
@@ -165,17 +166,24 @@ async fn await_confirmations_multiple_mint_orders() {
     )
     .await;
 
-    let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
-        new_operation_ids,
-        wallet_address,
-    })) = result
+    let Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(
+        MintOrder { recipient, .. },
+    )))) = result
     else {
         panic!("Wrong result: {result:?}");
     };
 
-    assert_eq!(new_operation_ids.len(), COUNT);
+    let operations = state
+        .borrow()
+        .operations
+        .get_for_address(&recipient, None, None)
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect::<Vec<_>>();
 
-    for operation_id in new_operation_ids {
+    assert_eq!(operations.len(), COUNT);
+
+    for operation_id in operations {
         let operation = state.borrow().operations.get(operation_id).unwrap();
         assert!(matches!(
             operation,
@@ -184,6 +192,4 @@ async fn await_confirmations_multiple_mint_orders() {
             ))
         ));
     }
-
-    assert_eq!(wallet_address, tests::sender());
 }

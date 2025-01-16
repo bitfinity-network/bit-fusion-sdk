@@ -124,13 +124,6 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent { .. }) => Err(
                 Error::FailedToProgress("TransactionSent task cannot be progressed".into()),
             ),
-            RuneBridgeOp::OperationSplit {
-                wallet_address,
-                new_operation_ids,
-            } => {
-                log::debug!("RuneBridgeOp::OperationSplit {wallet_address} {new_operation_ids:?}");
-                Self::schedule_operation_split(ctx, new_operation_ids).await
-            }
         };
         Ok(OperationProgress::Progress(next_step?))
     }
@@ -146,7 +139,6 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => false,
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. }) => false,
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent { .. }) => true,
-            RuneBridgeOp::OperationSplit { .. } => false,
         }
     }
 
@@ -179,7 +171,6 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::TransactionSent {
                 from_address, ..
             }) => from_address.clone(),
-            RuneBridgeOp::OperationSplit { wallet_address, .. } => wallet_address.clone(),
         }
     }
 
@@ -191,9 +182,7 @@ impl Operation for RuneBridgeOpImpl {
                     .with_fixed_backoff_policy(2)
                     .with_max_retries_policy(10),
             ),
-            RuneBridgeOp::Deposit(_)
-            | RuneBridgeOp::Withdraw(_)
-            | RuneBridgeOp::OperationSplit { .. } => Some(
+            RuneBridgeOp::Deposit(_) | RuneBridgeOp::Withdraw(_) => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
                     .with_fixed_backoff_policy(5),
@@ -203,58 +192,35 @@ impl Operation for RuneBridgeOpImpl {
 }
 
 impl RuneBridgeOpImpl {
-    fn split(state: RuntimeState<Self>, wallet_address: H160, operations: Vec<Self>) -> Self {
-        let mut state = state.borrow_mut();
-        let ids = operations
-            .into_iter()
-            .map(|op| state.operations.new_operation(op, None))
-            .collect();
-        Self(RuneBridgeOp::OperationSplit {
-            wallet_address,
-            new_operation_ids: ids,
-        })
-    }
-
-    fn split_or_update(
-        state: RuntimeState<Self>,
-        wallet_address: H160,
-        mut operations: Vec<Self>,
-    ) -> Self {
+    fn split(state: RuntimeState<Self>, mut operations: Vec<Self>) -> Self {
         debug_assert!(
             !operations.is_empty(),
             "operations list must contain at least one operation"
         );
 
-        if operations.len() > 1 {
-            Self::split(state, wallet_address, operations)
-        } else {
-            operations.remove(0)
-        }
-    }
+        log::debug!("splitting {} operations", operations.len());
 
-    async fn schedule_operation_split(
-        ctx: RuntimeState<Self>,
-        operation_ids: Vec<OperationId>,
-    ) -> BTFResult<Self> {
-        let state = ctx.borrow();
+        // get first
+        let self_update = operations.remove(0);
 
-        let mut operations = operation_ids
+        // schedule remaining ops
+        let runtime = get_runtime();
+        let runtime_mut = runtime.borrow_mut();
+
+        let mut state = state.borrow_mut();
+        operations
             .into_iter()
-            .filter_map(|id| state.operations.get(id).map(|op| (id, op)))
-            .collect::<Vec<_>>();
+            .flat_map(|op| {
+                let id = state.operations.new_operation(op, None);
+                log::debug!("created new operation on split {id}");
+                state.operations.get(id).map(|op| (id, op))
+            })
+            .for_each(|(id, operation)| {
+                log::debug!("scheduling split operation {id}");
+                runtime_mut.schedule_operation(id, operation);
+            });
 
-        log::debug!("Splitting operation: {operations:?}");
-
-        let (_, next_op) = operations.pop().ok_or(Error::FailedToProgress(
-            "no operations to split".to_string(),
-        ))?;
-
-        // schedule the rest of the operations
-        for (id, operation) in operations {
-            get_runtime().borrow_mut().schedule_operation(id, operation);
-        }
-
-        Ok(next_op)
+        self_update
     }
 
     async fn await_inputs(
@@ -324,11 +290,7 @@ impl RuneBridgeOpImpl {
             )));
         }
 
-        Ok(Self::split_or_update(
-            state.clone(),
-            dst_address,
-            operations,
-        ))
+        Ok(Self::split(state.clone(), operations))
     }
 
     async fn await_confirmations(
@@ -357,7 +319,7 @@ impl RuneBridgeOpImpl {
             })
             .collect();
 
-        Ok(Self::split_or_update(ctx, dst_address, operations))
+        Ok(Self::split(ctx, operations))
     }
 
     async fn create_withdrawal_transaction(payload: RuneWithdrawalPayload) -> BTFResult<Self> {

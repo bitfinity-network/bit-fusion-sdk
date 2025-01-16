@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use bridge_did::error::Error;
+use bridge_did::order::MintOrder;
 use bridge_did::runes::{RuneName, RuneToWrap};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::MockContext;
@@ -297,17 +298,22 @@ async fn await_inputs_returns_correct_operation_multiple_inputs() {
     )
     .await;
 
-    let Ok(RuneBridgeOpImpl(RuneBridgeOp::OperationSplit {
-        wallet_address,
-        new_operation_ids,
-    })) = result
+    let Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(
+        MintOrder { recipient, .. },
+    )))) = result
     else {
-        panic!("Incorrect operation returned")
+        panic!("Wrong result: {result:?}");
     };
 
-    for operation in new_operation_ids {
-        assert!(state.borrow().operations.get(operation).is_some());
-    }
+    let operations = state
+        .borrow()
+        .operations
+        .get_for_address(&recipient, None, None)
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect::<Vec<_>>();
 
-    assert_eq!(wallet_address, tests::sender());
+    for operation_id in operations {
+        assert!(state.borrow().operations.get(operation_id).is_some());
+    }
 }
