@@ -57,13 +57,6 @@ pub mod test {
             }
         }
 
-        pub fn ok() -> Self {
-            Self {
-                check_result: Ok(()),
-                is_utxo_used: false,
-            }
-        }
-
         pub fn already_used_utxo() -> Self {
             Self {
                 check_result: Ok(()),

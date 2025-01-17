@@ -45,7 +45,7 @@ impl Miner {
         let wait_time = Duration::from_millis(rng.gen_range(100..1000));
         while MINING
             .get()
-            .map_or(false, |v| v.load(std::sync::atomic::Ordering::Relaxed))
+            .is_some_and(|v| v.load(std::sync::atomic::Ordering::Relaxed))
         {
             thread::sleep(wait_time);
         }

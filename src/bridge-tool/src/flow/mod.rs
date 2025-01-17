@@ -263,7 +263,7 @@ impl EvmSide {
 
 const FEE_APPROVE_AMOUNT: u128 = 10u128.pow(15);
 
-impl<'a> Erc20BridgeFlow<'a> {
+impl Erc20BridgeFlow<'_> {
     async fn chain_id(&self, evm_side: EvmSide) -> anyhow::Result<u64> {
         let (client, _, _) = self.get_side(evm_side);
         client.get_chain_id().await
