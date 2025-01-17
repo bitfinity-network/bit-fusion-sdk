@@ -1,15 +1,13 @@
 use bridge_did::error::Error;
-use bridge_did::order::MintOrder;
 use bridge_did::runes::{RuneInfo, RuneToWrap};
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
-use ic_exports::ic_kit::MockContext;
 use ordinals::Rune;
 use snapbox::{assert_data_eq, str};
 
 use crate::core::utxo_handler::test::TestUtxoHandler;
 use crate::core::utxo_handler::UtxoHandlerError;
-use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl};
+use crate::ops::{tests, RuneBridgeOpImpl};
 
 fn get_utxo() -> Utxo {
     Utxo {
@@ -124,74 +122,4 @@ async fn await_confirmations_utxo_already_used() {
     };
 
     assert_data_eq!(message, str!["utxo is already used to create mint orders"]);
-}
-
-#[tokio::test]
-#[ignore = "we need runtime"]
-async fn await_confirmations_one_mint_order() {
-    let utxo_handler = TestUtxoHandler::ok();
-    let result = RuneBridgeOpImpl::await_confirmations(
-        tests::test_state(),
-        &utxo_handler,
-        tests::sender(),
-        get_utxo(),
-        get_to_wrap(1),
-    )
-    .await;
-
-    let Ok(operation) = result else {
-        panic!("Wrong result: {result:?}");
-    };
-
-    assert!(matches!(
-        operation,
-        RuneBridgeOpImpl(RuneBridgeOp::Deposit(
-            RuneBridgeDepositOp::SignMintOrder { .. }
-        ))
-    ));
-}
-
-#[tokio::test]
-#[ignore = "we need runtime"]
-async fn await_confirmations_multiple_mint_orders() {
-    MockContext::new().inject();
-
-    const COUNT: usize = 3;
-    let utxo_handler = TestUtxoHandler::ok();
-    let state = tests::test_state();
-    let result = RuneBridgeOpImpl::await_confirmations(
-        state.clone(),
-        &utxo_handler,
-        tests::sender(),
-        get_utxo(),
-        get_to_wrap(COUNT),
-    )
-    .await;
-
-    let Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(
-        MintOrder { recipient, .. },
-    )))) = result
-    else {
-        panic!("Wrong result: {result:?}");
-    };
-
-    let operations = state
-        .borrow()
-        .operations
-        .get_for_address(&recipient, None, None)
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect::<Vec<_>>();
-
-    assert_eq!(operations.len(), COUNT);
-
-    for operation_id in operations {
-        let operation = state.borrow().operations.get(operation_id).unwrap();
-        assert!(matches!(
-            operation,
-            RuneBridgeOpImpl(RuneBridgeOp::Deposit(
-                RuneBridgeDepositOp::SignMintOrder { .. }
-            ))
-        ));
-    }
 }

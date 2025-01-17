@@ -1,15 +1,13 @@
 use std::str::FromStr;
 
 use bridge_did::error::Error;
-use bridge_did::order::MintOrder;
-use bridge_did::runes::{RuneName, RuneToWrap};
+use bridge_did::runes::RuneName;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
-use ic_exports::ic_kit::MockContext;
 use snapbox::{assert_data_eq, str};
 
 use crate::core::rune_inputs::mock::TestRuneInputProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput};
-use crate::ops::{tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl};
+use crate::ops::{tests, RuneBridgeOpImpl};
 
 #[tokio::test]
 async fn await_inputs_returns_error_if_no_inputs() {
@@ -252,70 +250,4 @@ async fn await_inputs_returns_error_if_no_token_address() {
     };
 
     assert_data_eq!(message, str!["wrapped token address for rune A not found"]);
-}
-
-#[tokio::test]
-#[ignore = "we need runtime"]
-async fn await_inputs_returns_correct_operation_single_input() {
-    let input = rune_input("A", 1000);
-    let provider = TestRuneInputProvider::with_input(input.clone());
-    let result = RuneBridgeOpImpl::await_inputs(
-        tests::test_state(),
-        &provider,
-        tests::sender(),
-        tests::dst_tokens(),
-        None,
-    )
-    .await;
-    assert_eq!(
-        result,
-        Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(
-            RuneBridgeDepositOp::AwaitConfirmations {
-                dst_address: tests::sender(),
-                utxo: input.utxo,
-                runes_to_wrap: vec![RuneToWrap {
-                    rune_info: provider.rune_info(&RuneName::from_str("A").unwrap()),
-                    amount: 1000,
-                    wrapped_address: tests::token_address(3),
-                }],
-            }
-        )))
-    );
-}
-
-#[tokio::test]
-#[ignore = "we need runtime"]
-async fn await_inputs_returns_correct_operation_multiple_inputs() {
-    MockContext::new().inject();
-
-    let inputs = vec![rune_input("A", 1000), rune_input("B", 2000)];
-    let provider = TestRuneInputProvider::with_inputs(&inputs);
-    let state = tests::test_state();
-    let result = RuneBridgeOpImpl::await_inputs(
-        state.clone(),
-        &provider,
-        tests::sender(),
-        tests::dst_tokens(),
-        None,
-    )
-    .await;
-
-    let Ok(RuneBridgeOpImpl(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(
-        MintOrder { recipient, .. },
-    )))) = result
-    else {
-        panic!("Wrong result: {result:?}");
-    };
-
-    let operations = state
-        .borrow()
-        .operations
-        .get_for_address(&recipient, None, None)
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect::<Vec<_>>();
-
-    for operation_id in operations {
-        assert!(state.borrow().operations.get(operation_id).is_some());
-    }
 }
