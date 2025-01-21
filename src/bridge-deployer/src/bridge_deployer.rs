@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::anyhow;
 use bridge_client::{BridgeCanisterClient, GenericBridgeClient};
 use candid::Principal;
@@ -42,13 +40,12 @@ impl BridgeDeployer {
 
     pub async fn install_wasm(
         &self,
-        wasm_path: &PathBuf,
+        canister_wasm: &[u8],
         config: &Bridge,
         mode: InstallMode,
         network: EvmNetwork,
         evm: Principal,
     ) -> anyhow::Result<Principal> {
-        let canister_wasm = std::fs::read(wasm_path)?;
         debug!(
             "WASM file read successfully. File size: {}",
             canister_wasm.len()
@@ -63,7 +60,7 @@ impl BridgeDeployer {
         )?;
 
         management_canister
-            .install(&canister_id, &canister_wasm)
+            .install(&canister_id, canister_wasm)
             .with_mode(mode)
             .with_raw_arg(arg)
             .call_and_wait()

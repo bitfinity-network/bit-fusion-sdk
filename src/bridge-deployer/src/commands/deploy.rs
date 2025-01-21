@@ -46,9 +46,11 @@ pub struct DeployCommands {
     #[command(subcommand)]
     bridge_type: Bridge,
 
-    /// The path to the wasm file to deploy
+    /// The path to the wasm file to deploy. If not set, the default wasm file will be used.
+    ///
+    /// Latest build of the wasm files are already embedded in the binary.
     #[arg(long, value_name = "WASM_PATH")]
-    wasm: PathBuf,
+    wasm: Option<PathBuf>,
 
     /// Amount of cycles to deposit to the canister
     ///
@@ -93,10 +95,16 @@ impl DeployCommands {
         super::fetch_root_key(&ic_host, &agent).await?;
         let wallet_canister = self.get_wallet_canister(network)?;
 
+        let canister_wasm_path = self
+            .wasm
+            .as_deref()
+            .unwrap_or_else(|| super::wasm::get_default_wasm_path(&self.bridge_type));
+        let canister_wasm = std::fs::read(canister_wasm_path)?;
+
         let deployer = BridgeDeployer::create(agent.clone(), wallet_canister, self.cycles).await?;
         let canister_id = deployer
             .install_wasm(
-                &self.wasm,
+                &canister_wasm,
                 &self.bridge_type,
                 InstallMode::Install,
                 network,

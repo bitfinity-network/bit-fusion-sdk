@@ -20,5 +20,5 @@ clippy args="":
 # Runs fmt and clippy on the code. It fails if any of the checks fail
 [group('code_check')]
 check_code:
-    just fmt "--check"
-    just clippy "-- -D warnings"
+  just fmt "--check"
+  just clippy "-- -D warnings"
