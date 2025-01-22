@@ -6,7 +6,6 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use serde::{Deserialize, Serialize};
 
 use crate::events::MintedEventData;
-use crate::op_id::OperationId;
 use crate::order::{MintOrder, SignedOrders};
 use crate::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 
@@ -55,10 +54,4 @@ pub enum RuneBridgeWithdrawOp {
 pub enum RuneBridgeOp {
     Deposit(RuneBridgeDepositOp),
     Withdraw(RuneBridgeWithdrawOp),
-    /// The operation has been split into multiple operations
-    /// e.g. two runes deposit in a single call
-    OperationSplit {
-        wallet_address: H160,
-        new_operation_ids: Vec<OperationId>,
-    },
 }
