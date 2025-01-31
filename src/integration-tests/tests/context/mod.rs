@@ -6,6 +6,7 @@ pub mod stress;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bridge_did::error::BTFResult as McResult;
@@ -28,8 +29,8 @@ use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
-use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
+use ic_canister_client::CanisterClient;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -45,7 +46,7 @@ use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
-use crate::utils::{TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
+use crate::utils::{GanacheEvm, TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";
@@ -84,19 +85,21 @@ pub trait TestContext {
     fn sign_key(&self) -> SigningKeyId;
 
     /// Returns the base EVM LINK
-    fn base_evm_link(&self) -> EvmLink {
-        EvmLink::Ic(self.canisters().external_evm())
+    fn base_evm_link(&self) -> EvmLink;
+
+    /// Returns the external EVM LINK
+    fn wrapped_evm_link(&self) -> EvmLink {
+        EvmLink::Http(self.wrapped_evm_rpc())
     }
 
-    /// Returns client for the evm canister.
-    fn evm_client(&self, caller: &str) -> EvmCanisterClient<Self::Client> {
-        EvmCanisterClient::new(self.client(self.canisters().evm(), caller))
-    }
+    /// Returns the external evm rpc url
+    fn wrapped_evm_rpc(&self) -> String;
 
-    /// Returns client for the external evm canister.
-    fn external_evm_client(&self, caller: &str) -> EvmCanisterClient<Self::Client> {
-        EvmCanisterClient::new(self.client(self.canisters().external_evm(), caller))
-    }
+    /// Returns a reference to the base EVM instance.
+    fn base_evm(&self) -> Arc<GanacheEvm>;
+
+    /// Returns a reference to the wrapped EVM instance.
+    fn wrapped_evm(&self) -> Arc<GanacheEvm>;
 
     /// Returns client for the icrc2 bridge
     fn icrc_bridge_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
@@ -146,14 +149,14 @@ pub trait TestContext {
 
     /// Waits for transaction receipt.
     async fn wait_transaction_receipt(&self, hash: &H256) -> Result<Option<TransactionReceipt>> {
-        let client = self.evm_client(self.admin_name());
-        self.wait_transaction_receipt_on_evm(&client, hash).await
+        self.wait_transaction_receipt_on_evm(&self.wrapped_evm(), hash)
+            .await
     }
 
     /// Waits for transaction receipt.
     async fn wait_transaction_receipt_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
@@ -164,9 +167,7 @@ pub trait TestContext {
         while time_passed < timeout && receipt.is_none() {
             self.advance_time(tx_processing_interval).await;
             time_passed = Instant::now() - start;
-            receipt = evm_client
-                .eth_get_transaction_receipt(hash.clone())
-                .await??;
+            receipt = evm.get_transaction_receipt(hash).await?;
         }
         Ok(receipt)
     }
@@ -182,23 +183,21 @@ pub trait TestContext {
 
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
-        let client = self.evm_client(self.admin_name());
-        self.new_wallet_on_evm(&client, balance).await
+        self.new_wallet_on_evm(&self.wrapped_evm(), balance).await
     }
 
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         balance: u128,
     ) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
             let mut rng = rand::thread_rng();
             Wallet::new(&mut rng)
         };
-        evm_client
-            .admin_mint_native_tokens(wallet.address().into(), balance.into())
-            .await??;
+        evm.mint_native_tokens(wallet.address().into(), balance.into())
+            .await?;
 
         self.advance_time(Duration::from_secs(2)).await;
 
@@ -219,43 +218,31 @@ pub trait TestContext {
         creator_wallet: &Wallet<'_, SigningKey>,
         input: Vec<u8>,
     ) -> Result<H160> {
-        let evm_client = self.evm_client(self.admin_name());
-        self.create_contract_on_evm(&evm_client, creator_wallet, input)
+        self.create_contract_on_evm(&self.wrapped_evm(), creator_wallet, input)
             .await
     }
 
     /// Creates contract on the given EVM.
     async fn create_contract_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         creator_wallet: &Wallet<'_, SigningKey>,
         input: Vec<u8>,
     ) -> Result<H160> {
         let creator_address: H160 = creator_wallet.address().into();
-        let nonce = evm_client
-            .account_basic(creator_address.clone())
-            .await
-            .unwrap()
-            .nonce;
+        let nonce = evm.get_next_nonce(&creator_address).await?;
 
         let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
 
-        let hash = evm_client
-            .send_raw_transaction(create_contract_tx)
-            .await??;
+        let hash = evm.send_raw_transaction(create_contract_tx).await?;
         let receipt = self
-            .wait_transaction_receipt_on_evm(evm_client, &hash)
+            .wait_transaction_receipt_on_evm(evm, &hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
                 "transaction not processed".into(),
             )))?;
 
         if receipt.status != Some(U64::one()) {
-            let execution_result = evm_client
-                .get_tx_execution_result_by_hash(hash)
-                .await
-                .unwrap();
-            dbg!(execution_result);
             println!("tx status: {:?}", receipt.status);
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
@@ -276,9 +263,8 @@ pub trait TestContext {
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
     ) -> Result<H160> {
-        let client = self.evm_client(self.admin_name());
         self.initialize_btf_bridge_on_evm(
-            &client,
+            &self.wrapped_evm(),
             minter_canister_address,
             fee_charge_address,
             wrapped_token_deployer,
@@ -290,21 +276,20 @@ pub trait TestContext {
     /// Crates BTFBridge contract in EVMc and registered it in minter canister
     async fn initialize_btf_bridge_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
         is_wrapped: bool,
     ) -> Result<H160> {
-        evm_client
-            .admin_mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
-            .await??;
+        evm.mint_native_tokens(minter_canister_address.clone(), u64::MAX.into())
+            .await?;
         self.advance_time(Duration::from_secs(2)).await;
 
-        let wallet = self.new_wallet_on_evm(evm_client, u64::MAX.into()).await?;
+        let wallet = self.new_wallet_on_evm(evm, u64::MAX.into()).await?;
         let bridge_address = self
             .initialize_btf_bridge_with_minter_on_evm(
-                evm_client,
+                evm,
                 &wallet,
                 minter_canister_address,
                 fee_charge_address,
@@ -325,9 +310,8 @@ pub trait TestContext {
         wrapped_token_deployer: H160,
         is_wrapped: bool,
     ) -> Result<H160> {
-        let evm_client = self.evm_client(self.admin_name());
         self.initialize_btf_bridge_with_minter_on_evm(
-            &evm_client,
+            &self.wrapped_evm(),
             wallet,
             minter_canister_address,
             fee_charge_address,
@@ -340,7 +324,7 @@ pub trait TestContext {
     /// Creates BTFBridge contract in EVMC and registered it in minter canister
     async fn initialize_btf_bridge_with_minter_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
@@ -354,7 +338,7 @@ pub trait TestContext {
         println!("bridge bytecode size: {}", BTFBridge::BYTECODE.len());
 
         let bridge_address = self
-            .create_contract_on_evm(evm_client, wallet, bridge_input.clone())
+            .create_contract_on_evm(evm, wallet, bridge_input.clone())
             .await
             .unwrap();
 
@@ -377,7 +361,7 @@ pub trait TestContext {
         proxy_input.extend_from_slice(&constructor);
 
         let proxy_address = self
-            .create_contract_on_evm(evm_client, wallet, proxy_input)
+            .create_contract_on_evm(evm, wallet, proxy_input)
             .await
             .unwrap();
 
@@ -391,14 +375,17 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
-        let evm = self.evm_client(self.admin_name());
-        self.initialize_fee_charge_contract_on_evm(&evm, wallet, minter_canister_addresses)
-            .await
+        self.initialize_fee_charge_contract_on_evm(
+            &self.wrapped_evm(),
+            wallet,
+            minter_canister_addresses,
+        )
+        .await
     }
 
     async fn initialize_fee_charge_contract_on_evm(
         &self,
-        evm: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
@@ -428,14 +415,13 @@ pub trait TestContext {
         &self,
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
-        let evm = self.evm_client(self.admin_name());
-        self.initialize_wrapped_token_deployer_contract_on_evm(&evm, wallet)
+        self.initialize_wrapped_token_deployer_contract_on_evm(&self.wrapped_evm(), wallet)
             .await
     }
 
     async fn initialize_wrapped_token_deployer_contract_on_evm(
         &self,
-        evm: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
@@ -447,7 +433,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens_raw(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -467,7 +453,7 @@ pub trait TestContext {
             .abi_encode();
 
             let results = self
-                .call_contract_on_evm(evm_client, wallet, &from_token.clone(), input, 0)
+                .call_contract_on_evm(evm, wallet, &from_token.clone(), input, 0)
                 .await?;
             let output = results.1.output.unwrap();
             let decoded_output =
@@ -488,7 +474,7 @@ pub trait TestContext {
         .abi_encode();
 
         let (tx_hash, receipt) = self
-            .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
+            .call_contract_on_evm(evm, wallet, bridge, input, 0)
             .await?;
 
         if receipt.status != Some(U64::one()) {
@@ -512,7 +498,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_wrapped_erc_20_tokens(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -521,7 +507,7 @@ pub trait TestContext {
         amount: u128,
     ) -> Result<(u32, H256)> {
         self.burn_erc_20_tokens_raw(
-            evm_client,
+            evm,
             wallet,
             from_token,
             to_token_id,
@@ -537,7 +523,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_base_erc_20_tokens(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -547,7 +533,7 @@ pub trait TestContext {
         memo: Option<Memo>,
     ) -> Result<(u32, H256)> {
         self.burn_erc_20_tokens_raw(
-            evm_client,
+            evm,
             wallet,
             from_token,
             to_token_id,
@@ -563,7 +549,7 @@ pub trait TestContext {
     /// Current native token balance on user's deposit inside the Btfbridge.
     async fn native_token_deposit_balance(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         fee_charge: H160,
         user: H160,
     ) -> U256 {
@@ -571,7 +557,7 @@ pub trait TestContext {
             user: user.clone().into(),
         }
         .abi_encode();
-        let response = evm_client
+        let response = evm
             .eth_call(
                 Some(user),
                 Some(fee_charge),
@@ -581,8 +567,7 @@ pub trait TestContext {
                 Some(input.into()),
             )
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to get native token balance");
 
         let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(
             &hex::decode(response.trim_start_matches("0x")).unwrap(),
@@ -598,7 +583,7 @@ pub trait TestContext {
     /// Deposit native tokens to Btfbridge to pay mint fee.
     async fn native_token_deposit(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         fee_charge: H160,
         user_wallet: &Wallet<'static, SigningKey>,
         amount: u128,
@@ -606,7 +591,7 @@ pub trait TestContext {
         let input = FeeCharge::nativeTokenDepositCall {}.abi_encode();
 
         let receipt = self
-            .call_contract_on_evm(evm_client, user_wallet, &fee_charge, input, amount)
+            .call_contract_on_evm(evm, user_wallet, &fee_charge, input, amount)
             .await?
             .1;
 
@@ -653,28 +638,27 @@ pub trait TestContext {
         input: Vec<u8>,
         amount: u128,
     ) -> Result<(H256, TransactionReceipt)> {
-        let evm_client = self.evm_client(self.admin_name());
-        self.call_contract_on_evm(&evm_client, wallet, contract, input, amount)
+        self.call_contract_on_evm(&self.wrapped_evm(), wallet, contract, input, amount)
             .await
     }
 
     /// Calls contract in the evm_client.
     async fn call_contract_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
     ) -> Result<(H256, TransactionReceipt)> {
         let from: H160 = wallet.address().into();
-        let nonce = evm_client.account_basic(from.clone()).await?.nonce;
+        let nonce = evm.get_next_nonce(&from).await?;
 
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
-        let hash = evm_client.send_raw_transaction(call_tx).await??;
+        let hash = evm.send_raw_transaction(call_tx).await?;
         let receipt = self
-            .wait_transaction_receipt_on_evm(evm_client, &hash)
+            .wait_transaction_receipt_on_evm(evm, &hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
                 "transaction not processed".into(),
@@ -698,9 +682,8 @@ pub trait TestContext {
         amount: u128,
         nonce: Option<u64>,
     ) -> Result<H256> {
-        let evm_client = self.evm_client(self.admin_name());
         self.call_contract_without_waiting_on_evm(
-            &evm_client,
+            &self.wrapped_evm(),
             wallet,
             contract,
             input,
@@ -713,7 +696,7 @@ pub trait TestContext {
     /// Calls contract in the evm_client without waiting for it's receipt.
     async fn call_contract_without_waiting_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         contract: &H160,
         input: Vec<u8>,
@@ -723,13 +706,13 @@ pub trait TestContext {
         let from: H160 = wallet.address().into();
         let nonce = match nonce {
             Some(n) => n.into(),
-            None => evm_client.account_basic(from.clone()).await?.nonce,
+            None => evm.get_next_nonce(&from).await?,
         };
 
         println!("sending tx from wallet {from} with nonce {nonce}");
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
-        let hash = evm_client.send_raw_transaction(call_tx).await??;
+        let hash = evm.send_raw_transaction(call_tx).await?;
 
         Ok(hash)
     }
@@ -767,7 +750,7 @@ pub trait TestContext {
     /// Deploys TestWTM token of the given EVM.
     async fn deploy_test_wtm_token_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         wallet: &Wallet<'_, SigningKey>,
         init_balance: U256,
     ) -> Result<H160> {
@@ -779,16 +762,12 @@ pub trait TestContext {
         erc20_input.extend_from_slice(&constructor);
 
         let deployer_address = wallet.address();
-        let nonce = evm_client
-            .account_basic(deployer_address.into())
-            .await
-            .unwrap()
-            .nonce;
+        let nonce = evm.get_next_nonce(&deployer_address.into()).await?;
         let tx = self.signed_transaction(wallet, None, nonce, 0, erc20_input);
-        let hash = evm_client.send_raw_transaction(tx).await.unwrap().unwrap();
+        let hash = evm.send_raw_transaction(tx).await?;
 
         let receipt = self
-            .wait_transaction_receipt_on_evm(evm_client, &hash)
+            .wait_transaction_receipt_on_evm(evm, &hash)
             .await
             .unwrap()
             .unwrap();
@@ -920,15 +899,14 @@ pub trait TestContext {
         wallet: &Wallet<'_, SigningKey>,
         address: Option<&H160>,
     ) -> Result<u128> {
-        let evm_client = self.evm_client(self.admin_name());
-        self.check_erc20_balance_on_evm(&evm_client, token, wallet, address)
+        self.check_erc20_balance_on_evm(&self.wrapped_evm(), token, wallet, address)
             .await
     }
 
     /// Returns ERC-20 balance on the given evm.
     async fn check_erc20_balance_on_evm(
         &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
+        evm: &Arc<GanacheEvm>,
         token: &H160,
         wallet: &Wallet<'_, SigningKey>,
         address: Option<&H160>,
@@ -939,7 +917,7 @@ pub trait TestContext {
         }
         .abi_encode();
 
-        let response = evm_client
+        let response = evm
             .eth_call(
                 Some(wallet.address().into()),
                 Some(token.clone()),
@@ -948,9 +926,7 @@ pub trait TestContext {
                 None,
                 Some(input.into()),
             )
-            .await
-            .unwrap()
-            .unwrap();
+            .await?;
 
         let balance = WrappedToken::balanceOfCall::abi_decode_returns(
             &hex::decode(response.trim_start_matches("0x")).unwrap(),
@@ -1074,10 +1050,7 @@ pub trait TestContext {
                     .await
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
-                let hostname = format!(
-                    "http://{}.raw.localhost:8000",
-                    self.canisters().external_evm()
-                );
+                let hostname = self.wrapped_evm_rpc();
                 println!("EVM-RPC provider hostname: {hostname}");
                 // configure the EVM RPC canister provider
                 let args = evm_rpc_canister::RegisterProviderArgs {
@@ -1151,12 +1124,12 @@ pub trait TestContext {
                     "Installing default ICRC2 bridge canister with Principal {}",
                     self.canisters().icrc2_bridge()
                 );
-                let evm_canister = self
-                    .canisters()
-                    .get(CanisterType::Evm)
-                    .unwrap_or_else(|| Principal::from_slice(&[1; 20]));
-                let init_data =
-                    icrc_bridge_canister_init_data(self.admin(), evm_canister, self.sign_key());
+
+                let init_data = icrc_bridge_canister_init_data(
+                    self.admin(),
+                    self.wrapped_evm_link(),
+                    self.sign_key(),
+                );
                 self.install_canister(self.canisters().icrc2_bridge(), wasm, (init_data,))
                     .await
                     .unwrap();
@@ -1230,12 +1203,12 @@ pub trait TestContext {
                 );
                 let init_data = erc20_bridge_canister_init_data(
                     self.admin(),
-                    self.canisters().evm(),
+                    self.wrapped_evm_link(),
                     self.sign_key(),
                 );
 
                 let base_evm_settings = BaseEvmSettings {
-                    evm_link: EvmLink::Ic(self.canisters().external_evm()),
+                    evm_link: self.base_evm_link(),
                     signing_strategy: SigningStrategy::ManagementCanister {
                         key_id: self.sign_key(),
                     },
@@ -1259,7 +1232,7 @@ pub trait TestContext {
                 );
                 let init_data = btc_bridge_canister_init_data(
                     self.admin(),
-                    self.canisters().evm(),
+                    self.wrapped_evm_link(),
                     self.sign_key(),
                     self.canisters().ckbtc_minter(),
                     self.canisters().ckbtc_ledger(),
@@ -1276,7 +1249,7 @@ pub trait TestContext {
                 );
                 let init_data = brc20_bridge_canister_init_data(
                     self.admin(),
-                    self.canisters().evm(),
+                    self.wrapped_evm_link(),
                     self.sign_key(),
                 );
 
@@ -1291,7 +1264,7 @@ pub trait TestContext {
                 );
                 let init_data = rune_bridge_canister_init_data(
                     self.admin(),
-                    self.canisters().evm(),
+                    self.wrapped_evm_link(),
                     self.sign_key(),
                 );
 
@@ -1300,31 +1273,6 @@ pub trait TestContext {
                     .unwrap();
             }
         }
-    }
-
-    /// Reinstall the EVM canister with default settings.
-    async fn reinstall_evm_canister(
-        &self,
-        transaction_processing_interval: Option<Duration>,
-    ) -> Result<()> {
-        let init_data = evm_canister_init_data(
-            self.canisters().signature_verification(),
-            self.admin(),
-            transaction_processing_interval,
-        );
-        let wasm = get_evm_testnet_canister_bytecode().await;
-        self.reinstall_canister(self.canisters().evm(), wasm, (init_data,))
-            .await?;
-
-        Ok(())
-    }
-
-    /// Upgrades the EVM canister with default settings.
-    async fn upgrade_evm_canister(&self) -> Result<()> {
-        let wasm = get_evm_testnet_canister_bytecode().await;
-        self.upgrade_canister(self.canisters().evm(), wasm, ())
-            .await?;
-        Ok(())
     }
 
     /// Upgrades the icrc2 bridge canister with default settings.
@@ -1354,7 +1302,7 @@ pub trait TestContext {
     async fn reinstall_icrc2_bridge_canister(&self) -> Result<()> {
         eprintln!("reinstalling icrc2 bridge canister");
         let init_data =
-            icrc_bridge_canister_init_data(self.admin(), self.canisters().evm(), self.sign_key());
+            icrc_bridge_canister_init_data(self.admin(), self.wrapped_evm_link(), self.sign_key());
 
         let wasm = get_icrc2_bridge_canister_bytecode().await;
         self.reinstall_canister(self.canisters().icrc2_bridge(), wasm, (init_data,))
@@ -1404,12 +1352,12 @@ pub fn icrc_canister_default_init_args(
 
 pub fn icrc_bridge_canister_init_data(
     owner: Principal,
-    evm_principal: Principal,
+    evm_link: EvmLink,
     key_id: SigningKeyId,
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_link: EvmLink::Ic(evm_principal),
+        evm_link,
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),
@@ -1422,12 +1370,12 @@ pub fn icrc_bridge_canister_init_data(
 
 pub fn erc20_bridge_canister_init_data(
     owner: Principal,
-    evm_principal: Principal,
+    evm_link: EvmLink,
     key_id: SigningKeyId,
 ) -> BridgeInitData {
     BridgeInitData {
         owner,
-        evm_link: EvmLink::Ic(evm_principal),
+        evm_link,
         signing_strategy: SigningStrategy::ManagementCanister { key_id },
         log_settings: Some(LogCanisterSettings {
             enable_console: Some(true),
@@ -1440,12 +1388,12 @@ pub fn erc20_bridge_canister_init_data(
 
 pub fn btc_bridge_canister_init_data(
     owner: Principal,
-    evm_principal: Principal,
+    evm_link: EvmLink,
     key_id: SigningKeyId,
     ckbtc_minter: Principal,
     ckbtc_ledger: Principal,
 ) -> BtcBridgeConfig {
-    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+    let init_data = icrc_bridge_canister_init_data(owner, evm_link, key_id);
 
     BtcBridgeConfig {
         init_data,
@@ -1460,10 +1408,10 @@ pub fn btc_bridge_canister_init_data(
 
 pub fn rune_bridge_canister_init_data(
     owner: Principal,
-    evm_principal: Principal,
+    evm_link: EvmLink,
     key_id: SigningKeyId,
 ) -> (BridgeInitData, RuneBridgeConfig) {
-    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+    let init_data = icrc_bridge_canister_init_data(owner, evm_link, key_id);
 
     (
         init_data,
@@ -1483,10 +1431,10 @@ pub fn rune_bridge_canister_init_data(
 
 pub fn brc20_bridge_canister_init_data(
     owner: Principal,
-    evm_principal: Principal,
+    evm_link: EvmLink,
     key_id: SigningKeyId,
 ) -> (BridgeInitData, Brc20BridgeConfig) {
-    let init_data = icrc_bridge_canister_init_data(owner, evm_principal, key_id);
+    let init_data = icrc_bridge_canister_init_data(owner, evm_link, key_id);
 
     (
         init_data,
@@ -1719,55 +1667,28 @@ pub enum CanisterType {
 }
 
 impl CanisterType {
-    /// EVM and SignatureVerification.
-    pub const EVM_TEST_SET: [CanisterType; 2] = [CanisterType::Evm, CanisterType::Signature];
-
     /// EVM, SignatureVerification, Icrc2Bridge and Token1.
-    pub const ICRC2_MINTER_TEST_SET: [CanisterType; 4] = [
-        CanisterType::Evm,
-        CanisterType::Signature,
-        CanisterType::Token1,
-        CanisterType::Icrc2Bridge,
-    ];
+    pub const ICRC2_MINTER_TEST_SET: [CanisterType; 2] =
+        [CanisterType::Token1, CanisterType::Icrc2Bridge];
 
     /// EVM, ExternalEvm, SignatureVerification, Erc20Bridge
-    pub const EVM_MINTER_TEST_SET: [CanisterType; 4] = [
-        CanisterType::Evm,
-        CanisterType::ExternalEvm,
-        CanisterType::Signature,
-        CanisterType::Erc20Bridge,
-    ];
+    pub const EVM_MINTER_TEST_SET: [CanisterType; 1] = [CanisterType::Erc20Bridge];
 
     /// EVM, ExternalEvm, EvmRpc, SignatureVerification, Erc20Bridge
-    pub const EVM_MINTER_WITH_EVMRPC_TEST_SET: [CanisterType; 5] = [
-        CanisterType::Evm,
-        CanisterType::ExternalEvm,
-        CanisterType::EvmRpcCanister,
-        CanisterType::Signature,
-        CanisterType::Erc20Bridge,
-    ];
+    pub const EVM_MINTER_WITH_EVMRPC_TEST_SET: [CanisterType; 2] =
+        [CanisterType::EvmRpcCanister, CanisterType::Erc20Bridge];
 
-    pub const BTC_CANISTER_SET: [CanisterType; 7] = [
+    pub const BTC_CANISTER_SET: [CanisterType; 5] = [
         CanisterType::Bitcoin,
         CanisterType::BtcBridge,
         CanisterType::CkBtcMinter,
         CanisterType::Kyt,
         CanisterType::CkBtcLedger, // acts as CkBtcLedger
-        CanisterType::Evm,
-        CanisterType::Signature,
     ];
 
-    pub const BRC20_CANISTER_SET: [CanisterType; 3] = [
-        CanisterType::Brc20Bridge,
-        CanisterType::Evm,
-        CanisterType::Signature,
-    ];
+    pub const BRC20_CANISTER_SET: [CanisterType; 1] = [CanisterType::Brc20Bridge];
 
-    pub const RUNE_CANISTER_SET: [CanisterType; 3] = [
-        CanisterType::Evm,
-        CanisterType::Signature,
-        CanisterType::RuneBridge,
-    ];
+    pub const RUNE_CANISTER_SET: [CanisterType; 1] = [CanisterType::RuneBridge];
 
     pub async fn default_canister_wasm(&self) -> Vec<u8> {
         match self {

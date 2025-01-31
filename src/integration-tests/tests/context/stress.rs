@@ -143,13 +143,12 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         println!("Initializing Btfbridge contract");
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;
 
-        base_tokens
-            .ctx()
-            .evm_client(base_tokens.ctx().admin_name())
-            .admin_mint_native_tokens(bridge_canister_address.clone(), u64::MAX.into())
+        let wrapped_client = base_tokens.ctx().wrapped_evm();
+
+        wrapped_client
+            .mint_native_tokens(bridge_canister_address.clone(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint native tokens");
         base_tokens
             .ctx()
             .advance_by_times(Duration::from_secs(1), 2)
@@ -228,7 +227,7 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             }
 
             // Deposit native token to charge fee.
-            let evm_client = base_tokens.ctx().evm_client(base_tokens.ctx().admin_name());
+            let evm_client = base_tokens.ctx().wrapped_evm();
 
             if let Some(fee_charge_address) = fee_charge_address.as_ref() {
                 base_tokens
@@ -242,10 +241,9 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
                     .await?;
             } else {
                 evm_client
-                    .admin_mint_native_tokens(wallet.address().into(), u64::MAX.into())
+                    .mint_native_tokens(wallet.address().into(), u64::MAX.into())
                     .await
-                    .unwrap()
-                    .unwrap();
+                    .expect("failed to mint native tokens");
             }
 
             let user = User {
@@ -282,12 +280,12 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         let init_bridge_canister_native_balance = self
             .base_tokens
             .ctx()
-            .evm_client(self.base_tokens.ctx().admin_name())
+            .wrapped_evm()
             .eth_get_balance(
-                self.base_tokens.bridge_canister_evm_address().await?,
+                &self.base_tokens.bridge_canister_evm_address().await?,
                 did::BlockNumber::Latest,
             )
-            .await??;
+            .await?;
 
         // Prepare deposits and withdrawals
         let mut roundtrip_futures = Vec::new();
@@ -324,12 +322,12 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         let finish_bridge_canister_native_balance = self
             .base_tokens
             .ctx()
-            .evm_client(self.base_tokens.ctx().admin_name())
+            .wrapped_evm()
             .eth_get_balance(
-                self.base_tokens.bridge_canister_evm_address().await?,
+                &self.base_tokens.bridge_canister_evm_address().await?,
                 did::BlockNumber::Latest,
             )
-            .await??;
+            .await?;
 
         let successful_roundtrips = roundtrips_info.iter().sum();
         let expected_roundtrips = self.config.users_number

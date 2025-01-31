@@ -9,11 +9,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bridge_did::evm_link::EvmLink;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H256};
 use eth_signer::ic_sign::SigningKeyId;
-use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -21,7 +20,7 @@ use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
 use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
-use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+use crate::utils::GanacheEvm;
 
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";
@@ -29,8 +28,10 @@ pub const ALICE: &str = "alice";
 
 #[derive(Clone)]
 pub struct PocketIcTestContext {
+    base_evm: Arc<GanacheEvm>,
     pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
+    wrapped_evm: Arc<GanacheEvm>,
     live: bool,
 }
 
@@ -99,8 +100,10 @@ impl PocketIcTestContext {
 
         let client = Arc::new(pocket_ic);
         let mut ctx = PocketIcTestContext {
+            base_evm: Arc::new(GanacheEvm::run().await),
             client,
             canisters: TestCanisters::default(),
+            wrapped_evm: Arc::new(GanacheEvm::run().await),
             live,
         };
 
@@ -174,6 +177,26 @@ impl TestContext for PocketIcTestContext {
 
     fn admin_name(&self) -> &str {
         ADMIN
+    }
+
+    fn base_evm_link(&self) -> EvmLink {
+        EvmLink::Http(self.base_evm.rpc_url())
+    }
+
+    fn wrapped_evm_link(&self) -> EvmLink {
+        EvmLink::Http(self.wrapped_evm.rpc_url())
+    }
+
+    fn wrapped_evm_rpc(&self) -> String {
+        self.wrapped_evm.rpc_url()
+    }
+
+    fn base_evm(&self) -> Arc<GanacheEvm> {
+        self.base_evm.clone()
+    }
+
+    fn wrapped_evm(&self) -> Arc<GanacheEvm> {
+        self.wrapped_evm.clone()
     }
 
     async fn create_canister(&self) -> Result<Principal> {
@@ -254,30 +277,6 @@ impl TestContext for PocketIcTestContext {
             .unwrap();
 
         Ok(())
-    }
-
-    /// Waits for transaction receipt.
-    async fn wait_transaction_receipt_on_evm(
-        &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
-        hash: &H256,
-    ) -> Result<Option<TransactionReceipt>> {
-        for _ in 0..200 {
-            let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
-            self.advance_time(time).await;
-            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
-
-            if result.is_err() {
-                println!("failed to get tx receipt: {result:?}")
-            }
-
-            let receipt = result?;
-            if receipt.is_some() {
-                return Ok(receipt);
-            }
-        }
-
-        Ok(None)
     }
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {

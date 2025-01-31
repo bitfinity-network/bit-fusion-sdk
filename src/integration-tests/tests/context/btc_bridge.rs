@@ -122,17 +122,15 @@ where
         let wallet_address = wallet.address();
 
         context
-            .evm_client(context.admin_name())
-            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .wrapped_evm()
+            .mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .expect("failed to mint tokens to user")
             .expect("failed to mint tokens to user");
 
-        let client = context.evm_client(context.admin_name());
+        let client = context.wrapped_evm();
         client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+            .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
             .await
-            .expect("failed to mint tokens to btc bridge")
             .expect("failed to mint tokens to btc bridge");
 
         context.advance_time(Duration::from_secs(2)).await;

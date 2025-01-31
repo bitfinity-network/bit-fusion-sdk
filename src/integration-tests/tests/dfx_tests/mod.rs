@@ -1,9 +1,9 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bridge_did::evm_link::EvmLink;
-use bridge_utils::evm_link::{RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use eth_signer::ic_sign::SigningKeyId;
@@ -14,6 +14,7 @@ use ic_utils::interfaces::ManagementCanister;
 
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
+use crate::utils::GanacheEvm;
 
 mod brc20_bridge;
 mod bridge_deployer;
@@ -30,10 +31,12 @@ pub const ALEX: &str = "alex";
 
 /// The required setup for the dfx tests
 pub struct DfxTestContext {
+    alex: Agent,
+    alice: Agent,
+    base_evm: Arc<GanacheEvm>,
     canisters: TestCanisters,
     max: Agent,
-    alice: Agent,
-    alex: Agent,
+    wrapped_evm: Arc<GanacheEvm>,
 }
 
 impl DfxTestContext {
@@ -50,10 +53,12 @@ impl DfxTestContext {
             .unwrap();
 
         let mut ctx = Self {
+            alex,
+            alice,
+            base_evm: Arc::new(GanacheEvm::run().await),
             canisters: TestCanisters::default(),
             max,
-            alice,
-            alex,
+            wrapped_evm: Arc::new(GanacheEvm::run().await),
         };
 
         for canister_type in canisters_set {
@@ -107,16 +112,23 @@ impl TestContext for DfxTestContext {
     }
 
     fn base_evm_link(&self) -> EvmLink {
-        EvmLink::EvmRpcCanister {
-            canister_id: self.canisters().evm_rpc(),
-            rpc_service: vec![RpcService::Custom(RpcApi {
-                url: format!(
-                    "https://127.0.0.1:8002/?canisterId={}",
-                    self.canisters().external_evm()
-                ),
-                headers: None,
-            })],
-        }
+        EvmLink::Http(self.base_evm.rpc_url())
+    }
+
+    fn wrapped_evm_link(&self) -> EvmLink {
+        EvmLink::Http(self.wrapped_evm.rpc_url())
+    }
+
+    fn wrapped_evm_rpc(&self) -> String {
+        self.wrapped_evm.rpc_url()
+    }
+
+    fn base_evm(&self) -> Arc<GanacheEvm> {
+        self.base_evm.clone()
+    }
+
+    fn wrapped_evm(&self) -> Arc<GanacheEvm> {
+        self.wrapped_evm.clone()
     }
 
     /// Creates an empty canister with cycles on it's balance.

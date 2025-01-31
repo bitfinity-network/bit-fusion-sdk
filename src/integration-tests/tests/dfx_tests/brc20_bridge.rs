@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bitcoin::Amount;
-use did::BlockNumber;
 use eth_signer::Signer;
 
 use crate::context::brc20_bridge::{
@@ -57,12 +56,11 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     .expect("send brc20 failed");
 
     // get nonce
-    let client = ctx.inner.evm_client(ctx.inner.admin_name());
+    let client = ctx.inner.wrapped_evm();
     let nonce = client
-        .eth_get_transaction_count(ctx.eth_wallet.address().into(), BlockNumber::Latest)
+        .get_next_nonce(&ctx.eth_wallet.address().into())
         .await
-        .unwrap()
-        .unwrap();
+        .expect("get nonce failed");
 
     ctx.deposit(
         brc20_tick,

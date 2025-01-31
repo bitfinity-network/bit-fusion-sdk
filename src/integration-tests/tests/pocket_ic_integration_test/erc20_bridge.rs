@@ -11,7 +11,6 @@ use did::{H160, U256};
 use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
 use eth_signer::{Signer, Wallet};
 use ethers_core::k256::ecdsa::SigningKey;
-use evm_canister_client::EvmCanisterClient;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
@@ -37,19 +36,14 @@ impl ContextWithBridges {
         let ctx = PocketIcTestContext::new(&CanisterType::EVM_MINTER_TEST_SET).await;
 
         // Deploy external EVM canister.
-        let base_evm = ctx.canisters().external_evm();
-        let base_evm_client = EvmCanisterClient::new(ctx.client(base_evm, ctx.admin_name()));
-
-        println!("Deployed external EVM canister: {}", base_evm);
-        println!("Deployed EVM canister: {}", ctx.canisters().evm());
+        let base_evm_client = ctx.base_evm();
 
         let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
         let deployer_address = fee_charge_deployer.address();
         base_evm_client
-            .admin_mint_native_tokens(deployer_address.into(), u64::MAX.into())
+            .mint_native_tokens(deployer_address.into(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
         ctx.advance_time(Duration::from_secs(2)).await;
         let expected_fee_charge_address =
             ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
@@ -61,15 +55,13 @@ impl ContextWithBridges {
 
         // Mint native tokens for bob in both evms
         base_evm_client
-            .admin_mint_native_tokens(bob_address.clone(), u64::MAX.into())
+            .mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
-        ctx.evm_client(ADMIN)
-            .admin_mint_native_tokens(bob_address.clone(), u64::MAX.into())
+            .expect("Failed to mint native tokens");
+        ctx.base_evm()
+            .mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
         ctx.advance_time(Duration::from_secs(2)).await;
 
         // get evm bridge canister address
@@ -83,16 +75,14 @@ impl ContextWithBridges {
 
         // mint native tokens for the erc20-bridge on both EVMs
         println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
-        ctx.evm_client(ADMIN)
-            .admin_mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
+        ctx.base_evm()
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
         base_evm_client
-            .admin_mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
+            .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
         ctx.advance_time(Duration::from_secs(2)).await;
 
         // Deploy wrapped token deployer contracts
@@ -205,7 +195,7 @@ async fn test_external_bridging() {
     let amount = 1000_u128;
 
     // spender should deposit native tokens to btf bridge, to pay fee.
-    let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let wrapped_evm_client = ctx.context.wrapped_evm();
     ctx.context
         .native_token_deposit(
             &wrapped_evm_client,
@@ -216,10 +206,7 @@ async fn test_external_bridging() {
         .await
         .unwrap();
 
-    let base_evm_client = EvmCanisterClient::new(
-        ctx.context
-            .client(ctx.context.canisters().external_evm(), ADMIN),
-    );
+    let base_evm_client = ctx.context.base_evm();
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
@@ -301,7 +288,7 @@ async fn native_token_deposit_increase_and_decrease() {
     let alice_address: H160 = alice_wallet.address().into();
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
     let amount = 1000_u128;
-    let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let wrapped_evm_client = ctx.context.wrapped_evm();
 
     let start_native_balance = ctx
         .context
@@ -314,10 +301,9 @@ async fn native_token_deposit_increase_and_decrease() {
     assert_eq!(start_native_balance, U256::zero());
 
     let init_fee_contract_evm_balance = wrapped_evm_client
-        .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     // spender should deposit native tokens to btf bridge, to pay fee.
     let native_balance_after_deposit = 10_u64.pow(15);
@@ -344,20 +330,16 @@ async fn native_token_deposit_increase_and_decrease() {
     assert_eq!(queried_balance.0.as_u64(), native_balance_after_deposit);
 
     let fee_contract_evm_balance_after_deposit = wrapped_evm_client
-        .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     assert_eq!(
         init_fee_contract_evm_balance + init_native_balance.clone(),
         fee_contract_evm_balance_after_deposit
     );
 
-    let base_evm_client = EvmCanisterClient::new(
-        ctx.context
-            .client(ctx.context.canisters().external_evm(), ADMIN),
-    );
+    let base_evm_client = ctx.context.base_evm();
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
@@ -446,10 +428,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     let amount = 1000_u128;
 
     // spender should deposit native tokens to btf bridge, to pay fee.
-    let base_evm_client = EvmCanisterClient::new(
-        ctx.context
-            .client(ctx.context.canisters().external_evm(), ADMIN),
-    );
+    let base_evm_client = ctx.context.base_evm();
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
@@ -488,12 +467,11 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .unwrap();
     assert_eq!(0, balance);
 
-    let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let wrapped_evm_client = ctx.context.wrapped_evm();
     let bridge_canister_evm_balance_after_failed_mint = wrapped_evm_client
-        .eth_get_balance(ctx.erc20_bridge_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(&ctx.erc20_bridge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     // Wait for mint order removal
     ctx.context
@@ -538,10 +516,9 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
     // Check bridge canister balance not changed after user's transaction.
     let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client
-        .eth_get_balance(ctx.erc20_bridge_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(&ctx.erc20_bridge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     assert_eq!(
         bridge_canister_evm_balance_after_failed_mint,
@@ -555,15 +532,14 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
 
     let init_erc20_bridge_balance = ctx
         .context
-        .evm_client(ADMIN)
-        .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
+        .base_evm()
+        .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     // Deposit native tokens to btf bridge.
     let native_token_deposit = 10_000_000_u64;
-    let wrapped_evm_client = ctx.context.evm_client(ADMIN);
+    let wrapped_evm_client = ctx.context.wrapped_evm();
     ctx.context
         .native_token_deposit(
             &wrapped_evm_client,
@@ -576,11 +552,10 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
 
     let erc20_bridge_balance_after_deposit = ctx
         .context
-        .evm_client(ADMIN)
-        .eth_get_balance(ctx.fee_charge_address.clone(), did::BlockNumber::Latest)
+        .base_evm()
+        .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("Failed to get balance");
 
     assert_eq!(
         erc20_bridge_balance_after_deposit,
@@ -590,13 +565,7 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
 
 #[tokio::test]
 async fn erc20_bridge_stress_test() {
-    let context = PocketIcTestContext::new(&[
-        CanisterType::Evm,
-        CanisterType::ExternalEvm,
-        CanisterType::Signature,
-        CanisterType::Erc20Bridge,
-    ])
-    .await;
+    let context = PocketIcTestContext::new(&[CanisterType::Erc20Bridge]).await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -631,14 +600,12 @@ async fn create_btf_bridge(
     btf_input.extend_from_slice(&constructor);
 
     let evm = match side {
-        BridgeSide::Base => ctx.canisters().external_evm(),
-        BridgeSide::Wrapped => ctx.canisters().evm(),
+        BridgeSide::Base => ctx.base_evm(),
+        BridgeSide::Wrapped => ctx.wrapped_evm(),
     };
 
-    let evm_client = EvmCanisterClient::new(ctx.client(evm, ADMIN));
-
     let bridge_address = ctx
-        .create_contract_on_evm(&evm_client, wallet, btf_input.clone())
+        .create_contract_on_evm(&evm, wallet, btf_input.clone())
         .await
         .unwrap();
 
@@ -660,7 +627,7 @@ async fn create_btf_bridge(
     .abi_encode();
     proxy_input.extend_from_slice(&constructor);
 
-    ctx.create_contract_on_evm(&evm_client, wallet, proxy_input)
+    ctx.create_contract_on_evm(&evm, wallet, proxy_input)
         .await
         .unwrap()
 }

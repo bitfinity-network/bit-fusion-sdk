@@ -204,13 +204,6 @@ where
     pub async fn new(context: Ctx, runes: &[String]) -> Self {
         let rune_wallet = rune_setup(runes).await.expect("failed to setup runes");
 
-        context
-            .evm_client(context.admin_name())
-            .set_logger_filter("info")
-            .await
-            .expect("failed to set logger filter")
-            .unwrap();
-
         let bridge = context.canisters().rune_bridge();
 
         let _: () = context
@@ -232,18 +225,16 @@ where
         let wallet_address = wallet.address();
 
         context
-            .evm_client(context.admin_name())
-            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .wrapped_evm()
+            .mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint native tokens");
 
-        let client = context.evm_client(context.admin_name());
+        let client = context.wrapped_evm();
         client
-            .admin_mint_native_tokens(rune_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .mint_native_tokens(rune_bridge_eth_address.clone().unwrap(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint native tokens");
 
         context.advance_time(Duration::from_secs(2)).await;
 
@@ -533,7 +524,7 @@ where
             dst_tokens.insert(RuneName::from_str(&rune_info.name).unwrap(), erc20_address);
         }
 
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
         let data = RuneDepositRequestData {
@@ -570,8 +561,7 @@ where
         let tx_id = client
             .send_raw_transaction(transaction)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to send transaction");
         self.wait_for_tx_success(&tx_id).await;
         eprintln!(
             "Deposit notification sent by tx: 0x{}",
@@ -584,13 +574,12 @@ where
 
         let start = Instant::now();
         let timeout = Duration::from_secs(MAX_TX_TIMEOUT_SEC);
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         while start.elapsed() < timeout {
             let receipt = client
-                .eth_get_transaction_receipt(tx_hash.clone())
+                .get_transaction_receipt(&tx_hash)
                 .await
-                .expect("Failed to request transaction receipt")
-                .expect("Request for receipt failed");
+                .expect("Failed to request transaction receipt");
 
             if let Some(receipt) = receipt {
                 if receipt.status != Some(1u64.into()) {
@@ -633,7 +622,7 @@ where
 
         println!("Burning {amount} of {rune_id} to {recipient}");
 
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,

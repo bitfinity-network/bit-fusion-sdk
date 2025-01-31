@@ -28,30 +28,21 @@ pub struct Erc20BaseTokens<Ctx> {
 
 impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
-        let external_evm_client = ctx.external_evm_client(ctx.admin_name());
+        let base_evm_client = ctx.base_evm();
 
         // Create contract deployer wallet.
         let contracts_deployer = Wallet::new(&mut rand::thread_rng());
         let deployer_address = contracts_deployer.address();
-        let tx_hash = external_evm_client
-            .admin_mint_native_tokens(deployer_address.into(), u128::MAX.into())
+        base_evm_client
+            .mint_native_tokens(deployer_address.into(), u128::MAX.into())
             .await
-            .unwrap()
-            .unwrap()
-            .0;
-
-        let mint_tx_receipt = ctx
-            .wait_transaction_receipt_on_evm(&external_evm_client, &tx_hash)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+            .expect("mint_native_tokens failed");
 
         let mut tokens = Vec::with_capacity(base_tokens_number);
         for _ in 0..base_tokens_number {
             let icrc_principal = ctx
                 .deploy_test_wtm_token_on_evm(
-                    &external_evm_client,
+                    &base_evm_client,
                     &contracts_deployer,
                     u128::MAX.into(),
                 )
@@ -74,19 +65,10 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             .await
             .unwrap()
             .unwrap();
-        let tx_hash = external_evm_client
-            .admin_mint_native_tokens(bridge_address, u128::MAX.into())
+        base_evm_client
+            .mint_native_tokens(bridge_address, u128::MAX.into())
             .await
-            .unwrap()
-            .unwrap()
-            .0;
-
-        let mint_tx_receipt = ctx
-            .wait_transaction_receipt_on_evm(&external_evm_client, &tx_hash)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+            .expect("mint_native_tokens failed");
 
         Ok(Self {
             ctx,
@@ -108,7 +90,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             .unwrap();
         let base_wrapped_token_deployer = H160::default(); // We should not deploy wrapped tokens on base evm.
 
-        let base_evm_client = ctx.external_evm_client(ctx.admin_name());
+        let base_evm_client = ctx.base_evm();
         let addr = ctx
             .initialize_btf_bridge_on_evm(
                 &base_evm_client,
@@ -131,7 +113,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     }
 
     async fn wait_tx_success(&self, tx_hash: &H256) -> Result<TransactionReceipt> {
-        let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let evm_client = self.ctx.wrapped_evm();
         let mut retries = 0;
         let receipt = loop {
             if retries > 100 {
@@ -141,10 +123,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             }
 
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let Some(receipt) = evm_client
-                .eth_get_transaction_receipt(tx_hash.clone())
-                .await??
-            else {
+            let Some(receipt) = evm_client.get_transaction_receipt(&tx_hash).await? else {
                 retries += 1;
                 continue;
             };
@@ -200,21 +179,11 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
     async fn new_user(&self, wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
         let address = wrapped_wallet.address();
-        let client = self.ctx.external_evm_client(self.ctx.admin_name());
-        let tx_hash = client
-            .admin_mint_native_tokens(address.into(), u128::MAX.into())
+        let client = self.ctx.wrapped_evm();
+        client
+            .mint_native_tokens(address.into(), u128::MAX.into())
             .await
-            .unwrap()
-            .unwrap()
-            .0;
-
-        let mint_tx_receipt = self
-            .ctx
-            .wait_transaction_receipt_on_evm(&client, &tx_hash)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+            .expect("mint_native_tokens failed");
 
         self.nonces
             .write()
@@ -233,7 +202,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         }
         .abi_encode();
 
-        let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let evm_client = self.ctx.wrapped_evm();
         let receipt = self
             .ctx
             .call_contract_on_evm(
@@ -252,7 +221,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
 
     async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<U256> {
         let token_address = self.tokens[token_idx].clone();
-        let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let evm_client = self.ctx.wrapped_evm();
 
         let balance = self
             .ctx
@@ -274,7 +243,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
         let user_wallet = to_user.wallet.clone();
         let user_address = user_wallet.address();
         let token_address = self.tokens[info.base_token_idx].clone();
-        let evm_client = self.ctx.external_evm_client(self.ctx.admin_name());
+        let evm_client = self.ctx.wrapped_evm();
         let nonce = self.next_nonce(&user_address.into()).await;
         let to_token_id = self.token_id256(info.wrapped_token.clone());
         let recipient_id = self.user_id(user_address.into()).await;

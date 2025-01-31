@@ -1,3 +1,15 @@
+pub mod brc20_helper;
+pub mod btc;
+pub mod btc_rpc_client;
+pub mod error;
+mod ganache;
+pub mod hiro_ordinals_client;
+pub mod miner;
+pub mod ord_client;
+pub mod rune_helper;
+pub mod token_amount;
+pub mod wasm;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -6,16 +18,7 @@ use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
-pub mod brc20_helper;
-pub mod btc;
-pub mod btc_rpc_client;
-pub mod error;
-pub mod hiro_ordinals_client;
-pub mod miner;
-pub mod ord_client;
-pub mod rune_helper;
-pub mod token_amount;
-pub mod wasm;
+pub use self::ganache::GanacheEvm;
 
 /// Returns the Path to the workspace root dir
 pub fn get_workspace_root_dir() -> PathBuf {
