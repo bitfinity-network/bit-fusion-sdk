@@ -14,7 +14,7 @@ use ic_utils::interfaces::ManagementCanister;
 
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
-use crate::utils::GanacheEvm;
+use crate::utils::TestEvm;
 
 mod brc20_bridge;
 mod bridge_deployer;
@@ -30,17 +30,27 @@ pub const ALICE: &str = "alice";
 pub const ALEX: &str = "alex";
 
 /// The required setup for the dfx tests
-pub struct DfxTestContext {
+pub struct DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     alex: Agent,
     alice: Agent,
-    base_evm: Arc<GanacheEvm>,
+    base_evm: Arc<EVM>,
     canisters: TestCanisters,
     max: Agent,
-    wrapped_evm: Arc<GanacheEvm>,
+    wrapped_evm: Arc<EVM>,
 }
 
-impl DfxTestContext {
-    pub async fn new(canisters_set: &[CanisterType]) -> Self {
+impl<EVM> DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn new(
+        canisters_set: &[CanisterType],
+        base_evm: Arc<EVM>,
+        wrapped_evm: Arc<EVM>,
+    ) -> Self {
         let url = Some(DFX_URL);
         let max = get_agent(ADMIN, url, Some(Duration::from_secs(180)))
             .await
@@ -55,10 +65,10 @@ impl DfxTestContext {
         let mut ctx = Self {
             alex,
             alice,
-            base_evm: Arc::new(GanacheEvm::run().await),
+            base_evm,
             canisters: TestCanisters::default(),
             max,
-            wrapped_evm: Arc::new(GanacheEvm::run().await),
+            wrapped_evm,
         };
 
         for canister_type in canisters_set {
@@ -87,7 +97,10 @@ impl DfxTestContext {
 }
 
 #[async_trait::async_trait]
-impl TestContext for DfxTestContext {
+impl<EVM> TestContext<EVM> for DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     type Client = IcAgentClient;
 
     fn client(&self, canister: Principal, name: &str) -> Self::Client {
@@ -112,22 +125,18 @@ impl TestContext for DfxTestContext {
     }
 
     fn base_evm_link(&self) -> EvmLink {
-        EvmLink::Http(self.base_evm.rpc_url())
+        self.base_evm.link()
     }
 
     fn wrapped_evm_link(&self) -> EvmLink {
-        EvmLink::Http(self.wrapped_evm.rpc_url())
+        self.wrapped_evm.link()
     }
 
-    fn wrapped_evm_rpc(&self) -> String {
-        self.wrapped_evm.rpc_url()
-    }
-
-    fn base_evm(&self) -> Arc<GanacheEvm> {
+    fn base_evm(&self) -> Arc<EVM> {
         self.base_evm.clone()
     }
 
-    fn wrapped_evm(&self) -> Arc<GanacheEvm> {
+    fn wrapped_evm(&self) -> Arc<EVM> {
         self.wrapped_evm.clone()
     }
 
@@ -225,9 +234,14 @@ impl TestContext for DfxTestContext {
 ///
 /// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
 /// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(predicate: F, ctx: &DfxTestContext, max_wait: Duration) -> T
+pub async fn block_until_succeeds<F, T, EVM>(
+    predicate: F,
+    ctx: &DfxTestContext<EVM>,
+    max_wait: Duration,
+) -> T
 where
     F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+    EVM: TestEvm,
 {
     let start = Instant::now();
     let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");

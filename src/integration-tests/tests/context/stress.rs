@@ -19,6 +19,7 @@ use ic_exports::ic_cdk::println;
 
 use crate::context::TestContext;
 use crate::utils::error::Result;
+use crate::utils::TestEvm;
 
 pub struct StressTestConfig {
     pub users_number: usize,
@@ -33,8 +34,9 @@ pub struct StressTestConfig {
 pub trait BaseTokens {
     type TokenId: Clone + Send + Sync;
     type UserId: Clone + Send + Sync;
+    type EVM: TestEvm;
 
-    fn ctx(&self) -> &(impl TestContext + Send + Sync);
+    fn ctx(&self) -> &(impl TestContext<Self::EVM> + Send + Sync);
     fn ids(&self) -> &[Self::TokenId];
 
     /// Returns the bridged user id as bytes

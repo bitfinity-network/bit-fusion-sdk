@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::str::FromStr as _;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
@@ -27,12 +28,14 @@ use tokio::sync::{Mutex, RwLock};
 use super::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
+use crate::utils::TestEvm;
 
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
 
-pub struct BtcContext<Ctx>
+pub struct BtcContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     admin_btc_rpc_client: Arc<BitcoinRpcClient>,
     admin_address: Address,
@@ -43,6 +46,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub btf_bridge_contract: Arc<RwLock<H160>>,
     pub wrapped_token: H160,
+    _marker: PhantomData<EVM>,
 }
 
 fn generate_wallet_name() -> String {
@@ -56,8 +60,11 @@ fn generate_wallet_name() -> String {
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
-    pub async fn pocket_ic() -> Self {
+impl<EVM> BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn pocket_ic(evm: Arc<EVM>) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -79,6 +86,8 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                 })
             },
             false,
+            evm.clone(),
+            evm,
         )
         .await;
 
@@ -86,9 +95,10 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> BtcContext<Ctx>
+impl<Ctx, EVM> BtcContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx) -> Self {
         // set KYT api key
@@ -197,6 +207,7 @@ where
             token_id,
             tip_height: AtomicU32::default(),
             btf_bridge_contract: Arc::new(RwLock::new(btf_bridge)),
+            _marker: PhantomData,
         }
     }
 

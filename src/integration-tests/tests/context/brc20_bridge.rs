@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
+use crate::utils::TestEvm;
 
 /// Maximum supply of the BRC20 token
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
@@ -105,9 +107,10 @@ pub fn generate_wallet_name() -> String {
     name
 }
 
-pub struct Brc20Context<Ctx>
+pub struct Brc20Context<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
@@ -116,6 +119,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
     pub tokens: AsyncMap<Brc20Tick, H160>,
+    _marker: PhantomData<EVM>,
 }
 
 /// Setup a new brc20 for DFX tests
@@ -210,19 +214,29 @@ async fn brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20W
 }
 
 #[cfg(feature = "dfx_tests")]
-impl Brc20Context<crate::dfx_tests::DfxTestContext> {
-    pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
-        let context =
-            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::BRC20_CANISTER_SET).await;
+impl<EVM> Brc20Context<crate::dfx_tests::DfxTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs], evm: Arc<EVM>) -> Self {
+        let context = crate::dfx_tests::DfxTestContext::new(
+            &super::CanisterType::BRC20_CANISTER_SET,
+            evm.clone(),
+            evm,
+        )
+        .await;
 
         Self::new(context, brc20_to_deploy).await
     }
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
+impl<EVM> Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
-    pub async fn pocket_ic(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
+    pub async fn pocket_ic(brc20_to_deploy: &[Brc20InitArgs], evm: Arc<EVM>) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -245,6 +259,8 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
                 })
             },
             true,
+            evm.clone(),
+            evm,
         )
         .await;
 
@@ -252,9 +268,10 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> Brc20Context<Ctx>
+impl<Ctx, EVM> Brc20Context<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx, brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         let brc20_wallet = brc20_setup(brc20_to_deploy)
@@ -343,6 +360,7 @@ where
             inner: context,
             brc20: brc20_wallet,
             tokens,
+            _marker: PhantomData,
         }
     }
 
@@ -721,7 +739,7 @@ where
         let client = self.inner.wrapped_evm();
         while start.elapsed() < timeout {
             let receipt = client
-                .get_transaction_receipt(&tx_hash)
+                .get_transaction_receipt(tx_hash)
                 .await
                 .expect("Request for receipt failed");
 

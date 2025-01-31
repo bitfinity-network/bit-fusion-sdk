@@ -2,11 +2,11 @@ pub mod brc20_helper;
 pub mod btc;
 pub mod btc_rpc_client;
 pub mod error;
-mod ganache;
 pub mod hiro_ordinals_client;
 pub mod miner;
 pub mod ord_client;
 pub mod rune_helper;
+mod test_evm;
 pub mod token_amount;
 pub mod wasm;
 
@@ -18,7 +18,7 @@ use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
-pub use self::ganache::GanacheEvm;
+pub use self::test_evm::{default_evm, BitfinityEvm, GanacheEvm, TestEvm};
 
 /// Returns the Path to the workspace root dir
 pub fn get_workspace_root_dir() -> PathBuf {

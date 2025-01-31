@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
-use crate::utils::{TestWTM, CHAIN_ID};
+use crate::utils::{GanacheEvm, TestEvm as _, TestWTM, CHAIN_ID};
 
 pub struct Erc20BaseTokens<Ctx> {
     ctx: Ctx,
@@ -26,7 +26,7 @@ pub struct Erc20BaseTokens<Ctx> {
     nonces: RwLock<HashMap<H160, AtomicU64>>,
 }
 
-impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
+impl<Ctx: TestContext<GanacheEvm> + Send + Sync> Erc20BaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         let base_evm_client = ctx.base_evm();
 
@@ -123,7 +123,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             }
 
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let Some(receipt) = evm_client.get_transaction_receipt(&tx_hash).await? else {
+            let Some(receipt) = evm_client.get_transaction_receipt(tx_hash).await? else {
                 retries += 1;
                 continue;
             };
@@ -151,11 +151,12 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
     }
 }
 
-impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
+impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
     type TokenId = H160;
     type UserId = H160;
+    type EVM = GanacheEvm;
 
-    fn ctx(&self) -> &(impl TestContext + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
         &self.ctx
     }
 
@@ -339,7 +340,7 @@ pub async fn stress_test_erc20_bridge_with_ctx<T>(
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    T: TestContext + Send + Sync,
+    T: TestContext<GanacheEvm> + Send + Sync,
 {
     let base_tokens = Erc20BaseTokens::init(ctx, base_tokens_number)
         .await

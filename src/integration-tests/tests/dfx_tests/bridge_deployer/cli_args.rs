@@ -3,9 +3,11 @@ use std::process::Command;
 
 use candid::Principal;
 use eth_signer::{Signer as _, Wallet};
+use ic_canister_client::IcAgentClient;
 
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::DfxTestContext;
+use crate::utils::{BitfinityEvm, TestEvm as _};
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
@@ -20,15 +22,13 @@ pub struct CommonCliArgs {
 }
 
 impl CommonCliArgs {
-    pub async fn new(ctx: &DfxTestContext) -> Self {
+    pub async fn new(ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>) -> Self {
         let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY).expect("Invalid private key");
         let wallet = Wallet::from_bytes(&private_key_bytes).expect("Invalid private key");
 
-        let client = ctx.evm_client(ctx.admin_name());
-        client
-            .admin_mint_native_tokens(wallet.address().into(), u128::MAX.into())
+        ctx.wrapped_evm
+            .mint_native_tokens(wallet.address().into(), u128::MAX.into())
             .await
-            .expect("failed to mint native tokens (called failed)")
             .expect("failed to mint native tokens (call error)");
 
         let evm_principal = ctx.canisters.evm().to_text();
@@ -57,7 +57,7 @@ pub struct DeployCliArgs {
 }
 
 impl DeployCliArgs {
-    pub async fn new(ctx: &DfxTestContext) -> Self {
+    pub async fn new(ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>) -> Self {
         let brc20_bridge_wasm_path = ctx.get_wasm_path(CanisterType::Brc20Bridge).await;
         let btc_bridge_wasm_path = ctx.get_wasm_path(CanisterType::BtcBridge).await;
         let icrc2_bridge_wasm_path = ctx.get_wasm_path(CanisterType::Icrc2Bridge).await;

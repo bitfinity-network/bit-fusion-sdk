@@ -12,6 +12,7 @@ use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
+use crate::utils::{default_evm, TestEvm as _};
 
 /// Default deposit amount
 const DEFAULT_DEPOSIT_AMOUNT: u128 = 10_000;
@@ -26,12 +27,15 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
     let withdraw_amount = TokenAmount::from_int(DEFAULT_WITHDRAW_AMOUNT, DEFAULT_DECIMALS);
     let brc20_tick = brc20_bridge::generate_brc20_tick();
 
-    let ctx = Brc20Context::dfx(&[Brc20InitArgs {
-        tick: brc20_tick,
-        decimals: Some(DEFAULT_DECIMALS),
-        limit: Some(DEFAULT_MINT_AMOUNT),
-        max_supply: DEFAULT_MAX_AMOUNT,
-    }])
+    let ctx = Brc20Context::dfx(
+        &[Brc20InitArgs {
+            tick: brc20_tick,
+            decimals: Some(DEFAULT_DECIMALS),
+            limit: Some(DEFAULT_MINT_AMOUNT),
+            max_supply: DEFAULT_MAX_AMOUNT,
+        }],
+        default_evm().await,
+    )
     .await;
 
     // Get initial balance
@@ -137,7 +141,10 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_brc20_bridge_stress_test() {
-    let context = crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET).await;
+    let evm = default_evm().await;
+    let context =
+        crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET, evm.clone(), evm)
+            .await;
 
     let config = StressTestConfig {
         users_number: 5,

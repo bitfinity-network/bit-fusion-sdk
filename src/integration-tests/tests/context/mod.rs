@@ -46,7 +46,7 @@ use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
-use crate::utils::{GanacheEvm, TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
+use crate::utils::{TestEvm, TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";
@@ -63,7 +63,10 @@ use bridge_did::op_id::OperationId;
 use ic_log::did::LogCanisterSettings;
 
 #[async_trait::async_trait]
-pub trait TestContext {
+pub trait TestContext<EVM>
+where
+    EVM: TestEvm,
+{
     type Client: CanisterClient + Send + Sync;
 
     /// Returns principals for canisters in the context.
@@ -88,18 +91,13 @@ pub trait TestContext {
     fn base_evm_link(&self) -> EvmLink;
 
     /// Returns the external EVM LINK
-    fn wrapped_evm_link(&self) -> EvmLink {
-        EvmLink::Http(self.wrapped_evm_rpc())
-    }
-
-    /// Returns the external evm rpc url
-    fn wrapped_evm_rpc(&self) -> String;
+    fn wrapped_evm_link(&self) -> EvmLink;
 
     /// Returns a reference to the base EVM instance.
-    fn base_evm(&self) -> Arc<GanacheEvm>;
+    fn base_evm(&self) -> Arc<EVM>;
 
     /// Returns a reference to the wrapped EVM instance.
-    fn wrapped_evm(&self) -> Arc<GanacheEvm>;
+    fn wrapped_evm(&self) -> Arc<EVM>;
 
     /// Returns client for the icrc2 bridge
     fn icrc_bridge_client(&self, caller: &str) -> Icrc2BridgeClient<Self::Client> {
@@ -156,7 +154,7 @@ pub trait TestContext {
     /// Waits for transaction receipt.
     async fn wait_transaction_receipt_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
@@ -189,7 +187,7 @@ pub trait TestContext {
     /// Creates a new wallet with the EVM balance on it.
     async fn new_wallet_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         balance: u128,
     ) -> Result<Wallet<'static, SigningKey>> {
         let wallet = {
@@ -225,7 +223,7 @@ pub trait TestContext {
     /// Creates contract on the given EVM.
     async fn create_contract_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         creator_wallet: &Wallet<'_, SigningKey>,
         input: Vec<u8>,
     ) -> Result<H160> {
@@ -276,7 +274,7 @@ pub trait TestContext {
     /// Crates BTFBridge contract in EVMc and registered it in minter canister
     async fn initialize_btf_bridge_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
@@ -324,7 +322,7 @@ pub trait TestContext {
     /// Creates BTFBridge contract in EVMC and registered it in minter canister
     async fn initialize_btf_bridge_with_minter_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
@@ -385,7 +383,7 @@ pub trait TestContext {
 
     async fn initialize_fee_charge_contract_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
@@ -421,7 +419,7 @@ pub trait TestContext {
 
     async fn initialize_wrapped_token_deployer_contract_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
     ) -> Result<H160> {
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
@@ -433,7 +431,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_erc_20_tokens_raw(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -498,7 +496,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_wrapped_erc_20_tokens(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -523,7 +521,7 @@ pub trait TestContext {
     #[allow(clippy::too_many_arguments)]
     async fn burn_base_erc_20_tokens(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         from_token: &H160,
         to_token_id: &[u8],
@@ -549,7 +547,7 @@ pub trait TestContext {
     /// Current native token balance on user's deposit inside the Btfbridge.
     async fn native_token_deposit_balance(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         fee_charge: H160,
         user: H160,
     ) -> U256 {
@@ -583,7 +581,7 @@ pub trait TestContext {
     /// Deposit native tokens to Btfbridge to pay mint fee.
     async fn native_token_deposit(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         fee_charge: H160,
         user_wallet: &Wallet<'static, SigningKey>,
         amount: u128,
@@ -645,7 +643,7 @@ pub trait TestContext {
     /// Calls contract in the evm_client.
     async fn call_contract_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         contract: &H160,
         input: Vec<u8>,
@@ -696,7 +694,7 @@ pub trait TestContext {
     /// Calls contract in the evm_client without waiting for it's receipt.
     async fn call_contract_without_waiting_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         contract: &H160,
         input: Vec<u8>,
@@ -750,7 +748,7 @@ pub trait TestContext {
     /// Deploys TestWTM token of the given EVM.
     async fn deploy_test_wtm_token_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         wallet: &Wallet<'_, SigningKey>,
         init_balance: U256,
     ) -> Result<H160> {
@@ -906,7 +904,7 @@ pub trait TestContext {
     /// Returns ERC-20 balance on the given evm.
     async fn check_erc20_balance_on_evm(
         &self,
-        evm: &Arc<GanacheEvm>,
+        evm: &Arc<EVM>,
         token: &H160,
         wallet: &Wallet<'_, SigningKey>,
         address: Option<&H160>,
@@ -1050,7 +1048,10 @@ pub trait TestContext {
                     .await
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
-                let hostname = self.wrapped_evm_rpc();
+
+                let EvmLink::Http(hostname) = self.wrapped_evm_link() else {
+                    panic!("EVM-RPC provider hostname is not set");
+                };
                 println!("EVM-RPC provider hostname: {hostname}");
                 // configure the EVM RPC canister provider
                 let args = evm_rpc_canister::RegisterProviderArgs {

@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
+use crate::utils::TestEvm;
 
 type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
@@ -57,9 +59,10 @@ pub struct RuneWallet {
     pub runes: HashMap<RuneId, RuneWalletInfo>,
 }
 
-pub struct RunesContext<Ctx>
+pub struct RunesContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
@@ -68,6 +71,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub runes: RuneWallet,
     pub tokens: AsyncMap<RuneId, H160>,
+    _marker: PhantomData<EVM>,
 }
 
 pub fn generate_rune_name() -> String {
@@ -155,19 +159,29 @@ async fn rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> {
 }
 
 #[cfg(feature = "dfx_tests")]
-impl RunesContext<crate::dfx_tests::DfxTestContext> {
-    pub async fn dfx(runes_to_etch: &[String]) -> Self {
-        let context =
-            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::RUNE_CANISTER_SET).await;
+impl<EVM> RunesContext<crate::dfx_tests::DfxTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn dfx(runes_to_etch: &[String], evm: Arc<EVM>) -> Self {
+        let context = crate::dfx_tests::DfxTestContext::new(
+            &super::CanisterType::RUNE_CANISTER_SET,
+            evm.clone(),
+            evm,
+        )
+        .await;
 
         Self::new(context, runes_to_etch).await
     }
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
+impl<EVM> RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
-    pub async fn pocket_ic(runes: &[String]) -> Self {
+    pub async fn pocket_ic(runes: &[String], evm: Arc<EVM>) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -190,6 +204,8 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                 })
             },
             true,
+            evm.clone(),
+            evm,
         )
         .await;
 
@@ -197,9 +213,10 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> RunesContext<Ctx>
+impl<Ctx, EVM> RunesContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx, runes: &[String]) -> Self {
         let rune_wallet = rune_setup(runes).await.expect("failed to setup runes");
@@ -287,6 +304,7 @@ where
             inner: context,
             runes: rune_wallet,
             tokens,
+            _marker: PhantomData,
         }
     }
 
@@ -577,7 +595,7 @@ where
         let client = self.inner.wrapped_evm();
         while start.elapsed() < timeout {
             let receipt = client
-                .get_transaction_receipt(&tx_hash)
+                .get_transaction_receipt(tx_hash)
                 .await
                 .expect("Failed to request transaction receipt");
 

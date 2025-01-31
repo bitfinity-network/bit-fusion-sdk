@@ -19,6 +19,7 @@ candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
 ethers-core = { workspace = true }
+evm-canister-client = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
@@ -64,5 +65,6 @@ wildmatch = { workspace = true }
 
 # IC deps
 [features]
-pocket_ic_integration_test = []
+bitfinity_evm = []
 dfx_tests = []
+pocket_ic_integration_test = []
