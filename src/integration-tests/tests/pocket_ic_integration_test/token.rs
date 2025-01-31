@@ -1,13 +1,21 @@
+use std::sync::Arc;
+
 use candid::{Nat, Principal};
 use ic_exports::icrc_types::icrc1::transfer::TransferArg;
 
 use super::PocketIcTestContext;
 use crate::context::TestContext;
 use crate::pocket_ic_integration_test::{CanisterType, ADMIN};
+use crate::utils::GanacheEvm;
 
 #[tokio::test]
 async fn test_transfer_tokens() {
-    let ctx = PocketIcTestContext::new(&[CanisterType::Token1]).await;
+    let ctx = PocketIcTestContext::new(
+        &[CanisterType::Token1],
+        Arc::new(GanacheEvm::run().await),
+        Arc::new(GanacheEvm::run().await),
+    )
+    .await;
     let client = ctx.icrc_token_1_client(ADMIN);
     let amount = Nat::from(100_u64);
     let to = Principal::anonymous().into();

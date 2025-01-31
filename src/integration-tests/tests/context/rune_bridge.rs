@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
+use crate::utils::TestEvm;
 
 type AsyncMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
@@ -57,9 +59,10 @@ pub struct RuneWallet {
     pub runes: HashMap<RuneId, RuneWalletInfo>,
 }
 
-pub struct RunesContext<Ctx>
+pub struct RunesContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub inner: Ctx,
     pub eth_wallet: Wallet<'static, SigningKey>,
@@ -68,6 +71,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub runes: RuneWallet,
     pub tokens: AsyncMap<RuneId, H160>,
+    _marker: PhantomData<EVM>,
 }
 
 pub fn generate_rune_name() -> String {
@@ -155,19 +159,29 @@ async fn rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> {
 }
 
 #[cfg(feature = "dfx_tests")]
-impl RunesContext<crate::dfx_tests::DfxTestContext> {
-    pub async fn dfx(runes_to_etch: &[String]) -> Self {
-        let context =
-            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::RUNE_CANISTER_SET).await;
+impl<EVM> RunesContext<crate::dfx_tests::DfxTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn dfx(runes_to_etch: &[String], evm: Arc<EVM>) -> Self {
+        let context = crate::dfx_tests::DfxTestContext::new(
+            &super::CanisterType::RUNE_CANISTER_SET,
+            evm.clone(),
+            evm,
+        )
+        .await;
 
         Self::new(context, runes_to_etch).await
     }
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
+impl<EVM> RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
-    pub async fn pocket_ic(runes: &[String]) -> Self {
+    pub async fn pocket_ic(runes: &[String], evm: Arc<EVM>) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -190,6 +204,8 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                 })
             },
             true,
+            evm.clone(),
+            evm,
         )
         .await;
 
@@ -197,19 +213,13 @@ impl RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> RunesContext<Ctx>
+impl<Ctx, EVM> RunesContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx, runes: &[String]) -> Self {
         let rune_wallet = rune_setup(runes).await.expect("failed to setup runes");
-
-        context
-            .evm_client(context.admin_name())
-            .set_logger_filter("info")
-            .await
-            .expect("failed to set logger filter")
-            .unwrap();
 
         let bridge = context.canisters().rune_bridge();
 
@@ -232,18 +242,16 @@ where
         let wallet_address = wallet.address();
 
         context
-            .evm_client(context.admin_name())
-            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .wrapped_evm()
+            .mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint native tokens");
 
-        let client = context.evm_client(context.admin_name());
+        let client = context.wrapped_evm();
         client
-            .admin_mint_native_tokens(rune_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .mint_native_tokens(rune_bridge_eth_address.clone().unwrap(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to mint native tokens");
 
         context.advance_time(Duration::from_secs(2)).await;
 
@@ -296,6 +304,7 @@ where
             inner: context,
             runes: rune_wallet,
             tokens,
+            _marker: PhantomData,
         }
     }
 
@@ -533,7 +542,7 @@ where
             dst_tokens.insert(RuneName::from_str(&rune_info.name).unwrap(), erc20_address);
         }
 
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
         let data = RuneDepositRequestData {
@@ -570,8 +579,7 @@ where
         let tx_id = client
             .send_raw_transaction(transaction)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to send transaction");
         self.wait_for_tx_success(&tx_id).await;
         eprintln!(
             "Deposit notification sent by tx: 0x{}",
@@ -584,13 +592,12 @@ where
 
         let start = Instant::now();
         let timeout = Duration::from_secs(MAX_TX_TIMEOUT_SEC);
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         while start.elapsed() < timeout {
             let receipt = client
-                .eth_get_transaction_receipt(tx_hash.clone())
+                .get_transaction_receipt(tx_hash)
                 .await
-                .expect("Failed to request transaction receipt")
-                .expect("Request for receipt failed");
+                .expect("Failed to request transaction receipt");
 
             if let Some(receipt) = receipt {
                 if receipt.status != Some(1u64.into()) {
@@ -633,7 +640,7 @@ where
 
         println!("Burning {amount} of {rune_id} to {recipient}");
 
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,

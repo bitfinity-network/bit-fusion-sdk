@@ -17,6 +17,7 @@ use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs, Btc
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
+use crate::utils::GanacheEvm;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -30,9 +31,9 @@ struct Brc20Token {
 
 pub struct Brc20BaseTokens<Ctx>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<GanacheEvm> + Sync,
 {
-    ctx: Arc<Brc20Context<Ctx>>,
+    ctx: Arc<Brc20Context<Ctx, GanacheEvm>>,
     tokens: Vec<Brc20Token>,
     ticks: Vec<Brc20Tick>,
     users: AsyncMap<Id256, BtcWallet>,
@@ -40,7 +41,7 @@ where
 
 impl<Ctx> Brc20BaseTokens<Ctx>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<GanacheEvm> + Sync,
 {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         println!("Creating brc20 token canisters");
@@ -121,12 +122,13 @@ where
 
 impl<Ctx> BaseTokens for Brc20BaseTokens<Ctx>
 where
-    Ctx: TestContext + Send + Sync,
+    Ctx: TestContext<GanacheEvm> + Send + Sync,
 {
     type TokenId = Brc20Tick;
     type UserId = Id256;
+    type EVM = GanacheEvm;
 
-    fn ctx(&self) -> &(impl TestContext + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
         &self.ctx.inner
     }
 
@@ -349,7 +351,7 @@ pub async fn stress_test_brc20_bridge_with_ctx<Ctx>(
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    Ctx: TestContext + Send + Sync,
+    Ctx: TestContext<GanacheEvm> + Send + Sync,
 {
     let base_tokens = Brc20BaseTokens::init(ctx, base_tokens_number)
         .await

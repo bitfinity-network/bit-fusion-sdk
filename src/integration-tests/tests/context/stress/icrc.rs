@@ -20,6 +20,7 @@ use icrc_client::transfer::TransferArg;
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::utils::error::{Result, TestError};
+use crate::utils::GanacheEvm;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -28,7 +29,7 @@ pub struct IcrcBaseTokens<Ctx> {
     tokens: Vec<Principal>,
 }
 
-impl<Ctx: TestContext> IcrcBaseTokens<Ctx> {
+impl<Ctx: TestContext<GanacheEvm>> IcrcBaseTokens<Ctx> {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         println!("Creating icrc token canisters");
         let mut tokens = Vec::with_capacity(base_tokens_number);
@@ -60,11 +61,12 @@ impl<Ctx: TestContext> IcrcBaseTokens<Ctx> {
     }
 }
 
-impl<Ctx: TestContext + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
+impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
     type TokenId = Principal;
     type UserId = String;
+    type EVM = GanacheEvm;
 
-    fn ctx(&self) -> &(impl TestContext + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
         &self.ctx
     }
 
@@ -267,7 +269,7 @@ pub async fn stress_test_icrc_bridge_with_ctx<T>(
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    T: TestContext + Send + Sync,
+    T: TestContext<GanacheEvm> + Send + Sync,
 {
     let base_tokens = IcrcBaseTokens::init(ctx, base_tokens_number).await.unwrap();
     let icrc_stress_test_stats = StressTestState::run(&base_tokens, config).await.unwrap();

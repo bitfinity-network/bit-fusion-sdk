@@ -9,11 +9,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bridge_did::evm_link::EvmLink;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H256};
 use eth_signer::ic_sign::SigningKeyId;
-use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
@@ -21,37 +20,57 @@ use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
 use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
-use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+use crate::utils::TestEvm;
 
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";
 pub const ALICE: &str = "alice";
 
 #[derive(Clone)]
-pub struct PocketIcTestContext {
+pub struct PocketIcTestContext<EVM>
+where
+    EVM: TestEvm,
+{
+    base_evm: Arc<EVM>,
     pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
+    wrapped_evm: Arc<EVM>,
     live: bool,
 }
 
-impl PocketIcTestContext {
+impl<EVM> PocketIcTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     /// Creates a new test context with the given canisters.
-    pub async fn new(canisters_set: &[CanisterType]) -> Self {
+    pub async fn new(
+        canisters_set: &[CanisterType],
+        base_evm: Arc<EVM>,
+        wrapped_evm: Arc<EVM>,
+    ) -> Self {
         Self::new_with(
             canisters_set,
             |builder| builder,
             |pic| Box::pin(async move { pic }),
             false,
+            base_evm,
+            wrapped_evm,
         )
         .await
     }
 
-    pub async fn new_live(canisters_set: &[CanisterType]) -> Self {
+    pub async fn new_live(
+        canisters_set: &[CanisterType],
+        base_evm: Arc<EVM>,
+        wrapped_evm: Arc<EVM>,
+    ) -> Self {
         Self::new_with(
             canisters_set,
             |builder| builder,
             |pic| Box::pin(async move { pic }),
             false,
+            base_evm,
+            wrapped_evm,
         )
         .await
     }
@@ -86,6 +105,8 @@ impl PocketIcTestContext {
         with_build: FB,
         with_pocket_ic: FPIC,
         live: bool,
+        base_evm: Arc<EVM>,
+        wrapped_evm: Arc<EVM>,
     ) -> Self
     where
         FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
@@ -99,8 +120,10 @@ impl PocketIcTestContext {
 
         let client = Arc::new(pocket_ic);
         let mut ctx = PocketIcTestContext {
+            base_evm,
             client,
             canisters: TestCanisters::default(),
+            wrapped_evm,
             live,
         };
 
@@ -143,7 +166,10 @@ impl PocketIcTestContext {
 }
 
 #[async_trait::async_trait]
-impl TestContext for PocketIcTestContext {
+impl<EVM> TestContext<EVM> for PocketIcTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     type Client = PocketIcClient;
 
     fn canisters(&self) -> TestCanisters {
@@ -174,6 +200,22 @@ impl TestContext for PocketIcTestContext {
 
     fn admin_name(&self) -> &str {
         ADMIN
+    }
+
+    fn base_evm_link(&self) -> EvmLink {
+        self.base_evm.link()
+    }
+
+    fn wrapped_evm_link(&self) -> EvmLink {
+        self.wrapped_evm.link()
+    }
+
+    fn base_evm(&self) -> Arc<EVM> {
+        self.base_evm.clone()
+    }
+
+    fn wrapped_evm(&self) -> Arc<EVM> {
+        self.wrapped_evm.clone()
     }
 
     async fn create_canister(&self) -> Result<Principal> {
@@ -256,30 +298,6 @@ impl TestContext for PocketIcTestContext {
         Ok(())
     }
 
-    /// Waits for transaction receipt.
-    async fn wait_transaction_receipt_on_evm(
-        &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
-        hash: &H256,
-    ) -> Result<Option<TransactionReceipt>> {
-        for _ in 0..200 {
-            let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
-            self.advance_time(time).await;
-            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
-
-            if result.is_err() {
-                println!("failed to get tx receipt: {result:?}")
-            }
-
-            let receipt = result?;
-            if receipt.is_some() {
-                return Ok(receipt);
-            }
-        }
-
-        Ok(None)
-    }
-
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
         vec![
             (Account::from(bob()), Nat::from(ICRC1_INITIAL_BALANCE)),
@@ -293,7 +311,10 @@ impl TestContext for PocketIcTestContext {
     }
 }
 
-impl fmt::Debug for PocketIcTestContext {
+impl<EVM> fmt::Debug for PocketIcTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PocketIcTestContext")
             .field("env", &"PocketIcTestContext tests client")
@@ -306,13 +327,14 @@ impl fmt::Debug for PocketIcTestContext {
 ///
 /// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
 /// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(
+pub async fn block_until_succeeds<F, T, EVM>(
     predicate: F,
-    ctx: &PocketIcTestContext,
+    ctx: &PocketIcTestContext<EVM>,
     max_wait: Duration,
 ) -> T
 where
     F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+    EVM: TestEvm,
 {
     let start = Instant::now();
     let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");
