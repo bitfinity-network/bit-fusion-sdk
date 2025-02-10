@@ -1,0 +1,6 @@
+```
+$ bridge-deployer -v --ic-network localhost --evm-principal $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH upgrade --wasm $BRC20_BRIDGE_WASM_PATH --canister-id $BRC20_BRIDGE_ID
+Starting Bitfinity Deployer v[..]
+Canister [..] upgraded successfully
+
+```

@@ -1,6 +1,0 @@
-```
-$ bridge-deployer -v --evm-network localhost --evm $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH upgrade --wasm $ERC20_BRIDGE_WASM_PATH --canister-id $ERC20_BRIDGE_ID
-Starting Bitfinity Deployer v[..]
-Canister [..] upgraded successfully
-
-```

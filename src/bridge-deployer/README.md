@@ -34,7 +34,9 @@ The general syntax for using the Bridge Deployer is:
 
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
-- `--evm-network <EVM_NETWORK>`: EVM network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
+- `--ic-network <IC_NETWORK>`: IC network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
+- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided)
+- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge to communicate with a specific EVM network (must be used if `evm-principal` is not provided)
 - `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
 - `-v, --verbosity`: Set the verbosity level (use multiple times for higher levels)
 - `-q, --quiet`: Silence all output
@@ -53,15 +55,38 @@ For the deployment of canisters, you will require to have/create a wallet canist
 
 For the deployment, you will need to provide the wallet canister id as `--wallet-canister` or as an environment variable `WALLET_CANISTER`.
 
-Command to deploy a bridge canister:
+Command to deploy a bridge canister connecting the bridge to the EVM canister:
 
 ```bash
 ./bridge-deployer
   -vvv \
-  --evm-network localhost \
+  --ic-network localhost \
   --private-key <PRIVATE_KEY> \
   --identity path/to/identity.pem \
-  --evm <EVM_PRINCIPAL> \
+  --evm-principal <EVM_PRINCIPAL> \
+  deploy \
+  --wasm path/to/rune_bridge.wasm \
+  --wallet-canister <WALLET_CANISTER> \
+  rune \
+  --owner <ADMIN_PRINCIPAL> \
+  --min-confirmations 6 \
+  --indexer-urls <https://indexer1.com,https://indexer2.com,https://indexer3.com> \
+  --deposit-fee 1000000 \
+  --mempool-timeout 3600 \
+  --signing-key-id dfx \
+  --bitcoin-network <bitcoin_network> \
+  --indexer-consensus-threshold 3
+```
+
+Command to deploy a bridge canister connecting the bridge to a certain EVM node with RPC:
+
+```bash
+./bridge-deployer
+  -vvv \
+  --ic-network localhost \
+  --private-key <PRIVATE_KEY> \
+  --identity path/to/identity.pem \
+  --evm-rpc <EVM_RPC> \
   deploy \
   --wasm path/to/rune_bridge.wasm \
   --wallet-canister <WALLET_CANISTER> \
@@ -106,7 +131,7 @@ Note: You need to provide the canister arguments for the bridge type you are rei
 
 ```bash
 bridge-deployer -vvv \
-  --evm-network mainnet \
+  --ic-network mainnet \
   --identity <IDENTITY_PATH> \
   deploy \
   --wasm ./icrc_bridge.wasm \
@@ -114,7 +139,7 @@ bridge-deployer -vvv \
   icrc \
   --signing-key-id production \
   --owner 2vxsx-fae \
-  --evm <EVM_PRINCIPAL> \
+  --evm-principal <EVM_PRINCIPAL> \
   --log-filter "trace" # You can set the log filter to "trace", "debug", "info", "warn", "error"
 ```
 

@@ -1,10 +1,11 @@
+use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use super::{LogCanisterSettings, SigningKeyId};
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
 pub struct InitBridgeConfig {
@@ -24,14 +25,14 @@ impl InitBridgeConfig {
     pub fn into_bridge_init_data(
         self,
         owner: Principal,
-        evm_network: EvmNetwork,
-        evm: Principal,
+        evm_network: IcNetwork,
+        evm_link: EvmLink,
     ) -> BridgeInitData {
         let signing_strategy = self.signing_key_id(evm_network).into();
         let log_settings = self.log_settings.unwrap_or_else(default_log_settings);
         BridgeInitData {
             owner,
-            evm_link: crate::evm::evm_link(evm_network, Some(evm)),
+            evm_link,
             signing_strategy,
             log_settings: Some(ic_log::did::LogCanisterSettings {
                 enable_console: Some(log_settings.enable_console),
@@ -49,9 +50,9 @@ impl InitBridgeConfig {
         }
     }
 
-    pub fn signing_key_id(&self, network: EvmNetwork) -> SigningKeyId {
+    pub fn signing_key_id(&self, network: IcNetwork) -> SigningKeyId {
         self.signing_key_id.unwrap_or_else(|| {
-            if network != EvmNetwork::Localhost {
+            if network != IcNetwork::Localhost {
                 SigningKeyId::Production
             } else {
                 SigningKeyId::Dfx

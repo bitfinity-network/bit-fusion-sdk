@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::principals::CanisterPrincipals;
 use super::CanisterType;
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
 
 /// canister_ids.json db
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -16,7 +16,7 @@ pub struct CanistersDb {
 
 impl CanistersDb {
     /// Get the principal ID of a canister based on the network type.
-    pub fn get(&self, canister: CanisterType, network: EvmNetwork) -> Option<Principal> {
+    pub fn get(&self, canister: CanisterType, network: IcNetwork) -> Option<Principal> {
         self.canisters
             .get(&canister)
             .and_then(|canister| canister.get(network))
@@ -26,7 +26,7 @@ impl CanistersDb {
     /// set a new canister principal to the map.
     ///
     /// If the entry already exists, it will be updated.
-    pub fn set(&mut self, canister: CanisterType, principal: Principal, network: EvmNetwork) {
+    pub fn set(&mut self, canister: CanisterType, principal: Principal, network: IcNetwork) {
         self.canisters
             .entry(canister)
             .and_modify(|canister_data| canister_data.set(principal, network))
@@ -50,7 +50,7 @@ mod test {
         db.set(
             CanisterType::Brc20,
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap(),
-            EvmNetwork::Localhost,
+            IcNetwork::Localhost,
         );
 
         // set for mainnet
@@ -58,18 +58,18 @@ mod test {
         db.set(
             CanisterType::Brc20,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
-            EvmNetwork::Mainnet,
+            IcNetwork::Mainnet,
         );
 
         assert_eq!(
-            db.get(CanisterType::Brc20, EvmNetwork::Mainnet).unwrap(),
+            db.get(CanisterType::Brc20, IcNetwork::Mainnet).unwrap(),
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap()
         );
 
         // check for localhost
 
         assert_eq!(
-            db.get(CanisterType::Brc20, EvmNetwork::Localhost).unwrap(),
+            db.get(CanisterType::Brc20, IcNetwork::Localhost).unwrap(),
             Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap()
         );
     }

@@ -3,6 +3,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_utils::native::wait_for_tx;
 use candid::Principal;
@@ -28,9 +29,9 @@ const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
 #[derive(Debug, Clone, Args)]
 #[group(required = true, multiple = false)]
 pub struct NetworkConfig {
-    /// EVM network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    /// OC network to deploy the contract to (e.g. "mainnet", "testnet", "local")
     #[clap(value_enum, long)]
-    pub evm_network: EvmNetwork,
+    pub ic_network: IcNetwork,
     /// Custom network URL
     #[clap(long)]
     pub custom_network: Option<String>,
@@ -42,20 +43,20 @@ impl std::fmt::Display for NetworkConfig {
             return write!(f, "custom");
         }
 
-        let network = match self.evm_network {
-            EvmNetwork::Localhost => "localhost",
-            EvmNetwork::Testnet => "testnet",
-            EvmNetwork::Mainnet => "mainnet",
+        let network = match self.ic_network {
+            IcNetwork::Localhost => "localhost",
+            IcNetwork::Testnet => "testnet",
+            IcNetwork::Mainnet => "mainnet",
         };
 
         write!(f, "{network}")
     }
 }
 
-impl From<EvmNetwork> for NetworkConfig {
-    fn from(value: EvmNetwork) -> Self {
+impl From<IcNetwork> for NetworkConfig {
+    fn from(value: IcNetwork) -> Self {
         Self {
-            evm_network: value,
+            ic_network: value,
             custom_network: None,
         }
     }
@@ -63,14 +64,14 @@ impl From<EvmNetwork> for NetworkConfig {
 
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
-pub enum EvmNetwork {
+pub enum IcNetwork {
     Localhost,
     Testnet,
     Mainnet,
 }
 
 pub struct SolidityContractDeployer<'a> {
-    evm: Principal,
+    evm: EvmLink,
     network: NetworkConfig,
     wallet: Wallet<'a, SigningKey>,
 }
@@ -86,7 +87,7 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: NetworkConfig, pk: H256, evm: Principal) -> Self {
+    pub fn new(network: NetworkConfig, pk: H256, evm: EvmLink) -> Self {
         let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
         Self {
             evm,
@@ -95,19 +96,29 @@ impl SolidityContractDeployer<'_> {
         }
     }
 
-    /// Returns the network URL based on the selected network.
-    pub fn get_network_url(&self) -> String {
+    /// Returns the evm URL based on the selected network.
+    pub fn get_evm_url(&self) -> String {
+        match &self.evm {
+            EvmLink::Http(url) => url.to_string(),
+            EvmLink::Ic(principal) => self.get_evm_url_from_principal(principal),
+            EvmLink::EvmRpcCanister { .. } => {
+                panic!("EVM RPC canister is not supported for contract deployment")
+            }
+        }
+    }
+
+    /// Returns the evm URL based on the given principal.
+    fn get_evm_url_from_principal(&self, principal: &Principal) -> String {
         if let Some(custom_network) = &self.network.custom_network {
             custom_network.to_string()
         } else {
-            match self.network.evm_network {
-                EvmNetwork::Localhost => format!(
-                    "http://127.0.0.1:{dfx_port}/?canisterId={evm}",
+            match self.network.ic_network {
+                IcNetwork::Localhost => format!(
+                    "http://127.0.0.1:{dfx_port}/?canisterId={principal}",
                     dfx_port = dfx_webserver_port(),
-                    evm = self.evm,
                 ),
-                EvmNetwork::Testnet => TESTNET_URL.to_string(),
-                EvmNetwork::Mainnet => MAINNET_URL.to_string(),
+                IcNetwork::Testnet => TESTNET_URL.to_string(),
+                IcNetwork::Mainnet => MAINNET_URL.to_string(),
             }
         }
     }
@@ -148,7 +159,7 @@ impl SolidityContractDeployer<'_> {
             "-v",
             script_dir.to_str().expect("Invalid solidity dir"),
             "--rpc-url",
-            &self.get_network_url(),
+            &self.get_evm_url(),
             "--private-key",
             &self.pk(),
             "--sender",
@@ -336,7 +347,7 @@ impl SolidityContractDeployer<'_> {
     }
 
     fn rpc_client(&self) -> anyhow::Result<EthJsonRpcClient<ReqwestClient>> {
-        let url = self.get_network_url();
+        let url = self.get_evm_url();
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()?;
@@ -350,7 +361,7 @@ impl SolidityContractDeployer<'_> {
 
     /// Returns the nonce of the deployer.
     pub async fn get_nonce(&self) -> Result<u64> {
-        let network = self.get_network_url();
+        let network = self.get_evm_url();
         info!("Requesting nonce for network {network}");
 
         let client = self.rpc_client()?;

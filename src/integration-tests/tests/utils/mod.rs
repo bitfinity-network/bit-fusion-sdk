@@ -14,6 +14,7 @@ pub mod hiro_ordinals_client;
 pub mod miner;
 pub mod ord_client;
 pub mod rune_helper;
+pub mod test_evm;
 pub mod token_amount;
 pub mod wasm;
 

@@ -16,8 +16,7 @@ use tracing_subscriber::{filter, Layer as _};
 
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
-use crate::contracts::EvmNetwork;
-use crate::evm::evm_principal_or_default;
+use crate::contracts::IcNetwork;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
@@ -39,18 +38,27 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// EVM network to deploy the contract to
-    #[arg(
-        long,
-        value_name = "EVM_NETWORK",
-        default_value = "localhost",
-        help_heading = "Bridge Contract Args"
-    )]
-    evm_network: EvmNetwork,
+    /// IC network to deploy the contract to
+    #[arg(long, value_name = "IC_NETWORK", default_value = "localhost")]
+    ic_network: IcNetwork,
 
     /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
-    #[arg(long)]
-    pub evm: Option<Principal>,
+    #[arg(
+        long,
+        conflicts_with = "evm_rpc",
+        value_name = "PRINCIPAL",
+        help_heading = "EVM Link Args"
+    )]
+    pub evm_principal: Option<Principal>,
+
+    /// Optional EVM RPC endpoint to use. To be used in case you're not deploying on the EVM principal.
+    #[arg(
+        long,
+        value_name = "EVM_RPC",
+        help_heading = "EVM Link Args",
+        conflicts_with = "evm_principal"
+    )]
+    pub evm_rpc: Option<String>,
 
     /// Set the minimum log level.
     ///
@@ -99,23 +107,24 @@ impl Cli {
 
         let Cli {
             private_key,
-            evm,
-            evm_network,
+            evm_principal,
+            ic_network,
+            evm_rpc,
             command,
             canister_ids,
             ..
         } = cli;
 
         // derive arguments
-        let ic_host = crate::evm::ic_host(evm_network);
+        let evm_link = crate::evm::evm_link(evm_rpc, ic_network, evm_principal);
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
-        debug!("IC host: {}", ic_host);
+        debug!("EVM Link: {evm_link:?}",);
 
         // load canister ids file
         let canister_ids_path = canister_ids
-            .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
-            .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
+            .map(|path| CanisterIdsPath::CustomPath(path, ic_network))
+            .unwrap_or_else(|| CanisterIdsPath::from(ic_network));
 
         debug!("Canister ids path: {}", canister_ids_path.path().display());
 
@@ -123,9 +132,8 @@ impl Cli {
         command
             .run(
                 identity,
-                &ic_host,
-                evm_network,
-                evm_principal_or_default(evm_network, evm),
+                ic_network,
+                evm_link,
                 private_key,
                 canister_ids_path,
             )

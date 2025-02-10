@@ -1,0 +1,6 @@
+```
+$ bridge-deployer -v --ic-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH reinstall --wasm $ICRC2_BRIDGE_WASM_PATH  --btf-bridge $BTF_BRIDGE --canister-id $ICRC2_BRIDGE_ID icrc --signing-key-id dfx --enable-console --log-filter trace
+Starting Bitfinity Deployer v[..]
+Canister icrc2-bridge reinstalled with ID [..]
+
+```

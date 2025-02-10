@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
 
 const LOCAL_DIR: &str = ".dfx/local/";
 const TESTNET_DIR: &str = ".dfx/testnet/";
@@ -13,7 +13,7 @@ pub enum CanisterIdsPath {
     Testnet,
     Mainnet,
     /// Custom path with network type.
-    CustomPath(PathBuf, EvmNetwork),
+    CustomPath(PathBuf, IcNetwork),
 }
 
 impl CanisterIdsPath {
@@ -45,22 +45,22 @@ impl CanisterIdsPath {
     }
 }
 
-impl From<EvmNetwork> for CanisterIdsPath {
-    fn from(network: EvmNetwork) -> Self {
+impl From<IcNetwork> for CanisterIdsPath {
+    fn from(network: IcNetwork) -> Self {
         match network {
-            EvmNetwork::Localhost => Self::Localhost,
-            EvmNetwork::Testnet => Self::Testnet,
-            EvmNetwork::Mainnet => Self::Mainnet,
+            IcNetwork::Localhost => Self::Localhost,
+            IcNetwork::Testnet => Self::Testnet,
+            IcNetwork::Mainnet => Self::Mainnet,
         }
     }
 }
 
-impl From<&CanisterIdsPath> for EvmNetwork {
+impl From<&CanisterIdsPath> for IcNetwork {
     fn from(path: &CanisterIdsPath) -> Self {
         match path {
-            CanisterIdsPath::Localhost => EvmNetwork::Localhost,
-            CanisterIdsPath::Testnet => EvmNetwork::Testnet,
-            CanisterIdsPath::Mainnet => EvmNetwork::Mainnet,
+            CanisterIdsPath::Localhost => IcNetwork::Localhost,
+            CanisterIdsPath::Testnet => IcNetwork::Testnet,
+            CanisterIdsPath::Mainnet => IcNetwork::Mainnet,
             CanisterIdsPath::CustomPath(_, network) => *network,
         }
     }
@@ -74,7 +74,7 @@ mod test {
     #[test]
     fn test_should_get_path_for_custom_path() {
         let path = PathBuf::from("/tmp/canister_ids.json");
-        let canister_ids_path = CanisterIdsPath::CustomPath(path.clone(), EvmNetwork::Localhost);
+        let canister_ids_path = CanisterIdsPath::CustomPath(path.clone(), IcNetwork::Localhost);
 
         assert_eq!(canister_ids_path.path(), path);
     }
