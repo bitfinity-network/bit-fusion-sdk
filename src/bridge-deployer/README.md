@@ -7,6 +7,7 @@ Bridge Deployer is a CLI tool for deploying and managing various types of bridge
 - Rust
 - Forge CLI Installed
 - dfx (only for **local** deployment)
+- Either an EVM canister or an EVM RPC URL
 
 ## Installation
 
