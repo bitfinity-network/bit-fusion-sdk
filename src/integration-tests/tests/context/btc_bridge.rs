@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str::FromStr as _;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
@@ -43,12 +42,11 @@ where
     pub admin_address: Address,
     pub context: Ctx,
     pub tip_height: AtomicU32,
-    pub token_id: Id256,
+    pub ckbtc_ledger_id: Id256,
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub btf_bridge_contract: Arc<RwLock<H160>>,
     pub wrapped_token: Arc<RwLock<H160>>,
-    btc_balances: Arc<RwLock<HashMap<Address, Amount>>>,
 }
 
 fn generate_wallet_name() -> String {
@@ -158,9 +156,9 @@ where
             .await
             .expect("failed to initialize btf bridge");
 
-        let token_id = Id256::from(&context.canisters().ckbtc_ledger());
+        let ckbtc_ledger_id = Id256::from(&context.canisters().ckbtc_ledger());
         let token = context
-            .create_wrapped_token(&wallet, &btf_bridge, token_id)
+            .create_wrapped_token(&wallet, &btf_bridge, ckbtc_ledger_id)
             .await
             .expect("failed to create wrapped token");
 
@@ -202,10 +200,9 @@ where
             wrapped_token: Arc::new(RwLock::new(token)),
             exit,
             miner: Arc::new(Mutex::new(Some(miner))),
-            token_id,
+            ckbtc_ledger_id,
             tip_height: AtomicU32::default(),
             btf_bridge_contract: Arc::new(RwLock::new(btf_bridge)),
-            btc_balances: Arc::default(),
         }
     }
 
@@ -388,11 +385,39 @@ where
 
         println!("btc transferred at {txid}");
 
-        // decrease amount
-        self.balance_decrease(&from_wallet.address, amount).await;
-        println!("balance decreased");
-
         self.btc_to_erc20(from, to, memo, nonce).await
+    }
+
+    /// Withdraw to the specified recipient
+    pub async fn withdraw_btc(
+        &self,
+        from: &Wallet<'_, SigningKey>,
+        recipient: &Address,
+        amount: Amount,
+    ) -> anyhow::Result<()> {
+        let token_address = self.wrapped_token.read().await.clone();
+
+        println!("Burning {amount} to {recipient}");
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
+
+        let client = self.context.evm_client(self.context.admin_name());
+        self.context
+            .burn_erc_20_tokens_raw(
+                &client,
+                from,
+                &token_address,
+                &self.ckbtc_ledger_id.0,
+                recipient.to_string().as_bytes().to_vec(),
+                &btf_bridge_contract,
+                amount.to_sat() as u128,
+                true,
+                None,
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to burn tokens: {e}"))?;
+
+        Ok(())
     }
 
     pub async fn mint_admin_wrapped_btc(
@@ -539,12 +564,9 @@ where
 
     /// Get the BTC balance of the given address
     pub async fn btc_balance(&self, address: &Address) -> Amount {
-        self.btc_balances
-            .read()
-            .await
-            .get(address)
-            .cloned()
-            .unwrap_or_default()
+        self.admin_btc_rpc_client
+            .btc_balance(address)
+            .expect("failed to get btc balance")
     }
 
     pub async fn get_funding_utxo(&self, to: &Address, amount: Amount) -> anyhow::Result<Utxo> {
@@ -566,9 +588,6 @@ where
         let utxo = self
             .admin_btc_rpc_client
             .get_utxo_by_address(&fund_tx, to)?;
-
-        // increment into balances
-        self.balance_increase(to, amount).await;
 
         Ok(utxo)
     }
@@ -595,18 +614,6 @@ where
                 miner.join().expect("Failed to join miner thread");
             }
         }
-    }
-
-    async fn balance_decrease(&self, address: &Address, amount: Amount) {
-        let mut lock = self.btc_balances.write().await;
-        let entry = lock.entry(address.clone()).or_default();
-        *entry = entry.checked_sub(amount).unwrap_or_default();
-    }
-
-    async fn balance_increase(&self, address: &Address, amount: Amount) {
-        let mut lock = self.btc_balances.write().await;
-        let entry = lock.entry(address.clone()).or_default();
-        *entry += amount;
     }
 
     /// Wait for the transaction to be confirmed by the EVM within a reasonable time frame
