@@ -13,8 +13,9 @@ use rand::Rng;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs, BtcWallet};
+use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs};
 use crate::context::TestContext;
+use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
 
@@ -156,7 +157,7 @@ where
 
     async fn new_user(&self, _wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
         // generate random address
-        let wallet = ctx::generate_btc_wallet();
+        let wallet = BtcWallet::new_random();
         // mint some tokens
         self.ctx
             .send_btc(&wallet.address, Amount::from_sat(10_000_000))

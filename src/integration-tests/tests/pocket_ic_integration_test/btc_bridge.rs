@@ -26,8 +26,9 @@ async fn btc_to_erc20_test() {
             .await
             .expect("Failed to create a wallet"),
     );
+    let my_eth_address = wallet.address().0.into();
 
-    ctx.mint_wrapped_btc(deposit_value, &wallet)
+    ctx.mint_admin_wrapped_btc(deposit_value, &wallet, &my_eth_address, 0)
         .await
         .expect("Mint failed");
 
@@ -39,7 +40,7 @@ async fn btc_to_erc20_test() {
             let ctx = ctx_t.clone();
             let wallet = wallet_t.clone();
             Box::pin(async move {
-                let balance = ctx.erc20_balance_of(&wallet).await?;
+                let balance = ctx.erc20_balance_of(&wallet, None).await?;
 
                 if balance > 0 {
                     Ok(balance)
@@ -150,7 +151,8 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
             let wallet = wallet_t.clone();
             Box::pin(async move {
                 let caller_eth_address = wallet.address().0.into();
-                ctx.btc_to_erc20(&wallet, &caller_eth_address).await
+                ctx.btc_to_erc20(&wallet, &caller_eth_address, [0; 32], 0)
+                    .await
             })
         },
         &ctx.context,
@@ -167,7 +169,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
             let ctx = ctx_t.clone();
             let wallet = wallet_t.clone();
             Box::pin(async move {
-                let balance = ctx.erc20_balance_of(&wallet).await?;
+                let balance = ctx.erc20_balance_of(&wallet, None).await?;
 
                 if balance == expected_balance {
                     Ok(balance)
@@ -227,10 +229,12 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
             .expect("Failed to get funding utxo");
 
         println!("Pushed tx from {deposit_address}: {utxo:?}");
+
+        ctx.wait_for_blocks(1).await;
     }
 
     for wallet in &wallets {
-        let caller_eth_address = wallet.address().0.into();
+        println!("making deposit for {}", wallet.address());
         // deposit
         let wallet_t = wallet.clone();
         let ctx_t = ctx.clone();
@@ -240,38 +244,38 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
                 let wallet = wallet_t.clone();
                 Box::pin(async move {
                     let caller_eth_address = wallet.address().0.into();
-                    ctx.btc_to_erc20(&wallet, &caller_eth_address).await
+                    ctx.btc_to_erc20(&wallet, &caller_eth_address, [0; 32], 0)
+                        .await
                 })
             },
             &ctx.context,
-            Duration::from_secs(60),
+            Duration::from_secs(120),
         )
         .await;
-        assert!(ctx.btc_to_erc20(wallet, &caller_eth_address).await.is_ok());
 
         let ctx_t = ctx.clone();
         let wallet_t = wallet.clone();
-        let minted = block_until_succeeds(
+
+        let expected_balance = (deposit_value - KYT_FEE - CKBTC_LEDGER_FEE) as u128;
+
+        block_until_succeeds(
             move || {
                 let ctx = ctx_t.clone();
                 let wallet = wallet_t.clone();
                 Box::pin(async move {
-                    let balance = ctx.erc20_balance_of(&wallet).await?;
+                    let balance = ctx.erc20_balance_of(&wallet, None).await?;
 
-                    if balance > 0 {
+                    if balance == expected_balance {
                         Ok(balance)
                     } else {
-                        anyhow::bail!("Balance is 0")
+                        anyhow::bail!("Balance is {balance}; expected: {expected_balance}")
                     }
                 })
             },
             &ctx.context,
-            Duration::from_secs(60),
+            Duration::from_secs(120),
         )
         .await;
-
-        let expected_balance = (deposit_value - KYT_FEE - CKBTC_LEDGER_FEE) as u128;
-        assert_eq!(minted, expected_balance);
     }
 
     ctx.stop().await;
