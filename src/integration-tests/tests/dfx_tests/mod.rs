@@ -17,6 +17,7 @@ use crate::utils::error::{Result, TestError};
 
 mod brc20_bridge;
 mod bridge_deployer;
+mod btc_bridge;
 mod rune_bridge;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
@@ -195,9 +196,14 @@ impl TestContext for DfxTestContext {
     async fn create_canister_with_id_and_controller(
         &self,
         _id: Principal,
-        _owner: Principal,
+        owner: Principal,
     ) -> Result<Principal> {
-        unimplemented!()
+        let wallet = Canister::new_wallet(&self.max, ADMIN).unwrap();
+        let principal = wallet
+            .create_canister(INIT_CANISTER_CYCLES, Some(vec![owner]))
+            .await?;
+
+        Ok(principal)
     }
 
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {

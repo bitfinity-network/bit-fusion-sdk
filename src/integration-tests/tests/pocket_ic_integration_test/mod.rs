@@ -159,6 +159,10 @@ impl TestContext for PocketIcTestContext {
         }
     }
 
+    fn is_pocket_ic(&self) -> bool {
+        true
+    }
+
     fn client(&self, canister: Principal, caller: &str) -> Self::Client {
         let caller_principal = Self::principal_of(caller);
         PocketIcClient::from_client(self.client.clone(), canister, caller_principal)

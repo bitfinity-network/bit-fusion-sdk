@@ -602,7 +602,11 @@ where
             .await
             .expect("Failed to stop btc bridge canister");
         self.context
-            .stop_canister(self.context.canisters().bitcoin())
+            .stop_canister(
+                self.context
+                    .canisters()
+                    .bitcoin(self.context.is_pocket_ic()),
+            )
             .await
             .expect("Failed to stop bitcoin canister");
 
