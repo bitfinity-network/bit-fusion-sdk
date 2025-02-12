@@ -158,7 +158,7 @@ where
         }
 
         // convert amount to satoshi
-        let amount = Amount::from_int_btc(amount);
+        let amount = Amount::from_sat(amount);
         let nonce = to_user.next_nonce();
 
         let from_user = self.user_wallet(&info.from).await?;
@@ -225,11 +225,20 @@ where
 
     async fn before_withdraw(
         &self,
-        _token_idx: usize,
-        _user_id: Self::UserId,
-        _user_wallet: &OwnedWallet,
-        _amount: did::U256,
+        token_idx: usize,
+        user_id: Self::UserId,
+        user_wallet: &OwnedWallet,
+        amount: did::U256,
     ) -> Result<()> {
+        println!(
+            "Before withdraw for token {token_idx} and user {user_id}; user {}; amount {}",
+            user_wallet.address(),
+            amount
+        );
+        println!(
+            "Before wallet: base token should be {:?}",
+            self.ctx.ckbtc_ledger_id.0
+        );
         Ok(())
     }
 

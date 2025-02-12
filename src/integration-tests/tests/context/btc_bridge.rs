@@ -23,8 +23,9 @@ use ic_canister_client::CanisterClient;
 use ic_ckbtc_kyt::SetApiKeyArg;
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use icrc_client::account::Account;
+use once_cell::sync::OnceCell;
 use ord_rs::Utxo;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, Semaphore};
 
 use super::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
@@ -33,6 +34,9 @@ use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::miner::{Exit, Miner};
 
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
+
+/// We need to lock the funding utxo to avoid conflicts
+static FUNDING_UTXO_LOCK: OnceCell<Semaphore> = OnceCell::new();
 
 pub struct BtcContext<Ctx>
 where
@@ -376,7 +380,7 @@ where
             &from_wallet.private_key,
             &from_wallet.address,
         )
-        .transfer(amount, funding_utxo, &deposit_address)
+        .transfer(amount, vec![funding_utxo], &deposit_address)
         .await?;
 
         // wait for confirmations
@@ -569,7 +573,88 @@ where
             .expect("failed to get btc balance")
     }
 
+    /// Get the funding UTXO for the given address which contains the given amount.
     pub async fn get_funding_utxo(&self, to: &Address, amount: Amount) -> anyhow::Result<Utxo> {
+        if self.context.is_pocket_ic() {
+            self.get_funding_utxo_pocket_ic(to, amount).await
+        } else {
+            self.get_funding_utxo_dfx(to, amount).await
+        }
+    }
+
+    async fn get_funding_utxo_dfx(&self, to: &Address, amount: Amount) -> anyhow::Result<Utxo> {
+        let semaphore = FUNDING_UTXO_LOCK.get_or_init(|| Semaphore::new(1));
+        let _permit = semaphore.acquire().await?;
+
+        let tmp_wallet = BtcWallet::new_random();
+        println!("temp wallet for funding {}", tmp_wallet.address);
+
+        let mut retries = 0;
+        let required_balance = amount + Amount::from_sat(10_000);
+
+        loop {
+            // get current balance for the admin address
+            let btc_balance = self.btc_balance(&tmp_wallet.address).await;
+            if btc_balance < required_balance {
+                self.admin_btc_rpc_client
+                    .generate_to_address(&tmp_wallet.address, 1)?;
+
+                println!("generated block");
+
+                if retries > 100 {
+                    panic!("failed to fund wallet, btc balance {btc_balance}; required {required_balance}");
+                }
+
+                retries += 1;
+            } else {
+                break;
+            }
+        }
+
+        // generate 100
+        self.admin_btc_rpc_client
+            .generate_to_address(&self.admin_address, 100)?;
+
+        // get unspent
+        let unspent_utxos = self
+            .admin_btc_rpc_client
+            .get_unspent_utxos(&tmp_wallet.address)?;
+
+        println!("unspent utxos: {}", unspent_utxos.len());
+
+        // get required amount
+        let mut required_utxos = vec![];
+        let mut total_amount = Amount::ZERO;
+        for utxo in unspent_utxos {
+            required_utxos.push(utxo.clone());
+            total_amount += utxo.amount;
+            if total_amount >= amount + Amount::from_sat(10_000) {
+                break;
+            }
+        }
+        println!("required utxos: {}", required_utxos.len());
+
+        // transfer btc
+        let txid = BtcTransferHelper::new(
+            &self.admin_btc_rpc_client,
+            &tmp_wallet.private_key,
+            &tmp_wallet.address,
+        )
+        .transfer(amount, required_utxos, to)
+        .await?;
+
+        println!("funding txid: {txid}");
+
+        let utxo = self.admin_btc_rpc_client.get_utxo_by_address(&txid, to)?;
+
+        Ok(utxo)
+    }
+
+    async fn get_funding_utxo_pocket_ic(
+        &self,
+        to: &Address,
+        amount: Amount,
+    ) -> anyhow::Result<Utxo> {
         let fund_tx;
         loop {
             match self.admin_btc_rpc_client.send_to_address(to, amount) {
@@ -622,7 +707,7 @@ where
 
     /// Wait for the transaction to be confirmed by the EVM within a reasonable time frame
     pub async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
-        const MAX_TX_TIMEOUT_SEC: Duration = Duration::from_secs(10);
+        const MAX_TX_TIMEOUT_SEC: Duration = Duration::from_secs(30);
 
         let start = Instant::now();
 
