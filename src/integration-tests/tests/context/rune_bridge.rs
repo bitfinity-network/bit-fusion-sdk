@@ -393,16 +393,30 @@ where
     }
 
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<Txid> {
-        let txid = self
-            .runes
-            .admin_btc_rpc_client
-            .send_to_address(btc_address, amount)
-            .expect("failed to send btc");
+        let fund_tx;
+        loop {
+            match self
+                .runes
+                .admin_btc_rpc_client
+                .send_to_address(btc_address, amount)
+            {
+                Ok(tx) => {
+                    fund_tx = tx;
+                    break;
+                }
+                Err(err) => {
+                    println!("Failed to send btc: {err}");
+                    self.runes
+                        .admin_btc_rpc_client
+                        .generate_to_address(&self.runes.admin_address, 1)?;
+                }
+            }
+        }
 
-        self.wait_for_confirmations(&txid, REQUIRED_CONFIRMATIONS)
+        self.wait_for_confirmations(&fund_tx, REQUIRED_CONFIRMATIONS)
             .await?;
 
-        Ok(txid)
+        Ok(fund_tx)
     }
 
     async fn wait_for_confirmations(

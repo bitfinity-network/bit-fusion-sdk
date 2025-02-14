@@ -684,18 +684,35 @@ where
     }
 
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<()> {
-        let txid = self
-            .brc20
-            .admin_btc_rpc_client
-            .send_to_address(btc_address, amount)
-            .expect("failed to send btc");
+        let fund_tx;
+        loop {
+            match self
+                .brc20
+                .admin_btc_rpc_client
+                .send_to_address(btc_address, amount)
+            {
+                Ok(tx) => {
+                    fund_tx = tx;
+                    break;
+                }
+                Err(err) => {
+                    println!("Failed to send btc: {err}");
+                    self.brc20
+                        .admin_btc_rpc_client
+                        .generate_to_address(&self.brc20.admin_address, 1)?;
+                }
+            }
+        }
 
         let brc20_helper = Brc20Helper::new(
             &self.brc20.admin_btc_rpc_client,
             &self.brc20.ord_wallet.private_key,
             &self.brc20.ord_wallet.address,
         );
-        brc20_helper.wait_for_confirmations(&txid, 6).await
+
+        brc20_helper.wait_for_confirmations(&fund_tx, 6).await?;
+
+        Ok(())
     }
 
     pub async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
