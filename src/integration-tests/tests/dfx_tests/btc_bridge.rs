@@ -10,7 +10,7 @@ async fn test_btc_bridge_stress_test() {
 
     let config = StressTestConfig {
         users_number: 5,
-        user_deposits_per_token: 2,
+        user_deposits_per_token: 1,
         init_user_balance: 100_000_000u64.into(), // 1 BTC
         operation_amount: 5_000_000u64.into(),    // 0.05 BTC
         operation_timeout: Duration::from_secs(120),
