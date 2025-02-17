@@ -6,8 +6,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
-use bitcoin::key::Secp256k1;
-use bitcoin::{Address, Amount, PrivateKey, Txid};
+use bitcoin::{Address, Amount, Txid};
 use brc20_bridge::interface::{DepositError, GetAddressError};
 use brc20_bridge::ops::Brc20DepositRequestData;
 use bridge_client::BridgeCanisterClient;
@@ -31,6 +30,7 @@ use tokio::time::Instant;
 use crate::context::TestContext;
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
+use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
@@ -57,31 +57,6 @@ pub struct Brc20Wallet {
     pub admin_btc_rpc_client: Arc<BitcoinRpcClient>,
     pub ord_wallet: BtcWallet,
     pub brc20_tokens: HashSet<Brc20Tick>,
-}
-
-#[derive(Clone)]
-pub struct BtcWallet {
-    pub private_key: PrivateKey,
-    pub address: Address,
-}
-
-pub fn generate_btc_wallet() -> BtcWallet {
-    use rand::Rng as _;
-    let entropy = rand::thread_rng().gen::<[u8; 16]>();
-    let mnemonic = bip39::Mnemonic::from_entropy(&entropy).unwrap();
-
-    let seed = mnemonic.to_seed("");
-
-    let private_key =
-        bitcoin::PrivateKey::from_slice(&seed[..32], bitcoin::Network::Regtest).unwrap();
-    let public_key = private_key.public_key(&Secp256k1::new());
-
-    let address = Address::p2wpkh(&public_key, bitcoin::Network::Regtest).unwrap();
-
-    BtcWallet {
-        private_key,
-        address,
-    }
 }
 
 pub fn generate_brc20_tick() -> Brc20Tick {
@@ -129,7 +104,7 @@ async fn brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20W
     //admin_btc_rpc_client.generate_to_address(&admin_address, 101)?;
 
     // create ord wallet
-    let ord_wallet = generate_btc_wallet();
+    let ord_wallet = BtcWallet::new_random();
 
     let mut brc20_tokens = HashSet::new();
 

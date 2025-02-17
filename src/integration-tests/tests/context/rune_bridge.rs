@@ -6,8 +6,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use alloy_sol_types::SolCall;
-use bitcoin::key::Secp256k1;
-use bitcoin::{Address, Amount, PrivateKey, Txid};
+use bitcoin::{Address, Amount, Txid};
 use bridge_client::BridgeCanisterClient;
 use bridge_did::event_data::MinterNotificationType;
 use bridge_did::id256::Id256;
@@ -31,6 +30,7 @@ use tokio::time::Instant;
 
 use crate::context::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
+use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::ord_client::OrdClient;
 use crate::utils::rune_helper::RuneHelper;
@@ -89,7 +89,7 @@ async fn rune_setup(runes_to_etch: &[String]) -> anyhow::Result<RuneWallet> {
     let admin_address = admin_btc_rpc_client.get_new_address()?;
 
     // create ord wallet
-    let ord_wallet = generate_btc_wallet();
+    let ord_wallet = BtcWallet::new_random();
 
     let mut runes = HashMap::new();
 
@@ -817,30 +817,5 @@ where
                 miner.join().expect("Failed to join miner thread");
             }
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct BtcWallet {
-    pub private_key: PrivateKey,
-    pub address: Address,
-}
-
-pub fn generate_btc_wallet() -> BtcWallet {
-    use rand::Rng as _;
-    let entropy = rand::thread_rng().gen::<[u8; 16]>();
-    let mnemonic = bip39::Mnemonic::from_entropy(&entropy).unwrap();
-
-    let seed = mnemonic.to_seed("");
-
-    let private_key =
-        bitcoin::PrivateKey::from_slice(&seed[..32], bitcoin::Network::Regtest).unwrap();
-    let public_key = private_key.public_key(&Secp256k1::new());
-
-    let address = Address::p2wpkh(&public_key, bitcoin::Network::Regtest).unwrap();
-
-    BtcWallet {
-        private_key,
-        address,
     }
 }
