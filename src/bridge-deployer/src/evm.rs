@@ -7,15 +7,14 @@ use candid::Principal;
 
 use crate::contracts::IcNetwork;
 
-const MAINNET_PRINCIPAL: &str = "i3jjb-wqaaa-aaaaa-qadrq-cai";
-const TESTNET_PRINCIPAL: &str = "4fe7g-7iaaa-aaaak-aegcq-cai";
+pub const MAINNET_PRINCIPAL: &str = "i3jjb-wqaaa-aaaaa-qadrq-cai";
+pub const TESTNET_PRINCIPAL: &str = "4fe7g-7iaaa-aaaak-aegcq-cai";
 
 /// Returns the IC host based on the EVM network.
 pub fn ic_host(ic_network: IcNetwork) -> String {
     match ic_network {
         IcNetwork::Localhost => format!("http://127.0.0.1:{}", dfx_replica_port()),
-        IcNetwork::Mainnet => format!("https://{MAINNET_PRINCIPAL}.ic0.app"),
-        IcNetwork::Testnet => format!("https://{TESTNET_PRINCIPAL}.ic0.app"),
+        IcNetwork::Ic => format!("https://{MAINNET_PRINCIPAL}.ic0.app"),
     }
 }
 
@@ -42,12 +41,7 @@ pub fn evm_principal_or_default(
         Some(principal) => principal,
         None => match evm_network {
             IcNetwork::Localhost => local_evm_principal(),
-            IcNetwork::Mainnet => {
-                Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal")
-            }
-            IcNetwork::Testnet => {
-                Principal::from_text(TESTNET_PRINCIPAL).expect("Invalid principal")
-            }
+            IcNetwork::Ic => Principal::from_text(MAINNET_PRINCIPAL).expect("Invalid principal"),
         },
     }
 }

@@ -27,7 +27,7 @@ impl CanisterPrincipals {
         debug!("Setting canister principal {principal} for network: {network:?}");
         match network {
             IcNetwork::Localhost => self.local = Some(principal),
-            IcNetwork::Mainnet | IcNetwork::Testnet => self.ic = Some(principal),
+            IcNetwork::Ic => self.ic = Some(principal),
         }
     }
 
@@ -35,7 +35,7 @@ impl CanisterPrincipals {
     pub fn get(&self, network: IcNetwork) -> Option<&Principal> {
         match network {
             IcNetwork::Localhost => self.local.as_ref(),
-            IcNetwork::Mainnet | IcNetwork::Testnet => self.ic.as_ref(),
+            IcNetwork::Ic => self.ic.as_ref(),
         }
     }
 }
@@ -55,12 +55,7 @@ mod test {
         assert_eq!(canister_principal.ic, None);
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipals::new(principal, IcNetwork::Testnet);
-        assert_eq!(canister_principal.local, None);
-        assert_eq!(canister_principal.ic, Some(principal));
-
-        let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipals::new(principal, IcNetwork::Mainnet);
+        let canister_principal = CanisterPrincipals::new(principal, IcNetwork::Ic);
         assert_eq!(canister_principal.local, None);
         assert_eq!(canister_principal.ic, Some(principal));
     }
@@ -71,10 +66,6 @@ mod test {
         let mut canister_principal = CanisterPrincipals::default();
         canister_principal.set(principal, IcNetwork::Localhost);
 
-        let other_principal = Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap();
-        canister_principal.set(other_principal, IcNetwork::Testnet);
-
         assert_eq!(canister_principal.local, Some(principal));
-        assert_eq!(canister_principal.ic, Some(other_principal));
     }
 }

@@ -58,11 +58,11 @@ mod test {
         db.set(
             CanisterType::Brc20,
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap(),
-            IcNetwork::Mainnet,
+            IcNetwork::Ic,
         );
 
         assert_eq!(
-            db.get(CanisterType::Brc20, IcNetwork::Mainnet).unwrap(),
+            db.get(CanisterType::Brc20, IcNetwork::Ic).unwrap(),
             Principal::from_text("v2uir-uiaaa-aaaal-ai5ca-cai").unwrap()
         );
 

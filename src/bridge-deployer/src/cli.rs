@@ -1,8 +1,9 @@
+mod evm_canister;
+
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use anyhow::bail;
-use candid::Principal;
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
 use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
@@ -14,6 +15,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
 
+pub use self::evm_canister::EvmCanister;
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
 use crate::contracts::IcNetwork;
@@ -46,10 +48,10 @@ pub struct Cli {
     #[arg(
         long,
         conflicts_with = "evm_rpc",
-        value_name = "PRINCIPAL",
+        value_name = "mainnet|testnet|PRINCIPAL",
         help_heading = "EVM Link Args"
     )]
-    pub evm_principal: Option<Principal>,
+    pub evm_canister: Option<EvmCanister>,
 
     /// Optional EVM RPC endpoint to use. To be used in case you're not deploying on the EVM principal.
     #[arg(
@@ -107,7 +109,7 @@ impl Cli {
 
         let Cli {
             private_key,
-            evm_principal,
+            evm_canister,
             ic_network,
             evm_rpc,
             command,
@@ -116,7 +118,8 @@ impl Cli {
         } = cli;
 
         // derive arguments
-        let evm_link = crate::evm::evm_link(evm_rpc, ic_network, evm_principal);
+        let evm_link =
+            crate::evm::evm_link(evm_rpc, ic_network, evm_canister.map(|x| x.principal()));
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
         debug!("EVM Link: {evm_link:?}",);

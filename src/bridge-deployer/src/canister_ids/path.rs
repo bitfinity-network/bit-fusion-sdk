@@ -3,15 +3,13 @@ use std::path::PathBuf;
 use crate::contracts::IcNetwork;
 
 const LOCAL_DIR: &str = ".dfx/local/";
-const TESTNET_DIR: &str = ".dfx/testnet/";
 const FILENAME: &str = "canister_ids.json";
 
 /// A struct to represent the path of the `canister_ids.json` file.
 #[derive(Debug, Clone)]
 pub enum CanisterIdsPath {
     Localhost,
-    Testnet,
-    Mainnet,
+    Ic,
     /// Custom path with network type.
     CustomPath(PathBuf, IcNetwork),
 }
@@ -29,14 +27,8 @@ impl CanisterIdsPath {
     fn default_path(&self) -> PathBuf {
         let mut path = PathBuf::from("./");
 
-        match self {
-            Self::Localhost => {
-                path.push(LOCAL_DIR);
-            }
-            Self::Testnet => {
-                path.push(TESTNET_DIR);
-            }
-            _ => {}
+        if let Self::Localhost = self {
+            path.push(LOCAL_DIR);
         };
 
         path.push(FILENAME);
@@ -49,8 +41,7 @@ impl From<IcNetwork> for CanisterIdsPath {
     fn from(network: IcNetwork) -> Self {
         match network {
             IcNetwork::Localhost => Self::Localhost,
-            IcNetwork::Testnet => Self::Testnet,
-            IcNetwork::Mainnet => Self::Mainnet,
+            IcNetwork::Ic => Self::Ic,
         }
     }
 }
@@ -59,8 +50,7 @@ impl From<&CanisterIdsPath> for IcNetwork {
     fn from(path: &CanisterIdsPath) -> Self {
         match path {
             CanisterIdsPath::Localhost => IcNetwork::Localhost,
-            CanisterIdsPath::Testnet => IcNetwork::Testnet,
-            CanisterIdsPath::Mainnet => IcNetwork::Mainnet,
+            CanisterIdsPath::Ic => IcNetwork::Ic,
             CanisterIdsPath::CustomPath(_, network) => *network,
         }
     }
@@ -90,18 +80,8 @@ mod test {
     }
 
     #[test]
-    fn test_should_get_path_for_testnet() {
-        let canister_ids_path = CanisterIdsPath::Testnet;
-        let path = canister_ids_path.path();
-
-        let expected = PathBuf::from("./").join(TESTNET_DIR).join(FILENAME);
-
-        assert_eq!(path, expected);
-    }
-
-    #[test]
     fn test_should_get_path_for_mainnet() {
-        let canister_ids_path = CanisterIdsPath::Mainnet;
+        let canister_ids_path = CanisterIdsPath::Ic;
         let path = canister_ids_path.path();
 
         let expected = PathBuf::from("./").join(FILENAME);

@@ -64,7 +64,7 @@ Command to deploy a bridge canister connecting the bridge to the EVM canister:
   --ic-network localhost \
   --private-key <PRIVATE_KEY> \
   --identity path/to/identity.pem \
-  --evm-principal <EVM_PRINCIPAL> \
+  --evm-canister <EVM_PRINCIPAL|mainnet|testnet> \
   deploy \
   --wasm path/to/rune_bridge.wasm \
   --wallet-canister <WALLET_CANISTER> \
@@ -79,28 +79,7 @@ Command to deploy a bridge canister connecting the bridge to the EVM canister:
   --indexer-consensus-threshold 3
 ```
 
-Command to deploy a bridge canister connecting the bridge to a certain EVM node with RPC:
-
-```bash
-./bridge-deployer
-  -vvv \
-  --ic-network localhost \
-  --private-key <PRIVATE_KEY> \
-  --identity path/to/identity.pem \
-  --evm-rpc <EVM_RPC> \
-  deploy \
-  --wasm path/to/rune_bridge.wasm \
-  --wallet-canister <WALLET_CANISTER> \
-  rune \
-  --owner <ADMIN_PRINCIPAL> \
-  --min-confirmations 6 \
-  --indexer-urls <https://indexer1.com,https://indexer2.com,https://indexer3.com> \
-  --deposit-fee 1000000 \
-  --mempool-timeout 3600 \
-  --signing-key-id dfx \
-  --bitcoin-network <bitcoin_network> \
-  --indexer-consensus-threshold 3
-```
+If you want to connect the bridge to a custom EVM node with RPC you can use the `--evm-rpc` argument in place of `--evm-canister`.
 
 For more detailed information on each command and its options, use the `--help` flag:
 

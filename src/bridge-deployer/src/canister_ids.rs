@@ -107,7 +107,7 @@ mod test {
         // deserialize
         let canister_ids = CanisterIds::read(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
-            IcNetwork::Mainnet,
+            IcNetwork::Ic,
         ))
         .unwrap();
 
@@ -175,7 +175,7 @@ mod test {
         );
 
         // set for mainnet
-        canister_ids.path = CanisterIdsPath::Mainnet;
+        canister_ids.path = CanisterIdsPath::Ic;
 
         canister_ids.set(
             CanisterType::Brc20,

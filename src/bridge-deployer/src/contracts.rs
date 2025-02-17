@@ -19,7 +19,7 @@ use ethers_core::types::{BlockNumber, H160};
 use ethers_core::utils::hex::ToHexExt;
 use tracing::{debug, error, info};
 
-use crate::evm::dfx_webserver_port;
+use crate::evm::{dfx_webserver_port, MAINNET_PRINCIPAL, TESTNET_PRINCIPAL};
 
 const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
 
@@ -45,8 +45,7 @@ impl std::fmt::Display for NetworkConfig {
 
         let network = match self.ic_network {
             IcNetwork::Localhost => "localhost",
-            IcNetwork::Testnet => "testnet",
-            IcNetwork::Mainnet => "mainnet",
+            IcNetwork::Ic => "ic",
         };
 
         write!(f, "{network}")
@@ -65,9 +64,8 @@ impl From<IcNetwork> for NetworkConfig {
 #[derive(Debug, Clone, Copy, strum::Display, ValueEnum, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum IcNetwork {
+    Ic,
     Localhost,
-    Testnet,
-    Mainnet,
 }
 
 pub struct SolidityContractDeployer<'a> {
@@ -117,8 +115,19 @@ impl SolidityContractDeployer<'_> {
                     "http://127.0.0.1:{dfx_port}/?canisterId={principal}",
                     dfx_port = dfx_webserver_port(),
                 ),
-                IcNetwork::Testnet => TESTNET_URL.to_string(),
-                IcNetwork::Mainnet => MAINNET_URL.to_string(),
+                IcNetwork::Ic
+                    if principal
+                        == &Principal::from_text(MAINNET_PRINCIPAL).expect("invalid principal") =>
+                {
+                    MAINNET_URL.to_string()
+                }
+                IcNetwork::Ic
+                    if principal
+                        == &Principal::from_text(TESTNET_PRINCIPAL).expect("invalid principal") =>
+                {
+                    TESTNET_URL.to_string()
+                }
+                _ => panic!("Invalid principal {principal}"),
             }
         }
     }
