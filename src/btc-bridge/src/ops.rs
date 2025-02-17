@@ -342,15 +342,21 @@ impl BtcBridgeOpImpl {
         };
 
         let amount = event.amount.0.as_u64();
-        log::trace!("Transferring {amount} ckBTC to {address}");
 
         let ck_btc_ledger = state.borrow().ck_btc_ledger();
         let ck_btc_minter = state.borrow().ck_btc_minter();
         let fee = state.borrow().ck_btc_ledger_fee();
+        log::trace!("Transferring {amount} ckBTC to {address} with fee {fee}");
+
         let account = Self::get_ckbtc_withdrawal_account(ck_btc_minter).await?;
 
         // ICRC1 takes fee on top of the amount
-        let to_transfer = amount - fee;
+        let to_transfer = amount.checked_sub(fee).unwrap_or_default();
+
+        if to_transfer == 0 {
+            log::error!("Value too small: {amount} ckBTC");
+            return Err(BtcBridgeError::ValueTooSmall.into());
+        }
         Self::transfer_ckbtc_to_minter(ck_btc_ledger, account, to_transfer, fee).await?;
 
         Self::request_btc_withdrawal(ck_btc_minter, address.to_string(), to_transfer).await?;

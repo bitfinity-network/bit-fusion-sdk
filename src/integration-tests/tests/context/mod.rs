@@ -88,6 +88,11 @@ pub trait TestContext {
         EvmLink::Ic(self.canisters().external_evm())
     }
 
+    /// Returns whether is a pocket IC instance.
+    fn is_pocket_ic(&self) -> bool {
+        false
+    }
+
     /// Returns client for the evm canister.
     fn evm_client(&self, caller: &str) -> EvmCanisterClient<Self::Client> {
         EvmCanisterClient::new(self.client(self.canisters().evm(), caller))
@@ -730,6 +735,7 @@ pub trait TestContext {
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
         let hash = evm_client.send_raw_transaction(call_tx).await??;
+        println!("tx hash: {hash}");
 
         Ok(hash)
     }
@@ -1190,28 +1196,44 @@ pub trait TestContext {
                 let nns_root_canister = Principal::from_text(NNS_ROOT_CANISTER_ID)
                     .expect("Failed to parse NNS_ROOT_CANISTER_ID");
 
-                let actual_canister_id = self
-                    .create_canister_with_id_and_controller(
-                        self.canisters().bitcoin(),
-                        nns_root_canister,
-                    )
-                    .await
-                    .unwrap();
-                assert_eq!(actual_canister_id, self.canisters().bitcoin());
+                if self.is_pocket_ic() {
+                    let actual_canister_id = self
+                        .create_canister_with_id_and_controller(
+                            self.canisters().bitcoin(self.is_pocket_ic()),
+                            nns_root_canister,
+                        )
+                        .await
+                        .unwrap();
+                    assert_eq!(
+                        actual_canister_id,
+                        self.canisters().bitcoin(self.is_pocket_ic())
+                    );
+                }
 
                 let btc_wasm = CanisterType::Bitcoin.default_canister_wasm().await;
                 let args = ic_btc_interface::Config {
                     network: ic_btc_interface::Network::Regtest,
                     ..Default::default()
                 };
-                self.install_canister_with_sender(
-                    self.canisters().bitcoin(),
-                    btc_wasm,
-                    (&args,),
-                    nns_root_canister,
-                )
-                .await
-                .expect("Failed to install Bitcoin canister");
+
+                if self.is_pocket_ic() {
+                    self.install_canister_with_sender(
+                        self.canisters().bitcoin(self.is_pocket_ic()),
+                        btc_wasm,
+                        (&args,),
+                        nns_root_canister,
+                    )
+                    .await
+                    .expect("Failed to install Bitcoin canister");
+                } else {
+                    self.install_canister(
+                        self.canisters().bitcoin(self.is_pocket_ic()),
+                        btc_wasm,
+                        (&args,),
+                    )
+                    .await
+                    .expect("Failed to install Bitcoin canister");
+                }
             }
             CanisterType::Kyt => {
                 println!(
@@ -1644,8 +1666,15 @@ impl TestCanisters {
             .expect("ckBTC minter canister should be initialized (see `TestContext::new()`)")
     }
 
-    pub fn bitcoin(&self) -> Principal {
-        Principal::from_text(BITCOIN_CANISTER_ID).expect("bitcoin canister id is invalid")
+    pub fn bitcoin(&self, pocket_ic: bool) -> Principal {
+        if pocket_ic {
+            Principal::from_text(BITCOIN_CANISTER_ID).expect("bitcoin canister id is invalid")
+        } else {
+            self.0
+                .get(&CanisterType::Bitcoin)
+                .cloned()
+                .expect("bitcoin canister should be initialized (see `TestContext::new()`)")
+        }
     }
 
     pub fn ckbtc_ledger(&self) -> Principal {

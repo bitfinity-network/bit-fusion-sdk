@@ -1,6 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 pub mod brc20;
+pub mod btc;
 pub mod erc20;
 pub mod icrc;
 
@@ -450,10 +451,14 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
         let token_id = self.base_tokens.ids()[token_idx].clone();
         let base_token_id: Id256 = self.base_tokens.token_id256(token_id);
 
+        println!("withdraw:: base token id: {base_token_id:?}; amount {amount}");
+
         let user_id = self
             .base_tokens
             .user_id(self.users[user_idx].base_id.clone())
             .await;
+
+        println!("withdraw:: user_id {user_id:?}");
 
         self.base_tokens
             .before_withdraw(

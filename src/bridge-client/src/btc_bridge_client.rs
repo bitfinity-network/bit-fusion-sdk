@@ -2,7 +2,7 @@ use bridge_did::error::BTFResult;
 use bridge_did::init::btc::WrappedTokenConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
-use bridge_did::operations::Brc20BridgeOp;
+use bridge_did::operations::BtcBridgeOp;
 use bridge_did::order::{SignedMintOrder, SignedOrders};
 use bridge_utils::common::Pagination;
 use did::H160;
@@ -40,7 +40,7 @@ impl<C: CanisterClient> BtcBridgeClient<C> {
         wallet_address: &H160,
         min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
-    ) -> CanisterClientResult<Vec<(OperationId, Brc20BridgeOp)>> {
+    ) -> CanisterClientResult<Vec<(OperationId, BtcBridgeOp)>> {
         self.client
             .query(
                 "get_operations_list",
@@ -73,7 +73,7 @@ impl<C: CanisterClient> BtcBridgeClient<C> {
     pub async fn get_operation_log(
         &self,
         operation_id: OperationId,
-    ) -> CanisterClientResult<Option<OperationLog<Brc20BridgeOp>>> {
+    ) -> CanisterClientResult<Option<OperationLog<BtcBridgeOp>>> {
         self.client
             .query("get_operation_log", (operation_id,))
             .await
@@ -83,7 +83,7 @@ impl<C: CanisterClient> BtcBridgeClient<C> {
         &self,
         memo: Memo,
         user_id: &H160,
-    ) -> CanisterClientResult<Option<(OperationId, Brc20BridgeOp)>> {
+    ) -> CanisterClientResult<Option<(OperationId, BtcBridgeOp)>> {
         self.client
             .query("get_operation_by_memo_and_user", (memo, user_id))
             .await

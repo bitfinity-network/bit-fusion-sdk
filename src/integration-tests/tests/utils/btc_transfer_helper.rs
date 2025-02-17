@@ -31,19 +31,20 @@ impl<'a> BtcTransferHelper<'a> {
         }
     }
 
-    /// Deploy BRC20 token
+    /// Transfer utxos to the provided address
     pub async fn transfer(
         &self,
         amount: Amount,
-        input: Utxo,
+        inputs: Vec<Utxo>,
         to: &Address,
     ) -> anyhow::Result<Txid> {
+        let total_amount: Amount = inputs.iter().map(|input| input.amount).sum();
+
         println!(
             "BTC transfer amount: {}; Input amount {}",
-            amount, input.amount
+            amount, total_amount
         );
-        let leftovers = input.amount - amount - Amount::from_sat(1000);
-        let inputs = vec![input];
+        let leftovers = total_amount - amount - (Amount::from_sat(1000) * inputs.len() as u64);
 
         let tx_in = inputs
             .iter()
