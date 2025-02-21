@@ -35,7 +35,7 @@ The general syntax for using the Bridge Deployer is:
 
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
-- `--ic-network <IC_NETWORK>`: IC network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
+- `--bridge-network <IC_NETWORK>`: IC network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
 - `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided)
 - `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge to communicate with a specific EVM network (must be used if `evm-principal` is not provided)
 - `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
@@ -61,7 +61,7 @@ Command to deploy a bridge canister connecting the bridge to the EVM canister:
 ```bash
 ./bridge-deployer
   -vvv \
-  --ic-network localhost \
+  --bridge-network localhost \
   --private-key <PRIVATE_KEY> \
   --identity path/to/identity.pem \
   --evm-canister <EVM_PRINCIPAL|mainnet|testnet> \
@@ -111,7 +111,7 @@ Note: You need to provide the canister arguments for the bridge type you are rei
 
 ```bash
 bridge-deployer -vvv \
-  --ic-network mainnet \
+  --bridge-network mainnet \
   --identity <IDENTITY_PATH> \
   deploy \
   --wasm ./icrc_bridge.wasm \

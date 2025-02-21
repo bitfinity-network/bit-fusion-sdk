@@ -40,9 +40,9 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// IC network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
-    #[arg(long, value_name = "IC_NETWORK", default_value = "localhost")]
-    ic_network: IcNetwork,
+    /// Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
+    #[arg(long, value_name = "BRIDGE_NETWORK", default_value = "localhost")]
+    bridge_network: IcNetwork,
 
     /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
     #[arg(
@@ -110,7 +110,7 @@ impl Cli {
         let Cli {
             private_key,
             evm_canister,
-            ic_network,
+            bridge_network: ic_network,
             evm_rpc,
             command,
             canister_ids,

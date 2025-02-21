@@ -1,5 +1,5 @@
 ```
-$ bridge-deployer -v --ic-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $ERC20_BRIDGE_WASM_PATH --wallet-canister $WALLET_CANISTER erc20 --base-evm-principal $EVM_PRINCIPAL --signing-key-id dfx --enable-console --log-filter trace
+$ bridge-deployer -v --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $ERC20_BRIDGE_WASM_PATH --wallet-canister $WALLET_CANISTER erc20 --base-evm-principal $EVM_PRINCIPAL --signing-key-id dfx --enable-console --log-filter trace
 Starting Bitfinity Deployer v[..]
 Canister erc20-bridge deployed with ID: [..]
 Wrapped side BTF bridge: [..]
