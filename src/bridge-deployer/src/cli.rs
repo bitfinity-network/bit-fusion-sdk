@@ -40,7 +40,7 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// IC network to deploy the contract to
+    /// IC network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
     #[arg(long, value_name = "IC_NETWORK", default_value = "localhost")]
     ic_network: IcNetwork,
 
