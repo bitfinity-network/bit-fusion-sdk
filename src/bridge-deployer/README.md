@@ -2,12 +2,22 @@
 
 Bridge Deployer is a CLI tool for deploying and managing various types of bridge contracts on the Internet Computer and Ethereum networks.
 
+## Glossary
+
+- **EVM Canister**: canister installed on Internet Computer running the **Bitfinity EVM**
+- **Principal**: A unique identifier for a canister on the Internet Computer
+- **Base token**: the native token to bridge (e.g. USDT on Ethereum).
+- **BFT Bridge**: An ethereum smart contract that bridges the Base token with the Wrapped token on the EVM side.
+- **Wrapped token**: the smart contract of the token on the bridged side (e.g. USDT on Bitfinity EVM). This token is either installed on the **Bitfinity EVM** or on the specified EVM network.
+- **Bridge Network**: the Internet Computer network where the bridge canister will be deployed (e.g. ic, localhost).
+- **EVM RPC**: the RPC URL of the EVM network which will the Wrapped token will be installed to.
+
 ## Requirements
 
 - Rust
 - Forge CLI Installed
 - dfx (only for **local** deployment)
-- Either an EVM canister or an EVM RPC URL
+- Either the EVM canister or an EVM RPC URL pointing to a network where the Wrapped token is deployed.
 
 ## Installation
 
@@ -36,8 +46,8 @@ The general syntax for using the Bridge Deployer is:
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
 - `--bridge-network <IC_NETWORK>`: Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
-- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided). This is the EVM canister where the BTF bridge and the bridge contract are deployed. Ensure that your wallet has enough native tokens to deploy the contracts.
-- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge to communicate with a specific EVM network (must be used if `evm-principal` is not provided). The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the bridge contract are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
+- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided). This is the EVM canister where the BTF bridge and the wrapped token contracts are deployed. Ensure that your wallet has enough native tokens to deploy the contracts.
+- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge canister to communicate with a specific EVM network (must be used if `evm-principal` is not provided). The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the wrapped token contract are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
 - `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
 - `-v, --verbosity`: Set the verbosity level (use multiple times for higher levels)
 - `-q, --quiet`: Silence all output

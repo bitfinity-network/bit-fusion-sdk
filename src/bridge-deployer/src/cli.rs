@@ -45,7 +45,7 @@ pub struct Cli {
     bridge_network: IcNetwork,
 
     /// Optional EVM canister to link to; if not provided, the default one will be used based on the network.
-    /// This is the EVM canister where the BTF bridge and the bridge contract are deployed.
+    /// This is the EVM canister where the BTF bridge and the wrapped tokens are deployed.
     /// Ensure that your wallet has enough native tokens to deploy the contracts.
     #[arg(
         long,
@@ -56,7 +56,7 @@ pub struct Cli {
     pub evm_canister: Option<EvmCanister>,
 
     /// Optional EVM RPC endpoint to use. To be used in case you're not deploying on the EVM principal.
-    /// The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the bridge contract
+    /// The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the wrapped tokens
     /// are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
     #[arg(
         long,
