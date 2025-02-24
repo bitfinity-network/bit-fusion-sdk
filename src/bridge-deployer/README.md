@@ -36,8 +36,8 @@ The general syntax for using the Bridge Deployer is:
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
 - `--bridge-network <IC_NETWORK>`: Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
-- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided)
-- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge to communicate with a specific EVM network (must be used if `evm-principal` is not provided)
+- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided). This is the EVM canister where the BTF bridge and the bridge contract are deployed. Ensure that your wallet has enough native tokens to deploy the contracts.
+- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge to communicate with a specific EVM network (must be used if `evm-principal` is not provided). The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the bridge contract are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
 - `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
 - `-v, --verbosity`: Set the verbosity level (use multiple times for higher levels)
 - `-q, --quiet`: Silence all output
