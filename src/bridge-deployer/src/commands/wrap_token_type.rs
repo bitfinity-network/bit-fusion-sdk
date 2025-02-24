@@ -69,7 +69,7 @@ impl WrapTokenType {
     ) -> anyhow::Result<H160> {
         let deployer = SolidityContractDeployer::new(
             NetworkConfig {
-                ic_network: evm_network,
+                bridge_network: evm_network,
                 custom_network: None,
             },
             pk,

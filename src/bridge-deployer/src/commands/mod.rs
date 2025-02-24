@@ -210,7 +210,7 @@ impl Bridge {
                 let network = if let Some(url) = &erc.base_evm_url {
                     NetworkConfig {
                         custom_network: Some(url.clone()),
-                        ic_network: IcNetwork::Localhost,
+                        bridge_network: IcNetwork::Localhost,
                     }
                 } else {
                     wrapped_network.into()

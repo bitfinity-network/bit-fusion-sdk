@@ -29,9 +29,9 @@ const MAINNET_URL: &str = "https://mainnet.bitfinity.network";
 #[derive(Debug, Clone, Args)]
 #[group(required = true, multiple = false)]
 pub struct NetworkConfig {
-    /// OC network to deploy the contract to (e.g. "mainnet", "testnet", "local")
+    /// Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
     #[clap(value_enum, long)]
-    pub ic_network: IcNetwork,
+    pub bridge_network: IcNetwork,
     /// Custom network URL
     #[clap(long)]
     pub custom_network: Option<String>,
@@ -43,7 +43,7 @@ impl std::fmt::Display for NetworkConfig {
             return write!(f, "custom");
         }
 
-        let network = match self.ic_network {
+        let network = match self.bridge_network {
             IcNetwork::Localhost => "localhost",
             IcNetwork::Ic => "ic",
         };
@@ -55,7 +55,7 @@ impl std::fmt::Display for NetworkConfig {
 impl From<IcNetwork> for NetworkConfig {
     fn from(value: IcNetwork) -> Self {
         Self {
-            ic_network: value,
+            bridge_network: value,
             custom_network: None,
         }
     }
@@ -110,7 +110,7 @@ impl SolidityContractDeployer<'_> {
         if let Some(custom_network) = &self.network.custom_network {
             custom_network.to_string()
         } else {
-            match self.network.ic_network {
+            match self.network.bridge_network {
                 IcNetwork::Localhost => format!(
                     "http://127.0.0.1:{dfx_port}/?canisterId={principal}",
                     dfx_port = dfx_webserver_port(),
