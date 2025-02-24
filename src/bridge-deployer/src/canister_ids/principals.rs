@@ -2,7 +2,7 @@ use candid::Principal;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
 
 /// A struct to represent the principal IDs of a canister.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +15,7 @@ pub struct CanisterPrincipals {
 
 impl CanisterPrincipals {
     /// Creates a new `CanisterPrincipals` instance.
-    pub fn new(principal: Principal, network: EvmNetwork) -> Self {
+    pub fn new(principal: Principal, network: IcNetwork) -> Self {
         let mut instance = Self::default();
         instance.set(principal, network);
 
@@ -23,19 +23,19 @@ impl CanisterPrincipals {
     }
 
     /// Set the principal ID of a canister based on the network type.
-    pub fn set(&mut self, principal: Principal, network: EvmNetwork) {
+    pub fn set(&mut self, principal: Principal, network: IcNetwork) {
         debug!("Setting canister principal {principal} for network: {network:?}");
         match network {
-            EvmNetwork::Localhost => self.local = Some(principal),
-            EvmNetwork::Mainnet | EvmNetwork::Testnet => self.ic = Some(principal),
+            IcNetwork::Localhost => self.local = Some(principal),
+            IcNetwork::Ic => self.ic = Some(principal),
         }
     }
 
     /// Get the principal ID of a canister based on the network type.
-    pub fn get(&self, network: EvmNetwork) -> Option<&Principal> {
+    pub fn get(&self, network: IcNetwork) -> Option<&Principal> {
         match network {
-            EvmNetwork::Localhost => self.local.as_ref(),
-            EvmNetwork::Mainnet | EvmNetwork::Testnet => self.ic.as_ref(),
+            IcNetwork::Localhost => self.local.as_ref(),
+            IcNetwork::Ic => self.ic.as_ref(),
         }
     }
 }
@@ -49,18 +49,13 @@ mod test {
     #[test]
     fn test_canister_principal() {
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Localhost);
+        let canister_principal = CanisterPrincipals::new(principal, IcNetwork::Localhost);
 
         assert_eq!(canister_principal.local, Some(principal));
         assert_eq!(canister_principal.ic, None);
 
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Testnet);
-        assert_eq!(canister_principal.local, None);
-        assert_eq!(canister_principal.ic, Some(principal));
-
-        let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-        let canister_principal = CanisterPrincipals::new(principal, EvmNetwork::Mainnet);
+        let canister_principal = CanisterPrincipals::new(principal, IcNetwork::Ic);
         assert_eq!(canister_principal.local, None);
         assert_eq!(canister_principal.ic, Some(principal));
     }
@@ -69,12 +64,8 @@ mod test {
     fn test_should_set() {
         let principal = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
         let mut canister_principal = CanisterPrincipals::default();
-        canister_principal.set(principal, EvmNetwork::Localhost);
-
-        let other_principal = Principal::from_text("v5vof-zqaaa-aaaal-ai5cq-cai").unwrap();
-        canister_principal.set(other_principal, EvmNetwork::Testnet);
+        canister_principal.set(principal, IcNetwork::Localhost);
 
         assert_eq!(canister_principal.local, Some(principal));
-        assert_eq!(canister_principal.ic, Some(other_principal));
     }
 }

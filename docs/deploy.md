@@ -63,9 +63,9 @@ cargo run -p bridge-deployer -- --help
 
 All commands of bridge deployer require a private key of you EVM wallet to run EVM operations. It can be specified:
 
-* through `.env` file with content `PRIVATE_KEY=<KEY>`
-* through setting `PRIVATE_KEY` environment variable
-* through command line argument `--private-key <KEY>`
+- through `.env` file with content `PRIVATE_KEY=<KEY>`
+- through setting `PRIVATE_KEY` environment variable
+- through command line argument `--private-key <KEY>`
 
 ### Erc20 bridge
 

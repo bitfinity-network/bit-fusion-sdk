@@ -20,6 +20,7 @@ did = { workspace = true }
 eth-signer = { workspace = true }
 ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
+futures = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
 ic-canister-client = { workspace = true, features = [
@@ -42,7 +43,7 @@ rust_decimal = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
-futures = { workspace = true }
+testcontainers = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

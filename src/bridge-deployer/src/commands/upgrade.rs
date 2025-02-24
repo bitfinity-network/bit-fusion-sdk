@@ -7,6 +7,9 @@ use ic_utils::interfaces::management_canister::builders::InstallMode;
 use ic_utils::interfaces::ManagementCanister;
 use tracing::info;
 
+use crate::contracts::IcNetwork;
+use crate::evm::ic_host;
+
 /// The upgrade command.
 ///
 /// This command is used to upgrade a canister on the IC network.
@@ -24,18 +27,19 @@ impl UpgradeCommands {
     pub async fn upgrade_canister(
         &self,
         identity: GenericIdentity,
-        ic_host: &str,
+        ic_network: IcNetwork,
     ) -> anyhow::Result<()> {
         info!("Upgrading canister with ID: {}", self.canister_id.to_text());
 
         let canister_wasm = std::fs::read(&self.wasm)?;
+        let ic_host = ic_host(ic_network);
 
         let agent = ic_agent::Agent::builder()
-            .with_url(ic_host)
+            .with_url(&ic_host)
             .with_identity(identity)
             .build()?;
 
-        super::fetch_root_key(ic_host, &agent).await?;
+        super::fetch_root_key(&ic_host, &agent).await?;
 
         let management_canister = ManagementCanister::create(&agent);
 

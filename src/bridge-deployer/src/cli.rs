@@ -1,8 +1,9 @@
+mod evm_canister;
+
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use anyhow::bail;
-use candid::Principal;
 use clap::{ArgAction, Parser};
 use ethereum_types::H256;
 use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
@@ -14,10 +15,10 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::{filter, Layer as _};
 
+pub use self::evm_canister::EvmCanister;
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
-use crate::contracts::EvmNetwork;
-use crate::evm::evm_principal_or_default;
+use crate::contracts::IcNetwork;
 
 /// The main CLI struct for the Bitfinity Deployer.
 #[derive(Parser, Debug)]
@@ -39,18 +40,31 @@ pub struct Cli {
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
     private_key: H256,
 
-    /// EVM network to deploy the contract to
+    /// Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
+    #[arg(long, value_name = "BRIDGE_NETWORK", default_value = "localhost")]
+    bridge_network: IcNetwork,
+
+    /// Optional EVM canister to link to; if not provided, the default one will be used based on the network.
+    /// This is the EVM canister where the BTF bridge and the wrapped tokens are deployed.
+    /// Ensure that your wallet has enough native tokens to deploy the contracts.
     #[arg(
         long,
-        value_name = "EVM_NETWORK",
-        default_value = "localhost",
-        help_heading = "Bridge Contract Args"
+        conflicts_with = "evm_rpc",
+        value_name = "mainnet|testnet|PRINCIPAL",
+        help_heading = "EVM Link Args"
     )]
-    evm_network: EvmNetwork,
+    pub evm_canister: Option<EvmCanister>,
 
-    /// Optional EVM canister to link to; if not provided, the default one will be used based on the network
-    #[arg(long)]
-    pub evm: Option<Principal>,
+    /// Optional EVM RPC endpoint to use. To be used in case you're not deploying on the EVM principal.
+    /// The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the wrapped tokens
+    /// are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
+    #[arg(
+        long,
+        value_name = "EVM_RPC",
+        help_heading = "EVM Link Args",
+        conflicts_with = "evm_principal"
+    )]
+    pub evm_rpc: Option<String>,
 
     /// Set the minimum log level.
     ///
@@ -99,23 +113,25 @@ impl Cli {
 
         let Cli {
             private_key,
-            evm,
-            evm_network,
+            evm_canister,
+            bridge_network: ic_network,
+            evm_rpc,
             command,
             canister_ids,
             ..
         } = cli;
 
         // derive arguments
-        let ic_host = crate::evm::ic_host(evm_network);
+        let evm_link =
+            crate::evm::evm_link(evm_rpc, ic_network, evm_canister.map(|x| x.principal()));
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
-        debug!("IC host: {}", ic_host);
+        debug!("EVM Link: {evm_link:?}",);
 
         // load canister ids file
         let canister_ids_path = canister_ids
-            .map(|path| CanisterIdsPath::CustomPath(path, evm_network))
-            .unwrap_or_else(|| CanisterIdsPath::from(evm_network));
+            .map(|path| CanisterIdsPath::CustomPath(path, ic_network))
+            .unwrap_or_else(|| CanisterIdsPath::from(ic_network));
 
         debug!("Canister ids path: {}", canister_ids_path.path().display());
 
@@ -123,9 +139,8 @@ impl Cli {
         command
             .run(
                 identity,
-                &ic_host,
-                evm_network,
-                evm_principal_or_default(evm_network, evm),
+                ic_network,
+                evm_link,
                 private_key,
                 canister_ids_path,
             )
