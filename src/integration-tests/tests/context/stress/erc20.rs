@@ -9,7 +9,7 @@ use bridge_did::operation_log::Memo;
 use bridge_did::operations::Erc20OpStage;
 use bridge_utils::BTFBridge;
 use did::{TransactionReceipt, H160, H256, U256, U64};
-use eth_signer::{Signer, Wallet};
+use eth_signer::LocalWallet;
 use ic_exports::ic_cdk::println;
 use tokio::sync::RwLock;
 
@@ -31,7 +31,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
         let external_evm_client = ctx.external_evm_client(ctx.admin_name());
 
         // Create contract deployer wallet.
-        let contracts_deployer = Wallet::new(&mut rand::thread_rng());
+        let contracts_deployer = LocalWallet::random();
         let deployer_address = contracts_deployer.address();
         let tx_hash = external_evm_client
             .admin_mint_native_tokens(deployer_address.into(), u128::MAX.into())
@@ -45,7 +45,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+        assert_eq!(mint_tx_receipt.status, Some(U64::from(1u64)));
 
         let mut tokens = Vec::with_capacity(base_tokens_number);
         for _ in 0..base_tokens_number {
@@ -86,7 +86,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+        assert_eq!(mint_tx_receipt.status, Some(U64::from(1u64)));
 
         Ok(Self {
             ctx,
@@ -143,7 +143,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             tokio::time::sleep(Duration::from_millis(300)).await;
             let Some(receipt) = evm_client
                 .eth_get_transaction_receipt(tx_hash.clone())
-                .await??
+                .await?
             else {
                 retries += 1;
                 continue;
@@ -152,7 +152,7 @@ impl<Ctx: TestContext + Send + Sync> Erc20BaseTokens<Ctx> {
             break receipt;
         };
 
-        if receipt.status != Some(U64::one()) {
+        if receipt.status != Some(U64::from(1u64)) {
             let output = receipt.output.unwrap_or_default();
             let output_str = String::from_utf8_lossy(&output);
             println!("tx failed with ouptput: {output_str}");
@@ -214,7 +214,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(mint_tx_receipt.status, Some(U64::one()));
+        assert_eq!(mint_tx_receipt.status, Some(U64::from(1u64)));
 
         self.nonces
             .write()
@@ -245,7 +245,7 @@ impl<Ctx: TestContext + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
             )
             .await?
             .1;
-        assert_eq!(receipt.status, Some(U64::one()));
+        assert_eq!(receipt.status, Some(U64::from(1u64)));
 
         Ok(())
     }

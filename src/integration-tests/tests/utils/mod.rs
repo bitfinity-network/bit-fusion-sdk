@@ -12,6 +12,7 @@ pub mod btc_rpc_client;
 pub mod btc_transfer_helper;
 pub mod btc_wallet;
 pub mod error;
+pub mod ethers;
 pub mod hiro_ordinals_client;
 pub mod miner;
 pub mod ord_client;

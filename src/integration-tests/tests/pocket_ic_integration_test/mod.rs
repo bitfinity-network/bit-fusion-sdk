@@ -265,13 +265,8 @@ impl TestContext for PocketIcTestContext {
         for _ in 0..200 {
             let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
             self.advance_time(time).await;
-            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
+            let receipt = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
 
-            if result.is_err() {
-                println!("failed to get tx receipt: {result:?}")
-            }
-
-            let receipt = result?;
             if receipt.is_some() {
                 return Ok(receipt);
             }

@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use alloy::primitives::{Address, B256};
 use anyhow::bail;
 use bridge_did::id256::Id256;
 use bridge_did::init::btc::WrappedTokenConfig;
 use candid::{Encode, Principal};
 use clap::Parser;
-use ethereum_types::{H160, H256};
 use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
@@ -79,7 +79,7 @@ impl DeployCommands {
         &self,
         identity: GenericIdentity,
         network: EvmNetwork,
-        pk: H256,
+        pk: B256,
         canister_ids_path: CanisterIdsPath,
         evm: Principal,
     ) -> anyhow::Result<()> {
@@ -202,11 +202,11 @@ impl DeployCommands {
     fn deploy_wrapped_btc(
         &self,
         network: EvmNetwork,
-        pk: H256,
-        btf_bridge: &H160,
+        pk: B256,
+        btf_bridge: &Address,
         btc_connection: BtcBridgeConnection,
         evm: Principal,
-    ) -> anyhow::Result<H160> {
+    ) -> anyhow::Result<Address> {
         let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
         let base_token_id = Id256::from(btc_connection.ledger_principal());
 
@@ -224,7 +224,7 @@ impl DeployCommands {
         &self,
         agent: &ic_agent::Agent,
         principal: &Principal,
-        wrapped_token: H160,
+        wrapped_token: Address,
     ) -> anyhow::Result<()> {
         let config = WrappedTokenConfig {
             token_address: wrapped_token.into(),

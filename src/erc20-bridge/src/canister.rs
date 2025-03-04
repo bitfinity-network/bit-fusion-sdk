@@ -22,7 +22,6 @@ use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::build::BuildData;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};

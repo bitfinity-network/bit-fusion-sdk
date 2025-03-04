@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bitcoin::Amount;
 use did::BlockNumber;
-use eth_signer::Signer;
 
 use crate::context::brc20_bridge::{
     self, Brc20Context, Brc20InitArgs, DEFAULT_MAX_AMOUNT, DEFAULT_MINT_AMOUNT,

@@ -12,8 +12,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_utils::BTFBridge;
 use did::{H160, U256};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use futures::future;
 use ic_exports::ic_cdk::println;
 
@@ -100,7 +99,7 @@ pub struct BurnInfo<UserId> {
     pub memo: Memo,
 }
 
-pub type OwnedWallet = Wallet<'static, SigningKey>;
+pub type OwnedWallet = LocalWallet;
 
 pub struct User<BaseId> {
     pub wallet: OwnedWallet,
@@ -138,7 +137,7 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             .unwrap();
 
         let expected_fee_charge_address =
-            ethers_core::utils::get_contract_address(admin_wallet.address(), 3);
+            crate::utils::ethers::get_contract_address(admin_wallet.address(), U256::from(3u64));
 
         println!("Initializing Btfbridge contract");
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;

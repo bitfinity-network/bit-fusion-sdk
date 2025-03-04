@@ -341,7 +341,7 @@ impl BtcBridgeOpImpl {
             return Err(BtcWithdrawError::InvalidRecipient(event.recipient_id.clone()).into());
         };
 
-        let amount = event.amount.0.as_u64();
+        let amount: u64 = event.amount.0.to();
         log::trace!("Transferring {amount} ckBTC to {address}");
 
         let ck_btc_ledger = state.borrow().ck_btc_ledger();
@@ -384,7 +384,7 @@ impl BtcBridgeOpImpl {
             dst_token: state_ref.token_address().clone(),
             nonce,
             sender_chain_id,
-            recipient_chain_id,
+            recipient_chain_id: recipient_chain_id as u32,
             name: state_ref.token_name(),
             symbol: state_ref.token_symbol(),
             decimals: state_ref.decimals(),

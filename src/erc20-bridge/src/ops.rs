@@ -14,7 +14,7 @@ use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
 use bridge_did::order::{MintOrder, SignedOrders};
 use candid::CandidType;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
 use serde::{Deserialize, Serialize};
@@ -206,7 +206,7 @@ impl Erc20OrderHandler {
 }
 
 impl MintOrderHandler for Erc20OrderHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.config.borrow().get_signer()
     }
 
@@ -258,7 +258,7 @@ impl MintOrderHandler for Erc20OrderHandler {
 }
 
 impl MintTxHandler for Erc20OrderHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.config.borrow().get_signer()
     }
 

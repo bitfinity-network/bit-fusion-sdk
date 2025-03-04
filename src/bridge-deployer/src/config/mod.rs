@@ -3,10 +3,8 @@ use std::collections::HashSet;
 pub use brc20::Brc20BridgeConfig;
 use candid::{CandidType, Principal};
 use clap::{Parser, ValueEnum};
-use eth_signer::sign_strategy;
 use eth_signer::sign_strategy::SigningStrategy;
-use ethers_core::k256::ecdsa::SigningKey;
-use ethers_core::rand;
+use eth_signer::{sign_strategy, LocalWallet};
 use serde::{Deserialize, Serialize};
 
 mod brc20;
@@ -48,7 +46,7 @@ impl From<SigningKeyId> for SigningStrategy {
                 key_id: sign_strategy::SigningKeyId::Production,
             },
             SigningKeyId::Pk => {
-                let signer = SigningKey::random(&mut rand::thread_rng());
+                let signer = LocalWallet::random();
                 let pk = signer.to_bytes();
                 Self::Local {
                     private_key: pk.into(),

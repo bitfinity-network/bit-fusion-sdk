@@ -432,7 +432,7 @@ impl<UTXO: UtxoProvider> RuneDeposit<UTXO> {
             .borrow()
             .get_evm_params()
             .unwrap()
-            .chain_id;
+            .chain_id as u32;
 
         MintOrder {
             amount: amount.into(),

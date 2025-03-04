@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use alloy::primitives::{Address, B256};
 use anyhow::Context;
 use bridge_client::Erc20BridgeClient;
 use bridge_did::error::BTFResult;
@@ -10,7 +11,6 @@ use candid::{Encode, Principal};
 use clap::{Args, Subcommand};
 use deploy::DeployCommands;
 use eth_signer::sign_strategy::SigningStrategy;
-use ethereum_types::{H160, H256};
 use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_canister_client::{CanisterClient, IcAgentClient};
@@ -195,7 +195,7 @@ impl Bridge {
         btf_args: &BTFArgs,
         wrapped_network: EvmNetwork,
         bridge_principal: Principal,
-        pk: H256,
+        pk: B256,
         agent: &Agent,
         evm: Principal,
     ) -> anyhow::Result<Option<BtfDeployedContracts>> {
@@ -265,7 +265,7 @@ impl Commands {
         ic_host: &str,
         network: EvmNetwork,
         evm: Principal,
-        pk: H256,
+        pk: B256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
         match self {
@@ -291,19 +291,19 @@ impl Commands {
 pub struct BTFArgs {
     /// The address of the owner of the contract.
     #[arg(long, value_name = "OWNER")]
-    owner: Option<H160>,
+    owner: Option<Address>,
 
     /// The list of controllers for the contract.
     #[arg(long, value_name = "CONTROLLERS")]
-    controllers: Option<Vec<H160>>,
+    controllers: Option<Vec<Address>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BtfDeployedContracts {
-    pub btf_bridge: H160,
-    pub wrapped_token_deployer: H160,
-    pub fee_charge: H160,
-    pub minter_address: H160,
+    pub btf_bridge: Address,
+    pub wrapped_token_deployer: Address,
+    pub fee_charge: Address,
+    pub minter_address: Address,
 }
 
 impl BTFArgs {
@@ -312,7 +312,7 @@ impl BTFArgs {
         &self,
         network: NetworkConfig,
         canister_id: Principal,
-        pk: H256,
+        pk: B256,
         agent: &Agent,
         is_wrapped_side: bool,
         evm: Principal,
@@ -337,7 +337,7 @@ impl BTFArgs {
         let wrapped_token_deployer = if is_wrapped_side {
             contract_deployer.deploy_wrapped_token_deployer()?
         } else {
-            H160::default()
+            Address::default()
         };
 
         let evm_address_method = if is_wrapped_side {

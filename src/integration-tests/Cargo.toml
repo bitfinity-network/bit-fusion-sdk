@@ -6,6 +6,7 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+alloy = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 bip39 = { workspace = true }
@@ -18,7 +19,6 @@ bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
-ethers-core = { workspace = true }
 evm-canister-client = { workspace = true }
 hex = { workspace = true }
 ic-btc-interface = { workspace = true }
@@ -37,6 +37,7 @@ once_cell = { workspace = true }
 ord-rs = { workspace = true, features = ["rune"] }
 ordinals = { workspace = true }
 rand = { workspace = true }
+rlp = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rust_decimal = { workspace = true }
 serde = { workspace = true }

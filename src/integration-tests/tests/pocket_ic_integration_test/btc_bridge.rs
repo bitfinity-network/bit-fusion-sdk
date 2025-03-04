@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bitcoin::Amount;
 use btc_bridge::canister::eth_address_to_subaccount;
-use eth_signer::Signer as _;
 use icrc_client::account::Account;
 
 use crate::context::btc_bridge::BtcContext;
@@ -27,7 +26,7 @@ async fn btc_to_erc20_test() {
             .await
             .expect("Failed to create a wallet"),
     );
-    let my_eth_address = wallet.address().0.into();
+    let my_eth_address = wallet.address().into();
 
     ctx.mint_admin_wrapped_btc(deposit_value, &wallet, &my_eth_address, 0)
         .await
@@ -81,7 +80,7 @@ async fn test_get_btc_address_from_bridge() {
             .expect("Failed to create a wallet"),
     );
 
-    let caller_eth_address = wallet.address().0.into();
+    let caller_eth_address = wallet.address().into();
 
     let deposit_account = Account {
         owner: ctx.context.canisters.btc_bridge(),
@@ -120,7 +119,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
 
     let tx_value = deposit_value / tx_count;
 
-    let caller_eth_address = wallet.address().0.into();
+    let caller_eth_address = wallet.address().into();
 
     for tx_count in 0..tx_count {
         let deposit_account = Account {
@@ -151,7 +150,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
             let ctx = ctx_t.clone();
             let wallet = wallet_t.clone();
             Box::pin(async move {
-                let caller_eth_address = wallet.address().0.into();
+                let caller_eth_address = wallet.address().into();
                 ctx.btc_to_erc20(&wallet, &caller_eth_address, [0; 32], 0)
                     .await
             })
@@ -215,7 +214,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
     }
 
     for wallet in &wallets {
-        let caller_eth_address = wallet.address().0.into();
+        let caller_eth_address = wallet.address().into();
         let deposit_account = Account {
             owner: ctx.context.canisters.btc_bridge(),
             subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
@@ -244,7 +243,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
                 let ctx = ctx_t.clone();
                 let wallet = wallet_t.clone();
                 Box::pin(async move {
-                    let caller_eth_address = wallet.address().0.into();
+                    let caller_eth_address = wallet.address().into();
                     ctx.btc_to_erc20(&wallet, &caller_eth_address, [0; 32], 0)
                         .await
                 })
@@ -310,7 +309,7 @@ async fn test_should_deposit_and_withdraw_btc() {
             let wallet = wallet_t.clone();
             let btc_wallet = btc_wallet_t.clone();
             Box::pin(async move {
-                let caller_eth_address = wallet.address().0.into();
+                let caller_eth_address = wallet.address().into();
                 ctx.deposit_btc(
                     &wallet,
                     &btc_wallet,

@@ -2,20 +2,19 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
+use alloy::hex::ToHexExt as _;
+use alloy::primitives::{Address, B256, U256};
 use anyhow::{Context, Result};
 use bridge_did::id256::Id256;
 use bridge_utils::native::wait_for_tx;
 use candid::Principal;
 use clap::{Args, ValueEnum};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
+use did::BlockNumber;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer, Wallet};
+use eth_signer::LocalWallet;
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
-use ethereum_types::H256;
-use ethers_core::k256::ecdsa::SigningKey;
-use ethers_core::types::{BlockNumber, H160};
-use ethers_core::utils::hex::ToHexExt;
 use tracing::{debug, error, info};
 
 use crate::evm::dfx_webserver_port;
@@ -69,13 +68,13 @@ pub enum EvmNetwork {
     Mainnet,
 }
 
-pub struct SolidityContractDeployer<'a> {
+pub struct SolidityContractDeployer {
     evm: Principal,
     network: NetworkConfig,
-    wallet: Wallet<'a, SigningKey>,
+    wallet: LocalWallet,
 }
 
-impl SolidityContractDeployer<'_> {
+impl SolidityContractDeployer {
     /// Creates a new `ContractDeployer` instance with the given network and private key.
     ///
     /// # Arguments
@@ -86,8 +85,8 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// A new `ContractDeployer` instance.
-    pub fn new(network: NetworkConfig, pk: H256, evm: Principal) -> Self {
-        let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
+    pub fn new(network: NetworkConfig, pk: B256, evm: Principal) -> Self {
+        let wallet = LocalWallet::from_bytes(&pk).expect("invalid wallet PK value");
         Self {
             evm,
             network,
@@ -122,7 +121,7 @@ impl SolidityContractDeployer<'_> {
 
     /// Returns the private key of the deployer.
     pub fn pk(&self) -> String {
-        self.wallet.signer().to_bytes().encode_hex_with_prefix()
+        self.wallet.credential().to_bytes().encode_hex_with_prefix()
     }
 
     /// Returns the address of the deployer.
@@ -202,7 +201,7 @@ impl SolidityContractDeployer<'_> {
     /// Extracts the address from the output.
     ///
     /// This is a helper function that extracts the address from the output.
-    fn extract_address_from_output(output: &str, prefix: &str) -> Result<H160> {
+    fn extract_address_from_output(output: &str, prefix: &str) -> Result<Address> {
         let address = output
             .lines()
             .find(|line| line.contains(prefix))
@@ -210,19 +209,19 @@ impl SolidityContractDeployer<'_> {
             .map(str::trim)
             .context(format!("Failed to extract {} address", prefix))?;
 
-        H160::from_str(address).context(format!("Invalid {} address", prefix))
+        Address::from_str(address).context(format!("Invalid {} address", prefix))
     }
 
     /// Deploys the BTF contract.
     pub fn deploy_btf(
         &self,
-        minter_address: &H160,
-        fee_charge_address: &H160,
-        wrapped_token_deployer_address: &H160,
+        minter_address: &Address,
+        fee_charge_address: &Address,
+        wrapped_token_deployer_address: &Address,
         is_wrapped_side: bool,
-        owner: Option<H160>,
-        controllers: &Option<Vec<H160>>,
-    ) -> Result<H160> {
+        owner: Option<Address>,
+        controllers: &Option<Vec<Address>>,
+    ) -> Result<Address> {
         info!("Deploying BTF contract");
 
         let env_vars = vec![
@@ -250,7 +249,7 @@ impl SolidityContractDeployer<'_> {
         let env_vars = if let Some(controllers) = controllers {
             let controllers_str = controllers
                 .iter()
-                .map(H160::encode_hex_upper_with_prefix)
+                .map(Address::encode_hex_upper_with_prefix)
                 .collect::<Vec<String>>()
                 .join(",");
             env_vars
@@ -266,7 +265,7 @@ impl SolidityContractDeployer<'_> {
     }
 
     /// Deploys the WrappedTokenDeployer contract.
-    pub fn deploy_wrapped_token_deployer(&self) -> Result<H160> {
+    pub fn deploy_wrapped_token_deployer(&self) -> Result<Address> {
         info!("Deploying WrappedTokenDeployer contract");
         let output = self.execute_forge_script("DeployWrappedTokenDeployer.s.sol", vec![])?;
         Self::extract_address_from_output(&output, "WrappedTokenDeployer address:")
@@ -275,14 +274,14 @@ impl SolidityContractDeployer<'_> {
     /// Deploys the FeeCharge contract.
     pub fn deploy_fee_charge(
         &self,
-        bridges: &[H160],
-        expected_address: Option<H160>,
-    ) -> Result<H160> {
+        bridges: &[Address],
+        expected_address: Option<Address>,
+    ) -> Result<Address> {
         info!("Deploying Fee Charge contract");
 
         let bridges = bridges
             .iter()
-            .map(H160::encode_hex_upper_with_prefix)
+            .map(Address::encode_hex_upper_with_prefix)
             .collect::<Vec<String>>()
             .join(",");
 
@@ -299,12 +298,12 @@ impl SolidityContractDeployer<'_> {
     /// Deploys the WrappedToken contract.
     pub fn deploy_wrapped_token(
         &self,
-        btf_bridge: &H160,
+        btf_bridge: &Address,
         name: &str,
         symbol: &str,
         decimals: u8,
         base_token_id: Id256,
-    ) -> Result<H160> {
+    ) -> Result<Address> {
         info!("Deploying Wrapped ERC20 contract");
 
         let env_vars = vec![
@@ -329,9 +328,9 @@ impl SolidityContractDeployer<'_> {
     /// # Returns
     ///
     /// The computed fee charge contract address.
-    pub fn compute_fee_charge_address(&self, nonce: u64) -> Result<H160> {
+    pub fn compute_fee_charge_address(&self, nonce: u64) -> Result<Address> {
         let deployer = self.wallet.address();
-        let contract_address = ethers_core::utils::get_contract_address(deployer, nonce);
+        let contract_address = crate::utils::get_contract_address(deployer, U256::from(nonce));
         Ok(contract_address)
     }
 
@@ -356,7 +355,7 @@ impl SolidityContractDeployer<'_> {
         let client = self.rpc_client()?;
         let address = self.wallet.address();
         let nonce = client
-            .get_transaction_count(address, BlockNumber::Latest)
+            .get_transaction_count(address.into(), BlockNumber::Latest)
             .await?;
 
         info!("Got nonce value for network {network}: {nonce}");
@@ -364,7 +363,7 @@ impl SolidityContractDeployer<'_> {
         Ok(nonce)
     }
 
-    pub async fn transfer_eth(&self, to: &H160, amount: u128) -> Result<()> {
+    pub async fn transfer_eth(&self, to: &Address, amount: u128) -> Result<()> {
         info!(
             "Transferring {amount} ETH tokens to address {}",
             to.encode_hex_with_prefix()
@@ -373,7 +372,7 @@ impl SolidityContractDeployer<'_> {
 
         let address = self.wallet.address();
         let nonce = client
-            .get_transaction_count(address, BlockNumber::Latest)
+            .get_transaction_count(address.into(), BlockNumber::Latest)
             .await?;
         let chain_id = client.get_chain_id().await?;
 
@@ -383,16 +382,16 @@ impl SolidityContractDeployer<'_> {
             nonce: nonce.into(),
             value: amount.into(),
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input: vec![],
-            signature: SigningMethod::SigningKey(self.wallet.signer()),
+            signature: SigningMethod::SigningKey(self.wallet.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
-        let hash = client.send_raw_transaction(tx.into()).await?;
-        wait_for_tx(&client, hash).await?;
+        let hash = client.send_raw_transaction(&tx.try_into()?).await?;
+        wait_for_tx(&client, hash.into()).await?;
 
         Ok(())
     }

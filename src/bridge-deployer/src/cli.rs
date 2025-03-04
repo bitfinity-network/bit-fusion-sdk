@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use alloy::primitives::B256;
 use anyhow::bail;
 use candid::Principal;
 use clap::{ArgAction, Parser};
-use ethereum_types::H256;
 use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
 use ic_agent::Identity;
 use ic_canister_client::agent::identity::GenericIdentity;
@@ -37,7 +37,7 @@ pub struct Cli {
     ///
     /// This must be provided in all the commands except for the `upgrade` command.
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
-    private_key: H256,
+    private_key: B256,
 
     /// EVM network to deploy the contract to
     #[arg(

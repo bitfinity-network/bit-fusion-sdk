@@ -51,7 +51,7 @@ pub fn new_withdraw_payload(
         ..
     } = burnt_event_data;
 
-    let amount = amount.0.as_u128();
+    let amount = amount.0.to();
 
     let Ok(address_string) = String::from_utf8(recipient_id.clone()) else {
         return Err(WithdrawError::InvalidRequest(format!(

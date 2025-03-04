@@ -12,7 +12,7 @@ use bridge_utils::query::{
 };
 use candid::{CandidType, Principal};
 use did::{codec, H160, U256};
-use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
+use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_stable_structures::{CellStructure, StableCell, Storable};
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
@@ -88,8 +88,8 @@ impl ConfigStorage {
         let params = EvmParams {
             nonce: 0,
             gas_price,
-            chain_id: chain_id.0.as_u32(),
-            next_block: latest_block.0.as_u64(),
+            chain_id: chain_id.0.to(),
+            next_block: latest_block.0.to(),
         };
 
         config
@@ -136,7 +136,7 @@ impl ConfigStorage {
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
 
         config.borrow_mut().update_evm_params(|p| {
-            p.nonce = nonce.0.as_u64();
+            p.nonce = nonce.0.to();
             p.gas_price = gas_price;
         });
 
@@ -201,7 +201,7 @@ impl ConfigStorage {
     }
 
     /// Creates a signer according to `Self::signing_strategy`.
-    pub fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    pub fn get_signer(&self) -> BTFResult<TxSigner> {
         let config = self.0.get();
         let chain_id = self.get_evm_params()?.chain_id;
         config

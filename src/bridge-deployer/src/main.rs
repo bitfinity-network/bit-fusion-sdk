@@ -7,6 +7,7 @@ mod commands;
 mod config;
 mod contracts;
 mod evm;
+mod utils;
 
 #[tokio::main]
 async fn main() {

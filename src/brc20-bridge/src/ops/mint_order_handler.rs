@@ -7,7 +7,7 @@ use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_did::order::{MintOrder, SignedOrders};
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_task_scheduler::scheduler::TaskScheduler as _;
 use ic_task_scheduler::task::ScheduledTask;
 
@@ -30,7 +30,7 @@ impl Brc20MintOrderHandler {
 }
 
 impl MintOrderHandler for Brc20MintOrderHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 

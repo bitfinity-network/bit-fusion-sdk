@@ -7,7 +7,6 @@ use bridge_did::evm_link::EvmLink;
 use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
 use ic_canister::{
     generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
 };

@@ -42,7 +42,7 @@ impl Storable for WrappedTokenConfig {
 
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         let mut bytes = Vec::with_capacity(Self::MAX_SIZE as usize);
-        bytes.extend_from_slice(self.token_address.0.as_bytes());
+        bytes.extend_from_slice(self.token_address.0.as_slice());
         bytes.extend_from_slice(&self.token_name);
         bytes.extend_from_slice(&self.token_symbol);
         bytes.push(self.decimals);

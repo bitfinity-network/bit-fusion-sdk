@@ -1,11 +1,11 @@
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use alloy::primitives::keccak256;
 use candid::CandidType;
 use did::transaction::Signature;
 use did::{H160, H256, U256};
-use eth_signer::sign_strategy::TransactionSigner;
-use ethers_core::utils::keccak256;
+use eth_signer::sign_strategy::TxSigner;
 use ic_stable_structures::{Bound, Storable};
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
@@ -94,17 +94,17 @@ impl MintOrder {
         buf[..32].copy_from_slice(&self.amount.to_big_endian());
         buf[32..64].copy_from_slice(self.sender.0.as_slice());
         buf[64..96].copy_from_slice(self.src_token.0.as_slice());
-        buf[96..116].copy_from_slice(self.recipient.0.as_bytes());
-        buf[116..136].copy_from_slice(self.dst_token.0.as_bytes());
+        buf[96..116].copy_from_slice(self.recipient.0.as_slice());
+        buf[116..136].copy_from_slice(self.dst_token.0.as_slice());
         buf[136..140].copy_from_slice(&self.nonce.to_be_bytes());
         buf[140..144].copy_from_slice(&self.sender_chain_id.to_be_bytes());
         buf[144..148].copy_from_slice(&self.recipient_chain_id.to_be_bytes());
         buf[148..180].copy_from_slice(&self.name);
         buf[180..196].copy_from_slice(&self.symbol);
         buf[196] = self.decimals;
-        buf[197..217].copy_from_slice(self.approve_spender.0.as_bytes());
+        buf[197..217].copy_from_slice(self.approve_spender.0.as_slice());
         buf[217..249].copy_from_slice(&self.approve_amount.to_big_endian());
-        buf[249..269].copy_from_slice(self.fee_payer.0.as_bytes());
+        buf[249..269].copy_from_slice(self.fee_payer.0.as_slice());
 
         buf
     }
@@ -133,10 +133,7 @@ impl MintOrder {
     ///
     /// All integers encoded in big-endian format.
     /// Signature signs KECCAK hash of the signed data.
-    pub async fn encode_and_sign(
-        &self,
-        signer: &impl TransactionSigner,
-    ) -> BTFResult<SignedMintOrder> {
+    pub async fn encode_and_sign(&self, signer: &TxSigner) -> BTFResult<SignedMintOrder> {
         let mut buf = [0; Self::SIGNED_ENCODED_DATA_SIZE];
 
         let encoded_data = self.encode();
@@ -146,12 +143,17 @@ impl MintOrder {
 
         // Sign fields data hash.
         let signature = signer
-            .sign_digest(digest)
+            .sign_digest(digest.0)
             .await
             .map_err(|e| Error::Signing(format!("failed to sign MintOrder: {e}")))?;
 
-        // Add signature to the data.
-        let signature_bytes: [u8; 65] = ethers_core::types::Signature::from(signature).into();
+        let alloy_sig = alloy::signers::Signature::new(
+            signature.r.0,
+            signature.s.0,
+            signature.y_parity.as_bool(),
+        );
+        let signature_bytes: [u8; 65] = alloy_sig.as_bytes();
+
         buf[Self::ENCODED_DATA_SIZE..].copy_from_slice(&signature_bytes);
 
         Ok(SignedMintOrder(buf))
@@ -203,10 +205,9 @@ impl MintOrder {
         }
 
         let decoded_data = Self::decode_data(data.as_ref())?;
-        let signature =
-            ethers_core::types::Signature::try_from(&data[Self::ENCODED_DATA_SIZE..][..65])
-                .ok()?
-                .into();
+        let signature = alloy::signers::Signature::try_from(&data[Self::ENCODED_DATA_SIZE..][..65])
+            .ok()?
+            .into();
 
         Some((decoded_data, signature))
     }
@@ -486,7 +487,7 @@ mod tests {
     #[tokio::test]
     async fn signed_mint_order_getters() {
         let order = MintOrder {
-            amount: U256::one(),
+            amount: U256::from(1u64),
             sender: Id256::from_evm_address(&H160::from_slice(&[1; 20]), 1),
             src_token: Id256::from_evm_address(&H160::from_slice(&[2; 20]), 2),
             recipient: H160::from_slice(&[3; 20]),

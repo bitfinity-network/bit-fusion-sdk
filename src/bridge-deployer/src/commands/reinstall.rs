@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
+use alloy::primitives::Address;
 use candid::Principal;
 use clap::Parser;
-use ethereum_types::H160;
 use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
@@ -41,7 +41,7 @@ pub struct ReinstallCommands {
 
     /// Existing BTF bridge contract address to work with the deployed bridge.
     #[arg(long = "btf-bridge", value_name = "ADDRESS")]
-    btf_bridge: H160,
+    btf_bridge: Address,
 }
 
 impl ReinstallCommands {

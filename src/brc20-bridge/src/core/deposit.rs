@@ -333,7 +333,7 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
             dst_token: token_address.clone(),
             nonce,
             sender_chain_id,
-            recipient_chain_id,
+            recipient_chain_id: recipient_chain_id as u32,
             name: brc20_info.tick.name_array(),
             symbol: brc20_info.tick.symbol_array(),
             decimals: brc20_info.decimals,

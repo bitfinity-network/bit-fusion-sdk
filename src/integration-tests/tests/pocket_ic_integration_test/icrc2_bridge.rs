@@ -9,8 +9,7 @@ use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
 use did::{H160, U256, U64};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
 use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
@@ -232,7 +231,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     assert_eq!(
         receipt.status,
-        Some(U64::one()),
+        Some(U64::from(1u64)),
         "Refund transaction failed: {}",
         String::from_utf8_lossy(&receipt.output.unwrap_or_default()),
     );
@@ -418,7 +417,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
 
 async fn icrc2_token_bridge(
     ctx: &PocketIcTestContext,
-    john_wallet: Wallet<'static, SigningKey>,
+    john_wallet: LocalWallet,
     btf_bridge: &H160,
     fee_charge: &H160,
     wrapped_token: &H160,
@@ -689,7 +688,7 @@ async fn rescheduling_deposit_operation() {
 async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
     async fn spam_reschedule_requests(
         ctx: PocketIcTestContext,
-        wallet: Wallet<'_, SigningKey>,
+        wallet: LocalWallet,
         btf_bridge: H160,
         spam_stopper: CancellationToken,
         semaphore: Arc<Semaphore>,
@@ -846,13 +845,13 @@ async fn icrc_bridge_stress_test() {
 /// - john wallet with native tokens,
 /// - operation points for john,
 /// - bridge contract
-pub async fn init_bridge() -> (PocketIcTestContext, Wallet<'static, SigningKey>, H160, H160) {
+pub async fn init_bridge() -> (PocketIcTestContext, LocalWallet, H160, H160) {
     let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
     let expected_fee_charge_address =
-        ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
+        crate::utils::ethers::get_contract_address(fee_charge_deployer.address(), U256::zero());
 
     let wrapped_token_deployer = ctx
         .initialize_wrapped_token_deployer_contract(&john_wallet)

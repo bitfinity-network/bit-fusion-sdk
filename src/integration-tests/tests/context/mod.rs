@@ -26,8 +26,7 @@ use did::init::EvmCanisterInitData;
 use did::{Transaction, TransactionReceipt, H160, H256, U256, U64};
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use evm_canister_client::{CanisterClient, EvmCanisterClient};
 use evm_rpc_canister::EvmRpcCanisterInitData;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
@@ -164,9 +163,7 @@ pub trait TestContext {
         while time_passed < timeout && receipt.is_none() {
             self.advance_time(tx_processing_interval).await;
             time_passed = Instant::now() - start;
-            receipt = evm_client
-                .eth_get_transaction_receipt(hash.clone())
-                .await??;
+            receipt = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
         }
         Ok(receipt)
     }
@@ -181,7 +178,7 @@ pub trait TestContext {
     }
 
     /// Creates a new wallet with the EVM balance on it.
-    async fn new_wallet(&self, balance: u128) -> Result<Wallet<'static, SigningKey>> {
+    async fn new_wallet(&self, balance: u128) -> Result<LocalWallet> {
         let client = self.evm_client(self.admin_name());
         self.new_wallet_on_evm(&client, balance).await
     }
@@ -191,11 +188,8 @@ pub trait TestContext {
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         balance: u128,
-    ) -> Result<Wallet<'static, SigningKey>> {
-        let wallet = {
-            let mut rng = rand::thread_rng();
-            Wallet::new(&mut rng)
-        };
+    ) -> Result<LocalWallet> {
+        let wallet = LocalWallet::random();
         evm_client
             .admin_mint_native_tokens(wallet.address().into(), balance.into())
             .await??;
@@ -214,11 +208,7 @@ pub trait TestContext {
     }
 
     /// Creates contract in EVMc.
-    async fn create_contract(
-        &self,
-        creator_wallet: &Wallet<'_, SigningKey>,
-        input: Vec<u8>,
-    ) -> Result<H160> {
+    async fn create_contract(&self, creator_wallet: &LocalWallet, input: Vec<u8>) -> Result<H160> {
         let evm_client = self.evm_client(self.admin_name());
         self.create_contract_on_evm(&evm_client, creator_wallet, input)
             .await
@@ -228,7 +218,7 @@ pub trait TestContext {
     async fn create_contract_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        creator_wallet: &Wallet<'_, SigningKey>,
+        creator_wallet: &LocalWallet,
         input: Vec<u8>,
     ) -> Result<H160> {
         let creator_address: H160 = creator_wallet.address().into();
@@ -241,7 +231,7 @@ pub trait TestContext {
         let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
 
         let hash = evm_client
-            .send_raw_transaction(create_contract_tx)
+            .send_raw_transaction(create_contract_tx.try_into()?)
             .await??;
         let receipt = self
             .wait_transaction_receipt_on_evm(evm_client, &hash)
@@ -250,7 +240,7 @@ pub trait TestContext {
                 "transaction not processed".into(),
             )))?;
 
-        if receipt.status != Some(U64::one()) {
+        if receipt.status != Some(U64::from(1u64)) {
             let execution_result = evm_client
                 .get_tx_execution_result_by_hash(hash)
                 .await
@@ -319,7 +309,7 @@ pub trait TestContext {
     /// Creates BTFBridge contract in EVMC and registered it in minter canister
     async fn initialize_btf_bridge_with_minter(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
@@ -341,7 +331,7 @@ pub trait TestContext {
     async fn initialize_btf_bridge_with_minter_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         minter_canister_address: H160,
         fee_charge_address: Option<H160>,
         wrapped_token_deployer: H160,
@@ -388,7 +378,7 @@ pub trait TestContext {
 
     async fn initialize_fee_charge_contract(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
         let evm = self.evm_client(self.admin_name());
@@ -399,7 +389,7 @@ pub trait TestContext {
     async fn initialize_fee_charge_contract_on_evm(
         &self,
         evm: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         minter_canister_addresses: &[H160],
     ) -> Result<H160> {
         let minter_canister_addresses = minter_canister_addresses
@@ -426,7 +416,7 @@ pub trait TestContext {
 
     async fn initialize_wrapped_token_deployer_contract(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
     ) -> Result<H160> {
         let evm = self.evm_client(self.admin_name());
         self.initialize_wrapped_token_deployer_contract_on_evm(&evm, wallet)
@@ -436,7 +426,7 @@ pub trait TestContext {
     async fn initialize_wrapped_token_deployer_contract_on_evm(
         &self,
         evm: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
     ) -> Result<H160> {
         let wrapped_token_deployer_input = WrappedTokenDeployer::BYTECODE.to_vec();
 
@@ -448,7 +438,7 @@ pub trait TestContext {
     async fn burn_erc_20_tokens_raw(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         from_token: &H160,
         to_token_id: &[u8],
         recipient: Vec<u8>,
@@ -491,7 +481,7 @@ pub trait TestContext {
             .call_contract_on_evm(evm_client, wallet, bridge, input, 0)
             .await?;
 
-        if receipt.status != Some(U64::one()) {
+        if receipt.status != Some(U64::from(1u64)) {
             let decoded_output =
                 BTFBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
                     .unwrap();
@@ -513,7 +503,7 @@ pub trait TestContext {
     async fn burn_wrapped_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         from_token: &H160,
         to_token_id: &[u8],
         recipient: Id256,
@@ -538,7 +528,7 @@ pub trait TestContext {
     async fn burn_base_erc_20_tokens(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         from_token: &H160,
         to_token_id: &[u8],
         recipient: Id256,
@@ -600,7 +590,7 @@ pub trait TestContext {
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         fee_charge: H160,
-        user_wallet: &Wallet<'static, SigningKey>,
+        user_wallet: &LocalWallet,
         amount: u128,
     ) -> Result<U256> {
         let input = FeeCharge::nativeTokenDepositCall {}.abi_encode();
@@ -623,7 +613,7 @@ pub trait TestContext {
     /// Returns a signed transaction from the given `wallet`.
     fn signed_transaction(
         &self,
-        wallet: &Wallet<SigningKey>,
+        wallet: &LocalWallet,
         to: Option<H160>,
         nonce: U256,
         value: u128,
@@ -636,9 +626,9 @@ pub trait TestContext {
             nonce,
             value: value.into(),
             gas: 8_000_000u64.into(),
-            gas_price: Some(DEFAULT_GAS_PRICE.into()),
+            gas_price: DEFAULT_GAS_PRICE.into(),
             input,
-            signature: SigningMethod::SigningKey(wallet.signer()),
+            signature: SigningMethod::SigningKey(wallet.credential()),
             chain_id: CHAIN_ID,
         }
         .calculate_hash_and_build()
@@ -648,7 +638,7 @@ pub trait TestContext {
     /// Calls contract in EVMc.
     async fn call_contract(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
@@ -662,7 +652,7 @@ pub trait TestContext {
     async fn call_contract_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
@@ -672,7 +662,9 @@ pub trait TestContext {
 
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
-        let hash = evm_client.send_raw_transaction(call_tx).await??;
+        let hash = evm_client
+            .send_raw_transaction(call_tx.try_into()?)
+            .await??;
         let receipt = self
             .wait_transaction_receipt_on_evm(evm_client, &hash)
             .await?
@@ -680,7 +672,7 @@ pub trait TestContext {
                 "transaction not processed".into(),
             )))?;
 
-        if receipt.status != Some(U64::one()) {
+        if receipt.status != Some(U64::from(1u64)) {
             println!("tx status: {:?}", receipt.status);
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
@@ -692,7 +684,7 @@ pub trait TestContext {
     /// Calls contract in the evm_client without waiting for it's receipt.
     async fn call_contract_without_waiting(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
@@ -714,7 +706,7 @@ pub trait TestContext {
     async fn call_contract_without_waiting_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         contract: &H160,
         input: Vec<u8>,
         amount: u128,
@@ -729,7 +721,9 @@ pub trait TestContext {
         println!("sending tx from wallet {from} with nonce {nonce}");
         let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
 
-        let hash = evm_client.send_raw_transaction(call_tx).await??;
+        let hash = evm_client
+            .send_raw_transaction(call_tx.try_into()?)
+            .await??;
 
         Ok(hash)
     }
@@ -737,7 +731,7 @@ pub trait TestContext {
     /// Creates wrapped token in EVMc by calling `BTFBridge:::deploy_wrapped_token()`.
     async fn create_wrapped_token(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         btf_bridge: &H160,
         base_token_id: Id256,
     ) -> Result<H160> {
@@ -768,7 +762,7 @@ pub trait TestContext {
     async fn deploy_test_wtm_token_on_evm(
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         init_balance: U256,
     ) -> Result<H160> {
         let mut erc20_input = TestWTM::BYTECODE.to_vec();
@@ -785,7 +779,11 @@ pub trait TestContext {
             .unwrap()
             .nonce;
         let tx = self.signed_transaction(wallet, None, nonce, 0, erc20_input);
-        let hash = evm_client.send_raw_transaction(tx).await.unwrap().unwrap();
+        let hash = evm_client
+            .send_raw_transaction(tx.try_into()?)
+            .await
+            .unwrap()
+            .unwrap();
 
         let receipt = self
             .wait_transaction_receipt_on_evm(evm_client, &hash)
@@ -793,7 +791,7 @@ pub trait TestContext {
             .unwrap()
             .unwrap();
 
-        assert_eq!(receipt.status, Some(U64::one()));
+        assert_eq!(receipt.status, Some(U64::from(1u64)));
 
         Ok(receipt.contract_address.unwrap())
     }
@@ -803,7 +801,7 @@ pub trait TestContext {
     async fn burn_icrc2(
         &self,
         caller: &str,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         bridge: &H160,
         erc20_token_address: &H160,
         amount: u128,
@@ -849,7 +847,7 @@ pub trait TestContext {
     async fn reschedule_operation(
         &self,
         operation_id: OperationId,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         bridge: &H160,
     ) -> Result<()> {
         let encoded_op_id = Encode!(&operation_id).unwrap();
@@ -896,7 +894,7 @@ pub trait TestContext {
     /// Mints ERC-20 token with the order.
     async fn batch_mint_erc_20_with_order(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         bridge: &H160,
         order: SignedOrders,
     ) -> Result<TransactionReceipt> {
@@ -917,7 +915,7 @@ pub trait TestContext {
     async fn check_erc20_balance(
         &self,
         token: &H160,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         address: Option<&H160>,
     ) -> Result<u128> {
         let evm_client = self.evm_client(self.admin_name());
@@ -930,7 +928,7 @@ pub trait TestContext {
         &self,
         evm_client: &EvmCanisterClient<Self::Client>,
         token: &H160,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         address: Option<&H160>,
     ) -> Result<u128> {
         let account = address.cloned().unwrap_or_else(|| wallet.address().into());

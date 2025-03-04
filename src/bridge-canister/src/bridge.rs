@@ -9,7 +9,7 @@ use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLinkClient;
 use candid::CandidType;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_task_scheduler::task::TaskOptions;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -52,7 +52,7 @@ pub trait OperationContext {
     fn get_evm_params(&self) -> BTFResult<EvmParams>;
 
     /// Get signer for transactions, orders, etc...
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner>;
+    fn get_signer(&self) -> BTFResult<TxSigner>;
 
     async fn collect_evm_events(&self, max_logs_number: u64) -> BTFResult<CollectedEvents> {
         log::trace!("collecting evm events");

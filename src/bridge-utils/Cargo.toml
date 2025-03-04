@@ -8,13 +8,18 @@ default = []
 native = ["tokio"]
 
 [dependencies]
+alloy = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
 anyhow = { workspace = true }
 bridge-did = { path = "../bridge-did" }
 candid = { workspace = true }
 did = { workspace = true }
-ethereum-json-rpc-client = { workspace = true, features = ["ic-canister-client", "http-outcall", "sanitize-http-outcall"] }
-ethers-core = { workspace = true }
+eth-signer = { workspace = true }
+ethereum-json-rpc-client = { workspace = true, features = [
+  "ic-canister-client",
+  "http-outcall",
+  "sanitize-http-outcall",
+] }
 hex = { workspace = true }
 ic-canister-client = { workspace = true }
 ic-exports = { workspace = true }

@@ -16,7 +16,7 @@ use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Nat};
 use did::{H160, H256, U256};
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
@@ -158,7 +158,7 @@ impl IcrcBridgeOpImpl {
         log::trace!("transferred icrc tokens to the bridge account");
 
         let sender_chain_id = IC_CHAIN_ID;
-        let recipient_chain_id = evm_params.chain_id;
+        let recipient_chain_id = evm_params.chain_id as u32;
 
         let sender = Id256::from(&burn_info.sender);
         let src_token = Id256::from(&burn_info.icrc2_token_principal);
@@ -253,7 +253,7 @@ impl IcrcBridgeOpImpl {
                 );
 
                 let sender_chain_id = IC_CHAIN_ID;
-                let recipient_chain_id = evm_params.chain_id;
+                let recipient_chain_id = evm_params.chain_id as u32;
 
                 // If we pass zero name or symbol, it will not be applied.
                 let name = event.name.try_into().unwrap_or_default();
@@ -314,7 +314,7 @@ impl IcrcMintOrderHandler {
 }
 
 impl MintOrderHandler for IcrcMintOrderHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 
@@ -380,7 +380,7 @@ impl IcrcMintTxHandler {
 }
 
 impl MintTxHandler for IcrcMintTxHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 
