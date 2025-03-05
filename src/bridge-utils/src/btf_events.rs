@@ -257,9 +257,9 @@ mod tests {
         let raw = RawLog {
             topics: vec![
                 H256::from_hex_str(
-                    "0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79",
+                    "0x9d727a82f0ec1a11adcfae675deaa61c758c84fb0c3c9af9c05838e693e3e643",
                 )
-                .unwrap()
+                .expect("invalid topic")
                 .0,
             ],
             data: raw_data.into(),
@@ -271,7 +271,8 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let event = BurnTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true).unwrap();
+        let event = BurnTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true)
+            .expect("failed to decode event");
         assert_eq!(event.sender, event.sender);
     }
 
