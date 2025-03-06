@@ -137,7 +137,7 @@ impl<'a, B: BaseTokens> StressTestState<'a, B> {
             .unwrap();
 
         let expected_fee_charge_address =
-            crate::utils::ethers::get_contract_address(admin_wallet.address(), U256::from(3u64));
+            bridge_utils::get_contract_address(admin_wallet.address(), U256::from(3u64));
 
         println!("Initializing Btfbridge contract");
         let bridge_canister_address = base_tokens.bridge_canister_evm_address().await?;

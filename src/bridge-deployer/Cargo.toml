@@ -23,7 +23,6 @@ ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-utils = { workspace = true }
 jsonrpc-core = { workspace = true }
-rlp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }

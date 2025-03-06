@@ -477,3 +477,31 @@ impl BtcBridgeOpImpl {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use bridge_canister::runtime::scheduler::BridgeTask;
+    use ic_stable_structures::Storable;
+    use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskStatus};
+
+    use super::*;
+
+    #[test]
+    fn test_should_store_task() {
+        let task = BtcBridgeOpImpl(BtcBridgeOp::UpdateCkBtcBalance {
+            eth_address: H160::from_hex_str("0xe57e761aa806c9afe7e06fb0601b17bec310f9c4")
+                .expect("valid eth address"),
+        });
+
+        let task = BridgeTask::new(OperationId::new(1), task);
+        let task = ScheduledTask::new(task);
+
+        let task =
+            InnerScheduledTask::with_status(1, task, TaskStatus::Scheduled { timestamp_secs: 1 });
+        let bytes = task.to_bytes();
+
+        let _deserialize: InnerScheduledTask<BridgeTask<BtcBridgeOpImpl>> =
+            InnerScheduledTask::from_bytes(bytes);
+    }
+}

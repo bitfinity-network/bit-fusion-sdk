@@ -330,7 +330,7 @@ impl SolidityContractDeployer {
     /// The computed fee charge contract address.
     pub fn compute_fee_charge_address(&self, nonce: u64) -> Result<Address> {
         let deployer = self.wallet.address();
-        let contract_address = crate::utils::get_contract_address(deployer, U256::from(nonce));
+        let contract_address = bridge_utils::get_contract_address(deployer, U256::from(nonce));
         Ok(contract_address)
     }
 

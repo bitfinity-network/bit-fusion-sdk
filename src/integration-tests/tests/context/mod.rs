@@ -158,11 +158,11 @@ pub trait TestContext {
         let tx_processing_interval = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
         let timeout = tx_processing_interval * 100;
         let start = Instant::now();
-        let mut time_passed = Duration::ZERO;
+
         let mut receipt = None;
-        while time_passed < timeout && receipt.is_none() {
+
+        while start.elapsed() < timeout && receipt.is_none() {
             self.advance_time(tx_processing_interval).await;
-            time_passed = Instant::now() - start;
             receipt = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
         }
         Ok(receipt)
@@ -225,7 +225,7 @@ pub trait TestContext {
         let nonce = evm_client
             .account_basic(creator_address.clone())
             .await
-            .unwrap()
+            .expect("failed to get nonce")
             .nonce;
 
         let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
@@ -233,6 +233,7 @@ pub trait TestContext {
         let hash = evm_client
             .send_raw_transaction(create_contract_tx.try_into()?)
             .await??;
+        println!("Contract creation tx hash: {hash}",);
         let receipt = self
             .wait_transaction_receipt_on_evm(evm_client, &hash)
             .await?
@@ -455,6 +456,8 @@ pub trait TestContext {
                 value: amount.clone().into(),
             }
             .abi_encode();
+
+            println!("abi encoded; calling evm");
 
             let results = self
                 .call_contract_on_evm(evm_client, wallet, &from_token.clone(), input, 0)

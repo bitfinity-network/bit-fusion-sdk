@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use alloy::primitives::{keccak256, Address, B256};
+use alloy::primitives::{Address, B256};
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_did::id256::Id256;
 use bridge_did::reason::Icrc2Burn;
@@ -718,7 +718,7 @@ fn expected_contract_address(args: ExpectedContractAddress) {
     )
     .expect("invalid wallet PK value");
     let deployer = wallet.address();
-    let contract_address = get_contract_address(deployer, U256::from(args.nonce));
+    let contract_address = bridge_utils::get_contract_address(deployer, U256::from(args.nonce));
     println!("{contract_address:#x}");
 }
 
@@ -967,19 +967,4 @@ fn decode_token_id(id_string: &str) -> Option<Id256> {
     }
 
     None
-}
-
-fn get_contract_address(sender: Address, nonce: impl Into<alloy::primitives::U256>) -> Address {
-    let nonce: alloy::primitives::U256 = nonce.into();
-
-    let mut stream = rlp::RlpStream::new();
-    stream.begin_list(2);
-    stream.append(&sender.as_slice());
-    stream.append(&nonce.as_le_slice());
-
-    let hash = keccak256(stream.out());
-
-    let mut bytes = [0u8; 20];
-    bytes.copy_from_slice(&hash[12..]);
-    Address::from(bytes)
 }

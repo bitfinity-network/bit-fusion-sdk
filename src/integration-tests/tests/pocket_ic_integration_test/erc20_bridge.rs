@@ -51,7 +51,7 @@ impl ContextWithBridges {
             .unwrap();
         ctx.advance_time(Duration::from_secs(2)).await;
         let expected_fee_charge_address =
-            crate::utils::ethers::get_contract_address(fee_charge_deployer.address(), U256::zero());
+            bridge_utils::get_contract_address(fee_charge_deployer.address(), U256::zero());
 
         let bob_wallet = LocalWallet::random();
         let bob_address: H160 = bob_wallet.address().into();
@@ -97,7 +97,7 @@ impl ContextWithBridges {
         let wrapped_wrapped_token_deployer = ctx
             .initialize_wrapped_token_deployer_contract(&bob_wallet)
             .await
-            .unwrap();
+            .expect("failed to initialize wrapped token deployer contract");
 
         // Deploy the BTFBridge contract on the external EVM.
         let base_btf_bridge = create_btf_bridge(
@@ -242,7 +242,7 @@ async fn test_external_bridging() {
             Some(memo),
         )
         .await
-        .unwrap();
+        .expect("failed to burn base erc20 tokens");
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection

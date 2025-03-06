@@ -685,7 +685,7 @@ async fn rescheduling_deposit_operation() {
 
 // Let's check that spamming reschedule does not break anything
 #[tokio::test]
-async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
+async fn test_icrc2_tokens_with_reschedule_spam_roundtrip() {
     async fn spam_reschedule_requests(
         ctx: PocketIcTestContext,
         wallet: LocalWallet,
@@ -851,7 +851,7 @@ pub async fn init_bridge() -> (PocketIcTestContext, LocalWallet, H160, H160) {
 
     let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
     let expected_fee_charge_address =
-        crate::utils::ethers::get_contract_address(fee_charge_deployer.address(), U256::zero());
+        bridge_utils::get_contract_address(fee_charge_deployer.address(), U256::zero());
 
     let wrapped_token_deployer = ctx
         .initialize_wrapped_token_deployer_contract(&john_wallet)

@@ -8,7 +8,7 @@ IC_COMMIT_HASH:="85bd56a70e55b2cea75cae6405ae11243e5fdad8"
 IC_EVM_RPC_TAG:="release-2024-05-23"
 
 # This is the bitfinity evmc tag to download
-EVMC_TAG:="v0.2.0_2068bd15"
+EVMC_TAG:="v0.2.0_4a388483"
 
 
 # Fetch all dependencies
