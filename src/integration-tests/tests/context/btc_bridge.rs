@@ -1,6 +1,6 @@
 use std::str::FromStr as _;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -15,9 +15,9 @@ use bridge_utils::BTFBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{H160, H256, TransactionReceipt, U256};
-use eth_signer::LocalWallet;
+use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ic_ckbtc_kyt::SetApiKeyArg;
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;

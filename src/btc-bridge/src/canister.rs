@@ -3,28 +3,28 @@ mod inspect;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bridge_canister::BridgeCanister;
-use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
-use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
+use bridge_canister::runtime::state::SharedConfig;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
+use bridge_canister::BridgeCanister;
 use bridge_did::error::BTFResult;
-use bridge_did::init::BtcBridgeConfig;
 use bridge_did::init::btc::WrappedTokenConfig;
+use bridge_did::init::BtcBridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::Memo;
 use bridge_did::order::SignedOrders;
 use bridge_utils::common::Pagination;
 use candid::Principal;
-use did::H160;
 use did::build::BuildData;
+use did::H160;
 use ic_canister::{
-    Canister, Idl, PreUpdate, generate_idl, init, post_upgrade, query, update,
-    virtual_canister_call,
+    generate_idl, init, post_upgrade, query, update, virtual_canister_call, Canister, Idl,
+    PreUpdate,
 };
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
 use ic_exports::ic_cdk;
@@ -185,7 +185,7 @@ impl BtcBridge {
 
 pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     let mut subaccount = [0; 32];
-    subaccount[0..eth_address.0.0.len()].copy_from_slice(eth_address.0.as_slice());
+    subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_slice());
 
     Subaccount(subaccount)
 }
@@ -267,11 +267,11 @@ pub fn get_runtime_state() -> RuntimeState<BtcBridgeOpImpl> {
 #[cfg(test)]
 mod test {
     use bridge_did::evm_link::EvmLink;
-    use bridge_did::init::BridgeInitData;
     use bridge_did::init::btc::BitcoinConnection;
+    use bridge_did::init::BridgeInitData;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
-    use ic_canister::{Canister, canister_call};
+    use ic_canister::{canister_call, Canister};
     use ic_exports::ic_kit::MockContext;
 
     use super::*;

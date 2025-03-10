@@ -5,8 +5,8 @@ use bitcoin::key::Secp256k1;
 use bitcoin::sighash::SighashCache;
 use bitcoin::transaction::Version;
 use bitcoin::{
-    Address, Amount, OutPoint, PrivateKey, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
-    Witness, secp256k1,
+    secp256k1, Address, Amount, OutPoint, PrivateKey, ScriptBuf, Sequence, Transaction, TxIn,
+    TxOut, Txid, Witness,
 };
 use ord_rs::Utxo;
 

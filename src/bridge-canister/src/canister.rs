@@ -8,7 +8,7 @@ use bridge_did::init::BridgeInitData;
 use candid::Principal;
 use did::H160;
 use ic_canister::{
-    Canister, Idl, PreUpdate, generate_exports, generate_idl, query, state_getter, update,
+    generate_exports, generate_idl, query, state_getter, update, Canister, Idl, PreUpdate,
 };
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
@@ -16,7 +16,7 @@ use ic_storage::IcStorage;
 use log::{debug, info};
 
 use crate::inspect;
-use crate::memory::{LOG_SETTINGS_MEMORY_ID, memory_by_id};
+use crate::memory::{memory_by_id, LOG_SETTINGS_MEMORY_ID};
 use crate::runtime::state::config::ConfigStorage;
 
 /// Common API of all bridge canisters.
@@ -160,7 +160,7 @@ mod tests {
     use bridge_did::evm_link::EvmLink;
     use eth_signer::sign_strategy::SigningStrategy;
     use ic_canister::{canister_call, init};
-    use ic_exports::ic_kit::{MockContext, inject};
+    use ic_exports::ic_kit::{inject, MockContext};
     use ic_storage::IcStorage;
 
     use super::*;

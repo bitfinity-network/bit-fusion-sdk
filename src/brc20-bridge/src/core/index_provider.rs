@@ -7,7 +7,7 @@ use std::str::FromStr;
 use bitcoin::Address;
 use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
-    CanisterHttpRequestArgument, HttpHeader, HttpMethod, http_request,
+    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;

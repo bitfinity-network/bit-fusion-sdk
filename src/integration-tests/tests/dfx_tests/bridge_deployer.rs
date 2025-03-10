@@ -10,7 +10,7 @@ use cli_args::{CommonCliArgs, DeployCliArgs, HARDHAT_ETH_PRIVATE_KEY};
 use eth_signer::LocalWallet;
 use tempfile::TempDir;
 
-use super::{ADMIN, DfxTestContext};
+use super::{DfxTestContext, ADMIN};
 use crate::context::{CanisterType, TestContext};
 
 async fn setup(canister_set: &[CanisterType]) -> DfxTestContext {

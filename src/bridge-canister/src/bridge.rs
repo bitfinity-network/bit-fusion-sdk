@@ -11,11 +11,11 @@ use candid::CandidType;
 use did::H160;
 use eth_signer::sign_strategy::TxSigner;
 use ic_task_scheduler::task::TaskOptions;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::runtime::RuntimeState;
 use crate::runtime::service::ServiceId;
+use crate::runtime::RuntimeState;
 
 /// Defines an operation that can be executed by the bridge.
 pub trait Operation:

@@ -7,7 +7,7 @@ use snapbox::{assert_data_eq, str};
 
 use crate::core::rune_inputs::mock::TestRuneInputProvider;
 use crate::core::rune_inputs::{GetInputsError, RuneInput};
-use crate::ops::{RuneBridgeOpImpl, tests};
+use crate::ops::{tests, RuneBridgeOpImpl};
 
 #[tokio::test]
 async fn await_inputs_returns_error_if_no_inputs() {
@@ -96,9 +96,7 @@ async fn await_inputs_returns_error_if_provider_returns_consensus_error() {
 
     assert_data_eq!(
         message,
-        str![
-            "failed to get deposit inputs: rune indexers returned different result for same request: response 1; response 2"
-        ]
+        str!["failed to get deposit inputs: rune indexers returned different result for same request: response 1; response 2"]
     )
 }
 
@@ -132,12 +130,7 @@ async fn await_inputs_returns_error_if_wrong_amounts_one_utxo() {
         panic!("Invalid result: {result:?}");
     };
 
-    assert_data_eq!(
-        message,
-        str![
-            "requested amounts {RuneName(Rune(0)): 1500} are not equal actual amounts {RuneName(Rune(0)): 1000}"
-        ]
-    );
+    assert_data_eq!(message, str!["requested amounts {RuneName(Rune(0)): 1500} are not equal actual amounts {RuneName(Rune(0)): 1000}"]);
 }
 
 #[tokio::test]
@@ -186,9 +179,7 @@ async fn await_inputs_cannot_progress_if_requested_less_than_actual_single_utxo(
 
     assert_data_eq!(
         message,
-        str![
-            "requested amounts {RuneName(Rune(0)): 500} cannot be equal actual amounts {RuneName(Rune(0)): 1000}"
-        ]
+        str!["requested amounts {RuneName(Rune(0)): 500} cannot be equal actual amounts {RuneName(Rune(0)): 1000}"]
     );
 }
 

@@ -2,13 +2,13 @@ use alloy::primitives::{Address, B256};
 use alloy::rpc::types::TransactionRequest;
 use alloy_sol_types::{SolInterface, SolValue};
 use bridge_did::id256::Id256;
-use bridge_utils::WrappedToken::{WrappedTokenCalls, decimalsCall, nameCall, symbolCall};
+use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
 use candid::Principal;
 use clap::{Args, Subcommand};
 use did::{BlockNumber, Bytes};
 use eth_signer::LocalWallet;
-use ethereum_json_rpc_client::EthJsonRpcClient;
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
+use ethereum_json_rpc_client::EthJsonRpcClient;
 use tracing::info;
 
 use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
@@ -207,6 +207,9 @@ mod tests {
         assert_eq!(token_params.name, "Maximium");
         assert_eq!(token_params.symbol, "MXM");
         assert_eq!(token_params.decimals, 18);
-        assert_eq!(token_params.id.to_evm_address().unwrap().1.0, token_address);
+        assert_eq!(
+            token_params.id.to_evm_address().unwrap().1 .0,
+            token_address
+        );
     }
 }

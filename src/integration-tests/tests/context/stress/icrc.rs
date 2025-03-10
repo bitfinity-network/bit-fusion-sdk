@@ -6,7 +6,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::Icrc2Burn;
-use bridge_utils::{BTFBridge, evm_link};
+use bridge_utils::{evm_link, BTFBridge};
 use candid::{Encode, Nat, Principal};
 use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
@@ -17,7 +17,7 @@ use icrc_client::approve::ApproveArgs;
 use icrc_client::transfer::TransferArg;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::{CanisterType, TestContext, icrc_canister_default_init_args};
+use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::utils::error::{Result, TestError};
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);

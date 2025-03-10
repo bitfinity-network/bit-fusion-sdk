@@ -18,7 +18,7 @@ use self::used_utxo_details::UsedUtxoDetails;
 use self::utxo_details::UtxoDetails;
 pub use self::utxo_key::UtxoKey;
 use self::utxo_runes::UtxoRunes;
-use crate::key::{KeyError, ic_dp_to_derivation_path};
+use crate::key::{ic_dp_to_derivation_path, KeyError};
 use crate::memory::{DEPOSITED_UTXOS_MEMORY_ID, RUNE_INFO_BY_UTXO_MEMORY_ID, USED_UTXOS_MEMORY_ID};
 
 /// Information about the unspent utxo.

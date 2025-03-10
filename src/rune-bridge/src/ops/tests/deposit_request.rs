@@ -8,7 +8,7 @@ use candid::Encode;
 use tests::events_handler::RuneEventsHandler;
 
 use crate::ops::{
-    RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData, tests,
+    tests, RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeOpImpl, RuneDepositRequestData,
 };
 
 #[tokio::test]

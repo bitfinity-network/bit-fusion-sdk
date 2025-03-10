@@ -5,9 +5,9 @@ use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ordinals::Rune;
 use snapbox::{assert_data_eq, str};
 
-use crate::core::utxo_handler::UtxoHandlerError;
 use crate::core::utxo_handler::test::TestUtxoHandler;
-use crate::ops::{RuneBridgeOpImpl, tests};
+use crate::core::utxo_handler::UtxoHandlerError;
+use crate::ops::{tests, RuneBridgeOpImpl};
 
 fn get_utxo() -> Utxo {
     Utxo {

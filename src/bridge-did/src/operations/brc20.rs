@@ -1,7 +1,7 @@
-use bitcoin::Transaction;
 use bitcoin::consensus::{Decodable as _, Encodable as _};
-use candid::CandidType;
+use bitcoin::Transaction;
 use candid::types::{Serializer, Type};
+use candid::CandidType;
 use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use serde::{Deserialize, Deserializer, Serialize};

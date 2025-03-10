@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -18,9 +18,9 @@ use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{H160, H256, TransactionReceipt, U256};
-use eth_signer::LocalWallet;
+use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};

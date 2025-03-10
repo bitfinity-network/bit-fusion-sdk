@@ -117,29 +117,20 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
             let ctx = ctx_t.clone();
             Box::pin(async move {
                 let new_brc20_balance = ctx
-                    .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
-                    .await?;
+                .brc20_balance(ctx.brc20_wallet_address(), &brc20_tick)
+                .await?;
                 if new_brc20_balance != expected_brc20_balance {
-                    anyhow::bail!(
-                        "Got BRC20 balance: {new_brc20_balance}; expected: {expected_brc20_balance}"
-                    );
+                    anyhow::bail!("Got BRC20 balance: {new_brc20_balance}; expected: {expected_brc20_balance}");
                 }
 
                 let new_erc20_balance = ctx.wrapped_balance(&brc20_tick, &ctx.eth_wallet).await;
                 if new_erc20_balance != expected_erc20_balance.amount() {
-                    anyhow::bail!(
-                        "Got ERC20 balance: {new_erc20_balance}; expected: {}",
-                        expected_erc20_balance.amount()
-                    );
+                    anyhow::bail!("Got ERC20 balance: {new_erc20_balance}; expected: {}", expected_erc20_balance.amount());
                 }
 
                 Ok(())
             })
-        },
-        &ctx.inner,
-        Duration::from_secs(120),
-    )
-    .await;
+        }, &ctx.inner, Duration::from_secs(120)).await;
 
     ctx.stop().await;
 }

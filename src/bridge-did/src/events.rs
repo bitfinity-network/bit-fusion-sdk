@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-use BTFBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 use alloy::primitives::Uint;
 use alloy_sol_types::sol;
 use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
+use BTFBridge::{BurnTokenEvent, MintTokenEvent, NotifyMinterEvent};
 
 use crate::error::{BTFResult, Error};
 use crate::op_id::OperationId;
@@ -51,9 +51,9 @@ impl BurntEventData {
 impl From<BurnTokenEvent> for BurntEventData {
     fn from(event: BurnTokenEvent) -> Self {
         Self {
-            sender: event.sender.0.0.into(),
+            sender: event.sender.0 .0.into(),
             amount: did::U256(Uint::from_limbs_slice(event.amount.as_limbs())),
-            from_erc20: event.fromERC20.0.0.into(),
+            from_erc20: event.fromERC20.0 .0.into(),
             recipient_id: event.recipientID.into(),
             to_token: event.toToken.0.into(),
             operation_id: event.operationID,
@@ -83,8 +83,8 @@ impl From<MintTokenEvent> for MintedEventData {
             amount: did::U256(Uint::from_limbs_slice(event.amount.as_limbs())),
             from_token: event.fromToken.0.into(),
             sender_id: event.senderID.0.into(),
-            to_erc20: event.toERC20.0.0.into(),
-            recipient: event.recipient.0.0.into(),
+            to_erc20: event.toERC20.0 .0.into(),
+            recipient: event.recipient.0 .0.into(),
             nonce: event.nonce,
             fee_charged: did::U256(Uint::from_limbs_slice(event.chargedFee.as_limbs())),
         }
@@ -168,7 +168,7 @@ impl From<NotifyMinterEvent> for NotifyMinterEventData {
     fn from(event: NotifyMinterEvent) -> Self {
         Self {
             notification_type: event.notificationType.into(),
-            tx_sender: event.txSender.0.0.into(),
+            tx_sender: event.txSender.0 .0.into(),
             user_data: event.userData.0.into(),
             memo: event.memo.0.into(),
         }

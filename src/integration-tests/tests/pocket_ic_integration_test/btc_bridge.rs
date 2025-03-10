@@ -5,8 +5,8 @@ use bitcoin::Amount;
 use btc_bridge::canister::eth_address_to_subaccount;
 use icrc_client::account::Account;
 
-use crate::context::TestContext;
 use crate::context::btc_bridge::BtcContext;
+use crate::context::TestContext;
 use crate::pocket_ic_integration_test::block_until_succeeds;
 use crate::utils::btc_wallet::BtcWallet;
 

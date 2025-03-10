@@ -138,9 +138,7 @@ pub enum HttpOutcallError {
         code: RejectionCode,
         message: String,
     },
-    #[error(
-        "invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsingError:?}"
-    )]
+    #[error("invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsingError:?}")]
     InvalidHttpJsonRpcResponse {
         status: u16,
         body: String,

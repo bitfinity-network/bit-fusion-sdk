@@ -1,11 +1,11 @@
 use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
 use bridge_canister::memory::StableMemory;
-use bridge_canister::runtime::RuntimeState;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
-use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::service::mint_tx::MintTxHandler;
 use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
+use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;

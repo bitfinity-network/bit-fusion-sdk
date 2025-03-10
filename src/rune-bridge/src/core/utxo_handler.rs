@@ -14,9 +14,7 @@ pub(crate) enum UtxoHandlerError {
     BtcAdapter(String),
     #[error("requested utxo is not in the main branch")]
     UtxoNotFound,
-    #[error(
-        "utxo is not confirmed, required {required_confirmations}, currently {current_confirmations} confirmations"
-    )]
+    #[error("utxo is not confirmed, required {required_confirmations}, currently {current_confirmations} confirmations")]
     NotConfirmed {
         required_confirmations: u32,
         current_confirmations: u32,

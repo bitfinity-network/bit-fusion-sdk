@@ -7,9 +7,9 @@ use bridge_did::op_id::OperationId;
 use candid::CandidType;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{StableBTreeMap, StableCell};
-use ic_task_scheduler::SchedulerError;
 use ic_task_scheduler::scheduler::{Scheduler, TaskScheduler};
 use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, Task, TaskStatus};
+use ic_task_scheduler::SchedulerError;
 use serde::{Deserialize, Serialize};
 
 use super::RuntimeState;
@@ -192,8 +192,8 @@ mod tests {
 
     use super::*;
     use crate::bridge::OperationProgress;
-    use crate::runtime::BridgeRuntime;
     use crate::runtime::state::config::ConfigStorage;
+    use crate::runtime::BridgeRuntime;
 
     #[derive(Debug, CandidType, Serialize, Deserialize, Clone, Eq, PartialEq)]
     struct TestOperation {
@@ -285,13 +285,11 @@ mod tests {
         assert_eq!(log.log()[0].step_result, Ok(op));
 
         for i in 1..COUNT + 1 {
-            assert!(
-                log.log()[i]
-                    .step_result
-                    .as_ref()
-                    .unwrap_err()
-                    .contains(TestOperation::ERR_MESSAGE)
-            );
+            assert!(log.log()[i]
+                .step_result
+                .as_ref()
+                .unwrap_err()
+                .contains(TestOperation::ERR_MESSAGE));
         }
     }
 

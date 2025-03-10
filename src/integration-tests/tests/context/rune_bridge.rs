@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -16,9 +16,9 @@ use bridge_did::runes::RuneName;
 use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{H160, H256, TransactionReceipt, U256};
-use eth_signer::LocalWallet;
+use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
@@ -787,11 +787,7 @@ where
             let balance_before = balance_before.get(rune_id).copied().ok_or_else(|| {
                 anyhow::anyhow!("Wrapped token balance of the wallet not found before")
             })?;
-            assert_eq!(
-                balance_after - balance_before,
-                *rune_amount,
-                "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}"
-            );
+            assert_eq!(balance_after - balance_before, *rune_amount, "Wrapped token balance of the wallet changed by unexpected amount. Balance before: {balance_before}, balance_after: {balance_after}, deposit amount: {rune_amount}");
         }
 
         self.wait_for_blocks(REQUIRED_CONFIRMATIONS).await;

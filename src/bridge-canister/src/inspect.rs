@@ -3,8 +3,8 @@ use ic_exports::ic_cdk::api;
 use ic_exports::ic_kit::ic;
 use ic_storage::IcStorage;
 
-use crate::runtime::state::SharedConfig;
 use crate::runtime::state::config::ConfigStorage;
+use crate::runtime::state::SharedConfig;
 
 /// Runs inspect checks for the bridge canister API methods. This function should be called from
 /// the canister `#[inspect]` function. In case any of the checks do not pass, the function

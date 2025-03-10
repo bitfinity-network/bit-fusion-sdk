@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use candid::Principal;
 use serde::{Deserialize, Serialize};
 
-use super::CanisterType;
 use super::principals::CanisterPrincipals;
+use super::CanisterType;
 use crate::contracts::EvmNetwork;
 
 /// canister_ids.json db

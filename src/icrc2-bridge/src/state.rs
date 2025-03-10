@@ -1,7 +1,7 @@
 use access_list::AccessList;
 pub use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{VirtualMemory, default_ic_memory_manager};
+use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
 
 use crate::constant::ACCESS_LIST_MEMORY_ID;
 

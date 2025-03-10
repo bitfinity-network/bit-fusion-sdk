@@ -23,7 +23,7 @@ use crate::core::rune_inputs::{GetInputsError, RuneInput, RuneInputProvider, Run
 use crate::core::utxo_handler::{UtxoHandler, UtxoHandlerError};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{BtcSignerType, KeyError, get_derivation_path_ic};
+use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
 use crate::ledger::UnspentUtxoInfo;
 use crate::ops::RuneBridgeOpImpl;
 use crate::state::RuneState;
@@ -343,9 +343,7 @@ impl<UTXO: UtxoProvider> RuneDeposit<UTXO> {
             match runes.get(rune_name) {
                 Some(v) => infos.push((*v, *amount)),
                 None => {
-                    log::error!(
-                        "Ord indexer didn't return a rune information for rune {rune_name} that was present in an UTXO"
-                    );
+                    log::error!("Ord indexer didn't return a rune information for rune {rune_name} that was present in an UTXO");
                     return None;
                 }
             }
@@ -483,7 +481,7 @@ mod tests {
     use async_trait::async_trait;
     use bitcoin::secp256k1::Secp256k1;
     use bitcoin::{FeeRate, PrivateKey, Transaction};
-    use bridge_canister::memory::{StableMemory, memory_by_id};
+    use bridge_canister::memory::{memory_by_id, StableMemory};
     use bridge_canister::operation_store::OperationsMemory;
     use bridge_canister::runtime::state::config::ConfigStorage;
     use bridge_canister::runtime::state::{SharedConfig, State};

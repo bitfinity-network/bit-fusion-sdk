@@ -17,10 +17,10 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::VirtualMemory;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ord_rs::Wallet;
+use ic_stable_structures::VirtualMemory;
 use ord_rs::wallet::LocalSigner;
+use ord_rs::Wallet;
 
 use self::config::Brc20BridgeConfigStorage;
 pub use self::master_key::MasterKey;

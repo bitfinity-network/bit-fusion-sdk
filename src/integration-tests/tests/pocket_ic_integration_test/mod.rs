@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{H256, TransactionReceipt};
+use did::{TransactionReceipt, H256};
 use eth_signer::ic_sign::SigningKeyId;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
@@ -19,9 +19,9 @@ use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
-use crate::context::{CanisterType, ICRC1_INITIAL_BALANCE, TestCanisters, TestContext};
-use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
 use crate::utils::error::Result;
+use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";

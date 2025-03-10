@@ -5,8 +5,8 @@ mod mint_tx_handler;
 use std::cell::RefCell;
 
 use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
-use bridge_canister::runtime::RuntimeState;
 use bridge_canister::runtime::service::ServiceId;
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use bridge_did::id256::Id256;
@@ -227,7 +227,7 @@ impl BtcBridgeOpImpl {
                                         .to_string(),
                                 ),
                             )
-                            .into());
+                            .into())
                         }
                     }
                 }
@@ -239,9 +239,7 @@ impl BtcBridgeOpImpl {
                 required_confirmations,
                 ..
             }) => {
-                log::debug!(
-                    "No new utxos found for {eth_address} with {current_confirmations} confirmations, waiting for {required_confirmations} confirmations"
-                );
+                log::debug!("No new utxos found for {eth_address} with {current_confirmations} confirmations, waiting for {required_confirmations} confirmations");
                 Err(BtcBridgeError::WaitingForConfirmations.into())
             }
             Err(UpdateBalanceError::NoNewUtxos { .. }) => {

@@ -1,8 +1,8 @@
 use bridge_canister::bridge::{Operation as _, OperationContext};
 use bridge_canister::memory::StableMemory;
-use bridge_canister::runtime::RuntimeState;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
 use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
+use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};

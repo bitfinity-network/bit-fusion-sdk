@@ -23,9 +23,9 @@ use self::state::config::ConfigStorage;
 use self::state::{SharedConfig, State};
 use crate::bridge::{Operation, OperationContext};
 use crate::memory::{
-    CONFIG_MEMORY_ID, MEMO_OPERATION_MEMORY_ID, OPERATIONS_ID_COUNTER_MEMORY_ID,
-    OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID, OPERATIONS_MEMORY_ID,
-    PENDING_TASKS_MEMORY_ID, PENDING_TASKS_SEQUENCE_MEMORY_ID, StableMemory, memory_by_id,
+    memory_by_id, StableMemory, CONFIG_MEMORY_ID, MEMO_OPERATION_MEMORY_ID,
+    OPERATIONS_ID_COUNTER_MEMORY_ID, OPERATIONS_LOG_MEMORY_ID, OPERATIONS_MAP_MEMORY_ID,
+    OPERATIONS_MEMORY_ID, PENDING_TASKS_MEMORY_ID, PENDING_TASKS_SEQUENCE_MEMORY_ID,
 };
 use crate::operation_store::OperationsMemory;
 
@@ -132,9 +132,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         };
 
         let Some(task_options) = operation.scheduling_options() else {
-            log::info!(
-                "Reschedule of operation #{operation_id} is requested but no scheduling is required for this operation"
-            );
+            log::info!("Reschedule of operation #{operation_id} is requested but no scheduling is required for this operation");
             return;
         };
 
@@ -142,9 +140,7 @@ impl<Op: Operation> BridgeRuntime<Op> {
         match current_task_id {
             Some(task_id) => {
                 self.scheduler.reschedule(task_id, task_options.clone());
-                log::trace!(
-                    "Updated schedule for operation #{operation_id} task #{task_id} to {task_options:?}"
-                );
+                log::trace!("Updated schedule for operation #{operation_id} task #{task_id} to {task_options:?}");
             }
             None => {
                 let task_id = self

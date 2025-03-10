@@ -8,10 +8,10 @@ use bridge_did::init::BridgeInitData;
 use bridge_utils::evm_bridge::EvmParams;
 use bridge_utils::evm_link::EvmLinkClient;
 use bridge_utils::query::{
-    self, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID, Query, QueryType,
+    self, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
 };
 use candid::{CandidType, Principal};
-use did::{H160, U256, codec};
+use did::{codec, H160, U256};
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_stable_structures::{CellStructure, StableCell, Storable};
 use jsonrpc_core::Id;

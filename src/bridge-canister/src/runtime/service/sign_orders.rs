@@ -77,7 +77,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
 
         let signer = self.order_handler.get_signer()?;
         let digest = keccak::keccak_hash(&orders_data);
-        let signature = signer.sign_digest(digest.0.0).await?;
+        let signature = signer.sign_digest(digest.0 .0).await?;
         let signature = PrimitiveSignature::from(signature);
         let signature_bytes: [u8; 65] = signature.into();
 

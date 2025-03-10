@@ -9,16 +9,16 @@ use bridge_utils::{BTFBridge, FeeCharge, UUPSProxy, WrappedToken, WrappedTokenDe
 use candid::{CandidType, Encode, IDLArgs, Principal, TypeEnv};
 use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{BlockNumber, H256, Transaction, TransactionReceipt, U256};
-use eth_signer::LocalWallet;
+use did::{BlockNumber, Transaction, TransactionReceipt, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::LocalWallet;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
 use tokio::time::Instant;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{Layer, filter};
+use tracing_subscriber::{filter, Layer};
 
 use crate::flow::{DepositToken, WithdrawToken};
 

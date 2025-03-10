@@ -84,7 +84,7 @@ impl IndexerType {
 
     pub fn normalize(&mut self) {
         match self {
-            Self::OrdHttp { url } => *url = url.strip_suffix('/').unwrap_or(url).to_owned(),
+            Self::OrdHttp { ref mut url } => *url = url.strip_suffix('/').unwrap_or(url).to_owned(),
         }
     }
 }

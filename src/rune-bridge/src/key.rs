@@ -7,7 +7,7 @@ use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey, XOnlyPublicKey};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{SignWithEcdsaArgument, sign_with_ecdsa};
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::{BtcTxSigner, OrdError, OrdResult};
 use thiserror::Error;
@@ -196,7 +196,7 @@ pub fn get_transit_address(state: &RefCell<RuneState>, eth_address: &H160) -> Ke
 
 pub fn get_derivation_path_ic(eth_address: &H160) -> Vec<Vec<u8>> {
     let mut bytes = vec![DERIVATION_PATH_PREFIX];
-    bytes.append(&mut eth_address.0.0.to_vec());
+    bytes.append(&mut eth_address.0 .0.to_vec());
 
     let mut dp = vec![];
     for slice in bytes.chunks_exact(3) {

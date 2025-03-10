@@ -8,7 +8,7 @@ use std::time::Duration;
 use bitcoin::bip32::ChainCode;
 use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_canister::memory::MEMORY_MANAGER;
-use bridge_did::init::{IndexerType, MIN_INDEXERS, RuneBridgeConfig};
+use bridge_did::init::{IndexerType, RuneBridgeConfig, MIN_INDEXERS};
 use bridge_did::runes::{RuneInfo, RuneName};
 use eth_signer::sign_strategy::SigningStrategy;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
@@ -16,10 +16,10 @@ use ic_exports::ic_cdk::api::management_canister::ecdsa::{
     EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
 };
 use ic_exports::ic_kit::ic;
-use ic_stable_structures::VirtualMemory;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
-use ord_rs::Wallet;
+use ic_stable_structures::VirtualMemory;
 use ord_rs::wallet::LocalSigner;
+use ord_rs::Wallet;
 use ordinals::RuneId;
 
 use self::config::RuneBridgeConfigStorage;

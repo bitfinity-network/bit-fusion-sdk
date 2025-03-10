@@ -4,7 +4,7 @@ pub use brc20::Brc20BridgeConfig;
 use candid::{CandidType, Principal};
 use clap::{Parser, ValueEnum};
 use eth_signer::sign_strategy::SigningStrategy;
-use eth_signer::{LocalWallet, sign_strategy};
+use eth_signer::{sign_strategy, LocalWallet};
 use serde::{Deserialize, Serialize};
 
 mod brc20;

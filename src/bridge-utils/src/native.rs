@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
 use alloy::primitives::B256;
-use did::HaltError;
 use did::block::ExeResult;
+use did::HaltError;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use thiserror::Error;
 

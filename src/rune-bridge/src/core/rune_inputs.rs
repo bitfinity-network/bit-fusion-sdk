@@ -43,16 +43,12 @@ pub(crate) enum GetInputsError {
     KeyError(#[from] KeyError),
     #[error("indexer responded with an error: {0}")]
     IndexerError(String),
-    #[error(
-        "rune indexers returned different result for same request: {first_response}; {another_response}"
-    )]
+    #[error("rune indexers returned different result for same request: {first_response}; {another_response}")]
     IndexersDisagree {
         first_response: String,
         another_response: String,
     },
-    #[error(
-        "insufficient consensus from rune indexers: {received_responses}/{required_responses} responses received, {checked_indexers} indexers checked"
-    )]
+    #[error("insufficient consensus from rune indexers: {received_responses}/{required_responses} responses received, {checked_indexers} indexers checked")]
     InsufficientConsensus {
         received_responses: usize,
         required_responses: u8,
