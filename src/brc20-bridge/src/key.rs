@@ -13,7 +13,7 @@ use bridge_did::schnorr::{
 use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{sign_with_ecdsa, SignWithEcdsaArgument};
+use ic_exports::ic_cdk::api::management_canister::ecdsa::{SignWithEcdsaArgument, sign_with_ecdsa};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::{BtcTxSigner, OrdError, OrdResult};
 use thiserror::Error;
@@ -241,7 +241,7 @@ pub fn get_transit_address(state: &RefCell<Brc20State>, eth_address: &H160) -> K
 
 pub fn get_derivation_path_ic(eth_address: &H160) -> Vec<Vec<u8>> {
     let mut bytes = vec![DERIVATION_PATH_PREFIX];
-    bytes.append(&mut eth_address.0 .0.to_vec());
+    bytes.append(&mut eth_address.0.0.to_vec());
 
     let mut dp = vec![];
     for slice in bytes.chunks_exact(3) {

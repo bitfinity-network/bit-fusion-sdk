@@ -5,14 +5,14 @@ use alloy::primitives::B256;
 use anyhow::bail;
 use candid::Principal;
 use clap::{ArgAction, Parser};
-use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
 use ic_agent::Identity;
+use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use tracing::level_filters::LevelFilter;
-use tracing::{debug, info, trace, Level};
+use tracing::{Level, debug, info, trace};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
-use tracing_subscriber::{filter, Layer as _};
+use tracing_subscriber::{Layer as _, filter};
 
 use crate::canister_ids::CanisterIdsPath;
 use crate::commands::Commands;
@@ -159,18 +159,20 @@ impl Cli {
             .with_span_events(FmtSpan::CLOSE)
             .with_writer(std::io::stdout);
 
+        let verbosity = self.verbosity;
+
         let registry = tracing_subscriber::registry().with(
             stdout_logger
                 .with_filter(self.level())
-                .with_filter(filter::filter_fn(self.source_filter())),
+                .with_filter(filter::filter_fn(Self::source_filter(verbosity))),
         );
 
         tracing::subscriber::set_global_default(registry).expect("failed to set global default");
     }
 
     /// Returns a filter function that filters out log messages based on the verbosity level.
-    fn source_filter(&self) -> impl Fn(&tracing::Metadata<'_>) -> bool {
-        if self.verbosity - 1 > 3 {
+    fn source_filter(verbosity: u8) -> impl Fn(&tracing::Metadata<'_>) -> bool {
+        if verbosity - 1 > 3 {
             Self::filter_none
         } else {
             Self::filter_deployer_only

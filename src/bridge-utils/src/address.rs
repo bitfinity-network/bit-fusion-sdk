@@ -1,4 +1,4 @@
-use alloy::primitives::{keccak256, Address, U256};
+use alloy::primitives::{Address, U256, keccak256};
 
 /// The address for an Ethereum contract is deterministically computed from the address of its
 /// creator (sender) and how many transactions the creator has sent (nonce).

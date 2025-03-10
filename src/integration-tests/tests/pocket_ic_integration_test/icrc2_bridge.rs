@@ -8,7 +8,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_did::reason::ApproveAfterMint;
 use bridge_utils::WrappedToken;
-use did::{H160, U256, U64};
+use did::{H160, U64, U256};
 use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
@@ -17,10 +17,10 @@ use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
-use super::{PocketIcTestContext, JOHN};
-use crate::context::stress::{icrc, StressTestConfig};
+use super::{JOHN, PocketIcTestContext};
+use crate::context::stress::{StressTestConfig, icrc};
 use crate::context::{
-    CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
+    CanisterType, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE, TestContext,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
 
@@ -203,10 +203,12 @@ async fn test_icrc2_token_canister_stopped() {
     ctx.advance_by_times(Duration::from_secs(2), 20).await;
 
     let minter_client = ctx.icrc_bridge_client(ADMIN);
-    let operation = dbg!(minter_client
-        .get_operations_list(&john_address, None, None)
-        .await
-        .unwrap())
+    let operation = dbg!(
+        minter_client
+            .get_operations_list(&john_address, None, None)
+            .await
+            .unwrap()
+    )
     .last()
     .cloned()
     .unwrap()

@@ -26,7 +26,7 @@ jobs:
           submodules: recursive
 
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.85.0
         with:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown, i686-unknown-linux-gnu

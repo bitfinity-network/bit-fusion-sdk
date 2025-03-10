@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use candid::Principal;
 use clap::Parser;
 use ic_canister_client::agent::identity::GenericIdentity;
-use ic_utils::interfaces::management_canister::builders::InstallMode;
 use ic_utils::interfaces::ManagementCanister;
+use ic_utils::interfaces::management_canister::builders::InstallMode;
 use tracing::info;
 
 /// The upgrade command.

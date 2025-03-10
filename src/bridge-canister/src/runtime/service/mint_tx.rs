@@ -8,7 +8,7 @@ use bridge_did::op_id::OperationId;
 use bridge_did::order::{SignedOrders, SignedOrdersData};
 use bridge_utils::btf_events::{self};
 use bridge_utils::evm_link::EvmLinkClient;
-use did::{Transaction as DidTransaction, H256};
+use did::{H256, Transaction as DidTransaction};
 use eth_signer::sign_strategy::TxSigner;
 
 use super::BridgeService;

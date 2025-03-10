@@ -6,7 +6,7 @@ use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::btf_events::TxParams;
-use crate::query::{batch_query, Query, QueryType, CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID};
+use crate::query::{CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID, Query, QueryType, batch_query};
 
 /// Information about EVM on a bridge side.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]

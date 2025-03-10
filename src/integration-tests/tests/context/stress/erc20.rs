@@ -8,7 +8,7 @@ use bridge_did::id256::Id256;
 use bridge_did::operation_log::Memo;
 use bridge_did::operations::Erc20OpStage;
 use bridge_utils::BTFBridge;
-use did::{TransactionReceipt, H160, H256, U256, U64};
+use did::{H160, H256, TransactionReceipt, U64, U256};
 use eth_signer::LocalWallet;
 use ic_exports::ic_cdk::println;
 use tokio::sync::RwLock;
@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
-use crate::utils::{TestWTM, CHAIN_ID};
+use crate::utils::{CHAIN_ID, TestWTM};
 
 pub struct Erc20BaseTokens<Ctx> {
     ctx: Ctx,
