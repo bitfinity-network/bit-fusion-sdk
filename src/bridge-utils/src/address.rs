@@ -1,18 +1,27 @@
 use alloy::primitives::{keccak256, Address, U256};
+use alloy_rlp::{Encodable, RlpEncodable};
 
 /// The address for an Ethereum contract is deterministically computed from the address of its
 /// creator (sender) and how many transactions the creator has sent (nonce).
 /// The sender and nonce are RLP encoded and then hashed with Keccak-256.
 pub fn get_contract_address(sender: Address, nonce: impl Into<U256>) -> Address {
+    #[derive(RlpEncodable)]
+    struct AddressWithNonce {
+        address: Address,
+        nonce: U256,
+    }
+
     let nonce: U256 = nonce.into();
 
-    let mut stream = rlp::RlpStream::new();
-    stream.begin_list(2);
-    stream.append(&sender.as_slice());
-    stream.append(&nonce.to_le_bytes_trimmed_vec());
+    let address_with_nonce = AddressWithNonce {
+        address: sender,
+        nonce,
+    };
 
-    let out = stream.out();
-    let hash = keccak256(&out);
+    let mut buffer = vec![];
+    address_with_nonce.encode(&mut buffer);
+
+    let hash = keccak256(&buffer);
 
     let mut bytes = [0u8; 20];
     bytes.copy_from_slice(&hash[12..]);

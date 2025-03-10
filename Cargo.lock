@@ -1506,6 +1506,7 @@ name = "bridge-utils"
 version = "0.2.0"
 dependencies = [
  "alloy",
+ "alloy-rlp",
  "alloy-sol-types",
  "anyhow",
  "bridge-did",
@@ -1522,7 +1523,6 @@ dependencies = [
  "jsonrpc-core",
  "log",
  "num-traits",
- "rlp 0.6.1",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -6074,16 +6074,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rlp"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa24e92bb2a83198bb76d661a71df9f7076b8c420b8696e4d3d97d50d94479e3"
-dependencies = [
- "bytes",
- "rustc-hex",
-]
-
-[[package]]
 name = "ruint"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6102,7 +6092,7 @@ dependencies = [
  "primitive-types",
  "proptest",
  "rand",
- "rlp 0.5.2",
+ "rlp",
  "ruint-macro",
  "serde",
  "valuable",
