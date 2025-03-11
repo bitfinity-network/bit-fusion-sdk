@@ -6,9 +6,9 @@ Bridge Deployer is a CLI tool for deploying and managing various types of bridge
 
 - **EVM Canister**: canister installed on Internet Computer running the **Bitfinity EVM**
 - **Principal**: A unique identifier for a canister on the Internet Computer
-- **Base token**: the native token to bridge (e.g. USDT on Ethereum).
-- **BFT Bridge**: An ethereum smart contract that bridges the Base token with the Wrapped token on the EVM side.
-- **Wrapped token**: the smart contract of the token on the bridged side (e.g. USDT on Bitfinity EVM). This token is either installed on the **Bitfinity EVM** or on the specified EVM network.
+- **Base token**: the native token to bridge (e.g. USDT on Ethereum; BTC on Bitcoin, ...).
+- **BTF Bridge**: An ethereum smart contract that bridges the Base token with the Wrapped token on the EVM side.
+- **Wrapped token**: the smart contract of the token on the bridged side (e.g. USDT on Bitfinity EVM; BTC on Bitfinity EVM, ...). This token is either installed on the **Bitfinity EVM** or on the specified EVM network.
 - **Bridge Network**: the Internet Computer network where the bridge canister will be deployed (e.g. ic, localhost).
 - **EVM RPC**: the RPC URL of the EVM network which will the Wrapped token will be installed to.
 
