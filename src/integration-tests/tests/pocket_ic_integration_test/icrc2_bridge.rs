@@ -12,7 +12,7 @@ use did::{H160, U256, U64};
 use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
-use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use ic_exports::pocket_ic::{ErrorCode, RejectResponse};
 use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
@@ -269,10 +269,10 @@ async fn set_owner_access() {
     let err = admin_client.set_owner(alice()).await.unwrap_err();
     assert!(matches!(
         err,
-        CanisterClientError::PocketIcTestError(CallError::UserError(UserError {
-            code: ErrorCode::CanisterCalledTrap,
-            description: _,
-        }))
+        CanisterClientError::PocketIcTestError(RejectResponse {
+            error_code: ErrorCode::CanisterCalledTrap,
+            ..
+        })
     ));
 
     // Now Alice is owner, so she can update owner.

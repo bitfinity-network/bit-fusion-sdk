@@ -3,7 +3,7 @@ use did::error::EvmError;
 use ic_canister_client::CanisterClientError;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use ic_exports::icrc_types::icrc2::approve::ApproveError;
-use ic_exports::pocket_ic::CallError;
+use ic_exports::pocket_ic::RejectResponse;
 use ic_test_utils::Error;
 use thiserror::Error;
 
@@ -60,8 +60,8 @@ impl From<ApproveError> for TestError {
     }
 }
 
-impl From<CallError> for TestError {
-    fn from(e: CallError) -> Self {
+impl From<RejectResponse> for TestError {
+    fn from(e: RejectResponse) -> Self {
         Self::CanisterClient(CanisterClientError::PocketIcTestError(e))
     }
 }

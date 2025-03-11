@@ -1,6 +1,4 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bridge_did::evm_link::EvmLink;
 use bridge_utils::evm_link::{RpcApi, RpcService};
@@ -15,9 +13,7 @@ use ic_utils::interfaces::ManagementCanister;
 use crate::context::{CanisterType, TestCanisters, TestContext};
 use crate::utils::error::{Result, TestError};
 
-mod brc20_bridge;
 mod bridge_deployer;
-mod rune_bridge;
 
 const DFX_URL: &str = "http://127.0.0.1:4943";
 pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
@@ -207,28 +203,4 @@ impl TestContext for DfxTestContext {
     fn sign_key(&self) -> SigningKeyId {
         SigningKeyId::Dfx
     }
-}
-
-/// Blocks until the predicate returns [`Ok`].
-///
-/// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
-/// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(predicate: F, ctx: &DfxTestContext, max_wait: Duration) -> T
-where
-    F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
-{
-    let start = Instant::now();
-    let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");
-    while start.elapsed() < max_wait {
-        match predicate().await {
-            Ok(res) => return res,
-            Err(e) => err = e,
-        }
-        ctx.advance_time(Duration::from_millis(100)).await;
-    }
-
-    panic!(
-        "Predicate did not succeed within {}s: {err}",
-        max_wait.as_secs()
-    );
 }

@@ -9,11 +9,11 @@ use crate::context::rune_bridge::{
     generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,
 };
 use crate::context::TestContext;
-use crate::dfx_tests::block_until_succeeds;
+use crate::pocket_ic_integration_test::block_until_succeeds;
 
 #[tokio::test]
 async fn runes_bridging_flow() {
-    let ctx = RunesContext::dfx(&[generate_rune_name()]).await;
+    let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
@@ -100,7 +100,7 @@ async fn runes_bridging_flow() {
 
 #[tokio::test]
 async fn inputs_from_different_users() {
-    let ctx = RunesContext::dfx(&[generate_rune_name()]).await;
+    let ctx = RunesContext::pocket_ic(&[generate_rune_name()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     // Mint one block in case there are some pending transactions
@@ -212,7 +212,7 @@ async fn inputs_from_different_users() {
 
 #[tokio::test]
 async fn test_should_deposit_two_runes_in_a_single_tx() {
-    let ctx = RunesContext::dfx(&[generate_rune_name(), generate_rune_name()]).await;
+    let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
@@ -273,7 +273,7 @@ async fn test_should_deposit_two_runes_in_a_single_tx() {
 
 #[tokio::test]
 async fn test_should_deposit_two_runes_in_two_tx() {
-    let ctx = RunesContext::dfx(&[generate_rune_name(), generate_rune_name()]).await;
+    let ctx = RunesContext::pocket_ic(&[generate_rune_name(), generate_rune_name()]).await;
     let foo_rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let bar_rune_id = ctx.runes.runes.keys().nth(1).copied().unwrap();
 
@@ -335,7 +335,7 @@ async fn test_should_deposit_two_runes_in_two_tx() {
 #[tokio::test]
 async fn bail_out_of_impossible_deposit() {
     let rune_name = generate_rune_name();
-    let ctx = RunesContext::dfx(&[rune_name.clone()]).await;
+    let ctx = RunesContext::pocket_ic(&[rune_name.clone()]).await;
 
     let rune_id = ctx.runes.runes.keys().next().copied().unwrap();
     let rune_name = RuneName::from_str(&rune_name).unwrap();

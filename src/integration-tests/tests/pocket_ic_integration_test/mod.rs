@@ -1,6 +1,8 @@
+mod brc20_bridge;
 pub mod btc_bridge;
 pub mod erc20_bridge;
 pub mod icrc2_bridge;
+mod rune_bridge;
 mod token;
 
 use std::fmt;
@@ -46,12 +48,19 @@ impl PocketIcTestContext {
         .await
     }
 
+    /// Creates a new test context with the given canisters and with the PocketIC instance in live mode.
     pub async fn new_live(canisters_set: &[CanisterType]) -> Self {
         Self::new_with(
             canisters_set,
             |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
+            |mut pic| {
+                Box::pin(async move {
+                    pic.set_time(std::time::SystemTime::now()).await;
+                    pic.make_live(None).await;
+                    pic
+                })
+            },
+            true,
         )
         .await
     }
@@ -161,7 +170,12 @@ impl TestContext for PocketIcTestContext {
 
     fn client(&self, canister: Principal, caller: &str) -> Self::Client {
         let caller_principal = Self::principal_of(caller);
-        PocketIcClient::from_client(self.client.clone(), canister, caller_principal)
+
+        if self.live {
+            PocketIcClient::from_client_live(self.client.clone(), canister, caller_principal)
+        } else {
+            PocketIcClient::from_client(self.client.clone(), canister, caller_principal)
+        }
     }
 
     fn principal_by_caller_name(&self, caller: &str) -> Principal {

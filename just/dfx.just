@@ -21,17 +21,11 @@ dfx_stop:
 
 # Start docker, dfx and run the dfx tests
 [group('dfx')]
-dfx_test test_name="": docker_down docker_pull docker_up dfx_start
+dfx_test test_name="":
   #!/usr/bin/env bash
   sleep 5
 
-  cleanup() {
-    just dfx_stop docker_down
-  }  
-  trap cleanup EXIT INT TERM
-
   cargo test {{test_name}} -p integration-tests --features dfx_tests
-
 
 
 [private]
