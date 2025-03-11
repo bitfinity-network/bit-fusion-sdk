@@ -30,6 +30,9 @@ pub enum TestError {
     #[error(transparent)]
     Icrc(IcrcError),
 
+    #[error("Ganache error: {0}")]
+    Ganache(String),
+
     #[error("{0}")]
     Generic(String),
 }
