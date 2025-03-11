@@ -6,6 +6,7 @@ use eth_signer::{Signer as _, Wallet};
 
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::DfxTestContext;
+use crate::utils::test_evm::{GanacheEvm, TestEvm};
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
@@ -15,8 +16,10 @@ pub const HARDHAT_ETH_PRIVATE_KEY: &str =
 
 pub struct CommonCliArgs {
     pub evm: String,
-    pub private_key: String,
+    pub evm_rpc: String,
+    pub evm_node: GanacheEvm,
     pub identity_path: PathBuf,
+    pub private_key: String,
 }
 
 impl CommonCliArgs {
@@ -39,8 +42,19 @@ impl CommonCliArgs {
         identity_path.push(ADMIN);
         identity_path.push("identity.pem");
 
+        // start evm rpc
+        let evm_node = GanacheEvm::run().await;
+
+        // mint some tokens to the wallet
+        evm_node
+            .mint_native_tokens(wallet.address().into(), u128::MAX.into())
+            .await
+            .expect("failed to mint native tokens");
+
         Self {
             evm: evm_principal,
+            evm_rpc: evm_node.rpc_url.clone(),
+            evm_node,
             private_key: HARDHAT_ETH_PRIVATE_KEY.to_string(),
             identity_path,
         }

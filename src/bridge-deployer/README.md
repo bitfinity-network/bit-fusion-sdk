@@ -2,11 +2,22 @@
 
 Bridge Deployer is a CLI tool for deploying and managing various types of bridge contracts on the Internet Computer and Ethereum networks.
 
+## Glossary
+
+- **EVM Canister**: canister installed on Internet Computer running the **Bitfinity EVM**
+- **Principal**: A unique identifier for a canister on the Internet Computer
+- **Base token**: the native token to bridge (e.g. USDT on Ethereum; BTC on Bitcoin, ...).
+- **BTF Bridge**: An ethereum smart contract that bridges the Base token with the Wrapped token on the EVM side.
+- **Wrapped token**: the smart contract of the token on the bridged side (e.g. USDT on Bitfinity EVM; BTC on Bitfinity EVM, ...). This token is either installed on the **Bitfinity EVM** or on the specified EVM network.
+- **Bridge Network**: the Internet Computer network where the bridge canister will be deployed (e.g. ic, localhost).
+- **EVM RPC**: the RPC URL of the EVM network which will the Wrapped token will be installed to.
+
 ## Requirements
 
 - Rust
 - Forge CLI Installed
 - dfx (only for **local** deployment)
+- Either the EVM canister or an EVM RPC URL pointing to a network where the Wrapped token is deployed.
 
 ## Installation
 
@@ -34,7 +45,9 @@ The general syntax for using the Bridge Deployer is:
 
 - `--identity <IDENTITY_PATH>`: Path to the identity file
 - `--private-key <PRIVATE_KEY>`: Private Key of the wallet to use for the transaction (can be provided as an environment variable `PRIVATE_KEY`)
-- `--evm-network <EVM_NETWORK>`: EVM network to deploy the contract to (e.g. "mainnet", "testnet", "localhost")
+- `--bridge-network <IC_NETWORK>`: Internet Computer network to deploy the bridge canister to (possible values: `ic` | `localhost`; default: localhost)
+- `--evm-principal <PRINCIPAL>`: Principal of the EVM canister to configure the bridge to communicate with the provided EVM canister. (must be used if `evm-rpc` is not provided). This is the EVM canister where the BTF bridge and the wrapped token contracts are deployed. Ensure that your wallet has enough native tokens to deploy the contracts.
+- `--evm-rpc <RPC_URL>`: EVM RPC URL to configure the bridge canister to communicate with a specific EVM network (must be used if `evm-principal` is not provided). The EVM RPC endpoint should be a valid HTTP URL and must be linked to an EVM where the BTF bridge and the wrapped token contract are deployed. Be aware that this operation will spend tokens (e.g. ETH) from your wallet by deploying the contracts.
 - `--canister-ids <PATH_TO_CANISTER_IDS>`: Path to the file containing the canister ids
 - `-v, --verbosity`: Set the verbosity level (use multiple times for higher levels)
 - `-q, --quiet`: Silence all output
@@ -53,15 +66,15 @@ For the deployment of canisters, you will require to have/create a wallet canist
 
 For the deployment, you will need to provide the wallet canister id as `--wallet-canister` or as an environment variable `WALLET_CANISTER`.
 
-Command to deploy a bridge canister:
+Command to deploy a bridge canister connecting the bridge to the EVM canister:
 
 ```bash
 ./bridge-deployer
   -vvv \
-  --evm-network localhost \
+  --bridge-network localhost \
   --private-key <PRIVATE_KEY> \
   --identity path/to/identity.pem \
-  --evm <EVM_PRINCIPAL> \
+  --evm-canister <EVM_PRINCIPAL|mainnet|testnet> \
   deploy \
   --wasm path/to/rune_bridge.wasm \
   --wallet-canister <WALLET_CANISTER> \
@@ -75,6 +88,8 @@ Command to deploy a bridge canister:
   --bitcoin-network <bitcoin_network> \
   --indexer-consensus-threshold 3
 ```
+
+If you want to connect the bridge to a custom EVM node with RPC you can use the `--evm-rpc` argument in place of `--evm-canister`.
 
 For more detailed information on each command and its options, use the `--help` flag:
 
@@ -106,7 +121,7 @@ Note: You need to provide the canister arguments for the bridge type you are rei
 
 ```bash
 bridge-deployer -vvv \
-  --evm-network mainnet \
+  --bridge-network mainnet \
   --identity <IDENTITY_PATH> \
   deploy \
   --wasm ./icrc_bridge.wasm \
@@ -114,7 +129,7 @@ bridge-deployer -vvv \
   icrc \
   --signing-key-id production \
   --owner 2vxsx-fae \
-  --evm <EVM_PRINCIPAL> \
+  --evm-principal <EVM_PRINCIPAL> \
   --log-filter "trace" # You can set the log filter to "trace", "debug", "info", "warn", "error"
 ```
 

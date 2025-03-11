@@ -1,0 +1,6 @@
+```
+$ bridge-deployer -v --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH reinstall --wasm $ERC20_BRIDGE_WASM_PATH  --btf-bridge $BTF_BRIDGE --canister-id $ERC20_BRIDGE_ID erc20 --base-evm-principal $EVM_PRINCIPAL --signing-key-id dfx --enable-console --log-filter trace
+Starting Bitfinity Deployer v[..]
+Canister erc20-bridge reinstalled with ID [..]
+
+```

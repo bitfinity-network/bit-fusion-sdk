@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use bridge_did::evm_link::EvmLink;
 use candid::Principal;
 use clap::Parser;
 use ethereum_types::H160;
@@ -11,7 +12,8 @@ use tracing::info;
 use super::Bridge;
 use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath, CanisterType};
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
+use crate::evm::ic_host;
 
 /// The reinstall command.
 ///
@@ -48,13 +50,13 @@ impl ReinstallCommands {
     pub async fn reinstall_canister(
         &self,
         identity: GenericIdentity,
-        ic_host: &str,
-        network: EvmNetwork,
+        network: IcNetwork,
         canister_ids_path: CanisterIdsPath,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<()> {
         info!("Starting canister reinstall");
 
+        let ic_host = ic_host(network);
         let canister_ids = CanisterIds::read_or_default(canister_ids_path);
 
         // get canister id
@@ -70,11 +72,11 @@ impl ReinstallCommands {
         };
 
         let agent = Agent::builder()
-            .with_url(ic_host)
+            .with_url(&ic_host)
             .with_identity(identity)
             .build()?;
 
-        super::fetch_root_key(ic_host, &agent).await?;
+        super::fetch_root_key(&ic_host, &agent).await?;
 
         let canister_wasm_path = self
             .wasm
@@ -89,7 +91,7 @@ impl ReinstallCommands {
                 &self.bridge_type,
                 InstallMode::Reinstall,
                 network,
-                evm,
+                evm_link,
             )
             .await?;
 

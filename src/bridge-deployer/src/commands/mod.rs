@@ -22,7 +22,7 @@ use upgrade::UpgradeCommands;
 use crate::canister_ids::{CanisterIdsPath, CanisterType};
 use crate::commands::wrap_token_type::WrapTokenType;
 use crate::config::{self, BaseEvmSettingsConfig};
-use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
+use crate::contracts::{IcNetwork, NetworkConfig, SolidityContractDeployer};
 
 mod deploy;
 mod reinstall;
@@ -116,8 +116,8 @@ impl Bridge {
     pub fn init_raw_arg(
         &self,
         owner: Principal,
-        evm_network: EvmNetwork,
-        evm: Principal,
+        evm_network: IcNetwork,
+        evm_link: EvmLink,
     ) -> anyhow::Result<Vec<u8>> {
         let arg = match &self {
             Bridge::Brc20 {
@@ -125,14 +125,18 @@ impl Bridge {
                 brc20,
             } => {
                 trace!("Preparing BRC20 bridge configuration");
-                let init_data = init.clone().into_bridge_init_data(owner, evm_network, evm);
+                let init_data = init
+                    .clone()
+                    .into_bridge_init_data(owner, evm_network, evm_link);
                 debug!("BRC20 Bridge Config : {:?}", init_data);
                 let brc20_config = bridge_did::init::brc20::Brc20BridgeConfig::from(brc20.clone());
                 Encode!(&init_data, &brc20_config)?
             }
             Bridge::Rune { init, rune } => {
                 trace!("Preparing Rune bridge configuration");
-                let init_data = init.clone().into_bridge_init_data(owner, evm_network, evm);
+                let init_data = init
+                    .clone()
+                    .into_bridge_init_data(owner, evm_network, evm_link);
                 debug!("Init Bridge Config : {:?}", init_data);
                 let rune_config = bridge_did::init::RuneBridgeConfig::from(rune.clone());
                 debug!("Rune Bridge Config : {:?}", rune_config);
@@ -142,14 +146,16 @@ impl Bridge {
                 trace!("Preparing ICRC bridge configuration");
                 let config = config
                     .clone()
-                    .into_bridge_init_data(owner, evm_network, evm);
+                    .into_bridge_init_data(owner, evm_network, evm_link);
                 debug!("ICRC Bridge Config : {:?}", config);
                 Encode!(&config)?
             }
             Bridge::Erc20 { init, erc, .. } => {
                 trace!("Preparing ERC20 bridge configuration");
                 let signing_strategy = init.signing_key_id(evm_network).into();
-                let init = init.clone().into_bridge_init_data(owner, evm_network, evm);
+                let init = init
+                    .clone()
+                    .into_bridge_init_data(owner, evm_network, evm_link);
 
                 // Workaround for not depending on the `erc-20` crate
                 #[derive(candid::CandidType)]
@@ -177,7 +183,7 @@ impl Bridge {
                 let connection = bridge_did::init::btc::BitcoinConnection::from(*connection);
                 let init_data = config
                     .clone()
-                    .into_bridge_init_data(owner, evm_network, evm);
+                    .into_bridge_init_data(owner, evm_network, evm_link);
                 let config = BtcBridgeConfig {
                     network: connection,
                     init_data,
@@ -193,25 +199,32 @@ impl Bridge {
     pub async fn finalize(
         &self,
         btf_args: &BTFArgs,
-        wrapped_network: EvmNetwork,
+        wrapped_network: IcNetwork,
         bridge_principal: Principal,
         pk: H256,
         agent: &Agent,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<Option<BtfDeployedContracts>> {
         match self {
             Self::Erc20 { erc, base_eth, .. } => {
                 let network = if let Some(url) = &erc.base_evm_url {
                     NetworkConfig {
                         custom_network: Some(url.clone()),
-                        evm_network: EvmNetwork::Localhost,
+                        bridge_network: IcNetwork::Localhost,
                     }
                 } else {
                     wrapped_network.into()
                 };
 
                 let contracts = btf_args
-                    .deploy_btf(network.clone(), bridge_principal, pk, agent, false, evm)
+                    .deploy_btf(
+                        network.clone(),
+                        bridge_principal,
+                        pk,
+                        agent,
+                        false,
+                        evm_link.clone(),
+                    )
                     .await?;
 
                 info!("Base BTF bridge deployed with address {contracts:?}");
@@ -225,7 +238,7 @@ impl Bridge {
                     .await?;
 
                 if let Some(eth) = base_eth {
-                    let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
+                    let contract_deployer = SolidityContractDeployer::new(network, pk, evm_link);
                     contract_deployer
                         .transfer_eth(&contracts.minter_address, *eth)
                         .await?;
@@ -262,9 +275,8 @@ impl Commands {
     pub async fn run(
         &self,
         identity: GenericIdentity,
-        ic_host: &str,
-        network: EvmNetwork,
-        evm: Principal,
+        network: IcNetwork,
+        evm: EvmLink,
         pk: H256,
         canister_ids_path: CanisterIdsPath,
     ) -> anyhow::Result<()> {
@@ -276,10 +288,10 @@ impl Commands {
             }
             Commands::Reinstall(reinstall) => {
                 reinstall
-                    .reinstall_canister(identity, ic_host, network, canister_ids_path, evm)
+                    .reinstall_canister(identity, network, canister_ids_path, evm)
                     .await?
             }
-            Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, ic_host).await?,
+            Commands::Upgrade(upgrade) => upgrade.upgrade_canister(identity, network).await?,
             Commands::Wrap(wrap_token_type) => wrap_token_type.wrap(network, pk, evm).await?,
         };
 
@@ -315,11 +327,11 @@ impl BTFArgs {
         pk: H256,
         agent: &Agent,
         is_wrapped_side: bool,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<BtfDeployedContracts> {
         info!("Deploying BTF contract");
 
-        let contract_deployer = SolidityContractDeployer::new(network, pk, evm);
+        let contract_deployer = SolidityContractDeployer::new(network, pk, evm_link);
 
         let nonce_increment = match is_wrapped_side {
             true => 3,  // 1) TokenDeployer, 2) BTFBridge, 3) FeePayer
