@@ -3,6 +3,7 @@ use std::process::{Command, Stdio};
 
 use alloy::primitives::{Address, B256};
 use anyhow::bail;
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_did::init::btc::WrappedTokenConfig;
 use candid::{Encode, Principal};
@@ -17,7 +18,7 @@ use crate::bridge_deployer::BridgeDeployer;
 use crate::canister_ids::{CanisterIds, CanisterIdsPath};
 use crate::commands::BtfDeployedContracts;
 use crate::config::BtcBridgeConnection;
-use crate::contracts::{EvmNetwork, SolidityContractDeployer};
+use crate::contracts::{IcNetwork, SolidityContractDeployer};
 use crate::evm::ic_host;
 
 /// The default number of cycles to deposit to the canister
@@ -78,10 +79,10 @@ impl DeployCommands {
     pub async fn deploy_canister(
         &self,
         identity: GenericIdentity,
-        network: EvmNetwork,
+        network: IcNetwork,
         pk: B256,
         canister_ids_path: CanisterIdsPath,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<()> {
         info!("Starting canister deployment");
         let mut canister_ids = CanisterIds::read_or_default(canister_ids_path);
@@ -108,7 +109,7 @@ impl DeployCommands {
                 &self.bridge_type,
                 InstallMode::Install,
                 network,
-                evm,
+                evm_link.clone(),
             )
             .await?;
 
@@ -124,7 +125,14 @@ impl DeployCommands {
             minter_address,
         } = self
             .btf_args
-            .deploy_btf(network.into(), canister_id, pk, &agent, true, evm)
+            .deploy_btf(
+                network.into(),
+                canister_id,
+                pk,
+                &agent,
+                true,
+                evm_link.clone(),
+            )
             .await?;
 
         info!("BTF bridge deployed successfully with {btf_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
@@ -133,7 +141,7 @@ impl DeployCommands {
         if let Bridge::Btc { connection, .. } = &self.bridge_type {
             info!("Deploying wrapped BTC contract");
             let wrapped_btc_addr =
-                self.deploy_wrapped_btc(network, pk, &btf_bridge, *connection, evm)?;
+                self.deploy_wrapped_btc(network, pk, &btf_bridge, *connection, evm_link.clone())?;
 
             info!("Wrapped BTC contract deployed successfully with {wrapped_btc_addr:x}");
             println!("Wrapped BTC contract deployed with address {wrapped_btc_addr:x}");
@@ -147,7 +155,8 @@ impl DeployCommands {
         deployer.configure_minter(btf_bridge).await?;
 
         if let Some(eth) = self.eth {
-            let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
+            let contract_deployer =
+                SolidityContractDeployer::new(network.into(), pk, evm_link.clone());
             contract_deployer.transfer_eth(&minter_address, eth).await?;
         }
 
@@ -159,7 +168,7 @@ impl DeployCommands {
                 deployer.bridge_principal(),
                 pk,
                 &agent,
-                evm,
+                evm_link,
             )
             .await?;
 
@@ -201,13 +210,13 @@ impl DeployCommands {
     /// Deploys the wrapped BTC contract.
     fn deploy_wrapped_btc(
         &self,
-        network: EvmNetwork,
+        network: IcNetwork,
         pk: B256,
         btf_bridge: &Address,
         btc_connection: BtcBridgeConnection,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<Address> {
-        let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm);
+        let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm_link);
         let base_token_id = Id256::from(btc_connection.ledger_principal());
 
         contract_deployer.deploy_wrapped_token(
@@ -248,7 +257,7 @@ impl DeployCommands {
     ///
     /// If configured through CLI argument, will return the set one. Otherwise, will return the
     /// default wallet of the current DFX identity.
-    fn get_wallet_canister(&self, network: EvmNetwork) -> anyhow::Result<Principal> {
+    fn get_wallet_canister(&self, network: IcNetwork) -> anyhow::Result<Principal> {
         if let Some(principal) = self.wallet_canister {
             return Ok(principal);
         }
@@ -256,7 +265,7 @@ impl DeployCommands {
         let mut command = Command::new("dfx");
         command.args(vec!["identity", "get-wallet"]);
 
-        if network != EvmNetwork::Localhost {
+        if network != IcNetwork::Localhost {
             command.arg("--ic");
         }
 

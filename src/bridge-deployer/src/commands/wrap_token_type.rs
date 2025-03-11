@@ -1,9 +1,9 @@
 use alloy::primitives::{Address, B256};
 use alloy::rpc::types::TransactionRequest;
 use alloy_sol_types::{SolInterface, SolValue};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
-use candid::Principal;
 use clap::{Args, Subcommand};
 use did::{BlockNumber, Bytes};
 use eth_signer::LocalWallet;
@@ -11,7 +11,7 @@ use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
 use tracing::info;
 
-use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
+use crate::contracts::{IcNetwork, NetworkConfig, SolidityContractDeployer};
 
 #[derive(Debug, Subcommand)]
 pub enum WrapTokenType {
@@ -19,10 +19,15 @@ pub enum WrapTokenType {
 }
 
 impl WrapTokenType {
-    pub async fn wrap(&self, network: EvmNetwork, pk: B256, evm: Principal) -> anyhow::Result<()> {
+    pub async fn wrap(
+        &self,
+        network: IcNetwork,
+        pk: B256,
+        evm_link: EvmLink,
+    ) -> anyhow::Result<()> {
         let base_token_parameters = self.get_base_token_parameters(pk).await?;
         let wrapped_token_address = self
-            .deploy_wrapped_token(&base_token_parameters, network, pk, evm)
+            .deploy_wrapped_token(&base_token_parameters, network, pk, evm_link)
             .await?;
 
         info!(
@@ -57,17 +62,17 @@ impl WrapTokenType {
     async fn deploy_wrapped_token(
         &self,
         base_token_params: &TokenParameters,
-        evm_network: EvmNetwork,
+        evm_network: IcNetwork,
         pk: B256,
-        evm: Principal,
+        evm_link: EvmLink,
     ) -> anyhow::Result<Address> {
         let deployer = SolidityContractDeployer::new(
             NetworkConfig {
-                evm_network,
+                bridge_network: evm_network,
                 custom_network: None,
             },
             pk,
-            evm,
+            evm_link,
         );
         let TokenParameters {
             name,
