@@ -89,9 +89,7 @@ jobs:
       - name: test
         if: ${{ !inputs.skip-test }}
         run: |
-          just test_all || true
-          cat target/integration_tests.log | grep "RuneBridge"
-          exit 1
+          just test_all
 
       - name: 32bits test
         if: ${{ !inputs.skip-test }}
@@ -102,3 +100,11 @@ jobs:
         if: ${{ !inputs.skip-test }}
         run: |
           just dfx_test
+
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: |
+            target/integration_tests.log
