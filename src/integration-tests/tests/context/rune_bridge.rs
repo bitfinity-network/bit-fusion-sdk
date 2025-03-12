@@ -462,8 +462,8 @@ where
             .await;
 
         self.wait_for_blocks(REQUIRED_CONFIRMATIONS).await;
-        const MAX_WAIT: Duration = Duration::from_secs(60);
-        const OP_INTERVAL: Duration = Duration::from_secs(5);
+        const MAX_WAIT: Duration = Duration::from_secs(120);
+        const OP_INTERVAL: Duration = Duration::from_secs(10);
         let start = Instant::now();
 
         let mut successful_orders = HashSet::new();
