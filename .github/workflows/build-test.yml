@@ -89,8 +89,9 @@ jobs:
       - name: test
         if: ${{ !inputs.skip-test }}
         run: |
-          just test_all
+          just test_all || true
           cat target/integration_tests.log | grep "RuneBridge"
+          exit 1
 
       - name: 32bits test
         if: ${{ !inputs.skip-test }}
