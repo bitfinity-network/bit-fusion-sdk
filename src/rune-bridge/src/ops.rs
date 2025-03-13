@@ -185,7 +185,7 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Deposit(_) | RuneBridgeOp::Withdraw(_) => Some(
                 TaskOptions::new()
                     .with_max_retries_policy(10)
-                    .with_fixed_backoff_policy(5),
+                    .with_fixed_backoff_policy(30),
             ),
         }
     }
