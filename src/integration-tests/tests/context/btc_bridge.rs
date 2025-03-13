@@ -74,14 +74,15 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                         18444,
                     ))
             },
-            |pic| {
+            |mut pic| {
                 Box::pin(async move {
                     // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
                     pic.set_time(std::time::SystemTime::now()).await;
+                    pic.make_live(None).await;
                     pic
                 })
             },
-            false,
+            true,
         )
         .await;
 
@@ -378,7 +379,7 @@ where
             &from_wallet.private_key,
             &from_wallet.address,
         )
-        .transfer(amount, funding_utxo, &deposit_address)
+        .transfer(amount, vec![funding_utxo], &deposit_address)
         .await?;
 
         // wait for confirmations

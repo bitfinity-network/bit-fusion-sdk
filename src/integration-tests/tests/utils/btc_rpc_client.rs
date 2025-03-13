@@ -148,4 +148,24 @@ impl BitcoinRpcClient {
 
         Ok(balance)
     }
+
+    /// Get unspent utxos for the provided address
+    pub fn get_unspent_utxos(&self, address: &Address) -> anyhow::Result<Vec<Utxo>> {
+        let descriptor = format!("addr({address})",);
+        let response = self
+            .client
+            .scan_tx_out_set_blocking(&[ScanTxOutRequest::Single(descriptor)])?;
+
+        let mut utxos = vec![];
+
+        for unspent in response.unspents {
+            utxos.push(Utxo {
+                id: unspent.txid,
+                index: unspent.vout,
+                amount: unspent.amount,
+            });
+        }
+
+        Ok(utxos)
+    }
 }
