@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use alloy::primitives::{Address, B256};
 use alloy_sol_types::{SolCall, SolConstructor};
 use bridge_did::id256::Id256;
 use bridge_did::reason::Icrc2Burn;
@@ -10,9 +11,7 @@ use clap::Parser;
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{BlockNumber, Transaction, TransactionReceipt, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer, Wallet};
-use ethereum_types::H160;
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
 use tokio::time::Instant;
@@ -97,7 +96,7 @@ struct DepositIcrcArgs {
 
     /// ERC20 token address
     #[arg(long)]
-    erc20_token_address: H160,
+    erc20_token_address: Address,
 
     /// IC host
     #[arg(long)]
@@ -342,7 +341,7 @@ async fn get_nonce(args: GetNonceArgs) {
 }
 
 async fn deposit_icrc(args: DepositIcrcArgs) {
-    let btf_bridge = H160::from_slice(
+    let btf_bridge = Address::from_slice(
         &hex::decode(args.btf_bridge.trim_start_matches("0x"))
             .expect("failed to parse btf bridge address"),
     );
@@ -388,16 +387,16 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         input,
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to sign the transaction");
 
     let hash = client
-        .send_raw_transaction(notify_minter_tx)
+        .send_raw_transaction(notify_minter_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute deposit notification transaction");
@@ -413,18 +412,20 @@ async fn deposit_icrc(args: DepositIcrcArgs) {
 async fn get_wallet<'a>(
     pk: &'a Option<String>,
     client: &'a EvmCanisterClient<IcAgentClient>,
-) -> Wallet<'a, SigningKey> {
+) -> LocalWallet {
     match pk {
-        Some(v) => Wallet::from_bytes(
-            &hex::decode(v.trim_start_matches("0x")).expect("invalid hex string for wallet PK"),
+        Some(v) => LocalWallet::from_bytes(
+            &(B256::from_slice(
+                &hex::decode(v.trim_start_matches("0x")).expect("invalid hex string for wallet PK"),
+            )),
         )
         .expect("invalid wallet PK value"),
         None => create_new_wallet(client).await,
     }
 }
 
-async fn create_new_wallet(client: &EvmCanisterClient<IcAgentClient>) -> Wallet<SigningKey> {
-    let wallet = Wallet::new(&mut rand::thread_rng());
+async fn create_new_wallet(client: &EvmCanisterClient<IcAgentClient>) -> LocalWallet {
+    let wallet = LocalWallet::random();
     eprintln!("Initialized new wallet: {:#x}", wallet.address());
 
     mint_tokens(client, &wallet).await;
@@ -432,7 +433,7 @@ async fn create_new_wallet(client: &EvmCanisterClient<IcAgentClient>) -> Wallet<
     wallet
 }
 
-async fn mint_tokens(client: &EvmCanisterClient<IcAgentClient>, wallet: &Wallet<'_, SigningKey>) {
+async fn mint_tokens(client: &EvmCanisterClient<IcAgentClient>, wallet: &LocalWallet) {
     let res = client
         .admin_mint_native_tokens(wallet.address().into(), u128::MAX.into())
         .await
@@ -459,8 +460,7 @@ async fn wait_for_tx_success(
         let receipt = client
             .eth_get_transaction_receipt(tx_hash.clone())
             .await
-            .expect("Failed to request transaction receipt")
-            .expect("Request for receipt failed");
+            .expect("Failed to request transaction receipt");
 
         if let Some(receipt) = receipt {
             if receipt.status != Some(1u64.into()) {
@@ -495,11 +495,16 @@ fn _print_signed_tx(tx: Transaction) {
     println!("{args}");
 }
 
+fn address_from_str(address: &str) -> Address {
+    Address::from_slice(
+        hex::decode(address.trim_start_matches("0x"))
+            .expect("failed to parse address")
+            .as_slice(),
+    )
+}
+
 async fn deploy_btf_bridge(args: DeployBtfArgs) {
-    let minter = H160::from_slice(
-        &hex::decode(args.minter_address.trim_start_matches("0x"))
-            .expect("failed to parse minter address"),
-    );
+    let minter = address_from_str(&args.minter_address);
 
     let identity = args.identity_path.as_deref().unwrap_or(IDENTITY_PATH);
     let host = args.ic_host.as_deref().unwrap_or("http://127.0.0.1:4943");
@@ -515,25 +520,17 @@ async fn deploy_btf_bridge(args: DeployBtfArgs) {
 
     let fee_charge = args
         .fee_charge_address
-        .map(|address_str| {
-            H160::from_slice(
-                &hex::decode(address_str.trim_start_matches("0x"))
-                    .expect("failed to parse fee charge address address"),
-            )
-        })
+        .map(|address_str| address_from_str(&address_str))
         .unwrap_or_default();
 
-    let wrapped_token_deployer = H160::from_slice(
-        &hex::decode(args.wrapped_token_deployer_address.trim_start_matches("0x"))
-            .expect("failed to parse wrapped token deployer address"),
-    );
+    let wrapped_token_deployer = address_from_str(&args.wrapped_token_deployer_address);
 
     async fn deploy_contract(
         client: &EvmCanisterClient<IcAgentClient>,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         input: Vec<u8>,
         chain_id: u64,
-    ) -> H160 {
+    ) -> Address {
         let nonce = client
             .eth_get_transaction_count(wallet.address().into(), BlockNumber::Pending)
             .await
@@ -546,16 +543,16 @@ async fn deploy_btf_bridge(args: DeployBtfArgs) {
             nonce,
             value: 0u64.into(),
             gas: 8_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(wallet.signer()),
+            signature: SigningMethod::SigningKey(wallet.credential()),
             chain_id: chain_id as _,
         }
         .calculate_hash_and_build()
         .expect("Failed to sign the transaction");
 
         let hash = client
-            .send_raw_transaction(tx)
+            .send_raw_transaction(tx.try_into().expect("failed to convert tx"))
             .await
             .expect("Failed to send raw transaction")
             .expect("Failed to execute contract deployment transaction");
@@ -626,18 +623,18 @@ async fn deploy_wrapped_token_deployer(args: DeployWrappedTokenDeployerArgs) {
         from: &did_from,
         input: deploy_tx_input,
         nonce,
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         to: None,
         value: U256::zero(),
         gas: 4_000_000_u64.into(),
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to build transaction");
 
     let hash = client
-        .send_raw_transaction(create_contract_tx)
+        .send_raw_transaction(create_contract_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute crate BTF contract transaction");
@@ -667,7 +664,7 @@ async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
         .bridges
         .iter()
         .map(|addr| {
-            let addr = H160::from_slice(
+            let addr = Address::from_slice(
                 &hex::decode(addr.trim_start_matches("0x"))
                     .expect("failed to parse bridge address"),
             );
@@ -688,18 +685,18 @@ async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
         from: &did_from,
         input: fee_charge_input,
         nonce: args.nonce.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         to: None,
         value: U256::zero(),
         gas: 4_000_000_u64.into(),
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to build transaction");
 
     let hash = client
-        .send_raw_transaction(create_contract_tx)
+        .send_raw_transaction(create_contract_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute crate BTF contract transaction");
@@ -713,21 +710,20 @@ async fn deploy_fee_charge(args: DeployFeeChargeArgs) {
 }
 
 fn expected_contract_address(args: ExpectedContractAddress) {
-    let wallet = Wallet::from_bytes(
-        &hex::decode(args.wallet.trim_start_matches("0x"))
-            .expect("invalid hex string for wallet PK"),
+    let wallet = LocalWallet::from_bytes(
+        &(B256::from_slice(
+            &hex::decode(args.wallet.trim_start_matches("0x"))
+                .expect("invalid hex string for wallet PK"),
+        )),
     )
     .expect("invalid wallet PK value");
     let deployer = wallet.address();
-    let contract_address = ethers_core::utils::get_contract_address(deployer, args.nonce);
+    let contract_address = bridge_utils::get_contract_address(deployer, U256::from(args.nonce));
     println!("{contract_address:#x}");
 }
 
 async fn create_token(args: CreateTokenArgs) {
-    let btf_bridge = H160::from_slice(
-        &hex::decode(args.btf_bridge_address.trim_start_matches("0x"))
-            .expect("failed to parse btf bridge address"),
-    );
+    let btf_bridge = address_from_str(&args.btf_bridge_address);
 
     let token_id = decode_token_id(&args.token_id)
         .unwrap_or_else(|| panic!("Invalid token id format: {}", args.token_id));
@@ -763,16 +759,16 @@ async fn create_token(args: CreateTokenArgs) {
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         input,
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to sign the transaction");
 
     let hash = client
-        .send_raw_transaction(create_token_tx)
+        .send_raw_transaction(create_token_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute crate token transaction");
@@ -814,13 +810,14 @@ async fn create_wallet(args: CreateWalletArgs) {
     }
     eprintln!("\"");
 
-    println!("0x{}", hex::encode(wallet.signer().to_bytes()));
+    println!("0x{}", hex::encode(wallet.credential().to_bytes()));
 }
 
 fn wallet_address(args: WalletAddressArgs) {
     let wallet_pk = hex::decode(args.wallet.trim_start_matches("0x"))
         .expect("Failed to decode wallet pk from hex string");
-    let wallet = Wallet::from_bytes(&wallet_pk).expect("Failed to create a wallet");
+    let wallet = LocalWallet::from_bytes(&(B256::from_slice(&wallet_pk)))
+        .expect("Failed to create a wallet");
 
     if args.candid {
         print!("blob \"");
@@ -852,15 +849,8 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
     let wallet = get_wallet(&wallet_addr, &client).await;
     let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
-    let btf_bridge = H160::from_slice(
-        &hex::decode(args.btf_bridge.trim_start_matches("0x"))
-            .expect("failed to parse btf bridge address"),
-    );
-
-    let token = H160::from_slice(
-        &hex::decode(args.token_address.trim_start_matches("0x"))
-            .expect("failed to parse btf bridge address"),
-    );
+    let btf_bridge = address_from_str(&args.btf_bridge);
+    let token = address_from_str(&args.token_address);
 
     let input = WrappedToken::balanceOfCall {
         account: wallet.address().0.into(),
@@ -901,16 +891,16 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         input,
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to sign the transaction");
 
     let hash = client
-        .send_raw_transaction(approve_tx)
+        .send_raw_transaction(approve_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute approve transaction");
@@ -938,16 +928,16 @@ async fn burn_wrapped(args: BurnWrappedArgs) {
         nonce,
         value: 0u64.into(),
         gas: 5_000_000u64.into(),
-        gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+        gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
         input,
-        signature: SigningMethod::SigningKey(wallet.signer()),
+        signature: SigningMethod::SigningKey(wallet.credential()),
         chain_id,
     }
     .calculate_hash_and_build()
     .expect("failed to sign the transaction");
 
     let hash = client
-        .send_raw_transaction(burn_tx)
+        .send_raw_transaction(burn_tx.try_into().expect("failed to convert tx"))
         .await
         .expect("Failed to send raw transaction")
         .expect("Failed to execute burn transaction");

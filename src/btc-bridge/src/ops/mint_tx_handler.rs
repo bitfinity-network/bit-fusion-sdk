@@ -7,7 +7,7 @@ use bridge_did::op_id::OperationId;
 use bridge_did::operations::BtcBridgeOp;
 use bridge_did::order::SignedOrders;
 use did::H256;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 
 use super::BtcBridgeOpImpl;
 
@@ -24,7 +24,7 @@ impl BtcMintTxHandler {
 }
 
 impl MintTxHandler for BtcMintTxHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 

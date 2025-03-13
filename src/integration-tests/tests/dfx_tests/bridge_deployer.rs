@@ -4,10 +4,10 @@ mod eval;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use alloy::primitives::Address;
 use bridge_client::BridgeCanisterClient as _;
 use cli_args::{CommonCliArgs, DeployCliArgs, HARDHAT_ETH_PRIVATE_KEY};
-use eth_signer::Wallet;
-use ethers_core::types::H160;
+use eth_signer::LocalWallet;
 use tempfile::TempDir;
 
 use super::{DfxTestContext, ADMIN};
@@ -367,9 +367,9 @@ fn restore_manifest_dir() {
 }
 
 /// Deploy the BTF bridge
-async fn deploy_btf_bridge(ctx: &DfxTestContext) -> anyhow::Result<H160> {
+async fn deploy_btf_bridge(ctx: &DfxTestContext) -> anyhow::Result<Address> {
     let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY)?;
-    let wallet = Wallet::from_bytes(&private_key_bytes)?;
+    let wallet = LocalWallet::from_slice(&private_key_bytes)?;
 
     let btc_bridge_eth_address = ctx
         .rune_bridge_client(ADMIN)

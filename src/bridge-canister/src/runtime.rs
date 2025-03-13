@@ -9,7 +9,7 @@ use bridge_did::error::BTFResult;
 use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_storage::IcStorage;
@@ -165,7 +165,7 @@ impl<Op: Operation> OperationContext for RuntimeState<Op> {
         self.borrow().config.get_evm_params()
     }
 
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.borrow().config.borrow().get_signer()
     }
 }

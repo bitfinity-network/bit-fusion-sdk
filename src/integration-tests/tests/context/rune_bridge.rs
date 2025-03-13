@@ -18,8 +18,7 @@ use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
 use ordinals::{Etching, Rune, RuneId, Terms};
@@ -62,7 +61,7 @@ where
     Ctx: TestContext + Sync,
 {
     pub inner: Ctx,
-    pub eth_wallet: Wallet<'static, SigningKey>,
+    pub eth_wallet: LocalWallet,
     pub btf_bridge_contract: Arc<RwLock<H160>>,
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
@@ -227,8 +226,7 @@ where
             .await
             .unwrap();
 
-        let mut rng = rand::thread_rng();
-        let wallet = Wallet::new(&mut rng);
+        let wallet = LocalWallet::random();
         let wallet_address = wallet.address();
 
         context
@@ -456,7 +454,7 @@ where
         runes: &[RuneId],
         amounts: Option<HashMap<RuneName, u128>>,
         dst_address: &H160,
-        sender: &Wallet<'static, SigningKey>,
+        sender: &LocalWallet,
         nonce: U256,
         memo: Option<[u8; 32]>,
     ) -> Result<(), DepositError> {
@@ -515,7 +513,7 @@ where
         runes: &[RuneId],
         amounts: Option<HashMap<RuneName, u128>>,
         dst_address: &H160,
-        sender: &Wallet<'static, SigningKey>,
+        sender: &LocalWallet,
         nonce: U256,
         memo: Option<[u8; 32]>,
     ) {
@@ -559,16 +557,20 @@ where
             nonce,
             value: Default::default(),
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(sender.signer()),
+            signature: SigningMethod::SigningKey(sender.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
         let tx_id = client
-            .send_raw_transaction(transaction)
+            .send_raw_transaction(
+                transaction
+                    .try_into()
+                    .expect("failed to convert transaction"),
+            )
             .await
             .unwrap()
             .unwrap();
@@ -589,8 +591,7 @@ where
             let receipt = client
                 .eth_get_transaction_receipt(tx_hash.clone())
                 .await
-                .expect("Failed to request transaction receipt")
-                .expect("Request for receipt failed");
+                .expect("Failed to request transaction receipt");
 
             if let Some(receipt) = receipt {
                 if receipt.status != Some(1u64.into()) {
@@ -670,7 +671,7 @@ where
 
     pub async fn create_wrapped_token(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         rune: RuneId,
     ) -> anyhow::Result<H160> {
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
@@ -685,7 +686,7 @@ where
         Ok(token)
     }
 
-    pub async fn wrapped_balance(&self, rune_id: &RuneId, wallet: &Wallet<'_, SigningKey>) -> u128 {
+    pub async fn wrapped_balance(&self, rune_id: &RuneId, wallet: &LocalWallet) -> u128 {
         let token_contract = self
             .tokens
             .read()
@@ -703,7 +704,7 @@ where
     pub async fn wrapped_balances(
         &self,
         runes: &[RuneId],
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
     ) -> HashMap<RuneId, u128> {
         let mut balances = HashMap::new();
         for rune_id in runes {
@@ -743,7 +744,7 @@ where
         &self,
         runes: &[(&RuneId, u128)],
         dst_address: &H160,
-        sender: &Wallet<'static, SigningKey>,
+        sender: &LocalWallet,
         nonce: U256,
         memo: Option<[u8; 32]>,
         deposit_strategy: RuneDepositStrategy,

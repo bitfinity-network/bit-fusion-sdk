@@ -185,7 +185,7 @@ impl BtcBridge {
 
 pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     let mut subaccount = [0; 32];
-    subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_bytes());
+    subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_slice());
 
     Subaccount(subaccount)
 }

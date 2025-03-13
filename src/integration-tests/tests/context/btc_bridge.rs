@@ -17,8 +17,7 @@ use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::{TransactionReceipt, H160, H256, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer as _, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ic_ckbtc_kyt::SetApiKeyArg;
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
@@ -121,8 +120,7 @@ where
             .expect("failed to get btc bridge eth address")
             .expect("failed to get btc bridge eth address");
 
-        let mut rng = rand::thread_rng();
-        let wallet = Wallet::new(&mut rng);
+        let wallet = LocalWallet::random();
         let wallet_address = wallet.address();
 
         context
@@ -212,12 +210,12 @@ where
 
     pub async fn btc_to_erc20(
         &self,
-        sender: &Wallet<'_, SigningKey>,
+        sender: &LocalWallet,
         to: &H160,
         memo: [u8; 32],
         nonce: u64,
     ) -> anyhow::Result<()> {
-        let caller_eth_address: H160 = sender.address().0.into();
+        let caller_eth_address = sender.address();
         println!("btc_to_erc20 caller {caller_eth_address}");
         let user_data = BtcDeposit {
             recipient: to.clone(),
@@ -225,7 +223,7 @@ where
                 approve_spender: sender.address().into(),
                 approve_amount: U256::from(1000_u64),
             }),
-            fee_payer: Some(caller_eth_address.clone()),
+            fee_payer: Some(caller_eth_address.into()),
         };
         let encoded_reason = Encode!(&user_data).unwrap();
 
@@ -246,16 +244,20 @@ where
             nonce: nonce.into(),
             value: Default::default(),
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(sender.signer()),
+            signature: SigningMethod::SigningKey(sender.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
         let tx_id = client
-            .send_raw_transaction(transaction)
+            .send_raw_transaction(
+                transaction
+                    .try_into()
+                    .expect("failed to serialize transaction"),
+            )
             .await
             .unwrap()
             .unwrap();
@@ -348,18 +350,18 @@ where
     /// Deposit BTC from a BTC wallet
     pub async fn deposit_btc(
         &self,
-        from: &Wallet<'_, SigningKey>,
+        from: &LocalWallet,
         from_wallet: &BtcWallet,
         amount: Amount,
         to: &H160,
         memo: [u8; 32],
         nonce: u64,
     ) -> anyhow::Result<()> {
-        let caller_eth_address = from.address().0.into();
+        let caller_eth_address = from.address();
 
         let deposit_account = Account {
             owner: self.bridge(),
-            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address.into()).0),
         };
 
         // get deposit utxo
@@ -391,7 +393,7 @@ where
     /// Withdraw to the specified recipient
     pub async fn withdraw_btc(
         &self,
-        from: &Wallet<'_, SigningKey>,
+        from: &LocalWallet,
         recipient: &Address,
         amount: Amount,
     ) -> anyhow::Result<()> {
@@ -423,15 +425,15 @@ where
     pub async fn mint_admin_wrapped_btc(
         &self,
         amount: u64,
-        from: &Wallet<'_, SigningKey>,
+        from: &LocalWallet,
         to: &H160,
         nonce: u64,
     ) -> anyhow::Result<()> {
-        let caller_eth_address = from.address().0.into();
+        let caller_eth_address = from.address();
 
         let deposit_account = Account {
             owner: self.bridge(),
-            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address.into()).0),
         };
 
         // get deposit utxo
@@ -447,7 +449,7 @@ where
 
     pub async fn erc20_balance_of(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
+        wallet: &LocalWallet,
         address: Option<&H160>,
     ) -> anyhow::Result<u128> {
         let value = self.wrapped_token.read().await.clone();
@@ -521,10 +523,7 @@ where
         Ok(())
     }
 
-    pub async fn create_wrapped_token(
-        &self,
-        wallet: &Wallet<'_, SigningKey>,
-    ) -> anyhow::Result<H160> {
+    pub async fn create_wrapped_token(&self, wallet: &LocalWallet) -> anyhow::Result<H160> {
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
         let token_id = Id256::from(&self.context.canisters().ckbtc_ledger());
@@ -627,8 +626,7 @@ where
             let receipt = client
                 .eth_get_transaction_receipt(tx_hash.clone())
                 .await
-                .expect("Failed to request transaction receipt")
-                .expect("Request for receipt failed");
+                .expect("Failed to request transaction receipt");
 
             if let Some(receipt) = receipt {
                 if receipt.status != Some(1u64.into()) {

@@ -16,7 +16,7 @@ use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Nat};
 use did::{H160, H256, U256};
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
@@ -47,26 +47,39 @@ impl Operation for IcrcBridgeOpImpl {
     ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             IcrcBridgeOp::BurnIcrc2Tokens(burn_info) => {
+                log::debug!("IcrcBridgeOp::BurnIcrc2Tokens: {burn_info:?}");
                 Self::burn_icrc_tokens(ctx, burn_info, id.nonce()).await
             }
             IcrcBridgeOp::SignMintOrder { .. } => {
+                log::debug!("IcrcBridgeOp::SignMintOrder");
                 return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
             IcrcBridgeOp::SendMintTransaction { .. } => {
+                log::debug!("IcrcBridgeOp::SendMintTransaction");
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
-            IcrcBridgeOp::ConfirmMint { .. } => Err(Error::FailedToProgress(
-                "ConfirmMint task should progress only on the Minted EVM event".into(),
-            )),
-            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => Err(Error::FailedToProgress(
-                "WrappedTokenMintConfirmed task should not progress".into(),
-            )),
+            IcrcBridgeOp::ConfirmMint { .. } => {
+                log::debug!("IcrcBridgeOp::ConfirmMint");
+                Err(Error::FailedToProgress(
+                    "ConfirmMint task should progress only on the Minted EVM event".into(),
+                ))
+            }
+            IcrcBridgeOp::WrappedTokenMintConfirmed(_) => {
+                log::debug!("IcrcBridgeOp::WrappedTokenMintConfirmed");
+                Err(Error::FailedToProgress(
+                    "WrappedTokenMintConfirmed task should not progress".into(),
+                ))
+            }
             IcrcBridgeOp::MintIcrcTokens(event) => {
+                log::debug!("IcrcBridgeOp::MintIcrcTokens: {event:?}");
                 Self::mint_icrc_tokens(ctx, event, id.nonce()).await
             }
-            IcrcBridgeOp::IcrcMintConfirmed { .. } => Err(Error::FailedToProgress(
-                "IcrcMintConfirmed task should not progress".into(),
-            )),
+            IcrcBridgeOp::IcrcMintConfirmed { .. } => {
+                log::debug!("IcrcBridgeOp::IcrcMintConfirmed");
+                Err(Error::FailedToProgress(
+                    "IcrcMintConfirmed task should not progress".into(),
+                ))
+            }
         };
 
         Ok(OperationProgress::Progress(Self(next_step?)))
@@ -158,7 +171,7 @@ impl IcrcBridgeOpImpl {
         log::trace!("transferred icrc tokens to the bridge account");
 
         let sender_chain_id = IC_CHAIN_ID;
-        let recipient_chain_id = evm_params.chain_id;
+        let recipient_chain_id = evm_params.chain_id as u32;
 
         let sender = Id256::from(&burn_info.sender);
         let src_token = Id256::from(&burn_info.icrc2_token_principal);
@@ -253,7 +266,7 @@ impl IcrcBridgeOpImpl {
                 );
 
                 let sender_chain_id = IC_CHAIN_ID;
-                let recipient_chain_id = evm_params.chain_id;
+                let recipient_chain_id = evm_params.chain_id as u32;
 
                 // If we pass zero name or symbol, it will not be applied.
                 let name = event.name.try_into().unwrap_or_default();
@@ -314,7 +327,7 @@ impl IcrcMintOrderHandler {
 }
 
 impl MintOrderHandler for IcrcMintOrderHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 
@@ -380,7 +393,7 @@ impl IcrcMintTxHandler {
 }
 
 impl MintTxHandler for IcrcMintTxHandler {
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.state.get_signer()
     }
 
@@ -413,5 +426,50 @@ impl MintTxHandler for IcrcMintTxHandler {
                 is_refund,
             }),
         );
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use bridge_canister::runtime::scheduler::BridgeTask;
+    use bridge_did::reason::ApproveAfterMint;
+    use candid::Principal;
+    use ic_stable_structures::Storable;
+    use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskStatus};
+
+    use super::*;
+
+    #[test]
+    fn test_should_store_task() {
+        let task = IcrcBridgeOpImpl(IcrcBridgeOp::BurnIcrc2Tokens(Icrc2Burn {
+            sender: Principal::management_canister(),
+            amount: U256::from(100u64),
+            icrc2_token_principal: Principal::management_canister(),
+            erc20_token_address: H160::from_hex_str("0xbf380c52c18d5ead99ea719b6fcfbba551df2f7f")
+                .expect("valid address"),
+            from_subaccount: [0u8; 32].into(),
+            recipient_address: H160::from_hex_str("0xbf380c52c18d5ead99ea719b6fcfbba551df2f7f")
+                .expect("valid address"),
+            approve_after_mint: Some(ApproveAfterMint {
+                approve_spender: H160::from_hex_str("0xbf380c52c18d5ead99ea719b6fcfbba551df2f7f")
+                    .expect("valid address"),
+                approve_amount: U256::from(100u64),
+            }),
+            fee_payer: Some(
+                H160::from_hex_str("0xbf380c52c18d5ead99ea719b6fcfbba551df2f7f")
+                    .expect("valid address"),
+            ),
+        }));
+
+        let task = BridgeTask::new(OperationId::new(1), task);
+        let task = ScheduledTask::new(task);
+
+        let task =
+            InnerScheduledTask::with_status(1, task, TaskStatus::Scheduled { timestamp_secs: 1 });
+        let bytes = task.to_bytes();
+
+        let _deserialize: InnerScheduledTask<BridgeTask<IcrcBridgeOpImpl>> =
+            InnerScheduledTask::from_bytes(bytes);
     }
 }

@@ -1,8 +1,9 @@
 use std::time::{Duration, Instant};
 
+use alloy::primitives::B256;
 use did::block::ExeResult;
 use did::HaltError;
-use ethereum_json_rpc_client::{Client, EthJsonRpcClient, H256};
+use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -19,14 +20,14 @@ pub enum TransactionError {
 
 pub async fn wait_for_tx(
     client: &EthJsonRpcClient<impl Client>,
-    hash: H256,
+    hash: B256,
 ) -> Result<Vec<u8>, TransactionError> {
     const TX_TIMEOUT: Duration = Duration::from_secs(120);
     const TX_REQUEST_INTERVAL: Duration = Duration::from_secs(1);
 
     let timeout = Instant::now() + TX_TIMEOUT;
     while Instant::now() < timeout {
-        if let Ok(result) = client.get_tx_execution_result_by_hash(hash).await {
+        if let Ok(result) = client.get_tx_execution_result_by_hash(hash.into()).await {
             return match result.exe_result {
                 ExeResult::Success { output, .. } => match output {
                     did::block::TransactOut::None => Ok(vec![]),

@@ -262,16 +262,14 @@ impl TestContext for PocketIcTestContext {
         evm_client: &EvmCanisterClient<Self::Client>,
         hash: &H256,
     ) -> Result<Option<TransactionReceipt>> {
-        for _ in 0..200 {
-            let time = EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS.mul_f64(1.1);
-            self.advance_time(time).await;
-            let result = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
+        let timeout = Duration::from_secs(60);
+        let start = Instant::now();
 
-            if result.is_err() {
-                println!("failed to get tx receipt: {result:?}")
-            }
+        while start.elapsed() < timeout {
+            self.advance_time(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS)
+                .await;
+            let receipt = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
 
-            let receipt = result?;
             if receipt.is_some() {
                 return Ok(receipt);
             }

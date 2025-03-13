@@ -122,13 +122,13 @@ impl TestEvm for GanacheEvm {
 
     /// Send a raw transaction
     async fn send_raw_transaction(&self, transaction: Transaction) -> TestResult<H256> {
-        let transaction: ethers_core::types::Transaction = transaction.into();
+        let transaction = transaction.rlp_encoded_2718()?;
 
         let response = self
             .rpc_request(serde_json::json!(
                 {
                     "method": "eth_sendRawTransaction",
-                    "params": [format!("0x{}", hex::encode(transaction.rlp()))],
+                    "params": [format!("0x{}", hex::encode(transaction))],
                     "id": 1,
                     "jsonrpc": "2.0"
                 }

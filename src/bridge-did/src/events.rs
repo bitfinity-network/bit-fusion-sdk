@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+use alloy::primitives::Uint;
 use alloy_sol_types::sol;
 use candid::{CandidType, Decode};
 use serde::{Deserialize, Serialize};
@@ -51,7 +52,7 @@ impl From<BurnTokenEvent> for BurntEventData {
     fn from(event: BurnTokenEvent) -> Self {
         Self {
             sender: event.sender.0 .0.into(),
-            amount: event.amount.as_limbs().into(),
+            amount: did::U256(Uint::from_limbs_slice(event.amount.as_limbs())),
             from_erc20: event.fromERC20.0 .0.into(),
             recipient_id: event.recipientID.into(),
             to_token: event.toToken.0.into(),
@@ -79,13 +80,13 @@ pub struct MintedEventData {
 impl From<MintTokenEvent> for MintedEventData {
     fn from(event: MintTokenEvent) -> Self {
         Self {
-            amount: event.amount.as_limbs().into(),
+            amount: did::U256(Uint::from_limbs_slice(event.amount.as_limbs())),
             from_token: event.fromToken.0.into(),
             sender_id: event.senderID.0.into(),
             to_erc20: event.toERC20.0 .0.into(),
             recipient: event.recipient.0 .0.into(),
             nonce: event.nonce,
-            fee_charged: event.chargedFee.as_limbs().into(),
+            fee_charged: did::U256(Uint::from_limbs_slice(event.chargedFee.as_limbs())),
         }
     }
 }

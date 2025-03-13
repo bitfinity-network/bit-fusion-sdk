@@ -341,7 +341,7 @@ impl BtcBridgeOpImpl {
             return Err(BtcWithdrawError::InvalidRecipient(event.recipient_id.clone()).into());
         };
 
-        let amount = event.amount.0.as_u64();
+        let amount: u64 = event.amount.0.to();
         log::trace!("Transferring {amount} ckBTC to {address}");
 
         let ck_btc_ledger = state.borrow().ck_btc_ledger();
@@ -384,7 +384,7 @@ impl BtcBridgeOpImpl {
             dst_token: state_ref.token_address().clone(),
             nonce,
             sender_chain_id,
-            recipient_chain_id,
+            recipient_chain_id: recipient_chain_id as u32,
             name: state_ref.token_name(),
             symbol: state_ref.token_symbol(),
             decimals: state_ref.decimals(),
@@ -475,5 +475,33 @@ impl BtcBridgeOpImpl {
             BtcBridgeOp::MintErc20 { order, .. } => Some(order.clone()),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use bridge_canister::runtime::scheduler::BridgeTask;
+    use ic_stable_structures::Storable;
+    use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskStatus};
+
+    use super::*;
+
+    #[test]
+    fn test_should_store_task() {
+        let task = BtcBridgeOpImpl(BtcBridgeOp::UpdateCkBtcBalance {
+            eth_address: H160::from_hex_str("0xe57e761aa806c9afe7e06fb0601b17bec310f9c4")
+                .expect("valid eth address"),
+        });
+
+        let task = BridgeTask::new(OperationId::new(1), task);
+        let task = ScheduledTask::new(task);
+
+        let task =
+            InnerScheduledTask::with_status(1, task, TaskStatus::Scheduled { timestamp_secs: 1 });
+        let bytes = task.to_bytes();
+
+        let _deserialize: InnerScheduledTask<BridgeTask<BtcBridgeOpImpl>> =
+            InnerScheduledTask::from_bytes(bytes);
     }
 }

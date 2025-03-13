@@ -1,5 +1,5 @@
 use access_list::AccessList;
-pub use eth_signer::sign_strategy::{SigningStrategy, TransactionSigner};
+pub use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{default_ic_memory_manager, VirtualMemory};
 

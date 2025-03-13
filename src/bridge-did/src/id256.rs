@@ -54,7 +54,7 @@ impl Id256 {
         buf[0] = Self::EVM_ADDRESS_MARK;
 
         let chain_id_data = chain_id.to_be_bytes();
-        let address_data = address.0.as_bytes();
+        let address_data = address.0.as_slice();
         buf[1..][..chain_id_data.len()].copy_from_slice(&chain_id_data);
         buf[1 + chain_id_data.len()..][..address_data.len()].copy_from_slice(address_data);
 

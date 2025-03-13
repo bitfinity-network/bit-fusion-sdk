@@ -1,9 +1,12 @@
 use alloy_sol_types::sol;
+mod address;
 pub mod btf_events;
 pub mod common;
 pub mod evm_bridge;
 pub mod evm_link;
 pub mod query;
+
+pub use self::address::get_contract_address;
 
 #[cfg(feature = "native")]
 pub mod native;

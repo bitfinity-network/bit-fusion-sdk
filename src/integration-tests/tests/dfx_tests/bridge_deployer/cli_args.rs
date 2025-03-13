@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use candid::Principal;
-use eth_signer::{Signer as _, Wallet};
+use eth_signer::LocalWallet;
 
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::DfxTestContext;
@@ -25,7 +25,7 @@ pub struct CommonCliArgs {
 impl CommonCliArgs {
     pub async fn new(ctx: &DfxTestContext) -> Self {
         let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY).expect("Invalid private key");
-        let wallet = Wallet::from_bytes(&private_key_bytes).expect("Invalid private key");
+        let wallet = LocalWallet::from_slice(&private_key_bytes).expect("Invalid private key");
 
         let client = ctx.evm_client(ctx.admin_name());
         client
