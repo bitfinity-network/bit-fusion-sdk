@@ -132,18 +132,34 @@ where
             .expect("failed to mint tokens to user");
 
         let client = context.evm_client(context.admin_name());
-        client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
-            .await
-            .expect("failed to mint tokens to btc bridge")
-            .expect("failed to mint tokens to btc bridge");
+        let mut wrapped_token_deployer = None;
 
-        context.advance_time(Duration::from_secs(2)).await;
+        for _ in 0..10 {
+            client
+                .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+                .await
+                .expect("failed to mint tokens to btc bridge")
+                .expect("failed to mint tokens to btc bridge");
 
-        let wrapped_token_deployer = context
-            .initialize_wrapped_token_deployer_contract(&wallet)
-            .await
-            .expect("failed to initialize wrapped token deployer");
+            context.advance_time(Duration::from_secs(2)).await;
+
+            match context
+                .initialize_wrapped_token_deployer_contract(&wallet)
+                .await
+            {
+                Ok(deployer) => {
+                    wrapped_token_deployer = Some(deployer);
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize wrapped token deployer: {e}");
+                }
+            }
+        }
+
+        let wrapped_token_deployer =
+            wrapped_token_deployer.expect("failed to initialize wrapped token deployer");
+
         let btf_bridge = context
             .initialize_btf_bridge_with_minter(
                 &wallet,
