@@ -1,6 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 pub mod brc20;
+pub mod btc;
 pub mod erc20;
 pub mod icrc;
 
