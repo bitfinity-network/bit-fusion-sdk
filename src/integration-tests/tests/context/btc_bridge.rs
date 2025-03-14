@@ -114,12 +114,31 @@ where
 
         context.advance_time(Duration::from_secs(10)).await;
 
-        let btc_bridge_eth_address = context
-            .btc_bridge_client(context.admin_name())
-            .get_bridge_canister_evm_address()
-            .await
-            .expect("failed to get btc bridge eth address")
-            .expect("failed to get btc bridge eth address");
+        let mut btc_bridge_eth_address = None;
+
+        for _ in 0..10 {
+            match context
+                .btc_bridge_client(context.admin_name())
+                .get_bridge_canister_evm_address()
+                .await
+            {
+                Ok(Ok(bridge_eth_address)) => {
+                    btc_bridge_eth_address = Some(bridge_eth_address);
+                    break;
+                }
+                Ok(Err(e)) => {
+                    eprintln!("Failed to get bridge eth address: {e}");
+                }
+                Err(e) => {
+                    eprintln!("Failed to get bridge eth address (canister client): {e}");
+                }
+            }
+
+            context.advance_time(Duration::from_secs(5)).await;
+        }
+
+        let btc_bridge_eth_address =
+            btc_bridge_eth_address.expect("failed to get bridge eth address");
 
         let wallet = LocalWallet::random();
         let wallet_address = wallet.address();
