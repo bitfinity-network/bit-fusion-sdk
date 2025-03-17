@@ -1,5 +1,6 @@
 use bitcoin::{Address, Amount, BlockHash, Transaction, Txid};
-use bitcoincore_rpc::{Auth, Client, RpcApi as _};
+use bitcoincore_rpc::json::ScanTxOutRequest;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 use ord_rs::Utxo;
 
 /// Bitcoin rpc client
@@ -131,5 +132,20 @@ impl BitcoinRpcClient {
         let block_height = self.client.get_block_count()?;
 
         Ok(block_height)
+    }
+
+    pub fn btc_balance(&self, address: &Address) -> anyhow::Result<Amount> {
+        let descriptor = format!("addr({address})",);
+        let response = self
+            .client
+            .scan_tx_out_set_blocking(&[ScanTxOutRequest::Single(descriptor)])?;
+
+        let mut balance = Amount::ZERO;
+
+        for unspent in response.unspents {
+            balance += unspent.amount;
+        }
+
+        Ok(balance)
     }
 }

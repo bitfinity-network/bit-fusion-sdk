@@ -1,7 +1,8 @@
+use alloy::primitives::Address;
 use anyhow::anyhow;
 use bridge_client::{BridgeCanisterClient, GenericBridgeClient};
+use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use ethereum_types::H160;
 use ic_agent::Agent;
 use ic_canister_client::IcAgentClient;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
@@ -9,7 +10,7 @@ use ic_utils::interfaces::{ManagementCanister, WalletCanister};
 use tracing::{debug, info};
 
 use crate::commands::Bridge;
-use crate::contracts::EvmNetwork;
+use crate::contracts::IcNetwork;
 
 pub struct BridgeDeployer {
     client: GenericBridgeClient<IcAgentClient>,
@@ -43,8 +44,8 @@ impl BridgeDeployer {
         canister_wasm: &[u8],
         config: &Bridge,
         mode: InstallMode,
-        network: EvmNetwork,
-        evm: Principal,
+        network: IcNetwork,
+        evm: EvmLink,
     ) -> anyhow::Result<Principal> {
         debug!(
             "WASM file read successfully. File size: {}",
@@ -74,7 +75,7 @@ impl BridgeDeployer {
         Ok(canister_id)
     }
 
-    pub async fn configure_minter(&self, btf_address: H160) -> anyhow::Result<()> {
+    pub async fn configure_minter(&self, btf_address: Address) -> anyhow::Result<()> {
         info!("Configuring bridge canister");
 
         self.client

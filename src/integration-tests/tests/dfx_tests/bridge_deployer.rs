@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
+use alloy::primitives::Address;
 use bridge_client::BridgeCanisterClient as _;
 use cli_args::{CommonCliArgs, DeployCliArgs, HARDHAT_ETH_PRIVATE_KEY};
-use eth_signer::Wallet;
-use ethers_core::types::H160;
+use eth_signer::LocalWallet;
 use ic_canister_client::IcAgentClient;
 use tempfile::TempDir;
 
@@ -25,7 +25,7 @@ async fn setup(canister_set: &[CanisterType]) -> DfxTestContext<BitfinityEvm<IcA
 }
 
 macro_rules! test_deploy {
-    ($test_name:ident, $trycmd_file:expr) => {
+    ($test_name:ident, $trycmd_file:expr, $trycmd_path:expr) => {
         #[tokio::test]
         #[serial_test::serial]
         #[cfg(feature = "dfx_tests")]
@@ -39,6 +39,8 @@ macro_rules! test_deploy {
 
             let CommonCliArgs {
                 evm: evm_principal,
+                evm_rpc,
+                evm_node: _evm_node,
                 private_key,
                 identity_path,
             } = CommonCliArgs::new(&ctx).await;
@@ -69,6 +71,7 @@ macro_rules! test_deploy {
                     ("ADMIN_PRINCIPAL", admin_principal.to_string()),
                     ("WALLET_CANISTER", wallet_canister.to_string()),
                     ("EVM_PRINCIPAL", evm_principal.to_string()),
+                    ("EVM_RPC", evm_rpc.to_string()),
                     ("CKBTC_LEDGER", ckbtc_ledger.to_string()),
                     ("CKBTC_MINTER", ckbtc_minter.to_string()),
                     ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
@@ -77,7 +80,7 @@ macro_rules! test_deploy {
                     ("ICRC2_BRIDGE_WASM_PATH", icrc2_bridge.display().to_string()),
                     ("RUNE_BRIDGE_WASM_PATH", rune_bridge.display().to_string()),
                 ],
-                Path::new("./tests/bridge_deployer/deploy"),
+                $trycmd_path,
                 trycmd_output_dir.path(),
                 $trycmd_file,
             )
@@ -98,11 +101,58 @@ macro_rules! test_deploy {
     };
 }
 
-test_deploy!(test_should_deploy_brc20_bridge, "brc20_bridge.trycmd");
-test_deploy!(test_should_deploy_btc_bridge, "btc_bridge.trycmd");
-test_deploy!(test_should_deploy_erc20_bridge, "erc20_bridge.trycmd");
-test_deploy!(test_should_deploy_icrc2_bridge, "icrc2_bridge.trycmd");
-test_deploy!(test_should_deploy_rune_bridge, "rune_bridge.trycmd");
+test_deploy!(
+    test_should_deploy_brc20_bridge,
+    "brc20_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_canister/deploy")
+);
+test_deploy!(
+    test_should_deploy_btc_bridge,
+    "btc_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_canister/deploy")
+);
+test_deploy!(
+    test_should_deploy_erc20_bridge,
+    "erc20_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_canister/deploy")
+);
+test_deploy!(
+    test_should_deploy_icrc2_bridge,
+    "icrc2_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_canister/deploy")
+);
+test_deploy!(
+    test_should_deploy_rune_bridge,
+    "rune_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_canister/deploy")
+);
+
+// with local node
+test_deploy!(
+    test_should_deploy_brc20_bridge_evm_rpc,
+    "brc20_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
+test_deploy!(
+    test_should_deploy_btc_bridge_evm_rpc,
+    "btc_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
+test_deploy!(
+    test_should_deploy_erc20_bridge_evm_rpc,
+    "erc20_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
+test_deploy!(
+    test_should_deploy_icrc2_bridge_evm_rpc,
+    "icrc2_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
+test_deploy!(
+    test_should_deploy_rune_bridge_evm_rpc,
+    "rune_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
 
 #[tokio::test]
 #[serial_test::serial]
@@ -125,6 +175,8 @@ async fn test_should_update_bridge() {
         evm: evm_principal,
         private_key,
         identity_path,
+        evm_node: _evm_node,
+        evm_rpc,
     } = CommonCliArgs::new(&ctx).await;
 
     let DeployCliArgs {
@@ -154,6 +206,7 @@ async fn test_should_update_bridge() {
             ("PRIVATE_KEY", private_key.to_string()),
             ("ADMIN_PRINCIPAL", admin_principal.to_string()),
             ("EVM_PRINCIPAL", evm_principal.to_string()),
+            ("EVM_RPC", evm_rpc.to_string()),
             ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
             ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
             ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
@@ -165,7 +218,7 @@ async fn test_should_update_bridge() {
             ("ICRC2_BRIDGE_ID", icrc2_bridge_id.to_string()),
             ("RUNE_BRIDGE_ID", rune_bridge_id.to_string()),
         ],
-        Path::new("./tests/bridge_deployer/upgrade"),
+        Path::new("./tests/bridge_deployer/evm_canister/upgrade"),
         trycmd_output_dir.path(),
         "*.trycmd",
     )
@@ -206,6 +259,8 @@ async fn test_should_reinstall_bridge() {
 
     let CommonCliArgs {
         evm: evm_principal,
+        evm_node: _evm_node,
+        evm_rpc,
         private_key,
         identity_path,
     } = CommonCliArgs::new(&ctx).await;
@@ -244,6 +299,7 @@ async fn test_should_reinstall_bridge() {
             ("PRIVATE_KEY", private_key.to_string()),
             ("ADMIN_PRINCIPAL", admin_principal.to_string()),
             ("EVM_PRINCIPAL", evm_principal.to_string()),
+            ("EVM_RPC", evm_rpc.to_string()),
             ("BRC20_BRIDGE_WASM_PATH", brc20_bridge.display().to_string()),
             ("BTC_BRIDGE_WASM_PATH", btc_bridge.display().to_string()),
             ("ERC20_BRIDGE_WASM_PATH", erc20_bridge.display().to_string()),
@@ -258,7 +314,7 @@ async fn test_should_reinstall_bridge() {
             ("RUNE_BRIDGE_ID", rune_bridge_id.to_string()),
             ("BTF_BRIDGE", hex::encode(btf_bridge)),
         ],
-        Path::new("./tests/bridge_deployer/reinstall"),
+        Path::new("./tests/bridge_deployer/evm_canister/reinstall"),
         trycmd_output_dir.path(),
         "*.trycmd",
     )
@@ -314,9 +370,9 @@ fn restore_manifest_dir() {
 /// Deploy the BTF bridge
 async fn deploy_btf_bridge(
     ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>,
-) -> anyhow::Result<H160> {
+) -> anyhow::Result<Address> {
     let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY)?;
-    let wallet = Wallet::from_bytes(&private_key_bytes)?;
+    let wallet = LocalWallet::from_slice(&private_key_bytes)?;
 
     let btc_bridge_eth_address = ctx
         .rune_bridge_client(ADMIN)

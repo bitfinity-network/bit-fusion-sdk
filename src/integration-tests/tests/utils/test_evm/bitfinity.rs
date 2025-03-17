@@ -13,7 +13,7 @@ use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::CanisterClient;
 
 use super::TestEvm;
-use crate::utils::error::Result as TestResult;
+use crate::utils::error::{Result as TestResult, TestError};
 
 #[derive(Clone)]
 pub struct BitfinityEvm<C>
@@ -50,7 +50,12 @@ where
     }
 
     async fn send_raw_transaction(&self, transaction: Transaction) -> TestResult<H256> {
-        let res = self.evm_client.send_raw_transaction(transaction).await??;
+        let res =
+            self.evm_client
+                .send_raw_transaction(transaction.try_into().map_err(|e| {
+                    TestError::Generic(format!("Failed to convert transaction: {}", e))
+                })?)
+                .await??;
 
         Ok(res)
     }
@@ -85,7 +90,7 @@ where
         let res = self
             .evm_client
             .eth_get_transaction_receipt(hash.clone())
-            .await??;
+            .await?;
 
         Ok(res)
     }

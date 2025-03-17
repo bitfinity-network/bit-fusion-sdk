@@ -1,6 +1,9 @@
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
+use alloy::hex::ToHexExt as _;
+use alloy::primitives::{Address, B256};
+use alloy::rpc::types::TransactionRequest;
 use alloy_sol_types::SolCall;
 use anyhow::anyhow;
 use bridge_client::Erc20BridgeClient;
@@ -10,15 +13,11 @@ use bridge_utils::{BTFBridge, FeeCharge, WrappedToken};
 use candid::Principal;
 use clap::{Args, Parser, Subcommand};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::U256;
+use did::{BlockNumber, U256};
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::{Signer, Wallet};
+use eth_signer::LocalWallet;
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
-use ethereum_types::{H160, H256};
-use ethers_core::k256::ecdsa::SigningKey;
-use ethers_core::types::{BlockNumber, TransactionRequest};
-use ethers_core::utils::hex::ToHexExt;
 use ic_agent::identity::AnonymousIdentity;
 use ic_agent::Agent;
 use ic_canister_client::IcAgentClient;
@@ -29,7 +28,7 @@ use tracing::{error, info};
 pub struct DepositToken {
     /// Private key of the wallet to be used for EVM operations
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
-    private_key: H256,
+    private_key: B256,
 
     /// Arguments for the token to be deposited
     #[command(subcommand)]
@@ -40,7 +39,7 @@ pub struct DepositToken {
 pub struct WithdrawToken {
     /// Private key of the wallet to be used for EVM operations
     #[arg(short('p'), long, value_name = "PRIVATE_KEY", env)]
-    private_key: H256,
+    private_key: B256,
 
     /// Arguments for the token to be withdrawn
     #[command(subcommand)]
@@ -65,11 +64,11 @@ pub struct DepositErc20Args {
 
     /// Base side BTF bridge contract address
     #[arg(long)]
-    base_btf: H160,
+    base_btf: Address,
 
     /// Base token address
     #[arg(long)]
-    base_token: H160,
+    base_token: Address,
 
     /// Wrapped side EVM (localhost, testnet, mainnet or http address)
     #[clap(long)]
@@ -77,11 +76,11 @@ pub struct DepositErc20Args {
 
     /// Wrapped side BTF bridge contract address
     #[arg(long)]
-    wrapped_btf: H160,
+    wrapped_btf: Address,
 
     /// Wrapped token address
     #[arg(long)]
-    wrapped_token: H160,
+    wrapped_token: Address,
 
     /// HTTP address of the IC connection to be used
     #[arg(long)]
@@ -97,7 +96,7 @@ pub struct DepositErc20Args {
 
     /// Recipient of the wrapped tokens (if no set, caller wallet will be used)
     #[arg(short, long)]
-    recipient: Option<H160>,
+    recipient: Option<Address>,
 }
 
 #[derive(Debug, Args)]
@@ -108,11 +107,11 @@ pub struct WithdrawErc20Args {
 
     /// Base side BTF bridge contract address
     #[arg(long)]
-    base_btf: H160,
+    base_btf: Address,
 
     /// Base token address
     #[arg(long)]
-    base_token: H160,
+    base_token: Address,
 
     /// Wrapped side EVM (localhost, testnet, mainnet or http address)
     #[clap(long)]
@@ -120,11 +119,11 @@ pub struct WithdrawErc20Args {
 
     /// Wrapped side BTF bridge contract address
     #[arg(long)]
-    wrapped_btf: H160,
+    wrapped_btf: Address,
 
     /// Wrapped token address
     #[arg(long)]
-    wrapped_token: H160,
+    wrapped_token: Address,
 
     /// HTTP address of the IC connection to be used
     #[arg(long)]
@@ -140,25 +139,25 @@ pub struct WithdrawErc20Args {
 
     /// Recipient of the base tokens (if no set, caller wallet will be used)
     #[arg(short, long)]
-    recipient: Option<H160>,
+    recipient: Option<Address>,
 }
 
 type RpcClient = EthJsonRpcClient<ReqwestClient>;
 
-struct Erc20BridgeFlow<'a> {
-    wallet: Wallet<'a, SigningKey>,
+struct Erc20BridgeFlow {
+    wallet: LocalWallet,
     base_client: RpcClient,
     wrapped_client: RpcClient,
-    base_btf: H160,
-    base_token: H160,
-    wrapped_btf: H160,
-    wrapped_token: H160,
+    base_btf: Address,
+    base_token: Address,
+    wrapped_btf: Address,
+    wrapped_token: Address,
     ic_host: String,
     bridge_canister: Principal,
 }
 
-impl Erc20BridgeFlow<'_> {
-    fn new_deposit(pk: H256, args: &DepositErc20Args) -> Self {
+impl Erc20BridgeFlow {
+    fn new_deposit(pk: B256, args: &DepositErc20Args) -> Self {
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
@@ -171,7 +170,7 @@ impl Erc20BridgeFlow<'_> {
             Self::evm_url(&args.wrapped_evm),
             reqwest_client,
         ));
-        let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
+        let wallet = LocalWallet::from_bytes(&pk).expect("invalid wallet PK value");
 
         Self {
             wallet,
@@ -186,7 +185,7 @@ impl Erc20BridgeFlow<'_> {
         }
     }
 
-    fn new_withdraw(pk: H256, args: &WithdrawErc20Args) -> Self {
+    fn new_withdraw(pk: B256, args: &WithdrawErc20Args) -> Self {
         let reqwest_client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
@@ -199,7 +198,7 @@ impl Erc20BridgeFlow<'_> {
             Self::evm_url(&args.wrapped_evm),
             reqwest_client,
         ));
-        let wallet = Wallet::from_bytes(pk.as_bytes()).expect("invalid wallet PK value");
+        let wallet = LocalWallet::from_bytes(&pk).expect("invalid wallet PK value");
 
         Self {
             wallet,
@@ -263,24 +262,24 @@ impl EvmSide {
 
 const FEE_APPROVE_AMOUNT: u128 = 10u128.pow(15);
 
-impl Erc20BridgeFlow<'_> {
+impl Erc20BridgeFlow {
     async fn chain_id(&self, evm_side: EvmSide) -> anyhow::Result<u64> {
         let (client, _, _) = self.get_side(evm_side);
         client.get_chain_id().await
     }
 
-    async fn deposit(&self, amount: u128, recipient: Option<H160>) -> anyhow::Result<()> {
+    async fn deposit(&self, amount: u128, recipient: Option<Address>) -> anyhow::Result<()> {
         self.wrap(amount, recipient, EvmSide::Base).await
     }
 
-    async fn withdraw(&self, amount: u128, recipient: Option<H160>) -> anyhow::Result<()> {
+    async fn withdraw(&self, amount: u128, recipient: Option<Address>) -> anyhow::Result<()> {
         self.wrap(amount, recipient, EvmSide::Wrapped).await
     }
 
     async fn wrap(
         &self,
         amount: u128,
-        recipient: Option<H160>,
+        recipient: Option<Address>,
         side: EvmSide,
     ) -> anyhow::Result<()> {
         let recipient = recipient.unwrap_or_else(|| self.wallet.address());
@@ -292,27 +291,28 @@ impl Erc20BridgeFlow<'_> {
         self.track_operation(memo, side.other()).await
     }
 
-    async fn get_fee_charge_address(&self, side: EvmSide) -> anyhow::Result<H160> {
+    async fn get_fee_charge_address(&self, side: EvmSide) -> anyhow::Result<Address> {
         let input = BTFBridge::feeChargeContractCall {}.abi_encode();
 
         let (client, btf, _) = self.get_side(side);
         let result = client
             .eth_call(
-                TransactionRequest {
+                &TransactionRequest {
                     from: Some(self.wallet.address()),
                     to: Some((*btf).into()),
                     gas: None,
                     gas_price: None,
                     value: None,
-                    data: Some(input.into()),
+                    input: input.into(),
                     nonce: None,
                     chain_id: None,
+                    ..Default::default()
                 },
                 BlockNumber::Latest,
             )
             .await
             .expect("get fee charge address call failed");
-        let address = H160::from_str(result.trim_start_matches("0x").trim_start_matches("0"))
+        let address = Address::from_str(result.trim_start_matches("0x").trim_start_matches("0"))
             .unwrap_or_else(|_| panic!("Invalid response for fee charge address: {result}"));
 
         info!(
@@ -333,7 +333,7 @@ impl Erc20BridgeFlow<'_> {
         let amount: U256 = amount.into();
 
         let nonce = client
-            .get_transaction_count(self.wallet.address(), BlockNumber::Latest)
+            .get_transaction_count(self.wallet.address().into(), BlockNumber::Latest)
             .await?;
         let chain_id = self.chain_id(evm_side).await?;
 
@@ -345,20 +345,20 @@ impl Erc20BridgeFlow<'_> {
             nonce: nonce.into(),
             value: amount,
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(self.wallet.signer()),
+            signature: SigningMethod::SigningKey(self.wallet.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
         let hash = client
-            .send_raw_transaction(approve_tx.into())
+            .send_raw_transaction(&approve_tx.try_into().expect("failed to convert tx"))
             .await
             .expect("Failed to send raw transaction");
 
-        Self::wait_for_tx(client, hash).await?;
+        Self::wait_for_tx(client, hash.into()).await?;
 
         info!("Fee charge approved");
         Ok(())
@@ -459,7 +459,7 @@ impl Erc20BridgeFlow<'_> {
         ))
     }
 
-    fn get_side(&self, evm_side: EvmSide) -> (&RpcClient, &H160, &H160) {
+    fn get_side(&self, evm_side: EvmSide) -> (&RpcClient, &Address, &Address) {
         match evm_side {
             EvmSide::Base => (&self.base_client, &self.base_btf, &self.base_token),
             EvmSide::Wrapped => (&self.wrapped_client, &self.wrapped_btf, &self.wrapped_token),
@@ -477,15 +477,16 @@ impl Erc20BridgeFlow<'_> {
 
         let result = client
             .eth_call(
-                TransactionRequest {
+                &TransactionRequest {
                     from: Some(self.wallet.address()),
                     to: Some((*token).into()),
                     gas: None,
                     gas_price: None,
                     value: None,
-                    data: Some(input.into()),
+                    input: input.into(),
                     nonce: None,
                     chain_id: None,
+                    ..Default::default()
                 },
                 BlockNumber::Latest,
             )
@@ -509,7 +510,7 @@ impl Erc20BridgeFlow<'_> {
         }
         .abi_encode();
         let nonce = client
-            .get_transaction_count(self.wallet.address(), BlockNumber::Latest)
+            .get_transaction_count(self.wallet.address().into(), BlockNumber::Latest)
             .await?;
         let chain_id = client.get_chain_id().await?;
 
@@ -519,26 +520,26 @@ impl Erc20BridgeFlow<'_> {
             nonce: nonce.into(),
             value: 0u64.into(),
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(self.wallet.signer()),
+            signature: SigningMethod::SigningKey(self.wallet.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
         let hash = client
-            .send_raw_transaction(approve_tx.into())
+            .send_raw_transaction(&approve_tx.try_into().expect("failed to convert tx"))
             .await
             .expect("Failed to send raw transaction");
 
-        Self::wait_for_tx(client, hash).await?;
+        Self::wait_for_tx(client, hash.into()).await?;
 
         info!("Erc20 transfer approved");
         Ok(())
     }
 
-    async fn wait_for_tx(client: &RpcClient, hash: H256) -> anyhow::Result<Vec<u8>> {
+    async fn wait_for_tx(client: &RpcClient, hash: B256) -> anyhow::Result<Vec<u8>> {
         Ok(bridge_utils::native::wait_for_tx(client, hash).await?)
     }
 
@@ -546,9 +547,9 @@ impl Erc20BridgeFlow<'_> {
         &self,
         evm_side: EvmSide,
         amount: u128,
-        recipient: &H160,
+        recipient: &Address,
         memo: [u8; 32],
-    ) -> anyhow::Result<H256> {
+    ) -> anyhow::Result<B256> {
         info!("Requesting BTF burn with amount {amount} ");
 
         let (client, btf, from_token) = self.get_side(evm_side);
@@ -571,7 +572,7 @@ impl Erc20BridgeFlow<'_> {
         .abi_encode();
 
         let nonce = client
-            .get_transaction_count(self.wallet.address(), BlockNumber::Latest)
+            .get_transaction_count(self.wallet.address().into(), BlockNumber::Latest)
             .await?;
         let chain_id = client.get_chain_id().await?;
         let burn_tx = TransactionBuilder {
@@ -580,24 +581,21 @@ impl Erc20BridgeFlow<'_> {
             nonce: nonce.into(),
             value: 0u64.into(),
             gas: 5_000_000u64.into(),
-            gas_price: Some((EIP1559_INITIAL_BASE_FEE * 2).into()),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
             input,
-            signature: SigningMethod::SigningKey(self.wallet.signer()),
+            signature: SigningMethod::SigningKey(self.wallet.credential()),
             chain_id,
         }
         .calculate_hash_and_build()
         .expect("failed to sign the transaction");
 
         let hash = client
-            .send_raw_transaction(burn_tx.into())
+            .send_raw_transaction(&burn_tx.try_into().expect("failed to convert tx"))
             .await
             .expect("Failed to send raw transaction");
 
-        info!(
-            "BTF burn transaction sent: 0x{}",
-            hash.encode_hex_with_prefix()
-        );
+        info!("BTF burn transaction sent: 0x{}", hash.to_hex_str());
 
-        Ok(hash)
+        Ok(hash.into())
     }
 }

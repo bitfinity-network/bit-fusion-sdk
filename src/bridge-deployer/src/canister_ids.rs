@@ -83,7 +83,7 @@ impl CanisterIds {
 mod test {
 
     use super::*;
-    use crate::contracts::EvmNetwork;
+    use crate::contracts::IcNetwork;
 
     #[test]
     fn test_should_deserialize_canister_ids() {
@@ -107,7 +107,7 @@ mod test {
         // deserialize
         let canister_ids = CanisterIds::read(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
-            EvmNetwork::Mainnet,
+            IcNetwork::Ic,
         ))
         .unwrap();
 
@@ -132,7 +132,7 @@ mod test {
         let tempfile = tempfile::NamedTempFile::new().unwrap();
         let mut canister_ids = CanisterIds::read_or_default(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
-            EvmNetwork::Localhost,
+            IcNetwork::Localhost,
         ));
 
         canister_ids.set(
@@ -150,7 +150,7 @@ mod test {
         // load and check
         let canister_ids = CanisterIds::read(CanisterIdsPath::CustomPath(
             tempfile.path().to_path_buf(),
-            EvmNetwork::Localhost,
+            IcNetwork::Localhost,
         ))
         .unwrap();
 
@@ -175,7 +175,7 @@ mod test {
         );
 
         // set for mainnet
-        canister_ids.path = CanisterIdsPath::Mainnet;
+        canister_ids.path = CanisterIdsPath::Ic;
 
         canister_ids.set(
             CanisterType::Brc20,

@@ -1,9 +1,0 @@
-```
-$ bridge-deployer -v --evm-network localhost --evm $EVM_PRINCIPAL --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $ICRC2_BRIDGE_WASM_PATH --wallet-canister $WALLET_CANISTER icrc --signing-key-id dfx --enable-console --log-filter trace
-Starting Bitfinity Deployer v[..]
-Canister icrc2-bridge deployed with ID: [..]
-Wrapped side BTF bridge: [..]
-Wrapped side FeeCharge: [..]
-Wrapped side bridge address: [..]
-
-```

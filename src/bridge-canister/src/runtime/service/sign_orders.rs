@@ -1,17 +1,18 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use alloy::primitives::PrimitiveSignature;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{MintOrder, SignedOrders, SignedOrdersData};
 use did::keccak;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 
 use super::BridgeService;
 
 pub trait MintOrderHandler {
     /// Get signer to sign mint orders batch.
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner>;
+    fn get_signer(&self) -> BTFResult<TxSigner>;
 
     /// Get mint order by the OperationId.
     fn get_order(&self, id: OperationId) -> Option<MintOrder>;
@@ -77,7 +78,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
         let signer = self.order_handler.get_signer()?;
         let digest = keccak::keccak_hash(&orders_data);
         let signature = signer.sign_digest(digest.0 .0).await?;
-        let signature = ethers_core::types::Signature::from(signature);
+        let signature = PrimitiveSignature::from(signature);
         let signature_bytes: [u8; 65] = signature.into();
 
         let signed_orders = SignedOrdersData {

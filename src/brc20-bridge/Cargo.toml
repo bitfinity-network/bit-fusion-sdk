@@ -11,6 +11,7 @@ default = []
 export-api = []
 
 [dependencies]
+alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bitcoin = { workspace = true }
@@ -20,7 +21,6 @@ bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
-ethers-core = { workspace = true }
 ethereum-json-rpc-client = { workspace = true, features = [
   "ic-canister-client",
 ] }

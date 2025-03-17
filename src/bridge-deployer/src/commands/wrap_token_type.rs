@@ -1,18 +1,17 @@
+use alloy::primitives::{Address, B256};
+use alloy::rpc::types::TransactionRequest;
 use alloy_sol_types::{SolInterface, SolValue};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::id256::Id256;
 use bridge_utils::WrappedToken::{decimalsCall, nameCall, symbolCall, WrappedTokenCalls};
-use candid::Principal;
 use clap::{Args, Subcommand};
-use did::Bytes;
-use eth_signer::{Signer, Wallet};
+use did::{BlockNumber, Bytes};
+use eth_signer::LocalWallet;
 use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use ethereum_json_rpc_client::EthJsonRpcClient;
-use ethereum_types::{H160, H256};
-use ethers_core::k256::ecdsa::SigningKey;
-use ethers_core::types::{BlockNumber, TransactionRequest};
 use tracing::info;
 
-use crate::contracts::{EvmNetwork, NetworkConfig, SolidityContractDeployer};
+use crate::contracts::{IcNetwork, NetworkConfig, SolidityContractDeployer};
 
 #[derive(Debug, Subcommand)]
 pub enum WrapTokenType {
@@ -20,10 +19,15 @@ pub enum WrapTokenType {
 }
 
 impl WrapTokenType {
-    pub async fn wrap(&self, network: EvmNetwork, pk: H256, evm: Principal) -> anyhow::Result<()> {
+    pub async fn wrap(
+        &self,
+        network: IcNetwork,
+        pk: B256,
+        evm_link: EvmLink,
+    ) -> anyhow::Result<()> {
         let base_token_parameters = self.get_base_token_parameters(pk).await?;
         let wrapped_token_address = self
-            .deploy_wrapped_token(&base_token_parameters, network, pk, evm)
+            .deploy_wrapped_token(&base_token_parameters, network, pk, evm_link)
             .await?;
 
         info!(
@@ -38,7 +42,7 @@ impl WrapTokenType {
         Ok(())
     }
 
-    async fn get_base_token_parameters(&self, pk: H256) -> anyhow::Result<TokenParameters> {
+    async fn get_base_token_parameters(&self, pk: B256) -> anyhow::Result<TokenParameters> {
         match self {
             WrapTokenType::Erc20(erc) => {
                 Self::get_erc20_params(erc.base_evm_url.clone(), &erc.token_address, &pk).await
@@ -46,7 +50,7 @@ impl WrapTokenType {
         }
     }
 
-    fn wrapped_btf_address(&self) -> &H160 {
+    fn wrapped_btf_address(&self) -> &Address {
         match self {
             WrapTokenType::Erc20(WrapErc20Args {
                 wrapped_btf_address,
@@ -58,17 +62,17 @@ impl WrapTokenType {
     async fn deploy_wrapped_token(
         &self,
         base_token_params: &TokenParameters,
-        evm_network: EvmNetwork,
-        pk: H256,
-        evm: Principal,
-    ) -> anyhow::Result<H160> {
+        evm_network: IcNetwork,
+        pk: B256,
+        evm_link: EvmLink,
+    ) -> anyhow::Result<Address> {
         let deployer = SolidityContractDeployer::new(
             NetworkConfig {
-                evm_network,
+                bridge_network: evm_network,
                 custom_network: None,
             },
             pk,
-            evm,
+            evm_link,
         );
         let TokenParameters {
             name,
@@ -81,11 +85,11 @@ impl WrapTokenType {
 
     async fn get_erc20_params(
         evm_url: String,
-        token_address: &H160,
-        pk: &H256,
+        token_address: &Address,
+        pk: &B256,
     ) -> anyhow::Result<TokenParameters> {
         let client = EthJsonRpcClient::new(ReqwestClient::new(evm_url));
-        let wallet = Wallet::from_bytes(&pk.0).expect("Cannot create ETH wallet");
+        let wallet = LocalWallet::from_bytes(pk).expect("Cannot create ETH wallet");
 
         let name = String::abi_decode(
             &Self::request_contract(
@@ -133,21 +137,24 @@ impl WrapTokenType {
 
     async fn request_contract(
         client: &EthJsonRpcClient<ReqwestClient>,
-        wallet: &Wallet<'_, SigningKey>,
-        address: &H160,
+        wallet: &LocalWallet,
+        address: &Address,
         data: Bytes,
     ) -> anyhow::Result<Vec<u8>> {
+        let data = data.0.to_vec();
+
         let result = client
             .eth_call(
-                TransactionRequest {
+                &TransactionRequest {
                     from: Some(wallet.address()),
                     to: Some((*address).into()),
                     gas: None,
                     gas_price: None,
                     value: None,
-                    data: Some(data.into()),
+                    input: data.into(),
                     nonce: None,
                     chain_id: None,
+                    ..Default::default()
                 },
                 BlockNumber::Finalized,
             )
@@ -171,13 +178,13 @@ pub struct WrapErc20Args {
     base_evm_url: String,
 
     #[arg(long)]
-    base_btf_address: H160,
+    base_btf_address: Address,
 
     #[arg(long)]
-    wrapped_btf_address: H160,
+    wrapped_btf_address: Address,
 
     #[arg(long)]
-    token_address: H160,
+    token_address: Address,
 }
 
 #[cfg(test)]
@@ -193,9 +200,9 @@ mod tests {
         let evm_url = TESTNET_URL;
 
         let token_address = hex::decode(token_address.trim_start_matches("0x")).unwrap();
-        let token_address = H160::from_slice(&token_address);
+        let token_address = Address::from_slice(&token_address);
         let wallet_pk = hex::decode(wallet_pk.trim_start_matches("0x")).unwrap();
-        let wallet_pk = H256::from_slice(&wallet_pk);
+        let wallet_pk = B256::from_slice(&wallet_pk);
 
         let token_params =
             WrapTokenType::get_erc20_params(evm_url.into(), &token_address, &wallet_pk)

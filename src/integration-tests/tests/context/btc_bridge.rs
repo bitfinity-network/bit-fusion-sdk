@@ -15,9 +15,10 @@ use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BTFBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
 use candid::{Encode, Nat, Principal};
-use did::{H160, U256};
-use eth_signer::{Signer as _, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use did::constant::EIP1559_INITIAL_BASE_FEE;
+use did::{TransactionReceipt, H160, H256, U256};
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClient;
 use ic_ckbtc_kyt::SetApiKeyArg;
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
@@ -27,6 +28,8 @@ use tokio::sync::{Mutex, RwLock};
 
 use super::TestContext;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
+use crate::utils::btc_transfer_helper::BtcTransferHelper;
+use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::TestEvm;
 
@@ -37,15 +40,15 @@ where
     Ctx: TestContext<EVM> + Sync,
     EVM: TestEvm,
 {
-    admin_btc_rpc_client: Arc<BitcoinRpcClient>,
-    admin_address: Address,
+    pub admin_btc_rpc_client: Arc<BitcoinRpcClient>,
+    pub admin_address: Address,
     pub context: Ctx,
     pub tip_height: AtomicU32,
-    pub token_id: Id256,
+    pub ckbtc_ledger_id: Id256,
     exit: Exit,
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub btf_bridge_contract: Arc<RwLock<H160>>,
-    pub wrapped_token: H160,
+    pub wrapped_token: Arc<RwLock<H160>>,
     _marker: PhantomData<EVM>,
 }
 
@@ -127,8 +130,7 @@ where
             .expect("failed to get btc bridge eth address")
             .expect("failed to get btc bridge eth address");
 
-        let mut rng = rand::thread_rng();
-        let wallet = Wallet::new(&mut rng);
+        let wallet = LocalWallet::random();
         let wallet_address = wallet.address();
 
         context
@@ -160,9 +162,9 @@ where
             .await
             .expect("failed to initialize btf bridge");
 
-        let token_id = Id256::from(&context.canisters().ckbtc_ledger());
+        let ckbtc_ledger_id = Id256::from(&context.canisters().ckbtc_ledger());
         let token = context
-            .create_wrapped_token(&wallet, &btf_bridge, token_id)
+            .create_wrapped_token(&wallet, &btf_bridge, ckbtc_ledger_id)
             .await
             .expect("failed to create wrapped token");
 
@@ -201,10 +203,10 @@ where
             admin_address,
             admin_btc_rpc_client,
             context,
-            wrapped_token: token,
+            wrapped_token: Arc::new(RwLock::new(token)),
             exit,
             miner: Arc::new(Mutex::new(Some(miner))),
-            token_id,
+            ckbtc_ledger_id,
             tip_height: AtomicU32::default(),
             btf_bridge_contract: Arc::new(RwLock::new(btf_bridge)),
             _marker: PhantomData,
@@ -217,41 +219,58 @@ where
 
     pub async fn btc_to_erc20(
         &self,
-        wallet: &Wallet<'_, SigningKey>,
-        eth_address: &H160,
+        sender: &LocalWallet,
+        to: &H160,
+        memo: [u8; 32],
+        nonce: u64,
     ) -> anyhow::Result<()> {
+        let caller_eth_address = sender.address();
+        println!("btc_to_erc20 caller {caller_eth_address}");
         let user_data = BtcDeposit {
-            recipient: eth_address.clone(),
+            recipient: to.clone(),
             approve_after_mint: Some(ApproveAfterMint {
-                approve_spender: wallet.address().into(),
+                approve_spender: sender.address().into(),
                 approve_amount: U256::from(1000_u64),
             }),
-            fee_payer: Some(eth_address.clone()),
+            fee_payer: Some(caller_eth_address.into()),
         };
         let encoded_reason = Encode!(&user_data).unwrap();
 
         let input = BTFBridge::notifyMinterCall {
             notificationType: Default::default(),
             userData: encoded_reason.into(),
-            memo: alloy_sol_types::private::FixedBytes::ZERO,
+            memo: memo.into(),
         }
         .abi_encode();
 
-        // advance
-        self.context.advance_time(Duration::from_secs(2)).await;
+        let client = self.context.wrapped_evm();
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
+        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
 
-        let receipt = self
-            .context
-            .call_contract(
-                wallet,
-                &self.btf_bridge_contract.read().await.clone(),
-                input,
-                0,
-            )
+        let transaction = TransactionBuilder {
+            from: &sender.address().into(),
+            to: Some(btf_bridge_contract),
+            nonce: nonce.into(),
+            value: Default::default(),
+            gas: 5_000_000u64.into(),
+            gas_price: (EIP1559_INITIAL_BASE_FEE * 2).into(),
+            input,
+            signature: SigningMethod::SigningKey(sender.credential()),
+            chain_id,
+        }
+        .calculate_hash_and_build()
+        .expect("failed to sign the transaction");
+
+        let tx_id = client
+            .send_raw_transaction(transaction)
             .await
-            .map(|(_, receipt)| receipt)?;
-
-        println!("btc_to_erc20 receipt: {:?}", receipt);
+            .expect("failed to send transaction");
+        println!(
+            "Deposit notification sent by tx: 0x{}",
+            hex::encode(tx_id.0)
+        );
+        self.wait_for_tx_success(&tx_id).await;
+        println!("Deposit notification confirmed");
 
         Ok(())
     }
@@ -270,8 +289,7 @@ where
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<Txid> {
         let txid = self
             .admin_btc_rpc_client
-            .send_to_address(btc_address, amount)
-            .expect("failed to send btc");
+            .send_to_address(btc_address, amount)?;
 
         self.wait_for_confirmations(&txid, REQUIRED_CONFIRMATIONS)
             .await?;
@@ -333,16 +351,93 @@ where
             .map_err(|e| anyhow::anyhow!(e))
     }
 
-    pub async fn mint_wrapped_btc(
+    /// Deposit BTC from a BTC wallet
+    pub async fn deposit_btc(
         &self,
-        amount: u64,
-        wallet: &Wallet<'_, SigningKey>,
+        from: &LocalWallet,
+        from_wallet: &BtcWallet,
+        amount: Amount,
+        to: &H160,
+        memo: [u8; 32],
+        nonce: u64,
     ) -> anyhow::Result<()> {
-        let caller_eth_address = wallet.address().0.into();
+        let caller_eth_address = from.address();
 
         let deposit_account = Account {
             owner: self.bridge(),
-            subaccount: Some(eth_address_to_subaccount(&caller_eth_address).0),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address.into()).0),
+        };
+
+        // get deposit utxo
+        let deposit_address = self.get_btc_address(deposit_account).await?;
+
+        // get funding utxo
+        let funding_utxo = self
+            .get_funding_utxo(&from_wallet.address, amount * 2)
+            .await?;
+
+        // send btc to the deposit address
+        let txid = BtcTransferHelper::new(
+            &self.admin_btc_rpc_client,
+            &from_wallet.private_key,
+            &from_wallet.address,
+        )
+        .transfer(amount, funding_utxo, &deposit_address)
+        .await?;
+
+        // wait for confirmations
+        self.wait_for_confirmations(&txid, REQUIRED_CONFIRMATIONS)
+            .await?;
+
+        println!("btc transferred at {txid}");
+
+        self.btc_to_erc20(from, to, memo, nonce).await
+    }
+
+    /// Withdraw to the specified recipient
+    pub async fn withdraw_btc(
+        &self,
+        from: &LocalWallet,
+        recipient: &Address,
+        amount: Amount,
+    ) -> anyhow::Result<()> {
+        let token_address = self.wrapped_token.read().await.clone();
+
+        println!("Burning {amount} to {recipient}");
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
+
+        let client = self.context.wrapped_evm();
+        self.context
+            .burn_erc_20_tokens_raw(
+                &client,
+                from,
+                &token_address,
+                &self.ckbtc_ledger_id.0,
+                recipient.to_string().as_bytes().to_vec(),
+                &btf_bridge_contract,
+                amount.to_sat() as u128,
+                true,
+                None,
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to burn tokens: {e}"))?;
+
+        Ok(())
+    }
+
+    pub async fn mint_admin_wrapped_btc(
+        &self,
+        amount: u64,
+        from: &LocalWallet,
+        to: &H160,
+        nonce: u64,
+    ) -> anyhow::Result<()> {
+        let caller_eth_address = from.address();
+
+        let deposit_account = Account {
+            owner: self.bridge(),
+            subaccount: Some(eth_address_to_subaccount(&caller_eth_address.into()).0),
         };
 
         // get deposit utxo
@@ -353,12 +448,17 @@ where
             .await?;
         println!("funding utxo: {:?}", funding_utxo);
 
-        self.btc_to_erc20(wallet, &caller_eth_address).await
+        self.btc_to_erc20(from, to, [0; 32], nonce).await
     }
 
-    pub async fn erc20_balance_of(&self, wallet: &Wallet<'_, SigningKey>) -> anyhow::Result<u128> {
+    pub async fn erc20_balance_of(
+        &self,
+        wallet: &LocalWallet,
+        address: Option<&H160>,
+    ) -> anyhow::Result<u128> {
+        let value = self.wrapped_token.read().await.clone();
         self.context
-            .check_erc20_balance(&self.wrapped_token, wallet, None)
+            .check_erc20_balance(&value, wallet, address)
             .await
             .map_err(|e| anyhow::anyhow!(e))
     }
@@ -415,6 +515,63 @@ where
         Ok(Address::from_str(&addr)?.assume_checked())
     }
 
+    pub async fn set_btf_bridge_contract(&self, btf_bridge: &H160) -> anyhow::Result<()> {
+        self.context
+            .btc_bridge_client(self.context.admin_name())
+            .set_btf_bridge_contract(btf_bridge)
+            .await?;
+        println!("btf bridge contract updated to {btf_bridge}");
+
+        *self.btf_bridge_contract.write().await = btf_bridge.clone();
+
+        Ok(())
+    }
+
+    pub async fn create_wrapped_token(&self, wallet: &LocalWallet) -> anyhow::Result<H160> {
+        let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
+
+        let token_id = Id256::from(&self.context.canisters().ckbtc_ledger());
+        let token = self
+            .context
+            .create_wrapped_token(wallet, &btf_bridge_contract, token_id)
+            .await
+            .expect("failed to create wrapped token");
+
+        println!("wrapped token {token}",);
+
+        *self.wrapped_token.write().await = token.clone();
+
+        let mut token_name = [0; 32];
+        token_name[0..7].copy_from_slice(b"wrapper");
+        let mut token_symbol = [0; 16];
+        token_symbol[0..3].copy_from_slice(b"WPT");
+
+        let wrapped_token_config = WrappedTokenConfig {
+            token_address: token.clone(),
+            token_name,
+            token_symbol,
+            decimals: 0,
+        };
+
+        self.context
+            .btc_bridge_client(self.context.admin_name())
+            .admin_configure_wrapped_token(wrapped_token_config)
+            .await
+            .expect("failed to configure wrapped token")
+            .expect("failed to configure wrapped token");
+
+        self.context.advance_time(Duration::from_secs(5)).await;
+
+        Ok(token)
+    }
+
+    /// Get the BTC balance of the given address
+    pub async fn btc_balance(&self, address: &Address) -> Amount {
+        self.admin_btc_rpc_client
+            .btc_balance(address)
+            .expect("failed to get btc balance")
+    }
+
     pub async fn get_funding_utxo(&self, to: &Address, amount: Amount) -> anyhow::Result<Utxo> {
         let fund_tx;
         loop {
@@ -460,5 +617,39 @@ where
                 miner.join().expect("Failed to join miner thread");
             }
         }
+    }
+
+    /// Wait for the transaction to be confirmed by the EVM within a reasonable time frame
+    pub async fn wait_for_tx_success(&self, tx_hash: &H256) -> TransactionReceipt {
+        const MAX_TX_TIMEOUT_SEC: Duration = Duration::from_secs(10);
+
+        let start = Instant::now();
+
+        let client = self.context.wrapped_evm();
+        while start.elapsed() < MAX_TX_TIMEOUT_SEC {
+            let receipt = client
+                .get_transaction_receipt(tx_hash)
+                .await
+                .expect("Failed to request transaction receipt");
+
+            if let Some(receipt) = receipt {
+                if receipt.status != Some(1u64.into()) {
+                    eprintln!("Transaction: {tx_hash}");
+                    eprintln!("Receipt: {receipt:?}");
+                    if let Some(output) = receipt.output {
+                        let output = String::from_utf8_lossy(&output);
+                        eprintln!("Output: {output}");
+                    }
+
+                    panic!("Transaction failed");
+                } else {
+                    return receipt;
+                }
+            } else {
+                self.context.advance_time(Duration::from_millis(100)).await;
+            }
+        }
+
+        panic!("Transaction {tx_hash} timed out");
     }
 }

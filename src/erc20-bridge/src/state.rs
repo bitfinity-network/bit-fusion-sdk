@@ -11,7 +11,7 @@ use bridge_did::evm_link::EvmLink;
 use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};
 use bridge_utils::evm_bridge::EvmParams;
 use candid::Principal;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_stable_structures::{CellStructure, StableCell};
 
 use crate::memory::{BASE_EVM_CONFIG_MEMORY_ID, DELAYS_MEMORY_ID};
@@ -76,7 +76,7 @@ impl OperationContext for SharedBaseEvmState {
         self.0.borrow().config.borrow().get_evm_params()
     }
 
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.0.borrow().config.borrow().get_signer()
     }
 }

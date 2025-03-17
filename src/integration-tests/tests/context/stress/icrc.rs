@@ -10,7 +10,6 @@ use bridge_utils::{evm_link, BTFBridge};
 use candid::{Encode, Nat, Principal};
 use did::error::{EvmError, TransactionPoolError};
 use did::{H160, U256};
-use eth_signer::Signer;
 use ic_exports::icrc_types::icrc1_ledger::LedgerArgument;
 use icrc_client::account::Account;
 use icrc_client::allowance::AllowanceArgs;

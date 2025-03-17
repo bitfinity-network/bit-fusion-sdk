@@ -51,14 +51,14 @@ impl Operation for BtcBridgeOpImpl {
     ) -> BTFResult<OperationProgress<Self>> {
         let next_step = match self.0 {
             BtcBridgeOp::UpdateCkBtcBalance { eth_address } => {
-                log::debug!("UpdateCkBtcBalance: Eth address {eth_address}");
+                log::debug!("BtcBridgeOp::UpdateCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_minter = get_state().borrow().ck_btc_minter();
                 Self::update_ckbtc_balance(ckbtc_minter, &eth_address).await?;
 
                 Ok(Self(BtcBridgeOp::CollectCkBtcBalance { eth_address }))
             }
             BtcBridgeOp::CollectCkBtcBalance { eth_address } => {
-                log::debug!("CollectCkBtcBalance: Eth address {eth_address}");
+                log::debug!("BtcBridgeOp::CollectCkBtcBalance: Eth address {eth_address}");
                 let ckbtc_ledger = get_state().borrow().ck_btc_ledger();
                 let ckbtc_balance = Self::collect_ckbtc_balance(ckbtc_ledger, &eth_address).await?;
 
@@ -71,7 +71,9 @@ impl Operation for BtcBridgeOpImpl {
                 eth_address,
                 amount,
             } => {
-                log::debug!("TransferCkBtc: Eth address {eth_address}, amount {amount}");
+                log::debug!(
+                    "BtcBridgeOp::TransferCkBtc: Eth address {eth_address}, amount {amount}"
+                );
                 let (ckbtc_ledger, ckbtc_fee) = {
                     let state = get_state();
                     let state_ref = state.borrow();
@@ -91,7 +93,9 @@ impl Operation for BtcBridgeOpImpl {
                 eth_address,
                 amount,
             } => {
-                log::debug!("CreateMintOrder: Eth address {eth_address}, amount {amount}");
+                log::debug!(
+                    "BtcBridgeOp::CreateMintOrder: Eth address {eth_address}, amount {amount}"
+                );
                 let order = Self::mint_erc20(ctx, &eth_address, id.nonce(), amount).await?;
 
                 Ok(Self(BtcBridgeOp::SignMintOrder { order }))
@@ -102,18 +106,19 @@ impl Operation for BtcBridgeOpImpl {
                 return Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID));
             }
             BtcBridgeOp::MintErc20 { order } => {
-                log::debug!("MintErc20: {order:?}");
+                log::debug!("BtcBridgeOp::MintErc20: {order:?}");
 
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
             BtcBridgeOp::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
-                "ConfirmErc20Mint task should progress only on the Minted EVM event".into(),
+                "BtcBridgeOp::ConfirmErc20Mint task should progress only on the Minted EVM event"
+                    .into(),
             )),
             BtcBridgeOp::Erc20MintConfirmed { .. } => Err(Error::FailedToProgress(
-                "ConfirmMint task should not progress".into(),
+                "BtcBridgeOp::Erc20MintConfirmed task should not progress".into(),
             )),
             BtcBridgeOp::WithdrawBtc(event) => {
-                log::debug!("WithdrawBtc: Eth address {}", event.sender);
+                log::debug!("BtcBridgeOp::WithdrawBtc: Eth address {}", event.sender);
                 Self::withdraw_btc(&event).await?;
 
                 Ok(Self(BtcBridgeOp::BtcWithdrawConfirmed {
@@ -121,7 +126,7 @@ impl Operation for BtcBridgeOpImpl {
                 }))
             }
             BtcBridgeOp::BtcWithdrawConfirmed { .. } => Err(Error::FailedToProgress(
-                "ConfirmMint task should not progress".into(),
+                "BtcBridgeOp::BtcWithdrawConfirmed task should not progress".into(),
             )),
         };
 
@@ -336,7 +341,7 @@ impl BtcBridgeOpImpl {
             return Err(BtcWithdrawError::InvalidRecipient(event.recipient_id.clone()).into());
         };
 
-        let amount = event.amount.0.as_u64();
+        let amount: u64 = event.amount.0.to();
         log::trace!("Transferring {amount} ckBTC to {address}");
 
         let ck_btc_ledger = state.borrow().ck_btc_ledger();
@@ -379,7 +384,7 @@ impl BtcBridgeOpImpl {
             dst_token: state_ref.token_address().clone(),
             nonce,
             sender_chain_id,
-            recipient_chain_id,
+            recipient_chain_id: recipient_chain_id as u32,
             name: state_ref.token_name(),
             symbol: state_ref.token_symbol(),
             decimals: state_ref.decimals(),
@@ -470,5 +475,33 @@ impl BtcBridgeOpImpl {
             BtcBridgeOp::MintErc20 { order, .. } => Some(order.clone()),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use bridge_canister::runtime::scheduler::BridgeTask;
+    use ic_stable_structures::Storable;
+    use ic_task_scheduler::task::{InnerScheduledTask, ScheduledTask, TaskStatus};
+
+    use super::*;
+
+    #[test]
+    fn test_should_store_task() {
+        let task = BtcBridgeOpImpl(BtcBridgeOp::UpdateCkBtcBalance {
+            eth_address: H160::from_hex_str("0xe57e761aa806c9afe7e06fb0601b17bec310f9c4")
+                .expect("valid eth address"),
+        });
+
+        let task = BridgeTask::new(OperationId::new(1), task);
+        let task = ScheduledTask::new(task);
+
+        let task =
+            InnerScheduledTask::with_status(1, task, TaskStatus::Scheduled { timestamp_secs: 1 });
+        let bytes = task.to_bytes();
+
+        let _deserialize: InnerScheduledTask<BridgeTask<BtcBridgeOpImpl>> =
+            InnerScheduledTask::from_bytes(bytes);
     }
 }

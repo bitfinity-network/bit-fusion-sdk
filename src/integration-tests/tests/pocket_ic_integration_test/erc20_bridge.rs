@@ -10,8 +10,7 @@ use bridge_did::operations::Erc20OpStage;
 use bridge_utils::{BTFBridge, UUPSProxy};
 use did::{H160, U256};
 use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
-use eth_signer::{Signer, Wallet};
-use ethers_core::k256::ecdsa::SigningKey;
+use eth_signer::LocalWallet;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
@@ -25,7 +24,7 @@ where
     EVM: TestEvm,
 {
     pub context: PocketIcTestContext<EVM>,
-    pub bob_wallet: Wallet<'static, SigningKey>,
+    pub bob_wallet: LocalWallet,
     pub bob_address: H160,
     pub erc20_bridge_address: H160,
     pub base_btf_bridge: H160,
@@ -55,11 +54,9 @@ where
             .expect("Failed to mint native tokens");
         ctx.advance_time(Duration::from_secs(2)).await;
         let expected_fee_charge_address =
-            ethers_core::utils::get_contract_address(fee_charge_deployer.address(), 0);
+            bridge_utils::get_contract_address(fee_charge_deployer.address(), U256::zero());
 
-        let mut rng = rand::thread_rng();
-
-        let bob_wallet = Wallet::new(&mut rng);
+        let bob_wallet = LocalWallet::random();
         let bob_address: H160 = bob_wallet.address().into();
 
         // Mint native tokens for bob in both evms
@@ -99,7 +96,7 @@ where
         let wrapped_wrapped_token_deployer = ctx
             .initialize_wrapped_token_deployer_contract(&bob_wallet)
             .await
-            .unwrap();
+            .expect("failed to initialize wrapped token deployer contract");
 
         // Deploy the BTFBridge contract on the external EVM.
         let base_btf_bridge = create_btf_bridge(
@@ -241,7 +238,7 @@ async fn test_external_bridging() {
             Some(memo),
         )
         .await
-        .unwrap();
+        .expect("failed to burn base erc20 tokens");
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
@@ -326,7 +323,10 @@ async fn native_token_deposit_increase_and_decrease() {
         )
         .await
         .unwrap();
-    assert_eq!(init_native_balance.0.as_u64(), native_balance_after_deposit);
+    assert_eq!(
+        init_native_balance.0.to::<u64>(),
+        native_balance_after_deposit
+    );
 
     let queried_balance = ctx
         .context
@@ -336,7 +336,7 @@ async fn native_token_deposit_increase_and_decrease() {
             ctx.bob_address(),
         )
         .await;
-    assert_eq!(queried_balance.0.as_u64(), native_balance_after_deposit);
+    assert_eq!(queried_balance.0.to::<u64>(), native_balance_after_deposit);
 
     let fee_contract_evm_balance_after_deposit = wrapped_evm_client
         .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
@@ -598,7 +598,7 @@ async fn erc20_bridge_stress_test() {
 
 async fn create_btf_bridge<EVM>(
     ctx: &PocketIcTestContext<EVM>,
-    wallet: &Wallet<'static, SigningKey>,
+    wallet: &LocalWallet,
     side: BridgeSide,
     fee_charge: H160,
     wrapped_token_deployer: H160,

@@ -1,8 +1,7 @@
 use bridge_did::evm_link::EvmLink;
 use candid::CandidType;
-use did::{H160, U256};
+use did::{BlockNumber, H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use ethers_core::types::{BlockNumber, U256 as EthU256};
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
@@ -20,14 +19,14 @@ pub struct EvmInfo {
 /// Parameters to query from EVM.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
 pub struct EvmParams {
-    pub chain_id: u32,
+    pub chain_id: u64,
     pub next_block: u64,
     pub nonce: u64,
     pub gas_price: U256,
 }
 
 impl EvmParams {
-    pub fn new(chain_id: u32, next_block: u64, nonce: u64, gas_price: U256) -> Self {
+    pub fn new(chain_id: u64, next_block: u64, nonce: u64, gas_price: U256) -> Self {
         Self {
             chain_id,
             next_block,
@@ -41,7 +40,7 @@ impl EvmParams {
         TxParams {
             sender: sender.0,
             bridge: bridge.0,
-            nonce: self.nonce.into(),
+            nonce: self.nonce,
             gas_price: self.gas_price.0,
             chain_id: self.chain_id,
         }
@@ -76,22 +75,25 @@ impl EvmParams {
         let (tx_with_price_count, sum_price) = latest_block
             .transactions
             .iter()
-            .filter_map(|tx| tx.gas_price)
-            .fold((0u64, EthU256::zero()), |(count, sum), price| {
+            .filter_map(|tx| tx.gas_price.clone())
+            .fold((0u64, U256::zero()), |(count, sum), price| {
                 (count + 1, sum + price)
             });
-        let mean_price = sum_price / EthU256::from(tx_with_price_count.max(1));
+
+        let mean_price = sum_price.0 / alloy::primitives::U256::from(tx_with_price_count.max(1));
+
+        let mean_price: U256 = mean_price.into();
         const DEFAULT_GAS_PRICE: u64 = 46 * 10u64.pow(9);
-        let gas_price = if mean_price == EthU256::zero() {
+        let gas_price = if mean_price == U256::zero() {
             DEFAULT_GAS_PRICE.into()
         } else {
-            mean_price.into()
+            mean_price
         };
 
         Ok(Self {
-            chain_id: chain_id.0.as_u32(),
-            next_block: next_block.0.as_u64(),
-            nonce: nonce.0.as_u64(),
+            chain_id: chain_id.0.to(),
+            next_block: next_block.0.to(),
+            nonce: nonce.0.to(),
             gas_price,
         })
     }

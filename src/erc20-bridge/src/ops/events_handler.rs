@@ -115,8 +115,9 @@ pub fn mint_order_from_burnt_event(
     mint_side_evm_params: EvmParams,
     nonce: u32,
 ) -> Option<MintOrder> {
-    let sender = Id256::from_evm_address(&event.sender, burn_side_evm_params.chain_id);
-    let src_token = Id256::from_evm_address(&event.from_erc20, burn_side_evm_params.chain_id);
+    let sender = Id256::from_evm_address(&event.sender, burn_side_evm_params.chain_id as u32);
+    let src_token =
+        Id256::from_evm_address(&event.from_erc20, burn_side_evm_params.chain_id as u32);
     let recipient = Id256::from_slice(&event.recipient_id)?
         .to_evm_address()
         .inspect_err(|err| {
@@ -141,8 +142,8 @@ pub fn mint_order_from_burnt_event(
         recipient,
         dst_token,
         nonce,
-        sender_chain_id: burn_side_evm_params.chain_id,
-        recipient_chain_id: mint_side_evm_params.chain_id,
+        sender_chain_id: burn_side_evm_params.chain_id as u32,
+        recipient_chain_id: mint_side_evm_params.chain_id as u32,
         name: to_array(&event.name)?,
         symbol: to_array(&event.symbol)?,
         decimals: event.decimals,

@@ -7,14 +7,14 @@ use bridge_client::BridgeCanisterClient as _;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::id256::{Id256, ID_256_BYTE_SIZE};
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp};
-use eth_signer::Signer as _;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs, BtcWallet};
+use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs};
 use crate::context::TestContext;
+use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
 use crate::utils::GanacheEvm;
@@ -158,7 +158,7 @@ where
 
     async fn new_user(&self, _wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
         // generate random address
-        let wallet = ctx::generate_btc_wallet();
+        let wallet = BtcWallet::new_random();
         // mint some tokens
         self.ctx
             .send_btc(&wallet.address, Amount::from_sat(10_000_000))
@@ -177,7 +177,7 @@ where
 
     async fn mint(&self, token_idx: usize, to: &Self::UserId, amount: did::U256) -> Result<()> {
         let token = self.token_info(token_idx)?;
-        let amount: u128 = amount.0.as_u128();
+        let amount: u128 = amount.0.to();
         if (token.max_supply as u128) < amount {
             return Err(TestError::Generic("Mint amount exceeds max supply".into()));
         }
@@ -234,7 +234,7 @@ where
         let nonce = to_user.next_nonce();
 
         let tick = token.tick;
-        let amount = TokenAmount::from_int(info.amount.0.as_u128(), token.decimals);
+        let amount = TokenAmount::from_int(info.amount.0.to(), token.decimals);
 
         // transfer BRC20 first
         let from_user = self.user_wallet(&info.from).await?;

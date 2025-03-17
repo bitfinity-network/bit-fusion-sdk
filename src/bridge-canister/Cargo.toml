@@ -8,6 +8,8 @@ default = ["export-api"]
 export-api = []
 
 [dependencies]
+alloy = { workspace = true }
+async-trait = { workspace = true }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
@@ -24,8 +26,6 @@ ic-task-scheduler = { workspace = true }
 jsonrpc-core = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
-ethers-core = { workspace = true }
-async-trait = { workspace = true }
 
 [dev-dependencies]
 ic-exports = { workspace = true }

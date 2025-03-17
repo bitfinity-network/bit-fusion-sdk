@@ -1,14 +1,17 @@
-use alloy_sol_types::private::{Bytes, LogData};
+use alloy::consensus::TxLegacy;
+use alloy::core::primitives::{Address, BlockNumber as EthBlockNumber, U256};
+use alloy::primitives::TxKind;
+use alloy::rpc::types::Log;
 use alloy_sol_types::{SolCall, SolEvent};
-use anyhow::anyhow;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use candid::CandidType;
 use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
-use ethers_core::types::{BlockNumber as EthBlockNumber, Log, Transaction, H160, U256};
 use serde::{Deserialize, Serialize};
 
 use crate::BTFBridge;
+
+const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
 
 /// Emitted when token is burnt or minted by BTFBridge.
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
@@ -23,7 +26,7 @@ impl BridgeEvent {
         evm_client: &EthJsonRpcClient<impl Client>,
         from_block: u64,
         to_block: u64,
-        bridge_contract: H160,
+        bridge_contract: Address,
     ) -> BTFResult<Vec<Self>> {
         let logs_result =
             Self::collect_logs(evm_client, from_block, to_block, bridge_contract).await;
@@ -55,7 +58,7 @@ impl BridgeEvent {
         evm_client: &EthJsonRpcClient<impl Client>,
         mut from_block: u64,
         to_block: u64,
-        bridge_contract: H160,
+        bridge_contract: Address,
     ) -> Result<Vec<Log>, anyhow::Error> {
         const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
         log::debug!("collecting logs from {from_block} to {to_block}",);
@@ -69,8 +72,8 @@ impl BridgeEvent {
             match Self::collect_logs_from_to(
                 evm_client,
                 bridge_contract,
-                EthBlockNumber::Number(from_block.into()),
-                EthBlockNumber::Number(to_block_for_page.into()),
+                from_block,
+                to_block_for_page,
             )
             .await
             {
@@ -103,14 +106,14 @@ impl BridgeEvent {
     /// Collects logs from the given range of blocks.
     async fn collect_logs_from_to(
         evm_client: &EthJsonRpcClient<impl Client>,
-        bridge_contract: H160,
+        bridge_contract: Address,
         from_block: EthBlockNumber,
         to_block: EthBlockNumber,
     ) -> Result<Vec<Log>, anyhow::Error> {
         let params = EthGetLogsParams {
-            address: Some(vec![bridge_contract]),
-            from_block,
-            to_block,
+            address: Some(vec![bridge_contract.into()]),
+            from_block: from_block.into(),
+            to_block: to_block.into(),
             topics: Some(vec![vec![
                 BurnTokenEvent::SIGNATURE_HASH.0.into(),
                 MintTokenEvent::SIGNATURE_HASH.0.into(),
@@ -129,22 +132,15 @@ impl TryFrom<Log> for BridgeEvent {
     type Error = anyhow::Error;
 
     fn try_from(value: Log) -> Result<Self, Self::Error> {
-        let topics = value
-            .topics
-            .iter()
-            .map(|topic| topic.0.into())
-            .collect::<Vec<_>>();
+        let log = value.data();
 
-        let log = LogData::new(topics, Bytes(value.data.0))
-            .ok_or_else(|| anyhow!("failed to decode log"))?;
-
-        let event = BurnTokenEvent::decode_log_data(&log, true)
+        let event = BurnTokenEvent::decode_log_data(log, true)
             .map(|event| Self::Burnt(event.into()))
             .or_else(|_| {
-                MintTokenEvent::decode_log_data(&log, true).map(|event| Self::Minted(event.into()))
+                MintTokenEvent::decode_log_data(log, true).map(|event| Self::Minted(event.into()))
             })
             .or_else(|_| {
-                NotifyMinterEvent::decode_log_data(&log, true)
+                NotifyMinterEvent::decode_log_data(log, true)
                     .map(|event| Self::Notify(event.into()))
             })?;
 
@@ -155,11 +151,11 @@ impl TryFrom<Log> for BridgeEvent {
 /// Parameters for EVM transaction.
 #[derive(Debug, Clone)]
 pub struct TxParams {
-    pub sender: H160,
-    pub bridge: H160,
-    pub nonce: U256,
+    pub sender: Address,
+    pub bridge: Address,
+    pub nonce: u64,
     pub gas_price: U256,
-    pub chain_id: u32,
+    pub chain_id: u64,
 }
 
 /// Sends transaction with given params to call `batchMint` function
@@ -169,7 +165,7 @@ pub fn batch_mint_transaction(
     mint_orders_data: &[u8],
     signature: &[u8],
     orders_to_process: &[u32],
-) -> Transaction {
+) -> TxLegacy {
     let data = BTFBridge::batchMintCall {
         encodedOrders: mint_orders_data.to_vec().into(),
         signature: signature.to_vec().into(),
@@ -177,17 +173,14 @@ pub fn batch_mint_transaction(
     }
     .abi_encode();
 
-    pub const DEFAULT_TX_GAS_LIMIT: u64 = 3_000_000;
-    ethers_core::types::Transaction {
-        from: params.sender,
-        to: params.bridge.into(),
+    TxLegacy {
+        chain_id: Some(params.chain_id),
         nonce: params.nonce,
-        value: U256::zero(),
-        gas: DEFAULT_TX_GAS_LIMIT.into(),
-        gas_price: Some(params.gas_price),
+        gas_price: params.gas_price.to(),
+        gas_limit: DEFAULT_TX_GAS_LIMIT,
+        to: TxKind::Call(params.bridge),
+        value: U256::ZERO,
         input: data.into(),
-        chain_id: Some(params.chain_id.into()),
-        ..Default::default()
     }
 }
 
@@ -195,9 +188,10 @@ pub fn batch_mint_transaction(
 mod tests {
     use std::collections::HashMap;
 
+    use alloy::primitives::Bytes;
+    use alloy::rpc::types::RawLog;
     use alloy_sol_types::private::{Address, FixedBytes, Uint};
     use did::H256;
-    use ethers_core::abi::{Bytes, RawLog};
 
     use super::*;
 
@@ -208,7 +202,7 @@ mod tests {
         let addr = Address(bytes20);
 
         let event = MintTokenEvent {
-            amount: did::U256::one().into(),
+            amount: did::U256::from(1u64).into(),
             fromToken: bytes32,
             senderID: bytes32,
             toERC20: addr,
@@ -221,7 +215,8 @@ mod tests {
 
         let raw = RawLog {
             topics: vec![H256::from_slice(&topic.0).into()],
-            data,
+            data: data.into(),
+            address: addr,
         };
 
         let topics = raw
@@ -231,7 +226,7 @@ mod tests {
             .collect::<Vec<FixedBytes<32>>>();
 
         let decoded_event =
-            MintTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+            MintTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true).unwrap();
 
         assert_eq!(event.amount, decoded_event.amount);
         assert_eq!(event.fromToken, decoded_event.fromToken);
@@ -245,10 +240,10 @@ mod tests {
     #[test]
     fn convert_raw_log_into_burnt_event() {
         let event = BurnTokenEvent {
-            sender: H160::random().0.into(),
+            sender: Address::repeat_byte(1),
             amount: Uint::ZERO,
-            fromERC20: H160::random().0.into(),
-            recipientID: Bytes::default().into(),
+            fromERC20: Address::repeat_byte(2),
+            recipientID: Bytes::default(),
             toToken: FixedBytes::from([3; 32]),
             operationID: 1,
             name: FixedBytes::from([2; 32]),
@@ -262,12 +257,13 @@ mod tests {
         let raw = RawLog {
             topics: vec![
                 H256::from_hex_str(
-                    "0xfa3804fd5313cc219c6d3a833f7dbc2b1b48ac5edbae532006f1aa876a23eb79",
+                    "0x9d727a82f0ec1a11adcfae675deaa61c758c84fb0c3c9af9c05838e693e3e643",
                 )
-                .unwrap()
+                .expect("invalid topic")
                 .0,
             ],
-            data: raw_data,
+            data: raw_data.into(),
+            address: event.sender,
         };
         let topics = raw
             .topics
@@ -275,7 +271,8 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let event = BurnTokenEvent::decode_raw_log(topics, &raw.data.to_vec(), true).unwrap();
+        let event = BurnTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true)
+            .expect("failed to decode event");
         assert_eq!(event.sender, event.sender);
     }
 
@@ -289,17 +286,20 @@ mod tests {
             logs.insert(
                 block,
                 vec![Log {
-                    address: ethers_core::types::H160::default(),
-                    topics: vec![],
-                    data: ethers_core::types::Bytes::default(),
                     block_hash: None,
                     block_number: None,
                     transaction_hash: None,
                     transaction_index: None,
                     log_index: None,
-                    transaction_log_index: None,
-                    log_type: None,
-                    removed: None,
+                    removed: false,
+                    block_timestamp: None,
+                    inner: alloy::primitives::Log {
+                        address: Address::ZERO,
+                        data: alloy::primitives::LogData::new_unchecked(
+                            vec![],
+                            Bytes::from(vec![]),
+                        ),
+                    },
                 }],
             );
         }
@@ -311,38 +311,33 @@ mod tests {
         let evm_client = EthJsonRpcClient::new(client);
 
         // get from 0 to 100
-        let logs =
-            BridgeEvent::collect_logs(&evm_client, 0, 100, ethers_core::types::H160::default())
-                .await
-                .unwrap();
+        let logs = BridgeEvent::collect_logs(&evm_client, 0, 100, Address::ZERO)
+            .await
+            .unwrap();
         assert_eq!(logs.len(), 0);
 
         // get from 80 to 220 (first result will be empty)
-        let logs =
-            BridgeEvent::collect_logs(&evm_client, 80, 220, ethers_core::types::H160::default())
-                .await
-                .unwrap();
+        let logs = BridgeEvent::collect_logs(&evm_client, 80, 220, Address::ZERO)
+            .await
+            .unwrap();
         assert_eq!(logs.len(), 21);
 
         // get from 100 to 800 (multiple requests)
-        let logs =
-            BridgeEvent::collect_logs(&evm_client, 100, 800, ethers_core::types::H160::default())
-                .await
-                .unwrap();
+        let logs = BridgeEvent::collect_logs(&evm_client, 100, 800, Address::ZERO)
+            .await
+            .unwrap();
         assert_eq!(logs.len(), 601);
 
         // get error block
-        let logs =
-            BridgeEvent::collect_logs(&evm_client, 801, 950, ethers_core::types::H160::default())
-                .await
-                .unwrap();
+        let logs = BridgeEvent::collect_logs(&evm_client, 801, 950, Address::ZERO)
+            .await
+            .unwrap();
         assert_eq!(logs.len(), 950 - 801); // error will be skipped
 
         // get with more blocks than available
-        let logs =
-            BridgeEvent::collect_logs(&evm_client, 10, 2000, ethers_core::types::H160::default())
-                .await
-                .unwrap();
+        let logs = BridgeEvent::collect_logs(&evm_client, 10, 2000, Address::ZERO)
+            .await
+            .unwrap();
         assert_eq!(logs.len(), 800);
     }
 

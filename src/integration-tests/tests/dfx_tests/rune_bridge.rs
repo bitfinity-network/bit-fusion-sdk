@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bridge_did::runes::RuneName;
-use eth_signer::Signer as _;
 
 use crate::context::rune_bridge::{
     generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,

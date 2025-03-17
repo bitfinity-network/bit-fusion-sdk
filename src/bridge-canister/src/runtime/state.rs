@@ -9,7 +9,7 @@ use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_utils::evm_bridge::EvmParams;
 use did::H160;
-use eth_signer::sign_strategy::TransactionSigner;
+use eth_signer::sign_strategy::TxSigner;
 use ic_exports::ic_kit::ic;
 
 use self::config::ConfigStorage;
@@ -109,7 +109,7 @@ impl OperationContext for SharedConfig {
         self.borrow().get_evm_params()
     }
 
-    fn get_signer(&self) -> BTFResult<impl TransactionSigner> {
+    fn get_signer(&self) -> BTFResult<TxSigner> {
         self.borrow().get_signer()
     }
 }

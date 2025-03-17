@@ -1,12 +1,14 @@
 pub mod brc20_helper;
 pub mod btc;
 pub mod btc_rpc_client;
+pub mod btc_transfer_helper;
+pub mod btc_wallet;
 pub mod error;
 pub mod hiro_ordinals_client;
 pub mod miner;
 pub mod ord_client;
 pub mod rune_helper;
-mod test_evm;
+pub mod test_evm;
 pub mod token_amount;
 pub mod wasm;
 
