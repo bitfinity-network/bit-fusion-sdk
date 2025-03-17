@@ -561,12 +561,10 @@ where
             .await
             .expect("Failed to get native token balance");
 
-        let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(&response, true)
+        FeeCharge::nativeTokenBalanceCall::abi_decode_returns(&response, true)
             .unwrap()
             .balance
-            .into();
-
-        balance
+            .into()
     }
 
     /// Deposit native tokens to Btfbridge to pay mint fee.
@@ -649,7 +647,7 @@ where
                 Some(from),
                 Some(contract.clone()),
                 Some(amount.into()),
-                8_000_000u64.into(),
+                8_000_000u64,
                 Some(DEFAULT_GAS_PRICE.into()),
                 Some(input.clone().into()),
             )

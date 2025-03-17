@@ -6,6 +6,7 @@ use btc_bridge::canister::eth_address_to_subaccount;
 use icrc_client::account::Account;
 
 use crate::context::btc_bridge::BtcContext;
+use crate::context::stress::StressTestConfig;
 use crate::context::TestContext;
 use crate::pocket_ic_integration_test::block_until_succeeds;
 use crate::utils::btc_wallet::BtcWallet;
@@ -412,4 +413,49 @@ async fn test_should_deposit_and_withdraw_btc() {
     .await;
 
     ctx.stop().await;
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_btc_bridge_stress_test() {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    let evm = default_evm().await;
+
+    let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
+        &crate::context::CanisterType::BTC_CANISTER_SET,
+        |builder| {
+            builder
+                .with_ii_subnet()
+                .with_bitcoin_subnet()
+                .with_bitcoind_addr(SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                    18444,
+                ))
+        },
+        |mut pic| {
+            Box::pin(async move {
+                // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
+                pic.set_time(std::time::SystemTime::now()).await;
+                pic.make_live(None).await;
+                pic
+            })
+        },
+        true,
+        evm.clone(),
+        evm,
+    )
+    .await;
+
+    let config = StressTestConfig {
+        users_number: 5,
+        user_deposits_per_token: 1,
+        init_user_balance: 1_000_000u64.into(), // 0.01 BTC
+        operation_amount: 500_000u64.into(),    // 0.005 BTC
+        operation_timeout: Duration::from_secs(120),
+        wait_per_iteration: Duration::from_secs(10),
+        charge_fee: false,
+    };
+
+    crate::context::stress::btc::stress_test_btc_bridge_with_ctx(context, config).await;
 }
