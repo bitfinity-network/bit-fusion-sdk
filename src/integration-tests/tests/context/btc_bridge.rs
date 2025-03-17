@@ -74,14 +74,15 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                         18444,
                     ))
             },
-            |pic| {
+            |mut pic| {
                 Box::pin(async move {
                     // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
                     pic.set_time(std::time::SystemTime::now()).await;
+                    pic.make_live(None).await;
                     pic
                 })
             },
-            false,
+            true,
         )
         .await;
 
@@ -113,12 +114,31 @@ where
 
         context.advance_time(Duration::from_secs(10)).await;
 
-        let btc_bridge_eth_address = context
-            .btc_bridge_client(context.admin_name())
-            .get_bridge_canister_evm_address()
-            .await
-            .expect("failed to get btc bridge eth address")
-            .expect("failed to get btc bridge eth address");
+        let mut btc_bridge_eth_address = None;
+
+        for _ in 0..10 {
+            match context
+                .btc_bridge_client(context.admin_name())
+                .get_bridge_canister_evm_address()
+                .await
+            {
+                Ok(Ok(bridge_eth_address)) => {
+                    btc_bridge_eth_address = Some(bridge_eth_address);
+                    break;
+                }
+                Ok(Err(e)) => {
+                    eprintln!("Failed to get bridge eth address: {e}");
+                }
+                Err(e) => {
+                    eprintln!("Failed to get bridge eth address (canister client): {e}");
+                }
+            }
+
+            context.advance_time(Duration::from_secs(5)).await;
+        }
+
+        let btc_bridge_eth_address =
+            btc_bridge_eth_address.expect("failed to get bridge eth address");
 
         let wallet = LocalWallet::random();
         let wallet_address = wallet.address();
@@ -131,18 +151,34 @@ where
             .expect("failed to mint tokens to user");
 
         let client = context.evm_client(context.admin_name());
-        client
-            .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
-            .await
-            .expect("failed to mint tokens to btc bridge")
-            .expect("failed to mint tokens to btc bridge");
+        let mut wrapped_token_deployer = None;
 
-        context.advance_time(Duration::from_secs(2)).await;
+        for _ in 0..10 {
+            client
+                .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+                .await
+                .expect("failed to mint tokens to btc bridge")
+                .expect("failed to mint tokens to btc bridge");
 
-        let wrapped_token_deployer = context
-            .initialize_wrapped_token_deployer_contract(&wallet)
-            .await
-            .expect("failed to initialize wrapped token deployer");
+            context.advance_time(Duration::from_secs(2)).await;
+
+            match context
+                .initialize_wrapped_token_deployer_contract(&wallet)
+                .await
+            {
+                Ok(deployer) => {
+                    wrapped_token_deployer = Some(deployer);
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize wrapped token deployer: {e}");
+                }
+            }
+        }
+
+        let wrapped_token_deployer =
+            wrapped_token_deployer.expect("failed to initialize wrapped token deployer");
+
         let btf_bridge = context
             .initialize_btf_bridge_with_minter(
                 &wallet,
@@ -378,7 +414,7 @@ where
             &from_wallet.private_key,
             &from_wallet.address,
         )
-        .transfer(amount, funding_utxo, &deposit_address)
+        .transfer(amount, vec![funding_utxo], &deposit_address)
         .await?;
 
         // wait for confirmations

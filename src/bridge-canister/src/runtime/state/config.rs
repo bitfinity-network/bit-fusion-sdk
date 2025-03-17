@@ -166,9 +166,11 @@ impl ConfigStorage {
 
     /// Returns parameters of EVM canister with which the bridge canister works.
     pub fn get_evm_params(&self) -> BTFResult<EvmParams> {
-        self.0.get().evm_params.clone().ok_or_else(|| {
-            Error::Initialization("failed to get uninitialized get evm params".into())
-        })
+        self.0
+            .get()
+            .evm_params
+            .clone()
+            .ok_or_else(|| Error::Initialization("failed to get uninitialized evm params".into()))
     }
 
     /// Updates parameters of EVM canister with which the bridge canister works.
