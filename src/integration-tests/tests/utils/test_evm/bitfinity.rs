@@ -31,7 +31,7 @@ impl<C> TestEvm for BitfinityEvm<C>
 where
     C: CanisterClient + Send + Sync,
 {
-    async fn eth_chain_id(&self) -> TestResult<u64> {
+    async fn chain_id(&self) -> TestResult<u64> {
         let res = self.evm_client.eth_chain_id().await?;
 
         Ok(res)
@@ -68,13 +68,14 @@ where
         gas_limit: u64,
         gas_price: Option<U256>,
         data: Option<Bytes>,
-    ) -> TestResult<String> {
+    ) -> TestResult<Vec<u8>> {
         let res = self
             .evm_client
             .eth_call(from, to, value, gas_limit, gas_price, data)
             .await??;
 
-        Ok(res)
+        hex::decode(res.trim_start_matches("0x"))
+            .map_err(|e| TestError::Ganache(format!("Failed to parse result: {:?}", e)))
     }
 
     async fn eth_get_balance(&self, address: &H160, block: BlockNumber) -> TestResult<U256> {
@@ -97,5 +98,9 @@ where
 
     async fn get_next_nonce(&self, address: &H160) -> TestResult<U256> {
         Ok(self.evm_client.account_basic(address.clone()).await?.nonce)
+    }
+
+    fn live(&self) -> bool {
+        false
     }
 }

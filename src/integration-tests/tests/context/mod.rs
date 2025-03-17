@@ -218,7 +218,10 @@ where
         let creator_address: H160 = creator_wallet.address().into();
         let nonce = evm.get_next_nonce(&creator_address).await?;
 
-        let create_contract_tx = self.signed_transaction(creator_wallet, None, nonce, 0, input);
+        let create_contract_tx = self
+            .signed_transaction(evm, creator_wallet, None, nonce, 0, input)
+            .await;
+        println!("tx {:?}", create_contract_tx);
 
         let hash = evm.send_raw_transaction(create_contract_tx).await?;
         println!("Contract creation tx hash: {hash}",);
@@ -558,13 +561,10 @@ where
             .await
             .expect("Failed to get native token balance");
 
-        let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(
-            &hex::decode(response.trim_start_matches("0x")).unwrap(),
-            true,
-        )
-        .unwrap()
-        .balance
-        .into();
+        let balance = FeeCharge::nativeTokenBalanceCall::abi_decode_returns(&response, true)
+            .unwrap()
+            .balance
+            .into();
 
         balance
     }
@@ -595,8 +595,9 @@ where
     }
 
     /// Returns a signed transaction from the given `wallet`.
-    fn signed_transaction(
+    async fn signed_transaction(
         &self,
+        evm: &Arc<EVM>,
         wallet: &LocalWallet,
         to: Option<H160>,
         nonce: U256,
@@ -613,7 +614,7 @@ where
             gas_price: DEFAULT_GAS_PRICE.into(),
             input,
             signature: SigningMethod::SigningKey(wallet.credential()),
-            chain_id: CHAIN_ID,
+            chain_id: evm.chain_id().await.expect("Failed to get chain id"),
         }
         .calculate_hash_and_build()
         .unwrap()
@@ -643,10 +644,23 @@ where
         let from: H160 = wallet.address().into();
         let nonce = evm.get_next_nonce(&from).await?;
 
-        let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
+        let output = evm
+            .eth_call(
+                Some(from),
+                Some(contract.clone()),
+                Some(amount.into()),
+                8_000_000u64.into(),
+                Some(DEFAULT_GAS_PRICE.into()),
+                Some(input.clone().into()),
+            )
+            .await?;
+
+        let call_tx = self
+            .signed_transaction(evm, wallet, Some(contract.clone()), nonce, amount, input)
+            .await;
 
         let hash = evm.send_raw_transaction(call_tx).await?;
-        let receipt = self
+        let mut receipt = self
             .wait_transaction_receipt_on_evm(evm, &hash)
             .await?
             .ok_or(TestError::Evm(EvmError::Internal(
@@ -658,6 +672,8 @@ where
             dbg!(&receipt);
             dbg!(&hex::encode(receipt.output.as_ref().unwrap_or(&vec![])));
         }
+
+        receipt.output = receipt.output.or(Some(output));
 
         Ok((hash, receipt))
     }
@@ -699,7 +715,9 @@ where
         };
 
         println!("sending tx from wallet {from} with nonce {nonce}");
-        let call_tx = self.signed_transaction(wallet, Some(contract.clone()), nonce, amount, input);
+        let call_tx = self
+            .signed_transaction(evm, wallet, Some(contract.clone()), nonce, amount, input)
+            .await;
 
         let hash = evm.send_raw_transaction(call_tx).await?;
 
@@ -723,7 +741,10 @@ where
 
         let (_hash, receipt) = self.call_contract(wallet, btf_bridge, input, 0).await?;
 
-        let output = receipt.output.as_ref().unwrap();
+        let output = receipt.output.as_ref().ok_or_else(|| {
+            println!("receipt: {:?}", receipt);
+            TestError::Generic("No output in receipt".into())
+        })?;
 
         let address = BTFBridge::deployERC20Call::abi_decode_returns(output, true)
             .unwrap()
@@ -752,7 +773,9 @@ where
 
         let deployer_address = wallet.address();
         let nonce = evm.get_next_nonce(&deployer_address.into()).await?;
-        let tx = self.signed_transaction(wallet, None, nonce, 0, erc20_input);
+        let tx = self
+            .signed_transaction(evm, wallet, None, nonce, 0, erc20_input)
+            .await;
         let hash = evm
             .send_raw_transaction(tx)
             .await
@@ -920,12 +943,9 @@ where
             )
             .await?;
 
-        let balance = WrappedToken::balanceOfCall::abi_decode_returns(
-            &hex::decode(response.trim_start_matches("0x")).unwrap(),
-            true,
-        )
-        .unwrap()
-        ._0;
+        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&response, true)
+            .unwrap()
+            ._0;
         Ok(balance.to())
     }
 
@@ -1049,7 +1069,7 @@ where
                 println!("EVM-RPC provider hostname: {hostname}");
                 // configure the EVM RPC canister provider
                 let args = evm_rpc_canister::RegisterProviderArgs {
-                    chainId: CHAIN_ID,
+                    chainId: self.wrapped_evm().chain_id().await.unwrap(),
                     hostname,
                     credentialPath: "".to_string(),
                     cyclesPerCall: 1,

@@ -48,18 +48,23 @@ where
         base_evm: Arc<EVM>,
         wrapped_evm: Arc<EVM>,
     ) -> Self {
-        Self::new_with(
-            canisters_set,
-            |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
-            base_evm,
-            wrapped_evm,
-        )
-        .await
+        if base_evm.live() || wrapped_evm.live() {
+            Self::new_live(canisters_set, base_evm, wrapped_evm).await
+        } else {
+            Self::new_with(
+                canisters_set,
+                |builder| builder,
+                |pic| Box::pin(async move { pic }),
+                false,
+                base_evm,
+                wrapped_evm,
+            )
+            .await
+        }
     }
 
-    pub async fn new_live(
+    /// Creates a new test context with the given canisters and with the PocketIC instance in live mode.
+    async fn new_live(
         canisters_set: &[CanisterType],
         base_evm: Arc<EVM>,
         wrapped_evm: Arc<EVM>,
@@ -67,8 +72,14 @@ where
         Self::new_with(
             canisters_set,
             |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
+            |mut pic| {
+                Box::pin(async move {
+                    pic.set_time(std::time::SystemTime::now()).await;
+                    pic.make_live(None).await;
+                    pic
+                })
+            },
+            true,
             base_evm,
             wrapped_evm,
         )

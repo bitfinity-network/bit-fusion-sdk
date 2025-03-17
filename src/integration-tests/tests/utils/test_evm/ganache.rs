@@ -33,6 +33,7 @@ impl GanacheEvm {
             .expect("Failed to get host port for Ganache");
         let rpc_url = format!("http://localhost:{host_port}");
         let chain_id = Self::get_chain_id(&rpc_url).await;
+        println!("chain id: {chain_id}");
 
         let rpc_client = reqwest::Client::new();
 
@@ -92,7 +93,7 @@ impl GanacheEvm {
 
 #[async_trait::async_trait]
 impl TestEvm for GanacheEvm {
-    async fn eth_chain_id(&self) -> TestResult<u64> {
+    async fn chain_id(&self) -> TestResult<u64> {
         Ok(self.chain_id)
     }
 
@@ -158,7 +159,7 @@ impl TestEvm for GanacheEvm {
         gas_limit: u64,
         gas_price: Option<U256>,
         data: Option<Bytes>,
-    ) -> TestResult<String> {
+    ) -> TestResult<Vec<u8>> {
         let response = self
             .rpc_request(serde_json::json!(
                 {
@@ -189,7 +190,9 @@ impl TestEvm for GanacheEvm {
             .ok_or_else(|| anyhow::anyhow!("Failed to get result: {:?}", body["error"]))
             .map_err(|e| TestError::Ganache(format!("Failed to get result: {:?}", e)))?;
 
-        Ok(result.to_string())
+        // hex to bytes
+        hex::decode(result.trim_start_matches("0x"))
+            .map_err(|e| TestError::Ganache(format!("Failed to parse result: {:?}", e)))
     }
 
     /// Get the balance of an address
@@ -198,7 +201,7 @@ impl TestEvm for GanacheEvm {
             .rpc_request(serde_json::json!(
                 {
                     "method": "eth_getBalance",
-                    "params": [address.to_hex_str(), block.to_string()],
+                    "params": [address.to_hex_str(), block.to_string().to_lowercase()],
                     "id": 1,
                     "jsonrpc": "2.0"
                 }
@@ -207,6 +210,7 @@ impl TestEvm for GanacheEvm {
             .unwrap();
 
         let body = response.json::<serde_json::Value>().await.unwrap();
+        println!("body: {:#?}", body);
         let balance_str = body["result"].as_str().unwrap();
 
         U256::from_hex_str(balance_str)
@@ -264,5 +268,9 @@ impl TestEvm for GanacheEvm {
         Ok(u64::from_str_radix(nonce_str.trim_start_matches("0x"), 16)
             .map_err(|e| TestError::Ganache(format!("Failed to parse nonce: {:?}", e)))?
             .into())
+    }
+
+    fn live(&self) -> bool {
+        true
     }
 }

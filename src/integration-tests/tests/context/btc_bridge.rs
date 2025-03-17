@@ -245,7 +245,7 @@ where
 
         let client = self.context.wrapped_evm();
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
-        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let chain_id = client.chain_id().await.expect("failed to get chain id");
 
         let transaction = TransactionBuilder {
             from: &sender.address().into(),

@@ -407,7 +407,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     }
     .abi_encode();
 
-    let allowance_response = ctx
+    let allowance_data = ctx
         .wrapped_evm()
         .eth_call(
             Some(john_address),
@@ -419,8 +419,6 @@ async fn test_icrc2_tokens_approve_after_mint() {
         )
         .await
         .expect("eth_call failed");
-
-    let allowance_data = hex::decode(allowance_response.trim_start_matches("0x")).unwrap();
 
     let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data, true)
         .unwrap()

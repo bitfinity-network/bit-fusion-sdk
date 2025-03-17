@@ -541,7 +541,7 @@ where
         }
 
         let client = self.inner.wrapped_evm();
-        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let chain_id = client.chain_id().await.expect("failed to get chain id");
 
         let data = RuneDepositRequestData {
             dst_address: dst_address.clone(),

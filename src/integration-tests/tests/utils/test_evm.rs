@@ -13,8 +13,11 @@ use crate::utils::error::Result as TestResult;
 /// An abstraction layer for interacting with a test EVM node
 #[async_trait::async_trait]
 pub trait TestEvm: Send + Sync {
+    /// returns whether requires live mode
+    fn live(&self) -> bool;
+
     /// Get the chain ID
-    async fn eth_chain_id(&self) -> TestResult<u64>;
+    async fn chain_id(&self) -> TestResult<u64>;
 
     /// Get EVM Link for this evm
     fn link(&self) -> EvmLink;
@@ -34,7 +37,7 @@ pub trait TestEvm: Send + Sync {
         gas_limit: u64,
         gas_price: Option<U256>,
         data: Option<Bytes>,
-    ) -> TestResult<String>;
+    ) -> TestResult<Vec<u8>>;
 
     /// Get the balance of an address
     async fn eth_get_balance(&self, address: &H160, block: BlockNumber) -> TestResult<U256>;
