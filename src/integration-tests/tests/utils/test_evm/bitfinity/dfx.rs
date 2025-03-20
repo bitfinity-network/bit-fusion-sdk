@@ -4,7 +4,6 @@ use std::time::Duration;
 use candid::Principal;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use ic_exports::ic_kit::mock_principals::bob;
 use ic_test_utils::{get_agent, Agent, Canister};
 use ic_utils::interfaces::ManagementCanister;
 
@@ -66,7 +65,7 @@ async fn install_evm(agent: &Agent, evm: Principal, signature: Principal) {
 
     let init_data = evm_canister_init_data(
         signature,
-        bob(),
+        agent.get_principal().expect("Failed to get principal"),
         Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
     );
     let mng = ManagementCanister::create(agent);

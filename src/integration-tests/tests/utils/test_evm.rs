@@ -9,8 +9,10 @@ use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256}
 
 pub use self::bitfinity::BitfinityEvm;
 pub use self::ganache::GanacheEvm;
+#[cfg(feature = "pocket_ic_integration_test")]
+pub use self::wrapper::test_evm_pocket_ic;
 #[cfg(any(feature = "pocket_ic_integration_test", feature = "dfx_tests"))]
-pub use self::wrapper::{test_evm, test_evm_pocket_ic, Evm};
+pub use self::wrapper::{test_evm, Evm};
 use crate::utils::error::Result as TestResult;
 
 /// An abstraction layer for interacting with a test EVM node
