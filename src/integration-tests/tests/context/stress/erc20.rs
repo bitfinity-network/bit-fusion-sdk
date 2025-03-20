@@ -38,6 +38,7 @@ where
 {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         let base_evm_client = ctx.base_evm();
+        let wrapped_evm_client = ctx.wrapped_evm();
 
         // Create contract deployer wallet.
         let contracts_deployer = LocalWallet::random();
@@ -46,6 +47,7 @@ where
             .mint_native_tokens(deployer_address.into(), u128::MAX.into())
             .await
             .expect("mint_native_tokens failed");
+        ctx.advance_time(Duration::from_secs(2)).await;
 
         let mut tokens = Vec::with_capacity(base_tokens_number);
         for _ in 0..base_tokens_number {
@@ -75,9 +77,13 @@ where
             .unwrap()
             .unwrap();
         base_evm_client
-            .mint_native_tokens(bridge_address, u128::MAX.into())
+            .mint_native_tokens(bridge_address.clone(), u128::MAX.into())
             .await
             .expect("mint_native_tokens failed");
+        wrapped_evm_client
+            .mint_native_tokens(bridge_address, u64::MAX.into())
+            .await
+            .expect("Failed to mint native tokens");
 
         Ok(Self {
             ctx,
@@ -123,7 +129,7 @@ where
     }
 
     async fn wait_tx_success(&self, tx_hash: &H256) -> Result<TransactionReceipt> {
-        let evm_client = self.ctx.wrapped_evm();
+        let evm_client = self.ctx.base_evm();
         let mut retries = 0;
         let receipt = loop {
             if retries > 100 {
@@ -194,7 +200,7 @@ where
 
     async fn new_user(&self, wrapped_wallet: &OwnedWallet) -> Result<Self::UserId> {
         let address = wrapped_wallet.address();
-        let client = self.ctx.wrapped_evm();
+        let client = self.ctx.base_evm();
         client
             .mint_native_tokens(address.into(), u128::MAX.into())
             .await
@@ -217,7 +223,7 @@ where
         }
         .abi_encode();
 
-        let evm_client = self.ctx.wrapped_evm();
+        let evm_client = self.ctx.base_evm();
         let receipt = self
             .ctx
             .call_contract_on_evm(
@@ -236,7 +242,7 @@ where
 
     async fn balance_of(&self, token_idx: usize, user: &Self::UserId) -> Result<U256> {
         let token_address = self.tokens[token_idx].clone();
-        let evm_client = self.ctx.wrapped_evm();
+        let evm_client = self.ctx.base_evm();
 
         let balance = self
             .ctx
@@ -258,7 +264,7 @@ where
         let user_wallet = to_user.wallet.clone();
         let user_address = user_wallet.address();
         let token_address = self.tokens[info.base_token_idx].clone();
-        let evm_client = self.ctx.wrapped_evm();
+        let evm_client = self.ctx.base_evm();
         let nonce = self.next_nonce(&user_address.into()).await;
         let to_token_id = self.token_id256(info.wrapped_token.clone());
         let recipient_id = self.user_id(user_address.into()).await;

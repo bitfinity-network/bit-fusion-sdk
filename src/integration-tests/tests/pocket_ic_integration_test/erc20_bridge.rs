@@ -553,7 +553,7 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
 
     let erc20_bridge_balance_after_deposit = ctx
         .context
-        .base_evm()
+        .wrapped_evm()
         .eth_get_balance(&ctx.fee_charge_address, did::BlockNumber::Latest)
         .await
         .expect("Failed to get balance");
