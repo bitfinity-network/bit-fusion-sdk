@@ -175,12 +175,14 @@ where
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl<EVM> RunesContext<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
-where
-    EVM: TestEvm,
+impl
+    RunesContext<
+        crate::pocket_ic_integration_test::PocketIcTestContext,
+        crate::utils::test_evm::Evm,
+    >
 {
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
-    pub async fn pocket_ic(runes: &[String], evm: Arc<EVM>) -> Self {
+    pub async fn pocket_ic(runes: &[String]) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -203,8 +205,6 @@ where
                 })
             },
             true,
-            evm.clone(),
-            evm,
         )
         .await;
 
@@ -800,10 +800,12 @@ where
     }
 
     pub async fn stop(&self) {
-        self.inner
-            .stop_canister(self.inner.canisters().evm())
-            .await
-            .expect("Failed to stop evm canister");
+        if !self.inner.wrapped_evm().live() {
+            self.inner
+                .stop_canister(self.inner.canisters().evm())
+                .await
+                .expect("Failed to stop evm canister");
+        }
         self.inner
             .stop_canister(self.inner.canisters().rune_bridge())
             .await

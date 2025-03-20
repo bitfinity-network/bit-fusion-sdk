@@ -1,8 +1,10 @@
 mod image;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use bridge_did::evm_link::EvmLink;
+use candid::Principal;
 use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
 use reqwest::Response;
 use serde_json::Value;
@@ -72,22 +74,35 @@ impl GanacheEvm {
     async fn rpc_request(&self, body: Value) -> TestResult<Response> {
         dbg!("Sending request: {:#?}", &body);
 
-        let response = self
-            .rpc_client
-            .post(&self.rpc_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))?;
+        // this method with live mode is flaky, retry 10 times
+        for _ in 0..10 {
+            let response = match self
+                .rpc_client
+                .post(&self.rpc_url)
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("ganache rpc error: {:#?}", e);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
 
-        if !response.status().is_success() {
-            return Err(TestError::Ganache(format!(
-                "Failed to send request: {:?}",
-                response
-            )));
+            if !response.status().is_success() {
+                return Err(TestError::Ganache(format!(
+                    "Failed to send request: {:?}",
+                    response
+                )));
+            }
+
+            return Ok(response);
         }
 
-        Ok(response)
+        Err(TestError::Ganache("Failed to send request".into()))
     }
 }
 
@@ -272,5 +287,13 @@ impl TestEvm for GanacheEvm {
 
     fn live(&self) -> bool {
         true
+    }
+
+    fn evm(&self) -> Principal {
+        Principal::anonymous()
+    }
+
+    fn signature(&self) -> Principal {
+        Principal::anonymous()
     }
 }

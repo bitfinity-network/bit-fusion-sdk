@@ -16,17 +16,26 @@ use tokio::sync::RwLock;
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::TestContext;
 use crate::utils::error::{Result, TestError};
-use crate::utils::{GanacheEvm, TestEvm as _, TestWTM, CHAIN_ID};
+use crate::utils::{TestEvm, TestWTM, CHAIN_ID};
 
-pub struct Erc20BaseTokens<Ctx> {
+pub struct Erc20BaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     ctx: Ctx,
     tokens: Vec<H160>,
     contracts_deployer: OwnedWallet,
     btf_bridge: H160,
     nonces: RwLock<HashMap<H160, AtomicU64>>,
+    _phantom: std::marker::PhantomData<EVM>,
 }
 
-impl<Ctx: TestContext<GanacheEvm> + Send + Sync> Erc20BaseTokens<Ctx> {
+impl<Ctx, EVM> Erc20BaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         let base_evm_client = ctx.base_evm();
 
@@ -76,6 +85,7 @@ impl<Ctx: TestContext<GanacheEvm> + Send + Sync> Erc20BaseTokens<Ctx> {
             contracts_deployer,
             btf_bridge,
             nonces: Default::default(),
+            _phantom: Default::default(),
         })
     }
 
@@ -151,12 +161,16 @@ impl<Ctx: TestContext<GanacheEvm> + Send + Sync> Erc20BaseTokens<Ctx> {
     }
 }
 
-impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for Erc20BaseTokens<Ctx> {
+impl<Ctx, EVM> BaseTokens for Erc20BaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     type TokenId = H160;
     type UserId = H160;
-    type EVM = GanacheEvm;
+    type EVM = EVM;
 
-    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<EVM> + Send + Sync) {
         &self.ctx
     }
 
@@ -335,12 +349,13 @@ impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for Erc20BaseTokens<
 }
 
 /// Run stress test with the given TestContext implementation.
-pub async fn stress_test_erc20_bridge_with_ctx<T>(
+pub async fn stress_test_erc20_bridge_with_ctx<T, EVM>(
     ctx: T,
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    T: TestContext<GanacheEvm> + Send + Sync,
+    T: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     let base_tokens = Erc20BaseTokens::init(ctx, base_tokens_number)
         .await

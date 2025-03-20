@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use alloy_sol_types::{SolCall, SolConstructor};
@@ -17,13 +16,10 @@ use super::PocketIcTestContext;
 use crate::context::stress::{erc20, StressTestConfig};
 use crate::context::{CanisterType, TestContext};
 use crate::pocket_ic_integration_test::ADMIN;
-use crate::utils::{default_evm, TestEvm, CHAIN_ID};
+use crate::utils::{TestEvm, CHAIN_ID};
 
-pub struct ContextWithBridges<EVM>
-where
-    EVM: TestEvm,
-{
-    pub context: PocketIcTestContext<EVM>,
+pub struct ContextWithBridges {
+    pub context: PocketIcTestContext,
     pub bob_wallet: LocalWallet,
     pub bob_address: H160,
     pub erc20_bridge_address: H160,
@@ -34,17 +30,13 @@ where
     pub fee_charge_address: H160,
 }
 
-impl<EVM> ContextWithBridges<EVM>
-where
-    EVM: TestEvm,
-{
-    pub async fn new(base_evm: Arc<EVM>, wrapped_evm: Arc<EVM>) -> Self {
-        let ctx =
-            PocketIcTestContext::new(&CanisterType::EVM_MINTER_TEST_SET, base_evm, wrapped_evm)
-                .await;
+impl ContextWithBridges {
+    pub async fn new() -> Self {
+        let ctx = PocketIcTestContext::new(&CanisterType::EVM_MINTER_TEST_SET).await;
 
         // Deploy external EVM canister.
         let base_evm_client = ctx.base_evm();
+        let wrapped_evm_client = ctx.wrapped_evm();
 
         let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();
         let deployer_address = fee_charge_deployer.address();
@@ -64,7 +56,7 @@ where
             .mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
             .expect("Failed to mint native tokens");
-        ctx.base_evm()
+        wrapped_evm_client
             .mint_native_tokens(bob_address.clone(), u64::MAX.into())
             .await
             .expect("Failed to mint native tokens");
@@ -81,11 +73,11 @@ where
 
         // mint native tokens for the erc20-bridge on both EVMs
         println!("Minting native tokens on both EVMs for {erc20_bridge_address}");
-        ctx.base_evm()
+        base_evm_client
             .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .expect("Failed to mint native tokens");
-        base_evm_client
+        wrapped_evm_client
             .mint_native_tokens(erc20_bridge_address.clone(), u64::MAX.into())
             .await
             .expect("Failed to mint native tokens");
@@ -189,7 +181,7 @@ where
 // Make sure SignedMintOrder removed from erc20-bridge after some time.
 #[tokio::test]
 async fn test_external_bridging() {
-    let ctx = ContextWithBridges::new(default_evm().await, default_evm().await).await;
+    let ctx = ContextWithBridges::new().await;
     // Approve ERC-20 transfer on behalf of some user in base EVM.
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
     let alice_address: H160 = alice_wallet.address().into();
@@ -287,7 +279,7 @@ async fn test_external_bridging() {
 
 #[tokio::test]
 async fn native_token_deposit_increase_and_decrease() {
-    let ctx = ContextWithBridges::new(default_evm().await, default_evm().await).await;
+    let ctx = ContextWithBridges::new().await;
 
     // Approve ERC-20 transfer on behalf of some user in base EVM.
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
@@ -429,7 +421,7 @@ async fn native_token_deposit_increase_and_decrease() {
 
 #[tokio::test]
 async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
-    let ctx = ContextWithBridges::new(default_evm().await, default_evm().await).await;
+    let ctx = ContextWithBridges::new().await;
     // Approve ERC-20 transfer on behalf of some user in base EVM.
     let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
     let alice_address: H160 = alice_wallet.address().into();
@@ -537,7 +529,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
 
 #[tokio::test]
 async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
-    let ctx = ContextWithBridges::new(default_evm().await, default_evm().await).await;
+    let ctx = ContextWithBridges::new().await;
 
     let init_erc20_bridge_balance = ctx
         .context
@@ -574,12 +566,7 @@ async fn native_token_deposit_should_increase_fee_charge_contract_balance() {
 
 #[tokio::test]
 async fn erc20_bridge_stress_test() {
-    let context = PocketIcTestContext::new(
-        &[CanisterType::Erc20Bridge],
-        default_evm().await,
-        default_evm().await,
-    )
-    .await;
+    let context = PocketIcTestContext::new(&[CanisterType::Erc20Bridge]).await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -596,17 +583,14 @@ async fn erc20_bridge_stress_test() {
     erc20::stress_test_erc20_bridge_with_ctx(context, 1, config).await;
 }
 
-async fn create_btf_bridge<EVM>(
-    ctx: &PocketIcTestContext<EVM>,
+async fn create_btf_bridge(
+    ctx: &PocketIcTestContext,
     wallet: &LocalWallet,
     side: BridgeSide,
     fee_charge: H160,
     wrapped_token_deployer: H160,
     minter_address: H160,
-) -> H160
-where
-    EVM: TestEvm,
-{
+) -> H160 {
     let is_wrapped = match side {
         BridgeSide::Base => false,
         BridgeSide::Wrapped => true,

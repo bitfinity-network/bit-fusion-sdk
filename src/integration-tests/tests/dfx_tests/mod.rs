@@ -12,7 +12,7 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_test_utils::{get_agent, Agent, Canister};
 use ic_utils::interfaces::ManagementCanister;
 
-use crate::context::{CanisterType, TestCanisters, TestContext};
+use crate::context::{CanisterType, TestCanisters, TestCanistersConfig, TestContext};
 use crate::utils::error::{Result, TestError};
 use crate::utils::TestEvm;
 
@@ -62,11 +62,18 @@ where
             .await
             .unwrap();
 
+        let test_canisters_config = TestCanistersConfig {
+            evm: base_evm.evm(),
+            external_evm: wrapped_evm.evm(),
+            signature: base_evm.signature(),
+            external_signature: wrapped_evm.signature(),
+        };
+
         let mut ctx = Self {
             alex,
             alice,
             base_evm,
-            canisters: TestCanisters::default(),
+            canisters: TestCanisters::new(test_canisters_config),
             max,
             wrapped_evm,
         };

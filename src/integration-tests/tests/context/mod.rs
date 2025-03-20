@@ -1085,14 +1085,25 @@ where
                     "Installing default Signature canister with Principal {}",
                     self.canisters().signature_verification()
                 );
-                let possible_canisters = [CanisterType::Evm, CanisterType::ExternalEvm];
-                let init_data = possible_canisters
-                    .into_iter()
-                    .filter_map(|canister_type| self.canisters().get(canister_type))
-                    .collect::<Vec<_>>();
+                let init_data = vec![self.canisters().evm()];
 
                 self.install_canister(
                     self.canisters().signature_verification(),
+                    wasm,
+                    (init_data,),
+                )
+                .await
+                .unwrap();
+            }
+            CanisterType::ExternalSignature => {
+                println!(
+                    "Installing default Signature canister with Principal {}",
+                    self.canisters().external_signature_verification()
+                );
+                let init_data = vec![self.canisters().external_evm()];
+
+                self.install_canister(
+                    self.canisters().external_signature_verification(),
                     wasm,
                     (init_data,),
                 )
@@ -1538,8 +1549,28 @@ fn kyc_init_data(ckbtc_minter: Principal, admin: Principal) -> LifecycleArg {
     })
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TestCanisters(HashMap<CanisterType, Principal>);
+
+#[derive(Debug, Clone, Copy)]
+pub struct TestCanistersConfig {
+    pub evm: Principal,
+    pub external_evm: Principal,
+    pub signature: Principal,
+    pub external_signature: Principal,
+}
+
+impl TestCanisters {
+    pub fn new(config: TestCanistersConfig) -> Self {
+        let mut map = HashMap::new();
+        map.insert(CanisterType::Evm, config.evm);
+        map.insert(CanisterType::ExternalEvm, config.external_evm);
+        map.insert(CanisterType::Signature, config.signature);
+        map.insert(CanisterType::ExternalSignature, config.external_signature);
+
+        Self(map)
+    }
+}
 
 impl TestCanisters {
     pub fn token_1(&self) -> Principal {
@@ -1582,6 +1613,13 @@ impl TestCanisters {
             .0
             .get(&CanisterType::Signature)
             .expect("signature canister should be initialized (see `TestContext::new()`)")
+    }
+
+    pub fn external_signature_verification(&self) -> Principal {
+        *self
+            .0
+            .get(&CanisterType::ExternalSignature)
+            .expect("external signature canister should be initialized (see `TestContext::new()`)")
     }
 
     pub fn icrc2_bridge(&self) -> Principal {
@@ -1670,6 +1708,7 @@ pub enum CanisterType {
     Evm,
     EvmRpcCanister,
     ExternalEvm,
+    ExternalSignature,
     CkBtcLedger,
     Icrc2Bridge,
     Kyt,
@@ -1710,14 +1749,17 @@ impl CanisterType {
             CanisterType::BtcBridge => get_btc_bridge_canister_bytecode().await,
             CanisterType::CkBtcMinter => get_ckbtc_minter_canister_bytecode().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_bytecode().await,
-            CanisterType::Evm => get_evm_testnet_canister_bytecode().await,
+            CanisterType::Evm | CanisterType::ExternalEvm => {
+                get_evm_testnet_canister_bytecode().await
+            }
             CanisterType::EvmRpcCanister => get_evm_rpc_canister_bytecode().await,
-            CanisterType::ExternalEvm => get_evm_testnet_canister_bytecode().await,
             CanisterType::CkBtcLedger => get_icrc1_token_canister_bytecode().await,
             CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_bytecode().await,
             CanisterType::Kyt => get_kyt_canister_bytecode().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_bytecode().await,
-            CanisterType::Signature => get_signature_verification_canister_bytecode().await,
+            CanisterType::Signature | CanisterType::ExternalSignature => {
+                get_signature_verification_canister_bytecode().await
+            }
             CanisterType::Token1 => get_icrc1_token_canister_bytecode().await,
             CanisterType::Token2 => get_icrc1_token_canister_bytecode().await,
         }
@@ -1730,14 +1772,17 @@ impl CanisterType {
             CanisterType::BtcBridge => get_btc_bridge_canister_wasm_path().await,
             CanisterType::CkBtcMinter => get_ckbtc_minter_canister_wasm_path().await,
             CanisterType::Erc20Bridge => get_ck_erc20_bridge_canister_wasm_path().await,
-            CanisterType::Evm => get_evm_testnet_canister_wasm_path().await,
-            CanisterType::EvmRpcCanister => get_evm_rpc_canister_wasm_path().await,
+            CanisterType::Evm | CanisterType::EvmRpcCanister => {
+                get_evm_testnet_canister_wasm_path().await
+            }
             CanisterType::ExternalEvm => get_evm_testnet_canister_wasm_path().await,
             CanisterType::CkBtcLedger => get_icrc1_token_canister_wasm_path().await,
             CanisterType::Icrc2Bridge => get_icrc2_bridge_canister_wasm_path().await,
             CanisterType::Kyt => get_kyt_canister_wasm_path().await,
             CanisterType::RuneBridge => get_rune_bridge_canister_wasm_path().await,
-            CanisterType::Signature => get_signature_verification_canister_wasm_path().await,
+            CanisterType::Signature | CanisterType::ExternalSignature => {
+                get_signature_verification_canister_wasm_path().await
+            }
             CanisterType::Token1 => get_icrc1_token_canister_wasm_path().await,
             CanisterType::Token2 => get_icrc1_token_canister_wasm_path().await,
         }

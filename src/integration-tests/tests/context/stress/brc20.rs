@@ -17,7 +17,7 @@ use crate::context::TestContext;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
-use crate::utils::GanacheEvm;
+use crate::utils::TestEvm;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -29,19 +29,21 @@ struct Brc20Token {
     max_supply: u64,
 }
 
-pub struct Brc20BaseTokens<Ctx>
+pub struct Brc20BaseTokens<Ctx, EVM>
 where
-    Ctx: TestContext<GanacheEvm> + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
-    ctx: Arc<Brc20Context<Ctx, GanacheEvm>>,
+    ctx: Arc<Brc20Context<Ctx, EVM>>,
     tokens: Vec<Brc20Token>,
     ticks: Vec<Brc20Tick>,
     users: AsyncMap<Id256, BtcWallet>,
 }
 
-impl<Ctx> Brc20BaseTokens<Ctx>
+impl<Ctx, EVM> Brc20BaseTokens<Ctx, EVM>
 where
-    Ctx: TestContext<GanacheEvm> + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         println!("Creating brc20 token canisters");
@@ -120,15 +122,16 @@ where
     }
 }
 
-impl<Ctx> BaseTokens for Brc20BaseTokens<Ctx>
+impl<Ctx, EVM> BaseTokens for Brc20BaseTokens<Ctx, EVM>
 where
-    Ctx: TestContext<GanacheEvm> + Send + Sync,
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     type TokenId = Brc20Tick;
     type UserId = Id256;
-    type EVM = GanacheEvm;
+    type EVM = EVM;
 
-    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<EVM> + Send + Sync) {
         &self.ctx.inner
     }
 
@@ -346,12 +349,13 @@ where
 }
 
 /// Run stress test with the given TestContext implementation.
-pub async fn stress_test_brc20_bridge_with_ctx<Ctx>(
+pub async fn stress_test_brc20_bridge_with_ctx<Ctx, EVM>(
     ctx: Ctx,
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    Ctx: TestContext<GanacheEvm> + Send + Sync,
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     let base_tokens = Brc20BaseTokens::init(ctx, base_tokens_number)
         .await

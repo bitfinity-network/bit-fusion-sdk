@@ -20,7 +20,7 @@ use candid::Principal;
 use did::init::EvmCanisterInitData;
 use ic_exports::ic_kit::mock_principals::bob;
 
-pub use self::test_evm::{default_evm, BitfinityEvm, GanacheEvm, TestEvm};
+pub use self::test_evm::{test_evm, BitfinityEvm, GanacheEvm, TestEvm};
 
 /// Returns the Path to the workspace root dir
 pub fn get_workspace_root_dir() -> PathBuf {

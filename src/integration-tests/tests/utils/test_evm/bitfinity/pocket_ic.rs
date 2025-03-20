@@ -3,7 +3,6 @@ use std::sync::Arc;
 use candid::Principal;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
-use ic_exports::ic_kit::mock_principals::bob;
 use ic_exports::pocket_ic::PocketIc;
 
 use super::init::evm_canister_init_data;
@@ -14,8 +13,8 @@ use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 impl BitfinityEvm<PocketIcClient> {
     /// Create a new [`BitfinityEvm`] instance for testing.
     pub async fn pocket_ic(pocket_ic: &Arc<PocketIc>) -> Self {
-        let signature = pocket_ic.create_canister().await;
-        let evm = pocket_ic.create_canister().await;
+        let signature = create_canister(pocket_ic).await;
+        let evm = create_canister(pocket_ic).await;
 
         install_signature(pocket_ic, signature, evm).await;
         install_evm(pocket_ic, evm, signature).await;
@@ -26,10 +25,22 @@ impl BitfinityEvm<PocketIcClient> {
             evm_client: Arc::new(EvmCanisterClient::new(PocketIcClient::from_client(
                 pocket_ic.clone(),
                 evm,
-                bob(),
+                crate::pocket_ic_integration_test::PocketIcTestContext::admin(),
             ))),
         }
     }
+}
+
+async fn create_canister(pocket_ic: &Arc<PocketIc>) -> Principal {
+    let principal = pocket_ic
+        .create_canister_with_settings(
+            Some(crate::pocket_ic_integration_test::PocketIcTestContext::admin()),
+            None,
+        )
+        .await;
+    pocket_ic.add_cycles(principal, u128::MAX).await;
+
+    principal
 }
 
 async fn install_signature(pocket_ic: &Arc<PocketIc>, signature: Principal, evm: Principal) {
@@ -41,7 +52,7 @@ async fn install_signature(pocket_ic: &Arc<PocketIc>, signature: Principal, evm:
             signature,
             CanisterType::Signature.default_canister_wasm().await,
             args,
-            Some(bob()),
+            Some(crate::pocket_ic_integration_test::PocketIcTestContext::admin()),
         )
         .await;
 }
@@ -51,7 +62,7 @@ async fn install_evm(pocket_ic: &Arc<PocketIc>, evm: Principal, signature: Princ
 
     let init_data = evm_canister_init_data(
         signature,
-        bob(),
+        crate::pocket_ic_integration_test::PocketIcTestContext::admin(),
         Some(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS),
     );
     let args = candid::encode_args((init_data,)).expect("Failed to encode arguments");
@@ -61,7 +72,7 @@ async fn install_evm(pocket_ic: &Arc<PocketIc>, evm: Principal, signature: Princ
             evm,
             CanisterType::Evm.default_canister_wasm().await,
             args,
-            Some(bob()),
+            Some(crate::pocket_ic_integration_test::PocketIcTestContext::admin()),
         )
         .await;
 }

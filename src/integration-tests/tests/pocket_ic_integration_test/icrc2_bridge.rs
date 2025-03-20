@@ -23,7 +23,7 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
-use crate::utils::{GanacheEvm, TestEvm};
+use crate::utils::TestEvm;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -262,12 +262,7 @@ async fn test_icrc2_token_canister_stopped() {
 
 #[tokio::test]
 async fn set_owner_access() {
-    let ctx = PocketIcTestContext::new(
-        &[CanisterType::Icrc2Bridge],
-        Arc::new(GanacheEvm::run().await),
-        Arc::new(GanacheEvm::run().await),
-    )
-    .await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
     let mut admin_client = ctx.icrc_bridge_client(ADMIN);
     admin_client.set_owner(alice()).await.unwrap();
 
@@ -288,12 +283,7 @@ async fn set_owner_access() {
 
 #[tokio::test]
 async fn canister_log_config_should_still_be_storable_after_upgrade() {
-    let ctx = PocketIcTestContext::new(
-        &[CanisterType::Icrc2Bridge],
-        Arc::new(GanacheEvm::run().await),
-        Arc::new(GanacheEvm::run().await),
-    )
-    .await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
 
     let minter_client = ctx.icrc_bridge_client(ADMIN);
 
@@ -321,12 +311,7 @@ async fn canister_log_config_should_still_be_storable_after_upgrade() {
 
 #[tokio::test]
 async fn test_canister_build_data() {
-    let ctx = PocketIcTestContext::new(
-        &[CanisterType::Icrc2Bridge],
-        Arc::new(GanacheEvm::run().await),
-        Arc::new(GanacheEvm::run().await),
-    )
-    .await;
+    let ctx = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
     let minter_client = ctx.icrc_bridge_client(ALICE);
     let build_data = minter_client.get_canister_build_data().await.unwrap();
     assert!(build_data.pkg_name.contains("icrc2_bridge"));
@@ -428,15 +413,13 @@ async fn test_icrc2_tokens_approve_after_mint() {
     assert_eq!(allowance, approve_amount);
 }
 
-async fn icrc2_token_bridge<EVM>(
-    ctx: &PocketIcTestContext<EVM>,
+async fn icrc2_token_bridge(
+    ctx: &PocketIcTestContext,
     john_wallet: LocalWallet,
     btf_bridge: &H160,
     fee_charge: &H160,
     wrapped_token: &H160,
-) where
-    EVM: TestEvm,
-{
+) {
     let minter_client = ctx.icrc_bridge_client(ADMIN);
     minter_client
         .add_to_whitelist(ctx.canisters().token_1())
@@ -699,15 +682,13 @@ async fn rescheduling_deposit_operation() {
 // Let's check that spamming reschedule does not break anything
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
-    async fn spam_reschedule_requests<EVM>(
-        ctx: PocketIcTestContext<EVM>,
+    async fn spam_reschedule_requests(
+        ctx: PocketIcTestContext,
         wallet: LocalWallet,
         btf_bridge: H160,
         spam_stopper: CancellationToken,
         semaphore: Arc<Semaphore>,
-    ) where
-        EVM: TestEvm,
-    {
+    ) {
         let bridge_client = ctx.icrc_bridge_client(JOHN);
         while !spam_stopper.is_cancelled() {
             let operations = bridge_client
@@ -834,12 +815,7 @@ async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
 
 #[tokio::test]
 async fn icrc_bridge_stress_test() {
-    let context = PocketIcTestContext::new(
-        &[CanisterType::Icrc2Bridge],
-        Arc::new(GanacheEvm::run().await),
-        Arc::new(GanacheEvm::run().await),
-    )
-    .await;
+    let context = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -860,13 +836,8 @@ async fn icrc_bridge_stress_test() {
 /// - john wallet with native tokens,
 /// - operation points for john,
 /// - bridge contract
-pub async fn init_bridge() -> (PocketIcTestContext<GanacheEvm>, LocalWallet, H160, H160) {
-    let ctx = PocketIcTestContext::new(
-        &CanisterType::ICRC2_MINTER_TEST_SET,
-        Arc::new(GanacheEvm::run().await),
-        Arc::new(GanacheEvm::run().await),
-    )
-    .await;
+pub async fn init_bridge() -> (PocketIcTestContext, LocalWallet, H160, H160) {
+    let ctx = PocketIcTestContext::new(&CanisterType::ICRC2_MINTER_TEST_SET).await;
     let john_wallet = ctx.new_wallet(u128::MAX).await.unwrap();
 
     let fee_charge_deployer = ctx.new_wallet(u128::MAX).await.unwrap();

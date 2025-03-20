@@ -19,16 +19,25 @@ use icrc_client::transfer::TransferArg;
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
 use crate::context::{icrc_canister_default_init_args, CanisterType, TestContext};
 use crate::utils::error::{Result, TestError};
-use crate::utils::GanacheEvm;
+use crate::utils::TestEvm;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-pub struct IcrcBaseTokens<Ctx> {
+pub struct IcrcBaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     ctx: Ctx,
     tokens: Vec<Principal>,
+    _evm: std::marker::PhantomData<EVM>,
 }
 
-impl<Ctx: TestContext<GanacheEvm>> IcrcBaseTokens<Ctx> {
+impl<Ctx, EVM> IcrcBaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     async fn init(ctx: Ctx, base_tokens_number: usize) -> Result<Self> {
         println!("Creating icrc token canisters");
         let mut tokens = Vec::with_capacity(base_tokens_number);
@@ -39,7 +48,11 @@ impl<Ctx: TestContext<GanacheEvm>> IcrcBaseTokens<Ctx> {
 
         println!("Icrc token canisters created");
 
-        Ok(Self { ctx, tokens })
+        Ok(Self {
+            ctx,
+            tokens,
+            _evm: Default::default(),
+        })
     }
 
     async fn init_icrc_token_canister(ctx: &Ctx, token_idx: usize) -> Result<Principal> {
@@ -60,12 +73,16 @@ impl<Ctx: TestContext<GanacheEvm>> IcrcBaseTokens<Ctx> {
     }
 }
 
-impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for IcrcBaseTokens<Ctx> {
+impl<Ctx, EVM> BaseTokens for IcrcBaseTokens<Ctx, EVM>
+where
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
+{
     type TokenId = Principal;
     type UserId = String;
-    type EVM = GanacheEvm;
+    type EVM = EVM;
 
-    fn ctx(&self) -> &(impl TestContext<GanacheEvm> + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<EVM> + Send + Sync) {
         &self.ctx
     }
 
@@ -263,12 +280,13 @@ impl<Ctx: TestContext<GanacheEvm> + Send + Sync> BaseTokens for IcrcBaseTokens<C
 }
 
 /// Run stress test with the given TestContext implementation.
-pub async fn stress_test_icrc_bridge_with_ctx<T>(
+pub async fn stress_test_icrc_bridge_with_ctx<T, EVM>(
     ctx: T,
     base_tokens_number: usize,
     config: StressTestConfig,
 ) where
-    T: TestContext<GanacheEvm> + Send + Sync,
+    T: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     let base_tokens = IcrcBaseTokens::init(ctx, base_tokens_number).await.unwrap();
     let icrc_stress_test_stats = StressTestState::run(&base_tokens, config).await.unwrap();

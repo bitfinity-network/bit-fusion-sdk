@@ -21,7 +21,6 @@ where
     C: CanisterClient,
 {
     evm: Principal,
-    #[allow(dead_code)]
     signature: Principal,
     evm_client: Arc<EvmCanisterClient<C>>,
 }
@@ -31,6 +30,14 @@ impl<C> TestEvm for BitfinityEvm<C>
 where
     C: CanisterClient + Send + Sync,
 {
+    fn evm(&self) -> Principal {
+        self.evm
+    }
+
+    fn signature(&self) -> Principal {
+        self.signature
+    }
+
     async fn chain_id(&self) -> TestResult<u64> {
         let res = self.evm_client.eth_chain_id().await?;
 

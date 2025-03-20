@@ -10,14 +10,13 @@ use crate::context::stress::StressTestConfig;
 use crate::context::TestContext;
 use crate::pocket_ic_integration_test::block_until_succeeds;
 use crate::utils::btc_wallet::BtcWallet;
-use crate::utils::default_evm;
 
 const CKBTC_LEDGER_FEE: u64 = 1_000;
 const KYT_FEE: u64 = 2_000;
 
 #[tokio::test]
 async fn btc_to_erc20_test() {
-    let ctx = BtcContext::pocket_ic(default_evm().await).await;
+    let ctx = BtcContext::pocket_ic().await;
     let ctx = Arc::new(ctx);
 
     let deposit_value = 100_000_000;
@@ -73,7 +72,7 @@ async fn btc_to_erc20_test() {
 
 #[tokio::test]
 async fn test_get_btc_address_from_bridge() {
-    let ctx = BtcContext::pocket_ic(default_evm().await).await;
+    let ctx = BtcContext::pocket_ic().await;
 
     let wallet = Arc::new(
         ctx.context
@@ -105,7 +104,7 @@ async fn test_get_btc_address_from_bridge() {
 
 #[tokio::test]
 async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
-    let ctx = Arc::new(BtcContext::pocket_ic(default_evm().await).await);
+    let ctx = Arc::new(BtcContext::pocket_ic().await);
 
     let deposit_value = 100_000_000;
 
@@ -199,7 +198,7 @@ async fn test_should_mint_erc20_with_several_concurrent_btc_transactions() {
 
 #[tokio::test]
 async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
-    let ctx = Arc::new(BtcContext::pocket_ic(default_evm().await).await);
+    let ctx = Arc::new(BtcContext::pocket_ic().await);
 
     let deposit_value = 100_000_000;
     let wallets_count = 12;
@@ -285,7 +284,7 @@ async fn test_should_mint_erc20_with_several_tx_from_different_wallets() {
 
 #[tokio::test]
 async fn test_should_deposit_and_withdraw_btc() {
-    let ctx = BtcContext::pocket_ic(default_evm().await).await;
+    let ctx = BtcContext::pocket_ic().await;
     let ctx = Arc::new(ctx);
 
     let deposit_value = 100_000_000;
@@ -420,8 +419,6 @@ async fn test_should_deposit_and_withdraw_btc() {
 async fn test_btc_bridge_stress_test() {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-    let evm = default_evm().await;
-
     let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
         &crate::context::CanisterType::BTC_CANISTER_SET,
         |builder| {
@@ -442,8 +439,6 @@ async fn test_btc_bridge_stress_test() {
             })
         },
         true,
-        evm.clone(),
-        evm,
     )
     .await;
 

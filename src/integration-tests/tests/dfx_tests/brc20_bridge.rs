@@ -11,7 +11,7 @@ use crate::context::stress::StressTestConfig;
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::block_until_succeeds;
 use crate::utils::token_amount::TokenAmount;
-use crate::utils::{default_evm, TestEvm as _};
+use crate::utils::{test_evm, TestEvm as _};
 
 /// Default deposit amount
 const DEFAULT_DEPOSIT_AMOUNT: u128 = 10_000;
@@ -33,7 +33,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
             limit: Some(DEFAULT_MINT_AMOUNT),
             max_supply: DEFAULT_MAX_AMOUNT,
         }],
-        default_evm().await,
+        test_evm().await,
     )
     .await;
 
@@ -140,7 +140,7 @@ async fn test_should_deposit_and_withdraw_brc20_tokens() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_brc20_bridge_stress_test() {
-    let evm = default_evm().await;
+    let evm = test_evm().await;
     let context =
         crate::dfx_tests::DfxTestContext::new(&CanisterType::BRC20_CANISTER_SET, evm.clone(), evm)
             .await;

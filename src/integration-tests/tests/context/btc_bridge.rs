@@ -63,11 +63,10 @@ fn generate_wallet_name() -> String {
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl<EVM> BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext<EVM>, EVM>
-where
-    EVM: TestEvm,
+impl
+    BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext, crate::utils::test_evm::Evm>
 {
-    pub async fn pocket_ic(evm: Arc<EVM>) -> Self {
+    pub async fn pocket_ic() -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
         let context = crate::pocket_ic_integration_test::PocketIcTestContext::new_with(
@@ -90,8 +89,6 @@ where
                 })
             },
             true,
-            evm.clone(),
-            evm,
         )
         .await;
 
@@ -632,10 +629,12 @@ where
     }
 
     pub async fn stop(&self) {
-        self.context
-            .stop_canister(self.context.canisters().evm())
-            .await
-            .expect("Failed to stop evm canister");
+        if !self.context.wrapped_evm().live() {
+            self.context
+                .stop_canister(self.context.canisters().evm())
+                .await
+                .expect("Failed to stop evm canister");
+        }
         self.context
             .stop_canister(self.bridge())
             .await
