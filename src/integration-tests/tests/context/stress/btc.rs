@@ -15,6 +15,7 @@ use crate::context::btc_bridge::BtcContext;
 use crate::context::TestContext;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
+use crate::utils::TestEvm;
 
 const FEE: u128 = 3_000;
 
@@ -33,19 +34,21 @@ impl UserWallet {
     }
 }
 
-pub struct BtcToken<Ctx>
+pub struct BtcToken<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
-    ctx: Arc<BtcContext<Ctx>>,
+    ctx: Arc<BtcContext<Ctx, EVM>>,
     max_supply: Amount,
     users: AsyncMap<H160, Arc<UserWallet>>,
     token_ids: Vec<Id256>,
 }
 
-impl<Ctx> BtcToken<Ctx>
+impl<Ctx, EVM> BtcToken<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     async fn init(ctx: Ctx) -> Result<Self> {
         println!("Creating BTC token canisters");
@@ -73,14 +76,16 @@ where
     }
 }
 
-impl<Ctx> BaseTokens for BtcToken<Ctx>
+impl<Ctx, EVM> BaseTokens for BtcToken<Ctx, EVM>
 where
-    Ctx: TestContext + Send + Sync,
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     type TokenId = Id256;
     type UserId = H160;
+    type EVM = EVM;
 
-    fn ctx(&self) -> &(impl TestContext + Send + Sync) {
+    fn ctx(&self) -> &(impl TestContext<EVM> + Send + Sync) {
         &self.ctx.context
     }
 
@@ -290,9 +295,10 @@ where
 }
 
 /// Run stress test with the given TestContext implementation.
-pub async fn stress_test_btc_bridge_with_ctx<Ctx>(ctx: Ctx, config: StressTestConfig)
+pub async fn stress_test_btc_bridge_with_ctx<Ctx, EVM>(ctx: Ctx, config: StressTestConfig)
 where
-    Ctx: TestContext + Send + Sync,
+    Ctx: TestContext<EVM> + Send + Sync,
+    EVM: TestEvm,
 {
     let base_tokens = BtcToken::init(ctx).await.expect("failed to init BtcToken");
 

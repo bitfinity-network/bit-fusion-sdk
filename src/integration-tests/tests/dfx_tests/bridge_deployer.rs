@@ -3,19 +3,25 @@ mod eval;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 use alloy::primitives::Address;
 use bridge_client::BridgeCanisterClient as _;
 use cli_args::{CommonCliArgs, DeployCliArgs, HARDHAT_ETH_PRIVATE_KEY};
 use eth_signer::LocalWallet;
+use ic_canister_client::IcAgentClient;
 use tempfile::TempDir;
 
 use super::{DfxTestContext, ADMIN};
 use crate::context::{CanisterType, TestContext};
+use crate::utils::BitfinityEvm;
 
-async fn setup(canister_set: &[CanisterType]) -> DfxTestContext {
+async fn setup(canister_set: &[CanisterType]) -> DfxTestContext<BitfinityEvm<IcAgentClient>> {
     restore_manifest_dir();
-    DfxTestContext::new(canister_set).await
+    let base_evm = Arc::new(BitfinityEvm::dfx().await);
+    let wrapped_evm = Arc::new(BitfinityEvm::dfx().await);
+
+    DfxTestContext::new(canister_set, base_evm, wrapped_evm).await
 }
 
 macro_rules! test_deploy {
@@ -25,8 +31,6 @@ macro_rules! test_deploy {
         #[cfg(feature = "dfx_tests")]
         async fn $test_name() {
             let ctx = setup(&[
-                CanisterType::Evm,
-                CanisterType::Signature,
                 CanisterType::Kyt,
                 CanisterType::CkBtcLedger,
                 CanisterType::CkBtcMinter,
@@ -155,10 +159,7 @@ test_deploy!(
 #[cfg(feature = "dfx_tests")]
 async fn test_should_update_bridge() {
     let ctx = setup(&[
-        CanisterType::Evm,
-        CanisterType::Signature,
         CanisterType::EvmRpcCanister,
-        CanisterType::ExternalEvm,
         CanisterType::Kyt,
         CanisterType::CkBtcLedger,
         CanisterType::CkBtcMinter,
@@ -367,7 +368,9 @@ fn restore_manifest_dir() {
 }
 
 /// Deploy the BTF bridge
-async fn deploy_btf_bridge(ctx: &DfxTestContext) -> anyhow::Result<Address> {
+async fn deploy_btf_bridge(
+    ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>,
+) -> anyhow::Result<Address> {
     let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY)?;
     let wallet = LocalWallet::from_slice(&private_key_bytes)?;
 

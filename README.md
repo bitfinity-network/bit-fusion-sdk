@@ -10,6 +10,26 @@ This code is still in the early stages of development and is not intended for pr
 
 See [Deploy readme](./docs/deploy.md)
 
+## Running tests
+
+To run tests you can use `just`.
+
+Integration tests can be either run against the Bitfinity EVM, if you have access to the Bitfinity evm repository or against a local instance of ganache which is automatically started by the test runner.
+
+In case you need to test with the local ganache instance you must set this environment variable:
+
+```bash
+export EVM=ganache
+```
+
+and then tests can be run with
+
+```bash
+just test
+just integration_test
+just dfx_test
+```
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)

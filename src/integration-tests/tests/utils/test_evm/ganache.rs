@@ -1,8 +1,10 @@
 mod image;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use bridge_did::evm_link::EvmLink;
+use candid::Principal;
 use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
 use reqwest::Response;
 use serde_json::Value;
@@ -33,6 +35,7 @@ impl GanacheEvm {
             .expect("Failed to get host port for Ganache");
         let rpc_url = format!("http://localhost:{host_port}");
         let chain_id = Self::get_chain_id(&rpc_url).await;
+        println!("chain id: {chain_id}");
 
         let rpc_client = reqwest::Client::new();
 
@@ -71,28 +74,41 @@ impl GanacheEvm {
     async fn rpc_request(&self, body: Value) -> TestResult<Response> {
         dbg!("Sending request: {:#?}", &body);
 
-        let response = self
-            .rpc_client
-            .post(&self.rpc_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))?;
+        // this method with live mode is flaky, retry 10 times
+        for _ in 0..10 {
+            let response = match self
+                .rpc_client
+                .post(&self.rpc_url)
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("ganache rpc error: {:#?}", e);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
 
-        if !response.status().is_success() {
-            return Err(TestError::Ganache(format!(
-                "Failed to send request: {:?}",
-                response
-            )));
+            if !response.status().is_success() {
+                return Err(TestError::Ganache(format!(
+                    "Failed to send request: {:?}",
+                    response
+                )));
+            }
+
+            return Ok(response);
         }
 
-        Ok(response)
+        Err(TestError::Ganache("Failed to send request".into()))
     }
 }
 
 #[async_trait::async_trait]
 impl TestEvm for GanacheEvm {
-    async fn eth_chain_id(&self) -> TestResult<u64> {
+    async fn chain_id(&self) -> TestResult<u64> {
         Ok(self.chain_id)
     }
 
@@ -158,7 +174,7 @@ impl TestEvm for GanacheEvm {
         gas_limit: u64,
         gas_price: Option<U256>,
         data: Option<Bytes>,
-    ) -> TestResult<String> {
+    ) -> TestResult<Vec<u8>> {
         let response = self
             .rpc_request(serde_json::json!(
                 {
@@ -189,7 +205,9 @@ impl TestEvm for GanacheEvm {
             .ok_or_else(|| anyhow::anyhow!("Failed to get result: {:?}", body["error"]))
             .map_err(|e| TestError::Ganache(format!("Failed to get result: {:?}", e)))?;
 
-        Ok(result.to_string())
+        // hex to bytes
+        hex::decode(result.trim_start_matches("0x"))
+            .map_err(|e| TestError::Ganache(format!("Failed to parse result: {:?}", e)))
     }
 
     /// Get the balance of an address
@@ -198,7 +216,7 @@ impl TestEvm for GanacheEvm {
             .rpc_request(serde_json::json!(
                 {
                     "method": "eth_getBalance",
-                    "params": [address.to_hex_str(), block.to_string()],
+                    "params": [address.to_hex_str(), block.to_string().to_lowercase()],
                     "id": 1,
                     "jsonrpc": "2.0"
                 }
@@ -207,6 +225,7 @@ impl TestEvm for GanacheEvm {
             .unwrap();
 
         let body = response.json::<serde_json::Value>().await.unwrap();
+        println!("body: {:#?}", body);
         let balance_str = body["result"].as_str().unwrap();
 
         U256::from_hex_str(balance_str)
@@ -264,5 +283,17 @@ impl TestEvm for GanacheEvm {
         Ok(u64::from_str_radix(nonce_str.trim_start_matches("0x"), 16)
             .map_err(|e| TestError::Ganache(format!("Failed to parse nonce: {:?}", e)))?
             .into())
+    }
+
+    fn live(&self) -> bool {
+        true
+    }
+
+    fn evm(&self) -> Principal {
+        Principal::anonymous()
+    }
+
+    fn signature(&self) -> Principal {
+        Principal::anonymous()
     }
 }

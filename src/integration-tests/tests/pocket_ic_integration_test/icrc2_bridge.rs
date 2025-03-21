@@ -12,7 +12,7 @@ use did::{H160, U256, U64};
 use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
-use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use ic_exports::pocket_ic::RejectResponse;
 use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
@@ -23,6 +23,7 @@ use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
 use crate::pocket_ic_integration_test::{ADMIN, ALICE};
+use crate::utils::TestEvm;
 
 #[tokio::test]
 async fn test_icrc2_tokens_roundtrip() {
@@ -43,7 +44,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let amount = 300_000u64;
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -90,7 +91,7 @@ async fn test_icrc2_tokens_roundtrip() {
 
     let _operation_id = ctx
         .burn_wrapped_erc_20_tokens(
-            &ctx.evm_client(ADMIN),
+            &ctx.wrapped_evm(),
             &john_wallet,
             &wrapped_token,
             base_token_id.0.as_slice(),
@@ -136,7 +137,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     let amount = 3_000_000u64;
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -188,7 +189,7 @@ async fn test_icrc2_token_canister_stopped() {
     let john_principal_id256 = Id256::from(&john());
     let _operation_id = ctx
         .burn_wrapped_erc_20_tokens(
-            &ctx.evm_client(ADMIN),
+            &ctx.wrapped_evm(),
             &john_wallet,
             &wrapped_token,
             base_token_id.0.as_slice(),
@@ -269,10 +270,10 @@ async fn set_owner_access() {
     let err = admin_client.set_owner(alice()).await.unwrap_err();
     assert!(matches!(
         err,
-        CanisterClientError::PocketIcTestError(CallError::UserError(UserError {
-            code: ErrorCode::CanisterCalledTrap,
-            description: _,
-        }))
+        CanisterClientError::PocketIcTestError(RejectResponse {
+            error_code: ic_exports::pocket_ic::ErrorCode::CanisterCalledTrap,
+            ..
+        })
     ));
 
     // Now Alice is owner, so she can update owner.
@@ -333,7 +334,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
     let john_address: H160 = john_wallet.address().into();
     let spender_wallet = ctx.new_wallet(0).await.unwrap();
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -391,8 +392,8 @@ async fn test_icrc2_tokens_approve_after_mint() {
     }
     .abi_encode();
 
-    let allowance_response = ctx
-        .evm_client(ADMIN)
+    let allowance_data = ctx
+        .wrapped_evm()
         .eth_call(
             Some(john_address),
             Some(wrapped_token),
@@ -402,10 +403,7 @@ async fn test_icrc2_tokens_approve_after_mint() {
             Some(input.into()),
         )
         .await
-        .unwrap()
-        .unwrap();
-
-    let allowance_data = hex::decode(allowance_response.trim_start_matches("0x")).unwrap();
+        .expect("eth_call failed");
 
     let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data, true)
         .unwrap()
@@ -431,7 +429,7 @@ async fn icrc2_token_bridge(
 
     let amount = 300_000u64;
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(10);
     ctx.native_token_deposit(
         &evm_client,
@@ -479,7 +477,7 @@ async fn icrc2_token_bridge(
 #[tokio::test]
 async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip() {
     let (ctx, john_wallet, btf_bridge, fee_charge) = init_bridge().await;
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
 
     let minter_address = ctx
         .get_icrc_bridge_canister_evm_address(ADMIN)
@@ -504,10 +502,9 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .unwrap();
 
     let bridge_balance_before_mint = evm_client
-        .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+        .eth_get_balance(&minter_address, did::BlockNumber::Latest)
         .await
-        .unwrap()
-        .unwrap();
+        .expect("eth_get_balance failed");
 
     const TOTAL_TX: u64 = 10;
     for _ in 0..TOTAL_TX {
@@ -521,10 +518,9 @@ async fn test_minter_canister_address_balances_gets_replenished_after_roundtrip(
         .await;
 
         let bridge_balance_after_mint = evm_client
-            .eth_get_balance(minter_address.clone(), did::BlockNumber::Latest)
+            .eth_get_balance(&minter_address, did::BlockNumber::Latest)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("eth_get_balance failed");
 
         assert!(dbg!(bridge_balance_before_mint.clone()) <= dbg!(bridge_balance_after_mint));
     }
@@ -549,7 +545,7 @@ async fn rescheduling_deposit_operation() {
 
     let amount = 300_000u64;
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -685,7 +681,7 @@ async fn rescheduling_deposit_operation() {
 
 // Let's check that spamming reschedule does not break anything
 #[tokio::test]
-async fn test_icrc2_tokens_with_reschedule_spam_roundtrip() {
+async fn test_icrc2_tokens_roundtrip_with_reschedule_spam() {
     async fn spam_reschedule_requests(
         ctx: PocketIcTestContext,
         wallet: LocalWallet,
@@ -736,7 +732,7 @@ async fn test_icrc2_tokens_with_reschedule_spam_roundtrip() {
 
     let amount = 300_000u64;
 
-    let evm_client = ctx.evm_client(ADMIN);
+    let evm_client = ctx.wrapped_evm();
     let native_token_amount = 10_u64.pow(17);
     ctx.native_token_deposit(
         &evm_client,
@@ -788,7 +784,7 @@ async fn test_icrc2_tokens_with_reschedule_spam_roundtrip() {
         let _ = semaphore.acquire().await;
         let _operation_id = ctx
             .burn_wrapped_erc_20_tokens(
-                &ctx.evm_client(ADMIN),
+                &ctx.wrapped_evm(),
                 &john_wallet,
                 &wrapped_token,
                 base_token_id.0.as_slice(),
@@ -819,12 +815,7 @@ async fn test_icrc2_tokens_with_reschedule_spam_roundtrip() {
 
 #[tokio::test]
 async fn icrc_bridge_stress_test() {
-    let context = PocketIcTestContext::new(&[
-        CanisterType::Evm,
-        CanisterType::Signature,
-        CanisterType::Icrc2Bridge,
-    ])
-    .await;
+    let context = PocketIcTestContext::new(&[CanisterType::Icrc2Bridge]).await;
 
     let config = StressTestConfig {
         users_number: 5,
@@ -858,12 +849,30 @@ pub async fn init_bridge() -> (PocketIcTestContext, LocalWallet, H160, H160) {
         .await
         .unwrap();
 
+    // give some time to the bridge to initialize
+    let mut minter_canister_address = None;
     let icrc_bridge_client = &ctx.icrc_bridge_client(ADMIN);
-    let minter_canister_address = icrc_bridge_client
-        .get_bridge_canister_evm_address()
-        .await
-        .unwrap()
-        .unwrap();
+    for _ in 0..10 {
+        minter_canister_address = match icrc_bridge_client
+            .get_bridge_canister_evm_address()
+            .await
+            .unwrap()
+        {
+            Ok(addr) => Some(addr),
+            Err(_) => {
+                println!("retry");
+                ctx.advance_time(Duration::from_secs(2)).await;
+                continue;
+            }
+        };
+
+        break;
+    }
+
+    let Some(minter_canister_address) = minter_canister_address else {
+        panic!("Bridge canister was not initialized");
+    };
+
     let btf_bridge = ctx
         .initialize_btf_bridge(
             minter_canister_address,
