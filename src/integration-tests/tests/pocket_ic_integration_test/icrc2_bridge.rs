@@ -12,7 +12,7 @@ use did::{H160, U256, U64};
 use eth_signer::LocalWallet;
 use ic_canister_client::CanisterClientError;
 use ic_exports::ic_kit::mock_principals::{alice, john};
-use ic_exports::pocket_ic::{CallError, ErrorCode, UserError};
+use ic_exports::pocket_ic::RejectResponse;
 use icrc2_bridge::ops::IcrcBridgeOpImpl;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
@@ -270,10 +270,10 @@ async fn set_owner_access() {
     let err = admin_client.set_owner(alice()).await.unwrap_err();
     assert!(matches!(
         err,
-        CanisterClientError::PocketIcTestError(CallError::UserError(UserError {
-            code: ErrorCode::CanisterCalledTrap,
-            description: _,
-        }))
+        CanisterClientError::PocketIcTestError(RejectResponse {
+            error_code: ic_exports::pocket_ic::ErrorCode::CanisterCalledTrap,
+            ..
+        })
     ));
 
     // Now Alice is owner, so she can update owner.
@@ -849,12 +849,30 @@ pub async fn init_bridge() -> (PocketIcTestContext, LocalWallet, H160, H160) {
         .await
         .unwrap();
 
+    // give some time to the bridge to initialize
+    let mut minter_canister_address = None;
     let icrc_bridge_client = &ctx.icrc_bridge_client(ADMIN);
-    let minter_canister_address = icrc_bridge_client
-        .get_bridge_canister_evm_address()
-        .await
-        .unwrap()
-        .unwrap();
+    for _ in 0..10 {
+        minter_canister_address = match icrc_bridge_client
+            .get_bridge_canister_evm_address()
+            .await
+            .unwrap()
+        {
+            Ok(addr) => Some(addr),
+            Err(_) => {
+                println!("retry");
+                ctx.advance_time(Duration::from_secs(2)).await;
+                continue;
+            }
+        };
+
+        break;
+    }
+
+    let Some(minter_canister_address) = minter_canister_address else {
+        panic!("Bridge canister was not initialized");
+    };
+
     let btf_bridge = ctx
         .initialize_btf_bridge(
             minter_canister_address,

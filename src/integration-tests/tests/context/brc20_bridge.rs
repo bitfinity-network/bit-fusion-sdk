@@ -226,14 +226,6 @@ impl
                         18444,
                     ))
             },
-            |mut pic| {
-                Box::pin(async move {
-                    // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                    pic.set_time(std::time::SystemTime::now()).await;
-                    pic.make_live(None).await;
-                    pic
-                })
-            },
             true,
         )
         .await;

@@ -1061,9 +1061,14 @@ where
                     .expect("authorize failed");
                 assert!(res, "authorize failed");
 
-                let EvmLink::Http(hostname) = self.wrapped_evm_link() else {
-                    panic!("EVM-RPC provider hostname is not set");
+                let hostname = match self.wrapped_evm_link() {
+                    EvmLink::Http(hostname) => hostname,
+                    EvmLink::Ic(principal) => format!("http://{principal}.raw.localhost:8000"),
+                    EvmLink::EvmRpcCanister { canister_id, .. } => {
+                        format!("http://{canister_id}.raw.localhost:8000")
+                    }
                 };
+
                 println!("EVM-RPC provider hostname: {hostname}");
                 // configure the EVM RPC canister provider
                 let args = evm_rpc_canister::RegisterProviderArgs {

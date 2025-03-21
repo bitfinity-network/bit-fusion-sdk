@@ -41,13 +41,7 @@ pub struct PocketIcTestContext {
 impl PocketIcTestContext {
     /// Creates a new test context with the given canisters.
     pub async fn new(canisters_set: &[CanisterType]) -> Self {
-        Self::new_with(
-            canisters_set,
-            |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
-        )
-        .await
+        Self::new_with(canisters_set, |builder| builder, false).await
     }
 
     /// Creates a new test context with the given canisters and custom build and pocket_ic.
@@ -69,36 +63,41 @@ impl PocketIcTestContext {
     /// let ctx = PocketIcTestContext::new_with(
     ///    &canisters_set,
     ///    |builder| builder.with_ii_subnet().with_bitcoin_subnet(),
-    ///    |mut pic| Box::pin(async move {
-    ///        pic.make_live(None).await;
-    ///        pic
-    ///    }),
+    ///   false,
     /// ).await;
     /// ```
-    pub async fn new_with<FB, FPIC>(
+    pub async fn new_with<FB>(
         canisters_set: &[CanisterType],
         with_build: FB,
-        with_pocket_ic: FPIC,
-        mut live: bool,
+        force_live: bool,
     ) -> Self
     where
         FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
-        FPIC: FnOnce(PocketIc) -> Pin<Box<dyn Future<Output = PocketIc> + Send + 'static>>,
     {
-        let mut pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
+        let pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
             .build_async()
             .await;
 
-        pocket_ic = with_pocket_ic(pocket_ic).await;
+        // get a instance to the same pocket ic
+        let mut pocket_ic_instance = PocketIc::new_from_existing_instance(
+            pocket_ic.get_server_url(),
+            pocket_ic.instance_id,
+            Some(300_000), // is default
+        );
 
         let client = Arc::new(pocket_ic);
         let base_evm = test_evm_pocket_ic(&client).await;
         let wrapped_evm = test_evm_pocket_ic(&client).await;
 
+        let live = base_evm.live() || wrapped_evm.live() || force_live;
+
         // force live if any of the evms are live
-        if base_evm.live() || wrapped_evm.live() {
-            // force live
-            live = true;
+        if live {
+            // set time and make live
+            pocket_ic_instance
+                .set_time(std::time::SystemTime::now())
+                .await;
+            pocket_ic_instance.make_live(None).await;
         }
 
         let test_canisters_config = TestCanistersConfig {
