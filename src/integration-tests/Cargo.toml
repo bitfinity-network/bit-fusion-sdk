@@ -65,6 +65,5 @@ wildmatch = { workspace = true }
 
 # IC deps
 [features]
-bitfinity_evm = []
 dfx_tests = []
 pocket_ic_integration_test = []
