@@ -28,6 +28,8 @@ pub struct GanacheEvm {
 impl GanacheEvm {
     /// Run a new Ganache EVM container
     pub async fn run() -> Self {
+        println!("Using Ganache EVM");
+
         let container = GanacheImage.start().await.expect("Failed to start Ganache");
         let host_port = container
             .get_host_port_ipv4(8545)

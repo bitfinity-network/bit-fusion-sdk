@@ -19,6 +19,7 @@ const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
 impl BitfinityEvm<IcAgentClient> {
     /// Create a new [`BitfinityEvm`] instance for testing.
     pub async fn dfx() -> Self {
+        println!("Using Bitfinity EVM (dfx)");
         let url = Some(DFX_URL);
         let max = get_agent(ADMIN, url, Some(Duration::from_secs(180)))
             .await

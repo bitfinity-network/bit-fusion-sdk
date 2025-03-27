@@ -13,6 +13,7 @@ use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 impl BitfinityEvm<PocketIcClient> {
     /// Create a new [`BitfinityEvm`] instance for testing.
     pub async fn pocket_ic(pocket_ic: &Arc<PocketIc>) -> Self {
+        println!("Using Bitfinity EVM (pocket-ic)");
         let signature = create_canister(pocket_ic).await;
         let evm = create_canister(pocket_ic).await;
 
