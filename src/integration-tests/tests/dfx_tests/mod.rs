@@ -1,9 +1,9 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bridge_did::evm_link::EvmLink;
-use bridge_utils::evm_link::{RpcApi, RpcService};
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
 use eth_signer::ic_sign::SigningKeyId;
@@ -12,8 +12,9 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_test_utils::{get_agent, Agent, Canister};
 use ic_utils::interfaces::ManagementCanister;
 
-use crate::context::{CanisterType, TestCanisters, TestContext};
+use crate::context::{CanisterType, TestCanisters, TestCanistersConfig, TestContext};
 use crate::utils::error::{Result, TestError};
+use crate::utils::TestEvm;
 
 mod brc20_bridge;
 mod bridge_deployer;
@@ -29,15 +30,27 @@ pub const ALICE: &str = "alice";
 pub const ALEX: &str = "alex";
 
 /// The required setup for the dfx tests
-pub struct DfxTestContext {
+pub struct DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
+    alex: Agent,
+    alice: Agent,
+    base_evm: Arc<EVM>,
     canisters: TestCanisters,
     max: Agent,
-    alice: Agent,
-    alex: Agent,
+    wrapped_evm: Arc<EVM>,
 }
 
-impl DfxTestContext {
-    pub async fn new(canisters_set: &[CanisterType]) -> Self {
+impl<EVM> DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn new(
+        canisters_set: &[CanisterType],
+        base_evm: Arc<EVM>,
+        wrapped_evm: Arc<EVM>,
+    ) -> Self {
         let url = Some(DFX_URL);
         let max = get_agent(ADMIN, url, Some(Duration::from_secs(180)))
             .await
@@ -49,11 +62,20 @@ impl DfxTestContext {
             .await
             .unwrap();
 
+        let test_canisters_config = TestCanistersConfig {
+            evm: base_evm.evm(),
+            external_evm: wrapped_evm.evm(),
+            signature: base_evm.signature(),
+            external_signature: wrapped_evm.signature(),
+        };
+
         let mut ctx = Self {
-            canisters: TestCanisters::default(),
-            max,
-            alice,
             alex,
+            alice,
+            base_evm,
+            canisters: TestCanisters::new(test_canisters_config),
+            max,
+            wrapped_evm,
         };
 
         for canister_type in canisters_set {
@@ -82,7 +104,10 @@ impl DfxTestContext {
 }
 
 #[async_trait::async_trait]
-impl TestContext for DfxTestContext {
+impl<EVM> TestContext<EVM> for DfxTestContext<EVM>
+where
+    EVM: TestEvm,
+{
     type Client = IcAgentClient;
 
     fn client(&self, canister: Principal, name: &str) -> Self::Client {
@@ -107,16 +132,19 @@ impl TestContext for DfxTestContext {
     }
 
     fn base_evm_link(&self) -> EvmLink {
-        EvmLink::EvmRpcCanister {
-            canister_id: self.canisters().evm_rpc(),
-            rpc_service: vec![RpcService::Custom(RpcApi {
-                url: format!(
-                    "https://127.0.0.1:8002/?canisterId={}",
-                    self.canisters().external_evm()
-                ),
-                headers: None,
-            })],
-        }
+        self.base_evm.link()
+    }
+
+    fn wrapped_evm_link(&self) -> EvmLink {
+        self.wrapped_evm.link()
+    }
+
+    fn base_evm(&self) -> Arc<EVM> {
+        self.base_evm.clone()
+    }
+
+    fn wrapped_evm(&self) -> Arc<EVM> {
+        self.wrapped_evm.clone()
     }
 
     /// Creates an empty canister with cycles on it's balance.
@@ -213,9 +241,14 @@ impl TestContext for DfxTestContext {
 ///
 /// If the predicate does not return [`Ok`] within `max_wait`, the function panics.
 /// Returns the value inside of the [`Ok`] variant of the predicate.
-pub async fn block_until_succeeds<F, T>(predicate: F, ctx: &DfxTestContext, max_wait: Duration) -> T
+pub async fn block_until_succeeds<F, T, EVM>(
+    predicate: F,
+    ctx: &DfxTestContext<EVM>,
+    max_wait: Duration,
+) -> T
 where
     F: Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<T>>>>,
+    EVM: TestEvm,
 {
     let start = Instant::now();
     let mut err = anyhow::Error::msg("Predicate did not succeed within the given time");

@@ -17,6 +17,7 @@ bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
+chrono = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
 evm-canister-client = { workspace = true }
@@ -65,5 +66,5 @@ wildmatch = { workspace = true }
 
 # IC deps
 [features]
-pocket_ic_integration_test = []
 dfx_tests = []
+pocket_ic_integration_test = []

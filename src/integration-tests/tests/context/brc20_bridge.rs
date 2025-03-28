@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -33,6 +34,7 @@ use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
+use crate::utils::TestEvm;
 
 /// Maximum supply of the BRC20 token
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;
@@ -79,9 +81,10 @@ pub fn generate_wallet_name() -> String {
     name
 }
 
-pub struct Brc20Context<Ctx>
+pub struct Brc20Context<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub inner: Ctx,
     pub eth_wallet: LocalWallet,
@@ -90,6 +93,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub brc20: Brc20Wallet,
     pub tokens: AsyncMap<Brc20Tick, H160>,
+    _marker: PhantomData<EVM>,
 }
 
 /// Setup a new brc20 for DFX tests
@@ -184,17 +188,29 @@ async fn brc20_setup(brc20_to_deploy: &[Brc20InitArgs]) -> anyhow::Result<Brc20W
 }
 
 #[cfg(feature = "dfx_tests")]
-impl Brc20Context<crate::dfx_tests::DfxTestContext> {
-    pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
-        let context =
-            crate::dfx_tests::DfxTestContext::new(&super::CanisterType::BRC20_CANISTER_SET).await;
+impl<EVM> Brc20Context<crate::dfx_tests::DfxTestContext<EVM>, EVM>
+where
+    EVM: TestEvm,
+{
+    pub async fn dfx(brc20_to_deploy: &[Brc20InitArgs], evm: Arc<EVM>) -> Self {
+        let context = crate::dfx_tests::DfxTestContext::new(
+            &super::CanisterType::BRC20_CANISTER_SET,
+            evm.clone(),
+            evm,
+        )
+        .await;
 
         Self::new(context, brc20_to_deploy).await
     }
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
+impl
+    Brc20Context<
+        crate::pocket_ic_integration_test::PocketIcTestContext,
+        crate::utils::test_evm::Evm,
+    >
+{
     /// Init Rune context for [`PocketIcTestContext`] to run on pocket-ic
     pub async fn pocket_ic(brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -210,14 +226,6 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
                         18444,
                     ))
             },
-            |mut pic| {
-                Box::pin(async move {
-                    // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                    pic.set_time(std::time::SystemTime::now()).await;
-                    pic.make_live(None).await;
-                    pic
-                })
-            },
             true,
         )
         .await;
@@ -226,21 +234,15 @@ impl Brc20Context<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> Brc20Context<Ctx>
+impl<Ctx, EVM> Brc20Context<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx, brc20_to_deploy: &[Brc20InitArgs]) -> Self {
         let brc20_wallet = brc20_setup(brc20_to_deploy)
             .await
             .expect("failed to setup brc20 tokens");
-
-        context
-            .evm_client(context.admin_name())
-            .set_logger_filter("info")
-            .await
-            .expect("failed to set logger filter")
-            .unwrap();
 
         let bridge = context.canisters().brc20_bridge();
 
@@ -262,18 +264,16 @@ where
         let wallet_address = wallet.address();
 
         context
-            .evm_client(context.admin_name())
-            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .wrapped_evm()
+            .mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
 
-        let client = context.evm_client(context.admin_name());
+        let client = context.wrapped_evm();
         client
-            .admin_mint_native_tokens(brc20_bridge_eth_address.clone().unwrap(), u64::MAX.into())
+            .mint_native_tokens(brc20_bridge_eth_address.clone().unwrap(), u64::MAX.into())
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
 
         context.advance_time(Duration::from_secs(2)).await;
 
@@ -325,14 +325,17 @@ where
             inner: context,
             brc20: brc20_wallet,
             tokens,
+            _marker: PhantomData,
         }
     }
 
     pub async fn stop(&self) {
-        self.inner
-            .stop_canister(self.inner.canisters().evm())
-            .await
-            .expect("Failed to stop evm canister");
+        if !self.inner.wrapped_evm().live() {
+            self.inner
+                .stop_canister(self.inner.canisters().evm())
+                .await
+                .expect("Failed to stop evm canister");
+        }
         self.inner
             .stop_canister(self.inner.canisters().brc20_bridge())
             .await
@@ -503,8 +506,8 @@ where
             .expect("token not found")
             .clone();
 
-        let client = self.inner.evm_client(self.inner.admin_name());
-        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let client = self.inner.wrapped_evm();
+        let chain_id = client.chain_id().await.expect("failed to get chain id");
 
         let data = Brc20DepositRequestData {
             dst_address: dst_address.clone(),
@@ -539,14 +542,9 @@ where
         .expect("failed to sign the transaction");
 
         let tx_id = client
-            .send_raw_transaction(
-                transaction
-                    .try_into()
-                    .expect("failed to convert transaction"),
-            )
+            .send_raw_transaction(transaction)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("Failed to mint native tokens");
         self.wait_for_tx_success(&tx_id).await;
         println!(
             "Deposit notification sent by tx: 0x{}",
@@ -608,7 +606,7 @@ where
         println!("Burning {amount} of {tick} to {recipient}");
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         self.inner
             .burn_erc_20_tokens_raw(
                 &client,
@@ -705,10 +703,10 @@ where
 
         let start = Instant::now();
         let timeout = Duration::from_secs(MAX_TX_TIMEOUT_SEC);
-        let client = self.inner.evm_client(self.inner.admin_name());
+        let client = self.inner.wrapped_evm();
         while start.elapsed() < timeout {
             let receipt = client
-                .eth_get_transaction_receipt(tx_hash.clone())
+                .get_transaction_receipt(tx_hash)
                 .await
                 .expect("Failed to request transaction receipt");
 

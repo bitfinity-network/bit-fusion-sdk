@@ -1,13 +1,17 @@
 mod image;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use bridge_did::evm_link::EvmLink;
+use candid::Principal;
 use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
 use reqwest::Response;
 use serde_json::Value;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::ContainerAsync;
+use tokio::io::AsyncReadExt;
+use tokio_util::sync::CancellationToken;
 
 use self::image::Ganache as GanacheImage;
 use super::TestEvm;
@@ -21,26 +25,69 @@ pub struct GanacheEvm {
     container: Arc<ContainerAsync<GanacheImage>>,
     pub rpc_url: String,
     rpc_client: reqwest::Client,
+    log_exit: CancellationToken,
 }
 
 impl GanacheEvm {
     /// Run a new Ganache EVM container
     pub async fn run() -> Self {
-        let container = GanacheImage.start().await.expect("Failed to start Ganache");
+        println!("Using Ganache EVM");
+
+        let container = GanacheImage::default()
+            .start()
+            .await
+            .expect("Failed to start Ganache");
         let host_port = container
             .get_host_port_ipv4(8545)
             .await
             .expect("Failed to get host port for Ganache");
         let rpc_url = format!("http://localhost:{host_port}");
         let chain_id = Self::get_chain_id(&rpc_url).await;
+        println!("chain id: {chain_id}");
 
         let rpc_client = reqwest::Client::new();
 
+        let container = Arc::new(container);
+        let exit = CancellationToken::new();
+        tokio::spawn(Self::print_logs(
+            container.clone(),
+            exit.clone(),
+            rpc_url.clone(),
+        ));
+
         Self {
             chain_id,
-            container: Arc::new(container),
+            container,
             rpc_client,
             rpc_url,
+            log_exit: exit,
+        }
+    }
+
+    async fn print_logs(
+        container: Arc<ContainerAsync<GanacheImage>>,
+        exit: CancellationToken,
+        rpc_url: String,
+    ) {
+        let mut stdout = container.stdout(true);
+        let mut stderr = container.stderr(true);
+        let mut buf = [0; 1024];
+        let mut stderr_buf = [0; 1024];
+
+        loop {
+            tokio::select! {
+                _ = exit.cancelled() => {
+                    break;
+                }
+                bytes_read = stdout.read(&mut buf) => {
+                    let bytes_as_str = String::from_utf8_lossy(&buf[..bytes_read.unwrap()]);
+                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), );
+                }
+                bytes_read = stderr.read(&mut stderr_buf) => {
+                    let bytes_as_str = String::from_utf8_lossy(&stderr_buf[..bytes_read.unwrap()]);
+                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+                }
+            }
         }
     }
 
@@ -71,28 +118,46 @@ impl GanacheEvm {
     async fn rpc_request(&self, body: Value) -> TestResult<Response> {
         dbg!("Sending request: {:#?}", &body);
 
-        let response = self
-            .rpc_client
-            .post(&self.rpc_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))?;
+        // this method with live mode is flaky, retry 10 times
+        for _ in 0..10 {
+            let response = match self
+                .rpc_client
+                .post(&self.rpc_url)
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| TestError::Ganache(format!("Failed to send request: {:?}", e)))
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("ganache rpc error: {:#?}", e);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
 
-        if !response.status().is_success() {
-            return Err(TestError::Ganache(format!(
-                "Failed to send request: {:?}",
-                response
-            )));
+            if !response.status().is_success() {
+                return Err(TestError::Ganache(format!(
+                    "Failed to send request: {:?}",
+                    response
+                )));
+            }
+
+            return Ok(response);
         }
 
-        Ok(response)
+        Err(TestError::Ganache("Failed to send request".into()))
     }
 }
 
 #[async_trait::async_trait]
 impl TestEvm for GanacheEvm {
-    async fn eth_chain_id(&self) -> TestResult<u64> {
+    async fn stop(&self) {
+        self.log_exit.cancel();
+        self.container.stop().await.expect("Failed to stop Ganache");
+    }
+
+    async fn chain_id(&self) -> TestResult<u64> {
         Ok(self.chain_id)
     }
 
@@ -158,7 +223,7 @@ impl TestEvm for GanacheEvm {
         gas_limit: u64,
         gas_price: Option<U256>,
         data: Option<Bytes>,
-    ) -> TestResult<String> {
+    ) -> TestResult<Vec<u8>> {
         let response = self
             .rpc_request(serde_json::json!(
                 {
@@ -189,7 +254,9 @@ impl TestEvm for GanacheEvm {
             .ok_or_else(|| anyhow::anyhow!("Failed to get result: {:?}", body["error"]))
             .map_err(|e| TestError::Ganache(format!("Failed to get result: {:?}", e)))?;
 
-        Ok(result.to_string())
+        // hex to bytes
+        hex::decode(result.trim_start_matches("0x"))
+            .map_err(|e| TestError::Ganache(format!("Failed to parse result: {:?}", e)))
     }
 
     /// Get the balance of an address
@@ -198,7 +265,7 @@ impl TestEvm for GanacheEvm {
             .rpc_request(serde_json::json!(
                 {
                     "method": "eth_getBalance",
-                    "params": [address.to_hex_str(), block.to_string()],
+                    "params": [address.to_hex_str(), block.to_string().to_lowercase()],
                     "id": 1,
                     "jsonrpc": "2.0"
                 }
@@ -207,6 +274,7 @@ impl TestEvm for GanacheEvm {
             .unwrap();
 
         let body = response.json::<serde_json::Value>().await.unwrap();
+        println!("body: {:#?}", body);
         let balance_str = body["result"].as_str().unwrap();
 
         U256::from_hex_str(balance_str)
@@ -264,5 +332,17 @@ impl TestEvm for GanacheEvm {
         Ok(u64::from_str_radix(nonce_str.trim_start_matches("0x"), 16)
             .map_err(|e| TestError::Ganache(format!("Failed to parse nonce: {:?}", e)))?
             .into())
+    }
+
+    fn live(&self) -> bool {
+        true
+    }
+
+    fn evm(&self) -> Principal {
+        Principal::anonymous()
+    }
+
+    fn signature(&self) -> Principal {
+        Principal::anonymous()
     }
 }

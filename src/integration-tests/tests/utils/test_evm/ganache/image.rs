@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use rand::Rng as _;
 use testcontainers::core::WaitFor;
 use testcontainers::Image;
 
@@ -8,7 +9,27 @@ const TAG: &str = "v7.9.2";
 
 /// Ganache image container
 #[derive(Debug, Clone)]
-pub struct Ganache;
+pub struct Ganache {
+    args: Vec<String>,
+}
+
+impl Default for Ganache {
+    fn default() -> Self {
+        let mut rng = rand::thread_rng();
+        let chain_id = rng.gen_range(1..5000);
+
+        Self {
+            args: vec![
+                "--chain.vmErrorsOnRPCResponse=true".to_string(),
+                "--wallet.totalAccounts=1".to_string(),
+                "--wallet.defaultBalance=100000000".to_string(),
+                "-m 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'"
+                    .to_string(),
+                format!("--chain.chainId={}", chain_id),
+            ],
+        }
+    }
+}
 
 impl Image for Ganache {
     fn name(&self) -> &str {
@@ -24,11 +45,6 @@ impl Image for Ganache {
     }
 
     fn cmd(&self) -> impl IntoIterator<Item = impl Into<Cow<'_, str>>> {
-        [
-            "--chain.vmErrorsOnRPCResponse=true",
-            "--wallet.totalAccounts=1",
-            "--wallet.defaultBalance=100000000",
-            "-m 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'",
-        ]
+        &self.args
     }
 }
