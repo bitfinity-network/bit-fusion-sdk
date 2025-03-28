@@ -55,9 +55,10 @@ pub trait OperationContext {
     fn get_signer(&self) -> BTFResult<TxSigner>;
 
     async fn collect_evm_events(&self, max_logs_number: u64) -> BTFResult<CollectedEvents> {
-        log::trace!("collecting evm events");
-
         let link = self.get_evm_link();
+
+        log::trace!("collecting evm events from {link:?}");
+
         let client = link.get_json_rpc_client();
         let evm_params = self.get_evm_params()?;
         let bridge_contract = self.get_bridge_contract_address()?;

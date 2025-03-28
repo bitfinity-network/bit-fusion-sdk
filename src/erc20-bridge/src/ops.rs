@@ -134,18 +134,26 @@ impl Erc20OpStageImpl {
 
     async fn progress(self) -> BTFResult<OperationProgress<Self>> {
         match self.0 {
-            Erc20OpStage::SignMintOrder(_) => {
+            Erc20OpStage::SignMintOrder(data) => {
+                log::debug!("ERC20OpStage::SignMintOrder {data:?}");
                 Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID))
             }
-            Erc20OpStage::SendMintTransaction(_) => {
+            Erc20OpStage::SendMintTransaction(data) => {
+                log::debug!("ERC20OpStage::SendMintTransaction {data:?}",);
                 Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID))
             }
-            Erc20OpStage::ConfirmMint { .. } => Err(bridge_did::error::Error::FailedToProgress(
-                "Erc20OpStage::ConfirmMint should progress by the event".into(),
-            )),
-            Erc20OpStage::TokenMintConfirmed(_) => Err(bridge_did::error::Error::FailedToProgress(
-                "Erc20OpStage::TokenMintConfirmed should not progress".into(),
-            )),
+            Erc20OpStage::ConfirmMint { .. } => {
+                log::debug!("ERC20OpStage::ConfirmMint");
+                Err(bridge_did::error::Error::FailedToProgress(
+                    "Erc20OpStage::ConfirmMint should progress by the event".into(),
+                ))
+            }
+            Erc20OpStage::TokenMintConfirmed(data) => {
+                log::debug!("ERC20OpStage::TokenMintConfirmed {data:?}");
+                Err(bridge_did::error::Error::FailedToProgress(
+                    "Erc20OpStage::TokenMintConfirmed should not progress".into(),
+                ))
+            }
         }
     }
 }

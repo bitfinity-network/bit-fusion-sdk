@@ -48,6 +48,13 @@ pub async fn test_evm_pocket_ic(pocket_ic: &Arc<ic_exports::pocket_ic::PocketIc>
 
 #[async_trait::async_trait]
 impl TestEvm for Evm {
+    async fn stop(&self) {
+        match self {
+            Evm::Bitfinity(evm) => evm.stop().await,
+            Evm::Ganache(evm) => evm.stop().await,
+        }
+    }
+
     fn evm(&self) -> Principal {
         match self {
             Evm::Bitfinity(evm) => evm.evm(),

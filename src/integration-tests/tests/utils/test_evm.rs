@@ -18,6 +18,8 @@ use crate::utils::error::Result as TestResult;
 /// An abstraction layer for interacting with a test EVM node
 #[async_trait::async_trait]
 pub trait TestEvm: Send + Sync {
+    async fn stop(&self);
+
     /// returns whether requires live mode
     fn live(&self) -> bool;
 

@@ -5,7 +5,7 @@ use bridge_canister::bridge::Operation;
 use bridge_client::{BridgeCanisterClient, Erc20BridgeClient};
 use bridge_did::bridge_side::BridgeSide;
 use bridge_did::id256::Id256;
-use bridge_did::operations::Erc20OpStage;
+use bridge_did::operations::{Erc20BridgeOp, Erc20OpStage};
 use bridge_utils::{BTFBridge, UUPSProxy};
 use did::{H160, U256};
 use erc20_bridge::ops::{Erc20BridgeOpImpl, Erc20OpStageImpl};
@@ -15,7 +15,7 @@ use ic_stable_structures::Storable as _;
 use super::PocketIcTestContext;
 use crate::context::stress::{erc20, StressTestConfig};
 use crate::context::{CanisterType, TestContext};
-use crate::pocket_ic_integration_test::ADMIN;
+use crate::pocket_ic_integration_test::{block_until_succeeds, ADMIN};
 use crate::utils::{TestEvm, CHAIN_ID};
 
 pub struct ContextWithBridges {
@@ -187,6 +187,13 @@ async fn test_external_bridging() {
     let alice_address: H160 = alice_wallet.address().into();
     let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
 
+    // mint native tokens also on base
+    let base_evm_client = ctx.context.base_evm();
+    base_evm_client
+        .mint_native_tokens(ctx.bob_address(), u64::MAX.into())
+        .await
+        .expect("Failed to mint native tokens");
+
     // Check mint operation complete
     let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
 
@@ -203,8 +210,6 @@ async fn test_external_bridging() {
         )
         .await
         .unwrap();
-
-    let base_evm_client = ctx.context.base_evm();
 
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
@@ -235,9 +240,45 @@ async fn test_external_bridging() {
     // Advance time to perform two tasks in erc20-bridge:
     // 1. Minted event collection
     // 2. Mint order removal
-    ctx.context
-        .advance_by_times(Duration::from_secs(2), 30)
-        .await;
+    //ctx.context.advance_time(Duration::from_secs(30)).await;
+    let ctx_t = ctx.context.clone();
+    let alice_wallet_t = alice_wallet.clone();
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
+            let wallet = alice_wallet_t.clone();
+            Box::pin(async move {
+                let (operation_id, op) = erc20_bridge_client
+                    .get_operation_by_memo_and_user(memo, &wallet.address().into())
+                    .await?
+                    .ok_or(anyhow::anyhow!("Operation not found"))?;
+
+                if operation_id.as_u64() == expected_operation_id as u64 {
+                    println!("op: {:?}", op);
+                    if matches!(
+                        op,
+                        Erc20BridgeOp {
+                            stage: Erc20OpStage::TokenMintConfirmed { .. },
+                            ..
+                        }
+                    ) {
+                        Ok(())
+                    } else {
+                        anyhow::bail!("Operation is not in TokenMintConfirmed stage")
+                    }
+                } else {
+                    anyhow::bail!(
+                        "Operation id is {operation_id}; expected: {expected_operation_id}"
+                    )
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
 
     let (operation_id, _) = erc20_bridge_client
         .get_operation_by_memo_and_user(memo, &alice_address)
@@ -254,17 +295,36 @@ async fn test_external_bridging() {
     assert_eq!(memos.len(), 1);
     assert_eq!(memos[0], memo);
 
-    let balance = ctx
-        .context
-        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet, None)
-        .await
-        .unwrap();
-    assert_eq!(amount, balance);
+    let ctx_t = ctx.context.clone();
+    let wrapped_token_address = ctx.wrapped_token_address.clone();
+    let alice_wallet = alice_wallet.clone();
+
+    // wait for balance to increase
+    block_until_succeeds(
+        move || {
+            let evm = ctx_t.wrapped_evm.clone();
+            let ctx = ctx_t.clone();
+            let wrapped_token_address = wrapped_token_address.clone();
+            let wallet = alice_wallet.clone();
+            Box::pin(async move {
+                let balance = ctx
+                    .check_erc20_balance_on_evm(&evm, &wrapped_token_address, &wallet, None)
+                    .await?;
+
+                if balance == amount {
+                    Ok(balance)
+                } else {
+                    anyhow::bail!("Balance is {balance}; expected: {amount}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
 
     // Wait for mint order removal
-    ctx.context
-        .advance_by_times(Duration::from_secs(2), 4)
-        .await;
+    ctx.context.advance_time(Duration::from_secs(10)).await;
 
     let operation = erc20_bridge_client
         .get_operations_list(&alice_address, None, None)
@@ -365,46 +425,34 @@ async fn native_token_deposit_increase_and_decrease() {
         .await
         .unwrap();
 
-    // Advance time to perform two tasks in erc20-bridge:
-    // 1. Minted event collection
-    // 2. Mint order removal
-    ctx.context
-        .advance_by_times(Duration::from_secs(2), 20)
-        .await;
+    let alice_address_t = alice_wallet.clone().address();
+    let ctx_t = ctx.context.clone();
 
-    let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
+            let alice_address = alice_address_t.clone();
+            Box::pin(async move {
+                let (_, op) = erc20_bridge_client
+                    .get_operations_list(&alice_address.into(), None, None)
+                    .await?
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
 
-    let mint_op = erc20_bridge_client
-        .get_operations_list(&alice_address, None, None)
-        .await
-        .unwrap()
-        .last()
-        .cloned()
-        .unwrap();
-
-    if let Erc20OpStage::ConfirmMint { tx_hash, .. } = mint_op.1.stage {
-        let receipt = ctx
-            .context
-            .wait_transaction_receipt(tx_hash.as_ref().unwrap())
-            .await
-            .unwrap()
-            .unwrap();
-        eprintln!(
-            "TX output: {}",
-            String::from_utf8_lossy(&receipt.output.unwrap())
-        );
-        eprintln!("TX status: {:?}", receipt.status);
-    }
-
-    let operation = erc20_bridge_client
-        .get_operations_list(&alice_address, None, None)
-        .await
-        .unwrap()
-        .last()
-        .cloned()
-        .unwrap();
-    let operation = Erc20BridgeOpImpl(operation.1);
-    assert!(operation.is_complete());
+                let stage = Erc20BridgeOpImpl(op);
+                if stage.is_complete() {
+                    Ok(())
+                } else {
+                    anyhow::bail!("Operation is not complete; {stage:?}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(120),
+    )
+    .await;
 
     // Check fee charged
     let native_balance_after_mint = ctx
@@ -431,13 +479,6 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     // spender should deposit native tokens to btf bridge, to pay fee.
     let base_evm_client = ctx.context.base_evm();
 
-    // Advance time to perform two tasks in erc20-bridge:
-    // 1. Minted event collection
-    // 2. Mint order removal
-    ctx.context
-        .advance_by_times(Duration::from_secs(2), 25)
-        .await;
-
     let to_token_id = Id256::from_evm_address(&ctx.wrapped_token_address, CHAIN_ID as _);
 
     ctx.context
@@ -461,12 +502,35 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .advance_by_times(Duration::from_secs(2), 25)
         .await;
 
-    let balance = ctx
-        .context
-        .check_erc20_balance(&ctx.wrapped_token_address, &alice_wallet, None)
-        .await
-        .unwrap();
-    assert_eq!(0, balance);
+    let ctx_t = ctx.context.clone();
+    let wrapped_token_address = ctx.wrapped_token_address.clone();
+    let alice_wallet_t = alice_wallet.clone();
+
+    let expected_amount = 0;
+
+    // wait for balance to increase
+    block_until_succeeds(
+        move || {
+            let evm = ctx_t.wrapped_evm.clone();
+            let ctx = ctx_t.clone();
+            let wrapped_token_address = wrapped_token_address.clone();
+            let wallet = alice_wallet_t.clone();
+            Box::pin(async move {
+                let balance = ctx
+                    .check_erc20_balance_on_evm(&evm, &wrapped_token_address, &wallet, None)
+                    .await?;
+
+                if balance == expected_amount {
+                    Ok(balance)
+                } else {
+                    anyhow::bail!("Balance is {balance}; expected: {expected_amount}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
 
     let wrapped_evm_client = ctx.context.wrapped_evm();
     let bridge_canister_evm_balance_after_failed_mint = wrapped_evm_client
@@ -474,22 +538,35 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .await
         .expect("Failed to get balance");
 
-    // Wait for mint order removal
-    ctx.context
-        .advance_by_times(Duration::from_secs(2), 4)
-        .await;
+    let alice_address_t = alice_wallet.clone().address();
+    let ctx_t = ctx.context.clone();
 
-    // Check mint order is not removed
-    let erc20_bridge_client = ctx.context.erc20_bridge_client(ADMIN);
-    let (_, op) = erc20_bridge_client
-        .get_operations_list(&alice_address, None, None)
-        .await
-        .unwrap()
-        .last()
-        .cloned()
-        .unwrap();
-    let stage = Erc20OpStageImpl(op.stage);
-    let signed_order = stage.get_signed_mint_order().unwrap();
+    let signed_order = block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
+            let alice_address = alice_address_t.clone();
+            Box::pin(async move {
+                let (_, op) = erc20_bridge_client
+                    .get_operations_list(&alice_address.into(), None, None)
+                    .await
+                    .unwrap()
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
+
+                let stage = Erc20OpStageImpl(op.stage);
+                let signed_order = stage
+                    .get_signed_mint_order()
+                    .ok_or_else(|| anyhow::anyhow!("Signed order not found"))?;
+
+                Ok(signed_order.clone())
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
 
     ctx.context
         .batch_mint_erc_20_with_order(
@@ -504,16 +581,35 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         .advance_by_times(Duration::from_secs(2), 10)
         .await;
 
-    // check the operation is complete after the successful mint
-    let (_, op) = erc20_bridge_client
-        .get_operations_list(&alice_address, None, None)
-        .await
-        .unwrap()
-        .last()
-        .cloned()
-        .unwrap();
-    let stage = Erc20BridgeOpImpl(op);
-    assert!(stage.is_complete());
+    let alice_address_t = alice_wallet.clone().address();
+    let ctx_t = ctx.context.clone();
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
+            let alice_address = alice_address_t.clone();
+            Box::pin(async move {
+                let (_, op) = erc20_bridge_client
+                    .get_operations_list(&alice_address.into(), None, None)
+                    .await
+                    .unwrap()
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
+
+                let stage = Erc20BridgeOpImpl(op);
+                if stage.is_complete() {
+                    Ok(())
+                } else {
+                    anyhow::bail!("Operation is not complete; {stage:?}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(120),
+    )
+    .await;
 
     // Check bridge canister balance not changed after user's transaction.
     let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client

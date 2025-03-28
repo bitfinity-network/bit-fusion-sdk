@@ -1246,6 +1246,13 @@ where
                         logs_query: Duration::from_secs(2),
                     },
                 };
+
+                println!(
+                    "installing ERC20 with WRAPPED LINK: {:?}; BASE LINK: {:?}",
+                    self.wrapped_evm_link(),
+                    self.base_evm_link()
+                );
+
                 self.install_canister(
                     self.canisters().erc20_bridge(),
                     wasm,

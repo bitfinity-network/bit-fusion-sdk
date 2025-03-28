@@ -17,6 +17,7 @@ bridge-client = { path = "../bridge-client" }
 bridge-did = { path = "../bridge-did" }
 bridge-utils = { path = "../bridge-utils" }
 candid = { workspace = true }
+chrono = { workspace = true }
 did = { workspace = true }
 eth-signer = { workspace = true }
 evm-canister-client = { workspace = true }

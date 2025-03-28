@@ -10,6 +10,8 @@ use reqwest::Response;
 use serde_json::Value;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::ContainerAsync;
+use tokio::io::AsyncReadExt;
+use tokio_util::sync::CancellationToken;
 
 use self::image::Ganache as GanacheImage;
 use super::TestEvm;
@@ -23,6 +25,7 @@ pub struct GanacheEvm {
     container: Arc<ContainerAsync<GanacheImage>>,
     pub rpc_url: String,
     rpc_client: reqwest::Client,
+    log_exit: CancellationToken,
 }
 
 impl GanacheEvm {
@@ -30,7 +33,10 @@ impl GanacheEvm {
     pub async fn run() -> Self {
         println!("Using Ganache EVM");
 
-        let container = GanacheImage.start().await.expect("Failed to start Ganache");
+        let container = GanacheImage::default()
+            .start()
+            .await
+            .expect("Failed to start Ganache");
         let host_port = container
             .get_host_port_ipv4(8545)
             .await
@@ -41,11 +47,47 @@ impl GanacheEvm {
 
         let rpc_client = reqwest::Client::new();
 
+        let container = Arc::new(container);
+        let exit = CancellationToken::new();
+        tokio::spawn(Self::print_logs(
+            container.clone(),
+            exit.clone(),
+            rpc_url.clone(),
+        ));
+
         Self {
             chain_id,
-            container: Arc::new(container),
+            container,
             rpc_client,
             rpc_url,
+            log_exit: exit,
+        }
+    }
+
+    async fn print_logs(
+        container: Arc<ContainerAsync<GanacheImage>>,
+        exit: CancellationToken,
+        rpc_url: String,
+    ) {
+        let mut stdout = container.stdout(true);
+        let mut stderr = container.stderr(true);
+        let mut buf = [0; 1024];
+        let mut stderr_buf = [0; 1024];
+
+        loop {
+            tokio::select! {
+                _ = exit.cancelled() => {
+                    break;
+                }
+                bytes_read = stdout.read(&mut buf) => {
+                    let bytes_as_str = String::from_utf8_lossy(&buf[..bytes_read.unwrap()]);
+                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), );
+                }
+                bytes_read = stderr.read(&mut stderr_buf) => {
+                    let bytes_as_str = String::from_utf8_lossy(&stderr_buf[..bytes_read.unwrap()]);
+                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+                }
+            }
         }
     }
 
@@ -110,6 +152,11 @@ impl GanacheEvm {
 
 #[async_trait::async_trait]
 impl TestEvm for GanacheEvm {
+    async fn stop(&self) {
+        self.log_exit.cancel();
+        self.container.stop().await.expect("Failed to stop Ganache");
+    }
+
     async fn chain_id(&self) -> TestResult<u64> {
         Ok(self.chain_id)
     }

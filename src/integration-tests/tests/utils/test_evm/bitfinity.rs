@@ -30,6 +30,8 @@ impl<C> TestEvm for BitfinityEvm<C>
 where
     C: CanisterClient + Send + Sync,
 {
+    async fn stop(&self) {}
+
     fn evm(&self) -> Principal {
         self.evm
     }

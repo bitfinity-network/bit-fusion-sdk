@@ -324,7 +324,7 @@ where
             Ok(res) => return res,
             Err(e) => err = e,
         }
-        ctx.advance_time(Duration::from_millis(100)).await;
+        ctx.advance_time(Duration::from_millis(500)).await;
     }
 
     panic!(
