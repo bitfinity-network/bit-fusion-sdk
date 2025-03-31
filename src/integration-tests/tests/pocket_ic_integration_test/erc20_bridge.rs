@@ -114,6 +114,9 @@ impl ContextWithBridges {
             erc20_bridge_address.clone(),
         )
         .await;
+
+        println!("base_btf_bridge: {base_btf_bridge}; wrapped_btf_bridge: {wrapped_btf_bridge}");
+
         erc20_bridge_client
             .set_btf_bridge_contract(&wrapped_btf_bridge)
             .await
@@ -170,7 +173,8 @@ impl ContextWithBridges {
     }
 }
 
-// Create a second EVM canister (base_evm) instance and create BTFBridge contract on it, // It will play role of external evm
+// Create a second EVM canister (base_evm) instance and create BTFBridge contract on it,
+// It will play role of external evm
 // Create erc20-bridge instance, initialized with EvmInfos for both EVM canisters.
 // Deploy ERC-20 token on external_evm,
 // Deploy Wrapped token on first EVM for the ERC-20 from previous step,
@@ -256,7 +260,6 @@ async fn test_external_bridging() {
                     .ok_or(anyhow::anyhow!("Operation not found"))?;
 
                 if operation_id.as_u64() == expected_operation_id as u64 {
-                    println!("op: {:?}", op);
                     if matches!(
                         op,
                         Erc20BridgeOp {
@@ -276,7 +279,7 @@ async fn test_external_bridging() {
             })
         },
         &ctx.context,
-        Duration::from_secs(60),
+        Duration::from_secs(90),
     )
     .await;
 
@@ -432,7 +435,7 @@ async fn native_token_deposit_increase_and_decrease() {
         move || {
             let ctx = ctx_t.clone();
             let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
-            let alice_address = alice_address_t.clone();
+            let alice_address = alice_address_t;
             Box::pin(async move {
                 let (_, op) = erc20_bridge_client
                     .get_operations_list(&alice_address.into(), None, None)
@@ -545,7 +548,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         move || {
             let ctx = ctx_t.clone();
             let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
-            let alice_address = alice_address_t.clone();
+            let alice_address = alice_address_t;
             Box::pin(async move {
                 let (_, op) = erc20_bridge_client
                     .get_operations_list(&alice_address.into(), None, None)
@@ -588,7 +591,7 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         move || {
             let ctx = ctx_t.clone();
             let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
-            let alice_address = alice_address_t.clone();
+            let alice_address = alice_address_t;
             Box::pin(async move {
                 let (_, op) = erc20_bridge_client
                     .get_operations_list(&alice_address.into(), None, None)

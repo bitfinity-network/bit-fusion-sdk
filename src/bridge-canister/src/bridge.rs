@@ -56,8 +56,7 @@ pub trait OperationContext {
 
     async fn collect_evm_events(&self, max_logs_number: u64) -> BTFResult<CollectedEvents> {
         let link = self.get_evm_link();
-
-        log::trace!("collecting evm events from {link:?}");
+        log::trace!("collecting evm events from {link}");
 
         let client = link.get_json_rpc_client();
         let evm_params = self.get_evm_params()?;

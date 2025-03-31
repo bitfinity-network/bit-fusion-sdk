@@ -183,6 +183,10 @@ fn init_runtime() -> SharedRuntime {
 
     // Init refresh_evm_params services
     let refresh_base_params_service = RefreshEvmParamsService::new(base_config.clone());
+    log::trace!(
+        "initializing evm params query service with interval: {}s",
+        base_state.query_delays().evm_params_query.as_secs()
+    );
     let refresh_base_params_service_with_delay = ServiceTimer::new(
         refresh_base_params_service,
         base_state.query_delays().evm_params_query,
@@ -198,6 +202,10 @@ fn init_runtime() -> SharedRuntime {
     );
     let base_events_service =
         FetchBtfBridgeEventsService::new(base_event_handler, runtime.clone(), base_config.clone());
+    log::trace!(
+        "initializing evm log query service with interval: {}s",
+        base_state.query_delays().logs_query.as_secs()
+    );
     let base_events_service_with_delay =
         ServiceTimer::new(base_events_service, base_state.query_delays().logs_query);
     let wrapped_event_handler = Erc20EventsHandler::new(

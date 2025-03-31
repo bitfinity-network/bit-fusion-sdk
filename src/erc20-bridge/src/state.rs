@@ -44,7 +44,10 @@ impl BaseEvmState {
             config.signing_strategy = settings.signing_strategy;
             config.evm_params = None;
             config.btf_bridge_contract_address = None;
-        })
+        });
+        self.delays
+            .set(settings.delays)
+            .expect("failed to set delays");
     }
 }
 

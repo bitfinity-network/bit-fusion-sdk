@@ -116,8 +116,6 @@ impl GanacheEvm {
     }
 
     async fn rpc_request(&self, body: Value) -> TestResult<Response> {
-        dbg!("Sending request: {:#?}", &body);
-
         // this method with live mode is flaky, retry 10 times
         for _ in 0..10 {
             let response = match self

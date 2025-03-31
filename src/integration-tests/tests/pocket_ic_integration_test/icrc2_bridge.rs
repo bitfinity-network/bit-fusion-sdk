@@ -22,7 +22,7 @@ use crate::context::stress::{icrc, StressTestConfig};
 use crate::context::{
     CanisterType, TestContext, DEFAULT_GAS_PRICE, ICRC1_INITIAL_BALANCE, ICRC1_TRANSFER_FEE,
 };
-use crate::pocket_ic_integration_test::{ADMIN, ALICE};
+use crate::pocket_ic_integration_test::{block_until_succeeds, ADMIN, ALICE};
 use crate::utils::TestEvm;
 
 #[tokio::test]
@@ -605,9 +605,6 @@ async fn rescheduling_deposit_operation() {
         break;
     }
 
-    // Need to wait for all the operation retries to execute
-    ctx.advance_by_times(Duration::from_secs(10), 60).await;
-
     // Resume token canister to make the following operations work.
     ctx.client
         .start_canister(ctx.canisters().token_1(), Some(ctx.admin()))
@@ -620,18 +617,35 @@ async fn rescheduling_deposit_operation() {
         .await
         .unwrap();
 
-    ctx.advance_by_times(Duration::from_secs(2), 5).await;
+    let ctx_t = ctx.clone();
+    let john_wallet_t = john_wallet.clone();
 
-    let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None, None)
-        .await
-        .unwrap();
-    let (operation_id, _) = &operations[0];
+    let (operation_id, log) = block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let bridge_client = ctx.icrc_bridge_client(JOHN);
+            let john_wallet = john_wallet_t.clone();
+            Box::pin(async move {
+                let (operation_id, _) = bridge_client
+                    .get_operations_list(&john_wallet.address().into(), None, None)
+                    .await?
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
 
-    let log = bridge_client
-        .get_operation_log(*operation_id)
-        .await
-        .unwrap();
+                let log = bridge_client.get_operation_log(operation_id).await?;
+                if let Some(log) = log {
+                    Ok((operation_id, log))
+                } else {
+                    anyhow::bail!("Operation log is empty")
+                }
+            })
+        },
+        &ctx,
+        Duration::from_secs(120),
+    )
+    .await;
+
     eprintln!("OPERATION LOG");
     dbg!(&log);
 
@@ -644,33 +658,65 @@ async fn rescheduling_deposit_operation() {
     assert_eq!(base_balance, ICRC1_INITIAL_BALANCE - ICRC1_TRANSFER_FEE);
     assert_eq!(wrapped_balance as u64, 0);
 
-    let bridge_client = ctx.icrc_bridge_client(JOHN);
-    let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None, None)
+    let ctx_t = ctx.clone();
+    let john_wallet_t = john_wallet.clone();
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let bridge_client = ctx.icrc_bridge_client(JOHN);
+            let john_wallet = john_wallet_t.clone();
+            Box::pin(async move {
+                let (_, op) = bridge_client
+                    .get_operations_list(&john_wallet.address().into(), None, None)
+                    .await?
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
+
+                if matches!(op, IcrcBridgeOp::BurnIcrc2Tokens { .. }) {
+                    Ok(())
+                } else {
+                    anyhow::bail!("Operation is not complete; {op:?}")
+                }
+            })
+        },
+        &ctx,
+        Duration::from_secs(120),
+    )
+    .await;
+
+    ctx.reschedule_operation(operation_id, &john_wallet, &btf_bridge)
         .await
         .unwrap();
-    let (operation_id, state) = &operations[0];
 
-    assert!(matches!(*state, IcrcBridgeOp::BurnIcrc2Tokens { .. }));
+    let ctx_t = ctx.clone();
+    let john_wallet_t = john_wallet.clone();
 
-    ctx.reschedule_operation(*operation_id, &john_wallet, &btf_bridge)
-        .await
-        .unwrap();
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let bridge_client = ctx.icrc_bridge_client(JOHN);
+            let john_wallet = john_wallet_t.clone();
+            Box::pin(async move {
+                let (_, op) = bridge_client
+                    .get_operations_list(&john_wallet.address().into(), None, None)
+                    .await?
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Operation not found"))?;
 
-    ctx.advance_by_times(Duration::from_secs(2), 25).await;
-
-    let operations = bridge_client
-        .get_operations_list(&john_wallet.address().into(), None, None)
-        .await
-        .unwrap();
-    let (_, state) = &operations[0];
-
-    dbg!(state);
-
-    assert!(matches!(
-        *state,
-        IcrcBridgeOp::WrappedTokenMintConfirmed { .. }
-    ));
+                if matches!(op, IcrcBridgeOp::WrappedTokenMintConfirmed { .. }) {
+                    Ok(())
+                } else {
+                    anyhow::bail!("Operation is not complete; {op:?}")
+                }
+            })
+        },
+        &ctx,
+        Duration::from_secs(120),
+    )
+    .await;
 
     let wrapped_balance = ctx
         .check_erc20_balance(&wrapped_token, &john_wallet, None)
