@@ -1,7 +1,7 @@
 use bridge_canister::bridge::{Operation, OperationContext, OperationProgress};
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
-use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::mint_tx::{MintTxHandler, MintTxResult};
 use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::state::SharedConfig;
@@ -15,7 +15,7 @@ use bridge_did::order::{self, MintOrder, SignedOrders};
 use bridge_did::reason::Icrc2Burn;
 use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Nat};
-use did::{H160, H256, U256};
+use did::{H160, U256};
 use eth_signer::sign_strategy::TxSigner;
 use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
@@ -58,7 +58,7 @@ impl Operation for IcrcBridgeOpImpl {
                 log::debug!("IcrcBridgeOp::SendMintTransaction");
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
-            IcrcBridgeOp::ConfirmMint { .. } => {
+            IcrcBridgeOp::WaitForErc20MintConfirm { .. } => {
                 log::debug!("IcrcBridgeOp::ConfirmMint");
                 Err(Error::FailedToProgress(
                     "ConfirmMint task should progress only on the Minted EVM event".into(),
@@ -90,7 +90,7 @@ impl Operation for IcrcBridgeOpImpl {
             IcrcBridgeOp::BurnIcrc2Tokens(_) => false,
             IcrcBridgeOp::SignMintOrder { .. } => false,
             IcrcBridgeOp::SendMintTransaction { .. } => false,
-            IcrcBridgeOp::ConfirmMint { .. } => false,
+            IcrcBridgeOp::WaitForErc20MintConfirm { .. } => false,
             IcrcBridgeOp::WrappedTokenMintConfirmed(_) => true,
             IcrcBridgeOp::MintIcrcTokens(_) => false,
             IcrcBridgeOp::IcrcMintConfirmed { .. } => true,
@@ -102,7 +102,7 @@ impl Operation for IcrcBridgeOpImpl {
             IcrcBridgeOp::BurnIcrc2Tokens(burn) => burn.recipient_address.clone(),
             IcrcBridgeOp::SignMintOrder { order, .. } => order.recipient.clone(),
             IcrcBridgeOp::SendMintTransaction { order, .. } => order.reader().get_recipient(),
-            IcrcBridgeOp::ConfirmMint { order, .. } => order.reader().get_recipient(),
+            IcrcBridgeOp::WaitForErc20MintConfirm { order, .. } => order.reader().get_recipient(),
             IcrcBridgeOp::WrappedTokenMintConfirmed(event) => event.recipient.clone(),
             IcrcBridgeOp::MintIcrcTokens(event) => event.sender.clone(),
             IcrcBridgeOp::IcrcMintConfirmed { src_address, .. } => src_address.clone(),
@@ -111,7 +111,7 @@ impl Operation for IcrcBridgeOpImpl {
 
     fn scheduling_options(&self) -> Option<TaskOptions> {
         match self.0 {
-            IcrcBridgeOp::ConfirmMint { .. } => None,
+            IcrcBridgeOp::WaitForErc20MintConfirm { .. } => None,
             IcrcBridgeOp::WrappedTokenMintConfirmed(_) => None,
             IcrcBridgeOp::IcrcMintConfirmed { .. } => None,
             _ => Some(
@@ -359,10 +359,11 @@ impl MintOrderHandler for IcrcMintOrderHandler {
                 order: signed,
                 is_refund,
             },
-            false => IcrcBridgeOp::ConfirmMint {
+            false => IcrcBridgeOp::WaitForErc20MintConfirm {
                 order: signed,
                 is_refund,
                 tx_hash: None,
+                mint_results: vec![],
             },
         };
 
@@ -411,18 +412,24 @@ impl MintTxHandler for IcrcMintTxHandler {
         Some(order)
     }
 
-    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256) {
+    fn mint_tx_sent(&self, id: OperationId, result: MintTxResult) {
         let op = self.state.borrow().operations.get(id);
         let Some(IcrcBridgeOp::SendMintTransaction { order, is_refund }) = op.map(|op| op.0) else {
             log::info!("MintTxHandler failed to update operation: unexpected operation state.");
             return;
         };
 
+        log::debug!(
+            "Mint transaction successful: {:?}; op_id: {id}; results: {:?}",
+            result.tx_hash,
+            result.results
+        );
         self.state.borrow_mut().operations.update(
             id,
-            IcrcBridgeOpImpl(IcrcBridgeOp::ConfirmMint {
+            IcrcBridgeOpImpl(IcrcBridgeOp::WaitForErc20MintConfirm {
                 order,
-                tx_hash: Some(tx_hash),
+                tx_hash: result.tx_hash,
+                mint_results: result.results,
                 is_refund,
             }),
         );

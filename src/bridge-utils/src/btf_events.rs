@@ -3,6 +3,7 @@ use alloy::core::primitives::{Address, BlockNumber as EthBlockNumber, U256};
 use alloy::primitives::TxKind;
 use alloy::rpc::types::Log;
 use alloy_sol_types::{SolCall, SolEvent};
+pub use bridge_did::batch_mint_result::{BatchMintErrorCode, BatchMintResultError};
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use candid::CandidType;
@@ -182,6 +183,17 @@ pub fn batch_mint_transaction(
         value: U256::ZERO,
         input: data.into(),
     }
+}
+
+/// Parse the output (slice of [`u8`]) of the `batchMint` function call to a [`Vec`] of [`BatchMintResult`].
+pub fn batch_mint_result(output: &[u8]) -> Result<Vec<BatchMintErrorCode>, BatchMintResultError> {
+    let output = BTFBridge::batchMintCall::abi_decode_returns(output, true)?;
+
+    output
+        ._0
+        .into_iter()
+        .map(BatchMintErrorCode::try_from)
+        .collect()
 }
 
 #[cfg(test)]

@@ -399,7 +399,7 @@ async fn native_token_deposit_increase_and_decrease() {
         .cloned()
         .unwrap();
 
-    if let Erc20OpStage::ConfirmMint { tx_hash, .. } = mint_op.1.stage {
+    if let Erc20OpStage::WaitForMintConfirm { tx_hash, .. } = mint_op.1.stage {
         let receipt = ctx
             .context
             .wait_transaction_receipt(tx_hash.as_ref().unwrap())

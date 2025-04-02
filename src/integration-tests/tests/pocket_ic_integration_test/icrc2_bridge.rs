@@ -212,10 +212,11 @@ async fn test_icrc2_token_canister_stopped() {
     .unwrap()
     .1;
 
-    let IcrcBridgeOp::ConfirmMint {
+    let IcrcBridgeOp::WaitForErc20MintConfirm {
         order,
         tx_hash,
         is_refund,
+        mint_results,
     } = operation
     else {
         panic!("expected ConfirmMint operation state");
@@ -223,6 +224,7 @@ async fn test_icrc2_token_canister_stopped() {
 
     assert!(is_refund);
     assert!(tx_hash.is_none());
+    assert!(mint_results.is_empty());
 
     let receipt = ctx
         .batch_mint_erc_20_with_order(&john_wallet, &btf_bridge, order)

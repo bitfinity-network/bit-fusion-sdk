@@ -67,7 +67,7 @@ impl Operation for Brc20BridgeOpImpl {
                 log::debug!("Brc20BridgeDepositOp::SendMintOrder {mint_order:?}");
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
-            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => {
+            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::WaitForMintConfirm { .. }) => {
                 Err(Error::FailedToProgress(
                     "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
                 ))
@@ -184,7 +184,7 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::AwaitConfirmations { .. }) => false,
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SignMintOrder { .. }) => false,
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder { .. }) => false,
-            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder { .. }) => false,
+            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::WaitForMintConfirm { .. }) => false,
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::MintOrderConfirmed { .. }) => true,
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::CreateInscriptionTxs { .. }) => false,
             Brc20BridgeOp::Withdraw(Brc20BridgeWithdrawOp::SendCommitTx { .. }) => false,
@@ -212,7 +212,7 @@ impl Operation for Brc20BridgeOpImpl {
             Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(signed_mint_order)) => {
                 signed_mint_order.reader().get_recipient()
             }
-            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::ConfirmMintOrder {
+            Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::WaitForMintConfirm {
                 orders: signed_mint_order,
                 ..
             }) => signed_mint_order.reader().get_recipient(),
