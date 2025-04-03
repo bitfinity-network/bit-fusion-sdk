@@ -65,6 +65,6 @@ wildmatch = { workspace = true }
 
 # IC deps
 [features]
-default = ["pocket_ic_integration_test"]
+default = []
 pocket_ic_integration_test = []
 dfx_tests = []
