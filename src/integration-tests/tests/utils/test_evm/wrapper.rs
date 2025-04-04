@@ -4,19 +4,12 @@ use bridge_did::evm_link::EvmLink;
 use candid::Principal;
 use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
 
-use super::{BitfinityEvm, GanacheEvm, TestEvm};
+use super::{BitfinityEvm, EvmSide, GanacheEvm, TestEvm};
 use crate::utils::error::Result as TestResult;
 
 const EVM_ENV_VAR: &str = "EVM";
 const ENV_EVM_BITFINITY: &str = "bitfinity";
 const ENV_EVM_GANACHE: &str = "ganache";
-
-/// EVM Side
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Side {
-    Base,
-    Wrapped,
-}
 
 pub enum Evm {
     #[cfg(feature = "pocket_ic_integration_test")]
@@ -27,7 +20,7 @@ pub enum Evm {
 }
 
 /// Create a default EVM instance
-pub async fn test_evm(side: Side) -> Arc<Evm> {
+pub async fn test_evm(side: EvmSide) -> Arc<Evm> {
     // get evm to use from env `EVM`
     let evm_var = std::env::var(EVM_ENV_VAR).unwrap_or_else(|_| ENV_EVM_BITFINITY.to_string());
 
@@ -44,7 +37,7 @@ pub async fn test_evm(side: Side) -> Arc<Evm> {
 #[cfg(feature = "pocket_ic_integration_test")]
 pub async fn test_evm_pocket_ic(
     pocket_ic: &Arc<ic_exports::pocket_ic::PocketIc>,
-    side: Side,
+    side: EvmSide,
 ) -> Arc<Evm> {
     // get evm to use from env `EVM`
     let evm_var = std::env::var(EVM_ENV_VAR).unwrap_or_else(|_| ENV_EVM_BITFINITY.to_string());

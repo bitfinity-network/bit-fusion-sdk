@@ -12,8 +12,15 @@ pub use self::ganache::GanacheEvm;
 #[cfg(feature = "pocket_ic_integration_test")]
 pub use self::wrapper::test_evm_pocket_ic;
 #[cfg(any(feature = "pocket_ic_integration_test", feature = "dfx_tests"))]
-pub use self::wrapper::{test_evm, Evm, Side as EvmSide};
+pub use self::wrapper::{test_evm, Evm};
 use crate::utils::error::Result as TestResult;
+
+/// EVM Side
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvmSide {
+    Base,
+    Wrapped,
+}
 
 /// An abstraction layer for interacting with a test EVM node
 #[async_trait::async_trait]

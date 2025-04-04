@@ -10,9 +10,9 @@ use reqwest::Response;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-use super::wrapper::Side;
 use super::TestEvm;
 use crate::utils::error::{Result as TestResult, TestError};
+use crate::utils::test_evm::EvmSide;
 
 const BASE_PORT: u16 = 29_000;
 const WRAPPED_PORT: u16 = 29_001;
@@ -28,12 +28,12 @@ pub struct GanacheEvm {
 
 impl GanacheEvm {
     /// Run a new Ganache EVM container
-    pub async fn new(side: Side) -> Self {
+    pub async fn new(side: EvmSide) -> Self {
         println!("Using Ganache EVM");
 
         let host_port = match side {
-            Side::Base => BASE_PORT,
-            Side::Wrapped => WRAPPED_PORT,
+            EvmSide::Base => BASE_PORT,
+            EvmSide::Wrapped => WRAPPED_PORT,
         };
         let rpc_url = format!("http://localhost:{host_port}");
         let chain_id = Self::get_chain_id(&rpc_url).await;
@@ -52,11 +52,11 @@ impl GanacheEvm {
         }
     }
 
-    async fn print_logs(side: Side, exit: CancellationToken) {
+    async fn print_logs(side: EvmSide, exit: CancellationToken) {
         let docker = Docker::connect_with_local_defaults().expect("Failed to connect to Docker");
         let image_name = match side {
-            Side::Base => "evm-base",
-            Side::Wrapped => "evm-wrapped",
+            EvmSide::Base => "evm-base",
+            EvmSide::Wrapped => "evm-wrapped",
         };
 
         let mut logs = docker.logs(
