@@ -45,6 +45,9 @@ impl BaseEvmState {
             config.evm_params = None;
             config.btf_bridge_contract_address = None;
         });
+        self.delays
+            .set(settings.delays)
+            .expect("failed to set delays");
     }
 }
 
@@ -78,5 +81,37 @@ impl OperationContext for SharedBaseEvmState {
 
     fn get_signer(&self) -> BTFResult<TxSigner> {
         self.0.borrow().config.borrow().get_signer()
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use eth_signer::ic_sign::SigningKeyId;
+    use eth_signer::sign_strategy::SigningStrategy;
+
+    use super::*;
+
+    #[test]
+    fn test_should_reset_evm_state() {
+        let mut state = BaseEvmState::default();
+        let settings = BaseEvmSettings {
+            evm_link: EvmLink::Ic(Principal::management_canister()),
+            signing_strategy: SigningStrategy::ManagementCanister {
+                key_id: SigningKeyId::Dfx,
+            },
+            delays: QueryDelays {
+                logs_query: Duration::from_secs(10),
+                evm_params_query: Duration::from_secs(20),
+            },
+        };
+        state.reset(settings.clone());
+
+        assert_eq!(state.config.borrow().get_evm_link(), settings.evm_link);
+        assert_eq!(
+            state.delays.get().evm_params_query,
+            settings.delays.evm_params_query
+        );
+        assert_eq!(state.delays.get().logs_query, settings.delays.logs_query);
     }
 }

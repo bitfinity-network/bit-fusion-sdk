@@ -1,12 +1,14 @@
 use bridge_did::evm_link::EvmLink;
 use candid::CandidType;
-use did::{BlockNumber, H160, U256};
+use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::btf_events::TxParams;
-use crate::query::{batch_query, Query, QueryType, CHAINID_ID, LATEST_BLOCK_ID, NONCE_ID};
+use crate::query::{
+    batch_query, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+};
 
 /// Information about EVM on a bridge side.
 #[derive(Default, Debug, Clone, Serialize, Deserialize, CandidType, PartialEq, Eq)]
@@ -60,6 +62,7 @@ impl EvmParams {
                 QueryType::Nonce {
                     address: address.into(),
                 },
+                QueryType::GasPrice,
             ],
         )
         .await?;
@@ -67,28 +70,7 @@ impl EvmParams {
         let chain_id: U256 = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
         let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
         let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
-
-        // TODO: Improve gas price selection strategy. https://infinityswap.atlassian.net/browse/EPROD-738
-        let latest_block = evm_client
-            .get_full_block_by_number(BlockNumber::Latest)
-            .await?;
-        let (tx_with_price_count, sum_price) = latest_block
-            .transactions
-            .iter()
-            .filter_map(|tx| tx.gas_price.clone())
-            .fold((0u64, U256::zero()), |(count, sum), price| {
-                (count + 1, sum + price)
-            });
-
-        let mean_price = sum_price.0 / alloy::primitives::U256::from(tx_with_price_count.max(1));
-
-        let mean_price: U256 = mean_price.into();
-        const DEFAULT_GAS_PRICE: u64 = 46 * 10u64.pow(9);
-        let gas_price = if mean_price == U256::zero() {
-            DEFAULT_GAS_PRICE.into()
-        } else {
-            mean_price
-        };
+        let gas_price: U256 = responses.get_value_by_id(Id::Str(GAS_PRICE_ID.into()))?;
 
         Ok(Self {
             chain_id: chain_id.0.to(),
