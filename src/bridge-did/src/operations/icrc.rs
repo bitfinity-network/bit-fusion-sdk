@@ -2,6 +2,7 @@ use candid::{CandidType, Nat};
 use did::{H160, H256};
 use serde::{Deserialize, Serialize};
 
+use crate::batch_mint_result::BatchMintErrorCode;
 use crate::events::{BurntEventData, MintedEventData};
 use crate::order::{MintOrder, SignedOrders};
 use crate::reason::Icrc2Burn;
@@ -18,10 +19,11 @@ pub enum IcrcBridgeOp {
         order: SignedOrders,
         is_refund: bool,
     },
-    ConfirmMint {
+    WaitForErc20MintConfirm {
         order: SignedOrders,
         tx_hash: Option<H256>,
         is_refund: bool,
+        mint_results: Vec<BatchMintErrorCode>,
     },
     WrappedTokenMintConfirmed(MintedEventData),
 

@@ -110,7 +110,7 @@ impl Operation for BtcBridgeOpImpl {
 
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
-            BtcBridgeOp::ConfirmErc20Mint { .. } => Err(Error::FailedToProgress(
+            BtcBridgeOp::WaitForErc20MintConfirm { .. } => Err(Error::FailedToProgress(
                 "BtcBridgeOp::ConfirmErc20Mint task should progress only on the Minted EVM event"
                     .into(),
             )),
@@ -141,7 +141,7 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::CreateMintOrder { .. } => false,
             BtcBridgeOp::SignMintOrder { .. } => false,
             BtcBridgeOp::MintErc20 { .. } => false,
-            BtcBridgeOp::ConfirmErc20Mint { .. } => false,
+            BtcBridgeOp::WaitForErc20MintConfirm { .. } => false,
             BtcBridgeOp::Erc20MintConfirmed { .. } => true,
             BtcBridgeOp::WithdrawBtc { .. } => false,
             BtcBridgeOp::BtcWithdrawConfirmed { .. } => true,
@@ -153,7 +153,7 @@ impl Operation for BtcBridgeOpImpl {
             BtcBridgeOp::BtcWithdrawConfirmed { eth_address } => eth_address.clone(),
             BtcBridgeOp::CollectCkBtcBalance { eth_address } => eth_address.clone(),
             BtcBridgeOp::CreateMintOrder { eth_address, .. } => eth_address.clone(),
-            BtcBridgeOp::ConfirmErc20Mint { order, .. } => order.reader().get_recipient(),
+            BtcBridgeOp::WaitForErc20MintConfirm { order, .. } => order.reader().get_recipient(),
             BtcBridgeOp::Erc20MintConfirmed(MintedEventData { recipient, .. }) => recipient.clone(),
             BtcBridgeOp::MintErc20 { order } => order.reader().get_recipient(),
             BtcBridgeOp::SignMintOrder { order } => order.recipient.clone(),
@@ -184,7 +184,7 @@ impl Operation for BtcBridgeOpImpl {
                     }),
             ),
             BtcBridgeOp::BtcWithdrawConfirmed { .. }
-            | BtcBridgeOp::ConfirmErc20Mint { .. }
+            | BtcBridgeOp::WaitForErc20MintConfirm { .. }
             | BtcBridgeOp::Erc20MintConfirmed(_) => None,
         }
     }
@@ -479,7 +479,7 @@ impl BtcBridgeOpImpl {
 
     pub fn get_signed_mint_order(&self) -> Option<SignedOrders> {
         match &self.0 {
-            BtcBridgeOp::ConfirmErc20Mint { order, .. } => Some(order.clone()),
+            BtcBridgeOp::WaitForErc20MintConfirm { order, .. } => Some(order.clone()),
             BtcBridgeOp::MintErc20 { order, .. } => Some(order.clone()),
             _ => None,
         }

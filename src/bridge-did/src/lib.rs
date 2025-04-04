@@ -1,3 +1,4 @@
+pub mod batch_mint_result;
 pub mod error;
 pub mod evm_link;
 pub mod id256;
