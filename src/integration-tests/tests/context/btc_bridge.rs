@@ -9,7 +9,7 @@ use bitcoin::{Address, Amount, Txid};
 use bridge_client::BridgeCanisterClient as _;
 use bridge_did::id256::Id256;
 use bridge_did::init::btc::WrappedTokenConfig;
-use bridge_did::order::{SignedMintOrder, SignedOrders};
+use bridge_did::operation_log::Memo;
 use bridge_did::reason::{ApproveAfterMint, BtcDeposit};
 use bridge_utils::BTFBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
@@ -307,17 +307,6 @@ where
         Ok(())
     }
 
-    pub async fn list_mint_orders(
-        &self,
-        eth_address: &H160,
-    ) -> anyhow::Result<Vec<(u32, SignedMintOrder)>> {
-        self.context
-            .btc_bridge_client(self.context.admin_name())
-            .list_mint_orders(eth_address)
-            .await
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
     pub async fn send_btc(&self, btc_address: &Address, amount: Amount) -> anyhow::Result<Txid> {
         let txid = self
             .admin_btc_rpc_client
@@ -371,18 +360,6 @@ where
         }
     }
 
-    pub async fn get_mint_order(
-        &self,
-        eth_address: &H160,
-        nonce: u32,
-    ) -> anyhow::Result<Option<SignedOrders>> {
-        self.context
-            .btc_bridge_client(self.context.admin_name())
-            .get_mint_order(eth_address, nonce)
-            .await
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
     /// Deposit BTC from a BTC wallet
     pub async fn deposit_btc(
         &self,
@@ -432,6 +409,7 @@ where
         from: &LocalWallet,
         recipient: &Address,
         amount: Amount,
+        memo: Option<Memo>,
     ) -> anyhow::Result<()> {
         let token_address = self.wrapped_token.read().await.clone();
 
@@ -449,7 +427,7 @@ where
                 &btf_bridge_contract,
                 amount.to_sat() as u128,
                 true,
-                None,
+                memo,
             )
             .await
             .map(|_| ())

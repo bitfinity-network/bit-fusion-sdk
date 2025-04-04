@@ -3,7 +3,6 @@ use bridge_did::init::btc::WrappedTokenConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_did::operations::BtcBridgeOp;
-use bridge_did::order::{SignedMintOrder, SignedOrders};
 use bridge_utils::common::Pagination;
 use did::H160;
 use ic_canister_client::{CanisterClient, CanisterClientResult};
@@ -46,27 +45,6 @@ impl<C: CanisterClient> BtcBridgeClient<C> {
                 "get_operations_list",
                 (wallet_address, min_included_id, pagination),
             )
-            .await
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    pub async fn list_mint_orders(
-        &self,
-        wallet_address: &H160,
-    ) -> CanisterClientResult<Vec<(u32, SignedMintOrder)>> {
-        self.client()
-            .query("list_mint_orders", (wallet_address,))
-            .await
-    }
-
-    /// Returns `(nonce, mint_order)` pairs for the given sender id.
-    pub async fn get_mint_order(
-        &self,
-        wallet_address: &H160,
-        operation_id: u32,
-    ) -> CanisterClientResult<Option<SignedOrders>> {
-        self.client()
-            .query("get_mint_order", (wallet_address, operation_id))
             .await
     }
 
