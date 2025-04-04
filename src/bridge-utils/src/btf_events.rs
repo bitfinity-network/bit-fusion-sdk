@@ -61,7 +61,7 @@ impl BridgeEvent {
         bridge_contract: Address,
     ) -> Result<Vec<Log>, anyhow::Error> {
         const DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE: u64 = 128;
-        log::debug!("collecting logs from {from_block} to {to_block}",);
+        log::debug!("collecting logs from {from_block} to {to_block} for {bridge_contract}",);
 
         let mut offset = DEFAULT_BLOCKS_TO_COLLECT_PER_PAGE;
         let mut logs = Vec::new();

@@ -9,19 +9,21 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bridge_did::evm_link::EvmLink;
 use candid::utils::ArgumentEncoder;
 use candid::{Nat, Principal};
-use did::{TransactionReceipt, H256};
 use eth_signer::ic_sign::SigningKeyId;
-use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::ic_kit::mock_principals::{alice, bob, john};
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
-use crate::context::{CanisterType, TestCanisters, TestContext, ICRC1_INITIAL_BALANCE};
+use crate::context::{
+    CanisterType, TestCanisters, TestCanistersConfig, TestContext, ICRC1_INITIAL_BALANCE,
+};
 use crate::utils::error::Result;
-use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+use crate::utils::test_evm::{test_evm_pocket_ic, Evm, EvmSide};
+use crate::utils::TestEvm;
 
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";
@@ -29,31 +31,17 @@ pub const ALICE: &str = "alice";
 
 #[derive(Clone)]
 pub struct PocketIcTestContext {
+    base_evm: Arc<Evm>,
     pub client: Arc<PocketIc>,
     pub canisters: TestCanisters,
+    wrapped_evm: Arc<Evm>,
     live: bool,
 }
 
 impl PocketIcTestContext {
     /// Creates a new test context with the given canisters.
     pub async fn new(canisters_set: &[CanisterType]) -> Self {
-        Self::new_with(
-            canisters_set,
-            |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
-        )
-        .await
-    }
-
-    pub async fn new_live(canisters_set: &[CanisterType]) -> Self {
-        Self::new_with(
-            canisters_set,
-            |builder| builder,
-            |pic| Box::pin(async move { pic }),
-            false,
-        )
-        .await
+        Self::new_with(canisters_set, |builder| builder, false).await
     }
 
     /// Creates a new test context with the given canisters and custom build and pocket_ic.
@@ -75,32 +63,55 @@ impl PocketIcTestContext {
     /// let ctx = PocketIcTestContext::new_with(
     ///    &canisters_set,
     ///    |builder| builder.with_ii_subnet().with_bitcoin_subnet(),
-    ///    |mut pic| Box::pin(async move {
-    ///        pic.make_live(None).await;
-    ///        pic
-    ///    }),
+    ///   false,
     /// ).await;
     /// ```
-    pub async fn new_with<FB, FPIC>(
+    pub async fn new_with<FB>(
         canisters_set: &[CanisterType],
         with_build: FB,
-        with_pocket_ic: FPIC,
-        live: bool,
+        force_live: bool,
     ) -> Self
     where
         FB: FnOnce(PocketIcBuilder) -> PocketIcBuilder,
-        FPIC: FnOnce(PocketIc) -> Pin<Box<dyn Future<Output = PocketIc> + Send + 'static>>,
     {
-        let mut pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
+        let pocket_ic = with_build(ic_exports::pocket_ic::init_pocket_ic().await)
             .build_async()
             .await;
 
-        pocket_ic = with_pocket_ic(pocket_ic).await;
+        // get a instance to the same pocket ic
+        let mut pocket_ic_instance = PocketIc::new_from_existing_instance(
+            pocket_ic.get_server_url(),
+            pocket_ic.instance_id,
+            Some(300_000), // is default
+        );
 
         let client = Arc::new(pocket_ic);
+        let base_evm = test_evm_pocket_ic(&client, EvmSide::Base).await;
+        let wrapped_evm = test_evm_pocket_ic(&client, EvmSide::Wrapped).await;
+
+        let live = base_evm.live() || wrapped_evm.live() || force_live;
+
+        // force live if any of the evms are live
+        if live {
+            // set time and make live
+            pocket_ic_instance
+                .set_time(std::time::SystemTime::now())
+                .await;
+            pocket_ic_instance.make_live(None).await;
+        }
+
+        let test_canisters_config = TestCanistersConfig {
+            evm: base_evm.evm(),
+            external_evm: wrapped_evm.evm(),
+            signature: base_evm.signature(),
+            external_signature: wrapped_evm.signature(),
+        };
+
         let mut ctx = PocketIcTestContext {
+            base_evm,
             client,
-            canisters: TestCanisters::default(),
+            canisters: TestCanisters::new(test_canisters_config),
+            wrapped_evm,
             live,
         };
 
@@ -143,7 +154,7 @@ impl PocketIcTestContext {
 }
 
 #[async_trait::async_trait]
-impl TestContext for PocketIcTestContext {
+impl TestContext<Evm> for PocketIcTestContext {
     type Client = PocketIcClient;
 
     fn canisters(&self) -> TestCanisters {
@@ -174,6 +185,22 @@ impl TestContext for PocketIcTestContext {
 
     fn admin_name(&self) -> &str {
         ADMIN
+    }
+
+    fn base_evm_link(&self) -> EvmLink {
+        self.base_evm.link()
+    }
+
+    fn wrapped_evm_link(&self) -> EvmLink {
+        self.wrapped_evm.link()
+    }
+
+    fn base_evm(&self) -> Arc<Evm> {
+        self.base_evm.clone()
+    }
+
+    fn wrapped_evm(&self) -> Arc<Evm> {
+        self.wrapped_evm.clone()
     }
 
     async fn create_canister(&self) -> Result<Principal> {
@@ -256,28 +283,6 @@ impl TestContext for PocketIcTestContext {
         Ok(())
     }
 
-    /// Waits for transaction receipt.
-    async fn wait_transaction_receipt_on_evm(
-        &self,
-        evm_client: &EvmCanisterClient<Self::Client>,
-        hash: &H256,
-    ) -> Result<Option<TransactionReceipt>> {
-        let timeout = Duration::from_secs(60);
-        let start = Instant::now();
-
-        while start.elapsed() < timeout {
-            self.advance_time(EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS)
-                .await;
-            let receipt = evm_client.eth_get_transaction_receipt(hash.clone()).await?;
-
-            if receipt.is_some() {
-                return Ok(receipt);
-            }
-        }
-
-        Ok(None)
-    }
-
     fn icrc_token_initial_balances(&self) -> Vec<(Account, Nat)> {
         vec![
             (Account::from(bob()), Nat::from(ICRC1_INITIAL_BALANCE)),
@@ -319,7 +324,7 @@ where
             Ok(res) => return res,
             Err(e) => err = e,
         }
-        ctx.advance_time(Duration::from_millis(100)).await;
+        ctx.advance_time(Duration::from_millis(500)).await;
     }
 
     panic!(

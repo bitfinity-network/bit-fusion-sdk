@@ -60,7 +60,7 @@ impl<H: MintOrderHandler> BridgeService for SignMintOrdersService<H> {
             return Ok(());
         }
 
-        log::trace!("Singing batch of {orders_number} mint orders.");
+        log::trace!("Signing batch of {orders_number} mint orders.");
 
         let order_ops: Vec<(OperationId, MintOrder)> = self
             .orders

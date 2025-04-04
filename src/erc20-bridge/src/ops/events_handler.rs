@@ -89,6 +89,11 @@ impl BtfBridgeEventHandler<Erc20BridgeOpImpl> for Erc20EventsHandler {
             return None;
         };
 
+        log::trace!(
+            "Mint order created for side {}: {order:?}",
+            self.side.other()
+        );
+
         let operation = Erc20BridgeOpImpl(Erc20BridgeOp {
             side: self.side.other(),
             stage: Erc20OpStage::SignMintOrder(order),
