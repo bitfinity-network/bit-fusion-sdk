@@ -3,17 +3,18 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Result of a batch mint operation on the BFT bridge.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CandidType)]
-#[repr(u8)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CandidType)]
 pub enum BatchMintErrorCode {
-    Ok = 0,
-    InsufficientFeeDeposit = 1,
-    ZeroAmount = 2,
-    UsedNonce = 3,
-    ZeroRecipient = 4,
-    UnexpectedRecipientChainId = 5,
-    TokensNotBridged = 6,
-    ProcessingNotRequested = 7,
+    Ok,
+    InsufficientFeeDeposit,
+    ZeroAmount,
+    UsedNonce,
+    ZeroRecipient,
+    UnexpectedRecipientChainId,
+    TokensNotBridged,
+    ProcessingNotRequested,
+    /// Transaction reverted with a string error message.
+    Reverted(String),
 }
 
 impl BatchMintErrorCode {
