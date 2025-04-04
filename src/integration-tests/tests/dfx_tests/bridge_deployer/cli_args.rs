@@ -43,7 +43,7 @@ impl CommonCliArgs {
         identity_path.push("identity.pem");
 
         // start evm rpc
-        let evm_node = GanacheEvm::run().await;
+        let evm_node = GanacheEvm::new(crate::utils::test_evm::EvmSide::Wrapped).await;
 
         // mint some tokens to the wallet
         evm_node

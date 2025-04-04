@@ -11,6 +11,13 @@ const EVM_ENV_VAR: &str = "EVM";
 const ENV_EVM_BITFINITY: &str = "bitfinity";
 const ENV_EVM_GANACHE: &str = "ganache";
 
+/// EVM Side
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Base,
+    Wrapped,
+}
+
 pub enum Evm {
     #[cfg(feature = "pocket_ic_integration_test")]
     Bitfinity(BitfinityEvm<ic_canister_client::PocketIcClient>),
@@ -20,7 +27,7 @@ pub enum Evm {
 }
 
 /// Create a default EVM instance
-pub async fn test_evm() -> Arc<Evm> {
+pub async fn test_evm(side: Side) -> Arc<Evm> {
     // get evm to use from env `EVM`
     let evm_var = std::env::var(EVM_ENV_VAR).unwrap_or_else(|_| ENV_EVM_BITFINITY.to_string());
 
@@ -29,19 +36,22 @@ pub async fn test_evm() -> Arc<Evm> {
         ENV_EVM_BITFINITY => Arc::new(Evm::Bitfinity(BitfinityEvm::dfx().await)),
         #[cfg(feature = "pocket_ic_integration_test")]
         ENV_EVM_BITFINITY => unimplemented!("use test_evm_pocket_ic instead"),
-        ENV_EVM_GANACHE => Arc::new(Evm::Ganache(GanacheEvm::run().await)),
+        ENV_EVM_GANACHE => Arc::new(Evm::Ganache(GanacheEvm::new(side).await)),
         _ => panic!("Unknown EVM: {}", evm_var),
     }
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-pub async fn test_evm_pocket_ic(pocket_ic: &Arc<ic_exports::pocket_ic::PocketIc>) -> Arc<Evm> {
+pub async fn test_evm_pocket_ic(
+    pocket_ic: &Arc<ic_exports::pocket_ic::PocketIc>,
+    side: Side,
+) -> Arc<Evm> {
     // get evm to use from env `EVM`
     let evm_var = std::env::var(EVM_ENV_VAR).unwrap_or_else(|_| ENV_EVM_BITFINITY.to_string());
 
     match evm_var.as_str() {
         ENV_EVM_BITFINITY => Arc::new(Evm::Bitfinity(BitfinityEvm::pocket_ic(pocket_ic).await)),
-        ENV_EVM_GANACHE => Arc::new(Evm::Ganache(GanacheEvm::run().await)),
+        ENV_EVM_GANACHE => Arc::new(Evm::Ganache(GanacheEvm::new(side).await)),
         _ => panic!("Unknown EVM: {}", evm_var),
     }
 }

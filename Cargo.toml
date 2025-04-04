@@ -38,6 +38,7 @@ async-trait = "0.1"
 bip39 = "2"
 bitcoin = "0.31"
 bitcoincore-rpc = "0.18.0"
+bollard = "0.18"
 candid = { version = "0.10", features = ["value"] }
 cfg-if = "1.0"
 chrono = "0.4"
@@ -90,7 +91,6 @@ signature-verification-canister-client = { git = "https://github.com/bitfinity-n
 snapbox = "0.6"
 strum = "0.26"
 tempfile = "3"
-testcontainers = "0.23"
 thiserror = "1.0"
 trycmd = "0.15"
 tokio = { version = "1.36", features = ["macros", "rt"] }

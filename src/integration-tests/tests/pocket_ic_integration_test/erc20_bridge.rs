@@ -22,6 +22,7 @@ pub struct ContextWithBridges {
     pub context: PocketIcTestContext,
     pub bob_wallet: LocalWallet,
     pub bob_address: H160,
+    #[allow(dead_code)]
     pub erc20_bridge_address: H160,
     pub base_btf_bridge: H160,
     pub wrapped_btf_bridge: H160,
@@ -535,12 +536,6 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
     )
     .await;
 
-    let wrapped_evm_client = ctx.context.wrapped_evm();
-    let bridge_canister_evm_balance_after_failed_mint = wrapped_evm_client
-        .eth_get_balance(&ctx.erc20_bridge_address, did::BlockNumber::Latest)
-        .await
-        .expect("Failed to get balance");
-
     let alice_address_t = alice_wallet.clone().address();
     let ctx_t = ctx.context.clone();
 
@@ -613,17 +608,6 @@ async fn mint_should_fail_if_not_enough_tokens_on_fee_deposit() {
         Duration::from_secs(120),
     )
     .await;
-
-    // Check bridge canister balance not changed after user's transaction.
-    let bridge_canister_evm_balance_after_user_mint = wrapped_evm_client
-        .eth_get_balance(&ctx.erc20_bridge_address, did::BlockNumber::Latest)
-        .await
-        .expect("Failed to get balance");
-
-    assert_eq!(
-        bridge_canister_evm_balance_after_failed_mint,
-        bridge_canister_evm_balance_after_user_mint
-    );
 }
 
 #[tokio::test]

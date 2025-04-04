@@ -22,7 +22,7 @@ use crate::context::{
     CanisterType, TestCanisters, TestCanistersConfig, TestContext, ICRC1_INITIAL_BALANCE,
 };
 use crate::utils::error::Result;
-use crate::utils::test_evm::{test_evm_pocket_ic, Evm};
+use crate::utils::test_evm::{test_evm_pocket_ic, Evm, EvmSide};
 use crate::utils::TestEvm;
 
 pub const ADMIN: &str = "admin";
@@ -86,8 +86,8 @@ impl PocketIcTestContext {
         );
 
         let client = Arc::new(pocket_ic);
-        let base_evm = test_evm_pocket_ic(&client).await;
-        let wrapped_evm = test_evm_pocket_ic(&client).await;
+        let base_evm = test_evm_pocket_ic(&client, EvmSide::Base).await;
+        let wrapped_evm = test_evm_pocket_ic(&client, EvmSide::Wrapped).await;
 
         let live = base_evm.live() || wrapped_evm.live() || force_live;
 

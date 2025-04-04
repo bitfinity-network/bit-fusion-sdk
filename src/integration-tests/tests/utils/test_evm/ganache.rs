@@ -1,28 +1,26 @@
-mod image;
-
-use std::sync::Arc;
 use std::time::Duration;
 
+use bollard::container::LogsOptions;
+use bollard::Docker;
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
 use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
+use futures::StreamExt;
 use reqwest::Response;
 use serde_json::Value;
-use testcontainers::runners::AsyncRunner;
-use testcontainers::ContainerAsync;
-use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 
-use self::image::Ganache as GanacheImage;
+use super::wrapper::Side;
 use super::TestEvm;
 use crate::utils::error::{Result as TestResult, TestError};
+
+const BASE_PORT: u16 = 29_000;
+const WRAPPED_PORT: u16 = 29_001;
 
 /// Ganache EVM container
 #[derive(Clone)]
 pub struct GanacheEvm {
     chain_id: u64,
-    #[allow(dead_code)]
-    container: Arc<ContainerAsync<GanacheImage>>,
     pub rpc_url: String,
     rpc_client: reqwest::Client,
     log_exit: CancellationToken,
@@ -30,62 +28,55 @@ pub struct GanacheEvm {
 
 impl GanacheEvm {
     /// Run a new Ganache EVM container
-    pub async fn run() -> Self {
+    pub async fn new(side: Side) -> Self {
         println!("Using Ganache EVM");
 
-        let container = GanacheImage::default()
-            .start()
-            .await
-            .expect("Failed to start Ganache");
-        let host_port = container
-            .get_host_port_ipv4(8545)
-            .await
-            .expect("Failed to get host port for Ganache");
+        let host_port = match side {
+            Side::Base => BASE_PORT,
+            Side::Wrapped => WRAPPED_PORT,
+        };
         let rpc_url = format!("http://localhost:{host_port}");
         let chain_id = Self::get_chain_id(&rpc_url).await;
         println!("chain id: {chain_id}");
 
         let rpc_client = reqwest::Client::new();
 
-        let container = Arc::new(container);
         let exit = CancellationToken::new();
-        tokio::spawn(Self::print_logs(
-            container.clone(),
-            exit.clone(),
-            rpc_url.clone(),
-        ));
+        tokio::spawn(Self::print_logs(side, exit.clone()));
 
         Self {
             chain_id,
-            container,
             rpc_client,
             rpc_url,
             log_exit: exit,
         }
     }
 
-    async fn print_logs(
-        container: Arc<ContainerAsync<GanacheImage>>,
-        exit: CancellationToken,
-        rpc_url: String,
-    ) {
-        let mut stdout = container.stdout(true);
-        let mut stderr = container.stderr(true);
-        let mut buf = [0; 1024];
-        let mut stderr_buf = [0; 1024];
+    async fn print_logs(side: Side, exit: CancellationToken) {
+        let docker = Docker::connect_with_local_defaults().expect("Failed to connect to Docker");
+        let image_name = match side {
+            Side::Base => "evm-base",
+            Side::Wrapped => "evm-wrapped",
+        };
+
+        let mut logs = docker.logs(
+            image_name,
+            Some(LogsOptions::<String> {
+                follow: true,
+                stdout: true,
+                stderr: true,
+                timestamps: true,
+                ..Default::default()
+            }),
+        );
 
         loop {
             tokio::select! {
                 _ = exit.cancelled() => {
                     break;
                 }
-                bytes_read = stdout.read(&mut buf) => {
-                    let bytes_as_str = String::from_utf8_lossy(&buf[..bytes_read.unwrap()]);
-                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), );
-                }
-                bytes_read = stderr.read(&mut stderr_buf) => {
-                    let bytes_as_str = String::from_utf8_lossy(&stderr_buf[..bytes_read.unwrap()]);
-                    print!("{} Ganache ({rpc_url}): {bytes_as_str}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+                Some(Ok(line)) = logs.next() => {
+                    print!("{side:?} Ganache: {line}", );
                 }
             }
         }
@@ -152,7 +143,6 @@ impl GanacheEvm {
 impl TestEvm for GanacheEvm {
     async fn stop(&self) {
         self.log_exit.cancel();
-        self.container.stop().await.expect("Failed to stop Ganache");
     }
 
     async fn chain_id(&self) -> TestResult<u64> {

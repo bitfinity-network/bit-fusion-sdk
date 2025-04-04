@@ -61,3 +61,55 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
       POSTGRES_PORT: 5432
+
+  evm-base:
+    image: trufflesuite/ganache:v7.9.2
+    ports:
+      - "29000:8545"
+    command:
+      [
+        "--chain.allowUnlimitedContractSize=true",
+        "--logging.debug=true",
+        "--logging.verbose=true",
+        "--miner.blockTime=0",
+        "--miner.callGasLimit=0x1fffffffffffff",
+        "--miner.defaultTransactionGasLimit=0x1fffffffffffff",
+        "--miner.blockGasLimit=0x1fffffffffffff",
+        "--miner.defaultGasPrice=0xC016219",
+        "--chain.vmErrorsOnRPCResponse=true",
+        "--wallet.totalAccounts=1",
+        "--wallet.defaultBalance=100000000",
+        "-m 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'",
+        --chain.chainId=355113,
+      ]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 29000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  evm-wrapped:
+    image: trufflesuite/ganache:v7.9.2
+    ports:
+      - "29001:8545"
+    command:
+      [
+        "--chain.allowUnlimitedContractSize=true",
+        "--logging.debug=true",
+        "--logging.verbose=true",
+        "--miner.blockTime=0",
+        "--miner.callGasLimit=0x1fffffffffffff",
+        "--miner.defaultTransactionGasLimit=0x1fffffffffffff",
+        "--miner.blockGasLimit=0x1fffffffffffff",
+        "--miner.defaultGasPrice=0xC016219",
+        "--chain.vmErrorsOnRPCResponse=true",
+        "--wallet.totalAccounts=1",
+        "--wallet.defaultBalance=100000000",
+        "-m 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'",
+        --chain.chainId=355113,
+      ]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 29001"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
