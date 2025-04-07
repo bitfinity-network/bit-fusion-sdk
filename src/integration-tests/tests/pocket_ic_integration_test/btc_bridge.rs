@@ -536,7 +536,10 @@ async fn test_should_track_deposit_and_withdrawal_operation() {
         .expect("deposit operation not found");
 
     assert!(
-        matches!(&deposit_operation, BtcBridgeOp::ConfirmErc20Mint { .. } | BtcBridgeOp::Erc20MintConfirmed { .. }),
+        matches!(
+            &deposit_operation,
+            BtcBridgeOp::ConfirmErc20Mint { .. } | BtcBridgeOp::Erc20MintConfirmed { .. }
+        ),
         "Incorrect operation result: {deposit_operation:?}"
     );
 
