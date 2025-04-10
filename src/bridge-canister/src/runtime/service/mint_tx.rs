@@ -101,6 +101,7 @@ impl<H> SendMintTxService<H> {
             Ok(output) => output,
             Err(err) => {
                 log::error!("Failed to call batch mint tx: {err}");
+                // TODO: migrate to newest sdk to parse JsonRpcError: <https://infinityswap.atlassian.net/browse/EPROD-1182>
                 return self.parse_batch_mint_revert(&err.to_string(), order_count);
             }
         };
