@@ -5,6 +5,7 @@ use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use serde::{Deserialize, Serialize};
 
+use crate::batch_mint_result::BatchMintErrorCode;
 use crate::events::MintedEventData;
 use crate::order::{MintOrder, SignedOrders};
 use crate::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
@@ -28,7 +29,11 @@ pub enum RuneBridgeDepositOp {
     /// Send the mint order to the bridge
     SendMintOrder(SignedOrders),
     /// Confirm the mint order
-    ConfirmMintOrder { order: SignedOrders, tx_id: H256 },
+    WaitForMintConfirm {
+        order: SignedOrders,
+        tx_id: Option<H256>,
+        mint_results: Vec<BatchMintErrorCode>,
+    },
     /// The mint order has been confirmed
     MintOrderConfirmed { data: MintedEventData },
 }

@@ -5,6 +5,7 @@ pub mod common;
 pub mod evm_bridge;
 pub mod evm_link;
 pub mod query;
+pub mod revert;
 
 pub use self::address::get_contract_address;
 

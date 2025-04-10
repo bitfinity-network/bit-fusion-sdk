@@ -666,6 +666,109 @@ async fn erc20_bridge_stress_test() {
     erc20::stress_test_erc20_bridge_with_ctx(context, 1, config).await;
 }
 
+#[tokio::test]
+async fn test_should_get_batch_mint_errors_if_mint_fails() {
+    let ctx = ContextWithBridges::new().await;
+    // Approve ERC-20 transfer on behalf of some user in base EVM.
+    let alice_wallet = ctx.context.new_wallet(u128::MAX).await.unwrap();
+    let alice_address: H160 = alice_wallet.address().into();
+    let alice_id = Id256::from_evm_address(&alice_address, CHAIN_ID as _);
+
+    let amount = 1000_u128;
+
+    // spender should deposit native tokens to btf bridge, to pay fee.
+    let wrapped_evm_client = ctx.context.wrapped_evm();
+    ctx.context
+        .native_token_deposit(
+            &wrapped_evm_client,
+            ctx.fee_charge_address.clone(),
+            &ctx.bob_wallet,
+            10_u64.pow(15).into(),
+        )
+        .await
+        .unwrap();
+
+    let base_evm_client = ctx.context.base_evm();
+
+    // Advance time to perform two tasks in erc20-bridge:
+    // 1. Minted event collection
+    // 2. Mint order removal
+    ctx.context
+        .advance_by_times(Duration::from_secs(2), 20)
+        .await;
+
+    let to_token_id = Id256::from_evm_address(
+        &H160::from_hex_str("0x6d3bd4e50c9aae16edccb5d1aef32f9271aed9b0").unwrap(),
+        1u64 as _,
+    ); // NOTE: this chain id will cause a mint error
+
+    let memo = [5 as _; 32];
+
+    let (expected_operation_id, _) = ctx
+        .context
+        .burn_base_erc_20_tokens(
+            &base_evm_client,
+            &ctx.bob_wallet,
+            &ctx.base_token_address,
+            &to_token_id.to_bytes(),
+            alice_id,
+            &ctx.base_btf_bridge,
+            amount,
+            Some(memo),
+        )
+        .await
+        .expect("failed to burn base erc20 tokens");
+
+    let ctx_t = ctx.context.clone();
+    let alice_wallet_t = alice_wallet.clone();
+
+    let (tx_hash, mint_results) = block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let erc20_bridge_client = ctx.erc20_bridge_client(ADMIN);
+            let wallet = alice_wallet_t.clone();
+            Box::pin(async move {
+                let (operation_id, op) = erc20_bridge_client
+                    .get_operation_by_memo_and_user(memo, &wallet.address().into())
+                    .await?
+                    .ok_or(anyhow::anyhow!("Operation not found"))?;
+
+                if operation_id.as_u64() == expected_operation_id as u64 {
+                    match op {
+                        Erc20BridgeOp {
+                            stage:
+                                Erc20OpStage::WaitForMintConfirm {
+                                    tx_hash,
+                                    mint_results,
+                                    ..
+                                },
+                            ..
+                        } => Ok((tx_hash, mint_results)),
+                        _ => anyhow::bail!("Expected WaitForMintConfirm stage: {op:?}"),
+                    }
+                } else {
+                    anyhow::bail!(
+                        "Operation id is {operation_id}; expected: {expected_operation_id}"
+                    )
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(90),
+    )
+    .await;
+
+    println!("Result: {tx_hash:?} | {mint_results:?}");
+    assert!(tx_hash.is_none(), "mint tx should not have been sent");
+    assert_eq!(mint_results.len(), 1);
+    assert_eq!(
+        mint_results[0],
+        bridge_did::batch_mint_result::BatchMintErrorCode::Reverted(
+            "Invalid token pair".to_string()
+        )
+    );
+}
+
 async fn create_btf_bridge(
     ctx: &PocketIcTestContext,
     wallet: &LocalWallet,
