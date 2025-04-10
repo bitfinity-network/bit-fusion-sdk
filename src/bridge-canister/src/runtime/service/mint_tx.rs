@@ -139,6 +139,8 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
             return Ok(());
         };
 
+        log::trace!("next mint order to send: {digest}");
+
         let config = self.handler.get_evm_config();
 
         let signer = config.borrow().get_signer()?;
@@ -181,6 +183,8 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         .into();
 
         let link = config.borrow().get_evm_link();
+        log::trace!("sending mint transaction {transaction:#?} to {link}");
+
         let client = link.get_json_rpc_client();
 
         // make tx envelope

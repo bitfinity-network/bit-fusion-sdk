@@ -2,13 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bitcoin::Amount;
+use bridge_did::operations::BtcBridgeOp;
 use btc_bridge::canister::eth_address_to_subaccount;
 use icrc_client::account::Account;
 
 use crate::context::btc_bridge::BtcContext;
 use crate::context::stress::StressTestConfig;
 use crate::context::TestContext;
-use crate::pocket_ic_integration_test::block_until_succeeds;
+use crate::pocket_ic_integration_test::{block_until_succeeds, ALICE};
 use crate::utils::btc_wallet::BtcWallet;
 
 const CKBTC_LEDGER_FEE: u64 = 1_000;
@@ -356,7 +357,7 @@ async fn test_should_deposit_and_withdraw_btc() {
     let withdraw_amount = Amount::from_sat(50_000_000);
     let prev_btc_balance = ctx.btc_balance(&recipient).await;
 
-    ctx.withdraw_btc(&wallet, &recipient, withdraw_amount)
+    ctx.withdraw_btc(&wallet, &recipient, withdraw_amount, None)
         .await
         .expect("withdraw failed");
 
@@ -430,14 +431,6 @@ async fn test_btc_bridge_stress_test() {
                     18444,
                 ))
         },
-        |mut pic| {
-            Box::pin(async move {
-                // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                pic.set_time(std::time::SystemTime::now()).await;
-                pic.make_live(None).await;
-                pic
-            })
-        },
         true,
     )
     .await;
@@ -453,4 +446,178 @@ async fn test_btc_bridge_stress_test() {
     };
 
     crate::context::stress::btc::stress_test_btc_bridge_with_ctx(context, config).await;
+}
+
+#[tokio::test]
+async fn test_should_track_deposit_and_withdrawal_operation() {
+    let ctx = BtcContext::pocket_ic().await;
+    let ctx = Arc::new(ctx);
+
+    let deposit_value = 100_000_000;
+    let deposit_amount = Amount::from_sat(deposit_value);
+
+    let wallet = Arc::new(
+        ctx.context
+            .new_wallet(u128::MAX)
+            .await
+            .expect("Failed to create a wallet"),
+    );
+
+    let btc_wallet = Arc::new(BtcWallet::new_random());
+    println!("BTC Wallet: {}", btc_wallet.address);
+
+    // ! deposit
+    let wallet_t = wallet.clone();
+    let ctx_t = ctx.clone();
+    let btc_wallet_t = btc_wallet.clone();
+
+    let deposit_memo = [77; 32];
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let wallet = wallet_t.clone();
+            let btc_wallet = btc_wallet_t.clone();
+            Box::pin(async move {
+                let caller_eth_address = wallet.address().into();
+                ctx.deposit_btc(
+                    &wallet,
+                    &btc_wallet,
+                    deposit_amount,
+                    &caller_eth_address,
+                    deposit_memo,
+                    0,
+                )
+                .await
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(120),
+    )
+    .await;
+
+    // wait for minted balance to be updated
+    let ctx_t = ctx.clone();
+    let wallet_t = wallet.clone();
+    let expected_balance = (deposit_value - KYT_FEE - CKBTC_LEDGER_FEE) as u128;
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let wallet = wallet_t.clone();
+            Box::pin(async move {
+                let balance = ctx.erc20_balance_of(&wallet, None).await?;
+
+                if balance == expected_balance {
+                    Ok(balance)
+                } else {
+                    anyhow::bail!("Balance is {balance}; expected: {expected_balance}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
+
+    let (deposit_op_id, deposit_operation) = ctx
+        .context
+        .btc_bridge_client(ALICE)
+        .get_operation_by_memo_and_user(deposit_memo, &wallet.address().into())
+        .await
+        .expect("error trying to retrieve deposition operation")
+        .expect("deposit operation not found");
+
+    assert!(
+        matches!(
+            &deposit_operation,
+            BtcBridgeOp::WaitForErc20MintConfirm { .. } | BtcBridgeOp::Erc20MintConfirmed { .. }
+        ),
+        "Incorrect operation result: {deposit_operation:?}"
+    );
+
+    // ! withdraw
+    let recipient = btc_wallet.address.clone();
+    let withdraw_amount = Amount::from_sat(50_000_000);
+    let prev_btc_balance = ctx.btc_balance(&recipient).await;
+    let withdrawal_memo = [101; 32];
+
+    ctx.withdraw_btc(&wallet, &recipient, withdraw_amount, Some(withdrawal_memo))
+        .await
+        .expect("withdraw failed");
+
+    ctx.context.advance_time(Duration::from_secs(1)).await;
+    ctx.wait_for_blocks(6).await;
+
+    // expected ERC20 balance
+    let ctx_t = ctx.clone();
+    let wallet_t = wallet.clone();
+    let expected_balance =
+        (deposit_value - KYT_FEE - CKBTC_LEDGER_FEE - withdraw_amount.to_sat()) as u128;
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let wallet = wallet_t.clone();
+            Box::pin(async move {
+                let balance = ctx.erc20_balance_of(&wallet, None).await?;
+
+                if balance == expected_balance {
+                    Ok(balance)
+                } else {
+                    anyhow::bail!("Balance is {balance}; expected: {expected_balance}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
+
+    // check btc balanace
+    let ctx_t = ctx.clone();
+    let expected_balance = prev_btc_balance + withdraw_amount - Amount::from_sat(4_017); // fee
+
+    block_until_succeeds(
+        move || {
+            let ctx = ctx_t.clone();
+            let recipient = recipient.clone();
+            Box::pin(async move {
+                let btc_balance = ctx.btc_balance(&recipient).await;
+
+                if btc_balance == expected_balance {
+                    Ok(btc_balance)
+                } else {
+                    anyhow::bail!("Balance is {btc_balance}; expected: {expected_balance}")
+                }
+            })
+        },
+        &ctx.context,
+        Duration::from_secs(60),
+    )
+    .await;
+
+    let (withdrawal_op_id, withdrawal_operation) = ctx
+        .context
+        .btc_bridge_client(ALICE)
+        .get_operation_by_memo_and_user(withdrawal_memo, &wallet.address().into())
+        .await
+        .expect("error trying to retrieve withdrawal operation")
+        .expect("withdrawal operation not found");
+
+    assert!(
+        matches!(&withdrawal_operation, BtcBridgeOp::BtcWithdrawConfirmed { eth_address } if *eth_address == wallet.address().into()),
+        "Incorrect operation result: {withdrawal_operation:?}"
+    );
+
+    let operation_list = ctx
+        .context
+        .btc_bridge_client(ALICE)
+        .get_operations_list(&wallet.address().into(), None, None)
+        .await
+        .expect("failed to get operation list");
+
+    assert!(operation_list.iter().any(|(id, _)| *id == deposit_op_id));
+    assert!(operation_list.iter().any(|(id, _)| *id == withdrawal_op_id));
+
+    ctx.stop().await;
 }

@@ -134,20 +134,26 @@ impl Erc20OpStageImpl {
 
     async fn progress(self) -> BTFResult<OperationProgress<Self>> {
         match self.0 {
-            Erc20OpStage::SignMintOrder(_) => {
+            Erc20OpStage::SignMintOrder(data) => {
+                log::debug!("ERC20OpStage::SignMintOrder {data:?}");
                 Ok(OperationProgress::AddToService(SIGN_MINT_ORDER_SERVICE_ID))
             }
-            Erc20OpStage::SendMintTransaction(_) => {
+            Erc20OpStage::SendMintTransaction(data) => {
+                log::debug!("ERC20OpStage::SendMintTransaction {data:?}",);
                 Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID))
             }
-            Erc20OpStage::WaitForMintConfirm { .. } => {
+            Erc20OpStage::WaitForMintConfirm { mint_results, .. } => {
+                log::debug!("ERC20OpStage::WaitForMintConfirm {mint_results:?}");
                 Err(bridge_did::error::Error::FailedToProgress(
                     "Erc20OpStage::ConfirmMint should progress by the event".into(),
                 ))
             }
-            Erc20OpStage::TokenMintConfirmed(_) => Err(bridge_did::error::Error::FailedToProgress(
-                "Erc20OpStage::TokenMintConfirmed should not progress".into(),
-            )),
+            Erc20OpStage::TokenMintConfirmed(data) => {
+                log::debug!("ERC20OpStage::TokenMintConfirmed {data:?}");
+                Err(bridge_did::error::Error::FailedToProgress(
+                    "Erc20OpStage::TokenMintConfirmed should not progress".into(),
+                ))
+            }
         }
     }
 }
@@ -215,7 +221,7 @@ impl MintOrderHandler for Erc20OrderHandler {
     fn get_order(&self, id: OperationId) -> Option<MintOrder> {
         let op = self.state.borrow().operations.get(id)?;
         let Erc20OpStage::SignMintOrder(order) = op.0.stage else {
-            log::info!("Mint order handler failed to get MintOrder: unexpected state.");
+            log::error!("Mint order handler failed to get MintOrder: unexpected state.");
             return None;
         };
 
@@ -224,16 +230,17 @@ impl MintOrderHandler for Erc20OrderHandler {
 
     fn set_signed_order(&self, id: OperationId, signed: SignedOrders) {
         let Some(op) = self.state.borrow().operations.get(id) else {
-            log::info!("Mint order handler failed to set MintOrder: operation not found.");
+            log::error!("Mint order handler failed to set MintOrder: operation not found.");
             return;
         };
 
         let Erc20OpStage::SignMintOrder(order) = op.0.stage else {
-            log::info!("Mint order handler failed to set MintOrder: unexpected state.");
+            log::error!("Mint order handler failed to set MintOrder: unexpected state.");
             return;
         };
 
         let should_send_mint_tx = order.fee_payer != H160::zero();
+        log::trace!("Should send mint tx: {should_send_mint_tx}");
         let new_stage = match should_send_mint_tx {
             true => Erc20OpStage::SendMintTransaction(signed),
             false => Erc20OpStage::WaitForMintConfirm {
@@ -242,6 +249,8 @@ impl MintOrderHandler for Erc20OrderHandler {
                 mint_results: vec![],
             },
         };
+
+        log::trace!("New stage for operation {id}: {new_stage:?}");
 
         let new_op = Erc20BridgeOpImpl(Erc20BridgeOp {
             side: op.0.side,
@@ -271,11 +280,13 @@ impl MintTxHandler for Erc20OrderHandler {
 
     fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders> {
         let Some(op) = self.state.borrow().operations.get(id) else {
-            log::info!("Mint order handler failed to get MintOrder: operation not found.");
+            log::error!("Mint order handler failed to get MintOrder: operation not found.");
             return None;
         };
         let Erc20OpStage::SendMintTransaction(order) = op.0.stage else {
-            log::info!("MintTxHandler failed to get mint order batch: unexpected operation state.");
+            log::error!(
+                "MintTxHandler failed to get mint order batch: unexpected operation state."
+            );
             return None;
         };
 
@@ -284,11 +295,11 @@ impl MintTxHandler for Erc20OrderHandler {
 
     fn mint_tx_sent(&self, id: OperationId, result: MintTxResult) {
         let Some(op) = self.state.borrow().operations.get(id) else {
-            log::info!("MintTxHandler failed to update operation: not found.");
+            log::error!("MintTxHandler failed to update operation: not found.");
             return;
         };
         let Erc20OpStage::SendMintTransaction(order) = op.0.stage else {
-            log::info!("MintTxHandler failed to update operation: unexpected state.");
+            log::error!("MintTxHandler failed to update operation: unexpected state.");
             return;
         };
 
