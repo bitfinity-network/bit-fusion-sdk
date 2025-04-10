@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::str::FromStr as _;
 use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
@@ -30,12 +31,14 @@ use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::btc_transfer_helper::BtcTransferHelper;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::miner::{Exit, Miner};
+use crate::utils::TestEvm;
 
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
 
-pub struct BtcContext<Ctx>
+pub struct BtcContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub admin_btc_rpc_client: Arc<BitcoinRpcClient>,
     pub admin_address: Address,
@@ -46,6 +49,7 @@ where
     miner: Arc<Mutex<Option<JoinHandle<()>>>>,
     pub btf_bridge_contract: Arc<RwLock<H160>>,
     pub wrapped_token: Arc<RwLock<H160>>,
+    _marker: PhantomData<EVM>,
 }
 
 fn generate_wallet_name() -> String {
@@ -59,7 +63,9 @@ fn generate_wallet_name() -> String {
 }
 
 #[cfg(feature = "pocket_ic_integration_test")]
-impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
+impl
+    BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext, crate::utils::test_evm::Evm>
+{
     pub async fn pocket_ic() -> Self {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -74,14 +80,6 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
                         18444,
                     ))
             },
-            |mut pic| {
-                Box::pin(async move {
-                    // NOTE: set time: Because the bitcoind process uses the real time, we set the time of the PocketIC instance to be the current time:
-                    pic.set_time(std::time::SystemTime::now()).await;
-                    pic.make_live(None).await;
-                    pic
-                })
-            },
             true,
         )
         .await;
@@ -90,9 +88,10 @@ impl BtcContext<crate::pocket_ic_integration_test::PocketIcTestContext> {
     }
 }
 
-impl<Ctx> BtcContext<Ctx>
+impl<Ctx, EVM> BtcContext<Ctx, EVM>
 where
-    Ctx: TestContext + Sync,
+    Ctx: TestContext<EVM> + Sync,
+    EVM: TestEvm,
 {
     pub async fn new(context: Ctx) -> Self {
         // set KYT api key
@@ -144,20 +143,18 @@ where
         let wallet_address = wallet.address();
 
         context
-            .evm_client(context.admin_name())
-            .admin_mint_native_tokens(wallet_address.into(), u64::MAX.into())
+            .wrapped_evm()
+            .mint_native_tokens(wallet_address.into(), u64::MAX.into())
             .await
-            .expect("failed to mint tokens to user")
             .expect("failed to mint tokens to user");
 
-        let client = context.evm_client(context.admin_name());
+        let client = context.wrapped_evm();
         let mut wrapped_token_deployer = None;
 
         for _ in 0..10 {
             client
-                .admin_mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
+                .mint_native_tokens(btc_bridge_eth_address.clone(), u64::MAX.into())
                 .await
-                .expect("failed to mint tokens to btc bridge")
                 .expect("failed to mint tokens to btc bridge");
 
             context.advance_time(Duration::from_secs(2)).await;
@@ -237,6 +234,7 @@ where
             ckbtc_ledger_id,
             tip_height: AtomicU32::default(),
             btf_bridge_contract: Arc::new(RwLock::new(btf_bridge)),
+            _marker: PhantomData,
         }
     }
 
@@ -270,9 +268,9 @@ where
         }
         .abi_encode();
 
-        let client = self.context.evm_client(self.context.admin_name());
+        let client = self.context.wrapped_evm();
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
-        let chain_id = client.eth_chain_id().await.expect("failed to get chain id");
+        let chain_id = client.chain_id().await.expect("failed to get chain id");
 
         let transaction = TransactionBuilder {
             from: &sender.address().into(),
@@ -289,14 +287,9 @@ where
         .expect("failed to sign the transaction");
 
         let tx_id = client
-            .send_raw_transaction(
-                transaction
-                    .try_into()
-                    .expect("failed to serialize transaction"),
-            )
+            .send_raw_transaction(transaction)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("failed to send transaction");
         println!(
             "Deposit notification sent by tx: 0x{}",
             hex::encode(tx_id.0)
@@ -416,7 +409,7 @@ where
         println!("Burning {amount} to {recipient}");
         let btf_bridge_contract = self.btf_bridge_contract.read().await.clone();
 
-        let client = self.context.evm_client(self.context.admin_name());
+        let client = self.context.wrapped_evm();
         self.context
             .burn_erc_20_tokens_raw(
                 &client,
@@ -606,10 +599,12 @@ where
     }
 
     pub async fn stop(&self) {
-        self.context
-            .stop_canister(self.context.canisters().evm())
-            .await
-            .expect("Failed to stop evm canister");
+        if !self.context.wrapped_evm().live() {
+            self.context
+                .stop_canister(self.context.canisters().evm())
+                .await
+                .expect("Failed to stop evm canister");
+        }
         self.context
             .stop_canister(self.bridge())
             .await
@@ -635,10 +630,10 @@ where
 
         let start = Instant::now();
 
-        let client = self.context.evm_client(self.context.admin_name());
+        let client = self.context.wrapped_evm();
         while start.elapsed() < MAX_TX_TIMEOUT_SEC {
             let receipt = client
-                .eth_get_transaction_receipt(tx_hash.clone())
+                .get_transaction_receipt(tx_hash)
                 .await
                 .expect("Failed to request transaction receipt");
 

@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use alloy::consensus::SignableTransaction as _;
+use alloy::consensus::{SignableTransaction as _, TxEnvelope};
 use alloy::rpc::types::Transaction as AlloyRpcTransaction;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
@@ -60,6 +60,8 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
             return Ok(());
         };
 
+        log::trace!("next mint order to send: {digest}");
+
         let config = self.handler.get_evm_config();
 
         let signer = config.borrow().get_signer()?;
@@ -102,17 +104,19 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         .into();
 
         let link = config.borrow().get_evm_link();
+        log::trace!("sending mint transaction {transaction:#?} to {link}");
+
         let client = link.get_json_rpc_client();
-        let tx_hash = client
-            .send_raw_transaction(&transaction.try_into().map_err(|e| {
-                log::error!("failed to convert transaction to envelope: {e}");
-                Error::EvmRequestFailed(format!("failed to convert transaction to envelope: {e}"))
-            })?)
-            .await
-            .map_err(|e| {
-                log::error!("Failed to send batch mint tx to EVM: {e}");
-                Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
-            })?;
+
+        let envelope: TxEnvelope = transaction.try_into().map_err(|e| {
+            log::error!("failed to convert transaction to envelope: {e}");
+            Error::EvmRequestFailed(format!("failed to convert transaction to envelope: {e}"))
+        })?;
+
+        let tx_hash = client.send_raw_transaction(&envelope).await.map_err(|e| {
+            log::error!("Failed to send batch mint tx to EVM: {e}");
+            Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
+        })?;
 
         // Increase nonce after tx sending.
         self.handler

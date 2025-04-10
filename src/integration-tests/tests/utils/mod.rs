@@ -1,11 +1,3 @@
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-
-use alloy_sol_types::sol;
-use candid::Principal;
-use did::init::EvmCanisterInitData;
-use ic_exports::ic_kit::mock_principals::bob;
-
 pub mod brc20_helper;
 pub mod btc;
 pub mod btc_rpc_client;
@@ -19,6 +11,18 @@ pub mod rune_helper;
 pub mod test_evm;
 pub mod token_amount;
 pub mod wasm;
+
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use alloy_sol_types::sol;
+use candid::Principal;
+use did::init::EvmCanisterInitData;
+use ic_exports::ic_kit::mock_principals::bob;
+
+#[cfg(any(feature = "pocket_ic_integration_test", feature = "dfx_tests"))]
+pub use self::test_evm::test_evm;
+pub use self::test_evm::{BitfinityEvm, GanacheEvm, TestEvm};
 
 /// Returns the Path to the workspace root dir
 pub fn get_workspace_root_dir() -> PathBuf {
