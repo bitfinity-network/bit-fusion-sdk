@@ -22,7 +22,6 @@ ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true }
 ic-utils = { workspace = true }
-jsonrpc-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }

@@ -191,6 +191,9 @@ mod tests {
     use alloy::primitives::Bytes;
     use alloy::rpc::types::RawLog;
     use alloy_sol_types::private::{Address, FixedBytes, Uint};
+    use did::rpc::params::Params;
+    use did::rpc::request::{Request, RpcRequest};
+    use did::rpc::response::{Failure, Response, RpcResponse, Success};
     use did::H256;
 
     use super::*;
@@ -351,41 +354,38 @@ mod tests {
     impl Client for FakeEthJsonRpcClient {
         fn send_rpc_request(
             &self,
-            request: jsonrpc_core::Request,
-        ) -> std::pin::Pin<
-            Box<dyn std::future::Future<Output = anyhow::Result<jsonrpc_core::Response>> + Send>,
-        > {
+            request: RpcRequest,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<RpcResponse>> + Send>>
+        {
             // get block number for eth_getLogs request
             let (id, from_block, to_block) = match request {
-                jsonrpc_core::Request::Single(jsonrpc_core::Call::MethodCall(method_call)) => {
-                    match method_call.params {
-                        jsonrpc_core::Params::Array(params) => {
-                            let obj = params[0].as_object().unwrap();
-                            let from_block = obj.get("fromBlock").unwrap();
-                            let to_block = obj.get("toBlock").unwrap();
+                RpcRequest::Single(Request { id, params, .. }) => match params {
+                    Params::Array(params) => {
+                        let obj = params[0].as_object().unwrap();
+                        let from_block = obj.get("fromBlock").unwrap();
+                        let to_block = obj.get("toBlock").unwrap();
 
-                            let to_block = match to_block.as_str().unwrap() {
-                                "latest" => u64::MAX,
-                                _ => u64::from_str_radix(
-                                    to_block.as_str().unwrap().trim_start_matches("0x"),
-                                    16,
-                                )
-                                .unwrap(),
-                            };
-
-                            (
-                                method_call.id,
-                                u64::from_str_radix(
-                                    from_block.as_str().unwrap().trim_start_matches("0x"),
-                                    16,
-                                )
-                                .unwrap(),
-                                to_block,
+                        let to_block = match to_block.as_str().unwrap() {
+                            "latest" => u64::MAX,
+                            _ => u64::from_str_radix(
+                                to_block.as_str().unwrap().trim_start_matches("0x"),
+                                16,
                             )
-                        }
-                        params => unimplemented!("expected array params: {params:?}"),
+                            .unwrap(),
+                        };
+
+                        (
+                            id,
+                            u64::from_str_radix(
+                                from_block.as_str().unwrap().trim_start_matches("0x"),
+                                16,
+                            )
+                            .unwrap(),
+                            to_block,
+                        )
                     }
-                }
+                    params => unimplemented!("expected array params: {params:?}"),
+                },
                 _ => unimplemented!("expected single method call request"),
             };
 
@@ -396,17 +396,15 @@ mod tests {
             for block_number in from_block..=to_block {
                 if Some(block_number) == self.error {
                     return Box::pin(async {
-                        Ok(jsonrpc_core::Response::Single(
-                            jsonrpc_core::Output::Failure(jsonrpc_core::Failure {
-                                jsonrpc: None,
-                                error: jsonrpc_core::Error {
-                                    code: jsonrpc_core::ErrorCode::ServerError(-32000),
-                                    message: "fake error".to_string(),
-                                    data: None,
-                                },
-                                id,
-                            }),
-                        ))
+                        Ok(RpcResponse::Single(Response::Failure(Failure {
+                            jsonrpc: None,
+                            error: did::rpc::error::Error {
+                                code: did::rpc::error::ErrorCode::ServerError(-32000),
+                                message: "fake error".to_string(),
+                                data: None,
+                            },
+                            id,
+                        })))
                     });
                 }
                 if let Some(block_logs) = self.logs.get(&block_number) {
@@ -414,13 +412,11 @@ mod tests {
                 }
             }
 
-            let response = jsonrpc_core::Response::Single(jsonrpc_core::Output::Success(
-                jsonrpc_core::Success {
-                    jsonrpc: None,
-                    result: serde_json::json!(logs),
-                    id,
-                },
-            ));
+            let response = RpcResponse::Single(Response::Success(Success {
+                jsonrpc: None,
+                result: serde_json::json!(logs),
+                id,
+            }));
 
             Box::pin(async { Ok(response) })
         }

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use foundry_compilers::artifacts::{remappings, EvmVersion, Optimizer, Remapping, Settings};
-use foundry_compilers::solc::SolcCompiler;
+use foundry_compilers::solc::{CliSettings, SolcCompiler, SolcSettings};
 use foundry_compilers::{ProjectBuilder, ProjectPathsConfig};
 
 /// The number of parallel Solidity compiler jobs to use when compiling the
@@ -25,6 +25,11 @@ fn main() -> anyhow::Result<()> {
         optimizer,
         evm_version: Some(EvmVersion::Paris),
         ..Default::default()
+    };
+
+    let settings = SolcSettings {
+        settings,
+        cli_settings: CliSettings::default(),
     };
 
     let root = foundry_compilers::utils::canonicalize(root)?;
