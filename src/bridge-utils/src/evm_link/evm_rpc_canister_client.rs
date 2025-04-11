@@ -6,7 +6,8 @@ pub use bridge_did::evm_link::{
     RpcApi, RpcService, Service,
 };
 use candid::Principal;
-use jsonrpc_core::{Request, Response};
+use did::rpc::request::RpcRequest;
+use did::rpc::response::RpcResponse;
 use num_traits::ToPrimitive;
 
 /// Client for sending RPC requests to the EVM-RPC canister.
@@ -28,8 +29,8 @@ impl EvmRpcCanisterClient {
     /// Sends an RPC request to the EVM-RPC canister.
     pub fn send_rpc_request(
         &self,
-        request: Request,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Response>> + Send>> {
+        request: RpcRequest,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<RpcResponse>> + Send>> {
         let rpc_service = self.rpc_service.clone();
         Box::pin(Self::try_rpc_request(self.principal, rpc_service, request))
     }
@@ -39,8 +40,8 @@ impl EvmRpcCanisterClient {
     async fn try_rpc_request(
         principal: Principal,
         rpc_service: Vec<RpcService>,
-        request: Request,
-    ) -> anyhow::Result<Response> {
+        request: RpcRequest,
+    ) -> anyhow::Result<RpcResponse> {
         let request = serde_json::to_string(&request)?;
         let mut last_error = None;
         // shuffle services using timestamp and module
@@ -65,7 +66,7 @@ impl EvmRpcCanisterClient {
         principal: Principal,
         rpc_service: &RpcService,
         request: &str,
-    ) -> anyhow::Result<Response> {
+    ) -> anyhow::Result<RpcResponse> {
         let service = Service(principal);
         const MAX_RESPONSE_SIZE: u64 = 2000000;
 

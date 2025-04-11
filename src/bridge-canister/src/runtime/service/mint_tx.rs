@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
+use alloy::consensus::transaction::Recovered;
 use alloy::consensus::{SignableTransaction as _, TxEnvelope};
 use alloy::rpc::types::Transaction as AlloyRpcTransaction;
 use bridge_did::error::{BTFResult, Error};
@@ -94,8 +95,7 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
         let signature = signer.sign_transaction(&mut tx).await?;
         let signed = tx.into_signed(signature.into());
         let transaction: DidTransaction = AlloyRpcTransaction {
-            inner: signed.into(),
-            from: sender,
+            inner: Recovered::new_unchecked(signed.into(), sender),
             block_hash: None,
             block_number: None,
             transaction_index: None,
