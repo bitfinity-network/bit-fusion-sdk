@@ -60,7 +60,7 @@ impl From<IcNetwork> for NetworkConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, strum_macros::Display, ValueEnum, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, strum::Display, ValueEnum, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum IcNetwork {
     Ic,
