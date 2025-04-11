@@ -19,7 +19,16 @@ pub use init::*;
 pub use rune::*;
 
 #[derive(
-    ValueEnum, Debug, Serialize, Deserialize, Clone, Copy, CandidType, PartialEq, Eq, strum::Display,
+    ValueEnum,
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    CandidType,
+    PartialEq,
+    Eq,
+    strum_macros::Display,
 )]
 /// The signing key ID to use for signing messages
 ///

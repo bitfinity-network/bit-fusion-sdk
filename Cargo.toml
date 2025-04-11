@@ -37,10 +37,10 @@ async-recursion = "1.0.4"
 async-trait = "0.1"
 bip39 = "2"
 bitcoin = "0.31"
-bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc = "0.18"
 bollard = "0.18"
 candid = { version = "0.10", features = ["value"] }
-cfg-if = "1.0"
+cfg-if = "1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.48.x" }
@@ -88,7 +88,8 @@ serde_json = "1.0"
 serial_test = "3"
 signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.48.x" }
 snapbox = "0.6"
-strum = "0.26"
+strum = "0.27"
+strum_macros = "0.27"
 tempfile = "3"
 thiserror = "2"
 trycmd = "0.15"
