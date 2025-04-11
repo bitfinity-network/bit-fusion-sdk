@@ -126,7 +126,7 @@ mod tests {
     use super::*;
     use crate::bridge::OperationProgress;
     use crate::memory::memory_by_id;
-    use crate::runtime::{default_state, RuntimeState};
+    use crate::runtime::{RuntimeState, default_state};
 
     #[derive(Clone, Deserialize, Debug, Serialize, CandidType)]
     pub struct TestOp;
