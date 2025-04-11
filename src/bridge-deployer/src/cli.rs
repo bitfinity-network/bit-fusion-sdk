@@ -6,14 +6,14 @@ use std::process::{Command, Stdio};
 use alloy::primitives::B256;
 use anyhow::bail;
 use clap::{ArgAction, Parser};
-use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
 use ic_agent::Identity;
+use ic_agent::identity::{BasicIdentity, Secp256k1Identity};
 use ic_canister_client::agent::identity::GenericIdentity;
 use tracing::level_filters::LevelFilter;
-use tracing::{debug, info, trace, Level};
+use tracing::{Level, debug, info, trace};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
-use tracing_subscriber::{filter, Layer as _};
+use tracing_subscriber::{Layer as _, filter};
 
 pub use self::evm_canister::EvmCanister;
 use crate::canister_ids::CanisterIdsPath;
@@ -184,7 +184,7 @@ impl Cli {
     }
 
     /// Returns a filter function that filters out log messages based on the verbosity level.
-    fn source_filter(&self) -> impl Fn(&tracing::Metadata<'_>) -> bool {
+    fn source_filter(&self) -> impl Fn(&tracing::Metadata<'_>) -> bool + 'static {
         if self.verbosity - 1 > 3 {
             Self::filter_none
         } else {
