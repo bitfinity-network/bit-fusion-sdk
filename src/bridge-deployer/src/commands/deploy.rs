@@ -135,7 +135,9 @@ impl DeployCommands {
             )
             .await?;
 
-        info!("BTF bridge deployed successfully with {btf_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}");
+        info!(
+            "BTF bridge deployed successfully with {btf_bridge}; wrapped_token_deployer: {wrapped_token_deployer:x}"
+        );
 
         // If the bridge type is BTC, we also deploy the Token contract for wrapped BTC
         if let Bridge::Btc { connection, .. } = &self.bridge_type {

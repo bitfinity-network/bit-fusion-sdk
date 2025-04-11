@@ -1,9 +1,9 @@
 #[cfg(feature = "export-api")]
 use bridge_canister::bridge_inspect;
 use bridge_canister::inspect::inspect_caller_is_owner;
+use bridge_canister::runtime::state::SharedConfig;
 #[cfg(feature = "export-api")]
 use bridge_canister::runtime::state::config::ConfigStorage;
-use bridge_canister::runtime::state::SharedConfig;
 #[cfg(feature = "export-api")]
 use ic_exports::ic_cdk;
 #[cfg(feature = "export-api")]

@@ -18,8 +18,8 @@ use futures::future;
 use ic_exports::ic_cdk::println;
 
 use crate::context::TestContext;
-use crate::utils::error::Result;
 use crate::utils::TestEvm;
+use crate::utils::error::Result;
 
 pub struct StressTestConfig {
     pub users_number: usize,

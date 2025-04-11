@@ -1,13 +1,13 @@
 use evm_canister_client::IcCanisterClient;
 use ic_exports::candid::{CandidType, Nat, Principal};
 use ic_exports::ic_kit::ic;
+use icrc_client::IcrcCanisterClient;
 use icrc_client::account::{Account, Subaccount};
 use icrc_client::transfer::{TransferArg, TransferError};
 use icrc_client::transfer_from::{TransferFromArgs, TransferFromError};
-use icrc_client::IcrcCanisterClient;
 use serde::Deserialize;
 
-use super::icrc1::{self, get_token_configuration, IcrcCanisterError};
+use super::icrc1::{self, IcrcCanisterError, get_token_configuration};
 
 #[derive(Debug, Deserialize, CandidType, Clone)]
 pub struct Success {

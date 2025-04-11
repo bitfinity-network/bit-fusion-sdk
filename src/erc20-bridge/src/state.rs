@@ -3,9 +3,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bridge_canister::bridge::OperationContext;
-use bridge_canister::memory::{memory_by_id, StableMemory};
-use bridge_canister::runtime::state::config::ConfigStorage;
+use bridge_canister::memory::{StableMemory, memory_by_id};
 use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::evm_link::EvmLink;
 use bridge_did::init::erc20::{BaseEvmSettings, QueryDelays};

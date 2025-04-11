@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use did::BlockNumber;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use jsonrpc_core::{
-    serde_json, Call, Id, MethodCall, Output, Params, Request, Response, Value, Version,
+    Call, Id, MethodCall, Output, Params, Request, Response, Value, Version, serde_json,
 };
 use serde::de::DeserializeOwned;
 
