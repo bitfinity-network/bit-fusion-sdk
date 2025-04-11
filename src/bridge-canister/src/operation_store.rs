@@ -201,7 +201,14 @@ where
         min_included_id: Option<OperationId>,
         pagination: Option<Pagination>,
     ) -> Vec<(OperationId, P)> {
-        log::trace!("Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}", self.incomplete_operations.len(), self.operations_log.len(), self.address_operation_map.len(), hex::encode(dst_address.0), self.address_operation_map.get(dst_address));
+        log::trace!(
+            "Operation store contains {} active operations, {} operations in log, {} entries in the map. Value for address {}: {:?}",
+            self.incomplete_operations.len(),
+            self.operations_log.len(),
+            self.address_operation_map.len(),
+            hex::encode(dst_address.0),
+            self.address_operation_map.get(dst_address)
+        );
 
         let offset = pagination.as_ref().map(|p| p.offset).unwrap_or(0);
         let count = pagination.map(|p| p.count).unwrap_or(usize::MAX);
@@ -423,9 +430,11 @@ mod tests {
         assert_eq!(store.address_operation_map.len(), LIMIT);
 
         for i in 0..(COUNT - LIMIT) {
-            assert!(store
-                .get_for_address(&eth_address(i as u8), None, None)
-                .is_empty());
+            assert!(
+                store
+                    .get_for_address(&eth_address(i as u8), None, None)
+                    .is_empty()
+            );
         }
 
         for i in (COUNT - LIMIT)..COUNT {
@@ -649,9 +658,11 @@ mod tests {
 
         // Ensure that the memo map is populated correctly
         for i in 0..COUNT {
-            assert!(store
-                .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
-                .is_some());
+            assert!(
+                store
+                    .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                    .is_some()
+            );
         }
 
         // Let us mark all of them complete
@@ -679,9 +690,11 @@ mod tests {
 
         // Try to get the old ones
         for i in 0..COUNT {
-            assert!(store
-                .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
-                .is_none());
+            assert!(
+                store
+                    .get_operation_by_memo_and_user(&[i as u8; 32], &eth_address(i as u8))
+                    .is_none()
+            );
         }
     }
 }

@@ -11,11 +11,11 @@ use eth_signer::LocalWallet;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::btc_bridge::BtcContext;
 use crate::context::TestContext;
+use crate::context::btc_bridge::BtcContext;
+use crate::utils::TestEvm;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
-use crate::utils::TestEvm;
 
 const FEE: u128 = 3_000;
 

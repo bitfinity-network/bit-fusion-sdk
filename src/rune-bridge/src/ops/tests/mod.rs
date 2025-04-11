@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use bridge_canister::memory::{memory_by_id, StableMemory};
+use bridge_canister::memory::{StableMemory, memory_by_id};
 use bridge_canister::operation_store::OperationsMemory;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::{SharedConfig, State};

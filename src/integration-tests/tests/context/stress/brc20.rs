@@ -1,23 +1,23 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use bitcoin::{Address, Amount};
 use bridge_client::BridgeCanisterClient as _;
 use bridge_did::brc20_info::Brc20Tick;
-use bridge_did::id256::{Id256, ID_256_BYTE_SIZE};
+use bridge_did::id256::{ID_256_BYTE_SIZE, Id256};
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp, Brc20BridgeWithdrawOp};
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use tokio::sync::RwLock;
 
 use super::{BaseTokens, BurnInfo, OwnedWallet, StressTestConfig, StressTestState, User};
-use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs};
 use crate::context::TestContext;
+use crate::context::brc20_bridge::{self as ctx, Brc20Context, Brc20InitArgs};
+use crate::utils::TestEvm;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::error::{Result, TestError};
 use crate::utils::token_amount::TokenAmount;
-use crate::utils::TestEvm;
 
 static USER_COUNTER: AtomicU32 = AtomicU32::new(0);
 

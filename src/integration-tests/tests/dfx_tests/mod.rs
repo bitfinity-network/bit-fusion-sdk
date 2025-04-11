@@ -9,12 +9,12 @@ use candid::{Nat, Principal};
 use eth_signer::ic_sign::SigningKeyId;
 use ic_canister_client::IcAgentClient;
 use ic_exports::icrc_types::icrc1::account::Account;
-use ic_test_utils::{get_agent, Agent, Canister};
+use ic_test_utils::{Agent, Canister, get_agent};
 use ic_utils::interfaces::ManagementCanister;
 
 use crate::context::{CanisterType, TestCanisters, TestCanistersConfig, TestContext};
-use crate::utils::error::{Result, TestError};
 use crate::utils::TestEvm;
+use crate::utils::error::{Result, TestError};
 
 mod brc20_bridge;
 mod bridge_deployer;

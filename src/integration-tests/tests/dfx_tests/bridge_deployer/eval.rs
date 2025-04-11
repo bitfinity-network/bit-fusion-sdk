@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use lazy_regex::{lazy_regex, Lazy, Regex};
+use lazy_regex::{Lazy, Regex, lazy_regex};
 use wildmatch::WildMatch;
 
 static VAR_REGEX: Lazy<Regex> = lazy_regex!(r"\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?");

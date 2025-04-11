@@ -1,15 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bridge_canister::BridgeCanister;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
-use bridge_canister::runtime::service::ServiceOrder;
-use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::state::SharedConfig;
+use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
-use bridge_canister::BridgeCanister;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::init::BridgeInitData;
 use bridge_did::op_id::OperationId;
@@ -17,10 +17,10 @@ use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_did::operations::IcrcBridgeOp;
 use bridge_utils::common::Pagination;
 use candid::Principal;
-use did::build::BuildData;
 use did::H160;
+use did::build::BuildData;
 use ic_canister::{
-    generate_idl, init, post_upgrade, query, update, Canister, Idl, MethodType, PreUpdate,
+    Canister, Idl, MethodType, PreUpdate, generate_idl, init, post_upgrade, query, update,
 };
 use ic_exports::ic_kit::ic;
 use ic_log::canister::{LogCanister, LogState};
@@ -29,7 +29,7 @@ use ic_storage::IcStorage;
 
 use crate::ops::events_handler::IcrcEventsHandler;
 use crate::ops::{
-    IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler, FETCH_BTF_EVENTS_SERVICE_ID,
+    FETCH_BTF_EVENTS_SERVICE_ID, IcrcBridgeOpImpl, IcrcMintOrderHandler, IcrcMintTxHandler,
     REFRESH_PARAMS_SERVICE_ID, SEND_MINT_TX_SERVICE_ID, SIGN_MINT_ORDER_SERVICE_ID,
 };
 use crate::state::IcrcState;
@@ -104,7 +104,7 @@ impl Icrc2BridgeCanister {
             .borrow()
             .operations
             .get_operation_by_memo_and_user(&memo, &user_id)
-            .map(|op| (op.0, op.1 .0))
+            .map(|op| (op.0, op.1.0))
     }
 
     /// Returns log of an operation by its ID.
@@ -283,8 +283,8 @@ mod test {
     use bridge_did::evm_link::EvmLink;
     use candid::Principal;
     use eth_signer::sign_strategy::SigningStrategy;
-    use ic_canister::{canister_call, Canister};
-    use ic_exports::ic_kit::{inject, MockContext};
+    use ic_canister::{Canister, canister_call};
+    use ic_exports::ic_kit::{MockContext, inject};
 
     use super::*;
     use crate::Icrc2BridgeCanister;

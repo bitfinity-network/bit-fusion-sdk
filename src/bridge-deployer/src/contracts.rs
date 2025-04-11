@@ -10,15 +10,15 @@ use bridge_did::id256::Id256;
 use bridge_utils::native::wait_for_tx;
 use candid::Principal;
 use clap::{Args, ValueEnum};
-use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::BlockNumber;
-use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use did::constant::EIP1559_INITIAL_BASE_FEE;
 use eth_signer::LocalWallet;
-use ethereum_json_rpc_client::reqwest::ReqwestClient;
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use ethereum_json_rpc_client::EthJsonRpcClient;
+use ethereum_json_rpc_client::reqwest::ReqwestClient;
 use tracing::{debug, error, info};
 
-use crate::evm::{dfx_webserver_port, MAINNET_PRINCIPAL, TESTNET_PRINCIPAL};
+use crate::evm::{MAINNET_PRINCIPAL, TESTNET_PRINCIPAL, dfx_webserver_port};
 
 const PRIVATE_KEY_ENV_VAR: &str = "PRIVATE_KEY";
 

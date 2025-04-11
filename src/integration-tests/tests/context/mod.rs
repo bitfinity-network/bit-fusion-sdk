@@ -24,10 +24,10 @@ use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
 use did::error::EvmError;
 use did::init::EvmCanisterInitData;
-use did::{Transaction, TransactionReceipt, H160, H256, U256, U64};
+use did::{H160, H256, Transaction, TransactionReceipt, U64, U256};
+use eth_signer::LocalWallet;
 use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
-use eth_signer::LocalWallet;
 use evm_canister_client::CanisterClient;
 use evm_rpc_canister::EvmRpcCanisterInitData;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
@@ -37,15 +37,15 @@ use ic_exports::icrc_types::icrc1_ledger::{
     ArchiveOptions, FeatureFlags, InitArgs, LedgerArgument,
 };
 use ic_exports::icrc_types::icrc2::approve::ApproveArgs;
-use icrc2_bridge::SigningStrategy;
 use icrc_client::IcrcCanisterClient;
+use icrc2_bridge::SigningStrategy;
 use tokio::time::Instant;
 
 use super::utils::error::Result;
 use crate::utils::btc::{BtcNetwork, InitArg, KytMode, LifecycleArg, MinterArg, Mode};
 use crate::utils::error::TestError;
 use crate::utils::wasm::*;
-use crate::utils::{TestEvm, TestWTM, CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS};
+use crate::utils::{CHAIN_ID, EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS, TestEvm, TestWTM};
 
 pub const DEFAULT_GAS_PRICE: u128 = EIP1559_INITIAL_BASE_FEE * 2;
 const BITCOIN_CANISTER_ID: &str = "g4xu7-jiaaa-aaaan-aaaaq-cai";

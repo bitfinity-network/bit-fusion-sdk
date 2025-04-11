@@ -19,11 +19,11 @@ use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::pocket_ic::{PocketIc, PocketIcBuilder};
 
 use crate::context::{
-    CanisterType, TestCanisters, TestCanistersConfig, TestContext, ICRC1_INITIAL_BALANCE,
+    CanisterType, ICRC1_INITIAL_BALANCE, TestCanisters, TestCanistersConfig, TestContext,
 };
-use crate::utils::error::Result;
-use crate::utils::test_evm::{test_evm_pocket_ic, Evm, EvmSide};
 use crate::utils::TestEvm;
+use crate::utils::error::Result;
+use crate::utils::test_evm::{Evm, EvmSide, test_evm_pocket_ic};
 
 pub const ADMIN: &str = "admin";
 pub const JOHN: &str = "john";

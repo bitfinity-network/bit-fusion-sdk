@@ -12,7 +12,7 @@ use eth_signer::LocalWallet;
 use ic_canister_client::IcAgentClient;
 use tempfile::TempDir;
 
-use super::{DfxTestContext, ADMIN};
+use super::{ADMIN, DfxTestContext};
 use crate::context::{CanisterType, TestContext};
 use crate::utils::BitfinityEvm;
 

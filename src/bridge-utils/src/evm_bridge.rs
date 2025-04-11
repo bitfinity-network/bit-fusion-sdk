@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::btf_events::TxParams;
 use crate::query::{
-    batch_query, Query, QueryType, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID,
+    CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID, Query, QueryType, batch_query,
 };
 
 /// Information about EVM on a bridge side.

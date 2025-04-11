@@ -10,7 +10,7 @@ pub struct BtcWallet {
 impl BtcWallet {
     pub fn new_random() -> Self {
         use rand::Rng as _;
-        let entropy = rand::thread_rng().gen::<[u8; 16]>();
+        let entropy = rand::thread_rng().r#gen::<[u8; 16]>();
         let mnemonic = bip39::Mnemonic::from_entropy(&entropy).unwrap();
 
         let seed = mnemonic.to_seed("");

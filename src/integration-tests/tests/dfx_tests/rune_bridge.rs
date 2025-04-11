@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use bridge_did::runes::RuneName;
 
-use crate::context::rune_bridge::{
-    generate_rune_name, RuneDepositStrategy, RunesContext, REQUIRED_CONFIRMATIONS,
-};
 use crate::context::TestContext;
+use crate::context::rune_bridge::{
+    REQUIRED_CONFIRMATIONS, RuneDepositStrategy, RunesContext, generate_rune_name,
+};
 use crate::dfx_tests::block_until_succeeds;
 use crate::utils::test_evm::EvmSide;
-use crate::utils::{test_evm, TestEvm as _};
+use crate::utils::{TestEvm as _, test_evm};
 
 #[tokio::test]
 async fn runes_bridging_flow() {
@@ -410,23 +410,26 @@ async fn bail_out_of_impossible_deposit() {
     // First entry in the log is the scheduling of the operation, so we skip it. There might be other
     // errors, but none of them should be a `cannot progress` error, so we check it here.
     for entry in log.log().iter().take(len.saturating_sub(1)).skip(1) {
-        assert!(!entry
+        assert!(
+            !entry
+                .step_result
+                .clone()
+                .unwrap_err()
+                .to_string()
+                .contains("operation cannot progress")
+        );
+    }
+
+    assert!(
+        log.log()
+            .last()
+            .unwrap()
             .step_result
             .clone()
             .unwrap_err()
             .to_string()
-            .contains("operation cannot progress"));
-    }
-
-    assert!(log
-        .log()
-        .last()
-        .unwrap()
-        .step_result
-        .clone()
-        .unwrap_err()
-        .to_string()
-        .contains("operation cannot progress"));
+            .contains("operation cannot progress")
+    );
 
     ctx.stop().await
 }

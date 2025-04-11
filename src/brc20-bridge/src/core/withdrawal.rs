@@ -29,7 +29,7 @@ use super::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::interface::WithdrawError;
-use crate::key::{get_derivation_path, BtcSignerType};
+use crate::key::{BtcSignerType, get_derivation_path};
 use crate::ledger::UtxoKey;
 use crate::state::Brc20State;
 
@@ -78,8 +78,8 @@ pub fn new_withdraw_payload(
         // called only when some tokens are burned, which means they have been minted before,
         // and that means that we already received the rune info from the indexer.
         return Err(WithdrawError::InvalidRequest(format!(
-                "Invalid brc20 id: {brc20_tick}. No such brc20 id in the brc20 list received from the indexer."
-            )));
+            "Invalid brc20 id: {brc20_tick}. No such brc20 id in the brc20 list received from the indexer."
+        )));
     };
 
     Ok(Brc20WithdrawalPayload {
@@ -145,7 +145,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
         let fee_rate = self.get_fee_rate().await?;
         let funding_address = self.get_funding_address(&sender).await?;
         let reveal_recipient_address = funding_address.clone();
-        log::debug!("funding address: {funding_address}; reveal recipient address: {reveal_recipient_address}");
+        log::debug!(
+            "funding address: {funding_address}; reveal recipient address: {reveal_recipient_address}"
+        );
         let amount = Self::convert_erc20_amount_to_brc20(amount, decimals)?;
 
         // get funding utxos, but filter out input utxos
@@ -259,7 +261,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
     ) -> Result<Utxo, WithdrawError> {
         let reveal_recipient_address = self.get_funding_address(sender_address).await?;
         let txid = Txid::from_slice(&reveal_utxo.txid).unwrap();
-        log::debug!("checking whether the reveal transaction {txid} is confirmed for address {reveal_recipient_address}");
+        log::debug!(
+            "checking whether the reveal transaction {txid} is confirmed for address {reveal_recipient_address}"
+        );
         // get utxos for the reveal address
         self.utxo_provider
             .get_utxos(&reveal_recipient_address)
@@ -398,7 +402,8 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
                     available,
                 }) => {
                     log::debug!(
-                        "Failed to build commit transaction with {input_count} utxos; required {required}; available {available}, trying with {} utxos", input_count + 1
+                        "Failed to build commit transaction with {input_count} utxos; required {required}; available {available}, trying with {} utxos",
+                        input_count + 1
                     );
                     input_count += 1;
                 }
@@ -595,7 +600,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             let solution_value =
                 Amount::from_sat(solution.iter().map(|utxo| utxo.value).sum::<u64>());
             if solution_value >= required_fee {
-                log::debug!("Found a funding solution with {utxos_count} utxos; required fee {required_fee}; fee funds: {solution_value}");
+                log::debug!(
+                    "Found a funding solution with {utxos_count} utxos; required fee {required_fee}; fee funds: {solution_value}"
+                );
                 return Ok(Some(solution.to_vec()));
             }
 

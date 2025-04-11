@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -19,22 +19,22 @@ use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_utils::BTFBridge;
 use candid::{Encode, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{TransactionReceipt, H160, H256, U256};
-use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use did::{H160, H256, TransactionReceipt, U256};
 use eth_signer::LocalWallet;
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use ic_canister_client::CanisterClient;
 use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 
 use crate::context::TestContext;
+use crate::utils::TestEvm;
 use crate::utils::brc20_helper::Brc20Helper;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::hiro_ordinals_client::HiroOrdinalsClient;
 use crate::utils::miner::{Exit, Miner};
 use crate::utils::token_amount::TokenAmount;
-use crate::utils::TestEvm;
 
 /// Maximum supply of the BRC20 token
 pub const DEFAULT_MAX_AMOUNT: u64 = 21_000_000;

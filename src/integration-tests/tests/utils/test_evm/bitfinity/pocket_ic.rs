@@ -5,8 +5,8 @@ use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::PocketIcClient;
 use ic_exports::pocket_ic::PocketIc;
 
-use super::init::evm_canister_init_data;
 use super::BitfinityEvm;
+use super::init::evm_canister_init_data;
 use crate::context::CanisterType;
 use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 

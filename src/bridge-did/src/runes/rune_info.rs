@@ -114,7 +114,7 @@ impl FromStr for RuneName {
 
 impl Hash for RuneName {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0 .0.hash(state)
+        self.0.0.hash(state)
     }
 }
 
@@ -145,7 +145,7 @@ impl CandidType for RuneName {
     where
         S: Serializer,
     {
-        self.0 .0.idl_serialize(serializer)
+        self.0.0.idl_serialize(serializer)
     }
 }
 
@@ -154,7 +154,7 @@ impl Serialize for RuneName {
     where
         S: serde::Serializer,
     {
-        self.0 .0.serialize(serializer)
+        self.0.0.serialize(serializer)
     }
 }
 
