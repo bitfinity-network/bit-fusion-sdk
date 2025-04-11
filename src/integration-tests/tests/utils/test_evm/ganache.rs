@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use bollard::container::LogsOptions;
 use bollard::Docker;
+use bollard::container::LogsOptions;
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
+use did::{BlockNumber, Bytes, H160, H256, Transaction, TransactionReceipt, U256};
 use futures::StreamExt;
 use reqwest::Response;
 use serde_json::Value;

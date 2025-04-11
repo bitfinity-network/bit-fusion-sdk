@@ -2,24 +2,24 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use bridge_canister::BridgeCanister;
+use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::service::fetch_logs::FetchBtfBridgeEventsService;
 use bridge_canister::runtime::service::mint_tx::SendMintTxService;
 use bridge_canister::runtime::service::sign_orders::SignMintOrdersService;
 use bridge_canister::runtime::service::update_evm_params::RefreshEvmParamsService;
-use bridge_canister::runtime::service::ServiceOrder;
 use bridge_canister::runtime::state::config::ConfigStorage;
 use bridge_canister::runtime::{BridgeRuntime, RuntimeState};
-use bridge_canister::BridgeCanister;
-use bridge_did::init::brc20::Brc20BridgeConfig;
 use bridge_did::init::BridgeInitData;
+use bridge_did::init::brc20::Brc20BridgeConfig;
 use bridge_did::op_id::OperationId;
 use bridge_did::operation_log::{Memo, OperationLog};
 use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
-use ic_canister::{generate_idl, init, post_upgrade, query, update, Canister, Idl, PreUpdate};
+use ic_canister::{Canister, Idl, PreUpdate, generate_idl, init, post_upgrade, query, update};
 use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    ecdsa_public_key, EcdsaPublicKeyArgument,
+    EcdsaPublicKeyArgument, ecdsa_public_key,
 };
 use ic_exports::ledger::Subaccount;
 use ic_log::canister::{LogCanister, LogState};
@@ -172,7 +172,7 @@ impl Brc20Bridge {
 
 pub fn eth_address_to_subaccount(eth_address: &H160) -> Subaccount {
     let mut subaccount = [0; 32];
-    subaccount[0..eth_address.0 .0.len()].copy_from_slice(eth_address.0.as_slice());
+    subaccount[0..eth_address.0.0.len()].copy_from_slice(eth_address.0.as_slice());
 
     Subaccount(subaccount)
 }

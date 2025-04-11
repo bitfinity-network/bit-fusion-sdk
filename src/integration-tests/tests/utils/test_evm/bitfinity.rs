@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
+use did::{BlockNumber, Bytes, H160, H256, Transaction, TransactionReceipt, U256};
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::CanisterClient;
 

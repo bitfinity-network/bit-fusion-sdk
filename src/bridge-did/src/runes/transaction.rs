@@ -1,7 +1,7 @@
-use bitcoin::consensus::{Decodable, Encodable};
 use bitcoin::Transaction;
-use candid::types::{Serializer, Type};
+use bitcoin::consensus::{Decodable, Encodable};
 use candid::CandidType;
+use candid::types::{Serializer, Type};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -96,7 +96,9 @@ pub enum DepositError {
     IndexersDisagree {
         indexer_responses: Vec<(String, String)>,
     },
-    #[error("insufficient consensus: received {received_responses}/{required_responses}, checked {checked_indexers}")]
+    #[error(
+        "insufficient consensus: received {received_responses}/{required_responses}, checked {checked_indexers}"
+    )]
     InsufficientConsensus {
         received_responses: usize,
         required_responses: u8,
@@ -108,7 +110,9 @@ pub enum DepositError {
     NotEnoughBtc { received: u64, minimum: u64 },
     #[error("unavailable: {0}")]
     Unavailable(String),
-    #[error("pending; min confirmations: {min_confirmations}, current confirmations: {current_confirmations}")]
+    #[error(
+        "pending; min confirmations: {min_confirmations}, current confirmations: {current_confirmations}"
+    )]
     Pending {
         min_confirmations: u32,
         current_confirmations: u32,

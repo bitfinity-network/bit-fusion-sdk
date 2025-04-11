@@ -8,7 +8,7 @@ use bridge_did::init::IndexerType;
 use bridge_did::runes::RuneName;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_cdk::api::management_canister::http_request::{
-    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
+    CanisterHttpRequestArgument, HttpHeader, HttpMethod, http_request,
 };
 use ordinals::{RuneId, SpacedRune};
 use serde::de::DeserializeOwned;

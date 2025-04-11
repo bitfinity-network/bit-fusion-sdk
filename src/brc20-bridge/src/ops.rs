@@ -6,8 +6,8 @@ mod withdraw;
 
 use bitcoin::Network;
 use bridge_canister::bridge::{Operation, OperationProgress};
-use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
+use bridge_canister::runtime::service::ServiceId;
 use bridge_did::brc20_info::Brc20Tick;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::{MinterNotificationType, NotifyMinterEventData};

@@ -1,9 +1,9 @@
 use bitcoin::consensus::Encodable;
 use bitcoin::{Address, FeeRate, Transaction};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    bitcoin_get_current_fee_percentiles, bitcoin_get_utxos, bitcoin_send_transaction,
     BitcoinNetwork, GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse,
-    SendTransactionRequest,
+    SendTransactionRequest, bitcoin_get_current_fee_percentiles, bitcoin_get_utxos,
+    bitcoin_send_transaction,
 };
 
 use crate::interface::{DepositError, WithdrawError};
