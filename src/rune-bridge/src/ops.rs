@@ -102,7 +102,7 @@ impl Operation for RuneBridgeOpImpl {
 
                 return Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID));
             }
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::WaitForMintConfirm { .. }) => {
                 Err(Error::FailedToProgress(
                     "ConfirmMintOrder task should progress only on the Minted EVM event".into(),
                 ))
@@ -134,7 +134,7 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::AwaitConfirmations { .. }) => false,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SignMintOrder(_)) => false,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(_)) => false,
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { .. }) => false,
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::WaitForMintConfirm { .. }) => false,
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { .. }) => true,
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::CreateTransaction { .. }) => false,
             RuneBridgeOp::Withdraw(RuneBridgeWithdrawOp::SendTransaction { .. }) => false,
@@ -156,7 +156,7 @@ impl Operation for RuneBridgeOpImpl {
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order)) => {
                 order.reader().get_recipient()
             }
-            RuneBridgeOp::Deposit(RuneBridgeDepositOp::ConfirmMintOrder { order, .. }) => {
+            RuneBridgeOp::Deposit(RuneBridgeDepositOp::WaitForMintConfirm { order, .. }) => {
                 order.reader().get_recipient()
             }
             RuneBridgeOp::Deposit(RuneBridgeDepositOp::MintOrderConfirmed { data }) => {

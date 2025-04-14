@@ -2,6 +2,7 @@ use candid::CandidType;
 use did::H256;
 use serde::{Deserialize, Serialize};
 
+use crate::batch_mint_result::BatchMintErrorCode;
 use crate::bridge_side::BridgeSide;
 use crate::events::MintedEventData;
 use crate::order::{MintOrder, SignedOrders};
@@ -21,8 +22,9 @@ pub struct Erc20BridgeOp {
 pub enum Erc20OpStage {
     SignMintOrder(MintOrder),
     SendMintTransaction(SignedOrders),
-    ConfirmMint {
+    WaitForMintConfirm {
         order: SignedOrders,
+        mint_results: Vec<BatchMintErrorCode>,
         tx_hash: Option<H256>,
     },
     TokenMintConfirmed(MintedEventData),
@@ -33,7 +35,7 @@ impl Erc20OpStage {
         match self {
             Erc20OpStage::SignMintOrder(_) => String::from("SignMintOrder"),
             Erc20OpStage::SendMintTransaction(_) => String::from("SendMintTransaction"),
-            Erc20OpStage::ConfirmMint { .. } => String::from("ConfirmMint"),
+            Erc20OpStage::WaitForMintConfirm { .. } => String::from("ConfirmMint"),
             Erc20OpStage::TokenMintConfirmed(_) => String::from("TokenMintConfirmed"),
         }
     }

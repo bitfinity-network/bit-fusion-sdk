@@ -2,7 +2,7 @@ use bridge_canister::bridge::{Operation, OperationProgress};
 use bridge_canister::memory::StableMemory;
 use bridge_canister::runtime::RuntimeState;
 use bridge_canister::runtime::scheduler::{BridgeTask, SharedScheduler};
-use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::mint_tx::{MintTxHandler, MintTxResult};
 use bridge_canister::runtime::service::sign_orders::MintOrderHandler;
 use bridge_canister::runtime::service::{BridgeService, ServiceId};
 use bridge_canister::runtime::state::SharedConfig;
@@ -61,7 +61,7 @@ impl Operation for Erc20BridgeOpImpl {
         match self.0.stage {
             Erc20OpStage::SignMintOrder(_) => false,
             Erc20OpStage::SendMintTransaction(_) => false,
-            Erc20OpStage::ConfirmMint { .. } => false,
+            Erc20OpStage::WaitForMintConfirm { .. } => false,
             Erc20OpStage::TokenMintConfirmed(_) => true,
         }
     }
@@ -80,7 +80,7 @@ impl Operation for Erc20BridgeOpImpl {
                     .expect("evm address")
                     .1
             }
-            (BridgeSide::Base, Erc20OpStage::ConfirmMint { order, .. }) => {
+            (BridgeSide::Base, Erc20OpStage::WaitForMintConfirm { order, .. }) => {
                 order
                     .reader()
                     .get_sender_id()
@@ -100,7 +100,7 @@ impl Operation for Erc20BridgeOpImpl {
             (BridgeSide::Wrapped, Erc20OpStage::SendMintTransaction(order)) => {
                 order.reader().get_recipient()
             }
-            (BridgeSide::Wrapped, Erc20OpStage::ConfirmMint { order, .. }) => {
+            (BridgeSide::Wrapped, Erc20OpStage::WaitForMintConfirm { order, .. }) => {
                 order.reader().get_recipient()
             }
             (BridgeSide::Wrapped, Erc20OpStage::TokenMintConfirmed(event)) => {
@@ -113,7 +113,7 @@ impl Operation for Erc20BridgeOpImpl {
         match self.0.stage {
             Erc20OpStage::SignMintOrder(_) => Some(TaskOptions::default()),
             Erc20OpStage::SendMintTransaction(_) => Some(TaskOptions::default()),
-            Erc20OpStage::ConfirmMint { .. } => None,
+            Erc20OpStage::WaitForMintConfirm { .. } => None,
             Erc20OpStage::TokenMintConfirmed(_) => None,
         }
     }
@@ -127,7 +127,7 @@ impl Erc20OpStageImpl {
         match &self.0 {
             Erc20OpStage::SignMintOrder(_) => None,
             Erc20OpStage::SendMintTransaction(order) => Some(order),
-            Erc20OpStage::ConfirmMint { order, .. } => Some(order),
+            Erc20OpStage::WaitForMintConfirm { order, .. } => Some(order),
             Erc20OpStage::TokenMintConfirmed(_) => None,
         }
     }
@@ -142,8 +142,8 @@ impl Erc20OpStageImpl {
                 log::debug!("ERC20OpStage::SendMintTransaction {data:?}",);
                 Ok(OperationProgress::AddToService(SEND_MINT_TX_SERVICE_ID))
             }
-            Erc20OpStage::ConfirmMint { .. } => {
-                log::debug!("ERC20OpStage::ConfirmMint");
+            Erc20OpStage::WaitForMintConfirm { mint_results, .. } => {
+                log::debug!("ERC20OpStage::WaitForMintConfirm {mint_results:?}");
                 Err(bridge_did::error::Error::FailedToProgress(
                     "Erc20OpStage::ConfirmMint should progress by the event".into(),
                 ))
@@ -241,13 +241,13 @@ impl MintOrderHandler for Erc20OrderHandler {
 
         let should_send_mint_tx = order.fee_payer != H160::zero();
         log::trace!("Should send mint tx: {should_send_mint_tx}");
-        let new_stage = if should_send_mint_tx {
-            Erc20OpStage::SendMintTransaction(signed)
-        } else {
-            Erc20OpStage::ConfirmMint {
+        let new_stage = match should_send_mint_tx {
+            true => Erc20OpStage::SendMintTransaction(signed),
+            false => Erc20OpStage::WaitForMintConfirm {
                 order: signed,
                 tx_hash: None,
-            }
+                mint_results: vec![],
+            },
         };
 
         log::trace!("New stage for operation {id}: {new_stage:?}");
@@ -293,7 +293,7 @@ impl MintTxHandler for Erc20OrderHandler {
         Some(order)
     }
 
-    fn mint_tx_sent(&self, id: OperationId, tx_hash: did::H256) {
+    fn mint_tx_sent(&self, id: OperationId, result: MintTxResult) {
         let Some(op) = self.state.borrow().operations.get(id) else {
             log::error!("MintTxHandler failed to update operation: not found.");
             return;
@@ -303,13 +303,19 @@ impl MintTxHandler for Erc20OrderHandler {
             return;
         };
 
+        log::debug!(
+            "Mint transaction successful: {:?}; op_id: {id}; results: {:?}",
+            result.tx_hash,
+            result.results
+        );
         self.state.borrow_mut().operations.update(
             id,
             Erc20BridgeOpImpl(Erc20BridgeOp {
                 side: op.0.side,
-                stage: Erc20OpStage::ConfirmMint {
+                stage: Erc20OpStage::WaitForMintConfirm {
                     order,
-                    tx_hash: Some(tx_hash),
+                    tx_hash: result.tx_hash,
+                    mint_results: result.results,
                 },
             }),
         );

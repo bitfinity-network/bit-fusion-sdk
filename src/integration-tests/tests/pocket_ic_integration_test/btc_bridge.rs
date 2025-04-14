@@ -530,7 +530,7 @@ async fn test_should_track_deposit_and_withdrawal_operation() {
     assert!(
         matches!(
             &deposit_operation,
-            BtcBridgeOp::ConfirmErc20Mint { .. } | BtcBridgeOp::Erc20MintConfirmed { .. }
+            BtcBridgeOp::WaitForErc20MintConfirm { .. } | BtcBridgeOp::Erc20MintConfirmed { .. }
         ),
         "Incorrect operation result: {deposit_operation:?}"
     );

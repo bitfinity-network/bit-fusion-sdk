@@ -1,15 +1,17 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use alloy::consensus::transaction::Recovered;
 use alloy::consensus::{SignableTransaction as _, TxEnvelope};
-use alloy::rpc::types::Transaction as AlloyRpcTransaction;
+use alloy::rpc::types::{Transaction as AlloyRpcTransaction, TransactionRequest};
 use bridge_did::error::{BTFResult, Error};
+use bridge_did::evm_link::EvmLink;
 use bridge_did::op_id::OperationId;
 use bridge_did::order::{SignedOrders, SignedOrdersData};
-use bridge_utils::btf_events::{self};
+use bridge_utils::btf_events::{self, BatchMintErrorCode};
 use bridge_utils::evm_link::EvmLinkClient;
-use did::{H256, Transaction as DidTransaction};
+use bridge_utils::revert::{ERROR_MARKER, parse_revert_reason};
+use did::{BlockNumber, H256, Transaction as DidTransaction};
 use eth_signer::sign_strategy::TxSigner;
 
 use super::BridgeService;
@@ -19,14 +21,24 @@ use crate::runtime::state::SharedConfig;
 #[derive(Debug, Clone)]
 pub struct MintOrderBatchInfo {
     orders_batch: SignedOrdersData,
-    related_operations: HashSet<OperationId>,
+    related_operation: OperationId,
+}
+
+///  [`BridgeService::run`] Result of an operation for the mint transaction.
+#[derive(Debug, Clone)]
+pub struct MintTxResult {
+    /// Transaction hash [`H256`] of the mint transaction.
+    /// If the transaction was not sent, this field is [`None`].
+    pub tx_hash: Option<H256>,
+    /// For each order in the batch, the result of the mint transaction.
+    pub results: Vec<BatchMintErrorCode>,
 }
 
 pub trait MintTxHandler {
     fn get_signer(&self) -> BTFResult<TxSigner>;
     fn get_evm_config(&self) -> SharedConfig;
     fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders>;
-    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256);
+    fn mint_tx_sent(&self, id: OperationId, result: MintTxResult);
 }
 
 /// Service to send mint transaction with signed mint orders batch.
@@ -42,6 +54,73 @@ impl<H> SendMintTxService<H> {
             handler,
             orders_to_send: Default::default(),
         }
+    }
+
+    /// Parses the revert reason from the given error string.
+    /// Returns a vector of [`BatchMintErrorCode`] for each order in the batch.
+    fn parse_batch_mint_revert(
+        &self,
+        err: &str,
+        order_count: usize,
+    ) -> BTFResult<Vec<BatchMintErrorCode>> {
+        let err = err.to_string();
+        let data_index = err.find(ERROR_MARKER);
+        let output = if let Some(index) = data_index {
+            &err[index..]
+        } else {
+            log::error!("Failed to call batch mint tx: {err}");
+            return Err(Error::EvmRequestFailed(format!(
+                "failed to call batch mint tx: {err}"
+            )));
+        };
+        log::trace!("eth_call output: '{output}'");
+        // find '"' which delimits the end of the error marker
+        let end_of_reason_index = output.find('"').unwrap_or(output.len());
+        let output = &output[..end_of_reason_index];
+        // parse error and return [``]
+        let reason = parse_revert_reason(output).map_err(|e| {
+            log::error!("Failed to parse revert reason: {e}");
+            Error::EvmRequestFailed(format!("failed to parse revert reason: {e}"))
+        })?;
+        log::error!("Failed to call batch mint tx: {reason}");
+        // return vec of revert
+        Ok((0..order_count)
+            .map(|_| BatchMintErrorCode::Reverted(reason.clone()))
+            .collect())
+    }
+
+    /// Sends a mint transaction with the given signed orders.
+    /// Returns the result of the mint transaction.
+    async fn batch_mint(
+        &self,
+        link: &EvmLink,
+        tx: &TransactionRequest,
+        order_count: usize,
+    ) -> BTFResult<Vec<BatchMintErrorCode>> {
+        let client = link.get_json_rpc_client();
+        let output = match client.eth_call(tx, BlockNumber::Latest).await {
+            Ok(output) => output,
+            Err(err) => {
+                log::error!("Failed to call batch mint tx: {err}");
+                // TODO: migrate to newest sdk to parse JsonRpcError: <https://infinityswap.atlassian.net/browse/EPROD-1182>
+                return self.parse_batch_mint_revert(&err.to_string(), order_count);
+            }
+        };
+
+        log::trace!("mint tx output of eth_call: {output}");
+
+        // decode output
+        let output = hex::decode(output.trim_start_matches("0x")).map_err(|e| {
+            log::error!("Failed to decode batch mint tx output: {e}");
+            Error::EvmRequestFailed(format!("failed to decode batch mint tx output: {e}"))
+        })?;
+
+        let mint_result = btf_events::batch_mint_result(&output).map_err(|e| {
+            log::error!("Failed to decode batch mint tx output: {e}");
+            Error::EvmRequestFailed(format!("failed to decode batch mint tx output: {e}"))
+        })?;
+
+        Ok(mint_result)
     }
 }
 
@@ -108,41 +187,68 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
 
         let client = link.get_json_rpc_client();
 
+        // make tx envelope
         let envelope: TxEnvelope = transaction.try_into().map_err(|e| {
             log::error!("failed to convert transaction to envelope: {e}");
             Error::EvmRequestFailed(format!("failed to convert transaction to envelope: {e}"))
         })?;
 
-        let tx_hash = client.send_raw_transaction(&envelope).await.map_err(|e| {
-            log::error!("Failed to send batch mint tx to EVM: {e}");
-            Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
-        })?;
+        // eth call to get the output
+        let mint_result = self
+            .batch_mint(
+                &link,
+                &(envelope.clone().into()),
+                batch_info.orders_batch.orders_number(),
+            )
+            .await?;
 
-        // Increase nonce after tx sending.
-        self.handler
-            .get_evm_config()
-            .borrow_mut()
-            .update_evm_params(|p| p.nonce += 1);
+        // zip operation ids with mint output
+        let operation_id = batch_info.related_operation;
 
-        log::trace!(
-            "The batchMint transaction with {} mint orders sent.",
-            batch_info.orders_batch.orders_number()
-        );
+        // if at least one order is successful, commit the transaction, otherwise we can skip it
+        let mut tx_hash = None;
+        if mint_result.is_empty()
+            || mint_result
+                .iter()
+                .any(|result| result == &BatchMintErrorCode::Ok)
+        {
+            // now commit the transaction
+            tx_hash = Some(client.send_raw_transaction(&envelope).await.map_err(|e| {
+                log::error!("Failed to send batch mint tx to EVM: {e}");
+                Error::EvmRequestFailed(format!("failed to send batch mint tx to EVM: {e}"))
+            })?);
+
+            // Increase nonce after tx sending.
+            self.handler
+                .get_evm_config()
+                .borrow_mut()
+                .update_evm_params(|p| p.nonce += 1);
+
+            log::trace!(
+                "The batchMint transaction with {} mint orders sent.",
+                batch_info.orders_batch.orders_number()
+            );
+        } else {
+            log::trace!(
+                "The batchMint transaction with {} mint orders not sent, because all of the order would fail.",
+                batch_info.orders_batch.orders_number()
+            );
+        }
 
         // Remove sent orders batch from service.
-        let sent_batch_info = match self.orders_to_send.borrow_mut().remove(&digest) {
-            Some(batch_info) => batch_info,
-            None => {
-                log::warn!("Failed to remove signed mint orders which was just sent.");
-                batch_info
-            }
-        };
+        self.orders_to_send.borrow_mut().remove(&digest);
 
         // Update state for all operations related with the orders batch.
-        for op_id in sent_batch_info.related_operations {
-            log::trace!("Updating state `mint_tx_sent` for operation {op_id} and tx {tx_hash}.");
-            self.handler.mint_tx_sent(op_id, tx_hash.clone())
-        }
+        log::trace!(
+            "Updating state `mint_tx_sent` for operation {operation_id} and tx {tx_hash:?} (results: {mint_result:?})."
+        );
+        self.handler.mint_tx_sent(
+            operation_id,
+            MintTxResult {
+                tx_hash,
+                results: mint_result,
+            },
+        );
 
         log::trace!("SendMintTxService run finished.");
 
@@ -159,16 +265,65 @@ impl<H: MintTxHandler> BridgeService for SendMintTxService<H> {
 
         let orders_batch = order.into_inner();
         let digest = orders_batch.digest();
-        self.orders_to_send
-            .borrow_mut()
-            .entry(digest)
-            .or_insert_with(|| MintOrderBatchInfo {
-                orders_batch,
-                related_operations: HashSet::new(),
-            })
-            .related_operations
-            .insert(op_id);
+        {
+            let mut orders_to_send = self.orders_to_send.borrow_mut();
+            let entry = orders_to_send
+                .entry(digest)
+                .or_insert_with(|| MintOrderBatchInfo {
+                    orders_batch,
+                    related_operation: op_id,
+                });
+            entry.related_operation = op_id;
+        }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    struct MockMintTxHandler;
+
+    impl MintTxHandler for MockMintTxHandler {
+        fn get_signer(&self) -> BTFResult<TxSigner> {
+            unimplemented!()
+        }
+
+        fn get_evm_config(&self) -> SharedConfig {
+            unimplemented!()
+        }
+
+        fn get_signed_orders(&self, _id: OperationId) -> Option<SignedOrders> {
+            unimplemented!()
+        }
+
+        fn mint_tx_sent(&self, _id: OperationId, _result: MintTxResult) {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn test_should_parse_batch_mint_revert() {
+        let error = r#"Single(Failure(Failure { jsonrpc: Some(V2), error: Error { code: ServerError(-32015), message: "The transaction has been reverted: 0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000", data: Some(String("0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000")) }, id: Str("eth_call") }))"#;
+        let mock_handler = SendMintTxService {
+            handler: MockMintTxHandler,
+            orders_to_send: RefCell::new(HashMap::new()),
+        };
+        let result = mock_handler.parse_batch_mint_revert(error, 2);
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result[0],
+            BatchMintErrorCode::Reverted("Invalid token pair".to_string())
+        );
+        assert_eq!(
+            result[1],
+            BatchMintErrorCode::Reverted("Invalid token pair".to_string())
+        );
     }
 }

@@ -1,12 +1,11 @@
 use bridge_canister::bridge::OperationContext as _;
 use bridge_canister::runtime::RuntimeState;
-use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::mint_tx::{MintTxHandler, MintTxResult};
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp};
 use bridge_did::order::SignedOrders;
-use did::H256;
 use eth_signer::sign_strategy::TxSigner;
 
 use super::RuneBridgeOpImpl;
@@ -45,7 +44,7 @@ impl MintTxHandler for RuneMintTxHandler {
         Some(order)
     }
 
-    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256) {
+    fn mint_tx_sent(&self, id: OperationId, result: MintTxResult) {
         let op = self.state.borrow().operations.get(id);
         let Some(RuneBridgeOp::Deposit(RuneBridgeDepositOp::SendMintOrder(order))) =
             op.map(|op| op.0)
@@ -56,12 +55,18 @@ impl MintTxHandler for RuneMintTxHandler {
             return;
         };
 
+        log::debug!(
+            "Mint transaction successful: {:?}; op_id: {id}; results: {:?}",
+            result.tx_hash,
+            result.results
+        );
         self.state.borrow_mut().operations.update(
             id,
             RuneBridgeOpImpl(RuneBridgeOp::Deposit(
-                RuneBridgeDepositOp::ConfirmMintOrder {
+                RuneBridgeDepositOp::WaitForMintConfirm {
                     order,
-                    tx_id: tx_hash,
+                    tx_id: result.tx_hash,
+                    mint_results: result.results,
                 },
             )),
         )

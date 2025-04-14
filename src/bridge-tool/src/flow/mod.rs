@@ -441,7 +441,7 @@ impl Erc20BridgeFlow {
         }
 
         let (evm_client, _, _) = self.get_side(side);
-        if let Erc20OpStage::ConfirmMint {
+        if let Erc20OpStage::WaitForMintConfirm {
             tx_hash: Some(tx_hash),
             ..
         } = curr_step.stage

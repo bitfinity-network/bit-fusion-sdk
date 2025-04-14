@@ -1,12 +1,11 @@
 use bridge_canister::bridge::OperationContext as _;
 use bridge_canister::runtime::RuntimeState;
-use bridge_canister::runtime::service::mint_tx::MintTxHandler;
+use bridge_canister::runtime::service::mint_tx::{MintTxHandler, MintTxResult};
 use bridge_canister::runtime::state::SharedConfig;
 use bridge_did::error::BTFResult;
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{Brc20BridgeDepositOp, Brc20BridgeOp};
 use bridge_did::order::SignedOrders;
-use did::H256;
 use eth_signer::sign_strategy::TxSigner;
 
 use super::Brc20BridgeOpImpl;
@@ -45,8 +44,7 @@ impl MintTxHandler for Brc20MintTxHandler {
         Some(order)
     }
 
-    fn mint_tx_sent(&self, id: OperationId, tx_hash: H256) {
-        log::debug!("Mint transaction sent: {tx_hash}; op_id: {id}");
+    fn mint_tx_sent(&self, id: OperationId, result: MintTxResult) {
         let op = self.state.borrow().operations.get(id);
         let Some(Brc20BridgeOp::Deposit(Brc20BridgeDepositOp::SendMintOrder(orders))) =
             op.map(|op| op.0)
@@ -57,14 +55,20 @@ impl MintTxHandler for Brc20MintTxHandler {
             return;
         };
 
+        log::debug!(
+            "Mint transaction successful: {:?}; op_id: {id}; results: {:?}",
+            result.tx_hash,
+            result.results
+        );
         self.state.borrow_mut().operations.update(
             id,
             Brc20BridgeOpImpl(Brc20BridgeOp::Deposit(
-                Brc20BridgeDepositOp::ConfirmMintOrder {
+                Brc20BridgeDepositOp::WaitForMintConfirm {
+                    mint_result: result.results,
                     orders,
-                    tx_id: tx_hash,
+                    tx_id: result.tx_hash,
                 },
             )),
-        )
+        );
     }
 }

@@ -6,6 +6,7 @@ use did::{H160, H256};
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::batch_mint_result::BatchMintErrorCode;
 use crate::brc20_info::{Brc20Info, Brc20Tick};
 use crate::events::MintedEventData;
 use crate::order::{MintOrder, SignedOrders};
@@ -41,8 +42,12 @@ pub enum Brc20BridgeDepositOp {
     SignMintOrder(MintOrder),
     /// Send the signed mint order to the bridge
     SendMintOrder(SignedOrders),
-    /// Confirm the mint order
-    ConfirmMintOrder { orders: SignedOrders, tx_id: H256 },
+    /// Wait for the mint order to be confirmed
+    WaitForMintConfirm {
+        orders: SignedOrders,
+        mint_result: Vec<BatchMintErrorCode>,
+        tx_id: Option<H256>,
+    },
     /// Mint order confirmed status
     MintOrderConfirmed { data: MintedEventData },
 }
