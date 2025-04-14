@@ -43,14 +43,14 @@ candid = { version = "0.10", features = ["value"] }
 cfg-if = "1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
-did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.48.x" }
+did = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "did", tag = "v0.49.x" }
 dirs = "6"
 dotenv = "0.15"
 drop_guard = "0.3"
 env_logger = { version = "0.11", default-features = false }
-eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.48.x" }
-ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.48.x" }
-evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.48.x" }
+eth-signer = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "eth-signer", tag = "v0.49.x" }
+ethereum-json-rpc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "ethereum-json-rpc-client", tag = "v0.49.x" }
+evm-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "evm-canister-client", tag = "v0.49.x" }
 foundry-compilers = { version = "0.14", features = ["svm-solc"] }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
@@ -70,7 +70,7 @@ ic-storage = { git = "https://github.com/bitfinity-network/canister-sdk", packag
 ic-task-scheduler = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-task-scheduler", tag = "v0.24.x" }
 ic-test-utils = { git = "https://github.com/bitfinity-network/canister-sdk", package = "ic-test-utils", tag = "v0.24.x" }
 ic-utils = "0.39"
-icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.48.x" }
+icrc-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "icrc-client", tag = "v0.49.x" }
 lazy-regex = "3"
 log = "0.4"
 mockall = "0.13"
@@ -86,7 +86,7 @@ serde = "1.0"
 serde_bytes = "0.11"
 serde_json = "1.0"
 serial_test = "3"
-signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.48.x" }
+signature-verification-canister-client = { git = "https://github.com/bitfinity-network/bitfinity-evm-sdk", package = "signature-verification-canister-client", tag = "v0.49.x" }
 snapbox = "0.6"
 strum = "0.27"
 tempfile = "3"

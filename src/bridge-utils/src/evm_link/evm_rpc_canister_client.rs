@@ -1,13 +1,16 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use bridge_did::evm_link::RpcError;
 pub use bridge_did::evm_link::{
-    EthMainnetService, EthSepoliaService, L2MainnetService, RequestCostResult, RequestResult,
-    RpcApi, RpcService, Service,
+    EthMainnetService, EthSepoliaService, JsonRpcError as BridgeJsonRpcError, L2MainnetService,
+    RequestCostResult, RequestResult, RpcApi, RpcService, Service,
 };
 use candid::Principal;
 use did::rpc::request::RpcRequest;
 use did::rpc::response::RpcResponse;
+use ethereum_json_rpc_client::{JsonRpcError, JsonRpcResult};
+use ic_exports::ic_kit::RejectionCode;
 use num_traits::ToPrimitive;
 
 /// Client for sending RPC requests to the EVM-RPC canister.
@@ -30,7 +33,7 @@ impl EvmRpcCanisterClient {
     pub fn send_rpc_request(
         &self,
         request: RpcRequest,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<RpcResponse>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = JsonRpcResult<RpcResponse>> + Send>> {
         let rpc_service = self.rpc_service.clone();
         Box::pin(Self::try_rpc_request(self.principal, rpc_service, request))
     }
@@ -41,7 +44,7 @@ impl EvmRpcCanisterClient {
         principal: Principal,
         rpc_service: Vec<RpcService>,
         request: RpcRequest,
-    ) -> anyhow::Result<RpcResponse> {
+    ) -> JsonRpcResult<RpcResponse> {
         let request = serde_json::to_string(&request)?;
         let mut last_error = None;
         // shuffle services using timestamp and module
@@ -57,7 +60,10 @@ impl EvmRpcCanisterClient {
 
         match last_error {
             Some(err) => Err(err),
-            None => anyhow::bail!("No services available"),
+            None => Err(JsonRpcError::CanisterCall {
+                rejection_code: RejectionCode::CanisterError,
+                message: "No services available".to_string(),
+            }),
         }
     }
 
@@ -66,7 +72,7 @@ impl EvmRpcCanisterClient {
         principal: Principal,
         rpc_service: &RpcService,
         request: &str,
-    ) -> anyhow::Result<RpcResponse> {
+    ) -> JsonRpcResult<RpcResponse> {
         let service = Service(principal);
         const MAX_RESPONSE_SIZE: u64 = 2000000;
 
@@ -74,15 +80,26 @@ impl EvmRpcCanisterClient {
         let (request_cost_result,) = service
             .request_cost(rpc_service, request, MAX_RESPONSE_SIZE)
             .await
-            .map_err(|(err, msg)| anyhow::anyhow!("request_cost failed: {err:?}, msg: {msg}",))?;
+            .map_err(|(rejection_code, message)| JsonRpcError::CanisterCall {
+                rejection_code,
+                message,
+            })?;
 
         let cycles = match request_cost_result {
-            RequestCostResult::Ok(cycles) => cycles
-                .0
-                .to_u128()
-                .ok_or_else(|| anyhow::anyhow!("cycles conversion failed"))?,
+            RequestCostResult::Ok(cycles) => {
+                cycles
+                    .0
+                    .to_u128()
+                    .ok_or_else(|| JsonRpcError::InsufficientCycles {
+                        available: 0,
+                        cost: 0,
+                    })?
+            }
             RequestCostResult::Err(err) => {
-                anyhow::bail!("request_cost error: {err}");
+                return Err(JsonRpcError::CanisterCall {
+                    rejection_code: RejectionCode::CanisterError,
+                    message: err.to_string(),
+                });
             }
         };
 
@@ -90,15 +107,25 @@ impl EvmRpcCanisterClient {
         let (request_result,) = service
             .request(rpc_service, request, MAX_RESPONSE_SIZE, cycles)
             .await
-            .map_err(|(err, msg)| anyhow::anyhow!("request failed: {err:?}, msg: {msg}",))?;
+            .map_err(|(rejection_code, message)| JsonRpcError::CanisterCall {
+                rejection_code,
+                message,
+            })?;
 
-        let response = match request_result {
-            RequestResult::Ok(response) => serde_json::from_str(&response)?,
-            RequestResult::Err(err) => {
-                anyhow::bail!("request error: {err}");
+        match request_result {
+            RequestResult::Ok(response) => {
+                serde_json::from_str(&response).map_err(JsonRpcError::Json)
             }
-        };
-
-        Ok(response)
+            RequestResult::Err(RpcError::JsonRpcError(BridgeJsonRpcError { message, .. })) => {
+                Err(JsonRpcError::CanisterCall {
+                    rejection_code: RejectionCode::CanisterError,
+                    message,
+                })
+            }
+            RequestResult::Err(err) => Err(JsonRpcError::CanisterCall {
+                rejection_code: RejectionCode::CanisterError,
+                message: err.to_string(),
+            }),
+        }
     }
 }

@@ -7,7 +7,7 @@ pub use bridge_did::batch_mint_result::{BatchMintErrorCode, BatchMintResultError
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::event_data::*;
 use candid::CandidType;
-use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient};
+use ethereum_json_rpc_client::{Client, EthGetLogsParams, EthJsonRpcClient, JsonRpcResult};
 use serde::{Deserialize, Serialize};
 
 use crate::BTFBridge;
@@ -110,7 +110,7 @@ impl BridgeEvent {
         bridge_contract: Address,
         from_block: EthBlockNumber,
         to_block: EthBlockNumber,
-    ) -> Result<Vec<Log>, anyhow::Error> {
+    ) -> JsonRpcResult<Vec<Log>> {
         let params = EthGetLogsParams {
             address: Some(vec![bridge_contract.into()]),
             from_block: from_block.into(),
@@ -367,7 +367,7 @@ mod tests {
         fn send_rpc_request(
             &self,
             request: RpcRequest,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<RpcResponse>> + Send>>
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = JsonRpcResult<RpcResponse>> + Send>>
         {
             // get block number for eth_getLogs request
             let (id, from_block, to_block) = match request {

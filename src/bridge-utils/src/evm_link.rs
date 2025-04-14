@@ -9,7 +9,7 @@ use candid::Principal;
 use did::rpc::request::RpcRequest;
 use did::rpc::response::RpcResponse;
 use ethereum_json_rpc_client::http_outcall::HttpOutcallClient;
-use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
+use ethereum_json_rpc_client::{Client, EthJsonRpcClient, JsonRpcResult};
 use ic_canister_client::IcCanisterClient;
 
 use self::evm_rpc_canister_client::EvmRpcCanisterClient;
@@ -42,7 +42,7 @@ impl Client for Clients {
     fn send_rpc_request(
         &self,
         request: RpcRequest,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<RpcResponse>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = JsonRpcResult<RpcResponse>> + Send>> {
         match self {
             Clients::Canister(client) => client.send_rpc_request(request),
             Clients::HttpOutCall(client) => client.send_rpc_request(request),
