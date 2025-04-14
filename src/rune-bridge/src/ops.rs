@@ -4,8 +4,8 @@ mod mint_tx_handler;
 use std::collections::HashMap;
 
 use bridge_canister::bridge::{Operation, OperationProgress};
-use bridge_canister::runtime::service::ServiceId;
 use bridge_canister::runtime::RuntimeState;
+use bridge_canister::runtime::service::ServiceId;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::op_id::OperationId;
 use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdrawOp};

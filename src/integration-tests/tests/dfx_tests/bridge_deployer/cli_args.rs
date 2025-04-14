@@ -7,8 +7,8 @@ use ic_canister_client::IcAgentClient;
 
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::DfxTestContext;
-use crate::utils::test_evm::{GanacheEvm, TestEvm};
 use crate::utils::BitfinityEvm;
+use crate::utils::test_evm::{GanacheEvm, TestEvm};
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";

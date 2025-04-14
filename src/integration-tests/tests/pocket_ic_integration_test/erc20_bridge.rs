@@ -13,10 +13,10 @@ use eth_signer::LocalWallet;
 use ic_stable_structures::Storable as _;
 
 use super::PocketIcTestContext;
-use crate::context::stress::{erc20, StressTestConfig};
+use crate::context::stress::{StressTestConfig, erc20};
 use crate::context::{CanisterType, TestContext};
-use crate::pocket_ic_integration_test::{block_until_succeeds, ADMIN};
-use crate::utils::{TestEvm, CHAIN_ID};
+use crate::pocket_ic_integration_test::{ADMIN, block_until_succeeds};
+use crate::utils::{CHAIN_ID, TestEvm};
 
 pub struct ContextWithBridges {
     pub context: PocketIcTestContext,

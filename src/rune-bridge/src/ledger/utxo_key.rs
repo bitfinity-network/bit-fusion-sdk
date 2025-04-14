@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use bitcoin::hashes::sha256d::Hash;
 use bitcoin::OutPoint;
+use bitcoin::hashes::sha256d::Hash;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
 use ic_stable_structures::{Bound, Storable};
 

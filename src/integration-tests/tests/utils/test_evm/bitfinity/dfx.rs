@@ -4,11 +4,11 @@ use std::time::Duration;
 use candid::Principal;
 use evm_canister_client::EvmCanisterClient;
 use ic_canister_client::IcAgentClient;
-use ic_test_utils::{get_agent, Agent, Canister};
+use ic_test_utils::{Agent, Canister, get_agent};
 use ic_utils::interfaces::ManagementCanister;
 
-use super::init::evm_canister_init_data;
 use super::BitfinityEvm;
+use super::init::evm_canister_init_data;
 use crate::context::CanisterType;
 use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
 
