@@ -130,8 +130,8 @@ pub enum RejectionCode {
     CanisterReject,
 }
 
-#[allow(non_snake_case)]
 #[derive(Debug, Error, CandidType, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum HttpOutcallError {
     #[error("IC error: {message} ({code})")]
     IcError {
@@ -139,12 +139,12 @@ pub enum HttpOutcallError {
         message: String,
     },
     #[error(
-        "invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsingError:?}"
+        "invalid http json-rpc response: status: {status}, body: {body}, parsing error: {parsing_error:?}"
     )]
     InvalidHttpJsonRpcResponse {
         status: u16,
         body: String,
-        parsingError: Option<String>,
+        parsing_error: Option<String>,
     },
 }
 

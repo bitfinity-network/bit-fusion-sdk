@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use alloy::primitives::Address;
 use anyhow::anyhow;
 use did::BlockNumber;
+use did::rpc::id::Id;
+use did::rpc::params::Params;
+use did::rpc::request::{Request, RpcRequest};
+use did::rpc::response::{Response, RpcResponse};
+use did::rpc::version::Version;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use jsonrpc_core::{
-    Call, Id, MethodCall, Output, Params, Request, Response, Value, Version, serde_json,
-};
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 pub const CHAINID_ID: &str = "chainID";
 pub const GAS_PRICE_ID: &str = "gasPrice";
@@ -23,7 +26,7 @@ pub enum QueryType {
 }
 
 impl QueryType {
-    fn to_method_call(&self) -> Call {
+    fn to_method_call(&self) -> Request {
         let (method, params, id) = match self {
             QueryType::GasPrice => ("eth_gasPrice", vec![], GAS_PRICE_ID),
             QueryType::Nonce { address } => (
@@ -38,12 +41,12 @@ impl QueryType {
             QueryType::ChainID => ("eth_chainId", vec![], CHAINID_ID),
         };
 
-        Call::MethodCall(MethodCall {
+        Request {
             jsonrpc: Some(Version::V2),
             method: method.into(),
             params: Params::Array(params),
-            id: Id::Str(id.into()),
-        })
+            id: Id::String(id.into()),
+        }
     }
 }
 
@@ -57,14 +60,14 @@ pub async fn batch_query(
         .map(QueryType::to_method_call)
         .collect::<Vec<_>>();
     log::trace!("Sending rpc query: {calls:?}");
-    let request = Request::Batch(calls);
-    let Response::Batch(responses) = client.request(request).await? else {
+    let request = RpcRequest::Batch(calls);
+    let RpcResponse::Batch(responses) = client.request(request).await? else {
         return Err(anyhow!("Unexpected response format"));
     };
 
     let mut response_map = HashMap::new();
     for response in responses {
-        if let Output::Success(success) = response {
+        if let Response::Success(success) = response {
             response_map.insert(success.id, success.result);
         } else {
             return Err(anyhow!("Failed to process response"));

@@ -6,10 +6,11 @@ use std::pin::Pin;
 use alloy::primitives::Address;
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
+use did::rpc::request::RpcRequest;
+use did::rpc::response::RpcResponse;
 use ethereum_json_rpc_client::http_outcall::HttpOutcallClient;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use ic_canister_client::IcCanisterClient;
-use jsonrpc_core::{Request, Response};
 
 use self::evm_rpc_canister_client::EvmRpcCanisterClient;
 pub use self::evm_rpc_canister_client::{
@@ -40,8 +41,8 @@ impl Clients {
 impl Client for Clients {
     fn send_rpc_request(
         &self,
-        request: Request,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Response>> + Send>> {
+        request: RpcRequest,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<RpcResponse>> + Send>> {
         match self {
             Clients::Canister(client) => client.send_rpc_request(request),
             Clients::HttpOutCall(client) => client.send_rpc_request(request),

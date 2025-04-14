@@ -14,6 +14,9 @@ build_solidity:
   cd solidity && forge test -vv
   cd solidity && forge build --force --sizes
 
+# Build all canisters and tools
+[group('build')]
+build_all: build_solidity build_all_canisters build_bridge_tool build_bridge_deployer_tool
 
 # Builds all canisters
 [group('build')]

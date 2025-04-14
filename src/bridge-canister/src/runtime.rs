@@ -15,7 +15,6 @@ use ic_stable_structures::{StableBTreeMap, StableCell};
 use ic_storage::IcStorage;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::ScheduledTask;
-use jsonrpc_core::futures;
 
 use self::scheduler::{BridgeTask, SharedScheduler};
 use self::service::{DynService, ServiceOrder};

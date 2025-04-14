@@ -11,10 +11,10 @@ use bridge_utils::query::{
     self, CHAINID_ID, GAS_PRICE_ID, LATEST_BLOCK_ID, NONCE_ID, Query, QueryType,
 };
 use candid::{CandidType, Principal};
+use did::rpc::id::Id;
 use did::{H160, U256, codec};
 use eth_signer::sign_strategy::{SigningStrategy, TxSigner};
 use ic_stable_structures::{CellStructure, StableCell, Storable};
-use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::memory::StableMemory;
@@ -76,13 +76,13 @@ impl ConfigStorage {
         log::trace!("initializing evm params responses: {responses:?}");
 
         let gas_price: U256 = responses
-            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .get_value_by_id(Id::String(GAS_PRICE_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
         let chain_id: U256 = responses
-            .get_value_by_id(Id::Str(CHAINID_ID.into()))
+            .get_value_by_id(Id::String(CHAINID_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query chain id: {e}")))?;
         let latest_block: U256 = responses
-            .get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))
+            .get_value_by_id(Id::String(LATEST_BLOCK_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query latest block: {e}")))?;
 
         let params = EvmParams {
@@ -129,10 +129,10 @@ impl ConfigStorage {
         .map_err(|e| Error::EvmRequestFailed(format!("failed to query evm params: {e}")))?;
 
         let nonce: U256 = responses
-            .get_value_by_id(Id::Str(NONCE_ID.into()))
+            .get_value_by_id(Id::String(NONCE_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query nonce: {e}")))?;
         let gas_price: U256 = responses
-            .get_value_by_id(Id::Str(GAS_PRICE_ID.into()))
+            .get_value_by_id(Id::String(GAS_PRICE_ID.into()))
             .map_err(|e| Error::EvmRequestFailed(format!("failed to query gas price: {e}")))?;
 
         config.borrow_mut().update_evm_params(|p| {

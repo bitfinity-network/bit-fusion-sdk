@@ -1,8 +1,8 @@
 use bridge_did::evm_link::EvmLink;
 use candid::CandidType;
+use did::rpc::id::Id;
 use did::{H160, U256};
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
-use jsonrpc_core::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::btf_events::TxParams;
@@ -67,10 +67,10 @@ impl EvmParams {
         )
         .await?;
 
-        let chain_id: U256 = responses.get_value_by_id(Id::Str(CHAINID_ID.into()))?;
-        let next_block: U256 = responses.get_value_by_id(Id::Str(LATEST_BLOCK_ID.into()))?;
-        let nonce: U256 = responses.get_value_by_id(Id::Str(NONCE_ID.into()))?;
-        let gas_price: U256 = responses.get_value_by_id(Id::Str(GAS_PRICE_ID.into()))?;
+        let chain_id: U256 = responses.get_value_by_id(Id::String(CHAINID_ID.into()))?;
+        let next_block: U256 = responses.get_value_by_id(Id::String(LATEST_BLOCK_ID.into()))?;
+        let nonce: U256 = responses.get_value_by_id(Id::String(NONCE_ID.into()))?;
+        let gas_price: U256 = responses.get_value_by_id(Id::String(GAS_PRICE_ID.into()))?;
 
         Ok(Self {
             chain_id: chain_id.0.to(),
