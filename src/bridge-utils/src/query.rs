@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use alloy::primitives::Address;
 use anyhow::anyhow;
+use did::BlockNumber;
 use did::rpc::id::Id;
 use did::rpc::params::Params;
 use did::rpc::request::{Request, RpcRequest};
 use did::rpc::response::{Response, RpcResponse};
 use did::rpc::version::Version;
-use did::BlockNumber;
 use ethereum_json_rpc_client::{Client, EthJsonRpcClient};
 use serde::de::DeserializeOwned;
 use serde_json::Value;

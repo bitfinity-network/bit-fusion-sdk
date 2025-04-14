@@ -191,10 +191,10 @@ mod tests {
     use alloy::primitives::Bytes;
     use alloy::rpc::types::RawLog;
     use alloy_sol_types::private::{Address, FixedBytes, Uint};
+    use did::H256;
     use did::rpc::params::Params;
     use did::rpc::request::{Request, RpcRequest};
     use did::rpc::response::{Failure, Response, RpcResponse, Success};
-    use did::H256;
 
     use super::*;
 

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr as _;
-use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -16,9 +16,9 @@ use bridge_utils::BTFBridge;
 use btc_bridge::canister::eth_address_to_subaccount;
 use candid::{Encode, Nat, Principal};
 use did::constant::EIP1559_INITIAL_BASE_FEE;
-use did::{TransactionReceipt, H160, H256, U256};
-use eth_signer::transaction::{SigningMethod, TransactionBuilder};
+use did::{H160, H256, TransactionReceipt, U256};
 use eth_signer::LocalWallet;
+use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use ic_canister_client::CanisterClient;
 use ic_ckbtc_kyt::SetApiKeyArg;
 use ic_ckbtc_minter::updates::get_btc_address::GetBtcAddressArgs;
@@ -27,11 +27,11 @@ use ord_rs::Utxo;
 use tokio::sync::{Mutex, RwLock};
 
 use super::TestContext;
+use crate::utils::TestEvm;
 use crate::utils::btc_rpc_client::BitcoinRpcClient;
 use crate::utils::btc_transfer_helper::BtcTransferHelper;
 use crate::utils::btc_wallet::BtcWallet;
 use crate::utils::miner::{Exit, Miner};
-use crate::utils::TestEvm;
 
 pub const REQUIRED_CONFIRMATIONS: u64 = 6;
 

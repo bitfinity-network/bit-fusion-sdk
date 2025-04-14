@@ -10,16 +10,16 @@ use bridge_did::runes::RuneWithdrawalPayload;
 use did::H160;
 use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
-use ord_rs::fees::{estimate_edict_transaction_fees, EstimateEdictTxFeesArgs};
-use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ord_rs::OrdTransactionBuilder;
+use ord_rs::fees::{EstimateEdictTxFeesArgs, estimate_edict_transaction_fees};
+use ord_rs::wallet::{CreateEdictTxArgs, ScriptType, TxInputInfo};
 use ordinals::RuneId;
 
 use crate::canister::{get_rune_state, get_runtime_state};
 use crate::constants::FEE_RATE_UPDATE_INTERVAL;
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::WithdrawError;
-use crate::key::{get_derivation_path, get_derivation_path_ic, BtcSignerType};
+use crate::key::{BtcSignerType, get_derivation_path, get_derivation_path_ic};
 use crate::state::RuneState;
 
 pub struct RuneWithdrawalPayloadImpl(pub RuneWithdrawalPayload);
@@ -375,7 +375,9 @@ impl<UTXO: UtxoProvider> Withdrawal<UTXO> {
             let solution_value =
                 Amount::from_sat(solution.iter().map(|utxo| utxo.value).sum::<u64>());
             if solution_value >= required_fee {
-                log::debug!("Found a funding solution with {utxos_count} utxos; required fee {required_fee}; fee funds: {solution_value}");
+                log::debug!(
+                    "Found a funding solution with {utxos_count} utxos; required fee {required_fee}; fee funds: {solution_value}"
+                );
                 return Some(solution.to_vec());
             }
 

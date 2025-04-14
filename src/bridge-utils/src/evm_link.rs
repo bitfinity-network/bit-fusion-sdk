@@ -75,7 +75,9 @@ impl EvmLinkClient for EvmLink {
                 canister_id: principal,
                 rpc_service,
             } => {
-                log::trace!("Using rpc client with canister_id: {principal} and rpc_service: {rpc_service:?}");
+                log::trace!(
+                    "Using rpc client with canister_id: {principal} and rpc_service: {rpc_service:?}"
+                );
                 EthJsonRpcClient::new(Clients::evm_rpc_canister(*principal, rpc_service))
             }
         }

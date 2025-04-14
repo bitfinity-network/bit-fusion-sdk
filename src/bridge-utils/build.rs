@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use foundry_compilers::artifacts::{remappings, EvmVersion, Optimizer, Remapping, Settings};
+use foundry_compilers::artifacts::{EvmVersion, Optimizer, Remapping, Settings, remappings};
 use foundry_compilers::solc::{CliSettings, SolcCompiler, SolcSettings};
 use foundry_compilers::{ProjectBuilder, ProjectPathsConfig};
 

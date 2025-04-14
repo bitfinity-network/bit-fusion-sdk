@@ -18,7 +18,7 @@ use crate::canister::{get_brc20_state, get_runtime_state};
 use crate::core::index_provider::{Brc20IndexProvider, OrdIndexProvider};
 use crate::core::utxo_provider::{IcUtxoProvider, UtxoProvider};
 use crate::interface::DepositError;
-use crate::key::{get_derivation_path_ic, BtcSignerType, KeyError};
+use crate::key::{BtcSignerType, KeyError, get_derivation_path_ic};
 use crate::ledger::UtxoKey;
 use crate::ops::Brc20BridgeOpImpl;
 use crate::state::Brc20State;
@@ -291,7 +291,9 @@ impl<UTXO: UtxoProvider, INDEX: Brc20IndexProvider> Brc20Deposit<UTXO, INDEX> {
         let res = match brc20s.get(tick) {
             Some(v) => Some(*v),
             None => {
-                log::error!("Ord indexer didn't return a brc20 information for brc20 {tick} that was present in an UTXO");
+                log::error!(
+                    "Ord indexer didn't return a brc20 information for brc20 {tick} that was present in an UTXO"
+                );
                 None
             }
         };

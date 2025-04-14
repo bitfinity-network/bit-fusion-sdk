@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
+use did::{BlockNumber, Bytes, H160, H256, Transaction, TransactionReceipt, U256};
 
 use super::{BitfinityEvm, EvmSide, GanacheEvm, TestEvm};
 use crate::utils::error::Result as TestResult;

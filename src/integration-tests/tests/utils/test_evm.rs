@@ -5,14 +5,14 @@ mod wrapper;
 
 use bridge_did::evm_link::EvmLink;
 use candid::Principal;
-use did::{BlockNumber, Bytes, Transaction, TransactionReceipt, H160, H256, U256};
+use did::{BlockNumber, Bytes, H160, H256, Transaction, TransactionReceipt, U256};
 
 pub use self::bitfinity::BitfinityEvm;
 pub use self::ganache::GanacheEvm;
 #[cfg(feature = "pocket_ic_integration_test")]
 pub use self::wrapper::test_evm_pocket_ic;
 #[cfg(any(feature = "pocket_ic_integration_test", feature = "dfx_tests"))]
-pub use self::wrapper::{test_evm, Evm};
+pub use self::wrapper::{Evm, test_evm};
 use crate::utils::error::Result as TestResult;
 
 /// EVM Side
