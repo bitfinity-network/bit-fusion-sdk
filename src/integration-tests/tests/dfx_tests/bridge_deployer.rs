@@ -240,6 +240,7 @@ async fn test_should_update_bridge() {
 #[tokio::test]
 #[serial_test::serial]
 #[cfg(feature = "dfx_tests")]
+#[ignore = "annoyingly fails randomly; to be fixed in <https://infinityswap.atlassian.net/browse/EPROD-1185>"]
 async fn test_should_reinstall_bridge() {
     let ctx = setup(&[
         CanisterType::Evm,
