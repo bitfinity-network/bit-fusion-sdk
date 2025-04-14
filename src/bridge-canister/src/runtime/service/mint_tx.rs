@@ -11,8 +11,11 @@ use bridge_did::order::{SignedOrders, SignedOrdersData};
 use bridge_utils::btf_events::{self, BatchMintErrorCode};
 use bridge_utils::evm_link::EvmLinkClient;
 use bridge_utils::revert::{ERROR_MARKER, parse_revert_reason};
+use did::rpc::error::{Error as EvmRpcError, ErrorCode};
+use did::rpc::response::Failure;
 use did::{BlockNumber, H256, Transaction as DidTransaction};
 use eth_signer::sign_strategy::TxSigner;
+use ethereum_json_rpc_client::JsonRpcError;
 
 use super::BridgeService;
 use crate::runtime::state::SharedConfig;
@@ -100,10 +103,22 @@ impl<H> SendMintTxService<H> {
         let client = link.get_json_rpc_client();
         let output = match client.eth_call(tx, BlockNumber::Latest).await {
             Ok(output) => output,
+            Err(JsonRpcError::Evm(Failure {
+                error:
+                    EvmRpcError {
+                        code: ErrorCode::ServerError(-32015),
+                        message,
+                        ..
+                    },
+                ..
+            })) => {
+                return self.parse_batch_mint_revert(&message, order_count);
+            }
             Err(err) => {
                 log::error!("Failed to call batch mint tx: {err}");
-                // TODO: migrate to newest sdk to parse JsonRpcError: <https://infinityswap.atlassian.net/browse/EPROD-1182>
-                return self.parse_batch_mint_revert(&err.to_string(), order_count);
+                return Err(Error::EvmRequestFailed(format!(
+                    "failed to parse revert reason: {err}"
+                )));
             }
         };
 
@@ -307,7 +322,7 @@ mod test {
 
     #[test]
     fn test_should_parse_batch_mint_revert() {
-        let error = r#"Single(Failure(Failure { jsonrpc: Some(V2), error: Error { code: ServerError(-32015), message: "The transaction has been reverted: 0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000", data: Some(String("0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000")) }, id: Str("eth_call") }))"#;
+        let error = r#"The transaction has been reverted: 0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000", data: Some(String("0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000012496e76616c696420746f6b656e20706169720000000000000000000000000000"#;
         let mock_handler = SendMintTxService {
             handler: MockMintTxHandler,
             orders_to_send: RefCell::new(HashMap::new()),

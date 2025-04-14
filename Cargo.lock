@@ -1239,6 +1239,7 @@ dependencies = [
  "did",
  "drop_guard",
  "eth-signer",
+ "ethereum-json-rpc-client",
  "futures",
  "hex",
  "ic-canister",
