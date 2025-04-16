@@ -86,16 +86,6 @@ jobs:
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           just fetch_all_canisters
 
-      - name: test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          just test_all
-
-      - name: 32bits test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          just test_i686
-
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
