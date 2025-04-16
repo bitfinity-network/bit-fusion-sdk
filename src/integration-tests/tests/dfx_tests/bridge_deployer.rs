@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use alloy::primitives::Address;
 use bridge_client::BridgeCanisterClient as _;
-use cli_args::{CommonCliArgs, DeployCliArgs, HARDHAT_ETH_PRIVATE_KEY};
+use cli_args::{CommonCliArgs, DeployCliArgs};
 use eth_signer::LocalWallet;
 use ic_canister_client::IcAgentClient;
 use tempfile::TempDir;
@@ -86,15 +86,8 @@ macro_rules! test_deploy {
             )
             .expect("failed to eval trycmd files");
 
-            // change cwd to workspace root
-            init_workspace().expect("failed to get workspace root");
-
             let case = format!("{}/*.eval.trycmd", trycmd_output_dir.path().display());
-            trycmd::TestCases::new().case(&case).run();
-
-            // restore the manifest dir
-            // otherwise other tests may start in the wrong directory
-            restore_manifest_dir();
+            run_scripts(&case);
 
             trycmd_output_dir.close().expect("failed to close temp dir");
         }
@@ -224,15 +217,8 @@ async fn test_should_update_bridge() {
     )
     .expect("failed to eval trycmd files");
 
-    // change cwd to workspace root
-    init_workspace().expect("failed to get workspace root");
-
     let case = format!("{}/*.eval.trycmd", trycmd_output_dir.path().display());
-    trycmd::TestCases::new().case(&case).run();
-
-    // restore the manifest dir
-    // otherwise other tests may start in the wrong directory
-    restore_manifest_dir();
+    run_scripts(&case);
 
     trycmd_output_dir.close().expect("failed to close temp dir");
 }
@@ -285,7 +271,7 @@ async fn test_should_reinstall_bridge() {
     let ckbtc_minter = ctx.canisters.ckbtc_minter().to_text();
 
     // deploy the btf bridge
-    let btf_bridge = deploy_btf_bridge(&ctx)
+    let btf_bridge = deploy_btf_bridge(&ctx, &private_key)
         .await
         .expect("failed to deploy btf bridge");
 
@@ -320,17 +306,26 @@ async fn test_should_reinstall_bridge() {
     )
     .expect("failed to eval trycmd files");
 
-    // change cwd to workspace root
-    init_workspace().expect("failed to get workspace root");
-
     let case = format!("{}/*.eval.trycmd", trycmd_output_dir.path().display());
-    trycmd::TestCases::new().case(&case).run();
+    run_scripts(&case);
+
+    trycmd_output_dir.close().expect("failed to close temp dir");
+}
+
+fn run_scripts(case: &str) {
+    let wrkdir = init_workspace().expect("failed to get workspace root");
+    let deployer_path = wrkdir.join("target/release/bridge-deployer");
+
+    println!("deployer_path: {:?}", deployer_path);
+
+    trycmd::TestCases::new()
+        .register_bin("bridge-deployer", &deployer_path)
+        .case(case)
+        .run();
 
     // restore the manifest dir
     // otherwise other tests may start in the wrong directory
     restore_manifest_dir();
-
-    trycmd_output_dir.close().expect("failed to close temp dir");
 }
 
 /// Change the current working directory to the workspace root
@@ -370,8 +365,9 @@ fn restore_manifest_dir() {
 /// Deploy the BTF bridge
 async fn deploy_btf_bridge(
     ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>,
+    private_key: &str,
 ) -> anyhow::Result<Address> {
-    let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY)?;
+    let private_key_bytes = hex::decode(private_key)?;
     let wallet = LocalWallet::from_slice(&private_key_bytes)?;
 
     let btc_bridge_eth_address = ctx

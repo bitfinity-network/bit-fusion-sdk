@@ -21,7 +21,7 @@ dfx_stop:
 
 # Start docker, dfx and run the dfx tests
 [group('dfx')]
-dfx_test test_name="": docker_down docker_pull docker_up dfx_start
+dfx_test test_name="": docker_down docker_pull docker_up dfx_start build_bridge_deployer_tool
   #!/usr/bin/env bash
   sleep 5
 
