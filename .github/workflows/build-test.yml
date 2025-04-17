@@ -86,12 +86,18 @@ jobs:
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           just fetch_all_canisters
 
+      - name: test
+        if: ${{ !inputs.skip-test }}
+        run: |
+          just test_all
+
+      - name: 32bits test
+        if: ${{ !inputs.skip-test }}
+        run: |
+          just test_i686
+
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
-          cat $(dfx info networks-json-path) || true
           echo '{"local":{"bind":"0.0.0.0:8080","type":"ephemeral","replica":{"subnet_type":"system","port":4943}}}' > $(dfx info networks-json-path)
-          echo $(dfx --version)
-          echo $(which dfx)
-          cat $(dfx info networks-json-path)
-          just dfx_test dfx_tests::bridge_deployer
+          just dfx_test
