@@ -29,6 +29,9 @@ impl CommonCliArgs {
         let private_key = rng.r#gen::<[u8; 32]>();
         let wallet = LocalWallet::from_slice(&private_key).expect("failed to create wallet");
 
+        println!("base evm principal: {}", ctx.base_evm.evm());
+        println!("wrapped evm address: {}", ctx.wrapped_evm.evm());
+
         ctx.wrapped_evm
             .mint_native_tokens(wallet.address().into(), u128::MAX.into())
             .await
