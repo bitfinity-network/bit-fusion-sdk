@@ -126,7 +126,7 @@ impl Cli {
             crate::evm::evm_link(evm_rpc, ic_network, evm_canister.map(|x| x.principal()));
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
-        debug!("EVM Link: {evm_link:?}",);
+        debug!("EVM Link: {evm_link}",);
 
         // load canister ids file
         let canister_ids_path = canister_ids

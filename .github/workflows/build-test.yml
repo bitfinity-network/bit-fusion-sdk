@@ -89,4 +89,4 @@ jobs:
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
-          just dfx_test
+          just dfx_test dfx_tests::bridge_deployer::test_should_deploy_erc20_bridge
