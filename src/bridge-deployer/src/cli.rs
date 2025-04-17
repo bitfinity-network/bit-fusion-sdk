@@ -72,8 +72,8 @@ pub struct Cli {
     /// -vv     Warnings
     /// -vvv    Info
     /// -vvvv   Debug
-    /// -vvvvv  Debug with other libraries
-    /// -vvvvvv  Traces (warning: very verbose!)
+    /// -v  Debug with other libraries
+    /// -vv  Traces (warning: very verbose!)
     #[arg(short, long, action = ArgAction::Count, global = true, default_value_t = 3, verbatim_doc_comment, help_heading = "Display")]
     verbosity: u8,
 

@@ -1,5 +1,5 @@
 ```
-$ bridge-deployer -vvvvv --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH upgrade --wasm $BTC_BRIDGE_WASM_PATH --canister-id $BTC_BRIDGE_ID
+$ bridge-deployer -v --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH upgrade --wasm $BTC_BRIDGE_WASM_PATH --canister-id $BTC_BRIDGE_ID
 Starting Bitfinity Deployer v[..]
 Canister [..] upgraded successfully
 

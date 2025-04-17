@@ -1,5 +1,5 @@
 ```
-$ bridge-deployer -vvvvv --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH reinstall --btf-bridge $BTF_BRIDGE --canister-id $BTC_BRIDGE_ID --wasm $BTC_BRIDGE_WASM_PATH btc --signing-key-id dfx --enable-console --log-filter trace --ledger $CKBTC_LEDGER --minter $CKBTC_MINTER --network regtest --fee 1000
+$ bridge-deployer -v --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH reinstall --btf-bridge $BTF_BRIDGE --canister-id $BTC_BRIDGE_ID --wasm $BTC_BRIDGE_WASM_PATH btc --signing-key-id dfx --enable-console --log-filter trace --ledger $CKBTC_LEDGER --minter $CKBTC_MINTER --network regtest --fee 1000
 Starting Bitfinity Deployer v[..]
 Canister btc-bridge reinstalled with ID [..]
 
