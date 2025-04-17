@@ -265,7 +265,10 @@ const FEE_APPROVE_AMOUNT: u128 = 10u128.pow(15);
 impl Erc20BridgeFlow {
     async fn chain_id(&self, evm_side: EvmSide) -> anyhow::Result<u64> {
         let (client, _, _) = self.get_side(evm_side);
-        client.get_chain_id().await
+        client
+            .get_chain_id()
+            .await
+            .map_err(|e| anyhow!("Failed to get chain id: {e}"))
     }
 
     async fn deposit(&self, amount: u128, recipient: Option<Address>) -> anyhow::Result<()> {
