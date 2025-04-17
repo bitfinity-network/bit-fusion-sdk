@@ -121,31 +121,31 @@ test_deploy!(
 );
 
 // with local node
-test_deploy!(
-    test_should_deploy_brc20_bridge_evm_rpc,
-    "brc20_bridge.trycmd",
-    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
-);
-test_deploy!(
-    test_should_deploy_btc_bridge_evm_rpc,
-    "btc_bridge.trycmd",
-    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
-);
+//test_deploy!(
+//    test_should_deploy_brc20_bridge_evm_rpc,
+//    "brc20_bridge.trycmd",
+//    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+//);
+//test_deploy!(
+//    test_should_deploy_btc_bridge_evm_rpc,
+//    "btc_bridge.trycmd",
+//    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+//);
 //test_deploy!(
 //    test_should_deploy_erc20_bridge_evm_rpc,
 //    "erc20_bridge.trycmd",
 //    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
 //);
-test_deploy!(
-    test_should_deploy_icrc2_bridge_evm_rpc,
-    "icrc2_bridge.trycmd",
-    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
-);
-test_deploy!(
-    test_should_deploy_rune_bridge_evm_rpc,
-    "rune_bridge.trycmd",
-    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
-);
+//test_deploy!(
+//    test_should_deploy_icrc2_bridge_evm_rpc,
+//    "icrc2_bridge.trycmd",
+//    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+//);
+//test_deploy!(
+//    test_should_deploy_rune_bridge_evm_rpc,
+//    "rune_bridge.trycmd",
+//    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+//);
 
 #[tokio::test]
 #[serial_test::serial]

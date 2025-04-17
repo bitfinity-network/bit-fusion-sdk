@@ -94,4 +94,4 @@ jobs:
           echo $(dfx --version)
           echo $(which dfx)
           cat $(dfx info networks-json-path)
-          just dfx_test dfx_tests::bridge_deployer::test_should_deploy_erc20_bridge
+          just dfx_test dfx_tests::bridge_deployer
