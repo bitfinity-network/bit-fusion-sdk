@@ -86,4 +86,4 @@ jobs:
         if: ${{ !inputs.skip-test }}
         run: |
           echo '{"local":{"bind":"0.0.0.0:8080","type":"ephemeral","replica":{"subnet_type":"system","port":4943}}}' > $(dfx info networks-json-path)
-          just dfx_test test_should_deploy_erc20_bridge_evm_rpc
+          just dfx_test
