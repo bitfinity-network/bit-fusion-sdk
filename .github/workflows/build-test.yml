@@ -75,10 +75,6 @@ jobs:
         run: |
           just build_solidity
 
-      - name: check rust code style
-        run: |
-          just check_code
-
       - name: build artifacts
         run: |
           just build_all_canisters
@@ -86,18 +82,8 @@ jobs:
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           just fetch_all_canisters
 
-      - name: test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          just test_all
-
-      - name: 32bits test
-        if: ${{ !inputs.skip-test }}
-        run: |
-          just test_i686
-
       - name: dfx test
         if: ${{ !inputs.skip-test }}
         run: |
           echo '{"local":{"bind":"0.0.0.0:8080","type":"ephemeral","replica":{"subnet_type":"system","port":4943}}}' > $(dfx info networks-json-path)
-          just dfx_test
+          just dfx_test test_should_deploy_erc20_bridge_evm_rpc

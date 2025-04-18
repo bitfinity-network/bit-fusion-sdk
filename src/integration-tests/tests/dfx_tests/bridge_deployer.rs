@@ -131,11 +131,11 @@ test_deploy!(
 //    "btc_bridge.trycmd",
 //    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
 //);
-//test_deploy!(
-//    test_should_deploy_erc20_bridge_evm_rpc,
-//    "erc20_bridge.trycmd",
-//    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
-//);
+test_deploy!(
+    test_should_deploy_erc20_bridge_evm_rpc,
+    "erc20_bridge.trycmd",
+    Path::new("./tests/bridge_deployer/evm_rpc/deploy")
+);
 //test_deploy!(
 //    test_should_deploy_icrc2_bridge_evm_rpc,
 //    "icrc2_bridge.trycmd",
