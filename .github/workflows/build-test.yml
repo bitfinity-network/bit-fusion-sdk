@@ -75,12 +75,26 @@ jobs:
         run: |
           just build_solidity
 
+      - name: check rust code style
+        run: |
+          just check_code
+
       - name: build artifacts
         run: |
           just build_all_canisters
 
           export GH_API_TOKEN=${{ secrets.GH_PKG_TOKEN }}
           just fetch_all_canisters
+
+      - name: test
+        if: ${{ !inputs.skip-test }}
+        run: |
+          just test_all
+
+      - name: 32bits test
+        if: ${{ !inputs.skip-test }}
+        run: |
+          just test_i686
 
       - name: dfx test
         if: ${{ !inputs.skip-test }}
