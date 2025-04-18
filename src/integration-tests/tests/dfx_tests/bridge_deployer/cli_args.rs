@@ -2,8 +2,10 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use candid::Principal;
+use did::U256;
 use eth_signer::LocalWallet;
 use ic_canister_client::IcAgentClient;
+use rand::Rng as _;
 
 use crate::context::{CanisterType, TestContext as _};
 use crate::dfx_tests::DfxTestContext;
@@ -12,9 +14,6 @@ use crate::utils::test_evm::{GanacheEvm, TestEvm};
 
 /// The name of the user with a thick wallet.
 pub const ADMIN: &str = "max";
-/// A private key for testing purposes.
-pub const HARDHAT_ETH_PRIVATE_KEY: &str =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 pub struct CommonCliArgs {
     pub evm: String,
@@ -26,13 +25,52 @@ pub struct CommonCliArgs {
 
 impl CommonCliArgs {
     pub async fn new(ctx: &DfxTestContext<BitfinityEvm<IcAgentClient>>) -> Self {
-        let private_key_bytes = hex::decode(HARDHAT_ETH_PRIVATE_KEY).expect("Invalid private key");
-        let wallet = LocalWallet::from_slice(&private_key_bytes).expect("Invalid private key");
+        let mut rng = rand::thread_rng();
+        let private_key = rng.r#gen::<[u8; 32]>();
+        let wallet = LocalWallet::from_slice(&private_key).expect("failed to create wallet");
+
+        println!("base evm principal: {}", ctx.base_evm.evm());
+        println!("wrapped evm address: {}", ctx.wrapped_evm.evm());
 
         ctx.wrapped_evm
             .mint_native_tokens(wallet.address().into(), u128::MAX.into())
             .await
             .expect("failed to mint native tokens (call error)");
+
+        // wait for tokens to be minted
+        loop {
+            let balance = ctx
+                .wrapped_evm
+                .eth_get_balance(&(wallet.address().into()), did::BlockNumber::Latest)
+                .await
+                .expect("failed to get balance");
+
+            if balance > U256::zero() {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+
+        ctx.base_evm
+            .mint_native_tokens(wallet.address().into(), u128::MAX.into())
+            .await
+            .expect("failed to mint native tokens (call error)");
+
+        // wait for tokens to be minted
+        loop {
+            let balance = ctx
+                .base_evm
+                .eth_get_balance(&(wallet.address().into()), did::BlockNumber::Latest)
+                .await
+                .expect("failed to get balance");
+
+            if balance > U256::zero() {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
 
         let evm_principal = ctx.canisters.evm().to_text();
 
@@ -55,7 +93,7 @@ impl CommonCliArgs {
             evm: evm_principal,
             evm_rpc: evm_node.rpc_url.clone(),
             evm_node,
-            private_key: HARDHAT_ETH_PRIVATE_KEY.to_string(),
+            private_key: hex::encode(private_key),
             identity_path,
         }
     }

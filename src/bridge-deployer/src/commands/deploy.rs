@@ -11,7 +11,7 @@ use clap::Parser;
 use ic_agent::Agent;
 use ic_canister_client::agent::identity::GenericIdentity;
 use ic_utils::interfaces::management_canister::builders::InstallMode;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::{BTFArgs, Bridge};
 use crate::bridge_deployer::BridgeDeployer;
@@ -182,7 +182,6 @@ impl DeployCommands {
             canister_id
         );
         println!("Bridge canister principal: {}", canister_id);
-        println!("---------------------------");
         println!("Wrapped side BTF bridge: 0x{}", hex::encode(btf_bridge));
         println!("Wrapped side FeeCharge: 0x{}", hex::encode(fee_charge));
         println!(
@@ -197,7 +196,6 @@ impl DeployCommands {
             ..
         }) = base_side_ids
         {
-            println!();
             println!("Base side BTF bridge: 0x{}", hex::encode(btf_bridge));
             println!("Base side FeeCharge: 0x{}", hex::encode(fee_charge));
             println!(
@@ -221,10 +219,16 @@ impl DeployCommands {
         let contract_deployer = SolidityContractDeployer::new(network.into(), pk, evm_link);
         let base_token_id = Id256::from(btc_connection.ledger_principal());
 
+        debug!("deploying wrapped BTC token with base token id: {base_token_id:?}");
+
+        // get name as string and trim nul bytes
+        let name = String::from_utf8_lossy(&BTC_ERC20_NAME);
+        let symbol = String::from_utf8_lossy(&BTC_ERC20_SYMBOL);
+
         contract_deployer.deploy_wrapped_token(
             btf_bridge,
-            String::from_utf8_lossy(&BTC_ERC20_NAME).as_ref(),
-            String::from_utf8_lossy(&BTC_ERC20_SYMBOL).as_ref(),
+            name.trim_end_matches('\0'),
+            symbol.trim_end_matches('\0'),
             BTC_ERC20_DECIMALS,
             base_token_id,
         )
