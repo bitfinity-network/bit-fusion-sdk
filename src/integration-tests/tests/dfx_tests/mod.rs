@@ -20,7 +20,6 @@ mod brc20_bridge;
 mod bridge_deployer;
 mod rune_bridge;
 
-const DFX_URL: &str = "http://127.0.0.1:4943";
 pub const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
 
 /// The name of the user with a thick wallet.
@@ -51,14 +50,14 @@ where
         base_evm: Arc<EVM>,
         wrapped_evm: Arc<EVM>,
     ) -> Self {
-        let url = Some(DFX_URL);
-        let max = get_agent(ADMIN, url, Some(Duration::from_secs(180)))
+        let url = Some(crate::utils::dfx::dfx_url());
+        let max = get_agent(ADMIN, url.as_deref(), Some(Duration::from_secs(180)))
             .await
             .unwrap();
-        let alice = get_agent(ALICE, url, Some(Duration::from_secs(180)))
+        let alice = get_agent(ALICE, url.as_deref(), Some(Duration::from_secs(180)))
             .await
             .unwrap();
-        let alex = get_agent(ALEX, url, Some(Duration::from_secs(180)))
+        let alex = get_agent(ALEX, url.as_deref(), Some(Duration::from_secs(180)))
             .await
             .unwrap();
 
