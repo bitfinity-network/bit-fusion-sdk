@@ -111,7 +111,7 @@ impl SolidityContractDeployer {
         } else {
             match self.network.bridge_network {
                 IcNetwork::Localhost => format!(
-                    "http://127.0.0.1:{dfx_port}/?canisterId={principal}",
+                    "http://{principal}.raw.localhost:{dfx_port}",
                     dfx_port = dfx_webserver_port(),
                 ),
                 IcNetwork::Ic
@@ -324,7 +324,9 @@ impl SolidityContractDeployer {
         decimals: u8,
         base_token_id: Id256,
     ) -> Result<Address> {
-        info!("Deploying Wrapped ERC20 contract");
+        info!(
+            "Deploying Wrapped ERC20 contract with btf_bridge: {btf_bridge}; name {name}; symbol: {symbol}; decimals: {decimals}; base_token_id: {base_token_id:?}"
+        );
 
         let env_vars = vec![
             ("BTF_BRIDGE", btf_bridge.encode_hex_with_prefix()),
