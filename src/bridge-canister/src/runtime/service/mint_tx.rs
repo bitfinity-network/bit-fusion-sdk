@@ -38,9 +38,16 @@ pub struct MintTxResult {
 }
 
 pub trait MintTxHandler {
+    /// Gets the signer for the mint transaction.
     fn get_signer(&self) -> BTFResult<TxSigner>;
+
+    /// Gets the EVM configuration.
     fn get_evm_config(&self) -> SharedConfig;
+
+    /// Gets signed orders for the given operation ID.
     fn get_signed_orders(&self, id: OperationId) -> Option<SignedOrders>;
+
+    /// Called when the mint transaction is sent.
     fn mint_tx_sent(&self, id: OperationId, result: MintTxResult);
 }
 
