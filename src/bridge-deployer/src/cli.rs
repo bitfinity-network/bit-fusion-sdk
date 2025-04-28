@@ -73,7 +73,7 @@ pub struct Cli {
     /// -vvv    Info
     /// -vvvv   Debug
     /// -vvvvv  Debug with other libraries
-    /// -vvvvvv  Traces (warning: very verbose!)
+    /// -vvvvvv Traces (warning: very verbose!)
     #[arg(short, long, action = ArgAction::Count, global = true, default_value_t = 3, verbatim_doc_comment, help_heading = "Display")]
     verbosity: u8,
 
@@ -126,7 +126,7 @@ impl Cli {
             crate::evm::evm_link(evm_rpc, ic_network, evm_canister.map(|x| x.principal()));
 
         println!("Starting Bitfinity Deployer v{}", env!("CARGO_PKG_VERSION"));
-        debug!("EVM Link: {evm_link:?}",);
+        debug!("EVM Link: {evm_link}",);
 
         // load canister ids file
         let canister_ids_path = canister_ids

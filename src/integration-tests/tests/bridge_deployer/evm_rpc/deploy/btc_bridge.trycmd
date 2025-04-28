@@ -1,7 +1,9 @@
 ```
 $ bridge-deployer -v --bridge-network localhost --evm-rpc $EVM_RPC --private-key $PRIVATE_KEY --identity $IDENTITY_PATH deploy --wasm $BTC_BRIDGE_WASM_PATH --wallet-canister $WALLET_CANISTER btc --signing-key-id dfx --enable-console --log-filter trace --ledger $CKBTC_LEDGER --minter $CKBTC_MINTER --network regtest --fee 1000
 Starting Bitfinity Deployer v[..]
+Wrapped BTC contract deployed with address [..]
 Canister btc-bridge deployed with ID: [..]
+Bridge canister principal: [..]
 Wrapped side BTF bridge: [..]
 Wrapped side FeeCharge: [..]
 Wrapped side bridge address: [..]

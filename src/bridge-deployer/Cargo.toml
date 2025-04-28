@@ -15,7 +15,10 @@ clap = { workspace = true, features = ["env"] }
 did = { workspace = true }
 dotenv = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
-ethereum-json-rpc-client = { workspace = true, features = ["reqwest"] }
+ethereum-json-rpc-client = { workspace = true, features = [
+  "ic-canister-client",
+  "reqwest",
+] }
 hex = { workspace = true }
 ic-agent = { workspace = true }
 ic-canister-client = { workspace = true, features = ["ic-agent-client"] }
