@@ -46,29 +46,32 @@ pub fn evm_principal_or_default(
     }
 }
 
-/// Returns local dfx replica port
+/// Returns local dfx replica port.
+///
+/// If it fails to get replica-port, it tries to get webserver-port.
 fn dfx_replica_port() -> u16 {
     dfx_info_port("replica-port")
+        .or_else(|_| dfx_info_port("webserver-port"))
+        .expect("Failed to get dfx replica port")
 }
 
 /// Returns local dfx replica port
 pub fn dfx_webserver_port() -> u16 {
-    dfx_info_port("webserver-port")
+    dfx_info_port("webserver-port").expect("Failed to get dfx webserver port")
 }
 
 /// Returns the port of the dfx service
-fn dfx_info_port(service: &str) -> u16 {
+fn dfx_info_port(service: &str) -> anyhow::Result<u16> {
     Command::new("dfx")
         .args(["info", service])
-        .output()
-        .expect("Failed to get dfx port")
+        .output()?
         .stdout
         .iter()
         .map(|&b| b as char)
         .collect::<String>()
         .trim()
         .parse::<u16>()
-        .expect("Failed to parse dfx port")
+        .map_err(|_| anyhow::anyhow!("Failed to parse dfx port"))
 }
 
 /// Returns the local EVM principal

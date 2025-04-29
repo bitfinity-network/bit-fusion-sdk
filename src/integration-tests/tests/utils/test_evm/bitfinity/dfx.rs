@@ -11,8 +11,8 @@ use super::BitfinityEvm;
 use super::init::evm_canister_init_data;
 use crate::context::CanisterType;
 use crate::utils::EVM_PROCESSING_TRANSACTION_INTERVAL_FOR_TESTS;
+use crate::utils::dfx::dfx_url;
 
-const DFX_URL: &str = "http://127.0.0.1:4943";
 const ADMIN: &str = "max";
 const INIT_CANISTER_CYCLES: u64 = 90_000_000_000_000;
 
@@ -20,8 +20,8 @@ impl BitfinityEvm<IcAgentClient> {
     /// Create a new [`BitfinityEvm`] instance for testing.
     pub async fn dfx() -> Self {
         println!("Using Bitfinity EVM (dfx)");
-        let url = Some(DFX_URL);
-        let max = get_agent(ADMIN, url, Some(Duration::from_secs(180)))
+        let url = Some(dfx_url());
+        let max = get_agent(ADMIN, url.as_deref(), Some(Duration::from_secs(180)))
             .await
             .expect("Failed to get agent");
 
