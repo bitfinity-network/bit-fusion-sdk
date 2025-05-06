@@ -7,7 +7,7 @@ use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey, XOnlyPublicKey};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{SignWithEcdsaArgument, sign_with_ecdsa};
+use ic_exports::ic_cdk::management_canister::{SignWithEcdsaArgs, sign_with_ecdsa};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::{BtcTxSigner, OrdError, OrdResult};
 use thiserror::Error;
@@ -84,16 +84,15 @@ impl BtcTxSigner for IcBtcSigner {
         message: Message,
         derivation_path: &DerivationPath,
     ) -> Result<Signature, Secp256Error> {
-        let request = SignWithEcdsaArgument {
+        let request = SignWithEcdsaArgs {
             message_hash: message.as_ref().to_vec(),
             derivation_path: derivation_path_to_ic(derivation_path.clone()),
             key_id: self.master_key.key_id.clone(),
         };
 
-        let response = sign_with_ecdsa(request)
+        let response = sign_with_ecdsa(&request)
             .await
-            .expect("sign_with_ecdsa failed")
-            .0;
+            .expect("sign_with_ecdsa failed");
 
         Signature::from_compact(&response.signature)
     }

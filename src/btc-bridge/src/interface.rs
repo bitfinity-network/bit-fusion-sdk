@@ -1,8 +1,7 @@
 use bridge_did::order::SignedMintOrder;
 use candid::CandidType;
 use did::H256;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_exports::icrc_types::icrc1::transfer::TransferError;
 use serde::Deserialize;
 
@@ -65,7 +64,7 @@ pub enum BtcBridgeError {
     /// Error transferring ckBTC tokens with ledger.
     CkBtcLedgerTransfer(TransferError),
     /// Error while checking the ledger balance.
-    CkBtcLedgerBalance(RejectionCode, String),
+    CkBtcLedgerBalance(String),
     /// Error while signing the mint order.
     Sign(String),
     /// Error connecting to the EVM.
@@ -103,9 +102,9 @@ impl From<BtcBridgeError> for bridge_did::error::Error {
                 code: ErrorCodes::CkBtcLedgerTransfer as u32,
                 msg: format!("CkBtcLedgerTransfer error: {:?}", err),
             },
-            BtcBridgeError::CkBtcLedgerBalance(code, msg) => Self::Custom {
+            BtcBridgeError::CkBtcLedgerBalance(msg) => Self::Custom {
                 code: ErrorCodes::CkBtcLedgerBalance as u32,
-                msg: format!("CkBtcLedgerBalance error: {msg} ({code:?})"),
+                msg: format!("CkBtcLedgerBalance error: {msg}"),
             },
             BtcBridgeError::Sign(msg) => Self::Custom {
                 code: ErrorCodes::Sign as u32,

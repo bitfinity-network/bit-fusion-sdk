@@ -6,14 +6,11 @@ use bitcoin::bip32::{ChildNumber, DerivationPath, Error as Bip32Error, Xpub};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{Error as Secp256Error, Message, Secp256k1};
 use bitcoin::{Address, Network, PublicKey, XOnlyPublicKey};
-use bridge_did::schnorr::{
-    ManagementCanisterSchnorrPublicKeyReply, ManagementCanisterSchnorrPublicKeyRequest,
-    ManagementCanisterSignatureReply, ManagementCanisterSignatureRequest, SchnorrKeyId,
-};
-use candid::Principal;
 use did::H160;
 use ic_exports::ic_cdk;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{SignWithEcdsaArgument, sign_with_ecdsa};
+use ic_exports::ic_cdk::management_canister::{
+    SchnorrKeyId, SchnorrPublicKeyArgs, SignWithEcdsaArgs, SignWithSchnorrArgs, sign_with_ecdsa,
+};
 use ord_rs::wallet::LocalSigner;
 use ord_rs::{BtcTxSigner, OrdError, OrdResult};
 use thiserror::Error;
@@ -86,16 +83,15 @@ impl BtcTxSigner for IcBtcSigner {
         message: Message,
         derivation_path: &DerivationPath,
     ) -> Result<Signature, Secp256Error> {
-        let request = SignWithEcdsaArgument {
+        let request = SignWithEcdsaArgs {
             message_hash: message.as_ref().to_vec(),
             derivation_path: derivation_path_to_ic(derivation_path.clone()),
             key_id: self.master_key.key_id.clone(),
         };
 
-        let response = sign_with_ecdsa(request)
+        let response = sign_with_ecdsa(&request)
             .await
-            .expect("sign_with_ecdsa failed")
-            .0;
+            .expect("sign_with_ecdsa failed");
 
         Signature::from_compact(&response.signature)
     }
@@ -104,19 +100,13 @@ impl BtcTxSigner for IcBtcSigner {
         &self,
         derivation_path: &DerivationPath,
     ) -> OrdResult<XOnlyPublicKey> {
-        let request = ManagementCanisterSchnorrPublicKeyRequest {
+        let res = ic_cdk::management_canister::schnorr_public_key(&SchnorrPublicKeyArgs {
             canister_id: None,
             derivation_path: derivation_path_to_ic(derivation_path.clone()),
             key_id: self.schnorr_key_id.clone(),
-        };
-
-        let (res,): (ManagementCanisterSchnorrPublicKeyReply,) = ic_cdk::call(
-            Principal::management_canister(),
-            "schnorr_public_key",
-            (request,),
-        )
+        })
         .await
-        .map_err(|e| OrdError::Custom(format!("schnorr_public_key failed {}", e.1)))?;
+        .map_err(|e| OrdError::Custom(format!("schnorr_public_key failed {e}",)))?;
 
         log::debug!("Got schnorr public key: {:?}", res.public_key);
 
@@ -136,26 +126,19 @@ impl BtcTxSigner for IcBtcSigner {
         message: Message,
         derivation_path: &DerivationPath,
     ) -> Result<bitcoin::secp256k1::schnorr::Signature, Secp256Error> {
-        let internal_request = ManagementCanisterSignatureRequest {
+        let reply = ic_cdk::management_canister::sign_with_schnorr(&SignWithSchnorrArgs {
             message: message.as_ref().to_vec(),
             derivation_path: derivation_path_to_ic(derivation_path.clone()),
             key_id: self.schnorr_key_id.clone(),
-        };
+            aux: None,
+        })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to call sign_with_schnorr: {:?}", e);
+            Secp256Error::InvalidSignature
+        })?;
 
-        let (internal_reply,): (ManagementCanisterSignatureReply,) =
-            ic_exports::ic_cdk::api::call::call_with_payment(
-                Principal::management_canister(),
-                "sign_with_schnorr",
-                (internal_request,),
-                25_000_000_000,
-            )
-            .await
-            .map_err(|e| {
-                log::error!("Failed to call sign_with_schnorr: {:?}", e);
-                Secp256Error::InvalidSignature
-            })?;
-
-        bitcoin::secp256k1::schnorr::Signature::from_slice(&internal_reply.signature)
+        bitcoin::secp256k1::schnorr::Signature::from_slice(&reply.signature)
     }
 }
 

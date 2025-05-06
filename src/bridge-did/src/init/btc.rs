@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use candid::{CandidType, Decode, Deserialize, Encode, Principal};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
 use ic_stable_structures::{Bound, Storable};
 use serde::Serialize;
 

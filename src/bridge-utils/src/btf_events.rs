@@ -135,14 +135,13 @@ impl TryFrom<Log> for BridgeEvent {
     fn try_from(value: Log) -> Result<Self, Self::Error> {
         let log = value.data();
 
-        let event = BurnTokenEvent::decode_log_data(log, true)
+        let event = BurnTokenEvent::decode_log_data(log)
             .map(|event| Self::Burnt(event.into()))
             .or_else(|_| {
-                MintTokenEvent::decode_log_data(log, true).map(|event| Self::Minted(event.into()))
+                MintTokenEvent::decode_log_data(log).map(|event| Self::Minted(event.into()))
             })
             .or_else(|_| {
-                NotifyMinterEvent::decode_log_data(log, true)
-                    .map(|event| Self::Notify(event.into()))
+                NotifyMinterEvent::decode_log_data(log).map(|event| Self::Notify(event.into()))
             })?;
 
         Ok(event)
@@ -187,10 +186,9 @@ pub fn batch_mint_transaction(
 
 /// Parse the output (slice of [`u8`]) of the `batchMint` function call to a [`Vec`] of [`BatchMintResult`].
 pub fn batch_mint_result(output: &[u8]) -> Result<Vec<BatchMintErrorCode>, BatchMintResultError> {
-    let output = BTFBridge::batchMintCall::abi_decode_returns(output, true)?;
+    let output = BTFBridge::batchMintCall::abi_decode_returns(output)?;
 
     output
-        ._0
         .into_iter()
         .map(BatchMintErrorCode::try_from)
         .collect()
@@ -240,8 +238,7 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let decoded_event =
-            MintTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true).unwrap();
+        let decoded_event = MintTokenEvent::decode_raw_log(topics, raw.data.as_ref()).unwrap();
 
         assert_eq!(event.amount, decoded_event.amount);
         assert_eq!(event.fromToken, decoded_event.fromToken);
@@ -286,7 +283,7 @@ mod tests {
             .map(|topic| topic.0.into())
             .collect::<Vec<FixedBytes<32>>>();
 
-        let event = BurnTokenEvent::decode_raw_log(topics, raw.data.as_ref(), true)
+        let event = BurnTokenEvent::decode_raw_log(topics, raw.data.as_ref())
             .expect("failed to decode event");
         assert_eq!(event.sender, event.sender);
     }

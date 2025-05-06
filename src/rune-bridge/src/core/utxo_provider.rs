@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use bitcoin::consensus::Encodable;
 use bitcoin::{Address, FeeRate, Transaction};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    BitcoinNetwork, GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse,
+use ic_exports::ic_cdk::bitcoin_canister::{
+    GetCurrentFeePercentilesRequest, GetUtxosRequest, GetUtxosResponse, Network as BitcoinNetwork,
     SendTransactionRequest, bitcoin_get_current_fee_percentiles, bitcoin_get_utxos,
     bitcoin_send_transaction,
 };
@@ -73,10 +73,9 @@ impl IcUtxoProvider {
 
         log::trace!("Requesting UTXO list for address {address}");
 
-        let response = bitcoin_get_utxos(args)
+        let response = bitcoin_get_utxos(&args)
             .await
-            .map(|value| value.0)
-            .map_err(GetInputsError::btc)?;
+            .map_err(|e| GetInputsError::btc(e.to_string()))?;
 
         log::trace!("Got UTXO list result for address {address}:");
         log::trace!("{response:?}");
@@ -143,13 +142,12 @@ impl UtxoProvider for IcUtxoProvider {
         let args = GetCurrentFeePercentilesRequest {
             network: self.network,
         };
-        let response = bitcoin_get_current_fee_percentiles(args)
+        let response = bitcoin_get_current_fee_percentiles(&args)
             .await
             .map_err(|err| {
                 log::error!("Failed to get current fee rate: {err:?}");
                 WithdrawError::FeeRateRequest
-            })?
-            .0;
+            })?;
 
         let middle_percentile = match self.network {
             BitcoinNetwork::Regtest => DEFAULT_REGTEST_FEE,
@@ -194,7 +192,7 @@ impl UtxoProvider for IcUtxoProvider {
             transaction: serialized,
             network: self.network,
         };
-        bitcoin_send_transaction(request).await.map_err(|err| {
+        bitcoin_send_transaction(&request).await.map_err(|err| {
             log::error!("Failed to send transaction: {err:?}");
             WithdrawError::TransactionSending
         })?;
@@ -282,7 +280,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "call_new should only be called inside canisters")]
+    #[should_panic(expected = "cost_call should only be called inside canisters")]
     async fn get_utxos_requests_if_not_in_cache() {
         let ctx = MockContext::new().inject();
         let provider = IcUtxoProvider::new(BitcoinNetwork::Mainnet, Duration::from_secs(60));

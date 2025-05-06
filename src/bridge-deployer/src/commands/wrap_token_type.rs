@@ -99,7 +99,6 @@ impl WrapTokenType {
                 WrappedTokenCalls::name(nameCall {}).abi_encode().into(),
             )
             .await?,
-            true,
         )?;
         let symbol = String::abi_decode(
             &Self::request_contract(
@@ -109,7 +108,6 @@ impl WrapTokenType {
                 WrappedTokenCalls::symbol(symbolCall {}).abi_encode().into(),
             )
             .await?,
-            true,
         )?;
         let decimals = u32::abi_decode(
             &Self::request_contract(
@@ -121,7 +119,6 @@ impl WrapTokenType {
                     .into(),
             )
             .await?,
-            true,
         )? as u8;
         let chain_id = client.get_chain_id().await?;
 

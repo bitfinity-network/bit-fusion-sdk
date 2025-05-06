@@ -1,7 +1,7 @@
 #![allow(clippy::enum_variant_names, non_snake_case)]
 
 use candid::CandidType;
-use ic_exports::ic_cdk::api::management_canister::http_request::HttpHeader;
+use ic_exports::ic_cdk::management_canister::HttpHeader;
 use serde::Deserialize;
 
 #[derive(CandidType, Deserialize)]

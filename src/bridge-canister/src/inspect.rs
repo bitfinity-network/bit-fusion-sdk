@@ -11,7 +11,7 @@ use crate::runtime::state::config::ConfigStorage;
 /// will `trap` (panic).
 pub fn bridge_inspect() {
     let config = ConfigStorage::get();
-    let method = api::call::method_name();
+    let method = api::msg_method_name();
 
     match method.as_str() {
         "set_logger_filter" => inspect_set_logger_filter(config),

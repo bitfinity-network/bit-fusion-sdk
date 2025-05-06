@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use candid::{CandidType, Nat, Principal};
 use evm_canister_client::{CanisterClient, CanisterClientError, IcCanisterClient};
-use ic_exports::ic_kit::RejectionCode;
 use icrc_client::IcrcCanisterClient;
 use icrc_client::account::Account;
 use icrc_client::transfer::TransferError;
@@ -225,7 +224,6 @@ mod test {
         decimals: u8,
     }
 
-    #[async_trait::async_trait]
     impl CanisterClient for FakeIcrcCanisterClient {
         async fn query<T, R>(&self, method: &str, _args: T) -> CanisterClientResult<R>
         where
@@ -289,8 +287,8 @@ pub enum IcrcCanisterError {
     #[error("failed to transfer from ICRC token: {0:?}")]
     TransferFromFailed(TransferFromError),
 
-    #[error("failed to call ICRC canister: {0:?} with message: {1}")]
-    CanisterError(RejectionCode, String),
+    #[error("failed to call ICRC canister with message: {0}")]
+    CanisterError(String),
 
     #[error("candid failure: {0}")]
     CandidFailed(candid::Error),
@@ -303,7 +301,7 @@ pub enum IcrcCanisterError {
 impl From<CanisterClientError> for IcrcCanisterError {
     fn from(value: CanisterClientError) -> Self {
         match value {
-            CanisterClientError::CanisterError(e) => Self::CanisterError(e.0, e.1),
+            CanisterClientError::CanisterError(e) => Self::CanisterError(e.to_string()),
             CanisterClientError::CandidError(e) => Self::CandidFailed(e),
             e => Self::Generic(e.to_string()),
         }

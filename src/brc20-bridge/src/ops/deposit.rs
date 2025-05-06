@@ -1,7 +1,7 @@
 use bridge_canister::runtime::RuntimeState;
 use bridge_did::error::{BTFResult, Error};
 use bridge_did::operations::{Brc20BridgeDepositOp, DepositRequest};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 
 use super::{Brc20BridgeOp, Brc20BridgeOpImpl};
 use crate::core::deposit::Brc20Deposit;

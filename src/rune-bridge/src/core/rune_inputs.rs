@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use bridge_did::runes::{RuneInfo, RuneName};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use thiserror::Error;
 
 use crate::key::KeyError;
@@ -61,8 +60,8 @@ pub(crate) enum GetInputsError {
 }
 
 impl GetInputsError {
-    pub fn btc(call_error: (RejectionCode, String)) -> Self {
-        Self::BtcAdapter(call_error.1)
+    pub fn btc(call_error: String) -> Self {
+        Self::BtcAdapter(call_error)
     }
 }
 

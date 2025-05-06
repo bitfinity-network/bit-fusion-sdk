@@ -1,25 +1,23 @@
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "export-api")]
 use bridge_canister::bridge_inspect;
 use bridge_did::error::BTFResult;
-#[cfg(target_family = "wasm")]
-use ic_exports::ic_cdk;
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "export-api")]
 use ic_exports::ic_cdk::{api, inspect_message};
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "export-api")]
 use ic_exports::ic_kit::ic;
 
 use crate::BtcBridge;
 
-#[cfg(target_family = "wasm")]
+#[cfg(feature = "export-api")]
 #[inspect_message]
 async fn inspect_message() {
     bridge_inspect();
-    let check_result = inspect_method(&api::call::method_name()).await;
+    let check_result = inspect_method(&api::msg_method_name()).await;
 
     if let Err(e) = check_result {
         ic::trap(&format!("Call rejected by inspect check: {e:?}"));
     } else {
-        api::call::accept_message();
+        api::accept_message();
     }
 }
 

@@ -1,6 +1,5 @@
 use candid::{CandidType, Principal};
 use ic_btc_interface::{OutPoint, Utxo};
-use ic_exports::ic_cdk::api::management_canister::main::CanisterId;
 use serde::{Deserialize, Serialize};
 
 // For source see: https://github.com/dfinity/ic/blob/master/rs/bitcoin/ckbtc/minter/src/lifecycle/init.rs
@@ -24,7 +23,7 @@ pub struct InitArgs {
     pub retrieve_btc_min_amount: u64,
 
     /// The CanisterId of the ckBTC Ledger
-    pub ledger_id: CanisterId,
+    pub ledger_id: Principal,
 
     /// Maximum time in nanoseconds that a transaction should spend in the queue
     /// before being sent.
@@ -47,7 +46,7 @@ pub struct InitArgs {
     /// The principal of the KYT canister.
     /// NOTE: this field is optional for backward compatibility.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kyt_principal: Option<CanisterId>,
+    pub kyt_principal: Option<Principal>,
 }
 
 #[derive(CandidType, Clone, Copy, Deserialize, Debug, Eq, PartialEq, Serialize, Hash)]
@@ -81,7 +80,7 @@ pub struct UpgradeArgs {
     pub kyt_fee: Option<u64>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kyt_principal: Option<CanisterId>,
+    pub kyt_principal: Option<Principal>,
 }
 
 /// Controls which operations the minter can perform.

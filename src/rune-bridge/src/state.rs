@@ -11,10 +11,8 @@ use bridge_canister::memory::MEMORY_MANAGER;
 use bridge_did::init::{IndexerType, MIN_INDEXERS, RuneBridgeConfig};
 use bridge_did::runes::{RuneInfo, RuneName};
 use eth_signer::sign_strategy::SigningStrategy;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
-};
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
+use ic_exports::ic_cdk::management_canister::{EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResult};
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::VirtualMemory;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
@@ -200,7 +198,7 @@ impl RuneState {
     /// configuration must be set before any of the transactions can be processed.
     pub fn configure_ecdsa(
         &mut self,
-        master_key: EcdsaPublicKeyResponse,
+        master_key: EcdsaPublicKeyResult,
         key_id: EcdsaKeyId,
     ) -> Result<(), String> {
         if master_key.chain_code.len() != 32 {

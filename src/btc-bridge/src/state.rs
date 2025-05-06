@@ -2,7 +2,7 @@ use bridge_canister::memory::memory_by_id;
 use bridge_did::init::btc::{BitcoinConnection, WrappedTokenConfig};
 use candid::Principal;
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
 use ic_stable_structures::stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{CellStructure, StableCell, VirtualMemory};
 

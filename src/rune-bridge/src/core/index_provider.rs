@@ -6,9 +6,9 @@ use std::str::FromStr as _;
 use async_trait::async_trait;
 use bridge_did::init::IndexerType;
 use bridge_did::runes::RuneName;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
-use ic_exports::ic_cdk::api::management_canister::http_request::{
-    CanisterHttpRequestArgument, HttpHeader, HttpMethod, http_request,
+use ic_exports::ic_cdk::bitcoin_canister::{Outpoint, Utxo};
+use ic_exports::ic_cdk::management_canister::{
+    HttpHeader, HttpMethod, HttpRequestArgs, http_request,
 };
 use ordinals::{RuneId, SpacedRune};
 use serde::de::DeserializeOwned;
@@ -34,7 +34,6 @@ pub(crate) fn get_indexer(indexer_type: IndexerType) -> Box<dyn RuneIndexProvide
     }
 }
 
-const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
 const MAX_RESPONSE_BYTES: u64 = 10_000;
 
 /// Trait for a generic HTTP client that can be used to make requests to the indexer.
@@ -59,7 +58,7 @@ impl HttpClient for IcHttpClient {
 
         log::trace!("Sending indexer request to: {url}");
 
-        let request_params = CanisterHttpRequestArgument {
+        let request_params = HttpRequestArgs {
             url,
             max_response_bytes: Some(MAX_RESPONSE_BYTES),
             method: HttpMethod::GET,
@@ -71,10 +70,9 @@ impl HttpClient for IcHttpClient {
             transform: None,
         };
 
-        let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+        let result = http_request(&request_params)
             .await
-            .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?
-            .0;
+            .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?;
 
         log::trace!(
             "Indexer responded with: {} {:?} BODY: {}",

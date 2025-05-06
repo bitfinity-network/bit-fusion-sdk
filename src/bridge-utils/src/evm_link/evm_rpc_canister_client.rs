@@ -10,7 +10,7 @@ use candid::Principal;
 use did::rpc::request::RpcRequest;
 use did::rpc::response::RpcResponse;
 use ethereum_json_rpc_client::{JsonRpcError, JsonRpcResult};
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::call::CallRejected;
 use num_traits::ToPrimitive;
 
 /// Client for sending RPC requests to the EVM-RPC canister.
@@ -60,10 +60,12 @@ impl EvmRpcCanisterClient {
 
         match last_error {
             Some(err) => Err(err),
-            None => Err(JsonRpcError::CanisterCall {
-                rejection_code: RejectionCode::CanisterError,
-                message: "No services available".to_string(),
-            }),
+            None => Err(JsonRpcError::CanisterCall(
+                ic_exports::ic_cdk::call::Error::CallRejected(CallRejected::with_rejection(
+                    0,
+                    "no service available".to_string(),
+                )),
+            )),
         }
     }
 
@@ -77,13 +79,9 @@ impl EvmRpcCanisterClient {
         const MAX_RESPONSE_SIZE: u64 = 2000000;
 
         // get request cost as cycles
-        let (request_cost_result,) = service
+        let request_cost_result = service
             .request_cost(rpc_service, request, MAX_RESPONSE_SIZE)
-            .await
-            .map_err(|(rejection_code, message)| JsonRpcError::CanisterCall {
-                rejection_code,
-                message,
-            })?;
+            .await?;
 
         let cycles = match request_cost_result {
             RequestCostResult::Ok(cycles) => {
@@ -96,36 +94,35 @@ impl EvmRpcCanisterClient {
                     })?
             }
             RequestCostResult::Err(err) => {
-                return Err(JsonRpcError::CanisterCall {
-                    rejection_code: RejectionCode::CanisterError,
-                    message: err.to_string(),
-                });
+                return Err(JsonRpcError::CanisterCall(
+                    ic_exports::ic_cdk::call::Error::CallRejected(CallRejected::with_rejection(
+                        0,
+                        err.to_string(),
+                    )),
+                ));
             }
         };
 
         // send rpc request
-        let (request_result,) = service
+        let request_result = service
             .request(rpc_service, request, MAX_RESPONSE_SIZE, cycles)
-            .await
-            .map_err(|(rejection_code, message)| JsonRpcError::CanisterCall {
-                rejection_code,
-                message,
-            })?;
+            .await?;
 
         match request_result {
             RequestResult::Ok(response) => {
                 serde_json::from_str(&response).map_err(JsonRpcError::Json)
             }
-            RequestResult::Err(RpcError::JsonRpcError(BridgeJsonRpcError { message, .. })) => {
-                Err(JsonRpcError::CanisterCall {
-                    rejection_code: RejectionCode::CanisterError,
-                    message,
-                })
-            }
-            RequestResult::Err(err) => Err(JsonRpcError::CanisterCall {
-                rejection_code: RejectionCode::CanisterError,
-                message: err.to_string(),
-            }),
+            RequestResult::Err(RpcError::JsonRpcError(BridgeJsonRpcError { message, .. })) => Err(
+                JsonRpcError::CanisterCall(ic_exports::ic_cdk::call::Error::CallRejected(
+                    CallRejected::with_rejection(0, message),
+                )),
+            ),
+            RequestResult::Err(err) => Err(JsonRpcError::CanisterCall(
+                ic_exports::ic_cdk::call::Error::CallRejected(CallRejected::with_rejection(
+                    0,
+                    err.to_string(),
+                )),
+            )),
         }
     }
 }

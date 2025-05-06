@@ -10,11 +10,10 @@ use bitcoin::{FeeRate, Network, PrivateKey, PublicKey};
 use bridge_canister::memory::MEMORY_MANAGER;
 use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
 use bridge_did::init::brc20::Brc20BridgeConfig;
-use bridge_did::schnorr::{SchnorrAlgorithm, SchnorrKeyId};
 use eth_signer::sign_strategy::SigningStrategy;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResponse,
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
+use ic_exports::ic_cdk::management_canister::{
+    EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyResult, SchnorrAlgorithm, SchnorrKeyId,
 };
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::VirtualMemory;
@@ -123,7 +122,7 @@ impl Brc20State {
         self.config
             .get()
             .schnorr_key_id
-            .to_key_id(SchnorrAlgorithm::Bip340Secp256k1)
+            .to_key_id(SchnorrAlgorithm::Bip340secp256k1)
     }
 
     pub fn btc_signer(&self, signing_strategy: &SigningStrategy) -> Option<BtcSignerType> {
@@ -195,7 +194,7 @@ impl Brc20State {
     /// configuration must be set before any of the transactions can be processed.
     pub fn configure_ecdsa(
         &mut self,
-        master_key: EcdsaPublicKeyResponse,
+        master_key: EcdsaPublicKeyResult,
         key_id: EcdsaKeyId,
     ) -> Result<(), String> {
         if master_key.chain_code.len() != 32 {

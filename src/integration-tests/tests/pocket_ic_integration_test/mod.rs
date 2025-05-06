@@ -95,7 +95,7 @@ impl PocketIcTestContext {
         if live {
             // set time and make live
             pocket_ic_instance
-                .set_time(std::time::SystemTime::now())
+                .set_time(std::time::SystemTime::now().into())
                 .await;
             pocket_ic_instance.make_live(None).await;
         }

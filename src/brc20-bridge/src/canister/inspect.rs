@@ -5,8 +5,6 @@ use bridge_canister::runtime::state::SharedConfig;
 #[cfg(feature = "export-api")]
 use bridge_canister::runtime::state::config::ConfigStorage;
 #[cfg(feature = "export-api")]
-use ic_exports::ic_cdk;
-#[cfg(feature = "export-api")]
 use ic_exports::ic_cdk::{api, inspect_message};
 use ic_exports::ic_kit::ic;
 #[cfg(feature = "export-api")]
@@ -16,9 +14,9 @@ use ic_storage::IcStorage;
 #[inspect_message]
 async fn inspect_message() {
     bridge_inspect();
-    inspect_method(&api::call::method_name());
+    inspect_method(&api::msg_method_name());
 
-    api::call::accept_message();
+    api::accept_message();
 }
 
 pub fn inspect_is_owner(config: SharedConfig) {

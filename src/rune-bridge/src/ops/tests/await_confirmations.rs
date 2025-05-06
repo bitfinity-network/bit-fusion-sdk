@@ -1,7 +1,7 @@
 use bridge_did::error::Error;
 use bridge_did::runes::{RuneInfo, RuneToWrap};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
+use ic_exports::ic_cdk::bitcoin_canister::{Outpoint, Utxo};
 use ordinals::Rune;
 use snapbox::{assert_data_eq, str};
 

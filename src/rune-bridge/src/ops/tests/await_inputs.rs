@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bridge_did::error::Error;
 use bridge_did::runes::RuneName;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
+use ic_exports::ic_cdk::bitcoin_canister::{Outpoint, Utxo};
 use snapbox::{assert_data_eq, str};
 
 use crate::core::rune_inputs::mock::TestRuneInputProvider;

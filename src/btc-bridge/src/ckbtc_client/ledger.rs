@@ -1,6 +1,6 @@
 use candid::{Nat, Principal};
 use ic_canister::virtual_canister_call;
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::call::CallResult;
 use ic_exports::icrc_types::icrc1::account::{Account, Subaccount};
 use ic_exports::icrc_types::icrc1::transfer::{TransferArg, TransferError};
 
@@ -13,7 +13,7 @@ impl From<Principal> for CkBtcLedgerClient {
 }
 
 impl CkBtcLedgerClient {
-    pub async fn icrc1_balance_of(&self, account: Account) -> Result<Nat, (RejectionCode, String)> {
+    pub async fn icrc1_balance_of(&self, account: Account) -> CallResult<Nat> {
         virtual_canister_call!(self.0, "icrc1_balance_of", (account,), Nat).await
     }
 
@@ -23,7 +23,7 @@ impl CkBtcLedgerClient {
         amount: Nat,
         fee: Nat,
         from_subaccount: Option<Subaccount>,
-    ) -> Result<Result<Nat, TransferError>, (RejectionCode, String)> {
+    ) -> CallResult<Result<Nat, TransferError>> {
         let args = TransferArg {
             from_subaccount,
             to,

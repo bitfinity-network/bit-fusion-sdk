@@ -16,9 +16,7 @@ use bridge_utils::common::Pagination;
 use candid::Principal;
 use did::H160;
 use ic_canister::{Canister, Idl, PreUpdate, generate_idl, init, post_upgrade, query, update};
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{
-    EcdsaPublicKeyArgument, ecdsa_public_key,
-};
+use ic_exports::ic_cdk::management_canister::{EcdsaPublicKeyArgs, ecdsa_public_key};
 use ic_exports::ledger::Subaccount;
 use ic_log::canister::{LogCanister, LogState};
 use ic_metrics::{Metrics, MetricsStorage};
@@ -140,7 +138,7 @@ impl RuneBridge {
 
         let key_id = get_rune_state().borrow().ecdsa_key_id(&signing_strategy);
 
-        let (master_key,) = ecdsa_public_key(EcdsaPublicKeyArgument {
+        let master_key = ecdsa_public_key(&EcdsaPublicKeyArgs {
             canister_id: None,
             derivation_path: vec![],
             key_id: key_id.clone(),

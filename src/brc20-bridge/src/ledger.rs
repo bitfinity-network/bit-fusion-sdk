@@ -4,7 +4,7 @@ mod utxo_key;
 
 use bitcoin::hashes::Hash;
 use bitcoin::{Address, Txid};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{BTreeMapStructure, MemoryId, MemoryManager, StableBTreeMap};
 use ord_rs::wallet::TxInputInfo;

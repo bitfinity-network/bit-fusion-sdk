@@ -6,8 +6,8 @@ use std::str::FromStr;
 
 use bitcoin::Address;
 use bridge_did::brc20_info::{Brc20Info, Brc20Tick};
-use ic_exports::ic_cdk::api::management_canister::http_request::{
-    CanisterHttpRequestArgument, HttpHeader, HttpMethod, http_request,
+use ic_exports::ic_cdk::management_canister::{
+    HttpHeader, HttpMethod, HttpRequestArgs, http_request,
 };
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
@@ -26,7 +26,6 @@ pub(crate) trait Brc20IndexProvider {
     async fn get_brc20_tokens(&self) -> Result<HashMap<Brc20Tick, Brc20Info>, DepositError>;
 }
 
-const CYCLES_PER_HTTP_REQUEST: u128 = 500_000_000;
 const MAX_RESPONSE_BYTES: u64 = 10_000;
 const HIRO_MAX_LIMIT: u64 = 60;
 
@@ -52,7 +51,7 @@ impl HttpClient for IcHttpClient {
 
         log::trace!("Sending indexer request to: {url}");
 
-        let request_params = CanisterHttpRequestArgument {
+        let request_params = HttpRequestArgs {
             url,
             max_response_bytes: Some(MAX_RESPONSE_BYTES),
             method: HttpMethod::GET,
@@ -64,10 +63,9 @@ impl HttpClient for IcHttpClient {
             transform: None,
         };
 
-        let result = http_request(request_params, CYCLES_PER_HTTP_REQUEST)
+        let result = http_request(&request_params)
             .await
-            .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?
-            .0;
+            .map_err(|err| DepositError::Unavailable(format!("Indexer unavailable: {err:?}")))?;
 
         log::trace!(
             "Indexer responded with: {} {:?} BODY: {}",

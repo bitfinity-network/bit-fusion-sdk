@@ -193,26 +193,30 @@ impl Service {
         request: &str,
         max_response_size: u64,
         cycles: u128,
-    ) -> CallResult<(RequestResult,)> {
-        ic_cdk::api::call::call_with_payment128(
-            self.0,
-            "request",
-            (rpc_service, request, max_response_size),
-            cycles,
-        )
-        .await
+    ) -> CallResult<RequestResult> {
+        let response = ic_cdk::call::Call::unbounded_wait(self.0, "request")
+            .with_args(&(rpc_service, request, max_response_size))
+            .with_cycles(cycles)
+            .await?;
+
+        response
+            .candid_tuple::<(RequestResult,)>()
+            .map_err(ic_exports::ic_cdk::call::Error::from)
+            .map(|(result,)| result)
     }
     pub async fn request_cost(
         &self,
         rpc_service: &RpcService,
         request: &str,
         max_response_size: u64,
-    ) -> CallResult<(RequestCostResult,)> {
-        ic_cdk::call(
-            self.0,
-            "requestCost",
-            (rpc_service, request, max_response_size),
-        )
-        .await
+    ) -> CallResult<RequestCostResult> {
+        let response = ic_cdk::call::Call::unbounded_wait(self.0, "requestCost")
+            .with_args(&(rpc_service, request, max_response_size))
+            .await?;
+
+        response
+            .candid_tuple::<(RequestCostResult,)>()
+            .map_err(ic_exports::ic_cdk::call::Error::from)
+            .map(|(result,)| result)
     }
 }

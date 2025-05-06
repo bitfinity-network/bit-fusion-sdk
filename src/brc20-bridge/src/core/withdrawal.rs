@@ -16,7 +16,7 @@ use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
 use bridge_did::operations::{Brc20WithdrawalPayload, DidTransaction, RevealUtxo};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_exports::ic_kit::ic;
 use ord_rs::fees::estimate_transaction_fees;
 use ord_rs::wallet::{ScriptType, TxInputInfo};
@@ -694,7 +694,7 @@ struct BuildCommitTransactionArgs<'a> {
 mod test {
 
     use bitcoin::PrivateKey;
-    use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Outpoint};
+    use ic_exports::ic_cdk::bitcoin_canister::{GetUtxosResponse, Outpoint};
     use ic_exports::ic_kit::MockContext;
     use ord_rs::constants::POSTAGE;
     use ord_rs::wallet::LocalSigner;

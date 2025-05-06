@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bridge_did::init::IndexerType;
 use clap::{Parser, ValueEnum};
-use ic_exports::ic_cdk::api::management_canister::bitcoin;
+use ic_exports::ic_cdk::bitcoin_canister;
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone)]
@@ -41,7 +41,7 @@ pub enum BitcoinNetwork {
     Regtest,
 }
 
-impl From<BitcoinNetwork> for bitcoin::BitcoinNetwork {
+impl From<BitcoinNetwork> for bitcoin_canister::Network {
     fn from(value: BitcoinNetwork) -> Self {
         match value {
             BitcoinNetwork::Mainnet => Self::Mainnet,

@@ -17,7 +17,6 @@ use bridge_utils::evm_link::address_to_icrc_subaccount;
 use candid::{CandidType, Nat};
 use did::{H160, U256};
 use eth_signer::sign_strategy::TxSigner;
-use ic_exports::ic_kit::RejectionCode;
 use ic_task_scheduler::retry::BackoffPolicy;
 use ic_task_scheduler::scheduler::TaskScheduler;
 use ic_task_scheduler::task::{ScheduledTask, TaskOptions};
@@ -252,7 +251,7 @@ impl IcrcBridgeOpImpl {
                 | e @ IcrcCanisterError::TransferFailed(TransferError::CreatedInFuture { .. })
                 | e @ IcrcCanisterError::TransferFailed(TransferError::TemporarilyUnavailable)
                 | e @ IcrcCanisterError::TransferFailed(TransferError::GenericError { .. })
-                | e @ IcrcCanisterError::CanisterError(RejectionCode::SysTransient, _),
+                | e @ IcrcCanisterError::CanisterError(_),
             ) => {
                 log::warn!("Failed to perform icrc token mint due to: {e}. Retrying...");
                 Err(Error::Custom {

@@ -30,7 +30,7 @@ use eth_signer::ic_sign::SigningKeyId;
 use eth_signer::transaction::{SigningMethod, TransactionBuilder};
 use evm_canister_client::CanisterClient;
 use evm_rpc_canister::EvmRpcCanisterInitData;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
 use ic_exports::icrc_types::icrc::generic_metadata_value::MetadataValue;
 use ic_exports::icrc_types::icrc1::account::Account;
 use ic_exports::icrc_types::icrc1_ledger::{
@@ -448,10 +448,9 @@ where
                 .call_contract_on_evm(evm, wallet, &from_token.clone(), input, 0)
                 .await?;
             let output = results.1.output.unwrap();
-            let decoded_output =
-                WrappedToken::approveCall::abi_decode_returns(&output, true).unwrap();
+            let decoded_output = WrappedToken::approveCall::abi_decode_returns(&output).unwrap();
 
-            assert!(decoded_output._0);
+            assert!(decoded_output);
         }
 
         println!("Burning src tokens using Btfbridge");
@@ -471,8 +470,7 @@ where
 
         if receipt.status != Some(U64::from(1u64)) {
             let decoded_output =
-                BTFBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap(), false)
-                    .unwrap();
+                BTFBridge::burnCall::abi_decode_returns(&receipt.output.clone().unwrap()).unwrap();
             return Err(TestError::Generic(format!(
                 "Burn transaction failed: {decoded_output:?} -- {receipt:?}, -- {}",
                 String::from_utf8_lossy(receipt.output.as_ref().unwrap())
@@ -480,11 +478,10 @@ where
         }
 
         let decoded_output =
-            BTFBridge::burnCall::abi_decode_returns(&dbg!(receipt.output.clone()).unwrap(), true)
+            BTFBridge::burnCall::abi_decode_returns(&dbg!(receipt.output.clone()).unwrap())
                 .unwrap();
 
-        let operation_id = decoded_output._0;
-        Ok((operation_id, tx_hash))
+        Ok((decoded_output, tx_hash))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -561,9 +558,8 @@ where
             .await
             .expect("Failed to get native token balance");
 
-        FeeCharge::nativeTokenBalanceCall::abi_decode_returns(&response, true)
+        FeeCharge::nativeTokenBalanceCall::abi_decode_returns(&response)
             .unwrap()
-            .balance
             .into()
     }
 
@@ -582,12 +578,9 @@ where
             .await?
             .1;
 
-        let new_balance = FeeCharge::nativeTokenDepositCall::abi_decode_returns(
-            receipt.output.as_ref().unwrap(),
-            true,
-        )
-        .unwrap()
-        .balance;
+        let new_balance =
+            FeeCharge::nativeTokenDepositCall::abi_decode_returns(receipt.output.as_ref().unwrap())
+                .unwrap();
 
         Ok(new_balance.into())
     }
@@ -744,9 +737,7 @@ where
             TestError::Generic("No output in receipt".into())
         })?;
 
-        let address = BTFBridge::deployERC20Call::abi_decode_returns(output, true)
-            .unwrap()
-            ._0;
+        let address = BTFBridge::deployERC20Call::abi_decode_returns(output).unwrap();
 
         println!(
             "Deployed Wrapped token on block {} with address {address}",
@@ -941,9 +932,7 @@ where
             )
             .await?;
 
-        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&response, true)
-            .unwrap()
-            ._0;
+        let balance = WrappedToken::balanceOfCall::abi_decode_returns(&response).unwrap();
         Ok(balance.to())
     }
 

@@ -265,9 +265,9 @@ impl BtcBridgeOpImpl {
             .await
         {
             Ok(amount) => amount.0.to_u64().unwrap_or_default(),
-            Err((rejection_code, message)) => {
-                log::error!("Failed to get current ckBTC balance: {rejection_code:?} {message}");
-                return Err(BtcBridgeError::CkBtcLedgerBalance(rejection_code, message).into());
+            Err(err) => {
+                log::error!("Failed to get current ckBTC balance: {err}");
+                return Err(BtcBridgeError::CkBtcLedgerBalance(err.to_string()).into());
             }
         };
 

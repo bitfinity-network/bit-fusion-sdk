@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use bitcoin::hashes::sha256d::Hash;
 use bitcoin::{Address, Amount, OutPoint, TxOut, Txid};
 use bridge_did::runes::RuneInfo;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_exports::ic_kit::ic;
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{BTreeMapStructure, MemoryId, MemoryManager, StableBTreeMap};
@@ -161,7 +161,7 @@ mod tests {
     use std::str::FromStr;
 
     use bridge_did::runes::RuneName;
-    use ic_exports::ic_cdk::api::management_canister::bitcoin::Outpoint;
+    use ic_exports::ic_cdk::bitcoin_canister::Outpoint;
     use ic_exports::ic_kit::MockContext;
     use ordinals::Rune;
 

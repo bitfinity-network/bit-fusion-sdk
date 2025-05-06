@@ -1,7 +1,7 @@
 use bridge_did::order::MintOrder;
 use bridge_did::runes::RuneToWrap;
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use thiserror::Error;
 
 use crate::key::KeyError;

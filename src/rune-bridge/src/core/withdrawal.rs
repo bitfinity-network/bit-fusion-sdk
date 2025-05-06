@@ -8,7 +8,7 @@ use bridge_did::event_data::BurntEventData;
 use bridge_did::id256::Id256;
 use bridge_did::runes::RuneWithdrawalPayload;
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{Outpoint, Utxo};
+use ic_exports::ic_cdk::bitcoin_canister::{Outpoint, Utxo};
 use ic_exports::ic_kit::ic;
 use ord_rs::OrdTransactionBuilder;
 use ord_rs::fees::{EstimateEdictTxFeesArgs, estimate_edict_transaction_fees};
@@ -414,7 +414,7 @@ struct WithdrawalTransactionArgs {
 #[cfg(test)]
 mod test {
     use bitcoin::{Address, FeeRate, PrivateKey, Transaction};
-    use ic_exports::ic_cdk::api::management_canister::bitcoin::GetUtxosResponse;
+    use ic_exports::ic_cdk::bitcoin_canister::GetUtxosResponse;
     use ic_exports::ic_kit::MockContext;
     use ord_rs::wallet::LocalSigner;
 

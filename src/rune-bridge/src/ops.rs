@@ -12,7 +12,7 @@ use bridge_did::operations::{RuneBridgeDepositOp, RuneBridgeOp, RuneBridgeWithdr
 use bridge_did::runes::{DidTransaction, RuneName, RuneToWrap, RuneWithdrawalPayload};
 use candid::{CandidType, Deserialize};
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_task_scheduler::task::TaskOptions;
 use serde::Serialize;
 

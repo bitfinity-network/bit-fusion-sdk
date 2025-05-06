@@ -29,6 +29,7 @@ futures = { workspace = true }
 hex = { workspace = true }
 ic-canister = { workspace = true }
 ic-canister-client = { workspace = true }
+ic-cdk = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true, features = ["canister"] }
 ic-metrics = { workspace = true }

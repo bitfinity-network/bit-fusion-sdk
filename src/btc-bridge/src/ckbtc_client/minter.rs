@@ -1,6 +1,6 @@
 use candid::Principal;
 use ic_canister::virtual_canister_call;
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::call::CallResult;
 use ic_exports::ledger::Subaccount;
 
 use super::interface::{RetrieveBtcArgs, RetrieveBtcError, RetrieveBtcOk};
@@ -23,7 +23,7 @@ impl CkBtcMinterClient {
         &self,
         owner: Principal,
         subaccount: Option<Subaccount>,
-    ) -> Result<Result<Vec<UtxoStatus>, UpdateBalanceError>, (RejectionCode, String)> {
+    ) -> CallResult<Result<Vec<UtxoStatus>, UpdateBalanceError>> {
         let args = UpdateBalanceArgs {
             owner: Some(owner),
             subaccount,
@@ -42,7 +42,7 @@ impl CkBtcMinterClient {
         &self,
         address: String,
         amount: u64,
-    ) -> Result<Result<RetrieveBtcOk, RetrieveBtcError>, (RejectionCode, String)> {
+    ) -> CallResult<Result<RetrieveBtcOk, RetrieveBtcError>> {
         let args = RetrieveBtcArgs { address, amount };
 
         virtual_canister_call!(

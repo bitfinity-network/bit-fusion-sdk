@@ -4,10 +4,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use ::bitcoin::Address;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{
-    self, BitcoinNetwork, GetUtxosRequest, Utxo, UtxoFilter,
-};
-use ic_exports::ic_kit::RejectionCode;
+use ic_exports::ic_cdk::bitcoin_canister::{self, GetUtxosRequest, Network, Utxo, UtxosFilter};
+use ic_exports::ic_cdk::call::CallResult;
 
 use crate::ledger::UtxoKey;
 use crate::state::RuneState;
@@ -69,8 +67,8 @@ impl RemoveUsedUtxosTask {
             let owner_utxos =
                 match Self::get_owner_utxos(&owner, btc_network, min_confirmations).await {
                     Ok(utxos) => utxos,
-                    Err((code, msg)) => {
-                        log::error!("failed to get owner {owner} utxos: {msg} ({code:?})");
+                    Err(e) => {
+                        log::error!("failed to get owner {owner} utxos: {e}");
                         continue;
                     }
                 };
@@ -110,26 +108,25 @@ impl RemoveUsedUtxosTask {
     /// Get all UTXOs owned by the given owner.
     async fn get_owner_utxos(
         owner: &Address,
-        btc_network: BitcoinNetwork,
+        btc_network: Network,
         min_confirmations: u32,
-    ) -> Result<Vec<Utxo>, (RejectionCode, String)> {
+    ) -> CallResult<Vec<Utxo>> {
         log::debug!("getting utxos for owner {owner}");
-        let mut filter = UtxoFilter::MinConfirmations(min_confirmations);
+        let mut filter = UtxosFilter::MinConfirmations(min_confirmations);
         let mut utxos = vec![];
         loop {
-            let response = bitcoin::bitcoin_get_utxos(GetUtxosRequest {
+            let response = bitcoin_canister::bitcoin_get_utxos(&GetUtxosRequest {
                 address: owner.to_string(),
                 network: btc_network,
                 filter: Some(filter),
             })
-            .await
-            .map(|(value,)| value)?;
+            .await?;
 
             utxos.extend(response.utxos);
             match response.next_page {
                 None => break,
                 Some(page) => {
-                    filter = UtxoFilter::Page(page);
+                    filter = UtxosFilter::Page(page);
                 }
             }
         }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use candid::CandidType;
 use did::{H160, H256};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use serde::{Deserialize, Serialize};
 
 use crate::batch_mint_result::BatchMintErrorCode;

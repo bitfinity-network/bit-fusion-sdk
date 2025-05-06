@@ -409,9 +409,8 @@ async fn test_icrc2_tokens_approve_after_mint() {
         .await
         .expect("eth_call failed");
 
-    let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data, true)
+    let allowance: U256 = WrappedToken::allowanceCall::abi_decode_returns(&allowance_data)
         .unwrap()
-        ._0
         .into();
 
     assert_eq!(allowance, approve_amount);

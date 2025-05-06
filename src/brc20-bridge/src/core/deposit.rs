@@ -9,7 +9,7 @@ use bridge_did::id256::Id256;
 use bridge_did::order::{MintOrder, SignedMintOrder};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
+use ic_exports::ic_cdk::bitcoin_canister::{GetUtxosResponse, Utxo};
 use rust_decimal::Decimal;
 use serde::Serialize;
 

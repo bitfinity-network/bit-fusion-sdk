@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use candid::{CandidType, Decode, Encode};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::bitcoin_canister::Network as BitcoinNetwork;
 use ic_stable_structures::Storable;
 use serde::Deserialize;
 

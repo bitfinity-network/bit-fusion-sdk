@@ -3,7 +3,7 @@ use bridge_did::operations::{
     Brc20BridgeWithdrawOp, Brc20WithdrawalPayload, DidTransaction, RevealUtxo,
 };
 use did::H160;
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 
 use super::{Brc20BridgeOp, Brc20BridgeOpImpl};
 use crate::core::withdrawal::{Brc20Transactions, Withdrawal};

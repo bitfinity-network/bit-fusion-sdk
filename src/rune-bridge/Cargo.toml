@@ -21,6 +21,7 @@ did = { workspace = true }
 eth-signer = { workspace = true, features = ["ic_sign"] }
 hex = { workspace = true }
 ic-canister = { workspace = true }
+ic-cdk = { workspace = true }
 ic-exports = { workspace = true, features = ["icrc", "ledger"] }
 ic-log = { workspace = true, features = ["canister"] }
 ic-metrics = { workspace = true }

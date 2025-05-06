@@ -1,6 +1,6 @@
 use bitcoin::PublicKey;
 use bitcoin::bip32::ChainCode;
-use ic_exports::ic_cdk::api::management_canister::ecdsa::{EcdsaCurve, EcdsaKeyId};
+use ic_exports::ic_cdk::management_canister::{EcdsaCurve, EcdsaKeyId};
 use ic_stable_structures::stable_structures::Memory;
 use ic_stable_structures::{CellStructure as _, MemoryId, MemoryManager, StableCell, Storable};
 

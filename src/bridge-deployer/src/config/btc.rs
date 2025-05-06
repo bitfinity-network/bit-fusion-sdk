@@ -1,7 +1,7 @@
 use bridge_did::init::btc::BitcoinConnection;
 use candid::{Deserialize, Principal};
 use clap::{Parser, ValueEnum};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::BitcoinNetwork;
+use ic_exports::ic_cdk::bitcoin_canister;
 use serde::Serialize;
 
 #[derive(Parser, Debug, Serialize, Deserialize, Clone, Copy)]
@@ -46,12 +46,12 @@ impl BtcBridgeConnection {
     }
 }
 
-impl From<BtcNetwork> for BitcoinNetwork {
+impl From<BtcNetwork> for bitcoin_canister::Network {
     fn from(value: BtcNetwork) -> Self {
         match value {
-            BtcNetwork::Mainnet => BitcoinNetwork::Mainnet,
-            BtcNetwork::Testnet => BitcoinNetwork::Testnet,
-            BtcNetwork::Regtest => BitcoinNetwork::Regtest,
+            BtcNetwork::Mainnet => bitcoin_canister::Network::Mainnet,
+            BtcNetwork::Testnet => bitcoin_canister::Network::Testnet,
+            BtcNetwork::Regtest => bitcoin_canister::Network::Regtest,
         }
     }
 }

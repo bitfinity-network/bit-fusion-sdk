@@ -778,10 +778,8 @@ async fn create_token(args: CreateTokenArgs) {
         &receipt
             .output
             .expect("Receipt for token creation does not contain output"),
-        true,
     )
-    .expect("Failed to decode token creation output")
-    ._0;
+    .expect("Failed to decode token creation output");
 
     eprintln!("Created token contract");
     println!("{:#x}", token_address);

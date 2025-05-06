@@ -13,7 +13,7 @@ use bridge_did::order::{MintOrder, SignedMintOrder};
 use bridge_did::runes::{RuneInfo, RuneName, RuneToWrap};
 use candid::{CandidType, Deserialize};
 use did::{H160, H256};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::{GetUtxosResponse, Utxo};
+use ic_exports::ic_cdk::bitcoin_canister::{GetUtxosResponse, Utxo};
 use serde::Serialize;
 
 use super::index_provider::get_indexer;

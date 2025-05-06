@@ -3,7 +3,7 @@
 //! a breaking change in these types.
 
 use candid::{CandidType, Deserialize, Principal};
-use ic_exports::ic_cdk::api::management_canister::bitcoin::Utxo;
+use ic_exports::ic_cdk::bitcoin_canister::Utxo;
 use ic_exports::ledger::Subaccount;
 use serde::Serialize;
 

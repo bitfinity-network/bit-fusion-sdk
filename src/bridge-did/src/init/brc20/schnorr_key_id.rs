@@ -1,7 +1,6 @@
 use candid::CandidType;
+use ic_exports::ic_cdk::management_canister::{SchnorrAlgorithm, SchnorrKeyId};
 use serde::Deserialize;
-
-use crate::schnorr::{SchnorrAlgorithm, SchnorrKeyId};
 
 /// Schnorr key IDs
 #[derive(Debug, Clone, PartialEq, Eq, CandidType, Deserialize)]

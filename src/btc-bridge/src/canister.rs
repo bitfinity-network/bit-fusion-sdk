@@ -157,7 +157,7 @@ impl BtcBridge {
     pub fn inspect_caller_is_owner() -> BTFResult<()> {
         let owner = ConfigStorage::get().borrow().get_owner();
 
-        if ic_cdk::caller() == owner {
+        if ic_cdk::api::msg_caller() == owner {
             Ok(())
         } else {
             Err(bridge_did::error::Error::AccessDenied)
